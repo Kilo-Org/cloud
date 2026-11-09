@@ -13,7 +13,6 @@ from types import SimpleNamespace
 import unittest
 from unittest import mock
 import urllib.error
-import urllib.request
 from test_router_ledger import SYNTHETIC_ADDITIONAL, SYNTHETIC_BASELINE, empty_campaign, prospective_campaign
 
 HERE = Path(__file__).resolve().parent
@@ -31,14 +30,10 @@ def load_study():
     return study
 
 
-def classifier_evidence(prompt="0.000000042", completion="0", context=262144):
-    return {"requested_model": "~typesafe/jev-latest", "resolved_model": "typesafe/jev-1.13", "alias_resolution": {"source": "fixture"}, "endpoints": {"fetched_at": time.time(), "body": {"data": {"id": "typesafe/jev-1.13", "endpoints": [{"context_length": context, "pricing": {"prompt": prompt, "completion": completion}}]}}}}
-
-
 def arms_spec(fixed=None):
     """Synthetic v5 arm/objective fixture pieces."""
     fixed = fixed or {mode: [{"model": "x/y", "variant": "variant=low"}] for mode in ("efficient", "frontier")}
-    return {"fixed_models": fixed, "control": {"seed": "control-seed", "distribution": {mode: [{"model": fixed[mode][0]["model"], "variant": fixed[mode][0]["variant"], "weight": "1"}] for mode in fixed}, "cost_matching": {"criterion": "total-cost-ratio-vs-reference", "reference_arm": "candidate", "tolerance_fraction": "0.1"}}, "objectives": {"efficient": {"kind": "efficient-minimize-cost-preserve-success", "success_floor": {"type": "baseline-relative"}}, "frontier": {"kind": "frontier-maximize-success-within-cost", "cost_budget": {"type": "comparator-relative"}}}, "pilot_cap_usd": "60"}
+    return {"fixed_models": fixed, "control": {"seed": "control-seed", "distribution": {mode: [{"model": fixed[mode][0]["model"], "variant": fixed[mode][0]["variant"], "weight": "1"}] for mode in fixed}, "cost_matching": {"criterion": "total-cost-ratio-vs-reference", "reference_arm": "router", "tolerance_fraction": "0.1"}}, "objectives": {"efficient": {"kind": "efficient-minimize-cost-preserve-success", "success_floor": {"type": "comparator-relative"}}, "frontier": {"kind": "frontier-maximize-success-within-cost", "cost_budget": {"type": "comparator-relative"}}}, "pilot_cap_usd": "60"}
 
 
 def task_expectations(instance="task"):
@@ -47,19 +42,6 @@ def task_expectations(instance="task"):
 
 def complete_grade(resolved):
     return {"resolved": resolved, "patch_successfully_applied": True, "tests_status": {"FAIL_TO_PASS": {"success": ["test_fix"] if resolved else [], "failure": [] if resolved else ["test_fix"]}, "PASS_TO_PASS": {"success": ["test_retained"], "failure": []}}}
-
-
-class FakeResponse:
-    def __init__(self, body, status=200):
-        self.status_code = status
-        self.headers = {"Content-Type": "application/json"}
-        self.body = json.dumps(body).encode()
-
-    def iter_content(self, chunk_size):
-        yield self.body
-
-    def close(self):
-        pass
 
 
 class VariantResolution(unittest.TestCase):
@@ -77,75 +59,106 @@ class VariantResolution(unittest.TestCase):
         self.assertEqual(router_study.table_pairs(table), {("x/y", "variant=low"), ("x/y", "variant=max"), ("x/y", "variant=high"), ("z/w", "variant=low"), ("fallback/model", "effort=low"), ("z/w", "effort=high")})
 
 
-class ClassifierQuote(unittest.TestCase):
-    def test_finances_full_context_plus_fee_for_every_attempt(self):
-        quote = router_study.classifier_quote(classifier_evidence(), "~typesafe/jev-latest", Decimal("0.06"))
-        self.assertEqual(Decimal(quote["attempt_bound_usd"]), Decimal("0.000000042") * 262144 * Decimal("1.06"))
-        self.assertEqual(quote["context_tokens"], 262144)
-
-    def test_rejects_paid_output_and_requested_model_drift(self):
-        with self.assertRaises(ValueError):
-            router_study.classifier_quote(classifier_evidence(completion="0.000001"), "~typesafe/jev-latest", Decimal("0.06"))
-        with self.assertRaises(ValueError):
-            router_study.classifier_quote(classifier_evidence(), "typesafe/jev-1.13", Decimal("0.06"))
-
-
 class SolverAvailability(unittest.TestCase):
     def test_coverage_allows_only_recorded_unavailable_reachable_pairs(self):
         expected = [["qwen/flash", "variant=thinking"], ["x/y", "variant=low"]]
         pricing = {"models": [{"model": "x/y", "effort": "variant=low"}]}
-        unavailable = [{"model": "qwen/flash", "effort": "variant=thinking", "reason": router_study.ENDPOINT_UNAVAILABLE, "at": time.time()}]
+        unavailable = [{"model": "qwen/flash", "effort": "variant=thinking", "reason": router_study.MODEL_UNAVAILABLE, "at": time.time()}]
         self.assertEqual(router_study.pricing_coverage(pricing, unavailable, expected), {("qwen/flash", "variant=thinking")})
         for invalid in ([], unavailable * 2, [{**unavailable[0], "model": "foreign/model"}], [{**unavailable[0], "reason": "authentication failed"}]):
             with self.subTest(unavailable=invalid), self.assertRaises(ValueError):
                 router_study.pricing_coverage(pricing, invalid, expected)
 
-    def test_quote_continues_only_for_exact_endpoint_availability_error(self):
+    def test_quote_continues_only_for_exact_model_availability_error(self):
         with tempfile.TemporaryDirectory() as temporary:
             out = Path(temporary)
-            evidence = out / "evidence.json"
-            evidence.write_text("{}")
-            manifest = {"spec": {"classifier_fee_fraction": "0.06"}, "approval": {"model_variants": [["qwen/flash", "variant=thinking"], ["x/y", "variant=low"]], "classifier_model": "classifier"}}
+            manifest = {"spec": {"classifier_allowance_usd": "0.01"}, "approval": {"model_variants": [["qwen/flash", "variant=thinking"], ["x/y", "variant=low"]], "classifier_model": "typesafe/jev-1.13"}}
             seen = []
             def catalog(folder, *, cfg):
                 candidate, = cfg["candidates"]
                 seen.append((candidate["model"], candidate["effort"]))
-                body = {"data": {"id": candidate["model"], "endpoints": []}}
-                router_study.frozen_write(folder / "pricing-endpoints" / f"{router_study.digest(body)}.json", {"body": body})
+                router_study.frozen_write(folder / "catalog-snapshot.json", {"entries": {candidate["model"]: None}})
+                endpoint = {"source": "fixture", "fetched_at": time.time(), "body": {"data": {"id": candidate["model"], "endpoints": []}}}
+                endpoint["body_sha256"] = router_study.digest(endpoint["body"])
+                router_study.frozen_write(folder / "pricing-endpoints" / f"{endpoint['body_sha256']}.json", endpoint)
                 if candidate["model"] == "qwen/flash":
-                    raise RuntimeError(router_study.ENDPOINT_UNAVAILABLE)
-                router_study.frozen_write(folder / "pricing.json", {"models": [candidate], "fetched_at": time.time()})
-            modules = {"study": SimpleNamespace(catalog=catalog, FINANCIAL_QUOTE_POLICY="fixture"), "parity": SimpleNamespace(scheduled_tier_pricing=nullcontext)}
-            classifier = {"attempt_bound_usd": "0.01"}
+                    raise RuntimeError(router_study.MODEL_UNAVAILABLE)
+                router_study.frozen_write(folder / "pricing.json", {"models": [{**candidate, "financial_quote": {"fixture": True}}], "fetched_at": time.time()})
+            def classifier_quote(folder, model):
+                seen.append((model, "classifier"))
+                endpoint = {"source": "fixture", "fetched_at": time.time(), "body": {"data": {"id": model, "endpoints": []}}}
+                endpoint["body_sha256"] = router_study.digest(endpoint["body"])
+                router_study.frozen_write(folder / "pricing-endpoints" / f"{endpoint['body_sha256']}.json", endpoint)
+                return {"model": model, "financial_quote": {"fixture": True}, "quote_fetched_at": time.time()}
+            modules = {"study": SimpleNamespace(catalog=catalog, classifier_quote=classifier_quote, FINANCIAL_QUOTE_POLICY="fixture", KILO_CATALOG_URL="https://app.kilo.ai/api/openrouter/models")}
             def read_quote(out, batch, manifest, modules):
-                return router_study.load(out / "quotes" / batch / "pricing.json"), classifier
-            with mock.patch.object(router_study, "validate", return_value=(manifest, None, None)), mock.patch.object(router_study, "solver_cfg", return_value={}), mock.patch.object(router_study, "classifier_quote", return_value=classifier), mock.patch.object(router_study, "read_quote", side_effect=read_quote):
-                result = router_study.quote(out, out, out, modules, "batch", evidence)
+                return router_study.load(out / "quotes" / batch / "pricing.json")
+            with mock.patch.object(router_study, "validate", return_value=(manifest, None, None)), mock.patch.object(router_study, "solver_cfg", return_value={}), mock.patch.object(router_study, "read_quote", side_effect=read_quote), mock.patch.object(router_study.text_tariffs, "classifier_allowance_bound", return_value=Decimal("0.005")):
+                result = router_study.quote(out, out, out, modules, "batch")
             unavailable = router_study.load(out / "quotes/batch/unavailable-pairs.json")
-            self.assertEqual(seen, [("qwen/flash", "variant=thinking"), ("x/y", "variant=low")])
+            self.assertEqual(seen, [("qwen/flash", "variant=thinking"), ("x/y", "variant=low"), ("typesafe/jev-1.13", "classifier")])
             self.assertEqual(result["unavailable_pairs_sha256"], router_study.digest(unavailable))
+            self.assertEqual(result["classifier_allowance_usd"], "0.01")
+            self.assertEqual(result["classifier_allowance_bound_usd"], "0.005")
             self.assertEqual([item["model"] for item in router_study.load(out / "quotes/batch/pricing.json")["models"]], ["x/y"])
+            self.assertTrue((out / "quotes/batch/catalog-snapshots/pair-000.json").is_file())
+            self.assertTrue(list((out / "quotes/batch/pricing-endpoints").glob("*.json")))
             modules["study"].catalog = mock.Mock(side_effect=RuntimeError("authentication failed"))
             with mock.patch.object(router_study, "validate", return_value=(manifest, None, None)), mock.patch.object(router_study, "solver_cfg", return_value={}), self.assertRaisesRegex(RuntimeError, "authentication failed"):
-                router_study.quote(out, out, out, modules, "bad", evidence)
+                router_study.quote(out, out, out, modules, "bad")
 
-    def test_recorded_unavailable_selection_never_constructs_or_calls_paid_model(self):
+    def test_unquotable_pool_model_blocks_router_arm_before_paid_model(self):
         with tempfile.TemporaryDirectory() as temporary:
             model = router_study.RoutedModel.__new__(router_study.RoutedModel)
             model.out, model.run = Path(temporary), "run"
-            model.pricing, model.models = {}, {}
-            model.unavailable = {("qwen/flash", "variant=thinking")}
-            model.route = lambda messages: ("qwen/flash", "variant=thinking")
+            model.row = {"router": "efficient"}
+            model.deadline = time.monotonic() + 60
+            model.cfg = {"router_phase": "final"}
+            model.budget = SimpleNamespace(stopped=lambda phase: [])
+            model.pricing = {"models": [{"model": "x/y", "effort": "variant=low", "context_length": 1000, "financial_quote": {}}], "unavailable_pairs": [{"model": "qwen/flash", "effort": "variant=thinking"}]}
+            model.pool = [("x/y", "variant=low"), ("qwen/flash", "variant=thinking")]
+            model.pair = ("kilo-auto/efficient", "effort=")
+            model.model = None
             paid = mock.Mock()
             model.modules = {"study": SimpleNamespace(save=router_study.frozen_write, paid_model=paid)}
-            with self.assertRaisesRegex(router_study.ProviderUnavailable, "qwen/flash"):
+            with self.assertRaisesRegex(RuntimeError, "every pool pair"):
                 model.query([])
             paid.assert_not_called()
-            self.assertEqual(router_study.load(model.out / "rollouts/run/provider-unavailable.json")["effort"], "variant=thinking")
-            model.unavailable.clear()
-            with self.assertRaisesRegex(RuntimeError, "outside the frozen"):
-                model.query([])
-            paid.assert_not_called()
+            self.assertFalse((model.out / "rollouts/run/provider-unavailable.json").exists())
+
+    def test_allowance_below_computed_bound_is_rejected_at_read_quote(self):
+        study = load_study()
+        tariffs = router_study.text_tariffs
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            folder = out / "quotes" / "batch"
+            cfg = {"max_input_tokens": 100, "max_output_tokens": 10, "variant_catalog": {}}
+            endpoints = [{"tag": "fixture", "status": 0, "context_length": 100000, "supported_parameters": ["reasoning", "max_tokens"], "pricing": {"prompt": "0.001", "completion": "0"}}]
+            body = {"data": {"id": "typesafe/jev-1.13", "endpoints": endpoints}}
+            financial = {**tariffs.classifier_endpoint_quote("typesafe/jev-1.13", endpoints), "endpoint_snapshot_sha256": router_study.digest(body)}
+            candidate = {"model": "typesafe/jev-1.13", "financial_quote": financial, "quote_fetched_at": time.time()}
+            router_study.frozen_write(folder / "pricing-endpoints" / f"{router_study.digest(body)}.json", {"source": "fixture", "fetched_at": time.time(), "body_sha256": router_study.digest(body), "body": body})
+            router_study.frozen_write(folder / "classifier-quote.json", candidate)
+            router_study.frozen_write(folder / "pricing.json", {"fetched_at": time.time(), "models": [], "unavailable_pairs": []})
+            router_study.frozen_write(folder / "unavailable-pairs.json", [])
+            bound = tariffs.classifier_allowance_bound(financial)
+            self.assertGreater(bound, Decimal("0.01"))
+            manifest = {"spec": {"classifier_allowance_usd": "0.01"}, "approval": {"model_variants": [], "classifier_model": "typesafe/jev-1.13"}}
+            modules = {"study": study}
+            with mock.patch.object(router_study, "solver_cfg", return_value=cfg), self.assertRaisesRegex(ValueError, "below the computed dearest-price bound"):
+                router_study.read_quote(out, "batch", manifest, modules)
+            manifest["spec"]["classifier_allowance_usd"] = str(bound)
+            with mock.patch.object(router_study, "solver_cfg", return_value=cfg):
+                self.assertEqual(router_study.read_quote(out, "batch", manifest, modules)["models"], [])
+
+    def test_classifier_model_reads_frozen_baseline_kv(self):
+        override = {"baseline": {"kv": {"classifier_model": "custom/classifier-x"}}, "candidate": {"kv": {}}}
+        self.assertEqual(router_study.classifier_model(override), "custom/classifier-x")
+        winner = {"baseline": {"kv": {"classifier_system_one_winner": json.dumps({"model": "winner/model"})}}, "candidate": {"kv": {}}}
+        self.assertEqual(router_study.classifier_model(winner), "winner/model")
+        self.assertEqual(router_study.classifier_model({"baseline": {"kv": {}}}), router_study.DEFAULT_CLASSIFIER_MODEL)
+        with self.assertRaises(ValueError):
+            router_study.classifier_model({"baseline": {}})
 
     def test_provider_outage_does_not_override_unknown_charge_status(self):
         result = {"exit_status": "ProviderUnavailable"}
@@ -187,6 +200,46 @@ class ArmExecution(unittest.TestCase):
             with self.assertRaises(router_study.ProviderUnavailable):
                 model.query([])
             paid.assert_not_called()
+
+    def test_router_arm_dispatches_live_gateway_model_with_worst_case_quote(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            tariffs = router_study.text_tariffs
+            cfg = {"router_phase": "final", "max_input_tokens": 100, "max_output_tokens": 10, "kilo_organization_id": "123e4567-e89b-12d3-a456-426614174000", "classifier_allowance_usd": "0.01", "variant_catalog": {"x/y": {"low": {"reasoning": {"effort": "low"}}}}}
+            entry = {"id": "x/y", "context_length": 1000, "supported_parameters": ["reasoning", "max_tokens"], "architecture": {"output_modalities": ["text"]}, "pricing": {"prompt": "0.000001", "completion": "0.000002"}}
+            endpoints = [{"tag": "fixture", "status": 0, "context_length": 1000, "supported_parameters": ["reasoning", "max_tokens"], "pricing": {"prompt": "0.000001", "completion": "0.000002"}}]
+            quote = tariffs.catalog_quote(entry, {**cfg, "candidate": {"model": "x/y", "effort": "variant=low"}}, endpoints=endpoints)
+            pricing = {"models": [{"model": "x/y", "effort": "variant=low", "context_length": 1000, "financial_quote": quote, "quote_fetched_at": time.time()}], "unavailable_pairs": []}
+            model = router_study.RoutedModel.__new__(router_study.RoutedModel)
+            model.out, model.run = Path(temporary), "run"
+            model.row = {"router": "frontier"}
+            model.deadline = time.monotonic() + 60
+            model.cfg = cfg
+            model.budget = SimpleNamespace(stopped=lambda phase: [], reserve=mock.Mock(), admission=mock.Mock(), guard=mock.Mock())
+            model.pricing, model.pool = pricing, [("x/y", "variant=low")]
+            model.pair = ("kilo-auto/frontier", "effort=")
+            model.model = None
+            solver = SimpleNamespace(query=mock.Mock(return_value={"ok": True}))
+            paid = mock.Mock(return_value=solver)
+            model.modules = {"study": SimpleNamespace(paid_model=paid, save=router_study.frozen_write), "census": SimpleNamespace(NativeInputBound=mock.Mock())}
+            self.assertEqual(model.query([]), {"ok": True})
+            candidate = paid.call_args.args[2]
+            self.assertEqual(candidate["model"], "kilo-auto/frontier")
+            self.assertEqual(candidate["financial_quote"]["classifier_allowance_usd"], "0.01")
+            self.assertEqual(candidate["financial_quote"]["candidate"], {"model": "kilo-auto/frontier", "effort": "effort="})
+            self.assertEqual(candidate["pool_models"], ["x/y"])
+            self.assertEqual(candidate["context_length"], 1000)
+            _, kwargs = paid.call_args
+            self.assertEqual((kwargs["reservation"], kwargs["transport_admission"], kwargs["state_guard"]), (model.budget.reserve, model.budget.admission, model.budget.guard))
+
+    def test_one_live_router_arm_per_mode_in_plan(self):
+        spec = {"experiment_id": "paired", "seed": "s", "repetitions": 2, "tasks": {"tuning": ["a"], "final": ["f"]}, "configurations": [{"id": "c1", "router": "efficient"}, {"id": "c2", "router": "frontier"}], **arms_spec()}
+        arms = router_study.arm_definitions(spec)
+        for mode in ("efficient", "frontier"):
+            router_arms = [arm for arm in arms[mode] if arm["arm_kind"] == "router"]
+            self.assertEqual(len(router_arms), 1)
+            self.assertEqual(router_arms[0]["arm_id"], "router")
+        plan = router_study.make_plan(spec, {task: {"repo": "r"} for task in ("a", "f")})
+        self.assertEqual({row["version"] for row in plan["runs"] if row["arm_kind"] == "router"}, {"router"})
 
     def test_selected_rows_never_drops_mandatory_final_arms(self):
         spec = {"experiment_id": "paired", "seed": "s", "repetitions": 2, "tasks": {"tuning": ["a"], "final": ["f"]}, "configurations": [{"id": "c1", "router": "efficient"}, {"id": "c2", "router": "frontier"}], **arms_spec()}
@@ -276,7 +329,7 @@ class LedgerBoundaries(unittest.TestCase):
         with self.assertRaises(ValueError):
             router_study.clear_stop(self.out, "not yet accounted", {"study": self.study})
         evidence = self.out / "lookup.json"
-        evidence.write_text(json.dumps({"url": "https://openrouter.ai/api/v1/generation?id=gen-fixture", "http_status": 404, "body": {"error": "not found"}}))
+        evidence.write_text(json.dumps({"gateway_request_id": "gen-fixture", "http_status": 404, "body": {"error": "not found"}}))
         router_study.account_unknown(self.out, request, evidence, {"study": self.study})
         rows, _, _ = self.rows()
         self.assertEqual((rows[0]["state"], rows[0]["actual"], rows[0]["bound"]), ("accounted_unknown", None, "1"))
@@ -295,7 +348,7 @@ class LedgerBoundaries(unittest.TestCase):
     def test_account_unknown_copies_the_exact_bytes_that_were_hashed(self):
         request = self.unknown_request()
         evidence_path = self.out / "lookup.json"
-        original = json.dumps({"url": "https://openrouter.ai/api/v1/generation?id=gen-fixture", "http_status": 404, "body": {"error": "not found"}}).encode()
+        original = json.dumps({"gateway_request_id": "gen-fixture", "http_status": 404, "body": {"error": "not found"}}).encode()
         evidence_path.write_bytes(original)
         writer = router_study.frozen_bytes
 
@@ -316,9 +369,9 @@ class LedgerBoundaries(unittest.TestCase):
         cause = self.unknown_request("cause")
         model = router_study.RoutedModel.__new__(router_study.RoutedModel)
         model.out, model.run, model.cfg = self.out, "sibling", self.cfg
-        model.deadline, model.budget = time.monotonic() + 60, self.budget
+        model.deadline, model.budget, model.model = time.monotonic() + 60, self.budget, None
         with self.assertRaises(self.study.BudgetLimited):
-            model.route([])
+            model.query([])
         with self.assertRaises(self.study.BudgetLimited):
             self.budget.reserve(self.out, "sibling", Decimal("0.2"), 1, cfg=self.cfg, ledger_out=self.out)
         with self.assertRaises(self.study.BudgetLimited):
@@ -328,7 +381,7 @@ class LedgerBoundaries(unittest.TestCase):
         self.assertEqual(len(events), 3)
         self.assertTrue(all("recorded_stop" in event["caps"] for event in events))
         evidence = self.out / "lookup.json"
-        evidence.write_text(json.dumps({"url": "https://openrouter.ai/api/v1/generation?id=gen-fixture", "http_status": 404, "body": {}}))
+        evidence.write_text(json.dumps({"gateway_request_id": "gen-fixture", "http_status": 404, "body": {}}))
         router_study.account_unknown(self.out, cause, evidence, {"study": self.study})
         router_study.clear_stop(self.out, "Retain full unknown hold", {"study": self.study})
         self.assertFalse(self.budget.stopped("tuning"))
@@ -341,7 +394,7 @@ class LedgerBoundaries(unittest.TestCase):
     def test_account_unknown_rejects_wrong_generation_evidence_and_breach(self):
         request = self.unknown_request()
         evidence = self.out / "lookup.json"
-        evidence.write_text(json.dumps({"url": "https://openrouter.ai/api/v1/generation?id=other", "http_status": 404, "body": {}}))
+        evidence.write_text(json.dumps({"gateway_request_id": "other", "http_status": 404, "body": {}}))
         with self.assertRaises(ValueError):
             router_study.account_unknown(self.out, request, evidence, {"study": self.study})
         with sqlite3.connect(self.ledger) as db:
@@ -376,8 +429,9 @@ class LedgerBoundaries(unittest.TestCase):
             db.execute("UPDATE requests SET state='unknown' WHERE id=?", (request,))
         model = router_study.RoutedModel.__new__(router_study.RoutedModel)
         model.out, model.run = self.out, "run"
-        model.route = lambda messages: pair
-        model.models = {pair: SimpleNamespace(query=mock.Mock(side_effect=urllib.error.HTTPError("https://openrouter.ai/api/v1/chat/completions", 404, "No endpoints found", None, None)))}
+        model.deadline, model.cfg, model.budget = time.monotonic() + 60, self.cfg, automatic
+        model.pair = pair
+        model.model = SimpleNamespace(query=mock.Mock(side_effect=urllib.error.HTTPError("https://ai-gateway.kilo.ai/api/v1/chat/completions", 404, "No endpoints found", None, None)))
         model.modules = {"study": self.study}
         with self.assertRaisesRegex(router_study.ProviderUnavailable, "HTTP404"):
             model.query([])
@@ -411,7 +465,7 @@ class LedgerBoundaries(unittest.TestCase):
         receipt.update(provider_generation_id=generation, http_status=200, response=None)
         self.study.save(receipt_path, receipt)
         evidence = self.out / "lookup.json"
-        evidence.write_text(json.dumps({"url": "https://openrouter.ai/api/v1/generation?id=" + generation, "http_status": 404, "body": {"error": "not found"}}))
+        evidence.write_text(json.dumps({"gateway_request_id": generation, "http_status": 404, "body": {"error": "not found"}}))
         router_study.account_unknown(self.out, request, evidence, {"study": self.study})
         rows, _, _ = self.rows()
         self.assertEqual((rows[0]["state"], rows[0]["actual"], rows[0]["bound"]), ("accounted_unknown", None, "1"))
@@ -491,8 +545,10 @@ class LedgerBoundaries(unittest.TestCase):
             self.assertFalse(db.execute("SELECT 1 FROM router_accounting").fetchone())
 
     def test_generation_fallback_cannot_replace_invalid_primary_or_use_arbitrary_fields(self):
+        self.assertEqual(router_study.receipt_generation({"gateway_request_id": "req-1", "generation_id": "gen-1"}), ("req-1", "gateway_request_id"))
+        self.assertEqual(router_study.receipt_generation({"gateway_request_id": None, "generation_id": "gen-1"}), ("gen-1", "generation_id"))
         self.assertEqual(router_study.receipt_generation({"provider_generation_id": "gen-provider"}), ("gen-provider", "provider_generation_id"))
-        self.assertIsNone(router_study.receipt_generation({"generation_id": "invalid", "provider_generation_id": "gen-provider"})[0])
+        self.assertIsNone(router_study.receipt_generation({"generation_id": "bad id!", "provider_generation_id": "gen-provider"})[0])
         self.assertIsNone(router_study.receipt_generation({"some_other_generation_id": "gen-other"})[0])
 
     def test_concurrent_process_reservations_never_exceed_aggregate_cap(self):
@@ -537,109 +593,6 @@ print(admitted)
         self.assertEqual(len(rows), 250)
         self.assertEqual(sum((self.study.held_cost(row) for row in rows), Decimal(0)), Decimal("250"))
         self.assertEqual(len(kinds), 250)
-
-    def broker_post(self, broker, run):
-        request = urllib.request.Request(broker.url + "/api/v1/systemone", data=json.dumps({"model": "~typesafe/jev-latest", "state": {}, "questions": []}).encode(), headers={"Content-Type": "application/json", "X-Benchmark-Run": run})
-        try:
-            with urllib.request.urlopen(request, timeout=10) as response:
-                return response.status, response.read()
-        except urllib.error.HTTPError as error:
-            return error.code, error.read()
-
-    def test_broker_reserves_before_dispatch_and_settles_byok_fee_plus_upstream(self):
-        quote = router_study.classifier_quote(classifier_evidence(), "~typesafe/jev-latest", Decimal("0.06"))
-        body = {"model": "typesafe/jev-1.13", "answers": [1], "usage": {"cost": 0.00005, "is_byok": True, "cost_details": {"upstream_inference_cost": 0.001}, "input_tokens": 900, "output_tokens": 3}}
-        seen = []
-
-        def transport(url, **options):
-            rows, _, _ = self.rows()
-            seen.append(([row["state"] for row in rows], url, options["headers"]["Authorization"]))
-            return FakeResponse(body)
-
-        self.activate("run-a")
-        self.budget.active["run-a"] = (self.cfg, time.monotonic() + 60)
-        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "host-only-test-key"}), router_study.ClassifierBroker(self.budget, quote, self.out, transport=transport) as broker:
-            status, returned = self.broker_post(broker, "run-a")
-        self.assertEqual((status, json.loads(returned)), (200, body))
-        self.assertEqual(seen, [(["reserved"], "https://openrouter.ai/api/v1/systemone", "Bearer host-only-test-key")])
-        rows, kinds, stops = self.rows()
-        self.assertEqual((rows[0]["state"], Decimal(rows[0]["actual"]), rows[0]["tokens"], kinds[rows[0]["id"]], stops), ("settled", Decimal("0.00105"), 903, "classifier", []))
-        self.assertNotIn("host-only-test-key", Path(rows[0]["receipt"]).read_text())
-
-    def test_unknown_classifier_charge_holds_bound_and_stops_all_dispatch(self):
-        quote = router_study.classifier_quote(classifier_evidence(), "~typesafe/jev-latest", Decimal("0.06"))
-        self.activate("run-a")
-        self.budget.active["run-a"] = (self.cfg, time.monotonic() + 60)
-        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "host-only-test-key"}), router_study.ClassifierBroker(self.budget, quote, self.out, transport=lambda url, **options: FakeResponse({"error": {"message": "overloaded"}}, 503)) as broker:
-            status, _ = self.broker_post(broker, "run-a")
-            unknown_run_status, _ = self.broker_post(broker, "run-unknown")
-        rows, _, stops = self.rows()
-        self.assertEqual((status, unknown_run_status, len(rows), rows[0]["state"], Decimal(rows[0]["bound"])), (503, 503, 1, "unknown", Decimal(quote["attempt_bound_usd"])))
-        self.assertTrue(stops)
-        with self.assertRaises(self.study.BudgetLimited):
-            self.budget.reserve(self.out, "run-a", Decimal("0.01"), 1, cfg=self.cfg, ledger_out=self.out)
-
-    def test_classifier_ambiguous_billing_retains_full_holds_and_known_charge_floors(self):
-        quote = router_study.classifier_quote(classifier_evidence(), "~typesafe/jev-latest", Decimal("0.06"))
-        cases = [({}, "unknown", None, Decimal(0)), ({"is_byok": None}, "unknown", None, Decimal(0)), ({"is_byok": "false"}, "unknown", None, Decimal(0)), ({"is_byok": 0}, "unknown", None, Decimal(0)), ({"is_byok": True}, "unknown", None, Decimal(0)), ({"is_byok": True, "cost": "2"}, "breach", None, Decimal("2")), ({"is_byok": False, "cost": 0}, "settled", Decimal(0), Decimal(0))]
-        for update, state, actual, floor in cases:
-            with self.subTest(update=update), tempfile.TemporaryDirectory() as temporary:
-                out = Path(temporary)
-                ledger = out / "budget.sqlite"
-                ledger.symlink_to(empty_campaign(out))
-                budget = router_study.Budget(ledger, {"study": self.study}, "100")
-                with sqlite3.connect(ledger) as db:
-                    db.execute("INSERT INTO router_runs VALUES ('run','tuning','active',0)")
-                budget.active["run"] = (self.cfg, time.monotonic() + 60)
-                body = {"model": "typesafe/jev-1.13", "usage": {"cost": 0.00005, "input_tokens": 1, "output_tokens": 0, **update}}
-                with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "fixture-only"}), router_study.ClassifierBroker(budget, quote, out, transport=lambda url, **options: FakeResponse(body)) as broker:
-                    status, _ = self.broker_post(broker, "run")
-                with sqlite3.connect(ledger) as db:
-                    row, = self.study.request_rows(db)
-                self.assertEqual((status, row["state"], None if row["actual"] is None else Decimal(row["actual"])), (200 if state == "settled" else 503, state, actual))
-                self.assertEqual(Decimal(row["bound"]), max(Decimal(quote["attempt_bound_usd"]), floor))
-                self.assertEqual(bool(budget.stopped("tuning")), state != "settled")
-
-    def test_auto_policy_still_stops_classifier_transport_without_response(self):
-        quote = router_study.classifier_quote(classifier_evidence(), "~typesafe/jev-latest", Decimal("0.06"))
-        self.activate("run-a")
-        self.budget.active["run-a"] = ({**self.cfg, "unknown_charge_policy": "account-full-bound-abort-run"}, time.monotonic() + 60)
-        def failed_transport(url, **options):
-            raise ConnectionError("No response")
-        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "host-only-test-key"}), router_study.ClassifierBroker(self.budget, quote, self.out, transport=failed_transport) as broker:
-            status, _ = self.broker_post(broker, "run-a")
-        rows, _, stops = self.rows()
-        self.assertEqual((status, rows[0]["state"], rows[0]["actual"]), (503, "unknown", None))
-        self.assertTrue(stops)
-
-
-
-class RuntimeEnvironment(unittest.TestCase):
-    def test_child_spawn_allows_only_explicit_safe_environment(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            snapshot = root / "snapshot.json"
-            snapshot.write_text("{}")
-            command = ["/pinned/node", "bootstrap", "--prepared-execution", "{prepared_execution}", "--snapshot", "{snapshot}", "--broker-url", "{broker_url}", "--port", "{port}"]
-            identity = {"serving_argv": command, "host": {"workerRoot": str(root)}}
-            health = {"snapshotSha256": router_study.file_hash(snapshot)}
-            proof = SimpleNamespace(execution_identity=mock.Mock(return_value=identity), verify_runtime_health=mock.Mock())
-            process = mock.Mock(pid=42)
-            process.poll.return_value = None
-            process.wait.return_value = 0
-            safe = {"PATH": "/fixture/bin", "HOME": "/fixture/home", "TMPDIR": str(root), "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"}
-            ambient = {key: "must-not-reach-child" for key in ("OPENROUTER_API_KEY", "KILO_API_KEY", "DATABASE_URL", "POSTGRES_URL", "PRODUCTION_BINDING", "CLOUDFLARE_ACCOUNT_ID", "SHELL", "NODE_OPTIONS", "NODE_PATH", "TSX_TSCONFIG_PATH", "TSX_DISABLE_CACHE", "MINIFLARE_WORKERD_AUTOGATES", "MINIFLARE_WORKERD_CONFIG_DEBUG", "HTTP_PROXY", "ALL_PROXY", "DYLD_INSERT_LIBRARIES", "LD_PRELOAD")}
-            with mock.patch.dict(os.environ, {**safe, **ambient}, clear=True), mock.patch.object(router_study, "helper", return_value=proof), mock.patch.object(router_study.subprocess, "Popen", return_value=process) as spawn, mock.patch.object(router_study, "runtime_json", return_value=health), mock.patch.object(router_study.os, "killpg"):
-                with router_study.runtime_process(command, snapshot, "http://127.0.0.1:1234", 18792, root / "prepared", identity, root / "health.json", health["snapshotSha256"]) as origin:
-                    self.assertEqual(origin, "http://127.0.0.1:18792")
-            spawn.assert_called_once()
-            self.assertEqual(spawn.call_args.kwargs["env"], safe)
-            self.assertEqual(spawn.call_args.kwargs["cwd"], str(root))
-            self.assertNotIn("shell", spawn.call_args.kwargs)
-            self.assertEqual(spawn.call_args.args[0], ["/pinned/node", "bootstrap", "--prepared-execution", str(root / "prepared"), "--snapshot", str(snapshot), "--broker-url", "http://127.0.0.1:1234", "--port", "18792"])
-            proof.verify_runtime_health.assert_called_once_with(health, identity)
-            self.assertEqual(router_study.load(root / "health.json"), health)
-
 
 class PinnedDriverAdapters(unittest.TestCase):
     def setUp(self):
@@ -718,47 +671,51 @@ class PinnedDriverAdapters(unittest.TestCase):
 
 
 class ProspectiveBudget(unittest.TestCase):
-    FINANCE_CFG = {"run_cost_limit_usd": "3", "step_limit": 2, "max_input_tokens": 100, "max_output_tokens": 10, "wall_seconds": 1800, "action_timeout_seconds": 180}
+    FINANCE_CFG = {"run_cost_limit_usd": "3", "step_limit": 2, "max_input_tokens": 100, "max_output_tokens": 10, "wall_seconds": 1800, "action_timeout_seconds": 180, "classifier_allowance_usd": "0.01", "variant_catalog": {"x/y": {"low": {"reasoning": {"effort": "low"}}}}}
 
     def fixture(self, root, additional=SYNTHETIC_ADDITIONAL):
         ledger, _ = prospective_campaign(root, additional=additional)
         out = root / "study"
         configs = [{"id": mode, "router": mode} for mode in ("efficient", "frontier")]
-        spec = {"prospective_grant_id": "bounded-two", "campaign_ledger": str(ledger), "experiment_id": "bounded", "seed": "frozen", "repetitions": 2, "tasks": {"tuning": ["pilot-task"], "final": ["holdout"]}, "configurations": configs, "classifier_fee_fraction": "0.06", "resources": {}, **arms_spec()}
+        spec = {"prospective_grant_id": "bounded-two", "campaign_ledger": str(ledger), "experiment_id": "bounded", "seed": "frozen", "repetitions": 2, "tasks": {"tuning": ["pilot-task"], "final": ["holdout"]}, "configurations": configs, "kilo_organization_id": "123e4567-e89b-12d3-a456-426614174000", "classifier_allowance_usd": "0.01", "gateway_routing_table_version": None, "resources": {}, **arms_spec()}
         manifest = {"version": router_study.SPEC_VERSION, "out_root": str(out), "spec": spec, "approval": {"execution_identity": {version: {"executableSha256": "bundle"} for version in ("baseline", "candidate")}, "mode_pools": {mode: [["x/y", "variant=low"]] for mode in ("efficient", "frontier")}}}
-        candidates = []
         for item in configs:
-            snapshot = {"baseline": {"real": True}, "candidate": {"mode": item["router"]}}
+            snapshot = {"baseline": {"kv": {}}, "candidate": {"kv": {}}}
             router_study.frozen_write(out / "snapshots" / f"{item['id']}.json", snapshot)
-            candidates.append({"router": item["router"], "executableSha256": "bundle", "config": snapshot["candidate"]})
         router_study.frozen_write(out / "variant-catalog.json", {"x/y": {"low": {"reasoning": {"effort": "low"}}}})
-        account_policy = {"source": "fixture-account-export", "captured_at": time.time(), "raw_sha256": "0" * 64, "default_plugins": []}
-        router_study.frozen_write(out / "account-policy.json", account_policy)
         plan = router_study.make_plan(spec, {task: {"repo": "repo"} for task in ("pilot-task", "holdout")})
-        manifest["approval"].update(execution_plan_sha256=router_study.digest(plan), account_policy_sha256=router_study.file_hash(out / "account-policy.json"))
-        spec["account_policy"] = str(out / "account-policy.json")
+        manifest["approval"].update(execution_plan_sha256=router_study.digest(plan))
         router_study.frozen_write(out / "execution-plan.json", plan)
         router_study.frozen_write(out / router_study.MANIFEST, manifest)
         (out / "budget.sqlite").symlink_to(ledger)
         with sqlite3.connect(ledger) as db:
             db.execute("BEGIN IMMEDIATE")
-            router_study.CAMPAIGN.register(db, manifest, candidates)
+            router_study.CAMPAIGN.register_manifest(db, manifest)
         return ledger, out, manifest, plan
 
     def quote(self, prompt, completion):
-        endpoints = [{"tag": "fixture", "status": 0, "context_length": 1000, "max_prompt_tokens": 100, "max_completion_tokens": 10, "supported_parameters": ["reasoning", "max_tokens"], "pricing": {"prompt": str(prompt), "completion": str(completion)}}]
-        return router_study.text_tariffs.endpoint_quote(endpoints, {**self.FINANCE_CFG, "byok_fee_ceiling_fraction": "0.06", "candidate": {"model": "x/y", "effort": "variant=low"}, "variant_catalog": {"x/y": {"low": {"reasoning": {"effort": "low"}}}}, "model_architecture": {"output_modalities": ["text"]}})
+        entry = {"id": "x/y", "context_length": 1000, "supported_parameters": ["reasoning", "max_tokens"], "architecture": {"output_modalities": ["text"]}, "pricing": {"prompt": str(prompt), "completion": str(completion)}}
+        endpoints = [{"tag": "fixture", "status": 0, "context_length": 1000, "supported_parameters": ["reasoning", "max_tokens"], "pricing": {"prompt": str(prompt), "completion": str(completion)}}]
+        return router_study.text_tariffs.catalog_quote(entry, {**self.FINANCE_CFG, "candidate": {"model": "x/y", "effort": "variant=low"}}, endpoints=endpoints)
 
-    def financing(self, manifest, plan, prompt="0.0004", completion="0.001", classifier="0.01"):
+    def financing(self, manifest, plan, prompt="0.0004", completion="0.001"):
         quote = self.quote(prompt, completion)
-        pricing = {"models": [{"model": "x/y", "effort": "variant=low", "model_architecture": {"output_modalities": ["text"]}, "financial_quote": quote}], "unavailable_pairs": []}
-        with mock.patch.object(router_study, "verified_classifier_attempts", return_value=2):
-            return router_study.build_financing(manifest, plan, pricing, {"attempt_bound_usd": classifier}, self.FINANCE_CFG)
+        pricing = {"models": [{"model": "x/y", "effort": "variant=low", "context_length": 1000, "financial_quote": quote, "quote_fetched_at": time.time()}], "unavailable_pairs": []}
+        return router_study.build_financing(manifest, plan, pricing, self.FINANCE_CFG)
 
     def register_financing(self, ledger, financing):
         with sqlite3.connect(ledger) as db:
             db.execute("BEGIN IMMEDIATE")
             return router_study.CAMPAIGN.register_financing(db, financing)
+
+    def test_v6_registration_leaves_no_candidate_rows(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            ledger, out, manifest, plan = self.fixture(Path(temporary))
+            with sqlite3.connect(ledger) as db:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM campaign_candidates").fetchone()[0], 0)
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM campaign_prospective_candidates").fetchone()[0], 0)
+                self.assertEqual(router_study.CAMPAIGN.candidate_state(db)["registered"], 0)
+                self.assertIsNotNone(db.execute("SELECT 1 FROM campaign_manifests WHERE sha256=?", (router_study.digest(manifest),)).fetchone())
 
     def test_read_quote_rejects_path_traversal_batch(self):
         with self.assertRaisesRegex(ValueError, "Unsafe batch identity"):
@@ -798,7 +755,7 @@ class ProspectiveBudget(unittest.TestCase):
     def test_forecast_above_allowance_registers_and_still_requires_registration(self):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan = self.fixture(Path(temporary))
-            oversubscribed = self.financing(manifest, plan, prompt="0.005", completion="0.01", classifier="0")
+            oversubscribed = self.financing(manifest, plan, prompt="0.005", completion="0.01")
             self.assertGreater(Decimal(oversubscribed["total_envelope_usd"]), Decimal(SYNTHETIC_ADDITIONAL))
             budget = router_study.Budget(ledger, {"study": load_study()})
             self.assertEqual(budget.claim(plan["runs"][0], manifest, {"run_cost_limit_usd": "3"}), "cost_forecast_missing")
@@ -811,7 +768,7 @@ class ProspectiveBudget(unittest.TestCase):
             self.assertIsNone(funded.claim(plan["runs"][0], manifest, {"run_cost_limit_usd": "3"}))
             small_pilot = json.loads(json.dumps(manifest))
             small_pilot["spec"]["pilot_cap_usd"] = "1"
-            pilot_forecast = self.financing(small_pilot, plan, prompt="0.005", completion="0.01", classifier="0")
+            pilot_forecast = self.financing(small_pilot, plan, prompt="0.005", completion="0.01")
             self.assertGreater(Decimal(pilot_forecast["pilot_envelope_usd"]), Decimal("1"))
 
     def test_reserve_releases_unused_hold_after_settlement_and_holds_unknowns(self):
@@ -904,9 +861,7 @@ class ProspectiveBudget(unittest.TestCase):
                 files[str(path)] = router_study.file_hash(path)
             receipt = out / "receipts" / f"{request_id}.json"
             router_study.frozen_write(receipt, {"local_request_id": request_id, "run": row["run"]})
-            health = out / "runtime-health" / f"{row['run']}.json"
-            router_study.frozen_write(health, {"snapshotSha256": "frozen"})
-            files.update({str(path): router_study.file_hash(path) for path in (receipt, health)})
+            files[str(receipt)] = router_study.file_hash(receipt)
             request = {"request_id": request_id, "run": row["run"], "text_parser": {"accepted": True}, "native_calls_present": False, "native_markup_present": False, "request_declares_tools": False, "category": "text_action_accepted"}
             observations.append({**{key: row[key] for key in ("run", "router", "instance_id", "configuration", "repetition")}, "requests": [request], "status": "completed", "exit_status": "Submitted", "resolved": False, "cost_usd": "0.1"})
             with sqlite3.connect(ledger) as db:
@@ -914,7 +869,7 @@ class ProspectiveBudget(unittest.TestCase):
                 db.execute("INSERT INTO requests VALUES (?,?, '0.2','0.1',1,'settled',?,1)", (request_id, row["run"], str(receipt)))
                 db.execute("INSERT INTO router_requests VALUES (?, 'solver')", (request_id,))
         parser = {"revision": router_study.helper("router-replay").MINI_REVISION, "files": {"parser.py": "hash"}, "model_settings": {}, "action_regex": "bash"}
-        evidence = {"schema": "router-baseline-protocol-pilot-v1", "manifest_sha256": router_study.digest(manifest), "execution_plan_sha256": router_study.digest(plan), "prospective_grant_id": "bounded-two", "passed": True, "runs": [row["run"] for row in plan["runs"][:2]], "parser": parser, "evidence_files": files, "failures": [], "observations": observations, "total_cost_usd": "0.2"}
+        evidence = {"schema": "router-protocol-pilot-v2", "manifest_sha256": router_study.digest(manifest), "execution_plan_sha256": router_study.digest(plan), "prospective_grant_id": "bounded-two", "passed": True, "runs": [row["run"] for row in plan["runs"][:2]], "parser": parser, "evidence_files": files, "failures": [], "observations": observations, "total_cost_usd": "0.2"}
         evidence_path = root / "pilot.json"
         evidence_path.write_text(json.dumps(evidence))
         return ledger, out, manifest, plan, evidence_path, evidence
@@ -923,10 +878,7 @@ class ProspectiveBudget(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan, path, evidence = self.pilot_fixture(Path(temporary))
             manifest["approval"]["snapshot_file_sha256"] = {mode: "frozen" for mode in ("efficient", "frontier")}
-            proof = SimpleNamespace(verify_runtime_health=mock.Mock())
-            original_helper = router_study.helper
-            with mock.patch.object(router_study, "helper", side_effect=lambda name: proof if name == "router-proof" else original_helper(name)):
-                report = router_study.analyze(out, manifest, plan, "pilot", {"study": load_study()})
+            report = router_study.analyze(out, manifest, plan, "pilot", {"study": load_study()})
             self.assertTrue(report["plan_complete"])
             self.assertFalse(report["can_establish_pass"])
             self.assertFalse(report["can_establish_superiority"])
@@ -936,7 +888,7 @@ class ProspectiveBudget(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan, path, evidence = self.pilot_fixture(Path(temporary))
             self.assertEqual(router_study.validate_pilot_evidence(out, manifest, plan, path), evidence)
-            approval = {"authorized": True, "action": "select-final-router-study-v5", "manifest_sha256": router_study.digest(manifest), "prospective_grant_id": "bounded-two", "pilot_evidence_sha256": router_study.digest(evidence), "pilot_evidence_file_sha256": router_study.file_hash(path), "configurations": {"efficient": "efficient", "frontier": "frontier"}}
+            approval = {"authorized": True, "action": "select-final-router-study-v6", "manifest_sha256": router_study.digest(manifest), "prospective_grant_id": "bounded-two", "pilot_evidence_sha256": router_study.digest(evidence), "pilot_evidence_file_sha256": router_study.file_hash(path), "configurations": {"efficient": "efficient", "frontier": "frontier"}}
             router_study.select_final(out, manifest, plan, approval, {}, path)
             self.assertEqual(router_study.final_selection(out, manifest), approval)
             path_in_out = out / "pilot-evidence.json"
@@ -947,7 +899,7 @@ class ProspectiveBudget(unittest.TestCase):
     def test_final_budget_stop_still_produces_a_read_only_inconclusive_report(self):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan, path, evidence = self.pilot_fixture(Path(temporary))
-            approval = {"authorized": True, "action": "select-final-router-study-v5", "manifest_sha256": router_study.digest(manifest), "prospective_grant_id": "bounded-two", "pilot_evidence_sha256": router_study.digest(evidence), "pilot_evidence_file_sha256": router_study.file_hash(path), "configurations": {"efficient": "efficient", "frontier": "frontier"}}
+            approval = {"authorized": True, "action": "select-final-router-study-v6", "manifest_sha256": router_study.digest(manifest), "prospective_grant_id": "bounded-two", "pilot_evidence_sha256": router_study.digest(evidence), "pilot_evidence_file_sha256": router_study.file_hash(path), "configurations": {"efficient": "efficient", "frontier": "frontier"}}
             router_study.select_final(out, manifest, plan, approval, {}, path)
             budget = router_study.Budget(ledger, {"study": load_study()})
             budget.stop("budget_exhausted", "final")
@@ -955,7 +907,7 @@ class ProspectiveBudget(unittest.TestCase):
             self.assertEqual(report["conclusion"], "inconclusive")
             self.assertIn("budget_exhausted", report["recorded_stops"])
             self.assertEqual(len(report["missing_or_invalid"]), len([row for row in plan["runs"] if row["phase"] == "final"]))
-            self.assertFalse(report["both_modes_pass"])
+            self.assertNotIn("both_modes_pass", report)
             self.assertEqual(budget.stopped("final"), ["budget_exhausted"])
 
     def test_pilot_protocol_provider_coverage_cost_and_grade_failures_block_final(self):
@@ -1007,7 +959,7 @@ class ProspectiveBudget(unittest.TestCase):
 
 
 class FrozenCoverage(unittest.TestCase):
-    def test_spec_requires_exact_bounded_v5_execution_campaign_contract(self):
+    def test_spec_requires_exact_bounded_v6_execution_campaign_contract(self):
         with tempfile.TemporaryDirectory() as temporary:
             import census
             root = Path(temporary)
@@ -1015,9 +967,7 @@ class FrozenCoverage(unittest.TestCase):
             execution = root / "execution.json"
             execution.write_text("{}")
             resources = {**census.RESOURCES, "run_cost_limit_usd": "60", "max_input_tokens": 1, "http_request_timeout_seconds": 600, "token_overrun_policy": "settle-known-v1"}
-            account = root / "account.json"
-            account.write_text(json.dumps({"source": "fixture", "captured_at": time.time(), "raw_sha256": "0" * 64, "default_plugins": []}))
-            spec = {"version": 5, "prospective_grant_id": "bounded-two", "experiment_id": "fixture", "configurations": [{"id": mode, "router": mode, "snapshot": "snapshot.json"} for mode in ("efficient", "frontier")], "tasks": {"tuning": [f"tuning-{index}" for index in range(18)], "final": [f"holdout-{index}" for index in range(32)]}, "resources": resources, "classifier_fee_fraction": "0.06", "variant_catalog": "variants.json", "execution_manifest": str(execution), "campaign_ledger": str(ledger), "account_policy": str(account), "repetitions": 2, "seed": "frozen", **arms_spec()}
+            spec = {"version": router_study.SPEC_VERSION, "prospective_grant_id": "bounded-two", "experiment_id": "fixture", "configurations": [{"id": mode, "router": mode, "snapshot": "snapshot.json"} for mode in ("efficient", "frontier")], "tasks": {"tuning": [f"tuning-{index}" for index in range(18)], "final": [f"holdout-{index}" for index in range(32)]}, "resources": resources, "kilo_organization_id": "123e4567-e89b-12d3-a456-426614174000", "classifier_allowance_usd": "0.01", "gateway_routing_table_version": None, "variant_catalog": "variants.json", "execution_manifest": str(execution), "campaign_ledger": str(ledger), "repetitions": 2, "seed": "frozen", **arms_spec()}
             modules = {"census": SimpleNamespace(RESOURCES=census.RESOURCES)}
             self.assertEqual(router_study.validate_spec(spec, modules), spec)
             for cap in ("0", "60.01", 60, None):
@@ -1025,35 +975,37 @@ class FrozenCoverage(unittest.TestCase):
                     router_study.validate_spec({**spec, "resources": {**resources, "run_cost_limit_usd": cap}}, modules)
             bad_control = {**spec["control"], "distribution": {mode: [{"model": "x/y", "variant": "variant=low", "weight": "0.5"}] for mode in ("efficient", "frontier")}}
             bad_objectives = {**spec["objectives"], "efficient": {"kind": "frontier-maximize-success-within-cost", "cost_budget": {"type": "absolute", "max_total_usd": "1"}}}
-            for change in ({"version": 4}, {"version": 3}, {"repetitions": 1}, {"repetitions": 3}, {"repetitions": True}, {"seed": ""}, {"campaign_ledger": "relative.sqlite"}, {"pilot_cap_usd": "60.01"}, {"pilot_cap_usd": "0"}, {"prospective_grant_id": "wrong"}, {"configurations": [spec["configurations"][0]]}, {"configurations": [spec["configurations"][0], {**spec["configurations"][1], "router": "efficient"}]}, {"tasks": {"tuning": ["a"], "final": spec["tasks"]["final"]}}, {"tasks": {"tuning": spec["tasks"]["tuning"], "final": ["b"]}}, {"fixed_models": {"efficient": spec["fixed_models"]["efficient"]}}, {"control": bad_control}, {"objectives": bad_objectives}):
+            for change in ({"version": 5}, {"version": 4}, {"repetitions": 1}, {"repetitions": 3}, {"repetitions": True}, {"seed": ""}, {"campaign_ledger": "relative.sqlite"}, {"pilot_cap_usd": "60.01"}, {"pilot_cap_usd": "0"}, {"kilo_organization_id": "not-a-uuid"}, {"kilo_organization_id": None}, {"classifier_allowance_usd": "-1"}, {"classifier_allowance_usd": "0"}, {"classifier_allowance_usd": 1}, {"gateway_routing_table_version": ""}, {"prospective_grant_id": "wrong"}, {"configurations": [spec["configurations"][0]]}, {"configurations": [spec["configurations"][0], {**spec["configurations"][1], "router": "efficient"}]}, {"tasks": {"tuning": ["a"], "final": spec["tasks"]["final"]}}, {"tasks": {"tuning": spec["tasks"]["tuning"], "final": ["b"]}}, {"fixed_models": {"efficient": spec["fixed_models"]["efficient"]}}, {"control": bad_control}, {"objectives": bad_objectives}):
                 with self.subTest(change=change), self.assertRaises(ValueError):
                     router_study.validate_spec({**spec, **change}, modules)
 
-    def test_run_approval_rejects_arbitrary_runtime_command_or_root_overrides(self):
-        command = ["node", "runtime", "--prepared-execution", "{prepared_execution}", "--snapshot", "{snapshot}", "--broker-url", "{broker_url}", "--port", "{port}"]
-        identity = {"serving_argv": command}
+    def test_run_approval_binds_gateway_billing_and_rejects_overrides(self):
+        identity = {"serving_argv": ["node", "runtime"]}
         authorization = {"grant_id": "bounded-two", "cumulative_additional_cap_usd": "60", "effective_ceiling_usd": "67.25"}
-        manifest = {"spec": {"prospective_grant_id": "bounded-two", "execution_manifest": "/prepared/execution.json", "pilot_cap_usd": "60"}, "approval": {"prospective_grant_approval_sha256": "grant-hash", "execution_identity": identity, "source_sha256": {}, "effective_authorization": authorization}}
+        manifest = {"spec": {"prospective_grant_id": "bounded-two", "execution_manifest": "/prepared/execution.json", "pilot_cap_usd": "60", "kilo_organization_id": "123e4567-e89b-12d3-a456-426614174000", "classifier_allowance_usd": "0.01", "gateway_routing_table_version": None}, "approval": {"prospective_grant_approval_sha256": "grant-hash", "execution_identity": identity, "source_sha256": {}, "effective_authorization": authorization}}
         plan = {"runs": [{"run": "one", "phase": "pilot"}]}
-        pricing, classifier = {"unavailable_pairs": []}, {}
-        financing = {"manifest_sha256": router_study.digest(manifest), "pricing_sha256": router_study.digest(pricing), "classifier_quote_sha256": router_study.digest(classifier), "authorization": authorization}
+        pricing = {"unavailable_pairs": []}
+        financing = {"manifest_sha256": router_study.digest(manifest), "pricing_sha256": router_study.digest(pricing), "classifier_allowance_usd": "0.01", "authorization": authorization}
         proof = SimpleNamespace(execution_identity=lambda path: identity)
         with mock.patch.object(router_study, "helper", return_value=proof):
-            approval = router_study.run_approval(Path("unused"), manifest, plan, "pilot", "batch", ["one"], pricing, classifier, command, financing=financing)
+            approval = router_study.run_approval(Path("unused"), manifest, plan, "pilot", "batch", ["one"], pricing, financing=financing)
             self.assertEqual(approval["execution_identity"], identity)
             self.assertEqual(approval["effective_authorization"], authorization)
             self.assertEqual(approval["cost_forecast_sha256"], router_study.digest(financing))
-            self.assertEqual(approval["action"], "run-router-study-v5")
+            self.assertEqual(approval["action"], "run-router-study-v6")
+            self.assertEqual(approval["kilo_organization_id"], "123e4567-e89b-12d3-a456-426614174000")
+            self.assertEqual(approval["gateway_models"], {"efficient": "kilo-auto/efficient", "frontier": "kilo-auto/frontier"})
+            self.assertNotIn("runtime_command", approval)
             self.assertNotIn("financing_sha256", approval)
             self.assertNotIn("additional_cap_usd", approval)
             with self.assertRaisesRegex(ValueError, "cost forecast"):
-                router_study.run_approval(Path("unused"), manifest, plan, "pilot", "batch", ["one"], pricing, classifier, command)
-            for argv in (["other-command"], [*command, "--baseline-root", "/mutable"]):
-                with self.subTest(argv=argv), self.assertRaisesRegex(ValueError, "fixed approved"):
-                    router_study.run_approval(Path("unused"), manifest, plan, "pilot", "batch", ["one"], pricing, classifier, argv, financing=financing)
+                router_study.run_approval(Path("unused"), manifest, plan, "pilot", "batch", ["one"], pricing)
+            drifted = {**financing, "classifier_allowance_usd": "9"}
+            with self.assertRaisesRegex(ValueError, "classifier allowance"):
+                router_study.run_approval(Path("unused"), manifest, plan, "pilot", "batch", ["one"], pricing, financing=drifted)
             for options in ({"concurrency": 2}, {"auto_account_unknown": True}):
                 with self.subTest(options=options), self.assertRaises(ValueError):
-                    router_study.run_approval(Path("unused"), manifest, plan, "pilot", "batch", ["one"], pricing, classifier, command, financing=financing, **options)
+                    router_study.run_approval(Path("unused"), manifest, plan, "pilot", "batch", ["one"], pricing, financing=financing, **options)
 
     def test_plan_covers_every_task_arm_and_repetition_in_a_frozen_seeded_order(self):
         fixed = {"efficient": [{"model": "x/y", "variant": "variant=low"}, {"model": "z/w", "variant": "effort=high"}], "frontier": [{"model": "x/y", "variant": "variant=low"}]}
@@ -1061,13 +1013,13 @@ class FrozenCoverage(unittest.TestCase):
         tasks = {task: {"repo": task + "/repo"} for task in spec["tasks"]["tuning"] + spec["tasks"]["final"]}
         plan = router_study.make_plan(spec, tasks)
         self.assertEqual(plan, router_study.make_plan(spec, tasks))
-        arms_per_mode = {mode: 3 + len(fixed[mode]) for mode in fixed}
+        arms_per_mode = {mode: 2 + len(fixed[mode]) for mode in fixed}
         expected = 2 + 32 * 2 * sum(arms_per_mode.values())
         self.assertEqual((len(plan["runs"]), plan["expected_runs"]), (expected, expected))
         keys = {(row["instance_id"], row["router"], row["configuration"], row["repetition"]) for row in plan["runs"]}
         self.assertEqual(len(keys), expected)
         self.assertEqual(len({row["run"] for row in plan["runs"]}), expected)
-        self.assertEqual([(row["instance_id"], row["configuration"], row["repetition"]) for row in plan["runs"][:2]], [("a", "baseline", 0)] * 2)
+        self.assertEqual([(row["instance_id"], row["arm_id"], row["repetition"]) for row in plan["runs"][:2]], [("a", "router", 0)] * 2)
         final = plan["runs"][2:]
         for mode in ("efficient", "frontier"):
             mode_rows = [row for row in final if row["router"] == mode]
@@ -1079,7 +1031,7 @@ class FrozenCoverage(unittest.TestCase):
         self.assertEqual(len({row["run"] for row in shared}), len(shared))
         controls = [row for row in final if row["arm_kind"] == "control"]
         self.assertTrue(all((row["model"], row["variant"]) in {(entry["model"], entry["variant"]) for entry in fixed[row["router"]]} for row in controls))
-        self.assertTrue(all(row["configuration"] in {"baseline", "control", "fixed-x-y", "fixed-z-w", "first" if row["router"] == "efficient" else "second"} for row in final))
+        self.assertTrue(all(row["configuration"] in {"control", "fixed-x-y", "fixed-z-w", "first" if row["router"] == "efficient" else "second"} for row in final))
 
     def test_panel_binding_rejects_subset_reorder_and_post_hoc_split(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -1118,7 +1070,7 @@ class PreAdmission(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             ledger = empty_campaign(root)
-            manifest = {"out_root": str(root / "one"), "spec": {"configurations": [{"id": "c1"}]}, "approval": {"execution_identity": {"candidate": {"executableSha256": "bundle"}}}}
+            manifest = {"out_root": str(root / "one"), "spec": {"configurations": [{"id": "c1"}]}, "approval": {"execution_identity": {"candidate": {"executableSha256": "bundle"}}, "mode_pools": {"efficient": [["x/y", "variant=low"]]}}}
             router_study.frozen_write(root / "one/snapshots/c1.json", {"candidate": {}})
             with sqlite3.connect(ledger) as db:
                 router_study.CAMPAIGN.register(db, manifest, [{"executableSha256": "bundle", "config": {}}])
@@ -1126,6 +1078,10 @@ class PreAdmission(unittest.TestCase):
             cfg = {"run_cost_limit_usd": "100"}
             row = {"run": "first", "phase": "tuning", "version": "candidate", "configuration": "c1", "instance_id": "task", "router": "efficient", "repetition": 0}
             self.assertIsNone(budget.claim(row, manifest, cfg))
+            with sqlite3.connect(ledger) as db:
+                attempt_key = db.execute("SELECT attempt_key FROM campaign_admissions WHERE run='first'").fetchone()[0]
+            expected_fingerprint = router_study.router_fingerprint("efficient", [["x/y", "variant=low"]])
+            self.assertEqual(attempt_key, router_study.digest(["task", "efficient", "tuning", 0, expected_fingerprint]))
             self.assertIsNone(budget.claim({**row, "run": "tail", "instance_id": "tail-task"}, manifest, cfg))
             with sqlite3.connect(ledger) as db:
                 self.assertEqual(dict(db.execute("SELECT run,maximum_usd FROM campaign_admissions")), {"first": "100", "tail": "100"})
@@ -1162,7 +1118,7 @@ class PreAdmission(unittest.TestCase):
             budget = router_study.Budget(ledger, {"study": study}, "100")
             row = {"run": "original", "phase": "tuning", "version": "candidate", "configuration": "c1", "instance_id": "task", "router": "efficient", "repetition": 0}
             for label in ("c1", "renamed"):
-                manifest = {"out_root": str(root / label), "spec": {"configurations": [{"id": label}]}, "approval": {"execution_identity": {"candidate": {"executableSha256": "bundle"}}}}
+                manifest = {"out_root": str(root / label), "spec": {"configurations": [{"id": label}]}, "approval": {"execution_identity": {"candidate": {"executableSha256": "bundle"}}, "mode_pools": {"efficient": [["x/y", "variant=low"]]}}}
                 router_study.frozen_write(root / label / "snapshots" / f"{label}.json", {"candidate": {"table": "same"}})
                 with sqlite3.connect(ledger) as db:
                     router_study.CAMPAIGN.register(db, manifest, [{"executableSha256": "bundle", "config": {"table": "same"}}])
@@ -1191,11 +1147,11 @@ class Analysis(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             row = self.record(temporary, "transport_unknown", {"grade_valid": False, "reason": "transport_unknown"})
             bills = [{"id": "known", "state": "settled", "actual": "0.2"}, {"id": "held", "state": "accounted_unknown", "actual": None, "bound": "1"}]
-            candidate, reason = router_study.outcome(temporary, row, bills, {"known": "solver", "held": "classifier"}, {"held"})
+            candidate, reason = router_study.outcome(temporary, row, bills, {"known": "solver", "held": "solver"}, {"held"})
             self.assertIsNone(reason)
             self.assertEqual((candidate["resolved"], candidate["quality_lower"], candidate["quality_upper"]), (None, 0, 1))
             self.assertEqual((candidate["cost_lower"], candidate["cost_upper"]), (Decimal("0.2"), Decimal("1.2")))
-            self.assertEqual(router_study.outcome(temporary, row, bills, {"known": "solver", "held": "classifier"})[1], "unknown_or_unsettled_charge")
+            self.assertEqual(router_study.outcome(temporary, row, bills, {"known": "solver", "held": "solver"})[1], "unknown_or_unsettled_charge")
 
     def test_provider_outage_is_a_failure_and_infra_timeout_blocks_even_accounted_unknown(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -1237,39 +1193,41 @@ class Analysis(unittest.TestCase):
             self.assertEqual((value["quality_lower"], value["quality_upper"]), (0, 0))
 
     def test_complete_repeated_quality_bounds_and_all_arm_costs_are_required(self):
-        rows = [{"run": f"{arm}-{task}-{rep}", "instance_id": task, "repetition": rep, "configuration": arm} for arm in ("baseline", "c1", "fixed-x-y") for task in ("t1", "t2") for rep in range(2)]
+        rows = [{"run": f"{arm}-{task}-{rep}", "instance_id": task, "repetition": rep, "configuration": arm} for arm in ("c1", "fixed-x-y", "control") for task in ("t1", "t2") for rep in range(2)]
         def value(lower, upper, cost):
-            return {"quality_lower": lower, "quality_upper": upper, "cost_lower": Decimal(cost), "cost_upper": Decimal(cost), "solver": Decimal(cost), "classifier": Decimal(0)}
-        efficient = {"kind": "efficient-minimize-cost-preserve-success", "success_floor": {"type": "baseline-relative"}}
+            return {"quality_lower": lower, "quality_upper": upper, "cost_lower": Decimal(cost), "cost_upper": Decimal(cost), "solver": Decimal(cost)}
+        efficient = {"kind": "efficient-minimize-cost-preserve-success", "success_floor": {"type": "comparator-relative"}}
         frontier = {"kind": "frontier-maximize-success-within-cost", "cost_budget": {"type": "comparator-relative"}}
         # Efficient: equal success at lower cost passes; strict dominance stays diagnostic-only.
         outcomes = {row["run"]: value(0, 0, "1") if row["configuration"] != "c1" else value(0, 0, "0.5") for row in rows}
-        comparison = router_study.compare(rows, outcomes, "c1", "baseline", 4, mode="efficient", objective=efficient)
+        comparison = router_study.compare(rows, outcomes, "c1", "fixed-x-y", 4, mode="efficient", objective=efficient)
         self.assertTrue(comparison["passes"])
         self.assertFalse(comparison["diagnostic_strict_dominance"]["passes"])
-        self.assertTrue(router_study.compare(rows, outcomes, "c1", "fixed-x-y", 4, mode="efficient", objective=efficient)["passes"])
+        self.assertTrue(router_study.compare(rows, outcomes, "c1", "control", 4, mode="efficient", objective=efficient)["passes"])
+        self.assertNotIn("candidate", comparison)
+        self.assertNotIn("baseline", comparison)
         uncertain_fixed = {**outcomes, **{row["run"]: value(0, 0, "0.4") for row in rows if row["configuration"] == "fixed-x-y"}}
         self.assertFalse(router_study.compare(rows, uncertain_fixed, "c1", "fixed-x-y", 4, mode="efficient", objective=efficient)["passes"])
         # Frontier: higher success at equal cost passes its own objective only.
         outcomes = {row["run"]: value(1, 1, "1") if row["configuration"] == "c1" else value(0, 0, "1") for row in rows}
-        comparison = router_study.compare(rows, outcomes, "c1", "baseline", 4, mode="frontier", objective=frontier)
+        comparison = router_study.compare(rows, outcomes, "c1", "fixed-x-y", 4, mode="frontier", objective=frontier)
         self.assertTrue(comparison["passes"])
         self.assertFalse(comparison["diagnostic_strict_dominance"]["strictly_lower_total_cost"])
-        ambiguous = {**outcomes, **{row["run"]: value(0, 1, "1") for row in rows if row["configuration"] == "baseline"}}
-        self.assertFalse(router_study.compare(rows, ambiguous, "c1", "baseline", 4, mode="frontier", objective=frontier)["passes"])
+        ambiguous = {**outcomes, **{row["run"]: value(0, 1, "1") for row in rows if row["configuration"] == "fixed-x-y"}}
+        self.assertFalse(router_study.compare(rows, ambiguous, "c1", "fixed-x-y", 4, mode="frontier", objective=frontier)["passes"])
         missing = {run: result for run, result in outcomes.items() if run != "c1-t2-1"}
         charges = {**outcomes, "c1-t2-1": value(0, 0, "9")}
-        comparison = router_study.compare(rows, missing, "c1", "baseline", 4, charges, mode="frontier", objective=frontier)
+        comparison = router_study.compare(rows, missing, "c1", "fixed-x-y", 4, charges, mode="frontier", objective=frontier)
         self.assertFalse(comparison["complete"])
         self.assertFalse(comparison["passes"])
         prefix = {run: result for run, result in outcomes.items() if "-t1-" in run}
-        self.assertFalse(router_study.compare(rows, prefix, "c1", "baseline", 4, mode="frontier", objective=frontier)["passes"])
-        self.assertEqual(comparison["candidate"]["expected"], 4)
-        self.assertEqual(Decimal(comparison["candidate"]["cost_upper"]), Decimal("12"))
+        self.assertFalse(router_study.compare(rows, prefix, "c1", "fixed-x-y", 4, mode="frontier", objective=frontier)["passes"])
+        self.assertEqual(comparison["router"]["expected"], 4)
+        self.assertEqual(Decimal(comparison["router"]["cost_upper"]), Decimal("12"))
         duplicate = [{**row, "repetition": 0} if row["run"] == "c1-t2-1" else row for row in rows]
-        self.assertFalse(router_study.compare(duplicate, outcomes, "c1", "baseline", 4, mode="frontier", objective=frontier)["complete"])
+        self.assertFalse(router_study.compare(duplicate, outcomes, "c1", "fixed-x-y", 4, mode="frontier", objective=frontier)["complete"])
         wrong_keys = {("t1", 0), ("t1", 1), ("t2", 0), ("other", 1)}
-        self.assertFalse(router_study.compare(rows, outcomes, "c1", "baseline", 4, mode="frontier", objective=frontier, expected_keys=wrong_keys)["complete"])
+        self.assertFalse(router_study.compare(rows, outcomes, "c1", "fixed-x-y", 4, mode="frontier", objective=frontier, expected_keys=wrong_keys)["complete"])
 
     def test_selection_rejects_an_unsuccessful_protocol_pilot(self):
         with mock.patch.object(router_study, "validate_pilot_evidence", side_effect=ValueError("pilot failed")), self.assertRaisesRegex(ValueError, "pilot failed"):
@@ -1298,40 +1256,40 @@ class Analysis(unittest.TestCase):
                 folder = out / "rollouts" / row["run"]
                 unavailable = row == outage
                 router_study.frozen_write(folder / "result.json", {"status": "provider_unavailable" if unavailable else "completed"})
-                router_study.frozen_write(folder / "evaluation.json", {"grade_valid": not unavailable, "result": [None, {row["instance_id"]: complete_grade(row["configuration"] != "baseline" and row["arm_kind"] != "fixed")}]})
+                router_study.frozen_write(folder / "evaluation.json", {"grade_valid": not unavailable, "result": [None, {row["instance_id"]: complete_grade(row["arm_kind"] == "router")}]})
                 if unavailable:
                     router_study.frozen_write(folder / "provider-unavailable.json", {"model": "model", "effort": "variant=low", "reason": "unavailable"})
-                if row["arm_kind"] == "router":
-                    router_study.frozen_write(out / "runtime-health" / f"{row['run']}.json", {"snapshotSha256": router_study.file_hash(out / "snapshots/c1.json"), "fixture": "verified"})
                 with sqlite3.connect(ledger) as db:
                     db.execute("INSERT INTO router_runs VALUES (?,?,'finished',?)", (row["run"], "final", time.time()))
-                    actual = "1" if row["configuration"] == "baseline" else "0.2"
+                    actual = "0.2" if row["arm_kind"] == "router" else "1"
                     db.execute("INSERT INTO requests VALUES (?,?,?, ?,1,'settled','',1)", (row["run"], row["run"], actual, actual))
                     db.execute("INSERT INTO router_requests VALUES (?,'solver')", (row["run"],))
-            proof = SimpleNamespace(verify_runtime_health=mock.Mock())
             modules = {"study": study}
-            original_helper = router_study.helper
-            with mock.patch.object(router_study, "helper", side_effect=lambda name: proof if name == "router-proof" else original_helper(name)), mock.patch.object(router_study, "final_selection", return_value={"configurations": {"efficient": "c1", "frontier": "c2"}}):
+            with mock.patch.object(router_study, "final_selection", return_value={"configurations": {"efficient": "c1", "frontier": "c2"}}):
                 report = router_study.analyze(out, manifest, plan, "final", modules)
                 self.assertFalse(report["missing_or_invalid"])
-                comparison = report["comparisons"]["efficient"]["baseline"]
-                self.assertEqual(comparison["candidate"]["expected"], 4)
-                self.assertEqual(comparison["candidate"]["resolved_lower"], 3)
+                comparison = report["comparisons"]["efficient"]["fixed-x-y"]
+                self.assertEqual(comparison["router"]["expected"], 4)
+                self.assertEqual(comparison["router"]["resolved_lower"], 3)
                 self.assertTrue(comparison["passes"])
-                self.assertTrue(report["both_modes_pass"])
+                self.assertNotIn("both_modes_pass", report)
                 self.assertEqual((report["conclusion"], report["inconclusive"], report["plan_complete"]), ("complete", False, True))
-                self.assertEqual(set(report["comparisons"]["efficient"]), {"baseline", "control", "fixed-x-y"})
-                self.assertFalse(report["fixed_model_superiority"]["efficient"]["superior_to_every_fixed_model"])
-                self.assertEqual(report["fixed_model_superiority"]["efficient"]["not_established_for"], ["fixed-x-y"])
-                self.assertTrue(report["control_cost_matching"]["efficient"]["claim_allowed"])
+                self.assertEqual(set(report["comparisons"]["efficient"]), {"control", "fixed-x-y"})
+                self.assertTrue(report["fixed_model_superiority"]["efficient"]["superior_to_every_fixed_model"])
+                self.assertEqual(report["fixed_model_superiority"]["efficient"]["not_established_for"], [])
+                self.assertFalse(report["control_cost_matching"]["efficient"]["claim_allowed"])
+                self.assertFalse(report["control_cost_matching"]["efficient"]["cost_matched"])
+                self.assertIn("classifier allowance", report["control_cost_matching"]["efficient"]["reason"])
+                self.assertFalse(report["can_establish_cost_matching"])
+                self.assertTrue(report["can_establish_pass"])
                 self.assertTrue(report["fixed_model_superiority"]["frontier"]["per_fixed_model"]["fixed-x-y"])
                 self.assertFalse(report["generalization_claim"])
                 self.assertEqual(report["provider_unavailable_runs"], [outage["run"]])
-                self.assertEqual(Decimal(report["phase_all_arm_cost_upper_usd"]), Decimal("12.8"))
+                self.assertEqual(Decimal(report["phase_all_arm_cost_upper_usd"]), Decimal("17.6"))
                 (out / "rollouts" / outage["run"] / "result.json").write_text(json.dumps({"status": "infra_invalid"}))
                 blocked = router_study.analyze(out, manifest, plan, "final", modules)
-                self.assertFalse(blocked["comparisons"]["efficient"]["baseline"]["complete"])
-                self.assertFalse(blocked["both_modes_pass"])
+                self.assertFalse(blocked["comparisons"]["efficient"]["fixed-x-y"]["complete"])
+                self.assertNotIn("both_modes_pass", blocked)
                 self.assertEqual((blocked["conclusion"], blocked["inconclusive"], blocked["can_establish_pass"], blocked["can_establish_superiority"], blocked["can_establish_cost_matching"]), ("inconclusive", True, False, False, False))
                 self.assertFalse(blocked["fixed_model_superiority"]["efficient"]["superior_to_every_fixed_model"])
                 self.assertFalse(blocked["control_cost_matching"]["efficient"]["claim_allowed"])
@@ -1341,8 +1299,8 @@ class Analysis(unittest.TestCase):
                     for comparison in comparisons.values():
                         self.assertFalse(any(comparison["objective_checks"].values()))
                         self.assertFalse(any(comparison["diagnostic_strict_dominance"].values()))
-                self.assertEqual(Decimal(blocked["phase_all_arm_cost_upper_usd"]), Decimal("12.8"))
-                self.assertEqual(Decimal(blocked["comparisons"]["efficient"]["baseline"]["candidate"]["cost_upper"]), Decimal("0.8"))
+                self.assertEqual(Decimal(blocked["phase_all_arm_cost_upper_usd"]), Decimal("17.6"))
+                self.assertEqual(Decimal(blocked["comparisons"]["efficient"]["fixed-x-y"]["router"]["cost_upper"]), Decimal("0.8"))
 
     def test_historical_audit_is_read_only_and_never_upgrades_a_pass(self):
         with tempfile.TemporaryDirectory() as temporary:

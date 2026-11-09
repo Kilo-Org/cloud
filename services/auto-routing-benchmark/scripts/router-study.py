@@ -4,25 +4,19 @@ from contextlib import closing, contextmanager
 from decimal import Decimal, InvalidOperation
 import fcntl
 import hashlib
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib
 import importlib.util
 import json
 import math
 import multiprocessing
-import os
 from pathlib import Path
 import re
-import shutil
-import signal
 import sqlite3
-import subprocess
 import sys
 import threading
 import time
 from types import SimpleNamespace
 import uuid
-from urllib.parse import urlparse
 
 DRIVER_ROOT = Path(__file__).resolve().parent.parent / "repo-study"
 sys.path.insert(0, str(DRIVER_ROOT))
@@ -31,30 +25,23 @@ from text_tariffs import resolve_variant
 
 
 MANIFEST = "router-study-manifest.json"
-SPEC_VERSION = 5
+SPEC_VERSION = 6
 # Legacy ledger ceiling from imported metadata; never by itself permission.
 CAP = Decimal("250")
 # Nested capped-exploration ceilings inside the cumulative new authorization.
 PILOT_CAP_USD = Decimal("60")
 RUN_CAP_USD = Decimal("60")
 MODES = ("efficient", "frontier")
+GATEWAY_MODELS = {mode: f"kilo-auto/{mode}" for mode in MODES}
 ROUTING_TABLE_KEYS = {"efficient": "routing_table_v1", "frontier": "routing_table_frontier_v1"}
-CLASSIFIER_BOUND_SOURCES = {
-    "services/auto-routing/src/decide.ts": "ea794fa14bb56dd6926f7b34f097ec46f09fac95b53679c87210caf77a391f47",
-    "services/auto-routing/src/model-classifier.ts": "0fd8c412ca94d3aa7ec6860b9cf885a59bc882d73755d73a0f8623e8ceb30d55",
-    "services/auto-routing/src/openrouter.ts": "6e6281fc76fe497a945a9aed9184910c286f725fb11cc5b03e89ef026a9da785",
-    "packages/auto-routing-contracts/src/classifier/system-one-classifier.ts": "b2a236b3814c964970c2a0c987854bc65348a764a1c74494c191da92a1c1aefd",
-}
-CLASSIFIER_FEE_FRACTION = Decimal("0.06")
 PRICING_MAX_AGE_SECONDS = 7200
 LEASE_MARGIN_SECONDS = 600
 SAFE = re.compile(r"[a-z0-9][a-z0-9_-]{0,79}")
 REPO = Path(__file__).resolve().parents[3]
 SOURCE_ROOTS = ("services/auto-routing", "packages/auto-routing-contracts", "packages/usage-contracts", "packages/worker-utils", "packages/db")
 SOURCE_EXCLUDED = {"node_modules", "dist", "coverage"}
-ENDPOINT_UNAVAILABLE = "No current active endpoint meets public reasoning/context/output constraints"
+MODEL_UNAVAILABLE = text_tariffs.MODEL_UNAVAILABLE
 RUNTIME_SOURCE = "repo/services/auto-routing-benchmark/scripts/router-runtime.ts"
-SAFE_RUNTIME_ENV = ("PATH", "HOME", "TMPDIR", "LANG", "LC_ALL")
 MUTEX = threading.RLock()
 
 
@@ -130,7 +117,7 @@ def driver(directory):
     if directory != DRIVER_ROOT.resolve(strict=True):
         raise ValueError("Use the bundled study driver; external executable drivers are not admitted")
     modules = {}
-    for name in ("study", "modern_panel", "modern_eval", "census_panel", "census", "parity"):
+    for name in ("study", "modern_panel", "modern_eval", "census_panel", "census"):
         module = importlib.import_module(name)
         if Path(module.__file__).resolve().parent != directory:
             raise RuntimeError(f"Driver import escaped --driver-dir: {name}")
@@ -194,19 +181,37 @@ def mode_pairs(snapshot, mode):
     return pairs
 
 
-def classifier_model(kv):
-    if "classifier_model" in kv:
+DEFAULT_CLASSIFIER_MODEL = "typesafe/jev-1.13"
+
+
+def classifier_model(snapshot):
+    """Classifier model named by the frozen baseline KV, or the contract default."""
+    baseline = snapshot.get("baseline") if isinstance(snapshot, dict) else None
+    kv = baseline.get("kv") if isinstance(baseline, dict) else None
+    if not isinstance(kv, dict):
+        raise ValueError("Snapshot lacks baseline KV for the classifier model")
+    if isinstance(kv.get("classifier_model"), str) and kv["classifier_model"]:
         return kv["classifier_model"]
     winner = json.loads(kv.get("classifier_system_one_winner", "null"))
-    if not isinstance(winner, dict) or not isinstance(winner.get("model"), str):
-        raise ValueError("Snapshot lacks the actual classifier model selection")
-    return winner["model"]
+    if isinstance(winner, dict) and isinstance(winner.get("model"), str) and winner["model"]:
+        return winner["model"]
+    return DEFAULT_CLASSIFIER_MODEL
+
+
+def router_fingerprint(mode, pool):
+    """Live router arm attempt identity: gateway model plus the frozen mode pool."""
+    return digest({"arm": "router", "gateway_model": GATEWAY_MODELS[mode], "pool": [list(pair) for pair in sorted(tuple(pair) for pair in pool)]})
 
 
 def snapshot_contract(snapshot):
+    """Frozen pool pairs from the baseline/candidate routing tables.
+
+    The snapshot defines the unchanged pool only. Paid router dispatch goes
+    to the live gateway model; no classifier is selected or priced here.
+    """
     if not isinstance(snapshot, dict) or not {"baseline", "candidate"} <= set(snapshot):
         raise ValueError("Snapshot must contain baseline and candidate KV")
-    pairs, classifiers = set(), set()
+    pairs = set()
     for version in ("baseline", "candidate"):
         entry = snapshot[version]
         if not isinstance(entry, dict) or set(entry) != {"kv"} or not isinstance(entry["kv"], dict):
@@ -219,10 +224,7 @@ def snapshot_contract(snapshot):
             raise ValueError("Snapshot lacks routing tables or capability data")
         for table in tables:
             pairs |= table_pairs(table)
-        classifiers.add(classifier_model(kv))
-    if len(classifiers) != 1:
-        raise ValueError("Baseline and candidate must request the same quoted classifier model")
-    return sorted(pairs), classifiers.pop()
+    return sorted(pairs)
 
 
 def arm_slug(model):
@@ -242,8 +244,7 @@ def arm_definitions(spec):
     arms = {}
     for mode in MODES:
         entries = [
-            {"arm_id": "baseline", "arm_kind": "router", "configuration": "baseline", "version": "baseline", "model": None, "variant": None},
-            {"arm_id": candidates[mode], "arm_kind": "router", "configuration": candidates[mode], "version": "candidate", "model": None, "variant": None},
+            {"arm_id": "router", "arm_kind": "router", "configuration": candidates[mode], "version": "router", "model": None, "variant": None},
             {"arm_id": "control", "arm_kind": "control", "configuration": "control", "version": "control", "model": None, "variant": None},
         ]
         for fixed in spec["fixed_models"][mode]:
@@ -273,14 +274,14 @@ def _validate_objectives(objectives):
     if not isinstance(efficient, dict) or set(efficient) != {"kind", "success_floor"} or efficient["kind"] != "efficient-minimize-cost-preserve-success":
         raise ValueError("Efficient objective must minimize full-task cost while preserving a frozen success floor")
     floor = efficient["success_floor"]
-    if not isinstance(floor, dict) or floor.get("type") not in {"baseline-relative", "comparator-relative", "absolute"} or floor["type"] == "absolute" and (set(floor) != {"type", "min_pass_rate"} or not isinstance(floor["min_pass_rate"], str) or not 0 <= money(floor["min_pass_rate"]) <= 1) or floor["type"] != "absolute" and set(floor) != {"type"}:
-        raise ValueError("Efficient success floor must be a preregistered baseline-relative, comparator-relative or absolute rule")
+    if not isinstance(floor, dict) or floor.get("type") not in {"comparator-relative", "absolute"} or floor["type"] == "absolute" and (set(floor) != {"type", "min_pass_rate"} or not isinstance(floor["min_pass_rate"], str) or not 0 <= money(floor["min_pass_rate"]) <= 1) or floor["type"] != "absolute" and set(floor) != {"type"}:
+        raise ValueError("Efficient success floor must be a preregistered comparator-relative or absolute rule; there is no baseline arm")
     frontier = objectives["frontier"]
     if not isinstance(frontier, dict) or set(frontier) != {"kind", "cost_budget"} or frontier["kind"] != "frontier-maximize-success-within-cost":
         raise ValueError("Frontier objective must maximize verified success within a frozen cost budget")
     budget = frontier["cost_budget"]
-    if not isinstance(budget, dict) or budget.get("type") not in {"baseline-relative", "comparator-relative", "absolute"} or budget["type"] == "absolute" and (set(budget) != {"type", "max_total_usd"} or not isinstance(budget["max_total_usd"], str) or money(budget["max_total_usd"]) <= 0) or budget["type"] != "absolute" and set(budget) != {"type"}:
-        raise ValueError("Frontier cost budget must be a preregistered baseline-relative, comparator-relative or absolute rule")
+    if not isinstance(budget, dict) or budget.get("type") not in {"comparator-relative", "absolute"} or budget["type"] == "absolute" and (set(budget) != {"type", "max_total_usd"} or not isinstance(budget["max_total_usd"], str) or money(budget["max_total_usd"]) <= 0) or budget["type"] != "absolute" and set(budget) != {"type"}:
+        raise ValueError("Frontier cost budget must be a preregistered comparator-relative or absolute rule; there is no baseline arm")
 
 
 def _validate_arms_spec(spec):
@@ -295,7 +296,7 @@ def _validate_arms_spec(spec):
     if not isinstance(control, dict) or set(control) != {"seed", "distribution", "cost_matching"} or not isinstance(control["seed"], str) or not control["seed"]:
         raise ValueError("Content-blind control needs a frozen seed, distribution and cost-matching rule")
     matching = control["cost_matching"]
-    if not isinstance(matching, dict) or set(matching) != {"criterion", "reference_arm", "tolerance_fraction"} or matching["criterion"] != "total-cost-ratio-vs-reference" or matching["reference_arm"] != "candidate" or not isinstance(matching["tolerance_fraction"], str) or not 0 <= money(matching["tolerance_fraction"]) < 1:
+    if not isinstance(matching, dict) or set(matching) != {"criterion", "reference_arm", "tolerance_fraction"} or matching["criterion"] != "total-cost-ratio-vs-reference" or matching["reference_arm"] != "router" or not isinstance(matching["tolerance_fraction"], str) or not 0 <= money(matching["tolerance_fraction"]) < 1:
         raise ValueError("Freeze the control cost-matching criterion and tolerance before outcomes")
     distribution = control["distribution"]
     if not isinstance(distribution, dict) or set(distribution) != set(MODES):
@@ -310,12 +311,18 @@ def _validate_arms_spec(spec):
 
 
 def validate_spec(spec, modules):
-    expected = {"version", "experiment_id", "configurations", "tasks", "resources", "pilot_cap_usd", "classifier_fee_fraction", "variant_catalog", "execution_manifest", "campaign_ledger", "repetitions", "seed", "prospective_grant_id", "fixed_models", "control", "objectives", "account_policy"}
+    expected = {"version", "experiment_id", "configurations", "tasks", "resources", "pilot_cap_usd", "kilo_organization_id", "classifier_allowance_usd", "gateway_routing_table_version", "variant_catalog", "execution_manifest", "campaign_ledger", "repetitions", "seed", "prospective_grant_id", "fixed_models", "control", "objectives"}
     if not isinstance(spec, dict) or set(spec) != expected or spec["version"] != SPEC_VERSION or not isinstance(spec["experiment_id"], str) or not SAFE.fullmatch(spec["experiment_id"]):
-        raise ValueError("Exact version5 capped-exploration router study spec required; old manifests are audit-only")
+        raise ValueError("Exact version6 capped-exploration router study spec required; old manifests are audit-only")
     if type(spec["repetitions"]) is not int or spec["repetitions"] != 2 or not isinstance(spec["seed"], str) or not spec["seed"]:
         raise ValueError("Exactly two paired repetitions and a frozen nonempty order seed are required")
-    for key in ("campaign_ledger", "execution_manifest", "account_policy"):
+    try:
+        text_tariffs.validate_organization_id(spec["kilo_organization_id"])
+    except ValueError as error:
+        raise ValueError("Freeze the canonical Kilo organization UUID that gateway requests bill") from error
+    if spec["gateway_routing_table_version"] is not None and (not isinstance(spec["gateway_routing_table_version"], str) or not spec["gateway_routing_table_version"]):
+        raise ValueError("Gateway routing table version must be a nonempty string or null when none is published")
+    for key in ("campaign_ledger", "execution_manifest"):
         if not isinstance(spec[key], str) or not Path(spec[key]).is_absolute() or not Path(spec[key]).exists():
             raise ValueError(f"{key} must be an existing absolute path")
     configs = spec["configurations"]
@@ -335,8 +342,8 @@ def validate_spec(spec, modules):
         raise ValueError("Frozen per-run resource cap must stay within the per-run ceiling")
     if len(tasks["tuning"]) != 18 or len(tasks["final"]) != 32:
         raise ValueError("Retain all 18 tuning and 32 final tasks; do not shrink the panel")
-    if spec["classifier_fee_fraction"] != str(CLASSIFIER_FEE_FRACTION):
-        raise ValueError("Classifier BYOK fee allowance must be the frozen six percent")
+    if not isinstance(spec["classifier_allowance_usd"], str) or money(spec["classifier_allowance_usd"]) <= 0:
+        raise ValueError("Classifier allowance must be a frozen positive amount added to every router-arm reservation and settlement")
     _validate_arms_spec(spec)
     with CAMPAIGN.readonly(spec["campaign_ledger"]) as db:
         CAMPAIGN.metadata(db)
@@ -355,7 +362,7 @@ def router_panel(modules):
 
 def panel_inputs(panel_out, kind, modules, spec):
     if kind != "router":
-        raise ValueError("Version5 requires the preregistered router panel and exact frozen split")
+        raise ValueError("Version6 requires the preregistered router panel and exact frozen split")
     module, panel_driver = router_panel(modules)
     panel_spec = module.frozen_spec(panel_out)
     panel, private = module.check_panel(panel_driver, panel_out, panel_spec)
@@ -384,7 +391,7 @@ def make_plan(spec, tasks):
         for task_id in ordered:
             for repetition in range(repetitions):
                 for router in MODES:
-                    # Baseline-only pilot stays two runs and precedes final work.
+                    # Router-only pilot stays two runs and precedes final work.
                     selected = [arms[router][0]] if phase == "pilot" else list(arms[router])
                     selected.sort(key=lambda arm: digest([spec["seed"], phase, repetition, task_id, router, arm["arm_id"]]))
                     for arm in selected:
@@ -415,18 +422,14 @@ def freeze_inputs(panel_out, kind, directory, spec, modules):
     raw = {item["id"]: Path(item["snapshot"]).read_bytes() for item in spec["configurations"]}
     snapshots = {key: json.loads(value) for key, value in raw.items()}
     baseline = next(iter(snapshots.values()))["baseline"]
-    pairs, classifiers = set(), set()
+    pairs = set()
     pools = {}
     for item in spec["configurations"]:
         snapshot = snapshots[item["id"]]
-        found, classifier = snapshot_contract(snapshot)
-        pairs.update(found)
-        classifiers.add(classifier)
+        pairs.update(snapshot_contract(snapshot))
         if snapshot["baseline"] != baseline:
             raise ValueError("Every candidate snapshot must carry exactly the same real baseline")
         pools[item["router"]] = sorted(mode_pairs(snapshot, item["router"]))
-    if len(classifiers) != 1:
-        raise ValueError("All configurations must request one quoted classifier model")
     for mode in MODES:
         pool_models = {model for model, _ in pools[mode]}
         fixed_models = {entry["model"] for entry in spec["fixed_models"][mode]}
@@ -439,13 +442,11 @@ def freeze_inputs(panel_out, kind, directory, spec, modules):
     catalog_coverage(catalog, pairs)
     plan = make_plan(spec, tasks)
     execution = helper("router-proof").execution_identity(spec["execution_manifest"])
-    fingerprints = {item["id"]: digest({"router": item["router"], "executableSha256": execution["candidate"]["executableSha256"], "config": snapshots[item["id"]]["candidate"]}) for item in spec["configurations"]}
-    if len(set(fingerprints.values())) != len(fingerprints):
-        raise ValueError("A spec cannot repeat the same content-addressed candidate under different IDs")
+    fingerprints = {mode: router_fingerprint(mode, pools[mode]) for mode in MODES}
     with CAMPAIGN.readonly(spec["campaign_ledger"]) as db:
         campaign = CAMPAIGN.metadata(db)
         authorization = CAMPAIGN.effective_authorization(db, spec["prospective_grant_id"])
-    approval = {"authorized": True, "action": "freeze-router-study-v5", "prospective_grant_id": spec["prospective_grant_id"], "prospective_grant_approval_sha256": authorization["approval_sha256"], "effective_authorization": CAMPAIGN.authorization_summary(authorization), "spec_sha256": digest(spec), "source_sha256": sources(directory), "snapshot_file_sha256": {key: hashlib.sha256(value).hexdigest() for key, value in raw.items()}, "account_policy_sha256": file_hash(spec["account_policy"]), "candidate_fingerprints": fingerprints, "variant_catalog_sha256": file_hash(spec["variant_catalog"]), "classifier_model": classifiers.pop(), "model_variants": [list(pair) for pair in sorted(pairs)], "mode_pools": {mode: [list(pair) for pair in pools[mode]] for mode in MODES}, "arms": plan["arms"], "execution_plan_sha256": digest(plan), "execution_identity": execution, "campaign_metadata": campaign, **bindings}
+    approval = {"authorized": True, "action": "freeze-router-study-v6", "prospective_grant_id": spec["prospective_grant_id"], "prospective_grant_approval_sha256": authorization["approval_sha256"], "effective_authorization": CAMPAIGN.authorization_summary(authorization), "spec_sha256": digest(spec), "source_sha256": sources(directory), "snapshot_file_sha256": {key: hashlib.sha256(value).hexdigest() for key, value in raw.items()}, "router_fingerprints": fingerprints, "variant_catalog_sha256": file_hash(spec["variant_catalog"]), "gateway_models": GATEWAY_MODELS, "classifier_model": classifier_model(next(iter(snapshots.values()))), "model_variants": [list(pair) for pair in sorted(pairs)], "mode_pools": {mode: [list(pair) for pair in pools[mode]] for mode in MODES}, "arms": plan["arms"], "execution_plan_sha256": digest(plan), "execution_identity": execution, "campaign_metadata": campaign, **bindings}
     return approval, plan
 
 
@@ -461,13 +462,11 @@ def freeze(out, panel_out, kind, directory, spec, approval, modules):
     for item in spec["configurations"]:
         frozen_copy(item["snapshot"], out / "snapshots" / f"{item['id']}.json")
     frozen_copy(spec["variant_catalog"], out / "variant-catalog.json")
-    frozen_copy(spec["account_policy"], out / "account-policy.json")
     frozen_copy(panel_out / "split.json", out / "split.json")
     manifest = {"version": SPEC_VERSION, "spec": spec, "approval": approval, "approval_sha256": digest(approval), "panel_kind": kind, "panel_root": str(panel_out), "driver_root": str(directory), "out_root": str(out)}
-    candidates = [{"router": item["router"], "executableSha256": approval["execution_identity"]["candidate"]["executableSha256"], "config": load(item["snapshot"])["candidate"]} for item in spec["configurations"]]
     with sqlite3.connect(spec["campaign_ledger"], timeout=60) as db:
         db.execute("BEGIN IMMEDIATE")
-        CAMPAIGN.register(db, manifest, candidates)
+        CAMPAIGN.register_manifest(db, manifest)
         frozen_write(out / "execution-plan.json", plan)
         frozen_write(out / MANIFEST, manifest)
         (out / "budget.sqlite").symlink_to(Path(spec["campaign_ledger"]).resolve(strict=True))
@@ -487,8 +486,8 @@ def validate(out, panel_out, directory, modules):
     plan = make_plan(spec, tasks)
     if load(out / "execution-plan.json") != plan or digest(plan) != approval["execution_plan_sha256"]:
         raise ValueError("Frozen execution plan changed")
-    if {item["id"]: file_hash(out / "snapshots" / f"{item['id']}.json") for item in spec["configurations"]} != approval["snapshot_file_sha256"] or file_hash(out / "variant-catalog.json") != approval["variant_catalog_sha256"] or file_hash(out / "account-policy.json") != approval["account_policy_sha256"]:
-        raise ValueError("Frozen runtime snapshot, variant catalog or account policy changed")
+    if {item["id"]: file_hash(out / "snapshots" / f"{item['id']}.json") for item in spec["configurations"]} != approval["snapshot_file_sha256"] or file_hash(out / "variant-catalog.json") != approval["variant_catalog_sha256"]:
+        raise ValueError("Frozen pool snapshot or variant catalog changed")
     for task_id in spec["tasks"]["tuning"] + spec["tasks"]["final"]:
         if file_hash(out / "images" / f"{task_id}.json") != file_hash(panel_out / "images" / f"{task_id}.json"):
             raise ValueError("Pinned rollout image record changed")
@@ -504,49 +503,17 @@ def validate(out, panel_out, directory, modules):
     return manifest, plan, tasks
 
 
-def classifier_quote(evidence, requested_model, fee_fraction):
-    if not isinstance(evidence, dict) or set(evidence) != {"requested_model", "resolved_model", "alias_resolution", "endpoints"} or evidence["requested_model"] != requested_model or not evidence["alias_resolution"]:
-        raise ValueError("Classifier evidence must bind the exact requested model and its alias resolution")
-    snapshot = evidence["endpoints"]
-    data = (snapshot.get("body") or {}).get("data") or {}
-    endpoints = data.get("endpoints")
-    if data.get("id") != evidence["resolved_model"] or not isinstance(endpoints, list) or not endpoints or isinstance(snapshot.get("fetched_at"), bool) or not isinstance(snapshot.get("fetched_at"), (int, float)):
-        raise ValueError("Classifier quote requires the resolved model endpoint snapshot")
-    prompt, request, context = Decimal(0), Decimal(0), 0
-    endpoint_bounds = []
-    for endpoint in endpoints:
-        if endpoint.get("status", 0) != 0:
-            continue
-        pricing, _zeros = text_tariffs.parse_pricing(endpoint.get("pricing"), require_positive=False)
-        maxima = text_tariffs.component_maxima(pricing)
-        if maxima.get("completion", Decimal(0)) != 0:
-            raise ValueError("Classifier output must be free; paid output needs a separate finite contract")
-        for key, value in maxima.items():
-            if key not in {*text_tariffs.INPUT_COMPONENTS, "completion", "request"} and value != 0:
-                raise ValueError(f"Unbounded classifier tariff component: {key}")
-        ceiling = endpoint.get("max_prompt_tokens") or endpoint.get("context_length")
-        if type(ceiling) is not int or ceiling <= 0 or maxima.get("prompt", Decimal(0)) <= 0:
-            raise ValueError("Classifier endpoint requires positive prompt pricing and a finite input capacity")
-        input_rate = sum((maxima.get(key, Decimal(0)) for key in text_tariffs.INPUT_COMPONENTS), Decimal(0))
-        request_rate = maxima.get("request", Decimal(0))
-        prompt, request, context = max(prompt, input_rate), max(request, request_rate), max(context, ceiling)
-        endpoint_bounds.append(str((input_rate * ceiling + request_rate) * (1 + fee_fraction)))
-    if not endpoint_bounds:
-        raise ValueError("Classifier quote has no active bounded endpoint")
-    bound = max(Decimal(value) for value in endpoint_bounds)
-    served = sorted({name.rpartition(" | ")[2] for name in (endpoint.get("name") for endpoint in endpoints) if isinstance(name, str) and name.rpartition(" | ")[2].startswith(evidence["resolved_model"] + "-")})
-    return {"requested_model": requested_model, "resolved_model": evidence["resolved_model"], "served_models": served, "context_tokens": context, "prompt_per_token": str(prompt), "request_usd": str(request), "fee_fraction": str(fee_fraction), "endpoint_attempt_bounds_usd": endpoint_bounds, "attempt_bound_usd": str(bound), "fetched_at": snapshot["fetched_at"], "evidence_sha256": digest(evidence)}
-
-
 def solver_cfg(manifest, modules):
     cfg = {**modules["study"].config(), **manifest["spec"]["resources"]}
     cfg["variant_catalog"] = load(Path(manifest["out_root"]) / "variant-catalog.json")
-    cfg["account_policy"] = load(Path(manifest["out_root"]) / "account-policy.json")
+    cfg["kilo_organization_id"] = manifest["spec"]["kilo_organization_id"]
+    cfg["classifier_allowance_usd"] = manifest["spec"]["classifier_allowance_usd"]
+    cfg["gateway_routing_table_version"] = manifest["spec"]["gateway_routing_table_version"]
     return cfg
 
 
 def quote_cfg(manifest, modules, candidate):
-    return {**solver_cfg(manifest, modules), "candidate": {"model": candidate["model"], "effort": candidate["effort"]}, "model_architecture": candidate.get("model_architecture")}
+    return {**solver_cfg(manifest, modules), "candidate": {"model": candidate["model"], "effort": candidate["effort"]}}
 
 
 def pricing_coverage(pricing, unavailable, expected):
@@ -554,8 +521,8 @@ def pricing_coverage(pricing, unavailable, expected):
         raise ValueError("Unavailable model variants must be a frozen list")
     missing = []
     for row in unavailable:
-        if not isinstance(row, dict) or set(row) != {"model", "effort", "reason", "at"} or row["reason"] != ENDPOINT_UNAVAILABLE or isinstance(row["at"], bool) or not isinstance(row["at"], (int, float)) or not math.isfinite(row["at"]):
-            raise ValueError("Invalid endpoint-availability evidence record")
+        if not isinstance(row, dict) or set(row) != {"model", "effort", "reason", "at"} or row["reason"] != MODEL_UNAVAILABLE or isinstance(row["at"], bool) or not isinstance(row["at"], (int, float)) or not math.isfinite(row["at"]):
+            raise ValueError("Invalid model-availability evidence record")
         missing.append((row["model"], row["effort"]))
     quoted = [(row["model"], row["effort"]) for row in pricing["models"]]
     expected = {tuple(pair) for pair in expected}
@@ -564,7 +531,17 @@ def pricing_coverage(pricing, unavailable, expected):
     return set(missing)
 
 
-def quote(out, panel_out, directory, modules, batch, classifier_evidence):
+def _copy_endpoint_snapshots(pair_directory, folder):
+    for snapshot in (pair_directory / "pricing-endpoints").glob("*.json"):
+        destination = folder / "pricing-endpoints" / snapshot.name
+        if destination.exists():
+            if load(destination)["body"] != load(snapshot)["body"]:
+                raise ValueError("Conflicting immutable endpoint snapshots")
+        else:
+            frozen_copy(snapshot, destination)
+
+
+def quote(out, panel_out, directory, modules, batch):
     manifest, _, _ = validate(out, panel_out, directory, modules)
     if not SAFE.fullmatch(batch):
         raise ValueError("Unsafe batch identity")
@@ -578,30 +555,28 @@ def quote(out, panel_out, directory, modules, batch, classifier_evidence):
         try:
             modules["study"].catalog(pair_directory, cfg={**solver_cfg(manifest, modules), "candidates": [candidate]})
         except RuntimeError as error:
-            if str(error) != ENDPOINT_UNAVAILABLE:
+            if str(error) != MODEL_UNAVAILABLE:
                 raise
             at = time.time()
-            unavailable.append({"model": candidate["model"], "effort": candidate["effort"], "reason": ENDPOINT_UNAVAILABLE, "at": at})
+            unavailable.append({"model": candidate["model"], "effort": candidate["effort"], "reason": MODEL_UNAVAILABLE, "at": at})
             quote_times.append(at)
         else:
             pair_pricing = load(pair_directory / "pricing.json")
             models.extend(pair_pricing["models"])
             quote_times.append(pair_pricing["fetched_at"])
-        for snapshot in (pair_directory / "pricing-endpoints").glob("*.json"):
-            destination = folder / "pricing-endpoints" / snapshot.name
-            if destination.exists():
-                if load(destination)["body"] != load(snapshot)["body"]:
-                    raise ValueError("Conflicting immutable endpoint snapshots")
-            else:
-                frozen_copy(snapshot, destination)
+        snapshot = pair_directory / "catalog-snapshot.json"
+        if snapshot.is_file():
+            frozen_copy(snapshot, folder / "catalog-snapshots" / f"{candidate['label']}.json")
+        _copy_endpoint_snapshots(pair_directory, folder)
     frozen_write(folder / "unavailable-pairs.json", unavailable)
-    frozen_write(folder / "pricing.json", {"source": "https://openrouter.ai/api/v1/models", "fetched_at": min(quote_times), "financial_quote_policy": modules["study"].FINANCIAL_QUOTE_POLICY, "models": models, "unavailable_pairs": unavailable})
-    evidence = load(classifier_evidence)
-    financial = classifier_quote(evidence, manifest["approval"]["classifier_model"], Decimal(manifest["spec"]["classifier_fee_fraction"]))
-    frozen_write(folder / "classifier-evidence.json", evidence)
-    frozen_write(folder / "classifier-quote.json", financial)
-    pricing, classifier = read_quote(out, batch, manifest, modules)
-    return {"batch": batch, "pricing_sha256": digest(pricing), "unavailable_pairs_sha256": digest(pricing["unavailable_pairs"]), "classifier_quote_sha256": digest(classifier), "classifier_attempt_bound_usd": classifier["attempt_bound_usd"], "manifest_sha256": digest(manifest)}
+    frozen_write(folder / "pricing.json", {"source": modules["study"].KILO_CATALOG_URL, "fetched_at": min(quote_times), "financial_quote_policy": modules["study"].FINANCIAL_QUOTE_POLICY, "models": models, "unavailable_pairs": unavailable})
+    classifier_directory = folder / "classifier"
+    classifier_directory.mkdir(parents=True)
+    classifier_candidate = modules["study"].classifier_quote(classifier_directory, manifest["approval"]["classifier_model"])
+    _copy_endpoint_snapshots(classifier_directory, folder)
+    frozen_write(folder / "classifier-quote.json", classifier_candidate)
+    pricing = read_quote(out, batch, manifest, modules)
+    return {"batch": batch, "pricing_sha256": digest(pricing), "unavailable_pairs_sha256": digest(pricing["unavailable_pairs"]), "classifier_quote_sha256": digest(classifier_candidate), "classifier_allowance_usd": manifest["spec"]["classifier_allowance_usd"], "classifier_allowance_bound_usd": str(text_tariffs.classifier_allowance_bound(classifier_candidate["financial_quote"])), "manifest_sha256": digest(manifest)}
 
 
 def read_quote(out, batch, manifest, modules):
@@ -609,71 +584,89 @@ def read_quote(out, batch, manifest, modules):
         raise ValueError("Unsafe batch identity")
     folder = out / "quotes" / batch
     pricing = load(folder / "pricing.json")
-    classifier = load(folder / "classifier-quote.json")
     now = time.time()
-    if not 0 <= now - pricing["fetched_at"] <= PRICING_MAX_AGE_SECONDS or not 0 <= now - classifier["fetched_at"] <= PRICING_MAX_AGE_SECONDS:
+    if not 0 <= now - pricing["fetched_at"] <= PRICING_MAX_AGE_SECONDS:
         raise ValueError("Pricing expired or future-dated; quote again and obtain a new approval")
     unavailable = load(folder / "unavailable-pairs.json")
     pricing_coverage(pricing, unavailable, manifest["approval"]["model_variants"])
     if pricing.get("unavailable_pairs") != unavailable:
         raise ValueError("Pricing and frozen unavailable-list binding differ")
+
+    def pair_snapshot(model, effort):
+        pair_index = manifest["approval"]["model_variants"].index([model, effort])
+        return load(folder / "catalog-snapshots" / f"pair-{pair_index:03d}.json")
+
+    def endpoints_for(financial):
+        snapshot = load(folder / "pricing-endpoints" / f"{financial['endpoint_snapshot_sha256']}.json")
+        if digest(snapshot["body"]) != financial["endpoint_snapshot_sha256"]:
+            raise ValueError("Endpoint price evidence changed")
+        return snapshot["body"]["data"]["endpoints"]
+
     for row in unavailable:
         if not 0 <= now - row["at"] <= PRICING_MAX_AGE_SECONDS:
-            raise ValueError("Unavailable endpoint evidence is expired or future-dated")
-        pair_index = manifest["approval"]["model_variants"].index([row["model"], row["effort"]])
-        snapshot_paths = list((folder / "pairs" / f"pair-{pair_index:03d}" / "pricing-endpoints").glob("*.json"))
-        if len(snapshot_paths) != 1:
-            raise ValueError("Unavailable pair lacks its exact raw endpoint snapshot")
-        snapshot = load(snapshot_paths[0])
-        if snapshot_paths[0].stem != digest(snapshot["body"]) or snapshot["body"]["data"]["id"] != row["model"]:
-            raise ValueError("Unavailable endpoint snapshot identity or hash changed")
+            raise ValueError("Unavailable model evidence is expired or future-dated")
+        snapshot = pair_snapshot(row["model"], row["effort"])
+        entry = snapshot["entries"].get(row["model"])
+        if entry is None:
+            continue
         try:
-            modules["study"].endpoint_ceiling(snapshot["body"]["data"]["endpoints"], quote_cfg(manifest, modules, {"model": row["model"], "effort": row["effort"]}))
+            modules["study"].catalog_quote(entry, quote_cfg(manifest, modules, {"model": row["model"], "effort": row["effort"]}))
         except RuntimeError as error:
-            if str(error) != ENDPOINT_UNAVAILABLE:
+            if str(error) != MODEL_UNAVAILABLE:
                 raise
         else:
-            raise ValueError("Recorded-unavailable model now reproduces an available endpoint quote")
-    cfg = solver_cfg(manifest, modules)
+            raise ValueError("Recorded-unavailable model now reproduces an available catalog quote")
     for candidate in pricing["models"]:
         financial = candidate["financial_quote"]
-        snapshot = load(folder / "pricing-endpoints" / f"{financial['endpoint_snapshot_sha256']}.json")
-        if digest(snapshot["body"]) != financial["endpoint_snapshot_sha256"] or snapshot["body"]["data"]["id"] != candidate["model"]:
-            raise ValueError("Solver endpoint evidence changed")
-        expected = modules["study"].endpoint_ceiling(snapshot["body"]["data"]["endpoints"], quote_cfg(manifest, modules, candidate))
+        snapshot = pair_snapshot(candidate["model"], candidate["effort"])
+        if digest(snapshot) != financial["catalog_snapshot_sha256"]:
+            raise ValueError("Solver catalog evidence changed")
+        entry = snapshot["entries"].get(candidate["model"])
+        if entry is None:
+            raise ValueError("Solver catalog entry is absent from its snapshot")
+        expected = modules["study"].catalog_quote(entry, quote_cfg(manifest, modules, candidate), endpoints=endpoints_for(financial))
         if any(financial.get(key) != value for key, value in expected.items()):
-            raise ValueError("Solver financial quote no longer reproduces from its endpoint evidence")
+            raise ValueError("Solver financial quote no longer reproduces from its catalog and endpoint evidence")
         modules["study"].financial_prices(candidate)
-        modules["study"].routing_max_price(candidate)
-        financial_attempt_bound(candidate, solver_cfg(manifest, modules), Decimal(manifest["spec"]["classifier_fee_fraction"]))
-    if classifier != classifier_quote(load(folder / "classifier-evidence.json"), manifest["approval"]["classifier_model"], Decimal(manifest["spec"]["classifier_fee_fraction"])):
-        raise ValueError("Classifier quote no longer reproduces from its evidence")
-    return pricing, classifier
+        financial_attempt_bound(candidate, solver_cfg(manifest, modules))
+    classifier = load(folder / "classifier-quote.json")
+    if classifier.get("model") != manifest["approval"].get("classifier_model"):
+        raise ValueError("Classifier quote belongs to another classifier model")
+    if not isinstance(classifier.get("quote_fetched_at"), (int, float)) or not 0 <= now - classifier["quote_fetched_at"] <= PRICING_MAX_AGE_SECONDS:
+        raise ValueError("Classifier quote expired or future-dated; quote again and obtain a new approval")
+    financial = classifier["financial_quote"]
+    expected = text_tariffs.classifier_endpoint_quote(classifier["model"], endpoints_for(financial))
+    if any(financial.get(key) != value for key, value in expected.items()):
+        raise ValueError("Classifier financial quote no longer reproduces from its endpoint evidence")
+    bound = text_tariffs.classifier_allowance_bound(financial)
+    if money(manifest["spec"]["classifier_allowance_usd"]) < bound:
+        raise ValueError(f"Classifier allowance is below the computed dearest-price bound {bound} for every classifier attempt of one request; raise the frozen allowance")
+    return pricing
 
 
-def financial_attempt_bound(candidate, cfg, fee_fraction):
+def financial_attempt_bound(candidate, cfg):
     quote = text_tariffs.validate_quote(candidate)
-    upstream, attempt = money(quote["upstream_bound_usd"]), money(quote["attempt_bound_usd"])
-    if money(quote["fee_fraction"]) != fee_fraction or attempt != upstream * (1 + fee_fraction):
-        raise ValueError("Financial attempt bound must include the full approved fee allowance")
-    return attempt, "complete endpoint component envelope plus approved fee allowance"
+    return money(quote["attempt_bound_usd"]), "complete Kilo catalog component envelope at frozen quantities, plus any frozen classifier allowance in the quote"
 
 
-def verified_classifier_attempts(execution):
-    for version in ("baseline", "candidate"):
-        root = execution.get(version, {}).get("workerRoot")
-        if not isinstance(root, str):
-            return None
-        for relative, expected in CLASSIFIER_BOUND_SOURCES.items():
-            try:
-                if file_hash(Path(root) / relative) != expected:
-                    return None
-            except OSError:
-                return None
-    return 2
+def gateway_router_candidate(pricing, pool, mode, cfg):
+    """Worst-case kilo-auto candidate over the complete mode pool, plus allowance.
+
+    Returns None unless every pool pair is quoted: a router arm with an
+    unquotable pool model is not admissible. The candidate carries the
+    smallest pool context so the solver input cap stays conservative, and
+    the frozen pool model set for the routed-model check.
+    """
+    by_pair = {(item["model"], item["effort"]): item for item in pricing["models"]}
+    if not pool or any(tuple(pair) not in by_pair for pair in pool):
+        return None
+    quoted = [by_pair[tuple(pair)] for pair in pool]
+    quote = text_tariffs.worst_case_quote([item["financial_quote"] for item in quoted], GATEWAY_MODELS[mode], "effort=", cfg, cfg.get("classifier_allowance_usd"))
+    fetched = [item.get("quote_fetched_at") for item in quoted]
+    return {"model": GATEWAY_MODELS[mode], "effort": "effort=", "context_length": min(item["context_length"] for item in quoted), "pool_models": sorted({model for model, _ in pool}), "financial_quote": quote, "quote_fetched_at": min(fetched) if all(isinstance(value, (int, float)) for value in fetched) else None}
 
 
-def build_financing(manifest, plan, pricing, classifier, cfg):
+def build_financing(manifest, plan, pricing, cfg):
     """Whole-plan cost forecast. Per-row envelope = min(resource cap, proved bound).
 
     The forecast prices every mandatory row. It guarantees no funding. Its
@@ -681,46 +674,44 @@ def build_financing(manifest, plan, pricing, classifier, cfg):
     the pilot cap. Dispatch reserves each request against the nested caps.
     """
     spec = manifest["spec"]
-    fee = Decimal(spec["classifier_fee_fraction"])
+    allowance = money(spec["classifier_allowance_usd"])
     run_cap = money(cfg["run_cost_limit_usd"])
     if run_cap <= 0 or run_cap > RUN_CAP_USD:
         raise ValueError("Cost forecast per-run resource cap must stay within the per-run ceiling")
     steps = cfg["step_limit"]
     if type(steps) is not int or steps <= 0:
-        raise ValueError("Cost forecast requires a proved positive solver/classifier call-count bound")
-    classifier_attempts = verified_classifier_attempts(manifest["approval"].get("execution_identity", {}))
+        raise ValueError("Cost forecast requires a proved positive solver call-count bound")
     by_pair = {(row["model"], row["effort"]): row for row in pricing["models"]}
     unavailable = {(row["model"], row["effort"]) for row in pricing.get("unavailable_pairs", [])}
     pools = {mode: [tuple(pair) for pair in pairs] for mode, pairs in manifest["approval"]["mode_pools"].items()}
     solver_bound = {}
     for pair, candidate in by_pair.items():
-        solver_bound[pair] = financial_attempt_bound(candidate, cfg, fee)[0]
-    classifier_bound = money(classifier["attempt_bound_usd"])
+        solver_bound[pair] = financial_attempt_bound(candidate, cfg)[0]
+    router_bound = {}
+    for mode in MODES:
+        candidate = gateway_router_candidate(pricing, pools[mode], mode, cfg)
+        if candidate is not None:
+            router_bound[mode] = financial_attempt_bound(candidate, cfg)[0]
     rows = []
     for row in plan["runs"]:
         if row["arm_kind"] == "router":
-            reachable = [solver_bound[pair] for pair in pools[row["router"]] if pair in solver_bound]
-            if not reachable:
-                raise ValueError("Router arm has no quoted reachable solver pair to forecast")
-            if classifier_attempts is None:
-                proved = run_cap
-                basis = {"solver_calls_max": steps, "classifier_attempts_max": None, "bound": "unchanged run money cap; classifier call count is not proved for both executables"}
-            else:
-                proved = steps * max(reachable) + steps * classifier_attempts * classifier_bound
-                basis = {"solver_calls_max": steps, "classifier_attempts_max": steps * classifier_attempts, "solver_attempt_bound_usd": str(max(reachable)), "classifier_attempt_bound_usd": str(classifier_bound)}
+            if row["router"] not in router_bound:
+                raise ValueError("Router arm requires a valid quote for every pool pair of its mode; an unquoted pool pair blocks admission")
+            proved = steps * router_bound[row["router"]]
+            basis = {"solver_calls_max": steps, "gateway_model": GATEWAY_MODELS[row["router"]], "solver_attempt_bound_usd": str(router_bound[row["router"]] - allowance), "classifier_allowance_per_request_usd": str(allowance)}
         else:
             pair = (row["model"], row["variant"])
             if pair in unavailable or pair not in solver_bound:
                 raise ValueError(f"Mandatory {row['arm_kind']} arm pair has no proved quote and cannot be forecast: {pair}")
             proved = steps * solver_bound[pair]
-            basis = {"solver_calls_max": steps, "classifier_attempts_max": 0, "solver_attempt_bound_usd": str(solver_bound[pair]), "classifier_attempt_bound_usd": "0", "model": pair[0], "variant": pair[1]}
+            basis = {"solver_calls_max": steps, "solver_attempt_bound_usd": str(solver_bound[pair]), "classifier_allowance_per_request_usd": "0", "model": pair[0], "variant": pair[1]}
         envelope = min(run_cap, proved)
         rows.append({"run": row["run"], "phase": row["phase"], "arm_id": row["arm_id"], "arm_kind": row["arm_kind"], "router": row["router"], "envelope_usd": str(envelope), "proved_envelope_usd": str(proved), "resource_cap_usd": str(run_cap), "basis": basis})
     pilot_total = sum((money(row["envelope_usd"]) for row in rows if row["phase"] == "pilot"), Decimal(0))
     pilot_cap = money(spec["pilot_cap_usd"])
     with CAMPAIGN.readonly(spec["campaign_ledger"]) as db:
         authorization = CAMPAIGN.effective_authorization(db, spec["prospective_grant_id"])
-    return {"schema": CAMPAIGN.FINANCING_SCHEMA, "forecast_only": True, "funding_guarantee": "none; capped exploration may stop inconclusive", "manifest_sha256": digest(manifest), "execution_plan_sha256": digest(plan), "authorization": CAMPAIGN.authorization_summary(authorization), "pricing_sha256": digest(pricing), "classifier_quote_sha256": digest(classifier), "resources": {key: cfg[key] for key in ("step_limit", "wall_seconds", "action_timeout_seconds", "max_output_tokens", "max_input_tokens", "run_cost_limit_usd") if key in cfg}, "call_count_bound_source": {"solver": "clean pinned mini-SWE-agent DefaultAgent.query increments n_calls before each query, including format errors", "classifier": "one classification per decision, at most two HTTP attempts for supported source hashes; otherwise retain the full run cap", "supported_classifier_sources": CLASSIFIER_BOUND_SOURCES}, "pilot_cap_usd": str(pilot_cap), "pilot_envelope_usd": str(pilot_total), "total_envelope_usd": str(sum((money(row["envelope_usd"]) for row in rows), Decimal(0))), "rows": rows}
+    return {"schema": CAMPAIGN.FINANCING_SCHEMA, "forecast_only": True, "funding_guarantee": "none; capped exploration may stop inconclusive", "manifest_sha256": digest(manifest), "execution_plan_sha256": digest(plan), "authorization": CAMPAIGN.authorization_summary(authorization), "pricing_sha256": digest(pricing), "classifier_allowance_usd": str(allowance), "gateway": {"organization_id": spec["kilo_organization_id"], "routing_table_version": spec["gateway_routing_table_version"], "models": GATEWAY_MODELS}, "resources": {key: cfg[key] for key in ("step_limit", "wall_seconds", "action_timeout_seconds", "max_output_tokens", "max_input_tokens", "run_cost_limit_usd") if key in cfg}, "call_count_bound_source": {"solver": "clean pinned mini-SWE-agent DefaultAgent.query increments n_calls before each query, including format errors", "classifier": "billed by the gateway as a separate organization usage row excluded from usage.cost; the frozen per-request allowance is added to every router-arm reservation and settlement, and read_quote rejects an allowance below the computed dearest-price bound"}, "pilot_cap_usd": str(pilot_cap), "pilot_envelope_usd": str(pilot_total), "total_envelope_usd": str(sum((money(row["envelope_usd"]) for row in rows), Decimal(0))), "rows": rows}
 
 
 def financing_path(out, batch):
@@ -729,8 +720,8 @@ def financing_path(out, batch):
 
 def finance_plan(out, panel_out, directory, modules, batch):
     manifest, plan, _ = validate(out, panel_out, directory, modules)
-    pricing, classifier = read_quote(out, batch, manifest, modules)
-    financing = build_financing(manifest, plan, pricing, classifier, solver_cfg(manifest, modules))
+    pricing = read_quote(out, batch, manifest, modules)
+    financing = build_financing(manifest, plan, pricing, solver_cfg(manifest, modules))
     ledger = campaign_path(out)
     destination = financing_path(out, batch)
     with (ledger.parent / ".writer.lock").open("a+") as lock:
@@ -793,11 +784,18 @@ def accounted_row_valid(db, row):
 
 
 def receipt_generation(receipt):
-    field = "generation_id" if "generation_id" in receipt else "provider_generation_id"
-    generation = receipt.get(field)
-    if not isinstance(generation, str) or not re.fullmatch(r"gen-[A-Za-z0-9_-]+", generation):
-        return None, field
-    return generation, field
+    """Gateway request identity from a receipt, newest field first.
+
+    The first present non-null field is authoritative: an invalid value
+    never falls back to a different field.
+    """
+    for field in ("gateway_request_id", "generation_id", "provider_generation_id"):
+        if field in receipt and receipt[field] is not None:
+            generation = receipt[field]
+            if not isinstance(generation, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,256}", generation):
+                return None, field
+            return generation, field
+    return None, "gateway_request_id"
 
 
 def account_unknown(out, request_id, evidence_path, modules):
@@ -818,8 +816,8 @@ def account_unknown(out, request_id, evidence_path, modules):
                 raise ValueError("Dispatched request receipt must identify this request, run and generation")
             if money(row["bound"]) <= 0 or money(receipt.get("reservation_usd")) != money(row["bound"]):
                 raise ValueError("Accounting must retain the full unchanged original reservation")
-            if not isinstance(evidence, dict) or set(evidence) != {"url", "http_status", "body"} or evidence["url"] != "https://openrouter.ai/api/v1/generation?id=" + generation or type(evidence["http_status"]) is not int or not 100 <= evidence["http_status"] <= 599:
-                raise ValueError("Evidence requires the exact generation lookup URL, HTTP status and body")
+            if not isinstance(evidence, dict) or set(evidence) != {"gateway_request_id", "http_status", "body"} or evidence["gateway_request_id"] != generation or type(evidence["http_status"]) is not int or not 100 <= evidence["http_status"] <= 599:
+                raise ValueError("Evidence requires the exact gateway request id, HTTP status and body")
             claim = db.execute("SELECT state FROM router_runs WHERE run=?", (row["run"],)).fetchone()
             if claim not in {("stopped",), ("interrupted",)}:
                 raise ValueError("Only a permanently aborted run can have an unknown charge accounted")
@@ -854,7 +852,7 @@ def clear_stop(out, reason, modules):
 def automatic_account(db, row, receipt, out):
     generation, generation_field = receipt_generation(receipt)
     kind = db.execute("SELECT kind FROM router_requests WHERE id=?", (row["id"],)).fetchone()
-    eligible_kind = kind == ("solver",) or kind == ("classifier",) and isinstance(receipt.get("response"), dict) and generation is not None
+    eligible_kind = kind == ("solver",)
     if row["state"] != "unknown" or receipt.get("dispatch_entered") is not True or not eligible_kind or money(row["bound"]) <= 0 or money(row["bound"]) != money(receipt.get("reservation_usd")) or row["actual"] is not None and money(row["actual"]) > money(row["bound"]):
         return False
     evidence = {"kind": "automatic-full-bound", "receipt_sha256": digest(receipt), "generation_id": generation, "generation_id_field": generation_field if generation is not None else None, "error_type": receipt.get("error_type") or getattr(sys.exc_info()[0], "__name__", None), "receipt_snapshot": receipt}
@@ -876,7 +874,6 @@ class Budget:
         self.financing = financing
         self.financing_sha = digest(financing) if financing is not None else None
         self.financing_envelopes = {row["run"]: money(row["envelope_usd"]) for row in financing["rows"]} if financing else {}
-        self.active = {}
         self.auto_run = auto_run
         with self.connect() as db:
             CAMPAIGN.metadata(db)
@@ -980,11 +977,7 @@ class Budget:
             if db.execute("SELECT 1 FROM campaign_manifests WHERE sha256=?", (manifest_hash,)).fetchone() is None:
                 raise ValueError("Run admission requires a registered global campaign manifest")
             if row.get("arm_kind", "router") == "router":
-                snapshot_id = row["configuration"] if row["version"] == "candidate" else manifest["spec"]["configurations"][0]["id"]
-                snapshot = load(Path(manifest["out_root"]) / "snapshots" / f"{snapshot_id}.json")
-                executable = manifest["approval"]["execution_identity"][row["version"]]["executableSha256"]
-                # Keep the frozen router fingerprint bytes: attempt identity must not move.
-                fingerprint = digest({"router": row["router"], "executableSha256": executable, "config": snapshot[row["version"]]})
+                fingerprint = router_fingerprint(row["router"], manifest["approval"]["mode_pools"][row["router"]])
             else:
                 catalog = load(Path(manifest["out_root"]) / "variant-catalog.json")
                 fingerprint = digest({"router": row["router"], "arm_kind": row["arm_kind"], "model": row["model"], "variant": row["variant"], "resolved_variant": resolve_variant(catalog, row["model"], row["variant"]), "resources": manifest["spec"]["resources"]})
@@ -1125,131 +1118,6 @@ class Budget:
         return {"orphaned_requests": orphans, "interrupted_runs": interrupted}
 
 
-
-
-class ClassifierBroker:
-    def __init__(self, budget, classifier, out, port=0, transport=None):
-        self.budget, self.classifier, self.out = budget, classifier, Path(out)
-        self.transport = transport
-        broker = self
-
-        class Handler(BaseHTTPRequestHandler):
-            def log_message(self, *args):
-                pass
-
-            def do_POST(self):
-                try:
-                    size = int(self.headers.get("Content-Length", "0"))
-                    if self.path != "/api/v1/systemone" or not 0 < size <= 4194304:
-                        raise ValueError("Only bounded SystemOne POST requests are admitted")
-                    status, content_type, body = broker.dispatch(self.headers.get("X-Benchmark-Run"), self.rfile.read(size))
-                except Exception as error:
-                    status, content_type, body = 503, "application/json", json.dumps({"error": {"message": str(error), "type": type(error).__name__, "source": "router-study-broker"}}).encode()
-                try:
-                    self.send_response(status)
-                    self.send_header("Content-Type", content_type)
-                    self.send_header("Content-Length", str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
-                except (BrokenPipeError, ConnectionResetError):
-                    pass
-
-        self.server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-
-    @property
-    def url(self):
-        return f"http://127.0.0.1:{self.server.server_port}"
-
-    def __enter__(self):
-        self.thread.start()
-        return self
-
-    def __exit__(self, *args):
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join()
-
-    def dispatch(self, run, raw):
-        study = self.budget.modules["study"]
-        payload = json.loads(raw)
-        with MUTEX:
-            active = self.budget.active.get(run)
-        if active is None or not isinstance(payload, dict) or payload.get("model") != self.classifier["requested_model"]:
-            raise ValueError("Classifier requests require an active frozen run and the exact quoted model")
-        cfg, deadline = active
-        bound, context = money(self.classifier["attempt_bound_usd"]), self.classifier["context_tokens"]
-        if time.monotonic() >= deadline:
-            raise TimeoutError("Run deadline passed before classifier reservation")
-        request_id, receipt_path = self.budget.reserve(self.out, run, bound, context, cfg=cfg, ledger_out=self.out, kind="classifier")
-        receipt = {"local_request_id": request_id, "run": run, "kind": "classifier", "input_token_bound": context, "reservation_usd": str(bound), "request_sha256": hashlib.sha256(raw).hexdigest(), "request": payload, "classifier_quote_sha256": digest(self.classifier), "dispatch_entered": False, "started_at": time.time()}
-        study.save(receipt_path, receipt)
-        actual = None
-        known_floor, fee_breach = Decimal(0), False
-        try:
-            remaining = min(600, deadline - time.monotonic())
-            if remaining <= 0:
-                raise TimeoutError("Run deadline passed before classifier dispatch")
-            if self.transport is None:
-                import requests
-                send = requests.post
-            else:
-                send = self.transport
-            headers = {"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}", "Content-Type": "application/json"}
-            with self.budget.admission(self.out, run, request_id, cfg):
-                pass
-            receipt["dispatch_entered"] = True
-            study.save(receipt_path, receipt)
-            response = send("https://openrouter.ai/api/v1/systemone", headers=headers, data=raw, timeout=(min(15, remaining), remaining), allow_redirects=False, stream=True)
-            try:
-                body = bytearray()
-                for chunk in response.iter_content(chunk_size=4096):
-                    body.extend(chunk)
-                    if len(body) > 8388608:
-                        raise ValueError("Classifier response exceeds the bounded receipt size")
-                body = bytes(body)
-                receipt.update(http_status=response.status_code, response_sha256=hashlib.sha256(body).hexdigest())
-                parsed = json.loads(body)
-                receipt["response"] = parsed
-                usage = parsed.get("usage") if isinstance(parsed, dict) else None
-                if not isinstance(usage, dict):
-                    raise ValueError("Unknown classifier charge")
-                evidence = study.charge_evidence(usage, money(self.classifier["fee_fraction"]))
-                known_floor, fee_breach = evidence.known_floor, evidence.fee_breach
-                actual = evidence.actual if evidence.complete else None
-                if not evidence.complete or fee_breach:
-                    raise ValueError("Incomplete or ambiguous classifier billing evidence")
-                counts = (usage.get("input_tokens"), usage.get("output_tokens"))
-                if any(type(value) is not int or value < 0 for value in counts) or counts[0] > context:
-                    raise ValueError("Classifier token usage is unknown or beyond the quoted context")
-                tokens = sum(counts)
-                if actual > bound:
-                    raise ValueError("Classifier charge exceeds its full-context reservation")
-                self.budget.settle(request_id, "settled", bound, actual, tokens)
-                receipt.update(status="settled", actual_usd=str(actual), finished_at=time.time())
-                study.save(receipt_path, receipt)
-                served = parsed.get("model")
-                if isinstance(served, str) and served not in {self.classifier["requested_model"], self.classifier["resolved_model"], *self.classifier["served_models"]}:
-                    self.budget.stop(f"classifier_model_drift:{request_id}")
-                return response.status_code, response.headers.get("Content-Type", "application/json"), body
-            finally:
-                response.close()
-        except BaseException as error:
-            if receipt.get("status") == "settled":
-                raise
-            dispatched = receipt["dispatch_entered"]
-            if dispatched:
-                state = "breach" if fee_breach or known_floor > bound or actual is not None and actual > bound or "exceeds" in str(error) or "beyond" in str(error) else "unknown"
-                self.budget.settle(request_id, state, max(bound, known_floor, actual or Decimal(0)), actual, None, auto_account=self.budget.auto_run is not None, receipt=receipt)
-            else:
-                self.budget.settle(request_id, "settled", Decimal(0), Decimal(0), 0)
-            receipt.update(status=state if dispatched else "not_dispatched", error_type=type(error).__name__, finished_at=time.time())
-            study.save(receipt_path, receipt)
-            raise
-
-
-
-
 def driver_resource_summary(study, out, ledger_out, run, cfg, result, *, wall_exhausted=False):
     with sqlite3.connect(Path(ledger_out) / "budget.sqlite") as db:
         rows = [row for row in study.request_rows(db) if row["run"] == run]
@@ -1283,6 +1151,8 @@ def driver_resource_summary(study, out, ledger_out, run, cfg, result, *, wall_ex
         "native_completion_tokens": native_completion,
         "request_money_bounds_usd": [receipt["reservation_usd"] for receipt in receipts],
         "native_cost_usd": [value.get("cost") for value in usage],
+        "requested_models": [receipt.get("requested_model") or (receipt.get("request") or {}).get("model") for receipt in receipts],
+        "routed_models": [receipt.get("routed_model") for receipt in receipts],
         "missing_native_usage_requests": sum(prompt is None or completion is None for prompt, completion in zip(native_prompt, native_completion)),
         "settled_plus_held_usd": str(sum((study.held_cost(row) for row in rows), Decimal(0))),
         "settled_plus_held_tokens": sum((row["tokens"] if row["state"] == "settled" else row["token_bound"]) or 0 for row in rows),
@@ -1309,21 +1179,6 @@ def driver_adapters(modules):
         panel.evaluate, study.resource_summary = original_evaluate, original_summary
 
 
-def loopback_origin(port):
-    if type(port) is not int or not 1 <= port <= 65535:
-        raise ValueError("Invalid runtime port")
-    return f"http://127.0.0.1:{port}"
-
-
-def runtime_json(origin, path, payload=None, timeout=60):
-    import requests
-    if urlparse(origin).hostname != "127.0.0.1":
-        raise ValueError("Runtime must stay on loopback")
-    response = requests.get(origin + path, timeout=timeout, allow_redirects=False) if payload is None else requests.post(origin + path, json=payload, timeout=timeout, allow_redirects=False)
-    response.raise_for_status()
-    return response.json()
-
-
 def dispatch_provider_outage(out, run, pair):
     ledger = Path(out) / "budget.sqlite"
     if not ledger.is_file():
@@ -1342,54 +1197,40 @@ def dispatch_provider_outage(out, run, pair):
     error = response.get("error")
     message = error.get("message", "") if isinstance(error, dict) else str(error or response.get("message") or "")
     has_content = any(bool((choice.get("message") or {}).get("content") or (choice.get("message") or {}).get("tool_calls") or choice.get("text")) for choice in response.get("choices") or [] if isinstance(choice, dict) and isinstance(choice.get("message") or {}, dict))
-    if has_content and not re.search(r"no endpoints? found|no routable endpoints?|no allowed providers", str(message), re.IGNORECASE):
+    if has_content and not re.search(r"no endpoints? found|no routable endpoints?|no allowed providers|does not exist|model.{0,40}not found", str(message), re.IGNORECASE):
         return None
-    return {"model": pair[0], "effort": pair[1], "http_status": 404, "reason": f"HTTP404 provider unavailable for model={pair[0]}, variant={pair[1]} before routable content: {message}"}
+    return {"model": pair[0], "effort": pair[1], "http_status": 404, "reason": f"HTTP404 gateway provider unavailable for model={pair[0]}, variant={pair[1]} before routable content: {message}"}
 
 
 class RoutedModel:
-    def __init__(self, out, run, row, deadline, cfg, budget, origin, pricing, modules):
+    """Router arm: one live kilo-auto gateway model per mode. No local router."""
+
+    def __init__(self, out, run, row, deadline, cfg, budget, pricing, modules, pool):
         self.out, self.run, self.row, self.deadline, self.cfg = Path(out), run, row, deadline, cfg
-        self.budget, self.origin, self.modules = budget, origin, modules
-        self.pricing = {(item["model"], item["effort"]): item for item in pricing["models"]}
-        self.models = {}
-        self.turn = 0
-        self.unavailable = {(item["model"], item["effort"]) for item in pricing.get("unavailable_pairs", [])}
-        self.formatter = modules["study"].paid_model(out, run, {"model": f"kilo-auto/{row['router']}"}, deadline, cfg=cfg, ledger_out=out)
+        self.budget, self.modules = budget, modules
+        self.pricing = pricing
+        self.pool = [tuple(pair) for pair in pool]
+        self.pair = (GATEWAY_MODELS[row["router"]], "effort=")
+        self.model = None
+        self.formatter = modules["study"].paid_model(out, run, {"model": self.pair[0]}, deadline, cfg=cfg, ledger_out=out)
 
     def __getattr__(self, name):
         return getattr(self.formatter, name)
 
-    def route(self, messages):
-        remaining = self.deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError("WallTimeLimited before actual routing")
-        if self.budget.stopped(self.cfg["router_phase"]):
-            raise self.budget.limited(self.out, self.run, "Global stop before actual routing", {"caps": ["recorded_stop"]})
-        chat = [{"role": message["role"], "content": message["content"]} for message in messages]
-        response = runtime_json(self.origin, "/route", {"runId": self.run, "version": self.row["version"], "router": self.row["router"], "messages": chat}, timeout=min(120, remaining))
-        self.turn += 1
-        self.modules["study"].save(self.out / "routes" / self.run / f"{self.turn:04d}.json", {"messages_sha256": digest(chat), "response": response})
-        decision = response.get("decision") if isinstance(response, dict) else None
-        if not isinstance(decision, dict) or not isinstance(decision.get("model"), str):
-            raise RuntimeError("Actual router returned no concrete decision; synthetic fallback is forbidden")
-        return decision["model"], variant_label(decision)
-
     def query(self, messages, **kwargs):
-        pair = self.route(messages)
-        if pair not in self.models:
-            candidate = self.pricing.get(pair)
+        if self.deadline - time.monotonic() <= 0:
+            raise TimeoutError("WallTimeLimited before gateway router dispatch")
+        if self.budget.stopped(self.cfg["router_phase"]):
+            raise self.budget.limited(self.out, self.run, "Global stop before gateway router dispatch", {"caps": ["recorded_stop"]})
+        if self.model is None:
+            candidate = gateway_router_candidate(self.pricing, self.pool, self.row["router"], self.cfg)
             if candidate is None:
-                if pair in self.unavailable:
-                    reason = f"Quoted provider unavailable for model={pair[0]}, variant={pair[1]}; no solver request dispatched for this selection"
-                    self.modules["study"].save(self.out / "rollouts" / self.run / "provider-unavailable.json", {"model": pair[0], "effort": pair[1], "reason": reason})
-                    raise ProviderUnavailable(reason)
-                raise RuntimeError(f"Actual decision is outside the frozen quoted model variants: {pair}")
-            self.models[pair] = self.modules["study"].paid_model(self.out, self.run, candidate, self.deadline, cfg=self.cfg, ledger_out=self.out, input_bounder=self.modules["census"].NativeInputBound(), reservation=self.budget.reserve, transport_admission=self.budget.admission, state_guard=self.budget.guard)
+                raise RuntimeError(f"Router arm requires a valid quote for every pool pair of its mode; {self.pair[0]} is not admissible")
+            self.model = self.modules["study"].paid_model(self.out, self.run, candidate, self.deadline, cfg=self.cfg, ledger_out=self.out, input_bounder=self.modules["census"].NativeInputBound(), reservation=self.budget.reserve, transport_admission=self.budget.admission, state_guard=self.budget.guard)
         try:
-            return self.models[pair].query(messages, **kwargs)
+            return self.model.query(messages, **kwargs)
         except Exception as error:
-            outage = dispatch_provider_outage(self.out, self.run, pair)
+            outage = dispatch_provider_outage(self.out, self.run, self.pair)
             if outage is None:
                 raise
             self.modules["study"].save(self.out / "rollouts" / self.run / "provider-unavailable.json", outage)
@@ -1458,25 +1299,25 @@ def selected_rows(out, manifest, plan, phase):
     return rows
 
 
-def run_approval(out, manifest, plan, phase, batch, runs, pricing, classifier, runtime_command, concurrency=1, auto_account_unknown=False, financing=None, authorization=None):
+def run_approval(out, manifest, plan, phase, batch, runs, pricing, concurrency=1, auto_account_unknown=False, financing=None, authorization=None):
     if phase not in {"pilot", "final"} or type(concurrency) is not int or not 1 <= concurrency <= (1 if phase == "pilot" else 2):
         raise ValueError("Pilot must be sequential; final concurrency must be at most2")
     eligible = [row["run"] for row in selected_rows(out, manifest, plan, phase)]
     if not isinstance(runs, list) or not runs or runs[0] not in eligible or runs != eligible[eligible.index(runs[0]):eligible.index(runs[0]) + len(runs)]:
         raise ValueError("Run approval must list a nonempty contiguous slice of the frozen phase order")
     execution = helper("router-proof").execution_identity(manifest["spec"]["execution_manifest"])
-    if execution != manifest["approval"]["execution_identity"] or runtime_command != execution["serving_argv"]:
-        raise ValueError("Runtime argv must equal the fixed approved prepared-execution serving command")
+    if execution != manifest["approval"]["execution_identity"]:
+        raise ValueError("Frozen execution identity changed before run approval")
     if financing is None:
         raise ValueError("Run approval must bind the registered whole-plan cost forecast")
-    if financing.get("manifest_sha256") != digest(manifest) or financing.get("pricing_sha256") != digest(pricing) or financing.get("classifier_quote_sha256") != digest(classifier):
-        raise ValueError("Cost forecast must bind this exact manifest and quote batch")
+    if financing.get("manifest_sha256") != digest(manifest) or financing.get("pricing_sha256") != digest(pricing) or financing.get("classifier_allowance_usd") != manifest["spec"]["classifier_allowance_usd"]:
+        raise ValueError("Cost forecast must bind this exact manifest, quote batch and classifier allowance")
     authorization = authorization if authorization is not None else manifest["approval"]["effective_authorization"]
     if financing.get("authorization") != authorization:
         raise ValueError("Cost forecast and run approval must bind the same effective authorization")
     # This template grants nothing by itself: execute() re-reads the ledger,
     # the registered cost forecast and the effective authorization before dispatch.
-    required = {"authorized": True, "action": "run-router-study-v5", "prospective_grant_id": manifest["spec"]["prospective_grant_id"], "prospective_grant_approval_sha256": manifest["approval"]["prospective_grant_approval_sha256"], "effective_authorization": authorization, "cost_forecast_sha256": digest(financing), "manifest_sha256": digest(manifest), "execution_plan_sha256": digest(plan), "source_sha256": manifest["approval"]["source_sha256"], "execution_identity": execution, "phase": phase, "batch": batch, "runs": runs, "pricing_sha256": digest(pricing), "classifier_quote_sha256": digest(classifier), "runtime_command": runtime_command, "pilot_cap_usd": manifest["spec"]["pilot_cap_usd"], "unknown_charge_policy": "stop-all-dispatch-hold-full-bound"}
+    required = {"authorized": True, "action": "run-router-study-v6", "prospective_grant_id": manifest["spec"]["prospective_grant_id"], "prospective_grant_approval_sha256": manifest["approval"]["prospective_grant_approval_sha256"], "effective_authorization": authorization, "cost_forecast_sha256": digest(financing), "manifest_sha256": digest(manifest), "execution_plan_sha256": digest(plan), "source_sha256": manifest["approval"]["source_sha256"], "execution_identity": execution, "phase": phase, "batch": batch, "runs": runs, "pricing_sha256": digest(pricing), "kilo_organization_id": manifest["spec"]["kilo_organization_id"], "classifier_allowance_usd": manifest["spec"]["classifier_allowance_usd"], "gateway_routing_table_version": manifest["spec"]["gateway_routing_table_version"], "gateway_models": GATEWAY_MODELS, "pilot_cap_usd": manifest["spec"]["pilot_cap_usd"], "unknown_charge_policy": "stop-all-dispatch-hold-full-bound"}
     required["concurrency"] = concurrency
     required["unavailable_pairs_sha256"] = digest(pricing["unavailable_pairs"])
     if auto_account_unknown is not False:
@@ -1484,44 +1325,6 @@ def run_approval(out, manifest, plan, phase, batch, runs, pricing, classifier, r
     if phase == "final":
         required["final_selection_sha256"] = digest(final_selection(out, manifest))
     return required
-
-
-@contextmanager
-def runtime_process(command, snapshot, broker_url, port, prepared_execution, expected_identity, health_path, snapshot_sha256):
-    proof = helper("router-proof")
-    if proof.execution_identity(prepared_execution) != expected_identity or command != expected_identity["serving_argv"] or file_hash(snapshot) != snapshot_sha256:
-        raise ValueError("Prepared executable changed before runtime launch")
-    argv = [part.replace("{prepared_execution}", str(prepared_execution)).replace("{snapshot}", str(snapshot)).replace("{broker_url}", broker_url).replace("{port}", str(port)) for part in command]
-    environment = {key: os.environ[key] for key in SAFE_RUNTIME_ENV if key in os.environ}
-    process = subprocess.Popen(argv, cwd=expected_identity["host"]["workerRoot"], env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-    origin = loopback_origin(port)
-    try:
-        started = time.monotonic()
-        while True:
-            if process.poll() is not None:
-                raise RuntimeError("Isolated router runtime exited before readiness")
-            try:
-                health = runtime_json(origin, "/health", timeout=30)
-                break
-            except Exception:
-                if time.monotonic() - started > 120:
-                    raise RuntimeError("Isolated router runtime readiness deadline exceeded")
-                time.sleep(0.2)
-        if health.get("snapshotSha256") != snapshot_sha256:
-            raise ValueError("Runtime did not load the exact frozen snapshot bytes")
-        proof.verify_runtime_health(health, expected_identity)
-        frozen_write(health_path, health)
-        yield origin
-    finally:
-        try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        try:
-            process.wait(timeout=15)
-        except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
-            process.wait()
 
 
 def run_state(ledger, run):
@@ -1544,7 +1347,7 @@ def classify_router_result(ledger_out, run, result, timed_out, modules):
     return status
 
 
-def row_process(connection, out, directory, manifest, row, task, approval, cfg, batch, pricing, runtime_command, broker_url, port):
+def row_process(connection, out, directory, manifest, row, task, approval, cfg, batch, pricing):
     try:
         modules = driver(directory)
         budget = Budget(Path(out) / "budget.sqlite", modules, pilot_cap_usd=manifest["spec"]["pilot_cap_usd"], financing=load(financing_path(out, batch)))
@@ -1562,30 +1365,17 @@ def row_process(connection, out, directory, manifest, row, task, approval, cfg, 
                     state = "finished"
                 return summary, state
 
-        if row.get("arm_kind", "router") == "router":
-            snapshot = Path(out) / "snapshots" / f"{row['configuration'] if row['version'] == 'candidate' else manifest['spec']['configurations'][0]['id']}.json"
-            snapshot_id = row["configuration"] if row["version"] == "candidate" else manifest["spec"]["configurations"][0]["id"]
-            with runtime_process(runtime_command, snapshot, broker_url, port, manifest["spec"]["execution_manifest"], manifest["approval"]["execution_identity"], Path(out) / "runtime-health" / f"{row['run']}.json", manifest["approval"]["snapshot_file_sha256"][snapshot_id]) as origin, driver_adapters(modules):
-                def factory(unused_out, run, candidate, deadline, **unused):
-                    connection.send({"kind": "active", "cfg": cfg, "deadline": deadline})
-                    if connection.recv() != "admitted":
-                        raise RuntimeError("Parent did not admit the classifier broker run")
-                    return RoutedModel(Path(out), run, row, deadline, cfg, budget, origin, pricing, modules)
+        with driver_adapters(modules):
+            if row.get("arm_kind", "router") == "router":
+                pool = manifest["approval"]["mode_pools"][row["router"]]
 
-                try:
-                    summary, state = rollout_with(factory)
-                finally:
-                    try:
-                        runtime_json(origin, "/close", {"runId": row["run"]}, timeout=30)
-                    except Exception:
-                        pass
-        else:
-            # Fixed/control arms never touch the router runtime or classifier broker.
-            with driver_adapters(modules):
+                def factory(unused_out, run, candidate, deadline, **unused):
+                    return RoutedModel(Path(out), run, row, deadline, cfg, budget, pricing, modules, pool)
+            else:
                 def factory(unused_out, run, candidate, deadline, **unused):
                     return FixedModel(Path(out), run, row, deadline, cfg, budget, pricing, modules)
 
-                summary, state = rollout_with(factory)
+            summary, state = rollout_with(factory)
         connection.send({"kind": "result", "summary": summary, "state": state})
     except BaseException as error:
         connection.send({"kind": "result", "summary": {"run": row["run"], "status": "infra_invalid", "error_type": type(error).__name__, "error": str(error)}, "state": "stopped"})
@@ -1593,10 +1383,10 @@ def row_process(connection, out, directory, manifest, row, task, approval, cfg, 
         connection.close()
 
 
-def concurrent_row(out, directory, manifest, row, task, approval, cfg, batch, pricing, runtime_command, broker_url, port, budget):
+def concurrent_row(out, directory, manifest, row, task, approval, cfg, batch, pricing, budget):
     context = multiprocessing.get_context("spawn")
     parent, child = context.Pipe()
-    process = context.Process(target=row_process, args=(child, out, directory, manifest, row, task, approval, cfg, batch, pricing, runtime_command, broker_url, port))
+    process = context.Process(target=row_process, args=(child, out, directory, manifest, row, task, approval, cfg, batch, pricing))
     result = None
     try:
         process.start()
@@ -1606,11 +1396,7 @@ def concurrent_row(out, directory, manifest, row, task, approval, cfg, batch, pr
                 message = parent.recv()
             except EOFError:
                 break
-            if message.get("kind") == "active":
-                with MUTEX:
-                    budget.active[row["run"]] = (message["cfg"], message["deadline"])
-                parent.send("admitted")
-            elif message.get("kind") == "result":
+            if message.get("kind") == "result":
                 result = message
                 break
         process.join()
@@ -1630,26 +1416,24 @@ def concurrent_row(out, directory, manifest, row, task, approval, cfg, batch, pr
             budget.stop("unknown_charge_after:" + row["run"])
         return result
     finally:
-        with MUTEX:
-            budget.active.pop(row["run"], None)
         parent.close()
         child.close()
 
 
-def execute(out, panel_out, directory, modules, batch, phase, approval, runtime_command, runtime_port, broker_port, lease_deadline, concurrency=1, auto_account_unknown=False):
+def execute(out, panel_out, directory, modules, batch, phase, approval, lease_deadline, concurrency=1, auto_account_unknown=False):
     manifest, plan, private = validate(out, panel_out, directory, modules)
-    pricing, classifier = read_quote(out, batch, manifest, modules)
+    pricing = read_quote(out, batch, manifest, modules)
     financing = load_financing(out, batch, manifest)
     with CAMPAIGN.readonly(campaign_path(out)) as db:
         authorization = CAMPAIGN.authorization_summary(CAMPAIGN.effective_authorization(db, manifest["spec"]["prospective_grant_id"]))
-    if approval != run_approval(out, manifest, plan, phase, batch, approval.get("runs"), pricing, classifier, runtime_command, concurrency, auto_account_unknown, financing=financing, authorization=authorization):
-        raise ValueError("Exact parent approval for frozen phase, runs, quotes, cost forecast, authorization, runtime, source, concurrency and caps is required")
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        raise ValueError("A host-only OPENROUTER_API_KEY is required")
+    if approval != run_approval(out, manifest, plan, phase, batch, approval.get("runs"), pricing, concurrency, auto_account_unknown, financing=financing, authorization=authorization):
+        raise ValueError("Exact parent approval for frozen phase, runs, quotes, cost forecast, authorization, gateway billing, source, concurrency and caps is required")
+    try:
+        modules["study"].require_gateway_credentials(solver_cfg(manifest, modules))
+    except (RuntimeError, ValueError) as error:
+        raise ValueError("Host-only Kilo gateway credentials are required before dispatch") from error
     if isinstance(lease_deadline, bool) or not math.isfinite(lease_deadline):
         raise ValueError("A verified finite VM deletion deadline is required")
-    loopback_origin(runtime_port)
-    loopback_origin(runtime_port + concurrency - 1)
     modules["modern_eval"].verify_pins()
     panel_module = modules["modern_panel" if manifest["panel_kind"] == "modern" else "census_panel"]
     required_seconds = manifest["spec"]["resources"]["wall_seconds"] + panel_module.config()["evaluator_timeout_seconds"] + LEASE_MARGIN_SECONDS
@@ -1663,7 +1447,7 @@ def execute(out, panel_out, directory, modules, batch, phase, approval, runtime_
         rows = iter(selected_rows(out, manifest, plan, phase))
         slots = list(range(concurrency))
         cfg = {**solver_cfg(manifest, modules), "experiment_id": manifest["spec"]["experiment_id"], "experiment_cost_limit_usd": str(budget.allowance(phase)), "router_phase": phase, "unknown_charge_policy": approval["unknown_charge_policy"]}
-        with ClassifierBroker(budget, classifier, out, broker_port) as broker, ThreadPoolExecutor(max_workers=concurrency) as executor:
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
             while True:
                 while stopped is None and slots:
                     row = next(rows, None)
@@ -1692,7 +1476,7 @@ def execute(out, panel_out, directory, modules, batch, phase, approval, runtime_
                         stopped = reason
                         break
                     slot = slots.pop(0)
-                    future = executor.submit(concurrent_row, out, directory, manifest, row, private[row["instance_id"]], approval, cfg, batch, pricing, runtime_command, broker.url, runtime_port + slot, budget)
+                    future = executor.submit(concurrent_row, out, directory, manifest, row, private[row["instance_id"]], approval, cfg, batch, pricing, budget)
                     pending[future] = (row, slot)
                     next_run = None
                 if not pending:
@@ -1717,41 +1501,13 @@ def execute(out, panel_out, directory, modules, batch, phase, approval, runtime_
 
 
 def provider_outage_record(out, run, result):
-    directory = Path(out) / "rollouts" / run
-    record_path = directory / "provider-unavailable.json"
-    record = load(record_path) if record_path.is_file() else None
-    if record is not None and (not isinstance(record, dict) or not isinstance(record.get("model"), str) or not isinstance(record.get("effort"), str)):
+    record_path = Path(out) / "rollouts" / run / "provider-unavailable.json"
+    if not record_path.is_file():
         return None
-    paths = sorted((Path(out) / "routes" / run).glob("*.json"))
-    pair = None
-    if paths:
-        route = load(paths[-1])
-        response = route.get("response") if isinstance(route, dict) else None
-        decision = response.get("decision") if isinstance(response, dict) else None
-        if not isinstance(decision, dict) or not isinstance(decision.get("model"), str):
-            return None
-        try:
-            pair = (decision["model"], variant_label(decision))
-        except ValueError:
-            return None
-    if record is not None:
-        return record if pair is None or pair == (record["model"], record["effort"]) else None
-    if pair is None:
+    record = load(record_path)
+    if not isinstance(record, dict) or not isinstance(record.get("model"), str) or not isinstance(record.get("effort"), str) or not isinstance(record.get("reason"), str):
         return None
-    batch = result.get("batch_id")
-    approval_path = directory / "approval.json"
-    approval = load(approval_path) if approval_path.is_file() else {}
-    batch = batch if batch is not None else approval.get("batch")
-    if not isinstance(batch, str) or not SAFE.fullmatch(batch):
-        return None
-    unavailable_path = Path(out) / "quotes" / batch / "unavailable-pairs.json"
-    if not unavailable_path.is_file():
-        return None
-    unavailable = load(unavailable_path)
-    if not isinstance(unavailable, list) or approval.get("unavailable_pairs_sha256") is not None and approval["unavailable_pairs_sha256"] != digest(unavailable):
-        return None
-    evidence = next((row for row in unavailable if isinstance(row, dict) and (row.get("model"), row.get("effort")) == pair and row.get("reason") == ENDPOINT_UNAVAILABLE), None)
-    return {"model": pair[0], "effort": pair[1], "reason": evidence["reason"], "evidence": "last recorded route plus batch unavailable list"} if evidence else None
+    return record
 
 
 def outcome(out, row, bills, kinds, accounted_ids=(), task=None):
@@ -1794,9 +1550,9 @@ def outcome(out, row, bills, kinds, accounted_ids=(), task=None):
         quality_lower, quality_upper = 0, 1
     else:
         return None, "missing_or_invalid_grade"
-    lower = {kind: sum((money(bill["actual"]) for bill in bills if kinds[bill["id"]] == kind and bill["state"] == "settled"), Decimal(0)) for kind in ("solver", "classifier")}
-    upper = {kind: lower[kind] + sum((CAMPAIGN.held(bill) for bill in accounted if kinds[bill["id"]] == kind), Decimal(0)) for kind in ("solver", "classifier")}
-    return {"resolved": bool(quality_lower) if quality_lower == quality_upper else None, "quality_lower": quality_lower, "quality_upper": quality_upper, "status": status, "solver": upper["solver"], "classifier": upper["classifier"], "total": sum(upper.values()), "cost_lower": sum(lower.values()), "cost_upper": sum(upper.values()), "requests": len(bills)}, None
+    lower = sum((money(bill["actual"]) for bill in bills if kinds[bill["id"]] == "solver" and bill["state"] == "settled"), Decimal(0))
+    upper = lower + sum((CAMPAIGN.held(bill) for bill in accounted if kinds[bill["id"]] == "solver"), Decimal(0))
+    return {"resolved": bool(quality_lower) if quality_lower == quality_upper else None, "quality_lower": quality_lower, "quality_upper": quality_upper, "status": status, "solver": upper, "total": upper, "cost_lower": lower, "cost_upper": upper, "requests": len(bills)}, None
 
 
 def _arm_stats(rows, outcomes, configuration, task_count, charges):
@@ -1807,7 +1563,7 @@ def _arm_stats(rows, outcomes, configuration, task_count, charges):
     lower = sum(value["quality_lower"] for value in values)
     upper = sum(value["quality_upper"] for value in values)
     financial = [charges[row["run"]] for row in expected_rows] if charges is not None else values
-    return {"configuration": configuration, "expected": task_count, "planned": len(expected_rows), "valid": len(values), "unique_task_repetitions": len(set(keys)), "coverage": set(keys), "resolved_lower": lower, "resolved_upper": upper, "pass_rate_lower": lower / task_count if task_count else None, "pass_rate_upper": upper / task_count if task_count else None, "cost_lower": str(sum((value["cost_lower"] for value in financial), Decimal(0))), "cost_upper": str(sum((value["cost_upper"] for value in financial), Decimal(0))), "solver_usd": str(sum((value["solver"] for value in financial), Decimal(0))), "classifier_usd": str(sum((value["classifier"] for value in financial), Decimal(0))), "uncertain_runs": [row["run"] for row in arm_rows if outcomes[row["run"]]["quality_lower"] != outcomes[row["run"]]["quality_upper"]]}
+    return {"configuration": configuration, "expected": task_count, "planned": len(expected_rows), "valid": len(values), "unique_task_repetitions": len(set(keys)), "coverage": set(keys), "resolved_lower": lower, "resolved_upper": upper, "pass_rate_lower": lower / task_count if task_count else None, "pass_rate_upper": upper / task_count if task_count else None, "cost_lower": str(sum((value["cost_lower"] for value in financial), Decimal(0))), "cost_upper": str(sum((value["cost_upper"] for value in financial), Decimal(0))), "solver_usd": str(sum((value["solver"] for value in financial), Decimal(0))), "uncertain_runs": [row["run"] for row in arm_rows if outcomes[row["run"]]["quality_lower"] != outcomes[row["run"]]["quality_upper"]]}
 
 
 def arm_stats(rows, outcomes, configuration, task_count, charges=None):
@@ -1815,37 +1571,35 @@ def arm_stats(rows, outcomes, configuration, task_count, charges=None):
     return {key: value for key, value in stats.items() if key != "coverage"}
 
 
-def compare(rows, outcomes, candidate_configuration, comparator_configuration, task_count, charges=None, mode="efficient", objective=None, expected_keys=None):
-    needed = {candidate_configuration, comparator_configuration, "baseline"}
+def compare(rows, outcomes, router_configuration, comparator_configuration, task_count, charges=None, mode="efficient", objective=None, expected_keys=None):
+    needed = {router_configuration, comparator_configuration}
     stats = {name: _arm_stats(rows, outcomes, name, task_count, charges) for name in needed}
     coverage_ok = len({frozenset(item["coverage"]) for item in stats.values()}) == 1
     if expected_keys is not None:
         coverage_ok = coverage_ok and all(item["coverage"] == set(expected_keys) for item in stats.values())
     complete = task_count > 0 and coverage_ok and all(item["valid"] == item["planned"] == item["unique_task_repetitions"] == task_count and not item["uncertain_runs"] and money(item["cost_lower"]) == money(item["cost_upper"]) for item in stats.values())
-    candidate, comparator, baseline = stats[candidate_configuration], stats[comparator_configuration], stats["baseline"]
-    higher_pass = complete and candidate["resolved_lower"] > comparator["resolved_upper"]
-    lower_cost = complete and money(candidate["cost_upper"]) < money(comparator["cost_lower"])
+    router, comparator = stats[router_configuration], stats[comparator_configuration]
+    higher_pass = complete and router["resolved_lower"] > comparator["resolved_upper"]
+    lower_cost = complete and money(router["cost_upper"]) < money(comparator["cost_lower"])
     passes, checks = False, {}
     if objective is not None and mode == "efficient":
         floor = objective["success_floor"]
         if floor["type"] == "absolute":
-            checks["success_floor_met"] = complete and Decimal(candidate["resolved_lower"]) / Decimal(task_count) >= Decimal(floor["min_pass_rate"])
+            checks["success_floor_met"] = complete and Decimal(router["resolved_lower"]) / Decimal(task_count) >= Decimal(floor["min_pass_rate"])
         else:
-            reference = baseline if floor["type"] == "baseline-relative" else comparator
-            checks["success_floor_met"] = complete and candidate["resolved_lower"] >= reference["resolved_upper"]
+            checks["success_floor_met"] = complete and router["resolved_lower"] >= comparator["resolved_upper"]
         checks["strictly_lower_cost_than_comparator"] = lower_cost
         passes = all(checks.values())
     elif objective is not None and mode == "frontier":
         budget = objective["cost_budget"]
         if budget["type"] == "absolute":
-            checks["within_cost_budget"] = complete and money(candidate["cost_upper"]) <= money(budget["max_total_usd"])
+            checks["within_cost_budget"] = complete and money(router["cost_upper"]) <= money(budget["max_total_usd"])
         else:
-            reference = baseline if budget["type"] == "baseline-relative" else comparator
-            checks["within_cost_budget"] = complete and money(candidate["cost_upper"]) <= money(reference["cost_lower"])
+            checks["within_cost_budget"] = complete and money(router["cost_upper"]) <= money(comparator["cost_lower"])
         checks["strictly_higher_success_than_comparator"] = higher_pass
         passes = all(checks.values())
     clean = lambda item: {key: value for key, value in item.items() if key != "coverage"}
-    return {"complete": complete, "mode": mode, "objective_checks": checks, "passes": bool(passes), "diagnostic_strict_dominance": {"strictly_higher_pass_rate": higher_pass, "strictly_lower_total_cost": lower_cost, "passes": higher_pass and lower_cost}, "strictly_higher_pass_rate": higher_pass, "strictly_lower_total_cost": lower_cost, "comparator": clean(comparator), "candidate": clean(candidate), "baseline": clean(baseline)}
+    return {"complete": complete, "mode": mode, "objective_checks": checks, "passes": bool(passes), "diagnostic_strict_dominance": {"strictly_higher_pass_rate": higher_pass, "strictly_lower_total_cost": lower_cost, "passes": higher_pass and lower_cost}, "strictly_higher_pass_rate": higher_pass, "strictly_lower_total_cost": lower_cost, "comparator": clean(comparator), "router": clean(router)}
 
 
 def analyze(out, manifest, plan, phase, modules):
@@ -1867,24 +1621,10 @@ def analyze(out, manifest, plan, phase, modules):
     for row in rows:
         bills = [bill for bill in ledger if bill["run"] == row["run"]]
         lower = sum((money(bill["actual"]) for bill in bills if bill["state"] == "settled"), Decimal(0))
-        charges[row["run"]] = {"cost_lower": lower, "cost_upper": sum((CAMPAIGN.held(bill) for bill in bills), Decimal(0)), **{kind: sum((CAMPAIGN.held(bill) for bill in bills if kinds.get(bill["id"]) == kind), Decimal(0)) for kind in ("solver", "classifier")}}
-        health_path = out / "runtime-health" / f"{row['run']}.json"
-        health_error = None
-        # Router arms need runtime identity; fixed/control arms must not
-        # fabricate router-health evidence and are checked via their receipts.
-        if row["run"] in attempted and row.get("arm_kind", "router") == "router":
-            try:
-                helper("router-proof").verify_runtime_health(load(health_path), manifest["approval"]["execution_identity"])
-                snapshot_id = row["configuration"] if row["configuration"] != "baseline" else manifest["spec"]["configurations"][0]["id"]
-                if load(health_path).get("snapshotSha256") != manifest["approval"]["snapshot_file_sha256"][snapshot_id]:
-                    raise ValueError("Observed runtime snapshot differs")
-            except (OSError, ValueError, KeyError) as error:
-                health_error = "runtime_identity_evidence:" + str(error)
+        charges[row["run"]] = {"cost_lower": lower, "cost_upper": sum((CAMPAIGN.held(bill) for bill in bills), Decimal(0)), "solver": sum((CAMPAIGN.held(bill) for bill in bills if kinds.get(bill["id"]) == "solver"), Decimal(0))}
         value, reason = outcome(out, row, bills, kinds, accounted_ids, tasks.get(row["instance_id"]))
         if row["run"] not in attempted:
             invalid.append({"run": row["run"], "reason": "undispatched", "scored_as_failure": False})
-        elif health_error is not None:
-            invalid.append({"run": row["run"], "reason": health_error})
         elif value is None:
             invalid.append({"run": row["run"], "reason": reason})
         else:
@@ -1910,7 +1650,10 @@ def analyze(out, manifest, plan, phase, modules):
             control, reference = arms_report[router]["control"], arms_report[router][candidate_ids[router]]
             complete_arms = control["valid"] == control["planned"] == count and reference["valid"] == reference["planned"] == count and not control["uncertain_runs"] and not reference["uncertain_runs"] and money(control["cost_lower"]) == money(control["cost_upper"]) and money(reference["cost_lower"]) == money(reference["cost_upper"])
             matched = complete_arms and money(control["cost_upper"]) <= money(reference["cost_lower"]) * (1 + tolerance) and money(control["cost_lower"]) >= money(reference["cost_upper"]) * (1 - tolerance)
-            cost_matching[router] = {"criterion": spec["control"]["cost_matching"], "control_cost_lower_usd": control["cost_lower"], "control_cost_upper_usd": control["cost_upper"], "reference_cost_lower_usd": reference["cost_lower"], "reference_cost_upper_usd": reference["cost_upper"], "cost_matched": bool(matched), "claim_allowed": bool(matched and not stops and not invalid)}
+            # The reference arm is the live router. Its settled cost includes
+            # the full classifier allowance, an upper bound, so cost matching
+            # stays withheld until classifier charges are reconciled.
+            cost_matching[router] = {"criterion": spec["control"]["cost_matching"], "control_cost_lower_usd": control["cost_lower"], "control_cost_upper_usd": control["cost_upper"], "reference_cost_lower_usd": reference["cost_lower"], "reference_cost_upper_usd": reference["cost_upper"], "cost_matched": False, "claim_allowed": False, "reason": "router settled cost includes the full classifier allowance, an upper bound; cost matching withheld until classifier charges are reconciled", "diagnostic_cost_matched": bool(matched)}
     plan_complete = not invalid and not stops and all(stats["valid"] == stats["planned"] for mode_arms in arms_report.values() for stats in mode_arms.values()) and all(value["complete"] for values in comparisons.values() for value in values.values())
     if not plan_complete:
         for values in comparisons.values():
@@ -1925,9 +1668,7 @@ def analyze(out, manifest, plan, phase, modules):
         for value in cost_matching.values():
             value.update(cost_matched=False, claim_allowed=False)
     claims_allowed = phase == "final" and plan_complete
-    report = {"version": 4, "phase": phase, "manifest_sha256": digest(manifest), "missing_or_invalid": invalid, "recorded_stops": stops, "campaign_settled_plus_held_usd": str(sum((CAMPAIGN.held(row) for row in ledger), Decimal(0))), "phase_all_arm_cost_lower_usd": str(sum((value["cost_lower"] for value in charges.values()), Decimal(0))), "phase_all_arm_cost_upper_usd": str(sum((value["cost_upper"] for value in charges.values()), Decimal(0))), "arms": arms_report, "comparisons": comparisons, "fixed_model_superiority": superiority, "control_cost_matching": cost_matching, "provider_unavailable_runs": providers, "generalization_claim": False, "plan_complete": plan_complete, "conclusion": "complete" if plan_complete else "inconclusive", "inconclusive": not plan_complete, "can_establish_pass": claims_allowed, "can_establish_superiority": claims_allowed, "can_establish_cost_matching": claims_allowed, "denominator_note": "Repetitions are repeated observations of the same frozen tasks, not independent tasks; no generalization or statistical-power claim is made.", "outcome_rule": "Full frozen task x arm x repetition denominator for every mandatory arm. Provider unavailability is an arm failure. Audited ambiguous transport has quality interval [0,1]. Infrastructure/grader failures and incomplete grades block completeness. Undispatched rows are missing, never failures. A budget stop or any partial plan is inconclusive and cannot establish a pass, superiority or cost matching from a favorable prefix.", "cost_rule": "Every arm charge is retained even for invalid outcomes, including failed attempts and full unknown holds. Objectives are the preregistered per-mode rules; strict-both-better is diagnostic only."}
-    if phase == "final":
-        report["both_modes_pass"] = plan_complete and all(comparisons[mode]["baseline"]["passes"] and comparisons[mode]["baseline"]["complete"] for mode in MODES)
+    report = {"version": 4, "phase": phase, "manifest_sha256": digest(manifest), "missing_or_invalid": invalid, "recorded_stops": stops, "campaign_settled_plus_held_usd": str(sum((CAMPAIGN.held(row) for row in ledger), Decimal(0))), "phase_all_arm_cost_lower_usd": str(sum((value["cost_lower"] for value in charges.values()), Decimal(0))), "phase_all_arm_cost_upper_usd": str(sum((value["cost_upper"] for value in charges.values()), Decimal(0))), "arms": arms_report, "comparisons": comparisons, "fixed_model_superiority": superiority, "control_cost_matching": cost_matching, "provider_unavailable_runs": providers, "generalization_claim": False, "plan_complete": plan_complete, "conclusion": "complete" if plan_complete else "inconclusive", "inconclusive": not plan_complete, "can_establish_pass": claims_allowed, "can_establish_superiority": claims_allowed, "can_establish_cost_matching": False, "cost_matching_withheld_reason": "router settled cost includes the full classifier allowance, an upper bound; withheld until classifier charges are reconciled", "denominator_note": "Repetitions are repeated observations of the same frozen tasks, not independent tasks; no generalization or statistical-power claim is made.", "outcome_rule": "Full frozen task x arm x repetition denominator for every mandatory arm. Provider unavailability is an arm failure. Audited ambiguous transport has quality interval [0,1]. Infrastructure/grader failures and incomplete grades block completeness. Undispatched rows are missing, never failures. A budget stop or any partial plan is inconclusive and cannot establish a pass, superiority or cost matching from a favorable prefix.", "cost_rule": "Every arm charge is retained even for invalid outcomes, including failed attempts and full unknown holds. Objectives are the preregistered per-mode rules; strict-both-better is diagnostic only."}
     modules["study"].save(out / f"{phase}-analysis.json", report)
     return report
 
@@ -1936,20 +1677,20 @@ def validate_pilot_evidence(out, manifest, plan, evidence_path):
     evidence = load(evidence_path)
     expected = {"schema", "manifest_sha256", "execution_plan_sha256", "prospective_grant_id", "passed", "runs", "parser", "evidence_files", "failures", "observations", "total_cost_usd"}
     pilot = [row for row in plan["runs"] if row["phase"] == "pilot"]
-    if not isinstance(evidence, dict) or set(evidence) != expected or evidence["schema"] != "router-baseline-protocol-pilot-v1" or evidence["manifest_sha256"] != digest(manifest) or evidence["execution_plan_sha256"] != digest(plan) or evidence["prospective_grant_id"] != manifest["spec"]["prospective_grant_id"]:
+    if not isinstance(evidence, dict) or set(evidence) != expected or evidence["schema"] != "router-protocol-pilot-v2" or evidence["manifest_sha256"] != digest(manifest) or evidence["execution_plan_sha256"] != digest(plan) or evidence["prospective_grant_id"] != manifest["spec"]["prospective_grant_id"]:
         raise ValueError("Exact pilot evidence for this grant, manifest and plan required")
     if len(pilot) != 2 or evidence["runs"] != [row["run"] for row in pilot] or evidence["passed"] is not True or evidence["failures"] != []:
-        raise ValueError("Both baseline protocol pilots must succeed without unexplained failures")
+        raise ValueError("Both router protocol pilots must succeed without unexplained failures")
     if not isinstance(evidence["parser"], dict) or set(evidence["parser"]) != {"revision", "files", "model_settings", "action_regex"} or not evidence["parser"]["files"] or not evidence["parser"]["action_regex"]:
         raise ValueError("Pinned text parser identity and configuration required")
     if evidence["parser"]["revision"] != helper("router-replay").MINI_REVISION:
         raise ValueError("Pilot parser revision differs from the pinned text transport")
     observations = evidence["observations"]
     if not isinstance(observations, list) or len(observations) != len(pilot) or not all(isinstance(item, dict) for item in observations) or [item.get("run") for item in observations] != evidence["runs"]:
-        raise ValueError("Pilot observations must cover both baseline runs in frozen order")
+        raise ValueError("Pilot observations must cover both router runs in frozen order")
     for observation, row in zip(observations, pilot):
         if any(observation.get(key) != row[key] for key in ("run", "router", "instance_id", "configuration", "repetition")) or observation.get("status") != "completed" or observation.get("exit_status") != "Submitted" or type(observation.get("resolved")) is not bool:
-            raise ValueError("Pilot needs completed baseline observations, not infrastructure or format recovery")
+            raise ValueError("Pilot needs completed router observations, not infrastructure or format recovery")
         requests = observation.get("requests")
         if not isinstance(requests, list) or not requests:
             raise ValueError("Every observed solver output requires pinned text-parser evidence")
@@ -1964,9 +1705,8 @@ def validate_pilot_evidence(out, manifest, plan, evidence_path):
     if not isinstance(files, dict) or not files or any(not Path(path).is_absolute() or file_hash(path) != sha for path, sha in files.items()):
         raise ValueError("Pilot source evidence bytes changed")
     required_files = {str(Path(out) / folder / row["run"] / name) for row in pilot for folder, name in (("rollouts", "result.json"), ("rollouts", "evaluation.json"), ("rollouts", "approval.json"))}
-    required_files |= {str(Path(out) / "runtime-health" / f"{row['run']}.json") for row in pilot}
     if not required_files <= files.keys():
-        raise ValueError("Pilot requires every saved result, grade, approval and runtime identity")
+        raise ValueError("Pilot requires every saved result, grade and approval")
     with CAMPAIGN.readonly(campaign_path(out)) as db:
         ledger = CAMPAIGN.rows(db)
         kinds = dict(db.execute("SELECT id,kind FROM router_requests"))
@@ -1974,7 +1714,7 @@ def validate_pilot_evidence(out, manifest, plan, evidence_path):
         for row in pilot:
             bills = [bill for bill in ledger if bill["run"] == row["run"]]
             if db.execute("SELECT state FROM router_runs WHERE run=?", (row["run"],)).fetchone() != ("finished",) or not bills or any(bill["state"] != "settled" or str(Path(bill["receipt"])) not in files for bill in bills):
-                raise ValueError("Pilot must finish with all solver/classifier charges settled and receipts bound")
+                raise ValueError("Pilot must finish with all gateway charges settled and receipts bound")
             value, reason = outcome(out, row, bills, kinds, task=tasks.get(row["instance_id"]))
             if value is None or value["status"] != "completed":
                 raise ValueError("Pilot needs a complete valid deterministic grade: " + str(reason))
@@ -1992,9 +1732,9 @@ def validate_pilot_evidence(out, manifest, plan, evidence_path):
 def select_final(out, manifest, plan, approval, modules, pilot_evidence):
     evidence = validate_pilot_evidence(out, manifest, plan, pilot_evidence)
     configurations = {item["router"]: item["id"] for item in manifest["spec"]["configurations"]}
-    required = {"authorized": True, "action": "select-final-router-study-v5", "manifest_sha256": digest(manifest), "prospective_grant_id": manifest["spec"]["prospective_grant_id"], "pilot_evidence_sha256": digest(evidence), "pilot_evidence_file_sha256": file_hash(pilot_evidence), "configurations": configurations}
+    required = {"authorized": True, "action": "select-final-router-study-v6", "manifest_sha256": digest(manifest), "prospective_grant_id": manifest["spec"]["prospective_grant_id"], "pilot_evidence_sha256": digest(evidence), "pilot_evidence_file_sha256": file_hash(pilot_evidence), "configurations": configurations}
     if approval != required:
-        raise ValueError("Exact parent final approval bound to the successful baseline protocol pilot required")
+        raise ValueError("Exact parent final approval bound to the successful router protocol pilot required")
     with CAMPAIGN.readonly(campaign_path(out)) as db:
         if active_stops(db):
             raise ValueError("A recorded stop blocks final selection")
@@ -2026,7 +1766,7 @@ def historical_audit(out):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Frozen actual-router public-task study. No command grants paid authorization.")
+    parser = argparse.ArgumentParser(description="Frozen live-gateway router public-task study. No command grants paid authorization.")
     parser.add_argument("--driver-dir", type=Path)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--panel-out", type=Path)
@@ -2039,22 +1779,18 @@ def main():
             sub.add_argument("--approval", type=Path, required=True)
     sub = subs.add_parser("quote")
     sub.add_argument("--batch", required=True)
-    sub.add_argument("--classifier-evidence", type=Path, required=True)
     sub = subs.add_parser("finance")
     sub.add_argument("--batch", required=True)
     for name in ("run-inputs", "run"):
         sub = subs.add_parser(name)
         sub.add_argument("--batch", required=True)
         sub.add_argument("--phase", choices=("pilot", "final"), required=True)
-        sub.add_argument("--runtime-command", type=Path, required=True)
         sub.add_argument("--concurrency", type=int, default=1)
         sub.add_argument("--auto-account-unknown", action="store_true")
         if name == "run-inputs":
             sub.add_argument("--runs", type=Path, required=True)
         if name == "run":
             sub.add_argument("--approval", type=Path, required=True)
-            sub.add_argument("--runtime-port", type=int, default=18792)
-            sub.add_argument("--broker-port", type=int, default=0)
             sub.add_argument("--lease-deadline", type=float, required=True)
     sub = subs.add_parser("select-final")
     sub.add_argument("--approval", type=Path, required=True)
@@ -2084,22 +1820,22 @@ def main():
     elif args.command == "freeze":
         result = freeze(out, panel_out, args.panel_kind, directory, load(args.spec), load(args.approval), modules)
     elif args.command == "quote":
-        result = quote(out, panel_out, directory, modules, args.batch, args.classifier_evidence)
+        result = quote(out, panel_out, directory, modules, args.batch)
     elif args.command == "finance":
         result = finance_plan(out, panel_out, directory, modules, args.batch)
     elif args.command == "run":
-        result = execute(out, panel_out, directory, modules, args.batch, args.phase, load(args.approval), load(args.runtime_command), args.runtime_port, args.broker_port, args.lease_deadline, args.concurrency, args.auto_account_unknown)
+        result = execute(out, panel_out, directory, modules, args.batch, args.phase, load(args.approval), args.lease_deadline, args.concurrency, args.auto_account_unknown)
     elif args.command in {"account-unknown", "clear-stop"}:
         validate(out, panel_out, directory, modules)
         result = account_unknown(out, args.request, args.evidence, modules) if args.command == "account-unknown" else clear_stop(out, args.reason, modules)
     else:
         manifest, plan, _ = validate(out, panel_out, directory, modules)
         if args.command == "run-inputs":
-            pricing, classifier = read_quote(out, args.batch, manifest, modules)
+            pricing = read_quote(out, args.batch, manifest, modules)
             financing = load_financing(out, args.batch, manifest)
             with CAMPAIGN.readonly(campaign_path(out)) as db:
                 authorization = CAMPAIGN.authorization_summary(CAMPAIGN.effective_authorization(db, manifest["spec"]["prospective_grant_id"]))
-            result = run_approval(out, manifest, plan, args.phase, args.batch, load(args.runs), pricing, classifier, load(args.runtime_command), args.concurrency, args.auto_account_unknown, financing=financing, authorization=authorization)
+            result = run_approval(out, manifest, plan, args.phase, args.batch, load(args.runs), pricing, args.concurrency, args.auto_account_unknown, financing=financing, authorization=authorization)
         elif args.command == "select-final":
             result = select_final(out, manifest, plan, load(args.approval), modules, args.pilot_evidence)
         else:

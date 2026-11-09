@@ -617,11 +617,11 @@ and interval rule frozen before outcomes exist.
 
 **Mandatory comparisons.** The denominator is every arm × task × repetition.
 
-- Arms: the unchanged router, the candidate router, a cost-matched
-  content-blind control, and every fixed pool model. Give each fixed model its
-  frozen variant policy.
+- Arms: one live router arm per mode (`kilo-auto/efficient` or
+  `kilo-auto/frontier`), a cost-matched content-blind control, and every
+  fixed pool model. Give each fixed model its frozen variant policy.
 - The content-blind control selects without task content and matches the
-  candidate cost budget. It separates routing signal from spend alone.
+  router cost budget. It separates routing signal from spend alone.
 - Share one physical observation between arms only under an immutable,
   hash-bound identical-intervention mapping. The mapping must prove the same
   executable, task revision, model, variant, payload, limits, and grader.
@@ -629,15 +629,17 @@ and interval rule frozen before outcomes exist.
 - Do not shrink the denominator after dispatch. Missing, failed, and invalid
   rows stay visible with their reason and charges.
 
-**Financial admission gates.** Version 5 is capped exploration. It has no
+**Financial admission gates.** Version 6 is capped exploration. It has no
 full-plan funding guarantee. A budget stop leaves the plan inconclusive.
+Version 6 dispatches every solver request through the Kilo AI gateway.
+Old version 5 manifests are audit-only.
 
-1. **Continuity.** Retain all historical settled charges, unknown holds at
-   their full bound, router fees, and upstream BYOK charges. Do not reset the
-   ledger, attempt history, or candidate history. Cumulative new allowance
-   across all amendments stays at or below the authorized $100. An amendment
-   never rebases the allowance, and a tranche inside it is not new allowance.
-   A larger legacy ledger cap is not spending permission.
+1. **Continuity.** Retain all historical settled charges and unknown holds at
+   their full bound. Do not reset the ledger, attempt history, or candidate
+   history. Cumulative new allowance across all amendments stays at or below
+   the authorized $100. An amendment never rebases the allowance, and a
+   tranche inside it is not new allowance. A larger legacy ledger cap is not
+   spending permission.
 2. **Whole-plan cost forecast.** Register one hash-bound forecast for the whole
    plan: every arm, task, and repetition. Price every `(model, variant)` pair
    reachable from the baseline and candidate tables, not only first picks. A
@@ -652,37 +654,57 @@ full-plan funding guarantee. A budget stop leaves the plan inconclusive.
    reserves no money. Known settlement replaces a hold with the actual charge.
    The unused part then stops counting. An unknown or breached charge stays at
    its full bound and stops dispatch.
-4. **Pilot ceiling.** A baseline-only protocol pilot has an independent $60
+4. **Pilot ceiling.** A router-arm protocol pilot has an independent $60
    ceiling inside the same cumulative allowance. A frozen pilot cap can be
    lower. The pilot checks execution, grading, and receipts only. It cannot
    certify either objective. No final request may run before exact successful
-   pilot evidence exists.
-5. **Component tariffs.** Keep immutable raw price evidence with units and
-   quantities for every component: input, cached read, cache write and storage
-   with its time-to-live bound, output, hidden reasoning, and per-request fees.
-   Prove whether hidden-reasoning and completion rates are additive or alternative.
-   If both quantities have finite bounds, sum their rates conservatively or reject
-   the quote; never assume a component is free. BYOK totals are
-   the router fee plus the upstream charge; either part alone is unknown.
-6. **Provider closure.** Prove the exact provider, descendant-model, and
-   service-tier set that the frozen request constraints admit. Price the worst
-   reachable member of that closure, not the cheapest endpoint. Keep privacy,
-   parameter, and no-fallback constraints in the frozen request.
+   pilot evidence exists. The live worker picks its classifier from live
+   config, so the pilot must also confirm the billed classifier model and
+   cost from the organization's recorded usage before final dispatch.
+5. **Component tariffs.** Reserve at the dearest public provider price.
+   Take per-component maxima over the Kilo catalog pricing and every public
+   OpenRouter endpoint price for the model, including every override tier,
+   with positive discounts undone. Keep the raw catalog entry and the frozen
+   endpoint snapshots with their hashes as evidence. Sum the component
+   maxima for input, cached read, cache write, output, and hidden reasoning.
+   Add the per-request fee. Never assume a component is free. Missing or
+   unparseable endpoint evidence fails the quote. Hidden reasoning is
+   assumed bounded by `max_tokens`; this is unproven, and a charge above
+   the reservation stops dispatch.
+6. **Gateway worst case.** The gateway selects the provider. The request
+   carries no provider controls. Price a router arm from the maximum over
+   every pool model of its mode. Add the frozen classifier allowance to each
+   router-arm reservation and settlement: the gateway bills the classifier
+   as a separate organization usage row outside `usage.cost`. The Kilo
+   catalog does not list the classifier model, so its price comes from its
+   public endpoints only. The bound is the dearest public input rate times
+   32,768 input tokens, times six questions, times two attempts, plus the
+   request fee per attempt-question: one billed classification runs per
+   gateway request, billing may be per question, and each classification
+   gets at most two HTTP attempts. The classifier request sends no
+   `max_tokens`, so every endpoint output price must be exactly zero or the
+   quote fails. The allowance must be positive and at least this bound; a
+   lower allowance is rejected at quote time. Settlement records the full
+   allowance, so a router arm's settled cost is an upper bound. A router
+   cost claim needs the organization's recorded classifier charges for the
+   run from the read replica.
 7. **Payload guard.** After all variant mutation, validate the final serialized
    payload. Admit string text only. Reject media, files, native tools, search
    plugins, cache controls, automatic continuation, budget escalation, and any
    passthrough field that can add billable work. Reject; do not silently strip.
+   The payload has no `usage`, `provider`, `plugins`, or `tools` field.
    Bind the guard, its hash, and negative proofs to the executable identity.
 8. **Identity.** Bind the complete executable and input identity before
-   dispatch: source and bundle hashes, runtime argv, parser and grader
-   revisions, task split, arm snapshots, variant catalog, run order seed,
-   resource limits, classifier identity, and quote evidence. Dispatch only
-   inside the quote validity window; an expired quote needs a fresh quote.
+   dispatch: source and bundle hashes, parser and grader revisions, task
+   split, pool snapshots, variant catalog, run order seed, resource limits,
+   the frozen Kilo organization ID, the gateway model per mode, the recorded
+   gateway routing table version, and quote evidence. Dispatch only inside
+   the quote validity window; an expired quote needs a fresh quote.
    Any identity mismatch blocks dispatch.
 
 **Tariff incompatibility is a no-go, not an outage.** If a tariff cannot be
 bounded under this contract, record an accounting failure. Do not mark the
-endpoint unavailable, invent an outage, strip tariff fields, drop a pair, or
+model unavailable, invent an outage, strip tariff fields, drop a pair, or
 reduce the denominator to escape it.
 
 **Outcome interpretation.** Never retry an attempt that may have been paid.
@@ -707,25 +729,25 @@ reduce the denominator to escape it.
 
 **No-go states.** Paid dispatch stays blocked while an applicable gate fails:
 unaccounted unknown charges; unresolved historical candidate uncertainty;
-incomplete or expired tariff coverage; an unbounded tariff component; unresolved
-provider closure; a missing payload guard; an executable identity mismatch;
-or a changed denominator. A forecast above the caps is not a no-go. The next
-unaffordable request is the stop.
+incomplete or expired tariff coverage; an unbounded tariff component; a
+missing or malformed gateway token or organization ID; a missing payload
+guard; an executable identity mismatch; or a changed denominator. A forecast
+above the caps is not a no-go. The next unaffordable request is the stop.
 Final dispatch also requires exact successful pilot evidence. The pilot cannot
 prove its own admission retroactively. Report blocked while any applicable gate fails.
 
-The version 5 prospective protocol is implemented by the bundled `repo-study`
+The version 6 prospective protocol is implemented by the bundled `repo-study`
 driver and the `router-*` coordinator scripts. Old manifests and old financing
 manifests are audit-only. Paid execution requires, in order:
 
 1. A capped-exploration authorization whose cumulative new allowance is within
    the $100 programme ceiling and whose origin snapshot is immutable.
-2. A frozen version 5 spec with the complete router, content-blind control and
-   fixed-model arms for each mode, the unchanged task split and resources, and
-   frozen account-plugin evidence supplied as an absolute `account_policy` path.
-   Its bytes are bound into the freeze approval.
+2. A frozen version 6 spec with the complete router, content-blind control and
+   fixed-model arms for each mode, the unchanged task split and resources, the
+   frozen `kilo_organization_id`, the frozen `classifier_allowance_usd`, and
+   `gateway_routing_table_version` (null when no version is published).
 3. A fresh complete tariff quote for every mandatory pair. An unsupported tariff
-   is an accounting failure, not an endpoint outage.
+   is an accounting failure, not a model outage.
 4. A registered whole-plan cost forecast covering every mandatory row.
    The `finance` command registers that forecast. It does not fund the plan.
    Audit executability requires current authorization and frozen plan
@@ -752,13 +774,39 @@ requests retain their full holds. Receipt or observer failures cannot overwrite
 a settled charge. Admission denials finalize their receipt and budget-limit
 evidence even when admission already settled the unused reservation.
 
-Classifier settlement uses the solver's billing-evidence rules. Missing billing
-mode or upstream-cost evidence retains the full hold and stops further dispatch.
-Known charge floors remain held even when they exceed the original reservation.
+Gateway settlement uses one rule for every arm. A charge settles only when
+`usage.cost` is a finite nonnegative number and `usage.is_byok` is exactly
+false. Router-arm settlement records `usage.cost` plus the frozen classifier
+allowance, because the classifier is billed separately. BYOK, a missing
+flag, or a missing cost is an unknown charge: the full hold stays and all
+further dispatch stops.
 
-The isolated runtime uses the installed Miniflare configuration API. Closing a
-run attempts every instance, reports disposal failures, and retains failed
-instances for another cleanup attempt. Package type checks include this runtime.
+**Gateway transport.** Every solver request goes to
+`POST https://ai-gateway.kilo.ai/api/v1/chat/completions`. The host-only
+`KILO_API_TOKEN` environment variable authenticates the request as the Kilo
+account. The frozen `kilo_organization_id` is sent as
+`X-KiloCode-OrganizationId`, so the Kilo organization is billed. The
+organization ID is stored in the spec and receipts; it is not secret. The
+token is never stored. The router arm requests `kilo-auto/efficient` or
+`kilo-auto/frontier`; the receipt records the concrete routed model from
+the response `model`. A routed model outside the frozen pool keeps the full
+hold and stops dispatch. Fixed and control arms request their frozen
+concrete model through the same transport. A router arm needs a valid quote
+for every pool pair of its mode, or it blocks admission. The gateway's
+optional `x-kilo-max-cost-microdollars` bound accepts only system and user
+messages, so multi-turn agent requests do not send it. The local serialized
+ledger is the spending control: it reserves each request's quoted worst case
+before dispatch and enforces the cumulative $100 allowance and the $60 pilot
+and $60 per-run ceilings. A charge above its reservation stops all further
+dispatch. A rejected response after dispatch keeps its full hold. This is not
+a provider-invoice hard cap: the gateway balance is a snapshot and in-flight
+requests can finish after a cap is reached. A daily member limit on the
+organization account is a recommended backstop, not a ceiling. Live routing tables
+can change during a run. The spec records the published table version in
+`gateway_routing_table_version`, or null when none is published; a null
+value is a stated limitation, not a frozen table. There is one live router
+arm per mode; objectives compare it against every fixed pool model and the
+content-blind control.
 
 Run the offline checks with:
 
@@ -768,8 +816,9 @@ python3 -m pip install -r repo-study/requirements.txt
 (cd scripts && python3 -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants)
 ```
 
-Do not authorize paid work without real account-policy evidence, a finite quote
-for every mandatory pair, and independent evidence of total billed exposure.
+Do not authorize paid work without a host-only gateway token, a verified
+organization ID, a finite quote for every mandatory pair, and independent
+evidence of total billed exposure.
 A forecast above the remaining authorization can register for offline checks.
 The code checks quoted reservations; it does not certify a provider-invoice
 ceiling. Local admission stops before an unaffordable reservation. This protocol

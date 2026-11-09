@@ -402,6 +402,8 @@ describe('migrated origin permissions', () => {
               'gh pr create': 'deny',
               'gh api repos/*/issues/*/comments --input*': 'allow',
               'gh api repos/*/issues/comments/* -X PATCH*': 'allow',
+              'find *-exec*': 'deny',
+              'sort *--compress-program*': 'deny',
             }
       );
       expect(spec.env).toMatchObject({

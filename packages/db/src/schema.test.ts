@@ -1594,6 +1594,7 @@ describe('database schema', () => {
       ImpactConversionReportState: ['queued', 'retrying', 'delivered', 'failed'],
       ImpactAdvocateRewardRedemptionState: ['queued', 'retrying', 'redeemed', 'failed'],
       BYOKManagementSource: ['user', 'coding_plan'],
+      ClaudeBillingConnectionStatus: ['pending', 'connected', 'billing_unavailable', 'removed'],
       CodingPlanCredentialStatus: [
         'available',
         'assigned',

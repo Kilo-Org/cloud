@@ -495,6 +495,41 @@ describe('response classes', () => {
     expect(result.eventsParked).toBe(0);
   });
 
+  it('omits the Vercel bypass header when no bypass is configured', async () => {
+    const target = stub('no-bypass');
+    const io = harness({ pages: [[directoryEvent('evt_1')]] });
+
+    await runInDurableObject(target, instance => instance.poll());
+
+    // Production's origin is unprotected, and an empty bypass is a *rejected*
+    // bypass rather than no bypass, so the header must be absent entirely.
+    expect(io.calls).toHaveLength(1);
+    expect(io.calls[0]?.protectionBypass).toBeNull();
+  });
+
+  it('sends the Vercel bypass header when one is configured', async () => {
+    const target = stub('with-bypass');
+    const io = harness({ pages: [[directoryEvent('evt_1')]] });
+
+    // Staging's origin sits behind Deployment Protection: without this header
+    // Vercel's edge answers every call before the app runs, so no
+    // `x-internal-api-key` can authenticate. The binding is read per poll, so
+    // setting it on the test env is what the deployed secret does.
+    const configured = env as Env;
+    configured.SCIM_PROTECTION_BYPASS = 'bypass-token';
+    try {
+      await runInDurableObject(target, instance => instance.poll());
+
+      expect(io.calls).toHaveLength(1);
+      expect(io.calls[0]?.protectionBypass).toBe('bypass-token');
+      // The internal secret still travels with it; the bypass only gets past
+      // the edge, it does not authenticate.
+      expect(io.calls[0]?.apiKey).not.toBeNull();
+    } finally {
+      delete configured.SCIM_PROTECTION_BYPASS;
+    }
+  });
+
   it('never parks a network failure', async () => {
     const target = stub('network-error');
     harness({

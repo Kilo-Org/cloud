@@ -135,6 +135,10 @@ async function writeEvent(
 /**
  * Advances grants whose clock has run out. Called under the actor/org advisory
  * lock so two requests cannot both claim the same stale row.
+ *
+ * The grant deadline bounds access. These write paths record an elapsed grant on
+ * the row, and `deriveGrantStatus` applies the same deadline when a grant is
+ * presented.
  */
 async function expireStaleGrants(
   tx: DrizzleTransaction,
@@ -199,14 +203,28 @@ export type SupportGrantSummary = {
   reviewedAt: string | null;
 };
 
-export function toSupportGrantSummary(grant: SupportAccessGrant): SupportGrantSummary {
+/** Presents a grant through its own time box: the deadline decides the status. */
+function deriveGrantStatus(grant: SupportAccessGrant, nowMs: number): SupportAccessGrantStatus {
+  if (grant.status === 'active' && grant.expires_at !== null) {
+    return Date.parse(grant.expires_at) <= nowMs ? 'expired' : 'active';
+  }
+  if (grant.status === 'pending' && grant.request_expires_at !== null) {
+    return Date.parse(grant.request_expires_at) <= nowMs ? 'expired' : 'pending';
+  }
+  return grant.status;
+}
+
+export function toSupportGrantSummary(
+  grant: SupportAccessGrant,
+  nowMs: number = Date.now()
+): SupportGrantSummary {
   return {
     id: grant.id,
     actorKiloUserId: grant.actor_kilo_user_id,
     organizationId: grant.organization_id,
     actionClass: grant.action_class,
     grantKind: grant.grant_kind,
-    status: grant.status,
+    status: deriveGrantStatus(grant, nowMs),
     reason: grant.reason,
     ticketReference: grant.ticket_reference,
     requestedAt: grant.requested_at,
@@ -259,9 +277,10 @@ export async function toSupportGrantListItems(
   const people = new Map(userRows.map(row => [row.id, row]));
   const person = (id: string): SupportGrantPerson =>
     people.get(id) ?? { id, name: null, email: null };
+  const nowMs = Date.now();
 
   return grants.map(grant => ({
-    ...toSupportGrantSummary(grant),
+    ...toSupportGrantSummary(grant, nowMs),
     organizationName: organizationNames.get(grant.organization_id) ?? null,
     actor: person(grant.actor_kilo_user_id),
     approvedBy: grant.approved_by_kilo_user_id ? person(grant.approved_by_kilo_user_id) : null,

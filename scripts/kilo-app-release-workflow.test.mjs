@@ -228,7 +228,7 @@ function validate(workflow) {
   );
   assert.match(
     suite.run,
-    /select\(\.name == "mobile-test \(1\/8\)"\)/,
+    /select\(\.name == "mobile-test \(1\/4\)"\)/,
     'the proof must read a shard job that runs only when the suite runs'
   );
   assert.match(
@@ -1129,7 +1129,7 @@ const mutations = {
   'the suite proof reads a job that runs for every commit': workflow => {
     const suite = step(workflow, 'check-changes', 'suite');
     suite.run = suite.run.replace(
-      'select(.name == "mobile-test (1/8)")',
+      'select(.name == "mobile-test (1/4)")',
       'select(.name == "mobile-changes")'
     );
   },

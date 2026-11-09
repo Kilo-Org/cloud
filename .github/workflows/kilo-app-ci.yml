@@ -114,7 +114,7 @@ jobs:
   # neither build reads the other's output: one job made every consumer wait for
   # both in sequence, so a declaration miss delayed the shards that never open
   # packages/trpc/dist. `typecheck` and `lint` read both trees and wait for both
-  # producers; `check-unused` and the eight `mobile-test` shards import only the
+  # producers; `check-unused` and the four `mobile-test` shards import only the
   # harness SDK build, so they wait for `prepare-harness-sdk` alone.
   prepare-harness-sdk:
     needs: mobile-changes
@@ -339,14 +339,14 @@ jobs:
       - name: Check unused exports
         run: pnpm --filter kilo-app run check:unused
 
-  # Eight shards run the mobile Vitest suite in parallel; the `test` job below
+  # Four shards run the mobile Vitest suite in parallel; the `test` job below
   # reports the combined result under the required check name.
   #
-  # The shard's `Test` step is CPU-bound and the jobs start together, so the
-  # runner size sets the wall clock of the whole row: measured on a work VM the
-  # step drops from 84 s to 36 s per shard (2 vCPU -> 4 vCPU), against a ~15 s
-  # fixed setup that does not change. Four vCPU pays for itself: the mobile row
-  # gets shorter while its vCPU-seconds rise by about 2%.
+  # The shard's `Test` step is CPU-bound and the jobs start together, so against
+  # a ~15 s fixed setup (checkout, install, artifact download) that does not
+  # change, four shards pay that setup four times instead of eight: the row
+  # gives up eight 4-vCPU jobs for four and the p50 wall of the whole row is
+  # little different — each remaining shard runs the test share twice.
   #
   # The label is `vars.RUNNER_MEDIUM_LABEL` (blacksmith-4vcpu-ubuntu-2404, 4 vCPU
   # and 16 GB; a shard peaks at 0.6 GB). Repo variables are not exposed to fork
@@ -354,11 +354,11 @@ jobs:
   mobile-test:
     needs: [mobile-changes, prepare-harness-sdk]
     if: needs.mobile-changes.outputs.mobile == 'true'
-    name: mobile-test (${{ matrix.shard }}/8)
+    name: mobile-test (${{ matrix.shard }}/4)
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4]
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -387,7 +387,7 @@ jobs:
           path: packages/harness-sdk/dist
 
       - name: Test
-        run: pnpm --filter kilo-app run test --shard=${{ matrix.shard }}/8
+        run: pnpm --filter kilo-app run test --shard=${{ matrix.shard }}/4
 
   # Required check. Skipped shards (no mobile change) pass; a failed or
   # cancelled shard fails this job. It needs both producers for the same reason:

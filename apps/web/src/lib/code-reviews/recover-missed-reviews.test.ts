@@ -250,7 +250,9 @@ describe('recoverMissedReviews', () => {
     expect(mockHandlePullRequestCodeReview).toHaveBeenCalledTimes(1);
     const [payload, integration] = mockHandlePullRequestCodeReview.mock.calls[0];
     expect(payload).toMatchObject({
-      action: 'opened',
+      // The handler's merge-head guard only runs for `synchronize`, so a
+      // recovered head that merges content a review covers is declined.
+      action: 'synchronize',
       pull_request: {
         number: 7,
         draft: false,

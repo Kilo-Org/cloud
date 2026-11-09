@@ -1914,7 +1914,7 @@ export async function createCheckRun(
   const { data } = await octokit.checks.create({
     owner,
     repo,
-    name: 'Kilo Code Review',
+    name: CHECK_RUN_NAME,
     head_sha: headSha,
     status: completed ? 'completed' : 'queued',
     ...(options.conclusion ? { conclusion: options.conclusion } : {}),
@@ -1932,6 +1932,42 @@ export async function createCheckRun(
   });
 
   return data.id;
+}
+
+/** The check run name the Kilo Code Review creates on a pull request head. */
+const CHECK_RUN_NAME = 'Kilo Code Review';
+
+/**
+ * The id of the latest Kilo Code Review run that already exists on a commit, or
+ * undefined when the commit carries none. A read failure also answers
+ * undefined after it is logged, so the caller cannot tell it from "no run"; the
+ * caller's fallback is a re-gate, and a decided duplicate run answers 422,
+ * which the create path logs and leaves in place.
+ */
+export async function findLatestCheckRunId(
+  installationId: string,
+  owner: string,
+  repo: string,
+  headSha: string,
+  appType: GitHubAppType = 'standard'
+): Promise<number | undefined> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+    const { data } = await octokit.checks.listForRef({
+      owner,
+      repo,
+      ref: headSha,
+      check_name: CHECK_RUN_NAME,
+      filter: 'latest',
+      per_page: 1,
+    });
+    const [latest] = data.check_runs;
+    return latest?.id;
+  } catch (error) {
+    logExceptInTest('[findLatestCheckRunId] Failed to list check runs:', error);
+    return undefined;
+  }
 }
 
 /**

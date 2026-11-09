@@ -13,6 +13,12 @@
  * repository is reached across successive runs without keeping a cursor. The
  * database selects the slice, so one run transfers a bounded number of rows
  * however large the installation fleet is.
+ *
+ * The synthesized event replays `synchronize` rather than `opened`, because the
+ * sweep cannot know which delivery it missed and `synchronize` is the stricter
+ * of the two: it also runs the handler's merge-head guard, so a head that
+ * merges base content a review already covers is gated from that review instead
+ * of being reviewed a second time.
  */
 
 import * as z from 'zod';
@@ -30,7 +36,7 @@ import {
   assertGitHubInstallationRuntimeAuthorized,
   GitHubRuntimeAuthorizationError,
 } from '@/lib/integrations/github/runtime-authorization';
-import { PLATFORM } from '@/lib/integrations/core/constants';
+import { PLATFORM, GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import {
   findActiveReviewsForPR,
@@ -355,6 +361,11 @@ function reportRepositoryFailure(
 /**
  * The webhook payload shape for a pull request read from the API, so recovery
  * runs through the webhook handler unchanged.
+ *
+ * The sweep cannot know which delivery it missed, so it replays the stricter
+ * one. `synchronize` is the only action that runs the handler's merge-head
+ * guard, and a recovered head that is a merge of base content a review already
+ * covers must not start a second, billable review of that content.
  */
 function toPullRequestPayload(
   pull: OpenPullRequest,
@@ -362,7 +373,7 @@ function toPullRequestPayload(
   installationId: number
 ): PullRequestPayload {
   return PullRequestPayloadSchema.parse({
-    action: 'opened',
+    action: GITHUB_ACTION.SYNCHRONIZE,
     pull_request: {
       number: pull.number,
       title: pull.title,
@@ -457,7 +468,9 @@ async function recoverPullRequest(params: {
       entry.integration
     );
     // The handler answers 202 when it queued a review, 200 when one of its
-    // skip rules declines, and 500 when it failed.
+    // skip rules declines, and 500 when it failed. A merge head whose content a
+    // finished review already covers is one of the declines: the handler gates
+    // that head from the covering review instead of reviewing it again.
     if (response.status === 202) {
       started = true;
       return;

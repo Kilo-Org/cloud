@@ -315,9 +315,9 @@ export function AdvancedConfigPanel({
               variant="outline"
               onPress={onRepoDefaults}
               disabled={disabled}
-              accessibilityLabel={t('profiles.repoBindings.entryLabel')}
+              accessibilityLabel={t('profiles.repoBindings.title')}
             >
-              <Text>{t('profiles.repoBindings.entryLabel')}</Text>
+              <Text>{t('profiles.repoBindings.title')}</Text>
             </Button>
           ) : null}
         </View>

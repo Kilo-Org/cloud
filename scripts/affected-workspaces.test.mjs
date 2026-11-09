@@ -24,6 +24,8 @@ const references = [
   ['packages/trpc/src/index.ts', 'apps/web/src/routers/root-router'],
   ['apps/web/src/lib/preview.ts', 'services/agent/src/shared/preview'],
   ['services/leaf/vitest.config.ts', 'tools/shared'],
+  // The app's oxlint configs load the plugins from tools/oxlint.
+  ['apps/mobile/.oxlintrc.json', 'tools/oxlint'],
 ];
 const select = (changedFiles, dependencyDirs = []) =>
   selectAffected({ items, changedFiles, dependencyDirs, references });
@@ -129,6 +131,60 @@ test('a check script change runs only that check everywhere', () => {
   const both = select(['scripts/typecheck-all.sh', 'services/leaf/src/a.ts']);
   assert.deepEqual(both.full_checks, ['typecheck']);
   assert.deepEqual(both.packages, ['leaf']);
+});
+
+test('a lint-only input lints every workspace and typechecks none', () => {
+  // No typecheck program reads the lint config or its plugins, so such a change
+  // must not start a typecheck row, while the lint rows still cover every
+  // workspace through full_checks.
+  for (const file of [
+    '.oxlintrc.json',
+    'oxlint-plugin-drizzle.js',
+    'tools/oxlint/anti-slop/index.ts',
+  ]) {
+    const result = select([file]);
+    assert.deepEqual(
+      result,
+      {
+        full: false,
+        reasons: [],
+        full_checks: ['lint'],
+        dirs: [],
+        packages: [],
+        ...noTests,
+      },
+      file
+    );
+    assert.deepEqual(
+      selectGroups(result),
+      { typecheck_groups: [], lint_groups: ['trpc', 'rest'] },
+      file
+    );
+  }
+});
+
+test('a lint plugin change is not a workspace change', () => {
+  // The app's oxlint configs point at tools/oxlint, and kilo-app CI names that
+  // path in its own change detection, so the selection stays lint-only here and
+  // does not drag the app's readers into a typecheck.
+  const result = select(['tools/oxlint/anti-slop/index.ts']);
+  assert.deepEqual(result.dirs, []);
+  assert.deepEqual(result.full_checks, ['lint']);
+});
+
+test('a formatter config change selects no check', () => {
+  // ci.yml's format-check job reads no selection, so the formatter config needs
+  // no workspace, typecheck or lint row.
+  const result = select(['.oxfmtrc.json']);
+  assert.deepEqual(result, {
+    full: false,
+    reasons: [],
+    full_checks: [],
+    dirs: [],
+    packages: [],
+    ...noTests,
+  });
+  assert.deepEqual(selectGroups(result), { typecheck_groups: [], lint_groups: [] });
 });
 
 const groups = selection => selectGroups({ dirs: [], packages: [], ...selection });
@@ -265,6 +321,7 @@ test('documents and neutral root locations are the shared neutral set', () => {
     'dev/a.ts',
     '.github/workflows/deploy.yml',
     'scripts/affected-workspaces.mjs',
+    '.oxfmtrc.json',
   ]) {
     assert.equal(isNeutral(file), true, file);
   }
@@ -273,6 +330,9 @@ test('documents and neutral root locations are the shared neutral set', () => {
     'apps/mobile/src/app/index.tsx',
     'pnpm-workspace.yaml',
     'package.json',
+    // A lint input is not neutral: it selects the lint check through
+    // CHECK_INPUTS.
+    '.oxlintrc.json',
   ]) {
     assert.equal(isNeutral(file), false, file);
   }

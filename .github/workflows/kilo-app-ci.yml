@@ -60,6 +60,9 @@ jobs:
       # The suite jobs always report (required checks); only the suite's own
       # paths justify the heavy work. The patterns are pinned by
       # scripts/stacked-ci.test.mjs, which ci.yml's `ci-wiring` job runs.
+      # tools/oxlint is detected on its own, because the app's oxlint configs
+      # load those plugins: a change there must run the app's own lint and i18n
+      # checks, and the workspace selection treats those paths as lint-only.
       # A lockfile change matches the patterns first, so the detector below
       # never parses the lockfile and needs no installed dependencies.
       - name: Detect mobile-relevant changes
@@ -78,6 +81,10 @@ jobs:
             base="${{ github.event.before }}"
           fi
           if ! git rev-parse --verify "${base}^{commit}" > /dev/null 2>&1; then
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" HEAD | grep -Eq '^tools/oxlint/'; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi

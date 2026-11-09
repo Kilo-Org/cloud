@@ -41,6 +41,9 @@ const mobilePathFragments = [
   /packages\/event-service\//,
   /packages\/notifications\//,
   /packages\/cloud-agent-sdk\//,
+  // The app's oxlint configs load the plugins from tools/oxlint, so a plugin
+  // change must run the app's own lint and i18n checks.
+  /tools\/oxlint\//,
   /pnpm-lock\\?\.yaml/,
   /kilo-app-ci\\?\.yml/,
   // Path-qualified: a bare `/ci\\?\.yml/` also matches the `kilo-app-ci.yml`

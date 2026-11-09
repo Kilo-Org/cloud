@@ -229,16 +229,17 @@ Three classes, and they decide cursor movement:
 | 400 / 401 / 5xx | Contract mismatch, missing secret, or an unexpected failure | Hold; 5xx bodies are fixed strings, detail is in the app's log |
 
 A 409 is not always recoverable by waiting. A group under a sub-organization is
-structural, and a refused account takeover is a claim the directory cannot
+structural, and a refused address bind is a claim the directory cannot
 substantiate — no arrival order fixes either.
 
 `PUT .../users/{external_id}` carries `directoryId` so it can resolve that
-claim. A pre-existing Kilo account holding the address is taken over only when
-the address's domain equals the Effective SSO policy domain of the directory's
-organization: domain capture is what establishes the enterprise's claim to it.
-The account is then converted to the SSO authority's WorkOS identity, its other
-authentication providers are dropped and its browser sessions are invalidated,
-so the prior holder keeps neither a login that bypasses SSO nor a live session.
+claim. The address is accepted only when its domain equals the Effective SSO
+policy domain of the directory's organization — domain capture is what
+establishes the enterprise's claim to it — and a pre-existing Kilo account
+holding the address is then taken over. The account is converted to the SSO
+authority's WorkOS identity, its other authentication providers are dropped and
+its browser sessions are invalidated, so the prior holder keeps neither a login
+that bypasses SSO nor a live session.
 
 The match is the mailbox, not one spelling of it. The account is resolved
 case-insensitively and with `+` aliases and Gmail dots ignored, and that same
@@ -253,10 +254,12 @@ then resolve to no account — which the removal routes report as converged, so 
 would fail silently.
 
 Any other address is refused, including when the organization has captured no
-domain or its policy is misconfigured. Every SCIM account is expected to be
-domain-captured, so a refusal is a real misconfiguration rather than a race, and
-retrying will not clear it. The app logs it as
-`[scim] Refused a directory account takeover` with the directory and the email
+domain or its policy is misconfigured. The gate runs whether the address matches
+a pre-existing account or would create a new one, so a directory can neither
+take over nor mint an account at a domain it does not own. Every SCIM account is
+expected to be domain-captured, so a refusal is a real misconfiguration rather
+than a race, and retrying will not clear it. The app logs it as
+`[scim] Refused a directory address bind` with the directory and the email
 domain, and the 409 body names the domain too — neither carries the address. See
 `.specs/organization-sso.md`, Directory Sync rules 13 and 15.
 

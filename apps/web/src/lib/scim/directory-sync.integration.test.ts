@@ -114,6 +114,10 @@ async function seedSubOrganization(): Promise<string> {
 }
 
 async function seedUser(): Promise<string> {
+  // The fixture domain is captured, so the address binds: a directory may bind
+  // only an address at its organization's captured domain (rule 13), and the
+  // gate runs before both takeover and first-bind provisioning.
+  await seedOrganizationWithDomain('example.test');
   const result = await upsertDirectoryUser(externalId, {
     directoryId,
     email,
@@ -122,6 +126,15 @@ async function seedUser(): Promise<string> {
   });
   createdUserIds.push(result.id);
   return result.id;
+}
+
+async function seedOrganizationWithDomain(domain: string): Promise<string> {
+  const organizationId = await seedOrganization();
+  await db
+    .update(organizations)
+    .set({ sso_domain: domain })
+    .where(eq(organizations.id, organizationId));
+  return organizationId;
 }
 
 describe('upsertDirectoryOrganization', () => {
@@ -436,6 +449,10 @@ describe('upsertDirectorySubOrganization', () => {
 
 describe('upsertDirectoryUser', () => {
   test('creates a user bound to the directory user', async () => {
+    // A first bind is subject to the same captured-domain gate as a takeover
+    // (rule 13), so the organization seeds with the fixture address's domain.
+    await seedOrganizationWithDomain('example.test');
+
     const userId = await seedUser();
 
     const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, userId));
@@ -446,6 +463,44 @@ describe('upsertDirectoryUser', () => {
     // `createOrUpdateUser` owns this, so a directory user is billable like any
     // other account rather than carrying a placeholder.
     expect(row.stripe_customer_id).toBeTruthy();
+  });
+
+  test('refuses to create a user at a domain the organization never captured', async () => {
+    await seedOrganizationWithDomain(`captured-${suffix}.test`);
+
+    const foreignEmail = `newcomer-${suffix}@unrelated-${suffix}.test`;
+
+    await expect(
+      upsertDirectoryUser(externalId, {
+        directoryId,
+        email: foreignEmail,
+        firstName: 'New',
+        lastName: 'Comer',
+      })
+    ).rejects.toThrow(DirectorySyncConflictError);
+
+    // The refusal precedes provisioning, so no account was minted for the
+    // address — and none carries the directory binding.
+    const users = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.external_id, externalId));
+    expect(users).toEqual([]);
+
+    const byAddress = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.normalized_email, foreignEmail));
+    expect(byAddress).toEqual([]);
+
+    // No Stripe customer was settled for a user who was never created.
+    expect(organizationBilling.getOrCreateStripeCustomerIdForOrganization).not.toHaveBeenCalled();
+
+    // The refusal is not a missing dependency: the directory is bound and an
+    // address at its captured domain still binds, so a retry of *this* event
+    // fails identically rather than resolving after a delay.
+    const bound = await seedUser();
+    expect(bound).toBeTruthy();
   });
 
   test('is idempotent: a replayed event returns the same user', async () => {

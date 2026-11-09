@@ -295,15 +295,16 @@ export async function upsertDirectorySubOrganization(
 /**
  * Bind a WorkOS directory user to a Kilo user.
  *
- * A pre-existing account holding the directory user's address is taken over,
- * but only when the address's domain equals the Effective SSO policy domain of
- * the directory's organization. Domain capture is what establishes the
- * enterprise's claim to the address, and the identity provider has asserted
- * that this person holds it, so the account is converted to the SSO authority's
- * WorkOS identity rather than refused or duplicated. A non-matching domain is
- * refused: an unverified domain is not the enterprise's to claim. Every SCIM
- * account is expected to be domain-captured, so a refusal means the directory
- * is pushing an address its organization never proved it owns.
+ * Whether the address matches a pre-existing account (which is then taken over)
+ * or binds to a freshly created one, it is accepted only when its domain equals
+ * the Effective SSO policy domain of the directory's organization. Domain
+ * capture is what establishes the enterprise's claim to the address, and the
+ * identity provider has asserted that this person holds it, so a takeover is
+ * converted to the SSO authority's WorkOS identity rather than refused or
+ * duplicated. A non-matching domain is refused: an unverified domain is not the
+ * enterprise's to claim. Every SCIM account is expected to be
+ * domain-captured, so a refusal means the directory is pushing an address its
+ * organization never proved it owns.
  *
  * Both paths go through `createOrUpdateUser` with `provider: 'workos'` and
  * `autoLinkToExistingUser`, which owns the whole settlement: for an existing
@@ -340,9 +341,15 @@ export async function upsertDirectoryUser(
   // rows whose `normalized_email` is null, so it resolves the mailbox rather
   // than one spelling of it.
   const existing = await findUserByNormalizedEmail(input.email);
-  if (existing) {
-    await assertDirectoryOwnsEmailDomain(input.directoryId, input.email);
 
+  // Domain capture establishes the enterprise's claim to the address, so the
+  // gate runs before any binding: refusing it on the takeover path alone would
+  // let the same uncaptured address mint a new account instead. An address
+  // change cannot reach this point with an unbound account — it went through
+  // `applyDirectoryUserChanges` or this gate on its first bind.
+  await assertDirectoryOwnsEmailDomain(input.directoryId, input.email);
+
+  if (existing) {
     // One account, one directory user. Overwriting would silently drop the
     // first binding, and events for that identifier would then resolve to no
     // user — which the removal routes now report as converged, so it would fail
@@ -511,9 +518,9 @@ async function applyDirectoryUserChanges(
  */
 async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string): Promise<void> {
   const refuse = (reason: string): never => {
-    // The skipped takeover is the auditable event: it names a directory pushing
-    // an address its organization never proved it owns.
-    console.warn('[scim] Refused a directory account takeover', {
+    // The refused bind is the auditable event: it names a directory pushing an
+    // address its organization never proved it owns.
+    console.warn('[scim] Refused a directory address bind', {
       directoryId,
       emailDomain: getLowerDomainFromEmail(email),
       reason,
@@ -522,7 +529,7 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
     // logged again by `directorySyncErrorResponse`, and the directory id plus
     // the reason are what an operator acts on.
     throw new DirectorySyncConflictError(
-      `An existing Kilo account holds an address at ${getLowerDomainFromEmail(email)}, which directory ${directoryId} has not captured: ${reason}`
+      `Directory ${directoryId} has not captured the domain ${getLowerDomainFromEmail(email)}: ${reason}`
     );
   };
 

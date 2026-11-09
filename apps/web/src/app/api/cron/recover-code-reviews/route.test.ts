@@ -17,6 +17,12 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
 
 const mockRecoverMissedReviews = jest.fn();
 
+const mockSentryLogger = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  sentryLogger: () => mockSentryLogger,
+}));
+
 jest.mock('@/lib/code-reviews/recover-missed-reviews', () => ({
   recoverMissedReviews: () => mockRecoverMissedReviews(),
   RECOVER_MISSED_REVIEWS_LOOKBACK_HOURS: 24,
@@ -63,6 +69,18 @@ describe('GET /api/cron/recover-code-reviews', () => {
     expect(response.status).toBe(401);
     expect(mockRecoverMissedReviews).not.toHaveBeenCalled();
     expect(emitScheduledJobEvent).not.toHaveBeenCalled();
+  });
+
+  it('refuses a request whose bearer does not match and reports the attempt', async () => {
+    const response = await GET(
+      new Request('http://localhost/api/cron/recover-code-reviews', {
+        headers: { authorization: 'Bearer not-the-cron-secret' },
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockRecoverMissedReviews).not.toHaveBeenCalled();
+    expect(mockSentryLogger).toHaveBeenCalledTimes(1);
   });
 
   it('runs the sweep and reports its summary with the bounds it applied', async () => {

@@ -368,6 +368,24 @@ describe('recoverMissedReviews', () => {
     );
   });
 
+  it('resolves the owner and the installation authorization once per integration', async () => {
+    installedSlice([
+      { integrationId: INTEGRATION_ID, fullName: 'acme/widgets' },
+      { integrationId: INTEGRATION_ID, fullName: 'acme/gears' },
+    ]);
+    mockFetchOpenPullRequests.mockImplementation(async params => {
+      const { owner, repo } = fetchParams(params);
+      return [makePull({ baseRepoName: repo, baseRepoFullName: `${owner}/${repo}` })];
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+    expect(summary).toMatchObject({ repositoriesConsidered: 2, reviewsStarted: 2 });
+    expect(mockGetBotUserId).toHaveBeenCalledTimes(1);
+    expect(mockAssertAuthorized).toHaveBeenCalledTimes(1);
+    // Each repository still lists its own pull requests.
+    expect(mockFetchOpenPullRequests).toHaveBeenCalledTimes(2);
+  });
+
   it('drops a slice row its integration no longer holds', async () => {
     const missingId = '00000000-0000-4000-8000-0000000000dz';
     installedSlice([

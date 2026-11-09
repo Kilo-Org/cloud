@@ -6,6 +6,8 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { isCronAuthorizationValid } from '@/lib/cron-auth';
 import {
   recoverMissedReviews,
   RECOVER_MISSED_REVIEWS_LOOKBACK_HOURS,
@@ -17,7 +19,15 @@ import {
 export const maxDuration = 300;
 
 export async function GET(request: Request) {
-  if (!CRON_SECRET || request.headers.get('authorization') !== `Bearer ${CRON_SECRET}`) {
+  const authHeader = request.headers.get('authorization');
+  if (!CRON_SECRET || !isCronAuthorizationValid(authHeader, CRON_SECRET)) {
+    sentryLogger(
+      'cron',
+      'warning'
+    )(
+      'Refused recover-code-reviews cron request: ' +
+        (authHeader ? 'Invalid authorization header' : 'Missing authorization header')
+    );
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

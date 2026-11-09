@@ -113,6 +113,20 @@ describe('recoverMissedReviews slice selection against the database', () => {
     expect(summary.repositoriesConsidered).toBe(1);
   });
 
+  it('counts a repository entry without a name as unaddressable', async () => {
+    await insertIntegration({
+      repositories: [
+        { id: 8201, name: 'good', full_name: 'slice-owner/good', private: true },
+        // An entry without a full name is outside the sweep and still reported.
+        { id: 8202, name: 'nameless', private: true },
+      ],
+    });
+
+    const summary = await recoverMissedReviews({ now: new Date('2026-11-09T12:00:00Z') });
+    expect(summary.unaddressableRepositories).toBe(1);
+    expect(summary.repositoriesConsidered).toBe(1);
+  });
+
   it('ignores an entry whose name does not split on one slash', async () => {
     await insertIntegration({
       repositories: [

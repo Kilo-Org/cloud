@@ -136,6 +136,10 @@ function installedRepositoriesSql(): SQL {
  * A stored repository entry the payload can name: the review payload carries the
  * platform's numeric repository id, and the owner and name split on one slash.
  * A GitHub installation stores a number; anything else cannot be reviewed.
+ *
+ * An entry without a string name makes a comparison answer NULL rather than
+ * false, so every count wraps the predicate in COALESCE and the entry lands in
+ * the unaddressable bucket.
  */
 function addressableRepositorySql(): SQL {
   return sql`
@@ -191,8 +195,9 @@ async function countInstalledRepositories(): Promise<
 > {
   const result = await db.execute(sql`
     SELECT
-      count(*) FILTER (WHERE ${addressableRepositorySql()})::int AS addressable,
-      count(*) FILTER (WHERE NOT (${addressableRepositorySql()}))::int AS unaddressable
+      count(*) FILTER (WHERE COALESCE(${addressableRepositorySql()}, false))::int AS addressable,
+      count(*) FILTER (WHERE NOT COALESCE(${addressableRepositorySql()}, false))::int
+        AS unaddressable
     ${installedRepositoriesSql()}
   `);
   return installedRepositoriesCountSchema.parse(result.rows[0]);
@@ -259,6 +264,92 @@ async function resolveReviewOwner(integration: PlatformIntegration): Promise<Own
     return { type: 'user', id: integration.owned_by_user_id, userId: integration.owned_by_user_id };
   }
   return null;
+}
+
+/**
+ * The per-integration prerequisites of a sweep: the review owner, a usable
+ * installation id, and an authorized association. An integration with many
+ * repositories in one slice repeats none of these lookups.
+ */
+type IntegrationReadiness =
+  | { status: 'ready'; owner: Owner; installationId: number }
+  | { status: 'without_owner' }
+  | { status: 'unusable_installation' }
+  | { status: 'unauthorized' }
+  | { status: 'failed'; error: unknown };
+
+async function readIntegrationReadiness(
+  integration: PlatformIntegration
+): Promise<IntegrationReadiness> {
+  try {
+    const owner = await resolveReviewOwner(integration);
+    if (owner === null) return { status: 'without_owner' };
+
+    const installationId = Number(integration.platform_installation_id);
+    if (!Number.isInteger(installationId) || installationId <= 0) {
+      warnExceptInTest('[recoverMissedReviews] Unusable installation', {
+        integrationId: integration.id,
+      });
+      return { status: 'unusable_installation' };
+    }
+
+    // The selected association owns the delivery: installation-wide
+    // authorization must never carry a different association's identity, as on
+    // the webhook path.
+    await assertGitHubInstallationRuntimeAuthorized(
+      String(installationId),
+      integration.github_app_type ?? 'standard',
+      integration.id
+    );
+    return { status: 'ready', owner, installationId };
+  } catch (error) {
+    if (error instanceof GitHubRuntimeAuthorizationError) return { status: 'unauthorized' };
+    return { status: 'failed', error };
+  }
+}
+
+type PlannedRepository = { entry: RecoverableRepository; readiness: IntegrationReadiness };
+
+/** Resolves the shared prerequisites once per integration of the slice. */
+async function planRepositories(
+  repositories: RecoverableRepository[]
+): Promise<PlannedRepository[]> {
+  const integrations = new Map<string, PlatformIntegration>();
+  for (const entry of repositories) {
+    integrations.set(entry.integration.id, entry.integration);
+  }
+  const limit = pLimit(RECOVER_CONCURRENCY);
+  const readiness = new Map(
+    await Promise.all(
+      [...integrations].map(([integrationId, integration]) =>
+        limit(async () => [integrationId, await readIntegrationReadiness(integration)] as const)
+      )
+    )
+  );
+
+  const planned: PlannedRepository[] = [];
+  for (const entry of repositories) {
+    const resolved = readiness.get(entry.integration.id);
+    if (resolved === undefined) continue;
+    planned.push({ entry, readiness: resolved });
+  }
+  return planned;
+}
+
+function reportRepositoryFailure(
+  entry: RecoverableRepository,
+  error: unknown,
+  summary: RecoverMissedReviewsSummary
+): void {
+  summary.providerFailures += 1;
+  captureException(error, {
+    tags: { operation: 'recoverMissedReviews' },
+    extra: { integrationId: entry.integration.id, repository: entry.fullName },
+  });
+  logExceptInTest('[recoverMissedReviews] Repository sweep failed:', {
+    integrationId: entry.integration.id,
+    repository: entry.fullName,
+  });
 }
 
 /**
@@ -389,22 +480,6 @@ async function recoverRepository(
 ): Promise<void> {
   const { integration } = entry;
 
-  // The selected association owns the delivery: installation-wide authorization
-  // must never carry a different association's identity, as on the webhook path.
-  try {
-    await assertGitHubInstallationRuntimeAuthorized(
-      String(installationId),
-      integration.github_app_type ?? 'standard',
-      integration.id
-    );
-  } catch (error) {
-    if (error instanceof GitHubRuntimeAuthorizationError) {
-      run.summary.integrationsUnavailable += 1;
-      return;
-    }
-    throw error;
-  }
-
   const pulls = await fetchOpenPullRequests({
     installationId: String(installationId),
     owner: entry.ownerLogin,
@@ -482,35 +557,27 @@ export async function recoverMissedReviews(
   const repositories = repositoriesFromSlice(slice, integrations);
   summary.repositoriesConsidered = repositories.length;
 
+  const planned = await planRepositories(repositories);
   const limit = pLimit(RECOVER_CONCURRENCY);
   await Promise.all(
-    repositories.map(entry =>
+    planned.map(({ entry, readiness }) =>
       limit(async () => {
+        if (readiness.status === 'without_owner') {
+          summary.skippedWithoutOwner += 1;
+          return;
+        }
+        if (readiness.status === 'unauthorized' || readiness.status === 'unusable_installation') {
+          summary.integrationsUnavailable += 1;
+          return;
+        }
+        if (readiness.status === 'failed') {
+          reportRepositoryFailure(entry, readiness.error, summary);
+          return;
+        }
         try {
-          const owner = await resolveReviewOwner(entry.integration);
-          if (owner === null) {
-            summary.skippedWithoutOwner += 1;
-            return;
-          }
-          const installationId = Number(entry.integration.platform_installation_id);
-          if (!Number.isInteger(installationId) || installationId <= 0) {
-            summary.integrationsUnavailable += 1;
-            warnExceptInTest('[recoverMissedReviews] Unusable installation', {
-              integrationId: entry.integration.id,
-            });
-            return;
-          }
-          await recoverRepository(entry, owner, installationId, run);
+          await recoverRepository(entry, readiness.owner, readiness.installationId, run);
         } catch (error) {
-          summary.providerFailures += 1;
-          captureException(error, {
-            tags: { operation: 'recoverMissedReviews' },
-            extra: { integrationId: entry.integration.id, repository: entry.fullName },
-          });
-          logExceptInTest('[recoverMissedReviews] Repository sweep failed:', {
-            integrationId: entry.integration.id,
-            repository: entry.fullName,
-          });
+          reportRepositoryFailure(entry, error, summary);
         }
       })
     )

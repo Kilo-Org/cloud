@@ -590,6 +590,34 @@ async function expectPlatformCredentialConstraintViolation(
 }
 
 describe('database schema', () => {
+  it('enforces blacklisted domain primary key values', async () => {
+    const rollback = new Error('rollback blacklisted domain fixtures');
+    await expect(
+      schemaTestDb.db.transaction(async tx => {
+        const domain = 'Api.Deep.Example.COM';
+        const [inserted] = await tx
+          .insert(schema.blacklisted_domains)
+          .values({ domain })
+          .returning();
+        expect(inserted).toEqual({ domain });
+
+        await expect(
+          tx.transaction(nested => nested.insert(schema.blacklisted_domains).values({ domain }))
+        ).rejects.toMatchObject({
+          cause: { constraint: 'blacklisted_domains_pkey' },
+        });
+
+        await expect(
+          tx.transaction(nested =>
+            nested.execute(sql`INSERT INTO ${schema.blacklisted_domains} (domain) VALUES (NULL)`)
+          )
+        ).rejects.toMatchObject({ cause: { code: '23502', column: 'domain' } });
+
+        throw rollback;
+      })
+    ).rejects.toBe(rollback);
+  });
+
   it('indexes Enkrypt usage lookups by inference usage across monthly partitions', async () => {
     await schemaTestDb.db.transaction(async tx => {
       await tx.execute(sql`SET LOCAL enable_seqscan = off`);

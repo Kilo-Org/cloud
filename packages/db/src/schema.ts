@@ -5981,6 +5981,10 @@ export const ai_gateway_config = pgTable(
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
 
+export const blacklisted_domains = pgTable('blacklisted_domains', {
+  domain: text().primaryKey(),
+});
+
 export const ai_gateway_sync_providers_state = pgTable(
   'ai_gateway_sync_providers_state',
   {

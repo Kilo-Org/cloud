@@ -46,6 +46,7 @@ const jobRun = new Map([
   ['.github/actions/harness-sdk-build', harnessBuild],
 ]);
 const ciJobs = workflows['ci.yml'].jobs;
+const kiloAppJobs = workflows['kilo-app-ci.yml'].jobs;
 const pnpmCleanup = fileURLToPath(
   new URL('../.github/actions/pnpm-store/cleanup/cleanup.cjs', import.meta.url)
 );
@@ -1088,6 +1089,39 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.deepEqual(job.strategy.matrix.shard, [1, 2, 3, 4], 'four shards still run');
   const run = job.steps.find(step => step.name === 'Run web tests');
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
+});
+
+// The app's checks and suite read the app's workspace closure and the builds
+// the producers upload, so a recursive workspace install links every other
+// project for a step that reads none of them. A step that starts importing
+// another workspace widens its job's filter here; it does not restore the full
+// install. Dependency postinstalls stay enabled across these jobs.
+const appClosureInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
+
+test('the kilo-app CI consumers install the app closure', () => {
+  // The two producer jobs keep their own wider (or whole-workspace) closures;
+  // every other install in this workflow is the app's.
+  const consumerJobs = Object.entries(kiloAppJobs)
+    .filter(
+      ([name, job]) =>
+        !name.startsWith('prepare') &&
+        (job.steps ?? []).some(step => /^pnpm install --frozen-lockfile\b/.test(step.run ?? ''))
+    )
+    .map(([name]) => name);
+  for (const name of consumerJobs) {
+    const install = kiloAppJobs[name].steps.find(step => step.name === 'Install dependencies');
+    assert.equal(
+      install.run,
+      appClosureInstall,
+      `${name} installs the app closure, not the whole workspace`
+    );
+  }
+  assert.deepEqual(
+    consumerJobs,
+    ['typecheck', 'lint', 'check-unused', 'mobile-test'],
+    'the app closure covers every consumer install and leaves the producers alone'
+  );
 });
 
 // The extension's unit suite runs in extension-ci.yml for a pull request and a

@@ -211,8 +211,11 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the workspaces the app depends on and the root one are installed:
+      # the step runs the app's own scripts against the downloaded builds.
+      # Widen the filter when a step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
       - name: Download the tRPC declarations
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -253,8 +256,11 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the workspaces the app depends on and the root one are installed:
+      # the lint runs the app config's oxlint against its own sources.
+      # Widen the filter when a step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
       - name: Download the tRPC declarations
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -327,8 +333,11 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the workspaces the app depends on and the root one are installed:
+      # the check reads the app's own knip config and exports.
+      # Widen the filter when a step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
       - name: Download the harness SDK build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -375,8 +384,13 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the workspaces the app depends on and the root one are installed:
+      # the suite imports the app and its workspace dependencies, and the
+      # harness SDK build arrives as an artifact. Dependency postinstalls stay
+      # enabled. Widen the filter when a test imports a workspace outside the
+      # closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
       # The tests import the harness SDK build at run time. The tRPC build
       # holds only type declarations, which Vitest does not read.

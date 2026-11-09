@@ -85,11 +85,26 @@ jest.mock('@/components/ui/badge', () => ({
     createElement('span', { 'data-slot': 'badge' }, children),
 }));
 
+let mockTabsOnValueChange: ((value: string) => void) | undefined;
+
 jest.mock('@/components/ui/tabs', () => ({
-  Tabs: ({ children }: { children?: React.ReactNode }) => createElement('div', null, children),
+  Tabs: ({
+    children,
+    onValueChange,
+  }: {
+    children?: React.ReactNode;
+    onValueChange?: (value: string) => void;
+  }) => {
+    mockTabsOnValueChange = onValueChange;
+    return createElement('div', null, children);
+  },
   TabsList: ({ children }: { children?: React.ReactNode }) => createElement('div', null, children),
-  TabsTrigger: ({ children }: { children?: React.ReactNode }) =>
-    createElement('div', null, children),
+  TabsTrigger: ({ value, children }: { value: string; children?: React.ReactNode }) =>
+    createElement(
+      'button',
+      { type: 'button', onClick: () => mockTabsOnValueChange?.(value) },
+      children
+    ),
   TabsContent: ({ value, children }: { value: string; children?: React.ReactNode }) =>
     value === 'general' ? createElement('div', null, children) : null,
 }));
@@ -312,5 +327,29 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     act(() => toggle.click());
 
     expect(personalSwitch().getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('reports section changes so callers can sync the URL', () => {
+    mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
+    const onSectionChange = jest.fn();
+    act(() => {
+      root.render(
+        createElement(CloudAgentSettingsDialog, {
+          organizationId: undefined,
+          open: true,
+          onOpenChange: () => undefined,
+          onSectionChange,
+        })
+      );
+    });
+
+    const environments = Array.from(domDocument.querySelectorAll('button')).find(
+      button => button.textContent?.trim() === 'Environments'
+    );
+    if (!environments) throw new Error('Missing Environments tab');
+
+    act(() => environments.click());
+
+    expect(onSectionChange).toHaveBeenCalledWith('environments');
   });
 });

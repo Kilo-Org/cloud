@@ -23,11 +23,14 @@ import { RepositoryOverridesSection } from './RepositoryOverridesSection';
 import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
 
+export type SettingsSection = 'general' | 'profiles' | 'environments' | 'compute';
+
 type CloudAgentSettingsDialogProps = {
   organizationId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialSection?: 'general' | 'profiles' | 'environments' | 'compute';
+  initialSection?: SettingsSection;
+  onSectionChange?: (section: SettingsSection) => void;
   onProfileSelect?: (profileId: string) => void;
   openToNewProfile?: boolean;
   initialSelectedProfileId?: string | null;
@@ -63,6 +66,7 @@ export function CloudAgentSettingsDialog({
 function CloudAgentSettings({
   organizationId,
   initialSection = 'general',
+  onSectionChange,
   onProfileSelect,
   openToNewProfile,
   initialSelectedProfileId,
@@ -104,8 +108,10 @@ function CloudAgentSettings({
             value === 'profiles' ||
             value === 'environments' ||
             (value === 'compute' && settings?.canManage)
-          )
+          ) {
             setSection(value);
+            onSectionChange?.(value);
+          }
         }}
         orientation={isMobile ? 'horizontal' : 'vertical'}
         className="flex min-h-0 flex-1 flex-col md:flex-row"

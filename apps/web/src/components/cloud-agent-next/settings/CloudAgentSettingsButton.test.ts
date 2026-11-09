@@ -8,13 +8,18 @@ type DialogProps = {
   open?: boolean;
   initialSection?: string;
   organizationId?: string;
+  onSectionChange?: (section: 'general' | 'profiles' | 'environments' | 'compute') => void;
 };
 
 let mockSearchParams = new URLSearchParams();
+let mockPathname = '/cloud';
+const mockReplace = jest.fn();
 const mockDialogProps: DialogProps[] = [];
 
 jest.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams,
+  usePathname: () => mockPathname,
+  useRouter: () => ({ replace: mockReplace }),
 }));
 
 jest.mock('lucide-react', () => ({ Settings: () => null }));
@@ -50,6 +55,25 @@ function setSearchParams(search: string): void {
 }
 
 describe('CloudAgentSettingsButton deep links', () => {
+  beforeEach(() => {
+    mockReplace.mockReset();
+    mockPathname = '/cloud';
+  });
+
+  it.each([
+    ['?settings', 'general'],
+    ['?settings=', 'general'],
+    ['?settings=general', 'general'],
+    ['?settings=environments', 'environments'],
+  ] as const)('opens %s on the %s section', (search, section) => {
+    setSearchParams(search);
+
+    const props = renderButton();
+
+    expect(props.open).toBe(true);
+    expect(props.initialSection).toBe(section);
+  });
+
   it('opens personal profiles for the personal profiles deep link', () => {
     setSearchParams('?settings=profiles');
 
@@ -60,13 +84,13 @@ describe('CloudAgentSettingsButton deep links', () => {
     expect(props.organizationId).toBeUndefined();
   });
 
-  it('does not open organization profiles from the personal profiles link', () => {
+  it('opens profiles for a profiles deep link in organization scope', () => {
     setSearchParams('?settings=profiles');
 
     const props = renderButton('org-1');
 
-    expect(props.open).toBe(false);
-    expect(props.initialSection).toBe('general');
+    expect(props.open).toBe(true);
+    expect(props.initialSection).toBe('profiles');
     expect(props.organizationId).toBe('org-1');
   });
 
@@ -95,5 +119,17 @@ describe('CloudAgentSettingsButton deep links', () => {
 
     expect(props.open).toBe(false);
     expect(props.initialSection).toBe('general');
+  });
+
+  it('writes the active section to the URL', () => {
+    setSearchParams('?foo=bar');
+    mockPathname = '/cloud';
+    const props = renderButton();
+
+    props.onSectionChange?.('environments');
+
+    expect(mockReplace).toHaveBeenCalledWith('/cloud?foo=bar&settings=environments', {
+      scroll: false,
+    });
   });
 });

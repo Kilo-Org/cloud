@@ -235,14 +235,14 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
 
   if (Object.keys(vercelModelMetadata).length === 0) {
     throw new Error(
-      'No Vercel model metadata in the database, use the admin panel at ' +
+      'No Vercel model metadata in the database, refresh the metadata cache in the admin panel at ' +
         MODELS_BY_PROVIDER_ADMIN_URL
     );
   }
 
   if (Object.keys(openRouterModelMetadata).length === 0) {
     throw new Error(
-      'No OpenRouter model metadata in the database, use the admin panel at ' +
+      'No OpenRouter model metadata in the database, refresh the metadata cache in the admin panel at ' +
         MODELS_BY_PROVIDER_ADMIN_URL
     );
   }

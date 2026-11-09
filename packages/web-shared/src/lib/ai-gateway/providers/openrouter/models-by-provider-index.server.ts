@@ -42,7 +42,7 @@ type ProviderIndexLoaderOptions = {
 
 /**
  * Provider slugs that serve one exact model variant, derived from the gateway
- * endpoint metadata stored at sync time. Endpoint tags have the shape
+ * endpoint metadata stored in the metadata cache. Endpoint tags have the shape
  * `<provider-slug>[/<quantization>]`, so their prefix lives in the same slug
  * namespace as provider allow lists and `provider.only` routing.
  */

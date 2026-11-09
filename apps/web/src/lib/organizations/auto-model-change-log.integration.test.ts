@@ -340,9 +340,15 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
       'z-ai/glm-5.1',
     ]);
 
-    const remainingRows = await db.select().from(modelsByProvider);
+    const remainingRows = await db
+      .select({
+        id: modelsByProvider.id,
+        openrouter: modelsByProvider.openrouter,
+        vercel: modelsByProvider.vercel,
+      })
+      .from(modelsByProvider);
     expect(remainingRows).toHaveLength(1);
-    expect(remainingRows[0]).toMatchObject({ id: result.id, openrouter: null, vercel: null });
+    expect(remainingRows).toEqual([{ id: result.id, openrouter: null, vercel: null }]);
 
     const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
     expect(logs).toHaveLength(1);

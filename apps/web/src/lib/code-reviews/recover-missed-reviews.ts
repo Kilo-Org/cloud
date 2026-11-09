@@ -446,8 +446,8 @@ async function recoverPullRequest(params: {
     return;
   }
   // A review still in flight at an earlier head must not be superseded by a
-  // synthetic opened event; the webhook path reaches this handler only through
-  // the merge-commit and supersession logic that guards that case.
+  // synthetic synchronize event; the webhook path reaches this handler only
+  // through the merge-commit and supersession logic that guards that case.
   const activeReviews = await findActiveReviewsForPR(scope, pull.headSha);
   if (activeReviews.length > 0) {
     summary.skippedActiveReview += 1;

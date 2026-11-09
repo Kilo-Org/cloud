@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { and, eq, inArray } from 'drizzle-orm';
 import {
+  organizations,
   passkey_credentials,
   session_step_up_proofs,
   support_access_grant_events,
@@ -39,6 +40,26 @@ async function orgWithOwner() {
     0
   );
   return { owner, organization };
+}
+
+async function parentOrgWithChild() {
+  const parentOwner = await insertTestUser({ is_admin: false });
+  const childOwner = await insertTestUser({ is_admin: false });
+  const parent = await createTestOrganization(
+    `support-parent-${crypto.randomUUID()}`,
+    parentOwner.id,
+    0
+  );
+  const child = await createTestOrganization(
+    `support-child-${crypto.randomUUID()}`,
+    childOwner.id,
+    0
+  );
+  await db
+    .update(organizations)
+    .set({ parent_organization_id: parent.id })
+    .where(eq(organizations.id, child.id));
+  return { parent, child };
 }
 
 function constraintName(error: unknown): string | null {
@@ -621,6 +642,56 @@ describe('admin.supportAccess viewAccess', () => {
         organizationId: organization.id,
       })
     ).resolves.toEqual({ grantRequired: true, expiresAt: null });
+  });
+
+  test('an own active grant on the parent lets the admin open the child', async () => {
+    const admin = await insertRequester();
+    const { parent, child } = await parentOrgWithChild();
+    const caller = await stepUpCaller(admin.id);
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: parent.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+
+    await expect(
+      caller.admin.supportAccess.viewAccess({ organizationId: child.id })
+    ).resolves.toEqual({ grantRequired: false, expiresAt: grant.expiresAt });
+  });
+
+  test("another admin's active parent grant does not count for the child", async () => {
+    const holder = await insertRequester();
+    const other = await insertRequester();
+    const { parent, child } = await parentOrgWithChild();
+    await (
+      await stepUpCaller(holder.id)
+    ).admin.supportAccess.request({
+      organizationId: parent.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+
+    await expect(
+      (await stepUpCaller(other.id)).admin.supportAccess.viewAccess({
+        organizationId: child.id,
+      })
+    ).resolves.toEqual({ grantRequired: true, expiresAt: null });
+  });
+
+  test('getActiveForOrganization includes a live parent grant for the child', async () => {
+    const admin = await insertRequester();
+    const { parent, child } = await parentOrgWithChild();
+    const caller = await stepUpCaller(admin.id);
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: parent.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+
+    const active = await caller.admin.supportAccess.getActiveForOrganization({
+      organizationId: child.id,
+    });
+    expect(active.map(item => item.id)).toContain(grant.id);
   });
 
   test('an admin who is a member needs no grant', async () => {

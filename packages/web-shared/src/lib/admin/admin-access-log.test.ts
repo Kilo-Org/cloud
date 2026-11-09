@@ -203,6 +203,7 @@ describe('kilo admin elevation telemetry', () => {
       supportGrantId: null,
       supportActionId: null,
       inventoryId: null,
+      supportInheritedFromOrganizationId: null,
       issuanceId: null,
     });
   });

@@ -52,6 +52,15 @@ import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gate
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
+import {
+  assertMinimumCount,
+  createCachedMetadataReader,
+  type MetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+
+const OPENROUTER_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
+const OPENROUTER_MODELS_FETCH_TIMEOUT_MS = 15_000;
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -313,8 +322,8 @@ function removeUpstreamEnkrypt(response: unknown): unknown {
 
 /**
  * Reads one OpenRouter catalogue: fetch, sanitize, validate and report.
- * Callers own the URL, the headers and the cache policy, because the raw list may be cached
- * while the transcription list must not be.
+ * Callers own the URL, the headers and the cache policy; the metadata cache readers use this
+ * as their live fallback, and the local fake LLM transcription catalogue always fetches live.
  */
 async function fetchOpenRouterModels(
   url: string,
@@ -356,24 +365,81 @@ async function fetchOpenRouterModels(
   return parseResult.data;
 }
 
+function openRouterModelsHeaders() {
+  return {
+    Authorization: `Bearer ${OPENROUTER.apiKey}`,
+    ...ATTRIBUTION_HEADERS,
+  };
+}
+
+function openRouterModelsSource(
+  url: string,
+  minimumCount: number
+): MetadataSource<OpenRouterModelsResponse> {
+  return {
+    url,
+    headers: openRouterModelsHeaders,
+    parse: raw => {
+      const parsed = OpenRouterModelsResponseSchema.parse(removeUpstreamEnkrypt(raw));
+      assertMinimumCount(url, parsed.data.length, minimumCount);
+      return parsed;
+    },
+  };
+}
+
+function createOpenRouterModelsReader(
+  source: MetadataSource<OpenRouterModelsResponse>,
+  { subject, endpoint }: { subject: 'models' | 'transcription models'; endpoint: string }
+) {
+  return createCachedMetadataReader(source, {
+    fromDb: readDb,
+    ttlMs: OPENROUTER_MODELS_CACHE_TTL_MS,
+    fetchFallback: () =>
+      fetchOpenRouterModels(
+        source.url,
+        {
+          method: 'GET',
+          headers: openRouterModelsHeaders(),
+          cache: 'no-store',
+          signal: AbortSignal.timeout(OPENROUTER_MODELS_FETCH_TIMEOUT_MS),
+        },
+        { subject, endpoint }
+      ),
+  });
+}
+
+export const openRouterModelsMetadataSource = openRouterModelsSource(
+  `${OPENROUTER.apiUrl}/models`,
+  100
+);
+
+export const openRouterTranscriptionModelsMetadataSource = openRouterModelsSource(
+  `${OPENROUTER.apiUrl}/models?output_modalities=transcription`,
+  1
+);
+
+const openRouterModelsReader = createOpenRouterModelsReader(openRouterModelsMetadataSource, {
+  subject: 'models',
+  endpoint: 'openrouter/models',
+});
+
+const openRouterTranscriptionModelsReader = createOpenRouterModelsReader(
+  openRouterTranscriptionModelsMetadataSource,
+  { subject: 'transcription models', endpoint: 'openrouter/transcription-models' }
+);
+
+export function resetOpenRouterModelsCaches() {
+  openRouterModelsReader.reset();
+  openRouterTranscriptionModelsReader.reset();
+}
+
 /**
- * Fetch raw, unfiltered models from OpenRouter API
+ * Raw, unfiltered OpenRouter models, read from the metadata cache table (live fetch only when
+ * the row is missing or unusable) and kept in memory for 5 minutes.
  * Use this for syncing model stats where you need complete data including :free variants
  */
 export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
-  return fetchOpenRouterModels(
-    `${OPENROUTER.apiUrl}/models`,
-    {
-      cache: 'force-cache',
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${OPENROUTER.apiKey}`,
-        ...ATTRIBUTION_HEADERS,
-      },
-      next: { revalidate: 60 },
-    },
-    { subject: 'models', endpoint: 'openrouter/models' }
-  );
+  return openRouterModelsReader.get();
 }
 
 /**
@@ -399,22 +465,21 @@ export async function getEnhancedOpenRouterModels({
   return { data: publishEnkryptModels(models, snapshot) };
 }
 /**
- * Fetch speech-to-text models from the OpenRouter API.
+ * OpenRouter speech-to-text models, read like `getRawOpenRouterModels`. The local fake LLM
+ * catalogue is always fetched live.
  */
 export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterModelsResponse> {
   const localFakeModelsUrl = getLocalFakeTranscriptionModelsUrl();
+  if (!localFakeModelsUrl) {
+    return openRouterTranscriptionModelsReader.get();
+  }
   return fetchOpenRouterModels(
-    localFakeModelsUrl ?? `${OPENROUTER.apiUrl}/models?output_modalities=transcription`,
+    localFakeModelsUrl,
     {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${localFakeModelsUrl ? LOCAL_FAKE_LLM_API_KEY : OPENROUTER.apiKey}`,
-        ...ATTRIBUTION_HEADERS,
-      },
-      // Never serve a cached catalogue: a cached answer would mask an
-      // unreachable gateway and the mobile picker would list stale models
-      // instead of showing its load-failed retry state.
+      headers: { Authorization: `Bearer ${LOCAL_FAKE_LLM_API_KEY}`, ...ATTRIBUTION_HEADERS },
       cache: 'no-store',
+      signal: AbortSignal.timeout(OPENROUTER_MODELS_FETCH_TIMEOUT_MS),
     },
     { subject: 'transcription models', endpoint: 'openrouter/transcription-models' }
   );

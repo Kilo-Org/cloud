@@ -740,6 +740,9 @@ describe('admin.syncProviders manual sync', () => {
     await expect(caller.admin.syncProviders.triggerDirectByokSync()).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
+    await expect(caller.admin.syncProviders.triggerMetadataCacheRefresh()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
   });
 
   test.each(['preview', 'development'])('is enabled when VERCEL_ENV is %s', async vercelEnv => {

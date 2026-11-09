@@ -42,11 +42,23 @@ export function peekCursor(db: Db, configured: string | null): ResolvedCursor {
 /**
  * Resolves the cursor for a poll, rewriting both rows when the configured
  * value wins so that the override applies once rather than on every tick.
+ *
+ * An override also drops the held failure, because the row describes an event
+ * the new cursor may never reach again. Left behind, a forward reset past the
+ * held event leaves `/status.eventFailure` non-null forever — only that event
+ * applying or parking clears it, and neither can happen once the cursor is
+ * past it — and a rewind *onto* it would carry the old `attempts` and
+ * `first_failed_at` into `recordFailure`, so a conflict could be parked on its
+ * first attempt instead of getting the retry budget the reset was meant to
+ * grant. An operator reset is a deliberate "start from here".
  */
 export function resolveCursor(db: Db, configured: string | null): ResolvedCursor {
   const overrides = configured !== read(db, SEED_CURSOR_KEY);
   const resolved = peekCursor(db, configured);
-  if (overrides) writeCursor(db, configured);
+  if (overrides) {
+    writeCursor(db, configured);
+    clearHeldFailure(db);
+  }
   return resolved;
 }
 
@@ -151,6 +163,16 @@ export function currentFailure(db: Db): EventFailureState | null {
 /** Clears the held row once its event applies, or once it is parked. */
 export function clearFailure(db: Db, eventId: string): void {
   db.delete(eventFailures).where(eq(eventFailures.event_id, eventId)).run();
+}
+
+/**
+ * Drops whatever failure is held, without knowing its event id. Only the
+ * cursor override needs this: every other clear names the event it resolved,
+ * and at most one row exists because the stream is serial.
+ */
+function clearHeldFailure(db: Db): void {
+  const existing = currentFailure(db);
+  if (existing !== null) clearFailure(db, existing.eventId);
 }
 
 /**

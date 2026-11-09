@@ -17,10 +17,12 @@ import { REQUEST_TIMEOUT_MS } from '../util/constants';
  * - `conflict`: a dependency the stream can still supply is missing. Hold the
  *   cursor and retry, bounded by `CONFLICT_RETRY_BUDGET_MS`, then park.
  * - `terminal`: nothing the directory can send repairs it. Park immediately.
- * - `unavailable`: the app could not answer. Hold the cursor and retry
- *   indefinitely; never park. A missing or wrong secret is an operator
- *   problem, not a bad event, and parking the stream over one would discard
- *   every event behind it.
+ * - `unavailable`: the app could not apply the event, and nothing about the
+ *   event says it is unapplicable. Hold the cursor and retry indefinitely;
+ *   never park. A missing or wrong secret, a Worker deployed ahead of the app,
+ *   and a bug in a request this Worker builds are all operator problems rather
+ *   than bad events, and parking the stream over one would discard every event
+ *   behind it.
  */
 export type AttemptClass = 'applied' | 'conflict' | 'terminal' | 'unavailable';
 
@@ -75,6 +77,14 @@ export async function callApp(ctx: AppCallContext, init: CallInit): Promise<Atte
       },
       ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      // Never follow a redirect. `x-internal-api-key` is a custom header, so
+      // it is *not* stripped when a redirect crosses origins: a 3xx from
+      // `BACKEND_API_URL` or an intermediary in front of it would hand the
+      // shared internal secret to whatever origin the `Location` names, and
+      // the body that origin returned would then be parsed as the route's
+      // response. `'manual'` rather than `'error'` so the status is a value
+      // here and the classification below can name it.
+      redirect: 'manual',
     });
   } catch (error) {
     // A network error and a timeout are the same thing to the loop: the app
@@ -128,12 +138,45 @@ export async function callApp(ctx: AppCallContext, init: CallInit): Promise<Atte
     };
   }
 
-  // 400 is the only status that indicts the request itself: the bodies are
-  // strict Zod schemas, so a rejected one is a contract mismatch that
-  // retrying the same payload cannot clear.
+  // A 3xx reached this Worker because redirects are refused above. The app's
+  // internal routes answer the method they were called with, so a redirect is
+  // either a misrouted origin or an intermediary that should not be in the
+  // path — an operator problem, like a wrong secret, rather than a statement
+  // about the event. Held, never parked, and never followed.
+  if (response.status >= 300 && response.status < 400) {
+    return {
+      class: 'unavailable',
+      status: response.status,
+      code: null,
+      reason: `${init.method} ${init.path} answered ${response.status} with a redirect, which is never followed`,
+    };
+  }
+
+  // A 400 is retryable, which is not the obvious reading of the status.
+  //
+  // Two causes produce the same 400 and the loop cannot tell them apart: the
+  // app's request schemas are `z.strictObject`, so a Worker deployed ahead of
+  // the app — sending a field the app does not yet accept — is rejected with
+  // exactly the status a malformed path or a genuinely bad body produces.
+  // Deploy skew clears on its own the minute the app rolls out, so parking it
+  // would discard events over a condition that resolves itself, and nothing
+  // replays `parked_events`.
+  //
+  // `unavailable` rather than a bounded `conflict`: the skew window is
+  // operational rather than per-event, so an hour's conflict budget could
+  // expire mid-rollout and start parking, and a 400 indicts the *request*,
+  // which is identical for every event of that type — a bounded path would
+  // therefore park every event of that shape in sequence.
+  //
+  // The cost: a body no deploy will ever fix holds the stream indefinitely
+  // instead of being stepped over. That is the right side to fail on, because
+  // every body is built from the shared typed contract module with no user
+  // input in it, so a permanently rejected one is a bug in this Worker —
+  // an operator problem, like a wrong secret. `/status` reports the held
+  // failure with the status and the reason, which is how it gets noticed.
   if (response.status === 400) {
     return {
-      class: 'terminal',
+      class: 'unavailable',
       status: 400,
       code: null,
       reason: `${init.method} ${init.path} rejected the request body`,

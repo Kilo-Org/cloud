@@ -10,6 +10,7 @@ import {
   type DirectoryMembership,
   type DirectoryOrganizationUpsert,
   type DirectorySubOrganizationUpsert,
+  type DirectoryUserRevokeAll,
   type DirectoryUserUpsert,
 } from '@kilocode/scim-contracts';
 
@@ -22,8 +23,49 @@ import {
  * the user to. The caller commits the cursor only when every call applied, so
  * a partial event replays in full — which is safe, because every route is an
  * idempotent upsert keyed on a WorkOS identifier.
+ *
+ * Total, like `callApp`: an unexpected throw becomes an outcome for *this*
+ * event rather than unwinding into the poll's catch, where it would be
+ * recorded as a poll-level error with no event id, no `event_failures` row and
+ * an unmoved cursor — so every later poll would refetch the same event and
+ * throw again, forever, with nothing in the held-failure view naming it.
  */
 export async function applyEvent(ctx: AppCallContext, event: Event): Promise<AttemptOutcome> {
+  try {
+    return await dispatch(ctx, event);
+  } catch (error) {
+    // `conflict`, deliberately, and neither of the obvious alternatives.
+    //
+    // Not `unavailable`: an exception here is this Worker failing to build a
+    // request, which says nothing about whether the app can answer, and
+    // `unavailable` never parks — one unreadable payload would hold the
+    // stream indefinitely.
+    //
+    // Not `terminal` either: a throw is not proof the event is unapplicable.
+    // The SDK passes optional fields through without defaulting them, so the
+    // same shape may be a missing field this dispatcher should tolerate, a
+    // transient failure, or a real bug — and the loop cannot tell which.
+    //
+    // `conflict` is the only class that both retries and ends: the budget from
+    // the first failure gives a transient cause room to clear, and once it is
+    // spent the event is parked with its id, so the loop makes progress
+    // instead of spinning on one event.
+    //
+    // The message, not the payload: this dispatcher reads fields off `data`
+    // rather than echoing them, so a throw from it carries structural text —
+    // and an event's `data` is never logged.
+    return {
+      class: 'conflict',
+      status: null,
+      code: null,
+      reason: `${event.event} could not be dispatched: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
+}
+
+async function dispatch(ctx: AppCallContext, event: Event): Promise<AttemptOutcome> {
   switch (event.event) {
     case 'dsync.activated': {
       // Without an organization there is nothing to bind the directory to, and
@@ -75,14 +117,14 @@ export async function applyEvent(ctx: AppCallContext, event: Event): Promise<Att
       // `inactive` is the identity provider deprovisioning the person without
       // removing them, so it revokes access rather than applying attributes.
       return event.data.state === 'inactive'
-        ? revokeAllMemberships(ctx, event.data.id)
+        ? revokeAllMemberships(ctx, event.data)
         : upsertUser(ctx, event.data);
 
     case 'dsync.user.deleted':
       // Memberships only, never the account: `softDeleteUser` anonymizes an
       // account and refuses outright when a live subscription exists, so a
       // directory departure is not an account deletion.
-      return revokeAllMemberships(ctx, event.data.id);
+      return revokeAllMemberships(ctx, event.data);
 
     case 'dsync.group.user_added': {
       // The payload carries the whole group and the whole user, which is every
@@ -172,10 +214,18 @@ function upsertUser(ctx: AppCallContext, user: DirectoryUser): Promise<AttemptOu
   });
 }
 
-function revokeAllMemberships(ctx: AppCallContext, externalId: string): Promise<AttemptOutcome> {
+/**
+ * The directory user is in the path and its directory is in the body, which
+ * scopes the revocation: an account that also belongs to another directory's
+ * organization keeps those memberships. `DirectoryUser.directoryId` carries it
+ * on both branches that reach here, the hard deletion and the inactive update.
+ */
+function revokeAllMemberships(ctx: AppCallContext, user: DirectoryUser): Promise<AttemptOutcome> {
+  const body: DirectoryUserRevokeAll = { directoryId: user.directoryId };
   return callApp(ctx, {
     method: 'DELETE',
-    path: `/api/internal/scim/users/${encodeURIComponent(externalId)}/memberships`,
+    path: `/api/internal/scim/users/${encodeURIComponent(user.id)}/memberships`,
+    body,
     responseSchema: DirectoryMembershipRevokeAllResultSchema,
   });
 }

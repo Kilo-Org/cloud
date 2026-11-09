@@ -8,7 +8,9 @@ beforeEach(async () => {
 });
 
 // The harness stubs `fetch`, and a leaked stub would serve another test's
-// pages.
+// pages. `restoreAllMocks` puts `Date.now` back for the tests that drive the
+// drain budget off an injected clock.
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });

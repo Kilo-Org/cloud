@@ -5,7 +5,7 @@ import {
   organizations,
   user_auth_provider,
 } from '@kilocode/db/schema';
-import { db, sql } from '@kilocode/web-shared/lib/drizzle';
+import { db, sql, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { randomUUID } from 'node:crypto';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -21,7 +21,10 @@ import {
 import { and, eq, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
 
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
-import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
+import {
+  invalidateMemberSessionAccess,
+  removeUserFromOrganization,
+} from '@/lib/organizations/organization-member-removal';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { createOrUpdateUser, findUserByNormalizedEmail } from '@/lib/user';
 
@@ -35,6 +38,7 @@ import type {
   DirectorySyncConflictCode,
   DirectorySyncDeleteResult,
   DirectorySyncUpsertResult,
+  DirectoryUserRevokeAll,
   DirectoryUserUpsert,
 } from '@kilocode/scim-contracts';
 
@@ -603,10 +607,7 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
 
   const emailDomain = getLowerDomainFromEmail(email);
   if (emailDomain !== policy.domain) {
-    return refuse(
-      'domain_not_captured',
-      `the organization's captured domain is ${policy.domain}`
-    );
+    return refuse('domain_not_captured', `the organization's captured domain is ${policy.domain}`);
   }
 }
 
@@ -772,14 +773,29 @@ export async function removeDirectoryMembership(
  * the same parent is not the identity provider's statement about enterprise
  * membership, so a membership there does not keep the parent access alive.
  *
+ * `directoryId`, when given, also requires the remaining sibling to belong to
+ * that directory. It changes nothing today — a sub-organization inherits its
+ * parent's `directory_id`, so every live sibling under a directory's parent
+ * carries the same one — but it states the invariant the revoke-all caller
+ * relies on: that call is scoped to one directory, and a sibling from another
+ * directory must never be what keeps a membership alive. The single-removal
+ * path passes nothing and is unchanged.
+ *
+ * `txn` lets a caller revoking many memberships do the row work in one
+ * transaction; `removeUserFromOrganization` then skips its outbound session
+ * invalidation and the caller performs it after commit.
+ *
  * Idempotent: with the membership already gone `removeUserFromOrganization`
  * reports no rows and this answers false.
  */
 async function revokeParentWhenLastGroupLeft(
   parentOrganizationId: string,
-  kiloUserId: string
+  kiloUserId: string,
+  options: { directoryId?: string; txn?: DrizzleTransaction } = {}
 ): Promise<boolean> {
-  const remaining = await db
+  // Reads through the transaction when one is given, so the sibling test sees
+  // the group memberships this call already deleted inside it.
+  const remaining = await (options.txn ?? db)
     .select({ id: organizations.id })
     .from(organizations)
     .innerJoin(
@@ -790,6 +806,9 @@ async function revokeParentWhenLastGroupLeft(
       and(
         eq(organizations.parent_organization_id, parentOrganizationId),
         isNotNull(organizations.directory_group_id),
+        options.directoryId === undefined
+          ? undefined
+          : eq(organizations.directory_id, options.directoryId),
         liveOrganization,
         eq(organization_memberships.kilo_user_id, kiloUserId)
       )
@@ -798,13 +817,18 @@ async function revokeParentWhenLastGroupLeft(
 
   if (remaining.length > 0) return false;
 
-  const { rowCount } = await removeUserFromOrganization(parentOrganizationId, kiloUserId);
+  const { rowCount } = await removeUserFromOrganization(
+    parentOrganizationId,
+    kiloUserId,
+    undefined,
+    options.txn
+  );
   return (rowCount ?? 0) > 0;
 }
 
 /**
- * Revoke every directory membership the account bound to a directory user
- * holds.
+ * Revoke every membership the account bound to a directory user holds under
+ * `input.directoryId`.
  *
  * Applied for `dsync.user.deleted` and for a `dsync.user.updated` that reports
  * the user `inactive` — most identity providers soft-delete, so `inactive` is
@@ -816,15 +840,25 @@ async function revokeParentWhenLastGroupLeft(
  * `softDeleteUser` would anonymize it, rotate its credentials, and refuse
  * outright on a live subscription, none of which a directory event authorizes.
  *
+ * Only that directory's organizations. An account bound to this directory may
+ * also hold a membership under another one — an administrator add, a seat
+ * assignment, and an invitation all write a membership without consulting
+ * `directory_id`, so nothing stops it — and revoking that would delete another
+ * tenant's membership and fence the user out of it with a removal tombstone.
+ *
  * Each group membership goes through `removeUserFromOrganization`, so the
  * removal tombstone and the model-access group cascade behave exactly as they
- * do for a single `dsync.group.user_removed`.
+ * do for a single `dsync.group.user_removed`. The deletions share one
+ * transaction, so a user in many groups is revoked within the caller's request
+ * budget rather than paying a transaction and a session-invalidation round trip
+ * per group; the invalidation runs once per organization after commit.
  *
- * The rule-4 parent test then runs over two sets of candidate parents:
+ * The rule-4 parent test then runs over two sets of candidate parents, both
+ * within this directory:
  *
  * - the parents of the groups just left, and
- * - every live unparented organization carrying a `directory_id` the user still
- *   holds a membership in.
+ * - this directory's own organization — its live unparented row — when the user
+ *   holds a membership in it.
  *
  * The second set is load-bearing, not defensive. A user whose groups were
  * deleted before they were — a disbanded group, or a `dsync.group.deleted`
@@ -840,7 +874,8 @@ async function revokeParentWhenLastGroupLeft(
  * list.
  */
 export async function revokeAllDirectoryMemberships(
-  externalId: string
+  externalId: string,
+  input: DirectoryUserRevokeAll
 ): Promise<DirectoryMembershipRevokeAllResult> {
   const userRows = await db
     .select({ id: kilocode_users.id })
@@ -856,49 +891,88 @@ export async function revokeAllDirectoryMemberships(
     return { kiloUserId: null, revokedOrganizationIds: [] };
   }
 
+  // Both candidate sets are confined to the event's directory. An account bound
+  // to this directory can hold memberships under another one — an administrator
+  // add, a seat assignment, and an invitation all write a membership without
+  // consulting `directory_id` — and those are not this directory's to revoke.
   const memberships = await db
     .select({
       id: organizations.id,
       parent: organizations.parent_organization_id,
       directoryGroupId: organizations.directory_group_id,
-      directoryId: organizations.directory_id,
     })
     .from(organizations)
     .innerJoin(
       organization_memberships,
       eq(organization_memberships.organization_id, organizations.id)
     )
-    .where(and(liveOrganization, eq(organization_memberships.kilo_user_id, user.id)));
+    .where(
+      and(
+        eq(organizations.directory_id, input.directoryId),
+        liveOrganization,
+        eq(organization_memberships.kilo_user_id, user.id)
+      )
+    );
 
   const groups = memberships.filter(row => row.directoryGroupId !== null);
 
-  // Parents of the groups being left, plus the directory organizations the user
-  // is directly a member of — the latter is the only candidate left once the
-  // groups themselves are gone.
+  // Parents of the groups being left, plus this directory's own organization
+  // when the user is directly a member of it — the latter is the only candidate
+  // left once the groups themselves are gone. `parent_organization_id IS NULL`
+  // is what identifies the owner: a sub-organization inherits the same
+  // `directory_id`, so the column alone does not.
   const candidateParents = new Set<string>();
   for (const group of groups) {
     if (group.parent !== null) candidateParents.add(group.parent);
   }
   for (const row of memberships) {
-    if (row.parent === null && row.directoryId !== null) candidateParents.add(row.id);
+    if (row.parent === null) candidateParents.add(row.id);
   }
-
-  const revokedOrganizationIds: string[] = [];
 
   // Sorted so the work, the log, and the response are the same on every run;
   // the order itself carries no meaning.
-  for (const group of groups.map(row => row.id).toSorted()) {
-    const { rowCount } = await removeUserFromOrganization(group, user.id);
-    if ((rowCount ?? 0) > 0) revokedOrganizationIds.push(group);
-  }
+  const groupIds = groups.map(row => row.id).toSorted();
+  const parentIds = [...candidateParents].toSorted();
 
-  // After the groups, so the test sees the memberships this call removed. A
-  // sibling group the user remains in — one with no directory binding, or one
-  // under a different parent — still keeps its parent membership alive.
-  for (const parent of [...candidateParents].toSorted()) {
-    if (await revokeParentWhenLastGroupLeft(parent, user.id)) {
-      revokedOrganizationIds.push(parent);
+  // One transaction for every row deletion. Each removal in its own
+  // transaction, with no `txn`, also awaits an outbound session-invalidation
+  // call apiece, and a user in many groups then exceeds the Worker's 15s
+  // request budget — which it reads as `unavailable` and retries, re-walking
+  // the groups that remain. Sharing the transaction keeps the network work out
+  // of the loop; it runs once per organization after commit.
+  const revokedOrganizationIds = await db.transaction(async txn => {
+    const revoked: string[] = [];
+
+    for (const group of groupIds) {
+      const { rowCount } = await removeUserFromOrganization(group, user.id, undefined, txn);
+      if ((rowCount ?? 0) > 0) revoked.push(group);
     }
+
+    // After the groups, so the sibling test sees the memberships this call
+    // removed. A sibling group the user remains in — one under a different
+    // parent, or one whose membership this call did not touch — still keeps its
+    // parent membership alive. A sub-organization with no directory binding
+    // does not: `revokeParentWhenLastGroupLeft` counts only rows carrying a
+    // `directory_group_id`, which is what rule 4 requires.
+    for (const parent of parentIds) {
+      if (
+        await revokeParentWhenLastGroupLeft(parent, user.id, {
+          directoryId: input.directoryId,
+          txn,
+        })
+      ) {
+        revoked.push(parent);
+      }
+    }
+
+    return revoked;
+  });
+
+  // Best-effort, after commit: a network call must not run inside the
+  // transaction, and `removeUserFromOrganization` skipped it for every removal
+  // above because a `txn` was passed.
+  for (const organizationId of revokedOrganizationIds) {
+    await invalidateMemberSessionAccess(organizationId, user.id);
   }
 
   return { kiloUserId: user.id, revokedOrganizationIds };

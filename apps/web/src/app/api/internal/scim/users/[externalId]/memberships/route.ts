@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { revokeAllDirectoryMemberships } from '@/lib/scim/directory-sync';
 import { directorySyncErrorResponse } from '@/lib/scim/directory-sync-response';
+import { DirectoryUserRevokeAllSchema } from '@kilocode/scim-contracts';
 
 /** Writes to the PostgreSQL primary, so it must run beside it. */
 export const preferredRegion = 'fra1';
@@ -24,7 +25,12 @@ type RouteParams = { params: Promise<{ externalId: string }> };
  * instance exists; none of that is a directory event's to authorize, so the
  * sibling user route exposes no DELETE either.
  *
- * No body: the directory user in the path identifies everything to revoke.
+ * The body carries the directory that emitted the event, and the revocation is
+ * scoped to it: an account bound to this directory may also hold a membership
+ * under another one, created by an administrator, a seat assignment, or an
+ * invitation, and that is not this directory's to revoke. `DELETE` with a body,
+ * like the membership routes, for the same reason: one path segment cannot
+ * carry two WorkOS identifiers.
  *
  * Converges instead of conflicting: an `externalId` no account is bound to has
  * nothing to revoke, which is the state the event asserts, so this answers 200
@@ -36,12 +42,13 @@ export async function DELETE(request: NextRequest, { params }: RouteParams): Pro
   if (unauthorized) return unauthorized;
 
   const { externalId } = await params;
-  if (externalId === '') {
+  const parsed = DirectoryUserRevokeAllSchema.safeParse(await request.json().catch(() => null));
+  if (externalId === '' || !parsed.success) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
 
   try {
-    return NextResponse.json(await revokeAllDirectoryMemberships(externalId));
+    return NextResponse.json(await revokeAllDirectoryMemberships(externalId, parsed.data));
   } catch (error) {
     return directorySyncErrorResponse('revoke all memberships', externalId, error);
   }

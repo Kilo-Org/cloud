@@ -85,6 +85,7 @@ const userBody = {
   idpId: 'idp_1',
 };
 const membershipBody = { directoryGroupId: 'directory_group_123', externalId: 'directory_user_1' };
+const revokeAllBody = { directoryId: 'directory_123' };
 
 const organizationParams = { params: Promise.resolve({ directoryId: 'directory_123' }) };
 const groupParams = { params: Promise.resolve({ directoryGroupId: 'directory_group_123' }) };
@@ -121,7 +122,7 @@ describe('authentication', () => {
     ],
     [
       'DELETE user memberships',
-      () => revokeAllMemberships(request(null, { authenticated: false }), userParams),
+      () => revokeAllMemberships(request(revokeAllBody, { authenticated: false }), userParams),
     ],
   ])('%s rejects an unauthenticated request', async (_name, call) => {
     const response = await call();
@@ -232,15 +233,19 @@ describe('success', () => {
     });
   });
 
-  test('DELETE user memberships passes the path identifier through and returns the result', async () => {
-    const response = await revokeAllMemberships(request(null), userParams);
+  test('DELETE user memberships passes the path identifier and the body directory through', async () => {
+    const response = await revokeAllMemberships(request(revokeAllBody), userParams);
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       kiloUserId: 'user-1',
       revokedOrganizationIds: ['org-2', 'org-1'],
     });
-    expect(directorySync.revokeAllDirectoryMemberships).toHaveBeenCalledWith('directory_user_1');
+    // The directory scopes the revocation, so it must reach the mutation: the
+    // account may hold memberships under a different directory.
+    expect(directorySync.revokeAllDirectoryMemberships).toHaveBeenCalledWith('directory_user_1', {
+      directoryId: 'directory_123',
+    });
   });
 
   test('DELETE user memberships converges for a directory user no account is bound to', async () => {
@@ -248,16 +253,48 @@ describe('success', () => {
       .mocked(directorySync.revokeAllDirectoryMemberships)
       .mockResolvedValueOnce({ kiloUserId: null, revokedOrganizationIds: [] });
 
-    const response = await revokeAllMemberships(request(null), userParams);
+    const response = await revokeAllMemberships(request(revokeAllBody), userParams);
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ kiloUserId: null, revokedOrganizationIds: [] });
   });
 
   test('DELETE user memberships rejects an empty external id', async () => {
-    const response = await revokeAllMemberships(request(null), {
+    const response = await revokeAllMemberships(request(revokeAllBody), {
       params: Promise.resolve({ externalId: '' }),
     });
+
+    expect(response.status).toBe(400);
+    expect(directorySync.revokeAllDirectoryMemberships).not.toHaveBeenCalled();
+  });
+
+  // An unscoped revocation would delete memberships under every directory the
+  // account belongs to, so a body that does not name one must be refused
+  // rather than defaulted.
+  test.each([
+    ['no body at all', null],
+    ['an empty object', {}],
+    ['an empty directory id', { directoryId: '' }],
+    ['a non-string directory id', { directoryId: 123 }],
+    ['an unknown extra field', { directoryId: 'directory_123', externalId: 'directory_user_1' }],
+  ])('DELETE user memberships rejects %s and revokes nothing', async (_name, body: unknown) => {
+    const response = await revokeAllMemberships(request(body), userParams);
+
+    expect(response.status).toBe(400);
+    expect(directorySync.revokeAllDirectoryMemberships).not.toHaveBeenCalled();
+  });
+
+  test('DELETE user memberships rejects a malformed body', async () => {
+    const malformed = new NextRequest('https://kilocode.ai/api/internal/scim/test', {
+      method: 'PUT',
+      headers: {
+        'x-internal-api-key': INTERNAL_API_SECRET ?? '',
+        'content-type': 'application/json',
+      },
+      body: '{"directoryId":',
+    });
+
+    const response = await revokeAllMemberships(malformed, userParams);
 
     expect(response.status).toBe(400);
     expect(directorySync.revokeAllDirectoryMemberships).not.toHaveBeenCalled();
@@ -296,7 +333,7 @@ describe('error mapping', () => {
         )
       );
 
-    const response = await revokeAllMemberships(request(null), userParams);
+    const response = await revokeAllMemberships(request(revokeAllBody), userParams);
 
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ code: 'domain_not_captured' });

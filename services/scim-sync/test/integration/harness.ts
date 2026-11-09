@@ -19,12 +19,25 @@ export type RecordedCall = {
   path: string;
   body: unknown;
   apiKey: string | null;
+  /**
+   * The redirect mode the caller asked for; `'follow'` when it asked for
+   * nothing, which is the platform default. Recorded because following a
+   * redirect would hand `x-internal-api-key` to the redirect's origin.
+   * Typed as the runtime types type it on `RequestInit`.
+   */
+  redirect: string;
 };
 
 /** What the stubbed app answers for one request, in the order configured. */
 export type AppReply =
   | { status: 200; body: unknown }
   | { status: 409; code: string; error?: string }
+  /**
+   * A redirect, served the way the platform would: followed to `location`
+   * when the caller allows it, returned as the 3xx itself when the caller
+   * asked for `manual`, and raised when it asked for `error`.
+   */
+  | { status: 301 | 302 | 303 | 307 | 308; location: string; body: unknown }
   | { status: number; body?: unknown }
   | { throws: string };
 
@@ -122,11 +135,13 @@ export function harness(options: {
 
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
     const headers = new Headers(init?.headers);
+    const redirect = init?.redirect ?? 'follow';
     const call: RecordedCall = {
       method,
       path: url.pathname,
       body,
       apiKey: headers.get('x-internal-api-key'),
+      redirect,
     };
     calls.push(call);
     options.onCall?.(call);
@@ -140,6 +155,30 @@ export function harness(options: {
     if (route !== undefined) consumed.set(route, (consumed.get(route) ?? 0) + 1);
 
     if ('throws' in reply) throw new Error(reply.throws);
+    if ('location' in reply) {
+      // The three modes the platform offers, so a test can assert which one
+      // the caller asked for by what it gets back.
+      if (redirect === 'error') throw new TypeError(`fetch to ${url.pathname} was redirected`);
+      if (redirect === 'manual') {
+        return Response.json(null, {
+          status: reply.status,
+          headers: { location: reply.location },
+        });
+      }
+      // `follow`: the platform re-issues the request against `location`,
+      // custom headers and all, and the caller parses whatever answers. The
+      // re-issued request is recorded against the target's path, which is how
+      // a test sees the internal secret cross an origin.
+      const followed = new URL(reply.location);
+      calls.push({
+        method,
+        path: `${followed.host}${followed.pathname}`,
+        body,
+        apiKey: headers.get('x-internal-api-key'),
+        redirect,
+      });
+      return Response.json(reply.body);
+    }
     if (reply.status === 409 && 'code' in reply) {
       return Response.json({ error: reply.error ?? 'conflict', code: reply.code }, { status: 409 });
     }
@@ -154,17 +193,27 @@ export function harness(options: {
   return { calls, cursors };
 }
 
-/** The committed cursor and seed, read straight from the DO's SQLite. */
-export async function readState(
-  target: DurableObjectStub<ScimSyncDO>
-): Promise<{ rows: Record<string, string>; failures: number; parked: string[] }> {
+/**
+ * The committed cursor and seed, read straight from the DO's SQLite, with the
+ * held failure row: its attempt count is what an operator reset is supposed to
+ * reset, so a test has to see it rather than just count rows.
+ */
+export async function readState(target: DurableObjectStub<ScimSyncDO>): Promise<{
+  rows: Record<string, string>;
+  failures: number;
+  failure: { eventId: string; attempts: number } | null;
+  parked: string[];
+}> {
   return runInDurableObject(target, (_instance, state) => {
     const db = drizzle(state.storage);
     const rows: Record<string, string> = {};
     for (const row of db.select().from(syncState).all()) rows[row.key] = row.value;
+    const failureRows = db.select().from(eventFailures).all();
+    const held = failureRows[0];
     return {
       rows,
-      failures: db.select().from(eventFailures).all().length,
+      failures: failureRows.length,
+      failure: held === undefined ? null : { eventId: held.event_id, attempts: held.attempts },
       parked: db
         .select()
         .from(parkedEvents)
@@ -172,6 +221,33 @@ export async function readState(
         .map(row => row.event_id),
     };
   });
+}
+
+/**
+ * A `Date.now()` the test drives, so a 20-second drain budget or an hour's
+ * conflict budget can be spent without the test waiting for it. `advance` is
+ * wired to `harness`'s `onCall` hook, which makes one app request cost
+ * `stepMs` — the shape of the real thing, where every call is bounded by
+ * `REQUEST_TIMEOUT_MS`; `advanceBy` jumps the clock between polls. An
+ * injected clock rather than a production seam: the loop reads the same
+ * `Date.now()` it reads in production. Restored by `restoreAllMocks` in the
+ * setup file.
+ */
+export function steppingClock(stepMs: number): {
+  advance: () => void;
+  advanceBy: (ms: number) => void;
+} {
+  const base = Date.now();
+  let offset = 0;
+  vi.spyOn(Date, 'now').mockImplementation(() => base + offset);
+  return {
+    advance: () => {
+      offset += stepMs;
+    },
+    advanceBy: (ms: number) => {
+      offset += ms;
+    },
+  };
 }
 
 /** Events API wire format. Only the fields the dispatcher reads are filled. */
@@ -197,6 +273,18 @@ export function directoryEvent(
       updated_at: '2026-01-01T00:00:00.000Z',
     },
   };
+}
+
+/**
+ * An activation the SDK deserializes with `domains` absent, which is what the
+ * Events API sends for a directory with none: the SDK copies the field through
+ * without defaulting it, so the dispatcher's `data.domains.map(...)` throws a
+ * `TypeError` rather than failing a schema check.
+ */
+export function activationWithoutDomains(id: string): unknown {
+  const event = directoryEvent(id) as { data: Record<string, unknown> };
+  const { domains: _dropped, ...data } = event.data;
+  return { ...event, data };
 }
 
 export function groupEvent(id: string, event = 'dsync.group.created'): unknown {

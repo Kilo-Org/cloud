@@ -22,7 +22,7 @@ poller would cost roughly 300x more duration for the same work.
 |---|---|
 | Idle interval | `SCIM_POLL_INTERVAL_SECONDS`, default 60, clamped to 10..3600 |
 | Page size | 100 events, the Events API's documented `limit` maximum |
-| Drain budget | ~20 seconds of wall clock per poll |
+| Drain budget | ~20 seconds of wall clock per poll, checked before every event |
 | Catch-up re-arm | 1 second while pages keep coming back full |
 | Failure backoff | the interval doubled per attempt, capped at 5 minutes |
 | Event filter | all 10 `dsync.*` types |
@@ -45,6 +45,14 @@ thousands of events, which at 10 events a minute is days of backlog. The pages
 are still fetched strictly one at a time, because WorkOS prescribes a single
 serial consumer that requests the next page only after finishing the current
 one.
+
+The budget is checked **before every event**, not only before every page. A
+page is up to 100 events and a single `dsync.group.user_added` issues three
+sequential calls each bounded by `REQUEST_TIMEOUT_MS`, so a per-page check
+alone would let one page run minutes past the budget the alarm schedule is
+built on. A drain that stops mid-page leaves the cursor at the last applied
+event and reports not caught up, so the one-second re-arm resumes from exactly
+there.
 
 100 is the maximum the `limit` parameter accepts: "Accepts values between 1 and
 100. Default is 10"
@@ -75,6 +83,17 @@ retention window — `range_start`, which takes an ISO 8601 UTC timestamp with a
 `Z` suffix — is a separate operator action rather than a second meaning for this
 var.
 
+An override also **clears the held failure**, because the row describes an
+event the new cursor may never reach again. Left behind, a forward reset past
+a held event would leave `/status.eventFailure` non-null forever — only that
+event applying or being parked clears it, and once the cursor is ahead of it
+neither can happen — and a rewind *onto* it would carry the old attempt count
+and first-failure time into the next attempt, so a conflict could be parked
+immediately instead of getting the retry budget the reset was meant to grant. A
+reset is a deliberate "start from here", and the held failure does not survive
+it. `parked_events` does: those rows are the record of what was skipped, and a
+reset is how an operator replays them.
+
 ## Parking
 
 An event the loop gives up on is stepped over rather than retried forever: the
@@ -87,8 +106,9 @@ count.
 While the loop is stuck, `event_failures` holds exactly one row — the stream is
 serial, so a held event blocks everything behind it — carrying the attempt
 count and the first failure time. The row is deleted the moment that event
-applies, or when it is parked. `/status` reports it, which is the thing to look
-at when the cursor stops moving.
+applies, when it is parked, or when `WORKOS_EVENT_CURSOR` resets the stream.
+`/status` reports it, which is the thing to look at when the cursor stops
+moving.
 
 ## HTTP surface
 
@@ -133,7 +153,12 @@ applying attributes. That route converges rather than conflicting: an unknown
 
 The membership routes take the `{directoryGroupId, externalId}` pair in the
 body, including `DELETE`, because a membership is identified by two WorkOS
-identifiers. The revoke-all route takes no body at all.
+identifiers. The revoke-all route takes a body for the same reason: the
+directory user is in the path and its `{directoryId}` is in the body, which
+scopes the revocation to the directory that emitted the event. Without it, one
+tenant's offboarding would delete another tenant's memberships for an account
+that belongs to both; `DirectoryUser.directoryId` carries it on the hard
+deletion and on the inactive update alike.
 
 The endpoints are reached under `BACKEND_API_URL`, which the staging and
 production environments point at `staging-app.kilo.ai` and `app.kilo.ai`
@@ -144,11 +169,13 @@ respectively. Calling them also requires `INTERNAL_API_SECRET` in the
 (`packages/scim-contracts`). The app validates requests with its schemas and
 types its handlers from them; this Worker builds request bodies and parses
 responses with the same definitions. They deploy independently and the request
-schemas are `z.strictObject`, so an unknown field is a 400 that stalls the
-cursor rather than a silently dropped key — with a mirrored copy per side that
-drift stayed invisible until a real event hit it, and now it is a compile
-error. A new field must still land in the package as optional before the Worker
-starts sending it, because the app deploys on its own cadence.
+schemas are `z.strictObject`, so an unknown field is a 400 that holds the
+cursor rather than a silently dropped key — and a 400 is retryable precisely
+so that a Worker deployed ahead of the app waits for it instead of parking
+events (see "Response classes"). With a mirrored copy per side that drift
+stayed invisible until a real event hit it, and now it is a compile error. A
+new field must still land in the package as optional before the Worker starts
+sending it, because the app deploys on its own cadence.
 
 The package also owns `TERMINAL_CONFLICT_CODES`, so classifying a new conflict
 code is one decision in one place: a code nobody classified fails the
@@ -287,9 +314,9 @@ the cursor and whether the event survives:
 | Class | Cause | Effect |
 |---|---|---|
 | `applied` | 2xx | Continue to this event's next call, then commit the cursor |
-| `conflict` | 409 whose `code` is retryable, or an unrecognized code | Hold the cursor and retry, bounded by one hour from the first failure, then park |
-| `terminal` | 400, a 409 with a terminal `code`, or a payload that cannot be mapped at all | Park immediately |
-| `unavailable` | 401, 403, 408, 429, any 5xx, a network error, a timeout | Hold the cursor and retry indefinitely with capped backoff; never park |
+| `conflict` | 409 whose `code` is retryable, or an unrecognized code; an unexpected throw inside the dispatcher | Hold the cursor and retry, bounded by one hour from the first failure, then park |
+| `terminal` | a 409 with a terminal `code`, or a payload that cannot be mapped at all | Park immediately |
+| `unavailable` | 400, 401, 403, 408, 429, any 3xx, any 5xx, a 2xx whose body does not match the contract, a network error, a timeout | Hold the cursor and retry indefinitely with capped backoff; never park |
 
 The 409 body carries a machine-readable `code`, which is what separates the two
 outcomes a conflict can have. Four codes are retryable, because an event
@@ -310,6 +337,46 @@ types nullable and the endpoint requires, and a `dsync.activated` carrying no
 `unavailable` never parks, and the distinction matters most for a missing or
 wrong `INTERNAL_API_SECRET`. That is an operator problem rather than a bad
 event, and parking the stream over one would step past every event behind it.
+
+**A 400 is `unavailable`, not terminal**, which is not the obvious reading of
+the status. The app's request schemas are `z.strictObject`, so this Worker
+deployed ahead of the app — sending a field the app does not yet accept — is
+rejected with exactly the status a malformed path or a genuinely bad body
+produces, and the loop cannot tell them apart. Deploy skew clears on its own
+the minute the app rolls out, and nothing replays `parked_events`, so parking
+it would discard events over a condition that resolves itself in minutes. A
+bounded `conflict` is wrong for the same reason in a slower form: the skew
+window is operational rather than per-event, so the hour could expire
+mid-rollout, and a 400 indicts the *request*, which is identical for every
+event of that type — so the bounded path would park every event of that shape
+in sequence. The cost is that a body no deploy will ever fix holds the stream
+indefinitely instead of being stepped over; that is the right side to fail on,
+because every body is built from the shared typed contract module with no user
+input in it, so a permanently rejected one is a bug in this Worker, which is an
+operator problem exactly like a wrong secret. `/status` reports the held
+failure with the status and the reason, which is how it gets noticed.
+
+**Redirects are refused, never followed.** `x-internal-api-key` is a custom
+header, so it is *not* stripped when a redirect crosses origins: a followed
+3xx from `BACKEND_API_URL` or an intermediary in front of it would hand the
+shared internal secret to whatever origin the `Location` names, and that
+origin's body would then be parsed as the route's response. Every call is
+issued with `redirect: 'manual'`, and a 3xx is classified `unavailable` — an
+origin or intermediary to fix rather than a statement about the event.
+
+**An unexpected throw inside the dispatcher is an outcome for its own event**,
+classified `conflict`. The dispatcher is total, like `callApp`: a throw that
+unwound into the poll's single catch would be recorded as a poll-level error
+with no event id, no `event_failures` row and an unmoved cursor, so every later
+poll would refetch the same event and throw again forever, with nothing in the
+held-failure view naming it. `conflict` rather than the two alternatives: a
+throw is this Worker failing to build a request, which says nothing about
+whether the app can answer, so `unavailable` — which never parks — would hold
+the stream on one unreadable payload; but a throw is not proof the event is
+unapplicable either, because the SDK passes optional fields through without
+defaulting them. `conflict` is the only class that both retries and ends: the
+budget gives a transient cause room to clear, and once it is spent the event is
+parked with its id, so the loop makes progress.
 
 A 409 is not always recoverable by waiting. A group under a sub-organization is
 structural, and a refused address bind is a claim the directory cannot

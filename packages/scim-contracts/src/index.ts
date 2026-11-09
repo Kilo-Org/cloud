@@ -96,6 +96,23 @@ export const DirectoryMembershipSchema = z.strictObject({
 export type DirectoryMembership = z.infer<typeof DirectoryMembershipSchema>;
 
 /**
+ * Body of the revoke-all `DELETE`. The directory user is in the path; the
+ * directory that emitted the event is in the body, and it is required: the
+ * revocation applies only to memberships under that directory, so an account
+ * that also belongs to another directory's organization keeps them. Without it
+ * one tenant's offboarding event would delete another tenant's memberships.
+ *
+ * `DELETE` with a body, like the membership routes: the alternative is encoding
+ * two WorkOS identifiers into a path.
+ */
+export const DirectoryUserRevokeAllSchema = z.strictObject({
+  /** `data.directoryId` — scopes the revocation to the directory that emitted the event. */
+  directoryId: workOSId,
+});
+
+export type DirectoryUserRevokeAll = z.infer<typeof DirectoryUserRevokeAllSchema>;
+
+/**
  * Machine-readable reason a directory-sync write was refused, returned in the
  * 409 body as `code` alongside the human-readable `error`.
  *
@@ -269,12 +286,18 @@ export type DirectoryMembershipRemovalResult = z.infer<
 >;
 
 /**
- * Revokes every directory membership the account bound to a directory user
- * holds: the directory group organizations, and their parents under rule 4.
+ * Revokes every membership the account bound to a directory user holds *under
+ * the requesting directory*: the directory group organizations, and their
+ * parents under rule 4. Memberships under another directory, or in an
+ * organization no directory manages, are left alone — they are not this
+ * directory's to revoke.
  *
  * Applied for a hard deletion and for an update reporting the user `inactive`.
  * The account itself is never deleted or anonymized (rule 10): the membership
  * rows are the directory's to revoke, the account is not.
+ *
+ * Every membership is revoked in one call: the row deletions share a single
+ * transaction, so the response is complete and needs no follow-up call.
  *
  * Converges like the single membership removal: an `externalId` no account is
  * bound to has nothing to revoke, which is the state the event asserts, so it

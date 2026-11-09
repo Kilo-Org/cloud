@@ -106,6 +106,9 @@ export class ScimSyncDO extends DurableObject<Env> {
     let heldFailure: EventFailureState | null = null;
     // Nothing fetched yet, so nothing says the stream is caught up.
     let caughtUp = false;
+    // Set when the drain budget ran out mid-page, which is not the stream
+    // saying it is caught up: the page it stopped in still has events in it.
+    let budgetSpent = false;
 
     try {
       const resolved = state.resolveCursor(this.db, seed);
@@ -129,7 +132,7 @@ export class ScimSyncDO extends DurableObject<Env> {
       // `caughtUp` doubles as the loop condition: a short page is the stream
       // saying there is nothing more to read, which is also what decides
       // whether the next alarm is a second away or an interval away.
-      while (!caughtUp && Date.now() < deadline && heldFailure === null) {
+      while (!caughtUp && !budgetSpent && Date.now() < deadline && heldFailure === null) {
         const page = await workos.events.listEvents({
           events: DSYNC_EVENTS,
           limit: PAGE_LIMIT,
@@ -139,6 +142,21 @@ export class ScimSyncDO extends DurableObject<Env> {
         eventCount += page.data.length;
 
         for (const event of page.data) {
+          // Per event, not only per page: a page is up to `PAGE_LIMIT` events
+          // and one `dsync.group.user_added` issues three sequential calls,
+          // each bounded by `REQUEST_TIMEOUT_MS`, so checking only in the
+          // outer `while` lets one page run minutes past the budget the alarm
+          // schedule is built on. Stopping here leaves the cursor where the
+          // last applied event put it, and the next alarm resumes from there.
+          if (Date.now() >= deadline) {
+            budgetSpent = true;
+            // Not caught up, whatever this page's length said: it still has
+            // unapplied events in it, so the next alarm is the one-second
+            // re-arm rather than the idle interval.
+            caughtUp = false;
+            break;
+          }
+
           lastEventId = event.id;
           const outcome = await applyEvent(app, event);
 

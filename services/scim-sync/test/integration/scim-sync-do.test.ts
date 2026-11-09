@@ -1,13 +1,21 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 
-import { CURSOR_KEY, PAGE_LIMIT, SEED_CURSOR_KEY } from '../../src/util/constants';
 import {
+  CONFLICT_RETRY_BUDGET_MS,
+  CURSOR_KEY,
+  DRAIN_BUDGET_MS,
+  PAGE_LIMIT,
+  SEED_CURSOR_KEY,
+} from '../../src/util/constants';
+import {
+  activationWithoutDomains,
   directoryEvent,
   groupEvent,
   harness,
   membershipEvent,
   readState,
+  steppingClock,
   stub,
   userEvent,
   type AppRoute,
@@ -117,6 +125,39 @@ describe('drain', () => {
     expect(result.eventCount).toBe(PAGE_LIMIT * 2);
     expect(result.caughtUp).toBe(true);
   });
+
+  it('stops mid-page once the drain budget is spent, with the cursor at the last applied event', async () => {
+    const target = stub('drain-budget');
+    // A quarter of the budget per app call, so the fourth event's call spends
+    // it and the fifth is never attempted. One page, so the outer `while`
+    // never gets a chance to notice: only a per-event check can stop this.
+    const clock = steppingClock(DRAIN_BUDGET_MS / 4);
+    const io = harness({
+      pages: [Array.from({ length: 8 }, (_unused, i) => directoryEvent(`evt_${i}`))],
+      onCall: () => clock.advance(),
+    });
+
+    const result = await runInDurableObject(target, instance => instance.poll());
+
+    expect(result.eventsApplied).toBe(4);
+    expect(result.cursor).toBe('evt_3');
+    expect(io.calls).toHaveLength(4);
+    // One page fetched: the drain stopped inside it rather than after it.
+    expect(io.cursors).toEqual([null]);
+    // The page was full of unapplied events, so the stream is not caught up
+    // and the next alarm is the one-second re-arm.
+    expect(result.caughtUp).toBe(false);
+    expect(result.heldFailure).toBeNull();
+    expect(result.error).toBeNull();
+
+    // The next alarm resumes exactly where the budget ran out.
+    clock.advanceBy(1_000);
+    const second = harness({ pages: [[directoryEvent('evt_8')]] });
+    await runInDurableObject(target, instance => instance.poll());
+
+    expect(second.cursors[0]).toBe('evt_3');
+    expect((await readState(target)).rows[CURSOR_KEY]).toBe('evt_8');
+  });
 });
 
 describe('event mapping', () => {
@@ -167,7 +208,13 @@ describe('event mapping', () => {
       'DELETE /api/internal/scim/users/dir_usr_01/memberships',
       'DELETE /api/internal/scim/users/dir_usr_01/memberships',
     ]);
-    expect(io.calls.every(c => c.body === null)).toBe(true);
+    // The directory scopes the revocation: an account that also belongs to
+    // another directory's organization keeps those memberships, so the body
+    // is required on both branches.
+    expect(io.calls.map(c => c.body)).toEqual([
+      { directoryId: 'directory_01' },
+      { directoryId: 'directory_01' },
+    ]);
   });
 
   it('upserts the user for an active update', async () => {
@@ -289,19 +336,126 @@ describe('response classes', () => {
     expect((await target.getStatus()).parkedCount).toBe(1);
   });
 
-  it('parks a 400 immediately', async () => {
-    const target = stub('terminal-400');
-    harness({
-      pages: [[groupEvent('evt_1')]],
+  it('holds the cursor on a 400 and never parks it, so an app-first deploy recovers', async () => {
+    const target = stub('retryable-400');
+    // Deploy skew: this Worker sends a field the app's `z.strictObject` does
+    // not accept yet, so every attempt is a 400 until the app rolls out.
+    const ROUTE: AppRoute = {
+      method: 'PUT',
+      path: '/sub-organizations/dir_grp_01',
+      replies: [{ status: 400 }],
+    };
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      harness({ pages: [[groupEvent('evt_1')]], routes: [ROUTE] });
+      const result = await runInDurableObject(target, instance => instance.poll());
+
+      expect(result.heldFailure).toMatchObject({
+        eventId: 'evt_1',
+        attempts: attempt,
+        lastClass: 'unavailable',
+        lastStatus: 400,
+      });
+      expect(result.eventsParked).toBe(0);
+      // Parking would advance the cursor past the event, and nothing replays
+      // `parked_events`, so the event would be lost to a condition that
+      // clears itself.
+      expect((await readState(target)).rows[CURSOR_KEY]).toBeUndefined();
+    }
+
+    expect((await readState(target)).parked).toEqual([]);
+
+    // The app deploys and accepts the body: the held event applies and the
+    // cursor moves, with no operator action.
+    harness({ pages: [[groupEvent('evt_1')]] });
+    const recovered = await runInDurableObject(target, instance => instance.poll());
+
+    expect(recovered.eventsApplied).toBe(1);
+    const state = await readState(target);
+    expect(state.rows[CURSOR_KEY]).toBe('evt_1');
+    expect(state.failures).toBe(0);
+    expect(state.parked).toEqual([]);
+  });
+
+  it('does not follow a redirect and never parses the redirected body as a success', async () => {
+    const target = stub('redirect');
+    const io = harness({
+      pages: [[directoryEvent('evt_1')]],
       routes: [
-        { method: 'PUT', path: '/sub-organizations/dir_grp_01', replies: [{ status: 400 }] },
+        {
+          method: 'PUT',
+          path: '/organizations/directory_01',
+          replies: [
+            {
+              status: 302,
+              location: 'https://attacker.test/api/internal/scim/organizations/directory_01',
+              // A body that would parse as the route's contract, so following
+              // the redirect would look like a clean success.
+              body: { id: 'org_1', created: false },
+            },
+          ],
+        },
       ],
     });
 
     const result = await runInDurableObject(target, instance => instance.poll());
 
-    expect(result.eventsParked).toBe(1);
-    expect((await readState(target)).parked).toEqual(['evt_1']);
+    // One call, to the configured origin: `x-internal-api-key` is a custom
+    // header, so a followed cross-origin redirect would have handed the
+    // shared internal secret to the redirect's target.
+    expect(io.calls.map(c => c.path)).toEqual(['/api/internal/scim/organizations/directory_01']);
+    expect(io.calls[0]?.redirect).toBe('manual');
+
+    expect(result.eventsApplied).toBe(0);
+    expect(result.heldFailure).toMatchObject({ lastClass: 'unavailable', lastStatus: 302 });
+    expect(result.eventsParked).toBe(0);
+    expect((await readState(target)).rows[CURSOR_KEY]).toBeUndefined();
+  });
+
+  it('records an unexpected dispatcher throw against its event and then makes progress', async () => {
+    const target = stub('dispatch-throw');
+    // The SDK copies `domains` through without defaulting it, so an activation
+    // without the field makes the dispatcher's `.map(...)` throw a TypeError.
+    // Unrecorded, that unwound into the poll's catch: a poll-level error with
+    // no event id, no `event_failures` row and an unmoved cursor, so every
+    // later poll refetched the same event and threw again forever.
+    const clock = steppingClock(0);
+    const io = harness({ pages: [[activationWithoutDomains('evt_1')]] });
+
+    const first = await runInDurableObject(target, instance => instance.poll());
+
+    expect(first.error).toBeNull();
+    expect(first.heldFailure).toMatchObject({
+      eventId: 'evt_1',
+      eventType: 'dsync.activated',
+      attempts: 1,
+      lastClass: 'conflict',
+      lastStatus: null,
+    });
+    expect(first.heldFailure?.lastError).toContain('could not be dispatched');
+    // Nothing was asked of the app: the throw happened building the request.
+    expect(io.calls).toEqual([]);
+    // The operator view names the event, which is the whole point.
+    expect((await target.getStatus()).eventFailure?.eventId).toBe('evt_1');
+
+    // Retried rather than parked on the first attempt, then parked once the
+    // budget from the first failure is spent — so the loop moves on instead of
+    // spinning on one event.
+    harness({ pages: [[activationWithoutDomains('evt_1')]] });
+    const retried = await runInDurableObject(target, instance => instance.poll());
+    expect(retried.heldFailure?.attempts).toBe(2);
+    expect(retried.eventsParked).toBe(0);
+
+    clock.advanceBy(CONFLICT_RETRY_BUDGET_MS);
+    harness({ pages: [[activationWithoutDomains('evt_1'), directoryEvent('evt_2')]] });
+    const parked = await runInDurableObject(target, instance => instance.poll());
+
+    expect(parked.eventsParked).toBe(1);
+    expect(parked.eventsApplied).toBe(1);
+    expect(parked.cursor).toBe('evt_2');
+    const state = await readState(target);
+    expect(state.parked).toEqual(['evt_1']);
+    expect(state.failures).toBe(0);
   });
 
   it('never parks a 5xx, however many times it repeats', async () => {
@@ -424,6 +578,64 @@ describe('cursor override', () => {
       expect(second.cursors[0]).toBe('evt_1');
       expect(result.cursorSource).toBe('stored');
       expect((await readState(target)).rows[SEED_CURSOR_KEY]).toBe('evt_seed');
+    });
+  });
+
+  it('clears the held failure on a forward reset past the held event', async () => {
+    const target = stub('override-clears');
+    const HELD: AppRoute = {
+      method: 'PUT',
+      path: '/organizations/directory_01',
+      replies: [{ status: 500 }],
+    };
+    harness({ pages: [[directoryEvent('evt_1')]], routes: [HELD] });
+    await runInDurableObject(target, instance => instance.poll());
+    expect((await readState(target)).failure).toMatchObject({ eventId: 'evt_1' });
+
+    // Resetting *past* the held event: only that event applying or being
+    // parked clears its row, and neither can happen once the cursor is ahead
+    // of it, so a surviving row would leave `/status.eventFailure` non-null
+    // forever and the loop would look stuck when it is not.
+    await withCursorVar('evt_9', async () => {
+      harness({ pages: [[]] });
+      const result = await runInDurableObject(target, instance => instance.poll());
+
+      expect(result.cursorSource).toBe('var');
+      expect(result.heldFailure).toBeNull();
+      expect((await readState(target)).failure).toBeNull();
+      expect((await target.getStatus()).eventFailure).toBeNull();
+    });
+  });
+
+  it('gives a rewind onto a previously held event a fresh attempt count', async () => {
+    const target = stub('override-rewind');
+    const clock = steppingClock(0);
+    const CONFLICTED: AppRoute = {
+      method: 'PUT',
+      path: '/organizations/directory_01',
+      replies: [{ status: 409, code: 'directory_not_found' }],
+    };
+
+    harness({ pages: [[directoryEvent('evt_1')]], routes: [CONFLICTED] });
+    const held = await runInDurableObject(target, instance => instance.poll());
+    expect(held.heldFailure).toMatchObject({ eventId: 'evt_1', attempts: 1 });
+
+    // The conflict budget runs out while the event is held, so the next
+    // attempt on the carried row would park it.
+    clock.advanceBy(CONFLICT_RETRY_BUDGET_MS);
+
+    await withCursorVar('evt_0', async () => {
+      harness({ pages: [[directoryEvent('evt_1')]], routes: [CONFLICTED] });
+      const result = await runInDurableObject(target, instance => instance.poll());
+
+      // A reset is a deliberate "start from here", so the replayed event gets
+      // the whole retry budget again rather than inheriting the spent one.
+      expect(result.cursorSource).toBe('var');
+      expect(result.eventsParked).toBe(0);
+      expect(result.heldFailure).toMatchObject({ eventId: 'evt_1', attempts: 1 });
+      const state = await readState(target);
+      expect(state.failure).toMatchObject({ eventId: 'evt_1', attempts: 1 });
+      expect(state.parked).toEqual([]);
     });
   });
 });

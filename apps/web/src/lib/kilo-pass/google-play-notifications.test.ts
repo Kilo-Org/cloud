@@ -2183,7 +2183,9 @@ describe('processGooglePlayKiloPassNotification', () => {
         });
       const now = new Date(start);
       dateNowSpy.mockReturnValue(now.valueOf());
-      const end = new Date(now.valueOf() + 31 * 86400000).toISOString();
+      // The store-state read compares the purchase expiry against the wall clock, while the
+      // mocked clock drives the streak and promo rules. Keep the fixture purchase live.
+      const end = new Date(new Date().getTime() + 31 * 86400000).toISOString();
       const token = crypto.randomUUID();
       const orderId = crypto.randomUUID();
       const live = apiDataForUser(obfsAccountId, orderId, {

@@ -91,7 +91,7 @@ export function RequestSummary({
   );
 }
 
-function copyableItem(label: string, value: string | null | undefined): DetailItem {
+export function copyableItem(label: string, value: string | null | undefined): DetailItem {
   return value ? { label, value, mono: true, copyValue: value } : { label, value: ABSENT };
 }
 

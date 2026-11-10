@@ -12,6 +12,7 @@ import {
   auto_model,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_detector,
   enkrypt_usage_guardrail,
   feature,
   finish_reason,
@@ -170,10 +171,23 @@ async function enkryptGuardrailId(guardrail: 'input' | 'output'): Promise<number
   return row.id;
 }
 
+async function enkryptDetectorId(detector: 'pii' | 'toxicity' | 'injection_attack') {
+  await db
+    .insert(enkrypt_usage_detector)
+    .values({ detector })
+    .onConflictDoNothing({ target: enkrypt_usage_detector.detector });
+  const [row] = await db
+    .select({ id: enkrypt_usage_detector.detector_id })
+    .from(enkrypt_usage_detector)
+    .where(eq(enkrypt_usage_detector.detector, detector));
+  return row.id;
+}
+
 type EnkryptLookups = {
   apiKind: Record<'chat_completions' | 'messages' | 'responses', number>;
   decision: Record<'allowed' | 'blocked' | 'error', number>;
   guardrail: Record<'input' | 'output', number>;
+  detector: Record<'pii' | 'toxicity' | 'injection_attack', number>;
 };
 
 async function enkryptLookups(): Promise<EnkryptLookups> {
@@ -192,7 +206,30 @@ async function enkryptLookups(): Promise<EnkryptLookups> {
       input: await enkryptGuardrailId('input'),
       output: await enkryptGuardrailId('output'),
     },
+    detector: {
+      pii: await enkryptDetectorId('pii'),
+      toxicity: await enkryptDetectorId('toxicity'),
+      injection_attack: await enkryptDetectorId('injection_attack'),
+    },
   };
+}
+
+async function listEnkryptIds(
+  filters: Omit<
+    Parameters<
+      Awaited<
+        ReturnType<typeof createCallerForUser>
+      >['organizations']['requestLogs']['listEnkryptUsage']
+    >[0],
+    'organizationId'
+  > = {}
+): Promise<string[]> {
+  const caller = await createCallerForUser(owner.id);
+  const rows = await caller.organizations.requestLogs.listEnkryptUsage({
+    organizationId: organization.id,
+    ...filters,
+  });
+  return rows.map(row => row.id);
 }
 
 function enkryptRow(
@@ -923,16 +960,25 @@ describe('organizations.requestLogs trpc router', () => {
         organization_id: organization.id,
         kilo_user_id: member.id,
         session_id: 'ses_enkrypt_blocked',
+        microdollar_usage_id: randomUUID(),
         api_kind_id: lookups.apiKind.messages,
         decision_id: lookups.decision.blocked,
         guardrail_id: lookups.guardrail.output,
+        fired_detector_ids: [lookups.detector.toxicity, lookups.detector.pii],
         enkrypt_credits_cost: 2,
         charged_microdollars: 200,
         added_latency_ms: 60,
         created_at: hoursAgo(1),
       });
+      const usage = usageRow({
+        organization_id: organization.id,
+        model: 'moonshotai/kimi-k2',
+        requested_model: 'kilo-auto/balanced',
+      });
+      await db.insert(microdollar_usage).values(usage);
       const allowed = enkryptRow(lookups, {
         organization_id: organization.id,
+        microdollar_usage_id: usage.id,
         api_kind_id: lookups.apiKind.chat_completions,
         decision_id: lookups.decision.allowed,
         enkrypt_credits_cost: 1.5,
@@ -968,8 +1014,11 @@ describe('organizations.requestLogs trpc router', () => {
           created_at: errored.created_at,
           user: { id: owner.id, name: owner.google_user_name, email: owner.google_user_email },
           session_id: null,
+          request_id: null,
+          model: null,
           api_kind: 'responses',
-          decision: 'error',
+          outcome: 'error',
+          fired_detectors: [],
           guardrail: 'input',
           charged_microdollars: 0,
           added_latency_ms: null,
@@ -979,8 +1028,11 @@ describe('organizations.requestLogs trpc router', () => {
           created_at: blocked.created_at,
           user: { id: member.id, name: member.google_user_name, email: member.google_user_email },
           session_id: 'ses_enkrypt_blocked',
+          request_id: blocked.microdollar_usage_id,
+          model: null,
           api_kind: 'messages',
-          decision: 'blocked',
+          outcome: 'blocked',
+          fired_detectors: ['pii', 'toxicity'],
           guardrail: 'output',
           charged_microdollars: 200,
           added_latency_ms: 60,
@@ -990,8 +1042,11 @@ describe('organizations.requestLogs trpc router', () => {
           created_at: allowed.created_at,
           user: { id: owner.id, name: owner.google_user_name, email: owner.google_user_email },
           session_id: null,
+          request_id: usage.id,
+          model: 'kilo-auto/balanced',
           api_kind: 'chat_completions',
-          decision: 'allowed',
+          outcome: 'allowed',
+          fired_detectors: [],
           guardrail: 'input',
           charged_microdollars: 150,
           added_latency_ms: 40,
@@ -1021,6 +1076,250 @@ describe('organizations.requestLogs trpc router', () => {
       expect(result.map(row => row.id)).toEqual(
         rows.slice(0, REQUEST_LOGS_LIMIT).map(row => row.id)
       );
+    });
+
+    it('returns the 24 hours leading up to the start time, including the start', async () => {
+      await enableRequestLogs([organization.id]);
+      const lookups = await enkryptLookups();
+      const startMs = Date.now() - 3 * DAY_MS;
+      const partitions = await provisionEnkryptUsagePartitions(db, new Date(startMs - DAY_MS));
+      expect(partitions.errors).toEqual([]);
+      const atStart = enkryptRow(lookups, {
+        organization_id: organization.id,
+        created_at: isoAt(startMs),
+      });
+      const insideWindow = enkryptRow(lookups, {
+        organization_id: organization.id,
+        created_at: isoAt(startMs - 23 * HOUR_MS),
+      });
+      const atBoundary = enkryptRow(lookups, {
+        organization_id: organization.id,
+        created_at: isoAt(startMs - DAY_MS),
+      });
+      const afterStart = enkryptRow(lookups, {
+        organization_id: organization.id,
+        created_at: isoAt(startMs + MINUTE_MS),
+      });
+      await db.insert(enkrypt_usage).values([atStart, insideWindow, atBoundary, afterStart]);
+
+      await expect(listEnkryptIds({ startTime: isoAt(startMs) })).resolves.toEqual([
+        atStart.id,
+        insideWindow.id,
+      ]);
+    });
+
+    it('rejects a start time older than 365 days with BAD_REQUEST', async () => {
+      await enableRequestLogs([organization.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.requestLogs.listEnkryptUsage({
+          organizationId: organization.id,
+          startTime: isoAt(Date.now() - 366 * DAY_MS),
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('filters by user, decision outcome, and guardrail', async () => {
+      await enableRequestLogs([organization.id]);
+      const lookups = await enkryptLookups();
+      const allowed = enkryptRow(lookups, {
+        organization_id: organization.id,
+        guardrail_id: lookups.guardrail.input,
+        created_at: minutesAgo(1),
+      });
+      const flagged = enkryptRow(lookups, {
+        organization_id: organization.id,
+        guardrail_id: lookups.guardrail.output,
+        fired_detector_ids: [lookups.detector.pii],
+        created_at: minutesAgo(2),
+      });
+      const blocked = enkryptRow(lookups, {
+        organization_id: organization.id,
+        kilo_user_id: member.id,
+        decision_id: lookups.decision.blocked,
+        fired_detector_ids: [lookups.detector.injection_attack],
+        created_at: minutesAgo(3),
+      });
+      const errored = enkryptRow(lookups, {
+        organization_id: organization.id,
+        decision_id: lookups.decision.error,
+        guardrail_id: lookups.guardrail.output,
+        created_at: minutesAgo(4),
+      });
+      await db.insert(enkrypt_usage).values([allowed, flagged, blocked, errored]);
+
+      await expect(listEnkryptIds({ outcome: 'allowed' })).resolves.toEqual([allowed.id]);
+      await expect(listEnkryptIds({ outcome: 'flagged' })).resolves.toEqual([flagged.id]);
+      await expect(listEnkryptIds({ outcome: 'blocked' })).resolves.toEqual([blocked.id]);
+      await expect(listEnkryptIds({ outcome: 'error' })).resolves.toEqual([errored.id]);
+      await expect(listEnkryptIds({ guardrail: 'input' })).resolves.toEqual([
+        allowed.id,
+        blocked.id,
+      ]);
+      await expect(listEnkryptIds({ guardrail: 'output' })).resolves.toEqual([
+        flagged.id,
+        errored.id,
+      ]);
+      await expect(listEnkryptIds({ userId: member.id })).resolves.toEqual([blocked.id]);
+      await expect(listEnkryptIds({ userId: owner.id, guardrail: 'output' })).resolves.toEqual([
+        flagged.id,
+        errored.id,
+      ]);
+    });
+
+    it("does not return another organization's model for a linked request", async () => {
+      await enableRequestLogs([organization.id]);
+      const lookups = await enkryptLookups();
+      const otherOrgUsage = usageRow({ organization_id: otherOrganization.id });
+      await db.insert(microdollar_usage).values(otherOrgUsage);
+      const call = enkryptRow(lookups, {
+        organization_id: organization.id,
+        microdollar_usage_id: otherOrgUsage.id,
+      });
+      await db.insert(enkrypt_usage).values(call);
+
+      const caller = await createCallerForUser(owner.id);
+      const result = await caller.organizations.requestLogs.listEnkryptUsage({
+        organizationId: organization.id,
+      });
+
+      expect(result).toMatchObject([{ id: call.id, request_id: otherOrgUsage.id, model: null }]);
+    });
+  });
+
+  describe('getEnkryptRequestDetails', () => {
+    it('rejects the request when the feature is not enabled for the organization', async () => {
+      await enableRequestLogs([otherOrganization.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.requestLogs.getEnkryptRequestDetails({
+          organizationId: organization.id,
+          requestId: randomUUID(),
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('rejects a plain member with UNAUTHORIZED', async () => {
+      await enableRequestLogs([organization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.requestLogs.getEnkryptRequestDetails({
+          organizationId: organization.id,
+          requestId: randomUUID(),
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('returns NOT_FOUND for a request without Enkrypt calls in the organization', async () => {
+      await enableRequestLogs([organization.id, otherOrganization.id]);
+      const lookups = await enkryptLookups();
+      const otherOrgCall = enkryptRow(lookups, {
+        organization_id: otherOrganization.id,
+        microdollar_usage_id: randomUUID(),
+      });
+      await db.insert(enkrypt_usage).values(otherOrgCall);
+      const usage = usageRow({ organization_id: organization.id });
+      await db.insert(microdollar_usage).values(usage);
+
+      const caller = await createCallerForUser(owner.id);
+      for (const requestId of [otherOrgCall.microdollar_usage_id ?? '', usage.id]) {
+        await expect(
+          caller.organizations.requestLogs.getEnkryptRequestDetails({
+            organizationId: organization.id,
+            requestId,
+          })
+        ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      }
+    });
+
+    it('returns the calls of a blocked request without inference usage, oldest first', async () => {
+      await enableRequestLogs([organization.id]);
+      const lookups = await enkryptLookups();
+      const requestId = randomUUID();
+      const logOnly = enkryptRow(lookups, {
+        organization_id: organization.id,
+        session_id: 'ses_enkrypt_details',
+        microdollar_usage_id: requestId,
+        fired_detector_ids: [lookups.detector.pii],
+        added_latency_ms: null,
+        created_at: minutesAgo(1),
+      });
+      const blocking = enkryptRow(lookups, {
+        organization_id: organization.id,
+        session_id: 'ses_enkrypt_details',
+        microdollar_usage_id: requestId,
+        decision_id: lookups.decision.blocked,
+        fired_detector_ids: [lookups.detector.injection_attack],
+        added_latency_ms: 80,
+        created_at: minutesAgo(2),
+      });
+      const otherRequest = enkryptRow(lookups, {
+        organization_id: organization.id,
+        microdollar_usage_id: randomUUID(),
+      });
+      await db.insert(enkrypt_usage).values([logOnly, blocking, otherRequest]);
+
+      const caller = await createCallerForUser(owner.id);
+      const result = await caller.organizations.requestLogs.getEnkryptRequestDetails({
+        organizationId: organization.id,
+        requestId,
+      });
+
+      expect(result).toEqual({
+        calls: [
+          expect.objectContaining({
+            id: blocking.id,
+            request_id: requestId,
+            outcome: 'blocked',
+            fired_detectors: ['injection_attack'],
+            added_latency_ms: 80,
+          }),
+          expect.objectContaining({
+            id: logOnly.id,
+            request_id: requestId,
+            outcome: 'flagged',
+            fired_detectors: ['pii'],
+            added_latency_ms: null,
+          }),
+        ],
+        inference: null,
+        metadata: { status: 'not-configured' },
+      });
+    });
+
+    it('returns the inference usage of a request that reached the model', async () => {
+      await enableRequestLogs([organization.id]);
+      const lookups = await enkryptLookups();
+      const usage = usageRow({
+        organization_id: organization.id,
+        cost: 4_200,
+        model: 'moonshotai/kimi-k2',
+        requested_model: 'kilo-auto/balanced',
+        inference_provider: 'deepinfra',
+      });
+      await db.insert(microdollar_usage).values(usage);
+      await db
+        .insert(enkrypt_usage)
+        .values(
+          enkryptRow(lookups, { organization_id: organization.id, microdollar_usage_id: usage.id })
+        );
+
+      const caller = await createCallerForUser(owner.id);
+      const result = await caller.organizations.requestLogs.getEnkryptRequestDetails({
+        organizationId: organization.id,
+        requestId: usage.id,
+      });
+
+      expect(result.inference).toEqual({
+        model: 'moonshotai/kimi-k2',
+        requested_model: 'kilo-auto/balanced',
+        provider: 'DeepInfra',
+        cost_microdollars: 4_200,
+      });
+      expect(result.calls).toMatchObject([{ model: 'kilo-auto/balanced', outcome: 'allowed' }]);
     });
   });
 

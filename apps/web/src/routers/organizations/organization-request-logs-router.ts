@@ -4,6 +4,7 @@ import {
   editor_name,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_detector,
   enkrypt_usage_guardrail,
   feature,
   finish_reason,
@@ -13,7 +14,11 @@ import {
   microdollar_usage_metadata,
   mode,
 } from '@kilocode/db/schema';
-import type { EnkryptGuardrailDirection } from '@kilocode/db/schema-types';
+import type {
+  EnkryptDetectorId,
+  EnkryptGuardrailDecision,
+  EnkryptGuardrailDirection,
+} from '@kilocode/db/schema-types';
 import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -24,15 +29,18 @@ import {
   organizationBillingProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, gt, gte, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lte, sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 import { isRequestLogsEnabled } from '@/lib/request-logs/availability';
 import {
+  ENKRYPT_USAGE_OUTCOMES,
+  ENKRYPT_USAGE_WINDOW_HOURS,
   REQUEST_LOGS_LIMIT,
   REQUEST_LOGS_MODEL_PREFIX_MAX_LENGTH,
   REQUEST_LOGS_START_TIME_MAX_AGE_DAYS,
   REQUEST_LOGS_WINDOW_HOURS,
   isRequestLogStartTimeInBounds,
+  type EnkryptUsageOutcome,
 } from '@/lib/request-logs/filters';
 import { microdollarUsageModelStartsWith } from '@/lib/request-logs/model-prefix';
 import { formatRequestLogProvider } from '@/lib/request-logs/provider-label';
@@ -41,8 +49,6 @@ import {
   type RequestLogRoutingDetails,
 } from '@/lib/request-logs/routing-details';
 import { timedUsageQuery } from '@/lib/usage-query';
-
-export const ENKRYPT_USAGE_MAX_AGE_HOURS = 24;
 
 const LOG_SOURCE = 'request-logs';
 
@@ -56,6 +62,13 @@ const RequestLogsListInputSchema = OrganizationIdInputSchema.extend({
   startTime: StartTimeSchema.optional(),
   userId: z.string().min(1).max(256).optional(),
   modelPrefix: z.string().trim().max(REQUEST_LOGS_MODEL_PREFIX_MAX_LENGTH).optional(),
+});
+
+const EnkryptUsageListInputSchema = OrganizationIdInputSchema.extend({
+  startTime: StartTimeSchema.optional(),
+  userId: z.string().min(1).max(256).optional(),
+  outcome: z.enum(ENKRYPT_USAGE_OUTCOMES).optional(),
+  guardrail: z.enum(['input', 'output']).optional(),
 });
 
 export type RequestLogMetadata =
@@ -86,11 +99,105 @@ function withinRequestLogWindow(startTime: string | undefined) {
 /** Rows recorded before the output guardrail existed have no guardrail and are input scans. */
 const enkryptGuardrail = sql<EnkryptGuardrailDirection>`coalesce(${enkrypt_usage_guardrail.guardrail}, 'input')`;
 
-function withinEnkryptUsageWindow() {
-  return gte(
-    enkrypt_usage.created_at,
-    sql`NOW() - make_interval(hours => ${ENKRYPT_USAGE_MAX_AGE_HOURS})`
+/** Sorted by detector so the order is stable. An empty array when none fired. */
+const firedDetectors = sql<EnkryptDetectorId[]>`array(
+  select ${enkrypt_usage_detector.detector} from ${enkrypt_usage_detector}
+  where ${enkrypt_usage_detector.detector_id} = any(${enkrypt_usage.fired_detector_ids})
+  order by ${enkrypt_usage_detector.detector}
+)`;
+
+const hasFiredDetectors = sql`coalesce(cardinality(${enkrypt_usage.fired_detector_ids}), 0) > 0`;
+
+function withinEnkryptUsageWindow(startTime: string | undefined) {
+  const windowEnd = startTime === undefined ? sql`NOW()` : sql`${startTime}::timestamptz`;
+  return and(
+    lte(enkrypt_usage.created_at, windowEnd),
+    gt(
+      enkrypt_usage.created_at,
+      sql`${windowEnd} - make_interval(hours => ${ENKRYPT_USAGE_WINDOW_HOURS})`
+    )
   );
+}
+
+function enkryptOutcomeFilter(outcome: EnkryptUsageOutcome | undefined): SQL | undefined {
+  switch (outcome) {
+    case undefined:
+      return undefined;
+    case 'allowed':
+      return and(eq(enkrypt_usage_decision.decision, 'allowed'), sql`not ${hasFiredDetectors}`);
+    case 'flagged':
+      return and(eq(enkrypt_usage_decision.decision, 'allowed'), hasFiredDetectors);
+    case 'blocked':
+    case 'error':
+      return eq(enkrypt_usage_decision.decision, outcome);
+  }
+}
+
+function enkryptOutcome(
+  decision: EnkryptGuardrailDecision,
+  detectors: EnkryptDetectorId[]
+): EnkryptUsageOutcome {
+  return decision === 'allowed' && detectors.length > 0 ? 'flagged' : decision;
+}
+
+/** Guardrail calls with their user and, when inference was recorded, the request's model. */
+function selectEnkryptCalls(tx: typeof readDb, where: SQL | undefined) {
+  return tx
+    .select({
+      id: enkrypt_usage.id,
+      created_at: enkrypt_usage.created_at,
+      kilo_user_id: enkrypt_usage.kilo_user_id,
+      user_name: kilocode_users.google_user_name,
+      user_email: kilocode_users.google_user_email,
+      session_id: enkrypt_usage.session_id,
+      request_id: enkrypt_usage.microdollar_usage_id,
+      model: microdollar_usage.model,
+      requested_model: microdollar_usage.requested_model,
+      api_kind: api_kind.api_kind,
+      decision: enkrypt_usage_decision.decision,
+      fired_detectors: firedDetectors,
+      guardrail: enkryptGuardrail,
+      charged_microdollars: enkrypt_usage.charged_microdollars,
+      added_latency_ms: enkrypt_usage.added_latency_ms,
+    })
+    .from(enkrypt_usage)
+    .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
+    .innerJoin(
+      enkrypt_usage_decision,
+      eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+    )
+    .leftJoin(
+      enkrypt_usage_guardrail,
+      eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
+    )
+    .leftJoin(kilocode_users, eq(kilocode_users.id, enkrypt_usage.kilo_user_id))
+    .leftJoin(
+      microdollar_usage,
+      and(
+        eq(microdollar_usage.id, enkrypt_usage.microdollar_usage_id),
+        eq(microdollar_usage.organization_id, enkrypt_usage.organization_id)
+      )
+    )
+    .where(where);
+}
+
+type EnkryptCallRow = Awaited<ReturnType<typeof selectEnkryptCalls>>[number];
+
+function toEnkryptCall(row: EnkryptCallRow) {
+  return {
+    id: row.id,
+    created_at: toIsoTimestamp(row.created_at),
+    user: { id: row.kilo_user_id, name: row.user_name, email: row.user_email },
+    session_id: row.session_id,
+    request_id: row.request_id,
+    model: row.requested_model ?? row.model,
+    api_kind: row.api_kind,
+    outcome: enkryptOutcome(row.decision, row.fired_detectors),
+    fired_detectors: row.fired_detectors,
+    guardrail: row.guardrail,
+    charged_microdollars: row.charged_microdollars,
+    added_latency_ms: row.added_latency_ms,
+  };
 }
 
 function toIsoTimestamp(value: string): string {
@@ -193,61 +300,80 @@ export const organizationRequestLogsRouter = createTRPCRouter({
     }));
   }),
 
-  listEnkryptUsage: organizationBillingProcedure.query(async ({ input }) => {
-    await assertRequestLogsEnabled(input.organizationId);
-    const rows = await timedUsageQuery(
-      {
-        db: readDb,
-        route: 'organizations.requestLogs.listEnkryptUsage',
-        queryLabel: 'org_latest_enkrypt_usage',
-        scope: 'org',
-        period: `${ENKRYPT_USAGE_MAX_AGE_HOURS}h`,
-      },
-      tx =>
-        tx
-          .select({
-            id: enkrypt_usage.id,
-            created_at: enkrypt_usage.created_at,
-            kilo_user_id: enkrypt_usage.kilo_user_id,
-            user_name: kilocode_users.google_user_name,
-            user_email: kilocode_users.google_user_email,
-            session_id: enkrypt_usage.session_id,
-            api_kind: api_kind.api_kind,
-            decision: enkrypt_usage_decision.decision,
-            guardrail: enkryptGuardrail,
-            charged_microdollars: enkrypt_usage.charged_microdollars,
-            added_latency_ms: enkrypt_usage.added_latency_ms,
-          })
-          .from(enkrypt_usage)
-          .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
-          .innerJoin(
-            enkrypt_usage_decision,
-            eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+  listEnkryptUsage: organizationBillingProcedure
+    .input(EnkryptUsageListInputSchema)
+    .query(async ({ input }) => {
+      await assertRequestLogsEnabled(input.organizationId);
+      const rows = await timedUsageQuery(
+        {
+          db: readDb,
+          route: 'organizations.requestLogs.listEnkryptUsage',
+          queryLabel: 'org_latest_enkrypt_usage',
+          scope: 'org',
+          period: `${ENKRYPT_USAGE_WINDOW_HOURS}h`,
+        },
+        tx =>
+          selectEnkryptCalls(
+            tx,
+            and(
+              eq(enkrypt_usage.organization_id, input.organizationId),
+              withinEnkryptUsageWindow(input.startTime),
+              input.userId === undefined ? undefined : eq(enkrypt_usage.kilo_user_id, input.userId),
+              enkryptOutcomeFilter(input.outcome),
+              input.guardrail === undefined ? undefined : eq(enkryptGuardrail, input.guardrail)
+            )
           )
-          .leftJoin(
-            enkrypt_usage_guardrail,
-            eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
-          )
-          .leftJoin(kilocode_users, eq(kilocode_users.id, enkrypt_usage.kilo_user_id))
-          .where(
-            and(eq(enkrypt_usage.organization_id, input.organizationId), withinEnkryptUsageWindow())
-          )
-          .orderBy(desc(enkrypt_usage.created_at))
-          .limit(REQUEST_LOGS_LIMIT)
-    );
+            .orderBy(desc(enkrypt_usage.created_at))
+            .limit(REQUEST_LOGS_LIMIT)
+      );
+      return rows.map(toEnkryptCall);
+    }),
 
-    return rows.map(row => ({
-      id: row.id,
-      created_at: toIsoTimestamp(row.created_at),
-      user: { id: row.kilo_user_id, name: row.user_name, email: row.user_email },
-      session_id: row.session_id,
-      api_kind: row.api_kind,
-      decision: row.decision,
-      guardrail: row.guardrail,
-      charged_microdollars: row.charged_microdollars,
-      added_latency_ms: row.added_latency_ms,
-    }));
-  }),
+  /** The request behind Enkrypt calls, which may have no inference usage when the guardrail blocked it. */
+  getEnkryptRequestDetails: organizationBillingProcedure
+    .input(OrganizationIdInputSchema.extend({ requestId: z.uuid() }))
+    .query(async ({ input }) => {
+      await assertRequestLogsEnabled(input.organizationId);
+      const calls = await selectEnkryptCalls(
+        readDb,
+        and(
+          eq(enkrypt_usage.organization_id, input.organizationId),
+          eq(enkrypt_usage.microdollar_usage_id, input.requestId)
+        )
+      ).orderBy(asc(enkrypt_usage.created_at));
+      if (calls.length === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Request not found.' });
+      }
+
+      const [request] = await readDb
+        .select({
+          model: microdollar_usage.model,
+          requested_model: microdollar_usage.requested_model,
+          inference_provider: microdollar_usage.inference_provider,
+          cost: microdollar_usage.cost,
+        })
+        .from(microdollar_usage)
+        .where(
+          and(
+            eq(microdollar_usage.id, input.requestId),
+            eq(microdollar_usage.organization_id, input.organizationId)
+          )
+        )
+        .limit(1);
+
+      return {
+        calls: calls.map(toEnkryptCall),
+        inference: request
+          ? {
+              model: request.model,
+              requested_model: request.requested_model,
+              provider: formatRequestLogProvider(request.inference_provider),
+              cost_microdollars: request.cost,
+            }
+          : null,
+        metadata: await readRequestLogMetadata(input.requestId),
+      };
+    }),
 
   getDetails: organizationBillingProcedure
     .input(OrganizationIdInputSchema.extend({ usageId: z.uuid() }))

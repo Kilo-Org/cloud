@@ -14,7 +14,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { apiKindLabel } from '@/lib/api-kind-labels';
 import {
   ENKRYPT_USAGE_OUTCOMES,
   ENKRYPT_USAGE_WINDOW_HOURS,
@@ -63,7 +62,6 @@ const COLUMNS = [
   { label: 'Time' },
   { label: 'User' },
   { label: 'Model' },
-  { label: 'API' },
   { label: 'Guardrail' },
   { label: 'Decision' },
   { label: 'Detectors fired' },
@@ -129,7 +127,6 @@ function EnkryptUsageTableRow({
           {row.model ?? ABSENT_CELL}
         </div>
       </TableCell>
-      <TableCell className="whitespace-nowrap">{apiKindLabel(row.api_kind)}</TableCell>
       <TableCell>{GUARDRAIL_LABELS[row.guardrail]}</TableCell>
       <TableCell>
         <ToneBadge tone={outcome.tone}>{outcome.label}</ToneBadge>

@@ -3,7 +3,7 @@ import { usage } from './usage.test-fixture';
 import { enkryptRecord } from './enkrypt-usage.test-fixture';
 import {
   MAX_WRITER_RESPONSE_BYTES,
-  recordUsage,
+  recordLlmUsage,
   USAGE_WRITER_TIMEOUT_MS,
   recordEnkryptUsage,
 } from '@kilocode/worker-utils/usage-writer-client';
@@ -53,7 +53,7 @@ describe('usage writer client', () => {
       fetchMock.mockResolvedValue(
         Response.json({ error: 'Usage writer overloaded', reason }, { status: 429 })
       );
-      expect(await recordUsage(usage, config)).toEqual({
+      expect(await recordLlmUsage(usage, config)).toEqual({
         kind: 'unavailable',
         reason: 'http_error',
         status: 429,
@@ -79,7 +79,7 @@ describe('usage writer client', () => {
     new Uint8Array([0xff]),
   ])('preserves generic429 for invalid admission bytes %s', async body => {
     fetchMock.mockResolvedValue(new Response(body, { status: 429 }));
-    expect(await recordUsage(usage, config)).toEqual({
+    expect(await recordLlmUsage(usage, config)).toEqual({
       kind: 'unavailable',
       reason: 'http_error',
       status: 429,
@@ -92,7 +92,7 @@ describe('usage writer client', () => {
     fetchMock.mockResolvedValueOnce(
       new Response(json.padEnd(MAX_WRITER_RESPONSE_BYTES, ' '), { status: 429 })
     );
-    expect(await recordUsage(usage, config)).toMatchObject({ admissionReason: 'queue_limit' });
+    expect(await recordLlmUsage(usage, config)).toMatchObject({ admissionReason: 'queue_limit' });
     const cancel = vi.fn();
     fetchMock.mockResolvedValueOnce(
       new Response(
@@ -107,7 +107,7 @@ describe('usage writer client', () => {
         { status: 429 }
       )
     );
-    expect(await recordUsage(usage, config)).toEqual({
+    expect(await recordLlmUsage(usage, config)).toEqual({
       kind: 'unavailable',
       reason: 'http_error',
       status: 429,
@@ -120,7 +120,7 @@ describe('usage writer client', () => {
     const writer = stream.writable.getWriter();
     fetchMock.mockResolvedValue(new Response(stream.readable, { status: 429 }));
     let complete = false;
-    const work = recordUsage(usage, config).then(result => {
+    const work = recordLlmUsage(usage, config).then(result => {
       complete = true;
       return result;
     });
@@ -158,7 +158,7 @@ describe('usage writer client', () => {
           { status: 429 }
         );
       });
-      expect(await recordUsage(usage, config)).toEqual({
+      expect(await recordLlmUsage(usage, config)).toEqual({
         kind: 'unavailable',
         reason: 'http_error',
         status: 429,
@@ -169,7 +169,7 @@ describe('usage writer client', () => {
 
   it('logs only the error name when an LLM 429 body is malformed', async () => {
     fetchMock.mockResolvedValue(new Response(`{"secret":"${config.secret}"`, { status: 429 }));
-    expect(await recordUsage(usage, config)).toEqual({
+    expect(await recordLlmUsage(usage, config)).toEqual({
       kind: 'unavailable',
       reason: 'http_error',
       status: 429,
@@ -190,7 +190,7 @@ describe('usage writer client', () => {
     if (!response.body) throw new Error('Expected body');
     const read = vi.spyOn(response.body, 'getReader');
     fetchMock.mockResolvedValue(response);
-    expect(await recordUsage(usage, config)).toEqual({
+    expect(await recordLlmUsage(usage, config)).toEqual({
       kind: 'unavailable',
       reason: 'http_error',
       status: 503,
@@ -206,7 +206,7 @@ describe('usage writer client', () => {
     const pending = Promise.withResolvers<Response>();
     fetchMock.mockReturnValue(pending.promise);
     let completed = false;
-    const outcome = recordUsage(event, config).then(value => {
+    const outcome = recordLlmUsage(event, config).then(value => {
       completed = true;
       return value;
     });
@@ -228,7 +228,7 @@ describe('usage writer client', () => {
 
   it('marks explicitly queued requests without changing the event or acknowledgement', async () => {
     fetchMock.mockResolvedValue(Response.json({ status: 'recorded', result }));
-    expect(await recordUsage(usage, { ...config, source: 'queue' })).toEqual({
+    expect(await recordLlmUsage(usage, { ...config, source: 'queue' })).toEqual({
       kind: 'recorded',
       result,
     });
@@ -249,7 +249,7 @@ describe('usage writer client', () => {
   it('accepts a matching duplicate without requiring a new balance update', async () => {
     const duplicate = { ...result, newMicrodollarsUsed: null };
     fetchMock.mockResolvedValue(Response.json({ status: 'duplicate', result: duplicate }));
-    expect(await recordUsage(usage, { url: config.url, secret: config.secret })).toEqual({
+    expect(await recordLlmUsage(usage, { url: config.url, secret: config.secret })).toEqual({
       kind: 'duplicate',
       result: duplicate,
     });
@@ -258,7 +258,7 @@ describe('usage writer client', () => {
 
   it('reports HTTP 200 not_recorded as a failed write, without a client retry', async () => {
     fetchMock.mockResolvedValue(Response.json({ status: 'not_recorded', result: null }));
-    expect(await recordUsage(usage, config)).toEqual({
+    expect(await recordLlmUsage(usage, config)).toEqual({
       kind: 'unavailable',
       reason: 'not_recorded',
     });
@@ -268,7 +268,7 @@ describe('usage writer client', () => {
   it.each([{ url: config.url }, { secret: config.secret }])(
     'does no network I/O with missing configuration',
     async incomplete => {
-      expect(await recordUsage(usage, incomplete)).toEqual({
+      expect(await recordLlmUsage(usage, incomplete)).toEqual({
         kind: 'unavailable',
         reason: 'missing_config',
       });
@@ -280,7 +280,7 @@ describe('usage writer client', () => {
     'rejects HTTP %s, including redirects, without following or retrying',
     async status => {
       fetchMock.mockResolvedValue(new Response('synthetic error', { status }));
-      expect(await recordUsage(usage, config)).toEqual({
+      expect(await recordLlmUsage(usage, config)).toEqual({
         kind: 'unavailable',
         reason: 'http_error',
         status,
@@ -298,7 +298,7 @@ describe('usage writer client', () => {
     JSON.stringify({ status: 'unknown', result }),
   ])('rejects an invalid or mismatched acknowledgement', async body => {
     fetchMock.mockResolvedValue(new Response(body));
-    expect(await recordUsage(usage, config)).toEqual({
+    expect(await recordLlmUsage(usage, config)).toEqual({
       kind: 'unavailable',
       reason: 'invalid_response',
     });
@@ -306,7 +306,7 @@ describe('usage writer client', () => {
 
   it('rejects an empty acknowledgement', async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
-    expect(await recordUsage(usage, config)).toEqual({
+    expect(await recordLlmUsage(usage, config)).toEqual({
       kind: 'unavailable',
       reason: 'invalid_response',
     });
@@ -324,7 +324,7 @@ describe('usage writer client', () => {
       { headers: { 'content-length': '1' } }
     );
     fetchMock.mockResolvedValue(response);
-    expect(await recordUsage(usage, config)).toEqual({
+    expect(await recordLlmUsage(usage, config)).toEqual({
       kind: 'unavailable',
       reason: 'invalid_response',
     });
@@ -353,7 +353,7 @@ describe('usage writer client', () => {
         })
       );
     });
-    expect(await recordUsage(usage, config)).toEqual({ kind: 'unavailable', reason: 'timeout' });
+    expect(await recordLlmUsage(usage, config)).toEqual({ kind: 'unavailable', reason: 'timeout' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -363,7 +363,7 @@ describe('usage writer client', () => {
         `${config.url} ${config.secret} ${config.protectionBypass} ${usage.metadata.user_prompt_prefix}`
       )
     );
-    expect(await recordUsage(usage, config)).toEqual({
+    expect(await recordLlmUsage(usage, config)).toEqual({
       kind: 'unavailable',
       reason: 'request_failed',
     });
@@ -501,7 +501,7 @@ describe('unread response release', () => {
         { status }
       )
     );
-    await recordUsage(usage, config);
+    await recordLlmUsage(usage, config);
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(console.warn).toHaveBeenCalledOnce();
     expect(console.warn).not.toHaveBeenCalledWith(
@@ -511,7 +511,7 @@ describe('unread response release', () => {
   });
 
   it.each([
-    ['LLM', () => recordUsage(usage, config), { usageId: usage.core.id }],
+    ['LLM', () => recordLlmUsage(usage, config), { usageId: usage.core.id }],
     [
       'Enkrypt',
       () =>

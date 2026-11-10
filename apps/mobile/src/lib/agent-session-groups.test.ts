@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { groupAgentSessionsByDate } from './agent-session-groups';
 
@@ -138,5 +138,68 @@ describe('groupAgentSessionsByDate', () => {
     groupAgentSessionsByDate(input, 'updated_at', NOW);
 
     expect(reads).toBe(rowCount);
+  });
+});
+
+/**
+ * A section is a calendar day of the device's own zone, so the same session
+ * must change section when the local day or the zone moves under a list that
+ * stays open. `useAgentSessions` re-reads the grouping on the shared
+ * relative-time clock; these cases pin the contract that re-read depends on.
+ */
+describe('groupAgentSessionsByDate across a day boundary and a zone move', () => {
+  const originalZone = process.env.TZ;
+
+  afterEach(() => {
+    if (originalZone === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = originalZone;
+    }
+  });
+
+  it('moves a session from Today to Yesterday when local midnight passes', () => {
+    process.env.TZ = 'UTC';
+    const input: FakeSession[] = [
+      {
+        session_id: 'late',
+        created_at: '2024-06-10T23:30:00.000Z',
+        updated_at: '2024-06-10T23:30:00.000Z',
+      },
+    ];
+
+    expect(
+      groupAgentSessionsByDate(input, 'updated_at', new Date('2024-06-10T23:59:00.000Z')).map(
+        group => group.label
+      )
+    ).toEqual(['Today']);
+    expect(
+      groupAgentSessionsByDate(input, 'updated_at', new Date('2024-06-11T00:01:00.000Z')).map(
+        group => group.label
+      )
+    ).toEqual(['Yesterday']);
+  });
+
+  it('moves a session from Yesterday to Today when the device zone moves east', () => {
+    // Two hours apart, on different UTC dates but the same local date at UTC+14:
+    // the row only changes section because the device zone moved.
+    const input: FakeSession[] = [
+      {
+        session_id: 'late',
+        created_at: '2024-06-09T23:00:00.000Z',
+        updated_at: '2024-06-09T23:00:00.000Z',
+      },
+    ];
+    const now = new Date('2024-06-10T01:00:00.000Z');
+
+    process.env.TZ = 'UTC';
+    expect(groupAgentSessionsByDate(input, 'updated_at', now).map(group => group.label)).toEqual([
+      'Yesterday',
+    ]);
+
+    process.env.TZ = 'Pacific/Kiritimati';
+    expect(groupAgentSessionsByDate(input, 'updated_at', now).map(group => group.label)).toEqual([
+      'Today',
+    ]);
   });
 });

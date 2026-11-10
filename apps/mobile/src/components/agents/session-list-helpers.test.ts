@@ -232,6 +232,31 @@ describe('sectionAwareTimeMeta', () => {
     expect(sectionAwareTimeMeta(iso, 'Gestern', NOW).clock).not.toBeNull();
   });
 
+  it('counts calendar days, so a 47-hour-old row is not "yesterday"', () => {
+    // The shape the History list showed: read on local Tuesday 20:52, a session
+    // from local Sunday 21:00 is 47 h 52 m old, so the elapsed-time word is
+    // "yesterday" while the heading above it names Sunday.
+    const now = new Date(2026, 10, 10, 20, 52).getTime();
+    const iso = new Date(2026, 10, 8, 21, 0).toISOString();
+    expect(formatMeta(iso, now)).toBe('YESTERDAY');
+
+    expect(sectionAwareTimeMeta(iso, 'Sunday', now)).toEqual({
+      visible: '2 DAYS AGO',
+      clock: null,
+    });
+  });
+
+  it('still reaches the clock time for a row the calendar really places yesterday', () => {
+    // 26 hours old, but the previous local date: the day word agrees with the
+    // heading, so the row shows its clock instead of repeating the section.
+    const now = new Date(2026, 10, 10, 12, 0).getTime();
+    const iso = new Date(2026, 10, 9, 10, 0).toISOString();
+    expect(sectionAwareTimeMeta(iso, 'Yesterday', now)).toEqual({
+      visible: clockOf(iso),
+      clock: clockOf(iso),
+    });
+  });
+
   it('keeps the relative label under a heading it does not repeat', () => {
     const today = new Date(NOW - 3 * HOUR).toISOString();
     expect(sectionAwareTimeMeta(today, 'Today', NOW)).toEqual({

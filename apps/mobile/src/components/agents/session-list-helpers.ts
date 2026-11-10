@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { calendarDayRelativeLabel } from '@/lib/calendar-day-label';
 import {
   CURRENCY_ZERO_THRESHOLD,
   formatClockTime,
@@ -211,12 +212,14 @@ type SessionRowTimeMeta = {
 /**
  * Time meta for a session row that sits under a date section heading.
  *
- * `formatMeta` renders the relative day word, and in the Yesterday section that
- * word is the heading directly above the row (`YESTERDAY` under `YESTERDAY`),
- * so the row restated its own section. When the two strings match — the same
- * locale-folded text on screen, not a bucket rule — the row shows the clock
- * time of its own timestamp instead. Every other heading (Today, a weekday,
- * Older) never matches the relative label it renders, so those rows keep it.
+ * The day word comes from the calendar (`sectionRelativeLabel`), so the row can
+ * never claim "yesterday" for a session the heading above it files two days
+ * back, and in the Yesterday section that word is the heading directly above
+ * the row (`YESTERDAY` under `YESTERDAY`), so the row restated its own section.
+ * When the two strings match — the same locale-folded text on screen, not a
+ * bucket rule — the row shows the clock time of its own timestamp instead.
+ * Every other heading (Today, a weekday, Older) never matches the relative
+ * label it renders, so those rows keep it.
  *
  * `clock` is the replacement when one was made, so the spoken label says the
  * same clock time instead of repeating the section, and `null` when the
@@ -228,7 +231,7 @@ export function sectionAwareTimeMeta(
   sectionTitle: string | null | undefined,
   nowMs?: number
 ): SessionRowTimeMeta {
-  const relative = formatMeta(timestamp, nowMs);
+  const relative = calendarDayRelativeLabel(timestamp, nowMs);
   if (!sectionTitle || relative === '') {
     return { visible: relative, clock: null };
   }

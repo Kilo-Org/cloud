@@ -31,6 +31,7 @@ import {
 } from '@/lib/agent-session-sort';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useLiveSessionsHold } from '@/lib/hooks/use-live-sessions-hold';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
@@ -115,7 +116,14 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   const query = useInfiniteQuery(buildAgentSessionSearchQueryOptions(trpc, options));
 
   const sessions = useMemo(() => collectSearchPages(query.data?.pages), [query.data]);
-  const dateGroups = useMemo(() => groupAgentSessionsByDate(sessions, sortBy), [sessions, sortBy]);
+  // The sections are calendar days of the device's own zone, so they read the
+  // same shared clock the row labels do (see `useRelativeTimeNow`): a heading
+  // cannot outlive a zone change or a midnight the rows already followed.
+  const now = useRelativeTimeNow();
+  const dateGroups = useMemo(
+    () => groupAgentSessionsByDate(sessions, sortBy, new Date(now)),
+    [now, sessions, sortBy]
+  );
 
   return {
     dateGroups,
@@ -230,9 +238,14 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     [active.canRead, active.data]
   );
 
+  // The sections are calendar days of the device's own zone and day. Watching
+  // the shared relative-time clock (the one the row labels read) rebuilds them
+  // when a zone change or a midnight moves the boundary, so a stale heading
+  // cannot sit above a row that already reads a different day.
+  const now = useRelativeTimeNow();
   const dateGroups = useMemo(
-    () => groupAgentSessionsByDate(storedSessions, sortBy),
-    [storedSessions, sortBy]
+    () => groupAgentSessionsByDate(storedSessions, sortBy, new Date(now)),
+    [now, sortBy, storedSessions]
   );
 
   // Departure-triggered stored reset. Only the active poll has a refetch

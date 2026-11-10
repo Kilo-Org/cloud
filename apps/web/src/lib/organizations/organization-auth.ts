@@ -22,8 +22,10 @@ import {
 import {
   findSupportAllowEntry,
   isSupportAccessEnabled,
+  isSupportAccessReason,
   supportStandInRole,
   type OrganizationAccess,
+  type SupportAccessReason,
   type SupportActionClass,
   type SupportSurface,
 } from '@kilocode/web-shared/lib/admin/support-access';
@@ -42,9 +44,20 @@ type AuthorizedOrgData = {
   access: OrganizationAccess;
 };
 const UUIDSchema = z.uuid();
+
+export type OrgAccessDenial = {
+  status: number;
+  reason: SupportAccessReason | null;
+  isPlatformAdmin: boolean;
+};
+
 type DataOrNextError<T> = CustomResult<
-  { data: T; nextResponse?: never },
-  { data?: never; nextResponse: NextResponse<{ error: string }> }
+  { data: T; nextResponse?: never; denial?: never },
+  {
+    data?: never;
+    nextResponse: NextResponse<{ error: string }>;
+    denial?: OrgAccessDenial;
+  }
 >;
 
 export async function getAuthorizedOrgContext(
@@ -202,6 +215,7 @@ export async function getAuthorizedOrgContext(
             { error: 'Support access could not be verified', code: supportReason },
             { status: 503 }
           ),
+          denial: { status: 503, reason: supportReason, isPlatformAdmin: user.is_admin },
         };
       }
       if (supportReason !== null) {
@@ -211,6 +225,7 @@ export async function getAuthorizedOrgContext(
             { error: 'Support access required', code: supportReason },
             { status: 403 }
           ),
+          denial: { status: 403, reason: supportReason, isPlatformAdmin: user.is_admin },
         };
       }
       const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
@@ -228,11 +243,11 @@ export async function getAuthorizedOrgContext(
   });
 }
 
-function supportAccessReasonFromError(error: TRPCError): string | null {
+function supportAccessReasonFromError(error: TRPCError): SupportAccessReason | null {
   const cause = error.cause;
   if (cause === null || typeof cause !== 'object') return null;
   const reason = (cause as { supportAccessReason?: unknown }).supportAccessReason;
-  return typeof reason === 'string' ? reason : null;
+  return isSupportAccessReason(reason) ? reason : null;
 }
 
 function roleForAccess(

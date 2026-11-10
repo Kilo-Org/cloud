@@ -1,4 +1,3 @@
-import type * as ExpoCrypto from 'expo-crypto';
 import { type GlanceableSessionRow } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
@@ -12,7 +11,7 @@ import { whenAskBindingSettled } from './ask-binding';
 import { NotApprovableError, resolveCloudAgentSessionId } from './cloud-agent-session';
 import { createGlanceablePublisher } from './create-publisher';
 import { resolveAnsweredRaises } from './attention-rows';
-import { resolvePendingPermissionId } from './pending-permission';
+import { type PendingPermissionTarget, resolvePendingPermissionId } from './pending-permission';
 import { readWaitingAsk, recordWaitingAsk } from './waiting-ask';
 
 /**
@@ -192,7 +191,15 @@ export async function runGlanceableApprove(
     // the aggregate card's and stays as it is. A card's Approve answers a
     // permission, and the card carries no status time.
     const result = await answerPendingPermission(
-      { ...options.target, permissionId: null },
+      {
+        kiloSessionId: options.target.kiloSessionId,
+        organizationId: options.target.organizationId,
+        request: {
+          kind: 'approvalKey',
+          kiloSessionId: options.target.kiloSessionId,
+          approvalKey: options.target.approvalKey,
+        },
+      },
       options
     );
     // A request replaced by another one leaves the session waiting, so its
@@ -213,7 +220,11 @@ export async function runGlanceableApprove(
     return { kind: 'retryable' };
   }
   const result = await answerPendingPermission(
-    { ...ask, approvalKey: null, permissionId: ask.boundPermissionId },
+    {
+      kiloSessionId: ask.kiloSessionId,
+      organizationId: ask.organizationId,
+      request: { kind: 'permissionId', permissionId: ask.boundPermissionId },
+    },
     options
   );
   if (result.kind === 'approved') {
@@ -236,52 +247,38 @@ export type GlanceableApproveTarget = {
   approvalKey: string;
 };
 
-/** The approval key of one pending request, as the server mints it. */
-async function approvalKeyOf(kiloSessionId: string, permissionId: string): Promise<string> {
-  // Lazy require keeps the native digest out of the pure test graph.
-  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-  const { CryptoDigestAlgorithm, digestStringAsync } = require('expo-crypto') as typeof ExpoCrypto;
-  const key = await digestStringAsync(
-    CryptoDigestAlgorithm.SHA256,
-    JSON.stringify([kiloSessionId, permissionId])
-  );
-  return key;
-}
-
 /**
- * The answer body, whose terminal outcome the caller acks. A caller that names
- * its request — the session card's approval key, or the aggregate ask's pending
- * permission id — answers only that request: the live request must match it, or
- * the outcome is `gone`.
+ * The answer body, whose terminal outcome the caller acks. `request` is the one
+ * request the surface drew: the session card's approval key, or the aggregate
+ * ask's bound pending permission id. The read matches that identity against
+ * every pending request, so an approval answers exactly the request it was
+ * drawn for; a request that is no longer pending, and one that cannot be told
+ * apart from another pending request, both answer nothing and report `gone`.
  */
 async function answerPendingPermission(
   target: {
     kiloSessionId: string;
     organizationId: string | null;
-    approvalKey: string | null;
-    /** The pending permission the aggregate surface drew; null for a card. */
-    permissionId: string | null;
+    request: PendingPermissionTarget;
   },
   options: { now?: () => number }
 ): Promise<GlanceableApproveResult> {
   try {
     const cloudAgentSessionId = await resolveCloudAgentSessionId(target.kiloSessionId);
-    const permissionId = await resolvePendingPermissionId(
-      { cloudAgentSessionId, organizationId: target.organizationId },
+    const match = await resolvePendingPermissionId(
+      { cloudAgentSessionId, organizationId: target.organizationId, target: target.request },
       options.now ? { now: options.now } : undefined
     );
-    if (permissionId === null) {
-      return { kind: 'gone' };
+    if (match.kind !== 'matched') {
+      // `none` is nothing pending; `stale` and `ambiguous` are a live request set
+      // that does not single out the drawn one. All three answer nothing, and the
+      // session keeps waiting for whichever request it now holds.
+      return {
+        kind: 'gone',
+        replaced: match.kind === 'none' ? undefined : true,
+      };
     }
-    if (target.permissionId !== null && permissionId !== target.permissionId) {
-      return { kind: 'gone', replaced: true };
-    }
-    if (
-      target.approvalKey !== null &&
-      (await approvalKeyOf(target.kiloSessionId, permissionId)) !== target.approvalKey
-    ) {
-      return { kind: 'gone', replaced: true };
-    }
+    const permissionId = match.permissionId;
     await answerSessionPermission({
       kiloSessionId: target.kiloSessionId,
       cloudAgentSessionId,

@@ -151,9 +151,16 @@ function generateAppleClientSecret(): string {
   );
 }
 
-const claudeVerifiedEmailSchema = z.object({
+/**
+ * Anthropic's ID token carries `sub`, `email` and `name`; it does not carry
+ * `email_verified`. The claim may therefore be absent, but a token that states
+ * the address is unverified is still refused. An absent claim settles without
+ * the auto-link step, and a `true` claim passes it on, so neither case needs a
+ * different identity rule.
+ */
+const claudeEmailClaimSchema = z.object({
   email: z.email(),
-  email_verified: z.literal(true),
+  email_verified: z.literal(true).optional(),
 });
 
 const anacondaProfileSchema = z.object({
@@ -1129,13 +1136,12 @@ export const authOptions: NextAuthOptions = {
           }
         }
         if (account.provider === 'claude' && !isAccountLinking) {
-          const claims = claudeVerifiedEmailSchema.safeParse(profile);
+          const claims = claudeEmailClaimSchema.safeParse(profile);
           if (!claims.success) {
             console.warn('[claude-auth] authorization refused', {
               reason: 'invalid_profile_claims',
               claimNames: Object.keys(profile ?? {}).filter(
-                key =>
-                  key === 'sub' || key === 'email' || key === 'email_verified' || key === 'name'
+                key => key === 'sub' || key === 'email' || key === 'name'
               ),
               rejectedClaims: claims.error.issues.map(issue => issue.path.map(String).join('.')),
             });

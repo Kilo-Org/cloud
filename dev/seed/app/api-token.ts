@@ -4,6 +4,7 @@ import { eq, or } from 'drizzle-orm';
 
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { seedTokenSigningParams } from '../lib/token-signing';
 import { isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
 
@@ -29,22 +30,14 @@ const SECONDS_PER_DAY = 24 * 60 * 60;
  *   control-token routes (cloudAgentNext.prepareSession and every other
  *   createControlTokenForRequest caller) reject the token with 403
  *   "Unsupported legacy credential context".
- * - `env` must equal the NODE_ENV of the server that verifies the token. This
- *   seed only ever feeds the local dev stack, whose server runs `next dev` —
- *   Next pins its own process.env.NODE_ENV to "development" regardless of
- *   .env files. The seed process must not copy its own dotenv-loaded NODE_ENV
- *   (root .env.local carries NODE_ENV="production" for build tooling), or
- *   getResourceDelegationAuthority rejects every request with 401
- *   "Unauthorized resource delegation request".
+ * - `env` comes from `seedTokenSigningParams`, the helper every dev seed topic
+ *   signs with, so a seed token names the local dev stack.
  */
 export function apiTokenSigningParams(expiresDays: number): {
   expiresInSeconds: number;
   env: string;
 } {
-  return {
-    expiresInSeconds: expiresDays * SECONDS_PER_DAY,
-    env: 'development',
-  };
+  return seedTokenSigningParams(expiresDays * SECONDS_PER_DAY);
 }
 
 function printUsage(): void {

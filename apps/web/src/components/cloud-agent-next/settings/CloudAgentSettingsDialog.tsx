@@ -23,11 +23,14 @@ import { RepositoryOverridesSection } from './RepositoryOverridesSection';
 import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
 
+export type SettingsSection = 'general' | 'profiles' | 'environments' | 'compute';
+
 type CloudAgentSettingsDialogProps = {
   organizationId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialSection?: 'general' | 'profiles' | 'environments' | 'compute';
+  initialSection?: SettingsSection;
+  onSectionChange?: (section: SettingsSection) => void;
   onProfileSelect?: (profileId: string) => void;
   openToNewProfile?: boolean;
   initialSelectedProfileId?: string | null;
@@ -63,11 +66,17 @@ export function CloudAgentSettingsDialog({
 function CloudAgentSettings({
   organizationId,
   initialSection = 'general',
+  onSectionChange,
   onProfileSelect,
   openToNewProfile,
   initialSelectedProfileId,
 }: Omit<CloudAgentSettingsDialogProps, 'open' | 'onOpenChange'>) {
   const [section, setSection] = useState(initialSection);
+  const [environmentsVisited, setEnvironmentsVisited] = useState(initialSection === 'environments');
+  const changeSection = (next: SettingsSection) => {
+    setSection(next);
+    onSectionChange?.(next);
+  };
   const isMobile = useIsMobile();
   const settingsQuery = useCloudAgentSettings({ organizationId });
   const settings = settingsQuery.data;
@@ -104,8 +113,10 @@ function CloudAgentSettings({
             value === 'profiles' ||
             value === 'environments' ||
             (value === 'compute' && settings?.canManage)
-          )
-            setSection(value);
+          ) {
+            if (value === 'environments') setEnvironmentsVisited(true);
+            changeSection(value);
+          }
         }}
         orientation={isMobile ? 'horizontal' : 'vertical'}
         className="flex min-h-0 flex-1 flex-col md:flex-row"
@@ -170,7 +181,7 @@ function CloudAgentSettings({
                 <RepositoryOverridesSection
                   organizationId={organizationId}
                   settings={settings}
-                  onManageProfiles={() => setSection('profiles')}
+                  onManageProfiles={() => changeSection('profiles')}
                 />
               </section>
             ) : settingsQuery.isError ? (
@@ -203,9 +214,16 @@ function CloudAgentSettings({
         </TabsContent>
         <TabsContent
           value="environments"
-          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+          forceMount
+          className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col data-[state=inactive]:hidden"
         >
-          <EnvironmentsSection organizationId={organizationId} canManage={canManage} />
+          {environmentsVisited && (
+            <EnvironmentsSection
+              organizationId={organizationId}
+              canManage={canManage}
+              active={activeSection === 'environments'}
+            />
+          )}
         </TabsContent>
         <TabsContent
           value="profiles"

@@ -37,6 +37,35 @@ class ProviderRefused(RuntimeError):
     pass
 
 
+GATEWAY_BASE_URL = "https://ai-gateway.kilo.ai/api/v1"
+GATEWAY_CHAT_COMPLETIONS_URL = GATEWAY_BASE_URL + "/chat/completions"
+KILO_CATALOG_URL = "https://app.kilo.ai/api/openrouter/models"
+GATEWAY_TOKEN_ENV = "KILO_API_TOKEN"
+ORGANIZATION_HEADER = "X-KiloCode-OrganizationId"
+
+
+def gateway_token():
+    """Host-only Kilo token. Fail closed; the value is never logged or saved."""
+    token = os.environ.get(GATEWAY_TOKEN_ENV)
+    if not isinstance(token, str) or not token or token.strip() != token or any(char.isspace() or ord(char) < 32 for char in token):
+        raise RuntimeError(f"Host-only {GATEWAY_TOKEN_ENV} is required before gateway dispatch; do not put credentials in containers or artifacts")
+    return token
+
+
+def gateway_organization_id(cfg):
+    return text_tariffs.validate_organization_id((cfg or {}).get("kilo_organization_id"))
+
+
+def require_gateway_credentials(cfg):
+    """Validate token presence and the frozen organization id without exposing either secret."""
+    gateway_token()
+    return gateway_organization_id(cfg)
+
+
+def gateway_headers(organization_id):
+    return {"Authorization": f"Bearer {gateway_token()}", "Content-Type": "application/json", ORGANIZATION_HEADER: text_tariffs.validate_organization_id(organization_id)}
+
+
 def load(path):
     return json.loads(Path(path).read_text())
 
@@ -185,11 +214,6 @@ def active_candidates(out, cfg=None):
 def scope_digest(out, cfg=None):
     manifest = candidate_exclusion(out, cfg)
     return digest(manifest) if manifest else None
-
-
-def next_execution_row(out, plan, cfg=None):
-    active = {candidate["label"] for candidate in active_candidates(out, cfg)}
-    return next((row for row in plan["runs"] if row["candidate"] in active and not (Path(out) / "rollouts" / f"{row['instance_id']}--{row['candidate']}--{row['repetition']}" / "result.json").exists()), None)
 
 
 def exclude_candidate(out, approval_path):
@@ -398,16 +422,12 @@ def base_prices(pricing):
     return rate(pricing["prompt"]), rate(pricing["completion"])
 
 
-def routing_number(per_token):
-    return text_tariffs.routing_number(per_token)
-
-
 def effective_prices(pricing):
-    """Legacy listing helper for obsolete callers; never a full-charge bound.
+    """Listing helper for retained callers; never a full-charge bound.
 
-    New paid execution uses endpoint_ceiling/text_tariffs only. This keeps
-    the old prompt-side maximum shape so unmigrated listing checks fail or
-    pass on tariff validity, not on a silently different interpretation.
+    Paid execution uses catalog_quote/text_tariffs only. This keeps the old
+    prompt-side maximum shape so listing checks fail or pass on tariff
+    validity, not on a silently different interpretation.
     """
     parsed, _ = text_tariffs.parse_pricing(pricing)
     maxima = text_tariffs.component_maxima(parsed)
@@ -421,83 +441,90 @@ def effective_prices(pricing):
 FINANCIAL_QUOTE_POLICY = text_tariffs.FINANCIAL_QUOTE_POLICY
 
 
-def endpoint_ceiling(endpoints, cfg):
-    """Complete text-only quote. cfg must carry the per-candidate identity.
+def catalog_quote(entry, cfg, classifier_allowance_usd=None, endpoints=None):
+    """Complete text-only quote at the dearest public price for one model.
 
-    Required cfg keys: max_input_tokens, max_output_tokens,
-    byok_fee_ceiling_fraction, candidate {model, effort} (or model/effort),
-    and variant_catalog (loaded dict) for variant= labels. Optional:
-    model_architecture (raw listing architecture for modality evidence),
-    routing_context, account_policy. Unchecked bound overrides reject.
+    Required cfg keys: max_input_tokens, max_output_tokens, candidate
+    {model, effort} (or model/effort), and variant_catalog (loaded dict)
+    for variant= labels. Endpoints is the raw public endpoint list.
     """
-    return text_tariffs.endpoint_quote(endpoints, cfg)
+    return text_tariffs.catalog_quote(entry, cfg, classifier_allowance_usd, endpoints)
 
 
 def financial_prices(candidate):
-    """Validate a complete quote; returns (upstream_bound, attempt_bound).
+    """Validate a complete quote; returns (solver_bound, attempt_bound).
 
-    These are per-attempt charge bounds in USD, not per-token prices. The
-    old token-only pair no longer exists and must not be used as a charge.
+    These are per-attempt charge bounds in USD, not per-token prices.
     """
     quote = text_tariffs.validate_quote(candidate)
-    return Decimal(quote["upstream_bound_usd"]), Decimal(quote["attempt_bound_usd"])
+    return Decimal(quote["solver_bound_usd"]), Decimal(quote["attempt_bound_usd"])
 
 
-def routing_max_price(candidate):
-    quote = text_tariffs.validate_quote(candidate)
-    calculated = {"prompt": routing_number(quote["routing_prompt_per_token"]), "completion": routing_number(quote["routing_completion_per_token"])}
-    if calculated != quote["routing_max_price"]:
-        raise RuntimeError("Serialized routing caps do not match the exact paired witness")
-    return calculated
+OPENROUTER_ENDPOINTS_URL = "https://openrouter.ai/api/v1/models/{model}/endpoints"
 
 
 def catalog(out, *, cfg=None):
+    """Quote frozen candidates at the dearest public price. No credential is sent anywhere."""
     import requests
     cfg = config() if cfg is None else cfg
 
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        raise RuntimeError("Authenticated direct catalog requires host-only OPENROUTER_API_KEY")
-    headers = {"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}"}
-    authentication = requests.get("https://openrouter.ai/api/v1/auth/key", headers=headers, timeout=60, allow_redirects=False)
-    authentication.raise_for_status()
-    account = authentication.json()["data"]
-    save(out / "auth-check.json", {"checked_at": time.time(), "http_status": authentication.status_code, "is_free_tier": account.get("is_free_tier"), "limit_remaining": account.get("limit_remaining"), "note": "GET only; no inference, key, or account label retained"})
-    response = requests.get("https://openrouter.ai/api/v1/models", headers=headers, timeout=60, allow_redirects=False)
+    response = requests.get(KILO_CATALOG_URL, timeout=60, allow_redirects=False)
     response.raise_for_status()
     data = response.json()
-    models = {model["id"]: model for model in data["data"]}
+    if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+        raise RuntimeError("Kilo catalog response is not a model list")
+    models = {}
+    for model in data["data"]:
+        if isinstance(model, dict) and isinstance(model.get("id"), str):
+            if model["id"] in models:
+                raise RuntimeError(f"Duplicate Kilo catalog model ID: {model['id']}")
+            models[model["id"]] = model
+    entries = {candidate["model"]: models.get(candidate["model"]) for candidate in cfg["candidates"]}
+    fetched_at = time.time()
+    snapshot = {"source": KILO_CATALOG_URL, "fetched_at": fetched_at, "entries": entries}
+    snapshot_hash = digest(snapshot)
+    save(out / "catalog-snapshot.json", snapshot)
     chosen = []
-    endpoint_snapshots = {}
     for candidate in cfg["candidates"]:
-        model = models.get(candidate["model"])
-        if model is None:
-            raise RuntimeError(f"Unavailable exact model ID: {candidate['model']}")
-        # The model listing is preserved verbatim as evidence only. It is not
-        # interpreted as a tariff ceiling; endpoint evidence decides quoting.
-        pricing = model["pricing"]
         if ":" in candidate["model"]:
             raise RuntimeError("Model routing variants/plugins are not allowed")
-        endpoint_url = f"https://openrouter.ai/api/v1/models/{candidate['model']}/endpoints"
-        endpoint_response = requests.get(endpoint_url, headers=headers, timeout=60, allow_redirects=False)
+        model = entries[candidate["model"]]
+        if model is None:
+            raise RuntimeError(text_tariffs.MODEL_UNAVAILABLE)
+        endpoint_url = OPENROUTER_ENDPOINTS_URL.format(model=candidate["model"])
+        endpoint_response = requests.get(endpoint_url, timeout=60, allow_redirects=False)
         endpoint_response.raise_for_status()
         endpoint_body = endpoint_response.json()
-        if endpoint_body["data"]["id"] != candidate["model"]:
-            raise RuntimeError("Endpoint quote model identity mismatch")
-        snapshot_hash = digest(endpoint_body)
-        snapshot = {"source": endpoint_url, "fetched_at": time.time(), "body_sha256": snapshot_hash, "body": endpoint_body}
-        save(out / "pricing-endpoints" / f"{snapshot_hash}.json", snapshot)
-        quote = {**endpoint_ceiling(endpoint_body["data"]["endpoints"], {**cfg, "candidate": candidate, "model_architecture": model.get("architecture")}), "endpoint_snapshot_sha256": snapshot_hash, "source": endpoint_url}
-        chosen.append({**candidate, "pricing": pricing, "context_length": model["context_length"], "supported_parameters": model["supported_parameters"], "model_architecture": model.get("architecture"), "financial_quote": quote, "quote_fetched_at": snapshot["fetched_at"]})
-        endpoint_snapshots[candidate["model"]] = snapshot_hash
-    new_pricing = {"fetched_at": time.time(), "source": "https://openrouter.ai/api/v1/models", "models": chosen, "financial_quote_policy": FINANCIAL_QUOTE_POLICY}
+        if not isinstance(endpoint_body, dict) or not isinstance(endpoint_body.get("data"), dict) or endpoint_body["data"].get("id") != candidate["model"] or not isinstance(endpoint_body["data"].get("endpoints"), list):
+            raise RuntimeError("Public endpoint price evidence is missing or mismatched; the quote fails")
+        endpoint_hash = digest(endpoint_body)
+        save(out / "pricing-endpoints" / f"{endpoint_hash}.json", {"source": endpoint_url, "fetched_at": fetched_at, "body_sha256": endpoint_hash, "body": endpoint_body})
+        quote = {**catalog_quote(model, {**cfg, "candidate": candidate}, endpoints=endpoint_body["data"]["endpoints"]), "catalog_snapshot_sha256": snapshot_hash, "endpoint_snapshot_sha256": endpoint_hash, "source": KILO_CATALOG_URL}
+        chosen.append({**candidate, "pricing": model["pricing"], "context_length": model["context_length"], "supported_parameters": model["supported_parameters"], "model_architecture": model.get("architecture"), "financial_quote": quote, "quote_fetched_at": fetched_at})
+    new_pricing = {"fetched_at": fetched_at, "source": KILO_CATALOG_URL, "models": chosen, "financial_quote_policy": FINANCIAL_QUOTE_POLICY}
     previous_path = out / "pricing.json"
     if previous_path.exists():
         previous = load(previous_path)
         save(out / "pricing-snapshots" / f"{digest(previous)}.json", previous)
-        prior_archive = out / "pricing-amendment-v5" / "prior"
-        if prior_archive.exists() and not (out / "pricing-amendment-v5" / "amendment.json").exists():
-            save(out / "pricing-amendment-v5" / "amendment.json", {"policy": FINANCIAL_QUOTE_POLICY, "old_pricing_sha256": digest(previous), "new_pricing_sha256": digest(new_pricing), "endpoint_snapshot_sha256": endpoint_snapshots, "application": "Prospective unrun frozen-plan rows only; all24 prior outcomes/holds unchanged; no rejected-row retry; v4 full-universe financial caps were NOT paid-cleared or used", "advertised_prices": "Preserved verbatim; current single-endpoint paired BASE tariff is routing cap, financial max covers ALL base/cache/tier fees over selector closure intersect BOTH base caps", "privacy": "Eligibility unproven by metadata; deny/require_parameters/no-fallback unchanged", "archived_files_sha256": {str(path.relative_to(prior_archive)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(prior_archive.rglob("*")) if path.is_file()}})
     save(previous_path, new_pricing)
+
+
+def classifier_quote(out, model):
+    """Quote the frozen classifier from its public endpoint prices. No credential is sent."""
+    import requests
+
+    endpoint_url = OPENROUTER_ENDPOINTS_URL.format(model=model)
+    response = requests.get(endpoint_url, timeout=60, allow_redirects=False)
+    response.raise_for_status()
+    body = response.json()
+    if not isinstance(body, dict) or not isinstance(body.get("data"), dict) or body["data"].get("id") != model or not isinstance(body["data"].get("endpoints"), list):
+        raise RuntimeError("Classifier endpoint price evidence is missing or mismatched; the router arm is not admissible")
+    fetched_at = time.time()
+    endpoint_hash = digest(body)
+    save(out / "pricing-endpoints" / f"{endpoint_hash}.json", {"source": endpoint_url, "fetched_at": fetched_at, "body_sha256": endpoint_hash, "body": body})
+    quote = {**text_tariffs.classifier_endpoint_quote(model, body["data"]["endpoints"]), "endpoint_snapshot_sha256": endpoint_hash, "source": endpoint_url}
+    return {"model": model, "financial_quote": quote, "quote_fetched_at": fetched_at}
+
 
 
 def check_panel(out):
@@ -764,7 +791,7 @@ def partial_generation_id(text):
             position += 1
             position += len(text[position:]) - len(text[position:].lstrip())
             value, position = decoder.raw_decode(text, position)
-            if key == "id" and isinstance(value, str) and value.startswith("gen-") and len(value) <= 256 and all(char.isalnum() or char in "-_" for char in value):
+            if key == "id" and isinstance(value, str) and value and len(value) <= 256 and all(char.isalnum() or char in "-_" for char in value):
                 return value
             position += len(text[position:]) - len(text[position:].lstrip())
             if text[position] != ",":
@@ -778,18 +805,14 @@ def _check_contract_freshness(contract):
     fetched = contract.get("quote_fetched_at")
     if isinstance(fetched, bool) or not isinstance(fetched, (int, float)) or not math.isfinite(fetched) or not 0 <= time.time() - fetched <= contract["quote_max_age_seconds"]:
         raise RuntimeError("Quote source is expired or unbound at dispatch; quote again")
-    policy = contract.get("account_policy") or {}
-    captured = policy.get("captured_at")
-    if isinstance(captured, bool) or not isinstance(captured, (int, float)) or not math.isfinite(captured) or not 0 <= time.time() - captured <= contract["account_policy_max_age_seconds"]:
-        raise RuntimeError("Account policy evidence is expired or unbound at dispatch; recapture account state")
 
 
 def completion_http(payload, deadline, receipt, receipt_path, *, admission=None, contract=None, http_request_timeout_seconds=180):
     """Authoritative final guard, then exact-byte dispatch.
 
     Admission is mandatory and the receipt must be unused. The payload is
-    validated and hash-bound before admission; quote and account-policy
-    freshness are checked before admission and again after it yields,
+    validated and hash-bound before admission; gateway credentials and
+    quote freshness are checked before admission and again after it yields,
     immediately before the receipt is marked and the exact bytes are sent.
     Rejections after admission leave dispatch_entered untouched.
     """
@@ -802,20 +825,25 @@ def completion_http(payload, deadline, receipt, receipt_path, *, admission=None,
     raw = text_tariffs.validate_final_payload(payload, contract)
     if receipt.get("request_sha256") != text_tariffs.request_bytes_sha256(raw):
         raise RuntimeError("Final request bytes do not match the receipt-bound request hash")
+    if receipt.get("reservation_usd") is None:
+        raise RuntimeError("Gateway dispatch requires the receipt-bound local reservation")
+    # Fail closed on missing credentials before admission consumes the reservation.
+    headers = gateway_headers(contract.get("kilo_organization_id"))
     _check_contract_freshness(contract)
     import requests
 
     with admission():
         _check_contract_freshness(contract)
+        headers = gateway_headers(contract.get("kilo_organization_id"))
         if receipt.get("dispatch_entered") is not False:
             raise RuntimeError("Receipt was already dispatched or is not in a reserved state; one reservation funds one dispatch")
         timer = http_deadline(deadline) if http_request_timeout_seconds == 180 else http_deadline(deadline, http_request_timeout_seconds)
         with timer as remaining:
             receipt["dispatch_entered"] = True
             save(receipt_path, receipt)
-            response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers={"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}", "Content-Type": "application/json"}, data=raw, stream=True, timeout=(min(15, remaining), remaining), allow_redirects=False)
+            response = requests.post(GATEWAY_CHAT_COMPLETIONS_URL, headers=headers, data=raw, stream=True, timeout=(min(15, remaining), remaining), allow_redirects=False)
             try:
-                receipt.update(http_status=response.status_code, provider_request_id=response.headers.get("x-request-id"), openrouter_request_id=response.headers.get("x-openrouter-request-id"), provider_generation_id=response.headers.get("x-generation-id"))
+                receipt.update(http_status=response.status_code, gateway_request_id=response.headers.get("x-request-id"))
                 save(receipt_path, receipt)
                 body = bytearray()
                 for chunk in response.iter_content(chunk_size=4096):
@@ -841,7 +869,6 @@ class ChargeEvidence(NamedTuple):
     complete: bool
     actual: Decimal | None
     known_floor: Decimal
-    fee_breach: bool
     billing_mode: str
 
 
@@ -855,38 +882,37 @@ def _charge_money(value):
     return result if result.is_finite() and result >= 0 else None
 
 
-def charge_evidence(usage, fee_fraction):
-    """Typed billing evidence: completeness is separate from known charges.
+def charge_evidence(usage, classifier_allowance=Decimal(0)):
+    """Gateway billing evidence. Fail closed on anything but plain non-BYOK cost.
 
-    Only an affirmative boolean is_byok settles either mode. Missing, null
-    or non-boolean flags are ambiguous: known fee/upstream amounts still
-    floor the retained liability, but nothing settles and the non-BYOK
-    breakdown is never summed into its own total.
+    Complete only when `usage.cost` is a finite nonnegative number and
+    `usage.is_byok` is exactly False. That cost excludes the auto-routing
+    classifier, which the gateway bills as a separate organization usage
+    row, so the settled charge is cost plus the frozen classifier
+    allowance (zero for non-router candidates). BYOK, a missing or
+    non-boolean flag, or a missing cost is unknown: any known cost plus
+    the allowance still floors the retained liability, but nothing settles.
     """
+    allowance = classifier_allowance if isinstance(classifier_allowance, Decimal) else Decimal(str(classifier_allowance))
+    if not allowance.is_finite() or allowance < 0:
+        raise RuntimeError("Classifier allowance must be a finite nonnegative amount")
     if not isinstance(usage, dict):
-        return ChargeEvidence(False, None, Decimal(0), False, "missing-usage")
+        return ChargeEvidence(False, None, allowance, "missing-usage")
     cost = _charge_money(usage.get("cost"))
-    details = usage.get("cost_details") if isinstance(usage.get("cost_details"), dict) else {}
-    upstream = _charge_money(details.get("upstream_inference_cost"))
+    floor = (cost if cost is not None else Decimal(0)) + allowance
     flag = usage.get("is_byok")
-    known = [value for value in (cost, upstream) if value is not None]
-    if flag is True and cost is not None and upstream is not None:
-        known.append(cost + upstream)
-    floor = max(known) if known else Decimal(0)
     if flag is True:
-        if cost is not None and upstream is not None:
-            return ChargeEvidence(True, cost + upstream, floor, cost > fee_fraction * upstream, "byok")
-        return ChargeEvidence(False, None, floor, False, "byok-incomplete")
-    if flag is False:
-        if cost is not None:
-            return ChargeEvidence(True, cost, floor, False, "non-byok")
-        return ChargeEvidence(False, None, floor, False, "non-byok-incomplete")
-    return ChargeEvidence(False, None, floor, False, "ambiguous")
+        return ChargeEvidence(False, None, floor, "byok-not-allowed")
+    if flag is not False:
+        return ChargeEvidence(False, None, floor, "ambiguous")
+    if cost is None:
+        return ChargeEvidence(False, None, floor, "non-byok-incomplete")
+    return ChargeEvidence(True, cost + allowance, floor, "non-byok")
 
 
 def build_payload(candidate, prepared_messages, contract, cfg):
-    """Outbound payload with independently deep-copied approval controls."""
-    return {"model": candidate["model"], "messages": prepared_messages, "max_tokens": cfg["max_output_tokens"], **copy.deepcopy(contract["resolved_variant"]), "usage": {"include": True}, "stream": False, "plugins": copy.deepcopy(contract["plugins"]), "provider": copy.deepcopy(contract["provider"])}
+    """Outbound gateway payload with independently deep-copied variant controls."""
+    return {"model": candidate["model"], "messages": prepared_messages, "max_tokens": cfg["max_output_tokens"], **copy.deepcopy(contract["resolved_variant"]), "stream": False}
 
 
 def _variant_catalog(cfg):
@@ -907,7 +933,7 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
     ledger_out = Path(out if ledger_out is None else ledger_out)
     deadline = deadline if deadline is not None else time.monotonic() + cfg["wall_seconds"]
 
-    class ReservedOpenRouterModel(OpenRouterTextbasedModel):
+    class ReservedGatewayModel(OpenRouterTextbasedModel):
         def query(self, messages, **kwargs):
             require_paid_callbacks(reservation, transport_admission, state_guard, input_bounder)
             diagnostics = {"input_token_bound": None, "native_prompt_tokens": None, "native_completion_tokens": None}
@@ -919,16 +945,12 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
                 save(out / "resource-limits" / run / f"{uuid.uuid4().hex}.json", diagnostics)
                 raise BudgetLimited("BudgetLimited: conservative input token cap", diagnostics)
             quote = text_tariffs.validate_quote(candidate)
-            routing_max_price(candidate)
-            fee_fraction = rate(quote["fee_fraction"])
-            if cfg.get("byok_fee_ceiling_fraction") is not None and rate(cfg["byok_fee_ceiling_fraction"]) != fee_fraction:
-                raise RuntimeError("Configured BYOK fee allowance differs from the quoted fee fraction")
-            amounts = text_tariffs.attempt_reservation(quote, estimated_input_tokens=input_bound)
-            bound, upstream_reservation, fee_reservation = amounts["bound_usd"], amounts["upstream_usd"], amounts["fee_usd"]
             contract_cfg = {**cfg, "variant_catalog": _variant_catalog(cfg)}
             contract = text_tariffs.request_contract(candidate, contract_cfg, quote_fetched_at=candidate.get("quote_fetched_at"), quote_max_age_seconds=cfg.get("quote_max_age_seconds", 7200))
             payload = build_payload(candidate, prepared, contract, cfg)
             request_raw = text_tariffs.validate_final_payload(payload, contract)
+            amounts = text_tariffs.attempt_reservation(quote, estimated_input_tokens=input_bound, request_bytes=len(request_raw))
+            bound = amounts["bound_usd"]
             if time.monotonic() >= deadline:
                 raise TimeoutError("WallTimeLimited before reservation")
             try:
@@ -937,34 +959,40 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
                 error.diagnostics.update(diagnostics)
                 save(out / "resource-limits" / run / f"{uuid.uuid4().hex}.json", error.diagnostics)
                 raise
-            receipt = {"local_request_id": request_id, "run": run, "reservation_usd": str(bound), "upstream_reservation_usd": str(upstream_reservation), "token_reservation_usd": str(upstream_reservation), "byok_fee_ceiling_fraction": str(fee_fraction), "fee_reservation_usd": str(fee_reservation), "reservation_components": {key: str(value) if isinstance(value, Decimal) else value for key, value in amounts.items()}, "input_token_bound": input_bound, "request_sha256": text_tariffs.request_bytes_sha256(request_raw), "request": payload, "router_variant": candidate["effort"], "request_contract": contract, "financial_quote": quote, "status": "reserved", "dispatch_entered": False, "started_at": time.time()}
+            receipt = {"local_request_id": request_id, "run": run, "reservation_usd": str(bound), "solver_reservation_usd": str(amounts["solver_usd"]), "classifier_allowance_usd": str(amounts["classifier_allowance_usd"]), "reservation_components": {key: str(value) if isinstance(value, Decimal) else value for key, value in amounts.items()}, "input_token_bound": input_bound, "request_sha256": text_tariffs.request_bytes_sha256(request_raw), "request": payload, "requested_model": candidate["model"], "routed_model": None, "router_variant": candidate["effort"], "request_contract": contract, "financial_quote": quote, "status": "reserved", "dispatch_entered": False, "started_at": time.time()}
             save(receipt_path, receipt)
             observed_actual = None
             known_floor = Decimal(0)
             token_breach = False
-            fee_breach = False
             try:
                 transport_options = {"contract": contract, "admission": lambda: transport_admission(ledger_out, run, request_id, cfg)}
                 if "http_request_timeout_seconds" in cfg:
                     transport_options["http_request_timeout_seconds"] = request_timeout
                 response, body = completion_http(payload, deadline, receipt, receipt_path, **transport_options)
                 receipt["response"] = body
+                routed_model = body.get("model") if isinstance(body, dict) else None
+                receipt["routed_model"] = routed_model if isinstance(routed_model, str) and routed_model else None
                 usage = body.get("usage", {})
                 prompt_tokens = usage.get("prompt_tokens")
                 completion_tokens = usage.get("completion_tokens")
                 token_breach = any(value is not None and (type(value) is not int or value < 0 or value > upper) for value, upper in [(prompt_tokens, input_bound), (completion_tokens, cfg["max_output_tokens"])])
-                evidence = charge_evidence(usage, fee_fraction)
-                fee_breach, known_floor = evidence.fee_breach, evidence.known_floor
+                evidence = charge_evidence(usage, amounts["classifier_allowance_usd"])
+                known_floor = evidence.known_floor
                 observed_actual = evidence.actual if evidence.complete else None
-                receipt["charge_evidence"] = {"complete": evidence.complete, "actual_usd": str(evidence.actual) if evidence.actual is not None else None, "known_floor_usd": str(evidence.known_floor), "fee_breach": evidence.fee_breach, "billing_mode": evidence.billing_mode}
+                receipt["charge_evidence"] = {"complete": evidence.complete, "actual_usd": str(evidence.actual) if evidence.actual is not None else None, "solver_cost_usd": str(_charge_money(usage.get("cost"))) if _charge_money(usage.get("cost")) is not None else None, "classifier_allowance_usd": str(amounts["classifier_allowance_usd"]), "known_floor_usd": str(evidence.known_floor), "billing_mode": evidence.billing_mode}
                 save(receipt_path, receipt)
+                if candidate["model"].startswith("kilo-auto/") and receipt["routed_model"] is None:
+                    raise RuntimeError("Gateway response lacks the routed concrete model; known charges stay held")
+                pool_models = candidate.get("pool_models")
+                if pool_models is not None and receipt["routed_model"] not in pool_models:
+                    raise RuntimeError("Gateway routed to a model outside the frozen pool; known charges stay held")
                 response.raise_for_status()
                 if not evidence.complete:
-                    raise RuntimeError("Incomplete or ambiguous provider billing evidence; known charges stay held")
+                    raise RuntimeError("Incomplete or ambiguous gateway billing evidence; known charges stay held")
                 actual = evidence.actual
                 counts_valid = type(prompt_tokens) is int and type(completion_tokens) is int and prompt_tokens >= 0 and completion_tokens >= 0
                 token_overrun = counts_valid and (prompt_tokens > input_bound or completion_tokens > cfg["max_output_tokens"])
-                money_valid = not fee_breach and actual.is_finite() and 0 <= actual <= bound
+                money_valid = actual.is_finite() and 0 <= actual <= bound
                 if not money_valid or not counts_valid or token_overrun and overrun_policy != "settle-known-v1":
                     raise RuntimeError("Provider cost/token bound violation")
                 with (state_guard(ledger_out) if state_guard is not None else nullcontext()), sqlite3.connect(ledger_out / "budget.sqlite") as db:
@@ -974,7 +1002,7 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
             except BaseException as error:
                 dispatched = receipt["dispatch_entered"]
                 retained_bound = max(bound, known_floor, observed_actual if observed_actual is not None else Decimal(0))
-                state = "breach" if token_breach or fee_breach or known_floor > bound or observed_actual is not None and observed_actual > bound else "unknown"
+                state = "breach" if token_breach or known_floor > bound or observed_actual is not None and observed_actual > bound else "unknown"
                 if not dispatched:
                     retained_bound, observed_actual, state = Decimal(0), Decimal(0), "settled"
                 with (state_guard(ledger_out) if state_guard is not None else nullcontext()), sqlite3.connect(ledger_out / "budget.sqlite") as db:
@@ -1020,7 +1048,7 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
             message["extra"] = {"actions": actions, "response": body, "cost": float(actual), "timestamp": time.time()}
             return message
 
-    return ReservedOpenRouterModel(model_name=candidate["model"], **agent_settings(cfg)["model"])
+    return ReservedGatewayModel(model_name=candidate["model"], **agent_settings(cfg)["model"])
 
 
 def evidence_manifest(out):
@@ -1028,65 +1056,6 @@ def evidence_manifest(out):
     for directory in ["images", "fixtures", "image-audits", "runtime-preflight"]:
         paths.extend(sorted((out / directory).glob("*.json")))
     return {str(path.relative_to(out)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
-
-
-def solve(out, task_id, candidate_label, repetition, approval_path):
-    panel, _ = check_panel(out)
-    pricing = load(out / "pricing.json")
-    approval = load(approval_path)
-    plan = execution_plan(out)
-    if approval.get("authorized") is not True or approval.get("panel_sha256") != digest(panel) or approval.get("pricing_sha256") != digest(pricing) or approval.get("execution_plan_sha256") != digest(plan):
-        raise RuntimeError("Missing parent clearance for exact frozen panel, run plan and direct pricing")
-    if approval.get("code_sha256") != hashlib.sha256(Path(__file__).read_bytes()).hexdigest():
-        raise RuntimeError("Parent clearance is not bound to this exact driver source")
-    exclusion = candidate_exclusion(out, required=True)
-    if approval.get("exclusion_manifest_sha256") != digest(exclusion):
-        raise RuntimeError("Paid phase approval does not bind the authorized candidate exclusion")
-    active = {candidate["label"] for candidate in active_candidates(out)}
-    if candidate_label not in active:
-        raise RuntimeError("Candidate is prospectively excluded by the user's authorization")
-    if approval.get("evidence_sha256") != digest(evidence_manifest(out)):
-        raise RuntimeError("Parent clearance is not bound to the exact images, fixtures, audits and runtime proof")
-    if time.time() - pricing["fetched_at"] > 86400:
-        raise RuntimeError("Pricing snapshot older than one day; refresh and obtain new parent clearance")
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        raise RuntimeError("No OpenRouter key on host; do not put credentials in containers")
-    initialize_ledger(out / "budget.sqlite")
-    with sqlite3.connect(out / "budget.sqlite") as db:
-        if accounting_enabled(db):
-            authorization_hash = db.execute("SELECT value FROM metadata WHERE key='unknown_accounting_authorization_sha256'").fetchone()[0]
-            if approval.get("accounting_authorization_sha256") != authorization_hash:
-                raise RuntimeError("Paid phase approval does not bind the authorized unknown-hold policy")
-    task = next(row for row in panel["tasks"] if row["instance_id"] == task_id)
-    for row in panel["tasks"]:
-        if not load(out / "fixtures" / f"{row['instance_id']}.json")["eligible"]:
-            raise RuntimeError("All frozen panel fixtures must baseline-fail and gold-pass before inference")
-        audit = load(out / "image-audits" / f"{row['instance_id']}.json")
-        if audit["forbidden_hits"] or audit["image_id"] != load(out / "images" / f"{row['instance_id']}.json")["id"]:
-            raise RuntimeError("All pinned images require a clean host-only leakage audit")
-        runtime = load(out / "runtime-preflight" / f"{row['instance_id']}.json")
-        if not runtime["valid"] or runtime["image_id"] != audit["image_id"]:
-            raise RuntimeError("All sanitized solver snapshots require a working import and public test")
-    if repetition not in range(2 if task["split"] == "discovery" else 1):
-        raise RuntimeError("Repetition outside preregistered protocol")
-    if task["split"] != "discovery" and approval.get(f"release_{task['split']}") is not True:
-        raise RuntimeError("Validation/holdout require explicit staged release after discovery selection freeze")
-    if task["split"] != "discovery":
-        rule_key = "discovery_rule_sha256" if task["split"] == "validation" else "holdout_rule_sha256"
-        rule_hash = approval.get(rule_key, "")
-        if len(rule_hash) != 64 or any(char not in "0123456789abcdef" for char in rule_hash):
-            raise RuntimeError("Phase release requires a previously frozen decision-rule digest")
-        rule_file = out / ("discovery-rule.json" if task["split"] == "validation" else "holdout-rule.json")
-        if digest(load(rule_file)) != rule_hash:
-            raise RuntimeError("Phase decision-rule artifact does not match parent clearance")
-        if load(rule_file).get("exclusion_manifest_sha256") != digest(exclusion):
-            raise RuntimeError("Frozen phase rule does not match the authorized candidate scope")
-    candidate = next(row for row in pricing["models"] if row["label"] == candidate_label)
-    run = f"{task_id}--{candidate_label}--{repetition}"
-    next_row = next_execution_row(out, plan)
-    if next_row is None or (next_row["instance_id"], next_row["candidate"], next_row["repetition"]) != (task_id, candidate_label, repetition):
-        raise RuntimeError("Only the next row of the frozen phase-ordered execution plan may run")
-    return rollout(out, task, candidate, repetition, approval, run)
 
 
 def rollout(out, task, candidate, repetition, approval, run, *, cfg=None, ledger_out=None, metadata_extra=None):
@@ -1185,6 +1154,8 @@ def resource_summary(out, ledger_out, run, cfg, result, *, wall_exhausted=False)
         "native_completion_tokens": native_completion,
         "request_money_bounds_usd": [receipt["reservation_usd"] for receipt in receipts],
         "native_cost_usd": [value.get("cost") for value in usage],
+        "requested_models": [receipt.get("requested_model") or (receipt.get("request") or {}).get("model") for receipt in receipts],
+        "routed_models": [receipt.get("routed_model") for receipt in receipts],
         "missing_native_usage_requests": sum(prompt is None or completion is None for prompt, completion in zip(native_prompt, native_completion)),
         "settled_plus_held_usd": str(sum((held_cost(row) for row in rows), Decimal(0))),
         "settled_plus_held_tokens": sum((row["tokens"] if row["state"] == "settled" else row["token_bound"]) or 0 for row in rows),

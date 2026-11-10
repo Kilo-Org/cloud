@@ -147,13 +147,35 @@ jobs:
       AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
+  # Worker change detection reads only the SHAs check-changes publishes, so this
+  # call runs beside the Vercel staging chain instead of after it: the matrix is
+  # ready when the deploy gate below opens. It deploys nothing by itself.
+  detect-workers:
+    needs: check-changes
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    uses: ./.github/workflows/deploy-workers.yml
+    with:
+      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+
   deploy-workers:
-    needs: [db-gate, check-changes, stage-app, stage-ai-gateway, promote-app, promote-ai-gateway]
+    needs:
+      [
+        db-gate,
+        check-changes,
+        detect-workers,
+        stage-app,
+        stage-ai-gateway,
+        promote-app,
+        promote-ai-gateway,
+      ]
     if: >-
       ${{
         github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
+        needs.detect-workers.result == 'success' &&
         needs.db-gate.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.stage-ai-gateway.result) &&
@@ -162,7 +184,8 @@ jobs:
       }}
     uses: ./.github/workflows/deploy-workers.yml
     with:
-      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      worker_matrix: ${{ needs.detect-workers.outputs.matrix }}
+      deploy_cloud_agent_after_session_ingest: ${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-ingest }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
 

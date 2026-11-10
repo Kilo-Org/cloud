@@ -729,6 +729,10 @@ keep environment snapshots and existing history/worktree recovery.
    `workspace_setup_failed`. Worktree chats inherit their source chat's profile, environment, and
    secrets and share its directory runtime and HOME. Separate worktree directories retain separate
    runtimes; read-only Bitbucket reviews carry no profile secrets, like the withheld MCP snapshot.
+- A wrapper that accepts profile instructions advertises `x-kilo-runtime-instructions: 1` on the
+  WebSocket upgrade. The Sandbox DO retains this capability in the socket attachment across
+  hibernation and omits `runtimeInstructions` from both `session.prepare` and `session.attach` for
+  older wrappers, whose strict schemas reject the field. Stored workspace instructions are unchanged.
 
 - Connect, send `hello` (`wrapperId`, `allocationId`, protocol version), wait for `welcome` or
   `shutdown`. On `shutdown`, permanently close the connection and exit with code 0, even when the

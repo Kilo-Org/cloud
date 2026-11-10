@@ -2577,7 +2577,21 @@
       "thought": "Бодол",
       "showDetails": "Дэлгэрэнгүйг харуулах",
       "pending": "Хүлээгдэж байна…",
-      "running": "Ажиллаж байна…"
+      "running": "Ажиллаж байна…",
+      "field": {
+        "filePath": "Файлын зам",
+        "path": "Зам",
+        "offset": "Эхлэл",
+        "limit": "Хязгаар",
+        "pattern": "Загвар",
+        "include": "Оруулах",
+        "patchText": "Засварын бичвэр",
+        "query": "Асуулга",
+        "prompt": "Заавар",
+        "header": "Гарчиг",
+        "question": "Асуулт",
+        "options": "Сонголтууд"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Агуулгыг харуулж чадсангүй."

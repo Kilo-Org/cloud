@@ -2577,7 +2577,21 @@
       "thought": "Razoamento",
       "showDetails": "Mostrar detalles",
       "pending": "Pendente…",
-      "running": "Executando…"
+      "running": "Executando…",
+      "field": {
+        "filePath": "Ruta do ficheiro",
+        "path": "Ruta",
+        "offset": "Desprazamento",
+        "limit": "Límite",
+        "pattern": "Patrón",
+        "include": "Inclusión",
+        "patchText": "Texto do parche",
+        "query": "Consulta",
+        "prompt": "Instrución",
+        "header": "Encabezamento",
+        "question": "Pregunta",
+        "options": "Opcións"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Non se puido mostrar o contido."

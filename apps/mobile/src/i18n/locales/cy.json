@@ -2761,7 +2761,21 @@
       "thought": "Syniad",
       "showDetails": "Dangos manylion",
       "pending": "Yn aros…",
-      "running": "Yn rhedeg…"
+      "running": "Yn rhedeg…",
+      "field": {
+        "filePath": "Llwybr ffeil",
+        "path": "Llwybr",
+        "offset": "Dadleoliad",
+        "limit": "Terfyn",
+        "pattern": "Patrwm",
+        "include": "Cynnwys",
+        "patchText": "Testun clwt",
+        "query": "Ymholiad",
+        "prompt": "Anogiad",
+        "header": "Pennawd",
+        "question": "Cwestiwn",
+        "options": "Opsiynau"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Methu dangos y cynnwys."

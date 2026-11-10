@@ -2577,7 +2577,21 @@
       "thought": "ความคิด",
       "showDetails": "แสดงรายละเอียด",
       "pending": "รอดำเนินการ…",
-      "running": "กำลังทำงาน…"
+      "running": "กำลังทำงาน…",
+      "field": {
+        "filePath": "เส้นทางไฟล์",
+        "path": "เส้นทาง",
+        "offset": "ตำแหน่งเริ่มต้น",
+        "limit": "จำนวนสูงสุด",
+        "pattern": "รูปแบบ",
+        "include": "ไฟล์ที่รวม",
+        "patchText": "ข้อความแพตช์",
+        "query": "คำค้นหา",
+        "prompt": "พรอมต์",
+        "header": "หัวข้อ",
+        "question": "คำถาม",
+        "options": "ตัวเลือก"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ไม่สามารถแสดงเนื้อหาได้"

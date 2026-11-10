@@ -2577,7 +2577,21 @@
       "thought": "سوچ",
       "showDetails": "تفصیلات دکھائیں",
       "pending": "زیر التواء…",
-      "running": "چل رہا ہے…"
+      "running": "چل رہا ہے…",
+      "field": {
+        "filePath": "فائل کا راستہ",
+        "path": "راستہ",
+        "offset": "آفسیٹ",
+        "limit": "حد",
+        "pattern": "نمونہ",
+        "include": "شمولیت",
+        "patchText": "متنِ پیچ",
+        "query": "استفسار",
+        "prompt": "ہدایت",
+        "header": "سرخی",
+        "question": "سوال",
+        "options": "اختیارات"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "مواد دکھایا نہیں جا سکا۔"

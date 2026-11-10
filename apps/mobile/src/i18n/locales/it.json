@@ -2031,7 +2031,21 @@
       "thought": "Ragionamento",
       "showDetails": "Mostra i dettagli",
       "pending": "In attesa…",
-      "running": "In esecuzione…"
+      "running": "In esecuzione…",
+      "field": {
+        "filePath": "Percorso file",
+        "path": "Percorso",
+        "offset": "Offset",
+        "limit": "Limite",
+        "pattern": "Pattern",
+        "include": "Inclusione",
+        "patchText": "Testo patch",
+        "query": "Ricerca",
+        "prompt": "Prompt",
+        "header": "Intestazione",
+        "question": "Domanda",
+        "options": "Opzioni"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Impossibile visualizzare il contenuto."

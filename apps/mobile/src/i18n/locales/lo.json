@@ -2577,7 +2577,21 @@
       "thought": "ຄວາມຄິດ",
       "showDetails": "ສະແດງລາຍລະອຽດ",
       "pending": "ລໍຖ້າ…",
-      "running": "ກຳລັງເຮັດວຽກ…"
+      "running": "ກຳລັງເຮັດວຽກ…",
+      "field": {
+        "filePath": "ເສັ້ນທາງໄຟລ໌",
+        "path": "ເສັ້ນທາງ",
+        "offset": "ຕຳແໜ່ງ",
+        "limit": "ຂີດຈຳກັດ",
+        "pattern": "ຮູບແບບ",
+        "include": "ລວມ",
+        "patchText": "ຂໍ້ຄວາມແພັດ",
+        "query": "ຄຳຄົ້ນຫາ",
+        "prompt": "ຂໍ້ຄວາມສັ່ງ",
+        "header": "ຫົວຂໍ້",
+        "question": "ຄຳຖາມ",
+        "options": "ຕົວເລືອກ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ບໍ່ສາມາດສະແດງເນື້ອໃນໄດ້."

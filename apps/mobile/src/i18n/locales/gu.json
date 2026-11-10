@@ -2583,7 +2583,21 @@
       "thought": "વિચાર",
       "showDetails": "વિગતો બતાવો",
       "pending": "બાકી છે…",
-      "running": "ચાલી રહ્યું છે…"
+      "running": "ચાલી રહ્યું છે…",
+      "field": {
+        "filePath": "ફાઇલ પાથ",
+        "path": "પાથ",
+        "offset": "ઑફસેટ",
+        "limit": "મર્યાદા",
+        "pattern": "પેટર્ન",
+        "include": "સમાવેશ",
+        "patchText": "પેચ લખાણ",
+        "query": "ક્વેરી",
+        "prompt": "સૂચના",
+        "header": "શીર્ષક",
+        "question": "પ્રશ્ન",
+        "options": "વિકલ્પો"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "સામગ્રી બતાવી શકાઈ નહીં."

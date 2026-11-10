@@ -2064,7 +2064,21 @@
       "thought": "Razonamiento",
       "showDetails": "Mostrar detalles",
       "pending": "Pendiente…",
-      "running": "En ejecución…"
+      "running": "En ejecución…",
+      "field": {
+        "filePath": "Ruta de archivo",
+        "path": "Ruta",
+        "offset": "Desplazamiento",
+        "limit": "Límite",
+        "pattern": "Patrón",
+        "include": "Incluir",
+        "patchText": "Texto del parche",
+        "query": "Consulta",
+        "prompt": "Indicación",
+        "header": "Encabezado",
+        "question": "Pregunta",
+        "options": "Opciones"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "No se pudo mostrar el contenido."

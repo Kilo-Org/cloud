@@ -2577,7 +2577,21 @@
       "thought": "Te whakaaro",
       "showDetails": "Whakaaturia ngā taipitopito",
       "pending": "E tatari ana…",
-      "running": "Kei te haere…"
+      "running": "Kei te haere…",
+      "field": {
+        "filePath": "Ara kōnae",
+        "path": "Ara",
+        "offset": "Nekehanga",
+        "limit": "Tepe",
+        "pattern": "Tauira",
+        "include": "Whakauru",
+        "patchText": "Kuputuhi whakatikatanga",
+        "query": "Rapunga",
+        "prompt": "Tohutohu",
+        "header": "Upoko",
+        "question": "Pātai",
+        "options": "Kōwhiringa"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Kāore i taea te whakaatu i ngā ihirangi."

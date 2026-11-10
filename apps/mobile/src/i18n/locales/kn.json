@@ -2583,7 +2583,21 @@
       "thought": "ಯೋಚನೆ",
       "showDetails": "ವಿವರಗಳನ್ನು ತೋರಿಸಿ",
       "pending": "ಕಾಯುತ್ತಿದೆ…",
-      "running": "ಚಾಲನೆಯಲ್ಲಿದೆ…"
+      "running": "ಚಾಲನೆಯಲ್ಲಿದೆ…",
+      "field": {
+        "filePath": "ಕಡತದ ಮಾರ್ಗ",
+        "path": "ಮಾರ್ಗ",
+        "offset": "ಆರಂಭ ಸ್ಥಾನ",
+        "limit": "ಮಿತಿ",
+        "pattern": "ಮಾದರಿ",
+        "include": "ಸೇರ್ಪಡೆ",
+        "patchText": "ತಿದ್ದುಪಡಿ ಪಠ್ಯ",
+        "query": "ವಿಚಾರಣೆ",
+        "prompt": "ಸೂಚನೆ",
+        "header": "ಶೀರ್ಷಿಕೆ",
+        "question": "ಪ್ರಶ್ನೆ",
+        "options": "ಆಯ್ಕೆಗಳು"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ವಿಷಯವನ್ನು ಪ್ರದರ್ಶಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."

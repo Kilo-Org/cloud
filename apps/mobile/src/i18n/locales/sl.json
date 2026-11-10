@@ -2669,7 +2669,21 @@
       "thought": "Misel",
       "showDetails": "Prikaži podrobnosti",
       "pending": "Čakanje…",
-      "running": "Izvajanje…"
+      "running": "Izvajanje…",
+      "field": {
+        "filePath": "Pot datoteke",
+        "path": "Pot",
+        "offset": "Odmik",
+        "limit": "Omejitev",
+        "pattern": "Vzorec",
+        "include": "Vključitev",
+        "patchText": "Besedilo popravka",
+        "query": "Poizvedba",
+        "prompt": "Navodilo",
+        "header": "Naslov",
+        "question": "Vprašanje",
+        "options": "Možnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Vsebine ni bilo mogoče prikazati."

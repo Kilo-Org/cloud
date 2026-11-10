@@ -2583,7 +2583,21 @@
       "thought": "සිතුවිල්ල",
       "showDetails": "විස්තර පෙන්වන්න",
       "pending": "පොරොත්තුවේ…",
-      "running": "ධාවනය වෙමින්…"
+      "running": "ධාවනය වෙමින්…",
+      "field": {
+        "filePath": "ගොනු මාර්ගය",
+        "path": "මාර්ගය",
+        "offset": "ආරම්භක ස්ථානය",
+        "limit": "සීමාව",
+        "pattern": "රටාව",
+        "include": "ඇතුළත් කිරීම",
+        "patchText": "සංශෝධන පෙළ",
+        "query": "විමසුම",
+        "prompt": "උපදෙස",
+        "header": "ශීර්ෂය",
+        "question": "ප්‍රශ්නය",
+        "options": "විකල්ප"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "අන්තර්ගතය පෙන්විය නොහැකි විය."

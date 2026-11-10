@@ -2577,7 +2577,21 @@
       "thought": "Gondolat",
       "showDetails": "Részletek megjelenítése",
       "pending": "Függőben…",
-      "running": "Folyamatban…"
+      "running": "Folyamatban…",
+      "field": {
+        "filePath": "Fájlútvonal",
+        "path": "Útvonal",
+        "offset": "Eltolás",
+        "limit": "Korlát",
+        "pattern": "Minta",
+        "include": "Belefoglalás",
+        "patchText": "Javítás szövege",
+        "query": "Keresés",
+        "prompt": "Utasítás",
+        "header": "Címsor",
+        "question": "Kérdés",
+        "options": "Lehetőségek"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nem sikerült megjeleníteni a tartalmat."

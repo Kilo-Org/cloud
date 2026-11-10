@@ -2089,7 +2089,21 @@
       "thought": "Рассуждения",
       "showDetails": "Показать сведения",
       "pending": "Ожидание…",
-      "running": "Выполняется…"
+      "running": "Выполняется…",
+      "field": {
+        "filePath": "Путь файла",
+        "path": "Путь",
+        "offset": "Смещение",
+        "limit": "Ограничение",
+        "pattern": "Шаблон",
+        "include": "Фильтр",
+        "patchText": "Текст патча",
+        "query": "Запрос",
+        "prompt": "Инструкция",
+        "header": "Заголовок",
+        "question": "Вопрос",
+        "options": "Варианты"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не удалось отобразить содержимое."

@@ -2583,7 +2583,21 @@
       "thought": "ሐሳብ",
       "showDetails": "ዝርዝሮችን ያሳዩ",
       "pending": "በመጠበቅ ላይ…",
-      "running": "በሥራ ላይ…"
+      "running": "በሥራ ላይ…",
+      "field": {
+        "filePath": "የፋይል መንገድ",
+        "path": "መንገድ",
+        "offset": "መነሻ",
+        "limit": "ገደብ",
+        "pattern": "ንድፍ",
+        "include": "ማካተቻ",
+        "patchText": "የማስተካከያ ጽሑፍ",
+        "query": "የፍለጋ ጥያቄ",
+        "prompt": "መመሪያ",
+        "header": "አርዕስት",
+        "question": "ጥያቄ",
+        "options": "አማራጮች"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ይዘቱን ማሳየት አልተሳካም።"

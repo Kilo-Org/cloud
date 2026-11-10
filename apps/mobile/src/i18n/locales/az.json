@@ -2577,7 +2577,21 @@
       "thought": "Düşüncə",
       "showDetails": "Təfərrüatları göstər",
       "pending": "Gözlənilir…",
-      "running": "İşləyir…"
+      "running": "İşləyir…",
+      "field": {
+        "filePath": "Fayl yolu",
+        "path": "Yol",
+        "offset": "Başlanğıc",
+        "limit": "Məhdudiyyət",
+        "pattern": "Nümunə",
+        "include": "Daxiletmə",
+        "patchText": "Yamaq mətni",
+        "query": "Sorğu",
+        "prompt": "Təlimat",
+        "header": "Başlıq",
+        "question": "Sual",
+        "options": "Seçimlər"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Məzmunu göstərmək mümkün olmadı."

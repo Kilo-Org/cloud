@@ -2623,7 +2623,21 @@
       "thought": "Domas",
       "showDetails": "Rādīt detalizētu informāciju",
       "pending": "Gaida…",
-      "running": "Darbojas…"
+      "running": "Darbojas…",
+      "field": {
+        "filePath": "Faila ceļš",
+        "path": "Ceļš",
+        "offset": "Nobīde",
+        "limit": "Ierobežojums",
+        "pattern": "Raksts",
+        "include": "Iekļaušana",
+        "patchText": "Ielāpa teksts",
+        "query": "Vaicājums",
+        "prompt": "Uzvedne",
+        "header": "Virsraksts",
+        "question": "Jautājums",
+        "options": "Iespējas"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Neizdevās attēlot saturu."

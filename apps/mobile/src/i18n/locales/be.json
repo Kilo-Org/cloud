@@ -2669,7 +2669,21 @@
       "thought": "Развагі",
       "showDetails": "Паказаць падрабязнасці",
       "pending": "У чаканні…",
-      "running": "Выконваецца…"
+      "running": "Выконваецца…",
+      "field": {
+        "filePath": "Шлях файла",
+        "path": "Шлях",
+        "offset": "Зрух",
+        "limit": "Абмежаванне",
+        "pattern": "Узор",
+        "include": "Уключэнне",
+        "patchText": "Тэкст латкі",
+        "query": "Запыт",
+        "prompt": "Інструкцыя",
+        "header": "Загаловак",
+        "question": "Пытанне",
+        "options": "Варыянты"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не ўдалося адлюстраваць змесціва."

@@ -2039,7 +2039,21 @@
       "thought": "思考",
       "showDetails": "詳細を表示",
       "pending": "待機中…",
-      "running": "実行中…"
+      "running": "実行中…",
+      "field": {
+        "filePath": "ファイルパス",
+        "path": "パス",
+        "offset": "オフセット",
+        "limit": "上限",
+        "pattern": "パターン",
+        "include": "対象ファイル",
+        "patchText": "パッチ本文",
+        "query": "クエリ",
+        "prompt": "プロンプト",
+        "header": "見出し",
+        "question": "質問",
+        "options": "選択肢"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "コンテンツを表示できませんでした。"

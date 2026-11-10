@@ -2039,7 +2039,21 @@
       "thought": "Gedachtegang",
       "showDetails": "Details tonen",
       "pending": "In afwachting…",
-      "running": "Bezig…"
+      "running": "Bezig…",
+      "field": {
+        "filePath": "Bestandspad",
+        "path": "Pad",
+        "offset": "Startregel",
+        "limit": "Limiet",
+        "pattern": "Patroon",
+        "include": "Bestandsfilter",
+        "patchText": "Wijzigingstekst",
+        "query": "Zoekopdracht",
+        "prompt": "Instructie",
+        "header": "Kop",
+        "question": "Vraag",
+        "options": "Opties"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "De inhoud kon niet worden weergegeven."

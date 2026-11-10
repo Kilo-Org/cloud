@@ -2577,7 +2577,21 @@
       "thought": "Σκέψη",
       "showDetails": "Εμφάνιση λεπτομερειών",
       "pending": "Σε αναμονή…",
-      "running": "Σε εξέλιξη…"
+      "running": "Σε εξέλιξη…",
+      "field": {
+        "filePath": "Διαδρομή αρχείου",
+        "path": "Διαδρομή",
+        "offset": "Μετατόπιση",
+        "limit": "Όριο",
+        "pattern": "Μοτίβο",
+        "include": "Συμπερίληψη",
+        "patchText": "Κείμενο επιδιόρθωσης",
+        "query": "Ερώτημα",
+        "prompt": "Προτροπή",
+        "header": "Επικεφαλίδα",
+        "question": "Ερώτηση",
+        "options": "Επιλογές"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Δεν ήταν δυνατή η εμφάνιση του περιεχομένου."

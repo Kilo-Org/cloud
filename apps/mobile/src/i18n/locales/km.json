@@ -2577,7 +2577,21 @@
       "thought": "ការគិត",
       "showDetails": "បង្ហាញព័ត៌មានលម្អិត",
       "pending": "កំពុងរង់ចាំ…",
-      "running": "កំពុងដំណើរការ…"
+      "running": "កំពុងដំណើរការ…",
+      "field": {
+        "filePath": "ផ្លូវឯកសារ",
+        "path": "ផ្លូវ",
+        "offset": "គម្លាត",
+        "limit": "ដែនកំណត់",
+        "pattern": "លំនាំ",
+        "include": "រួមបញ្ចូល",
+        "patchText": "អត្ថបទបំណះ",
+        "query": "ពាក្យស្វែងរក",
+        "prompt": "សេចក្តីណែនាំ",
+        "header": "ចំណងជើង",
+        "question": "សំណួរ",
+        "options": "ជម្រើស"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "មិនអាចបង្ហាញមាតិកាបានទេ។"

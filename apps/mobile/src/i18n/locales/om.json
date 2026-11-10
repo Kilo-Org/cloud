@@ -2577,7 +2577,21 @@
       "thought": "Yaada",
       "showDetails": "Ibsa agarsiisi",
       "pending": "Eegachaa jira…",
-      "running": "Hojjechaa jira…"
+      "running": "Hojjechaa jira…",
+      "field": {
+        "filePath": "Daandii faayilii",
+        "path": "Daandii",
+        "offset": "Lakkoofsa jalqabaa",
+        "limit": "Daangaa",
+        "pattern": "Fakkaataa",
+        "include": "Dabalata",
+        "patchText": "Barreeffama sirreeffamaa",
+        "query": "Gaaffii barbaacha",
+        "prompt": "Qajeelfama",
+        "header": "Mataduree",
+        "question": "Gaaffii",
+        "options": "Filannoo"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Qabiyyee agarsiisuu hin danda'amne."

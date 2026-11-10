@@ -2715,7 +2715,21 @@
       "thought": "Machnamh",
       "showDetails": "Taispeáin sonraí",
       "pending": "Ar feitheamh…",
-      "running": "Ar siúl…"
+      "running": "Ar siúl…",
+      "field": {
+        "filePath": "Conair comhaid",
+        "path": "Conair",
+        "offset": "Fritháireamh",
+        "limit": "Teorainn",
+        "pattern": "Patrún",
+        "include": "Cuimsiú",
+        "patchText": "Téacs paiste",
+        "query": "Fiosrú",
+        "prompt": "Leid",
+        "header": "Ceannteideal",
+        "question": "Ceist",
+        "options": "Roghanna"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Níorbh fhéidir an t-ábhar a thaispeáint."

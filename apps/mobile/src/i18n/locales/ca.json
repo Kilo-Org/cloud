@@ -2623,7 +2623,21 @@
       "thought": "Raonament",
       "showDetails": "Mostra els detalls",
       "pending": "Pendent…",
-      "running": "En execució…"
+      "running": "En execució…",
+      "field": {
+        "filePath": "Camí del fitxer",
+        "path": "Camí",
+        "offset": "Desplaçament",
+        "limit": "Límit",
+        "pattern": "Patró",
+        "include": "Inclusió",
+        "patchText": "Text del pedaç",
+        "query": "Consulta",
+        "prompt": "Indicació",
+        "header": "Encapçalament",
+        "question": "Pregunta",
+        "options": "Opcions"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "No s'ha pogut mostrar el contingut."

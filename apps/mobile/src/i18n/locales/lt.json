@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} nepridėtas, nes prisijungei prie kitos paskyros.",
     "failedAccountAlreadyLinked": "{{provider}} nepridėtas, nes jau susietas su kita paskyra.",
     "failedProviderAlreadyLinked": "{{provider}} nepridėtas, nes tavo paskyra jau turi kitą {{provider}} prisijungimą.",
-    "failedLinking": "Nepavyko pridėti {{provider}} prie tavo paskyros."
+    "failedLinking": "Nepavyko pridėti {{provider}} prie tavo paskyros.",
+    "notAdded": "Esi prisijungęs. {{provider}} nepridėtas prie tavo paskyros."
   },
   "profile": {
     "codeReviewerSubtitle": "Automatinės PR peržiūros",

@@ -241,7 +241,8 @@
     "failedWrongAccount": "다른 계정으로 로그인하여 {{provider}}을(를) 추가하지 못했습니다.",
     "failedAccountAlreadyLinked": "{{provider}}이(가) 이미 다른 계정에 연결되어 있어 추가하지 못했습니다.",
     "failedProviderAlreadyLinked": "계정에 이미 다른 {{provider}} 로그인이 있어 {{provider}}을(를) 추가하지 못했습니다.",
-    "failedLinking": "{{provider}}을(를) 계정에 추가할 수 없습니다."
+    "failedLinking": "{{provider}}을(를) 계정에 추가할 수 없습니다.",
+    "notAdded": "로그인되었습니다. {{provider}}이(가) 계정에 추가되지 않았습니다."
   },
   "profile": {
     "codeReviewerSubtitle": "자동 PR 리뷰",

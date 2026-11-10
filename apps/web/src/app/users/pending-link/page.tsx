@@ -11,7 +11,7 @@ export default async function PendingLinkPage({
   return (
     <AuthPageLayout>
       <div className="mt-4 flex flex-col items-center">
-        <PendingLinkForm initialError={params['error']} />
+        <PendingLinkForm initialError={params['error']} confirm={params['confirm'] === '1'} />
       </div>
     </AuthPageLayout>
   );

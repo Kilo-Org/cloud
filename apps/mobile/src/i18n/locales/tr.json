@@ -241,7 +241,8 @@
     "failedWrongAccount": "Farklı bir hesapta oturum açtığın için {{provider}} eklenmedi.",
     "failedAccountAlreadyLinked": "{{provider}} zaten başka bir hesaba bağlı olduğu için eklenmedi.",
     "failedProviderAlreadyLinked": "Hesabında zaten farklı bir {{provider}} oturum açma yöntemi olduğu için {{provider}} eklenmedi.",
-    "failedLinking": "{{provider}} hesabına eklenemedi."
+    "failedLinking": "{{provider}} hesabına eklenemedi.",
+    "notAdded": "Oturum açtın. {{provider}} hesabına eklenmedi."
   },
   "profile": {
     "codeReviewerSubtitle": "Otomatik PR incelemeleri",

@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} is niet toegevoegd omdat je bij een ander account bent aangemeld.",
     "failedAccountAlreadyLinked": "{{provider}} is niet toegevoegd omdat het al aan een ander account is gekoppeld.",
     "failedProviderAlreadyLinked": "{{provider}} is niet toegevoegd omdat je account al een andere {{provider}}-aanmelding heeft.",
-    "failedLinking": "{{provider}} kon niet aan je account worden toegevoegd."
+    "failedLinking": "{{provider}} kon niet aan je account worden toegevoegd.",
+    "notAdded": "Je bent aangemeld. {{provider}} is niet aan je account toegevoegd."
   },
   "profile": {
     "codeReviewerSubtitle": "Automatische PR-beoordelingen",

@@ -308,7 +308,8 @@
     "failedWrongAccount": "{{provider}} wasn't added because you signed in to a different account.",
     "failedAccountAlreadyLinked": "{{provider}} wasn't added because it's already linked to another account.",
     "failedProviderAlreadyLinked": "{{provider}} wasn't added because your account already has a different {{provider}} sign-in.",
-    "failedLinking": "{{provider}} couldn't be added to your account."
+    "failedLinking": "{{provider}} couldn't be added to your account.",
+    "notAdded": "You're signed in. {{provider}} wasn't added to your account."
   },
   "profile": {
     "codeReviewerSubtitle": "Automatic PR reviews",

@@ -241,7 +241,8 @@
     "failedWrongAccount": "Tsy nampiana {{provider}} satria niditra tamin'ny kaonty hafa ianao.",
     "failedAccountAlreadyLinked": "Tsy nampiana {{provider}} satria efa mifandray amin'ny kaonty hafa izy.",
     "failedProviderAlreadyLinked": "Tsy nampiana {{provider}} satria efa manana fidirana {{provider}} hafa ny kaontinao.",
-    "failedLinking": "Tsy afaka nampiana tao amin'ny kaontinao {{provider}}."
+    "failedLinking": "Tsy afaka nampiana tao amin'ny kaontinao {{provider}}.",
+    "notAdded": "Tafiditra ianao. Tsy nampiana tao amin'ny kaontinao {{provider}}."
   },
   "profile": {
     "codeReviewerSubtitle": "Fandinihana PR mandeha ho azy",

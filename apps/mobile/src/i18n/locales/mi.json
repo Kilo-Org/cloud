@@ -241,7 +241,8 @@
     "failedWrongAccount": "Kāore i tāpirihia a {{provider}} nā te mea i takiuru koe ki tētahi pūkete kē.",
     "failedAccountAlreadyLinked": "Kāore i tāpirihia a {{provider}} nā te mea kua honoa kētia ki tētahi atu pūkete.",
     "failedProviderAlreadyLinked": "Kāore i tāpirihia a {{provider}} nā te mea he takiuru {{provider}} kē tō tō pūkete.",
-    "failedLinking": "Kāore i taea a {{provider}} te tāpiri ki tō pūkete."
+    "failedLinking": "Kāore i taea a {{provider}} te tāpiri ki tō pūkete.",
+    "notAdded": "Kua takiuru koe. Kāore i tāpirihia a {{provider}} ki tō pūkete."
   },
   "profile": {
     "codeReviewerSubtitle": "Ngā arotake PR aunoa",

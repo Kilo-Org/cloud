@@ -71,7 +71,7 @@ Every template must include this branding footer below the content table:
 | `magicLink.html` | `magic_link_url`, `email`, `expires_in`, `year` | `14` |
 | `signInCode.html` | `code`, `email`, `expires_in`, `year` | — |
 | `accountLinkCode.html` | `code`, `provider_name`, `email`, `expires_in`, `year` | — |
-| `newSignInMethod.html` | `provider_name`, `connected_accounts_url`, `email`, `year` | — |
+| `newSignInMethod.html` | `provider_name`, `linked_identity`, `connected_accounts_url`, `email`, `year` | — |
 | `balanceAlert.html` | `minimum_balance`, `organization_url`, `year` | `16` |
 | `autoTopUpFailed.html` | `reason`, `credits_url`, `year` | `17` |
 | `codeReviewDisabled.html` | `reason`, `recovery_url`, `recovery_label`, `support_email` (populated by `renderTemplate`), `year` | — |

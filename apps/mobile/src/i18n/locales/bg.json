@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} не беше добавен, защото влезе в друг акаунт.",
     "failedAccountAlreadyLinked": "{{provider}} не беше добавен, защото вече е свързан с друг акаунт.",
     "failedProviderAlreadyLinked": "{{provider}} не беше добавен, защото акаунтът ти вече има друго влизане с {{provider}}.",
-    "failedLinking": "{{provider}} не можа да бъде добавен към акаунта ти."
+    "failedLinking": "{{provider}} не можа да бъде добавен към акаунта ти.",
+    "notAdded": "Влязъл си. {{provider}} не беше добавен към акаунта ти."
   },
   "profile": {
     "codeReviewerSubtitle": "Автоматични прегледи на PR",

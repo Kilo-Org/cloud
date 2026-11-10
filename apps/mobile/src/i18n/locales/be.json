@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} не дададзены, бо вы ўвайшлі ў іншы ўліковы запіс.",
     "failedAccountAlreadyLinked": "{{provider}} не дададзены, бо ён ужо звязаны з іншым уліковым запісам.",
     "failedProviderAlreadyLinked": "{{provider}} не дададзены, бо ў вашым уліковым запісе ўжо ёсць іншы ўваход праз {{provider}}.",
-    "failedLinking": "Не ўдалося дадаць {{provider}} да вашага ўліковага запісу."
+    "failedLinking": "Не ўдалося дадаць {{provider}} да вашага ўліковага запісу.",
+    "notAdded": "Вы ўвайшлі. {{provider}} не дададзены да вашага ўліковага запісу."
   },
   "profile": {
     "codeReviewerSubtitle": "Аўтаматычныя праверкі PR",

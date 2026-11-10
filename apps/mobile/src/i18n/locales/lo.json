@@ -241,7 +241,8 @@
     "failedWrongAccount": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະທ່ານເຂົ້າສູ່ລະບົບບັນຊີອື່ນ.",
     "failedAccountAlreadyLinked": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະມັນເຊື່ອມຕໍ່ກັບບັນຊີອື່ນຢູ່ແລ້ວ.",
     "failedProviderAlreadyLinked": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະບັນຊີຂອງທ່ານມີການເຂົ້າສູ່ລະບົບ {{provider}} ອື່ນຢູ່ແລ້ວ.",
-    "failedLinking": "ບໍ່ສາມາດເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານໄດ້."
+    "failedLinking": "ບໍ່ສາມາດເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານໄດ້.",
+    "notAdded": "ທ່ານເຂົ້າສູ່ລະບົບແລ້ວ. ບໍ່ໄດ້ເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານ."
   },
   "profile": {
     "codeReviewerSubtitle": "ການກວດສອບ PR ອັດຕະໂນມັດ",

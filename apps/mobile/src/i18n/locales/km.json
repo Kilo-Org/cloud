@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះអ្នកបានចូលគណនីផ្សេង។",
     "failedAccountAlreadyLinked": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះវាបានភ្ជាប់ទៅគណនីផ្សេងរួចហើយ។",
     "failedProviderAlreadyLinked": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះគណនីរបស់អ្នកមានការចូល {{provider}} ផ្សេងរួចហើយ។",
-    "failedLinking": "មិនអាចបន្ថែម {{provider}} ទៅគណនីរបស់អ្នកបានទេ។"
+    "failedLinking": "មិនអាចបន្ថែម {{provider}} ទៅគណនីរបស់អ្នកបានទេ។",
+    "notAdded": "អ្នកបានចូលហើយ។ {{provider}} មិនត្រូវបានបន្ថែមទៅគណនីរបស់អ្នកទេ។"
   },
   "profile": {
     "codeReviewerSubtitle": "ការពិនិត្យ PR ដោយស្វ័យប្រវត្តិ",

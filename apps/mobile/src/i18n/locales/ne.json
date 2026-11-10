@@ -241,7 +241,8 @@
     "failedWrongAccount": "तपाईंले अर्कै खातामा साइन इन गर्नुभएकाले {{provider}} थपिएन।",
     "failedAccountAlreadyLinked": "{{provider}} पहिले नै अर्को खातासँग जोडिएकाले थपिएन।",
     "failedProviderAlreadyLinked": "तपाईंको खातामा पहिले नै फरक {{provider}} साइन इन भएकाले {{provider}} थपिएन।",
-    "failedLinking": "{{provider}} तपाईंको खातामा थप्न सकिएन।"
+    "failedLinking": "{{provider}} तपाईंको खातामा थप्न सकिएन।",
+    "notAdded": "तपाईं साइन इन हुनुभएको छ। {{provider}} तपाईंको खातामा थपिएन।"
   },
   "profile": {
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाहरू",

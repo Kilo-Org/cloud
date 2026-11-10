@@ -241,7 +241,8 @@
     "failedWrongAccount": "Etinyeghị {{provider}} n'ihi na ị banyere n'akaụntụ ọzọ.",
     "failedAccountAlreadyLinked": "Etinyeghị {{provider}} n'ihi na ejikọọla ya na akaụntụ ọzọ.",
     "failedProviderAlreadyLinked": "Etinyeghị {{provider}} n'ihi na akaụntụ gị nwereworị nbanye {{provider}} ọzọ.",
-    "failedLinking": "Enweghị ike itinye {{provider}} na akaụntụ gị."
+    "failedLinking": "Enweghị ike itinye {{provider}} na akaụntụ gị.",
+    "notAdded": "Ị banyela. Etinyeghị {{provider}} na akaụntụ gị."
   },
   "profile": {
     "codeReviewerSubtitle": "Nyocha PR akpaghị aka",

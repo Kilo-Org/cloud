@@ -241,7 +241,8 @@
     "failedWrongAccount": "Başqa hesaba daxil olduğun üçün {{provider}} əlavə edilmədi.",
     "failedAccountAlreadyLinked": "{{provider}} artıq başqa hesaba bağlı olduğu üçün əlavə edilmədi.",
     "failedProviderAlreadyLinked": "Hesabında artıq başqa {{provider}} girişi olduğu üçün {{provider}} əlavə edilmədi.",
-    "failedLinking": "{{provider}} hesabına əlavə edilə bilmədi."
+    "failedLinking": "{{provider}} hesabına əlavə edilə bilmədi.",
+    "notAdded": "Daxil olmusan. {{provider}} hesabına əlavə edilmədi."
   },
   "profile": {
     "codeReviewerSubtitle": "Avtomatik PR yoxlamaları",

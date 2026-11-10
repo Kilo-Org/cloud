@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}}-ն չավելացվեց, քանի որ մուտք ես գործել այլ հաշիվ։",
     "failedAccountAlreadyLinked": "{{provider}}-ն չավելացվեց, քանի որ այն արդեն կապված է այլ հաշվի։",
     "failedProviderAlreadyLinked": "{{provider}}-ն չավելացվեց, քանի որ քո հաշիվն արդեն ունի այլ {{provider}} մուտք։",
-    "failedLinking": "Չհաջողվեց {{provider}}-ն ավելացնել քո հաշվին։"
+    "failedLinking": "Չհաջողվեց {{provider}}-ն ավելացնել քո հաշվին։",
+    "notAdded": "Դու մուտք ես գործել։ {{provider}}-ն չավելացվեց քո հաշվին։"
   },
   "profile": {
     "codeReviewerSubtitle": "PR-ների ավտոմատ ստուգումներ",

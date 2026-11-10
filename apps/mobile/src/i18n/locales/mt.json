@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} ma żdiedx għax dħalt f'kont differenti.",
     "failedAccountAlreadyLinked": "{{provider}} ma żdiedx għax diġà marbut ma' kont ieħor.",
     "failedProviderAlreadyLinked": "{{provider}} ma żdiedx għax il-kont tiegħek diġà għandu dħul ieħor b'{{provider}}.",
-    "failedLinking": "{{provider}} ma setax jiżdied mal-kont tiegħek."
+    "failedLinking": "{{provider}} ma setax jiżdied mal-kont tiegħek.",
+    "notAdded": "Dħalt. {{provider}} ma żdiedx mal-kont tiegħek."
   },
   "profile": {
     "codeReviewerSubtitle": "Reviżjonijiet awtomatiċi tal-PR",

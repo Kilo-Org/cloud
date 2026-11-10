@@ -241,7 +241,8 @@
     "failedWrongAccount": "Herrega biraatti waan seenteef {{provider}} hin dabalamne.",
     "failedAccountAlreadyLinked": "{{provider}} duraanuu herrega biraa waliin waan walqabateef hin dabalamne.",
     "failedProviderAlreadyLinked": "Herregni kee duraanuu seensa {{provider}} biraa waan qabuuf {{provider}} hin dabalamne.",
-    "failedLinking": "{{provider}} herrega keetti dabaluun hin danda'amne."
+    "failedLinking": "{{provider}} herrega keetti dabaluun hin danda'amne.",
+    "notAdded": "Seentee jirta. {{provider}} herrega keetti hin dabalamne."
   },
   "profile": {
     "codeReviewerSubtitle": "Sakatta'iinsa PR ofumaan raawwatamu",

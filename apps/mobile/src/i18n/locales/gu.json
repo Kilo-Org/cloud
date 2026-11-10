@@ -241,7 +241,8 @@
     "failedWrongAccount": "તમે બીજા એકાઉન્ટમાં સાઇન ઇન કર્યું હોવાથી {{provider}} ઉમેરાયું નથી.",
     "failedAccountAlreadyLinked": "{{provider}} પહેલેથી બીજા એકાઉન્ટ સાથે લિંક થયેલું હોવાથી ઉમેરાયું નથી.",
     "failedProviderAlreadyLinked": "તમારા એકાઉન્ટમાં પહેલેથી અલગ {{provider}} સાઇન ઇન હોવાથી {{provider}} ઉમેરાયું નથી.",
-    "failedLinking": "{{provider}} તમારા એકાઉન્ટમાં ઉમેરી શકાયું નથી."
+    "failedLinking": "{{provider}} તમારા એકાઉન્ટમાં ઉમેરી શકાયું નથી.",
+    "notAdded": "તમે સાઇન ઇન કરેલું છે. {{provider}} તમારા એકાઉન્ટમાં ઉમેરાયું નથી."
   },
   "profile": {
     "codeReviewerSubtitle": "સ્વચાલિત PR સમીક્ષાઓ",

@@ -90,23 +90,39 @@ export function resolvePendingLinkView(params: {
 }
 
 /**
- * Tells the person, without blocking, what happened to the pending link a completed sign-in
- * carried. The sign-in stands either way. A failed result names no provider, so the offer the
- * request carried supplies it.
+ * What a completed link-bearing sign-in did with the link it carried. A sign-in that carried the
+ * link but reported no result did not add the provider: the approver declined it on the approval
+ * page. A failed result names no provider, so the offer the request carried supplies it.
  */
-export function announcePendingLinkResult(
-  result: PendingLinkResult | undefined,
+export type PendingLinkOutcome = PendingLinkResult | { status: 'not-added' };
+
+/** The outcome of a sign-in that carried a link, from the result the server sent back. */
+export function pendingLinkOutcome(result: PendingLinkResult | undefined): PendingLinkOutcome {
+  return result ?? { status: 'not-added' };
+}
+
+/**
+ * Tells the person, without blocking, what happened to the pending link a completed sign-in
+ * carried. The sign-in stands either way.
+ */
+export function announcePendingLinkOutcome(
+  outcome: PendingLinkOutcome | undefined,
   offer: PendingLinkOffer | null
 ): void {
-  if (result?.status === 'linked') {
+  if (outcome?.status === 'linked') {
     announcingToast.success(
-      i18n.t('pendingLink.linked', { provider: providerLabel(result.provider) })
+      i18n.t('pendingLink.linked', { provider: providerLabel(outcome.provider) })
     );
     return;
   }
-  if (result?.status === 'failed' && offer) {
-    announcingToast.warning(
-      i18n.t(FAILURE_KEYS[result.reason], { provider: providerLabel(offer.provider) })
-    );
+  // Every other outcome names the provider, so only the offer can say which one it is.
+  if (!outcome || !offer) {
+    return;
   }
+  const provider = providerLabel(offer.provider);
+  announcingToast.warning(
+    outcome.status === 'not-added'
+      ? i18n.t('pendingLink.notAdded', { provider })
+      : i18n.t(FAILURE_KEYS[outcome.reason], { provider })
+  );
 }

@@ -10,6 +10,7 @@ CREATE TABLE "pending_auth_links" (
 	"display_name" text,
 	"hosted_domain" text,
 	"email_code_allowed" boolean NOT NULL,
+	"email_code_send_count" integer DEFAULT 0 NOT NULL,
 	"email_code_challenge_id" uuid,
 	"callback_path" text,
 	"expires_at" timestamp with time zone NOT NULL,

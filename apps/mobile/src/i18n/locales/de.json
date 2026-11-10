@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} wurde nicht hinzugefügt, weil du dich bei einem anderen Konto angemeldet hast.",
     "failedAccountAlreadyLinked": "{{provider}} wurde nicht hinzugefügt, weil es bereits mit einem anderen Konto verknüpft ist.",
     "failedProviderAlreadyLinked": "{{provider}} wurde nicht hinzugefügt, weil dein Konto bereits eine andere {{provider}}-Anmeldung hat.",
-    "failedLinking": "{{provider}} konnte deinem Konto nicht hinzugefügt werden."
+    "failedLinking": "{{provider}} konnte deinem Konto nicht hinzugefügt werden.",
+    "notAdded": "Du bist angemeldet. {{provider}} wurde deinem Konto nicht hinzugefügt."
   },
   "profile": {
     "codeReviewerSubtitle": "Automatische PR-Prüfungen",

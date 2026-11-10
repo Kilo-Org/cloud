@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} زیاد نەکرا چونکە چوویتە ژوورەوەی هەژمارێکی تر.",
     "failedAccountAlreadyLinked": "{{provider}} زیاد نەکرا چونکە پێشتر بە هەژمارێکی ترەوە بەستراوە.",
     "failedProviderAlreadyLinked": "{{provider}} زیاد نەکرا چونکە هەژمارەکەت پێشتر چوونە ژوورەوەیەکی تری {{provider}}ی هەیە.",
-    "failedLinking": "نەتوانرا {{provider}} بۆ هەژمارەکەت زیاد بکرێت."
+    "failedLinking": "نەتوانرا {{provider}} بۆ هەژمارەکەت زیاد بکرێت.",
+    "notAdded": "چوویتە ژوورەوە. {{provider}} بۆ هەژمارەکەت زیاد نەکرا."
   },
   "profile": {
     "codeReviewerSubtitle": "پێداچوونەوەی خۆکاری PR",

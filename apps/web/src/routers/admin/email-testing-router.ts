@@ -95,7 +95,8 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
       return {
         email: 'user@example.com',
         provider_name: 'GitHub',
-        connected_accounts_url: `${NEXTAUTH_URL}/connected-accounts`,
+        linked_identity: 'octocat (user@example.com)',
+        connected_accounts_link: `${NEXTAUTH_URL}/connected-accounts`,
       };
     case 'balanceAlert':
       return { minimum_balance: '10', organization_url };

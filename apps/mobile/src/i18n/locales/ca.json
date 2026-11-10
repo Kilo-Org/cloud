@@ -241,7 +241,8 @@
     "failedWrongAccount": "No s'ha afegit {{provider}} perquè has iniciat la sessió en un altre compte.",
     "failedAccountAlreadyLinked": "No s'ha afegit {{provider}} perquè ja està vinculat a un altre compte.",
     "failedProviderAlreadyLinked": "No s'ha afegit {{provider}} perquè el teu compte ja té un altre inici de sessió amb {{provider}}.",
-    "failedLinking": "No s'ha pogut afegir {{provider}} al teu compte."
+    "failedLinking": "No s'ha pogut afegir {{provider}} al teu compte.",
+    "notAdded": "Has iniciat la sessió. No s'ha afegit {{provider}} al teu compte."
   },
   "profile": {
     "codeReviewerSubtitle": "Revisions automàtiques de PR",

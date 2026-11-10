@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} არ დაემატა, რადგან სხვა ანგარიშში შეხვედი.",
     "failedAccountAlreadyLinked": "{{provider}} არ დაემატა, რადგან ის უკვე დაკავშირებულია სხვა ანგარიშთან.",
     "failedProviderAlreadyLinked": "{{provider}} არ დაემატა, რადგან შენს ანგარიშს უკვე აქვს სხვა {{provider}}-ით შესვლა.",
-    "failedLinking": "{{provider}}-ის დამატება შენს ანგარიშზე ვერ მოხერხდა."
+    "failedLinking": "{{provider}}-ის დამატება შენს ანგარიშზე ვერ მოხერხდა.",
+    "notAdded": "შესული ხარ. {{provider}} არ დაემატა შენს ანგარიშს."
   },
   "profile": {
     "codeReviewerSubtitle": "PR-ების ავტომატური შემოწმება",

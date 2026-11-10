@@ -43,7 +43,7 @@ way, including Apple from connected accounts.
 
 ## Rules
 
-### Pending links (D1, D2)
+### Pending links
 
 1. On a different-provider sign-in refusal, the system MUST store the new
    provider identity as a pending link when the account does not already
@@ -56,16 +56,24 @@ way, including Apple from connected accounts.
 6. Email confirmation MUST NOT use a one-click approval link.
 7. The system MUST NOT create a pending link when the account already has
    the same provider type with a different account identifier.
+8. Under HTTPS, the browser binding MUST use a host-only cookie, so a
+   sibling subdomain cannot plant a pending link secret.
+9. Attaching MUST follow an explicit confirmation by the signed-in account
+   holder that names the provider and identity. A navigation alone MUST NOT
+   attach.
 
-### Email code eligibility (D3)
+### Email code eligibility
 
 1. The system MUST offer the email code only when the existing account has
    a verified primary address.
 2. For an account without a verified primary address, the system MUST
    offer only sign-in with an existing method.
 3. Eligibility MUST be decided when the pending link is created.
+4. A code MUST be accepted only for the link-code request made for that
+   pending link. A generic sign-in code MUST NOT complete a pending link.
+5. One pending link MUST allow at most 3 code sends.
 
-### Provider verification flags (D4)
+### Provider verification flags
 
 1. A verified provider email MUST count as proof of email ownership for
    the incoming sign-in.
@@ -77,13 +85,15 @@ way, including Apple from connected accounts.
 5. GitLab keeps the generic rule until a live provider response proves a
    verified field for the address the sign-in uses.
 
-### Apple explicit linking (D5)
+### Apple explicit linking
 
 1. Apple MUST be linkable from connected accounts.
 2. When the Apple callback cannot carry the linking session, the system
    MUST store an explicit pending link for the session user.
 3. Completion MUST run on a same-site request that carries the session.
 4. Completion MUST require that the session user equals the link target.
+5. The system MUST NOT create an explicit Apple link when the account
+   already has Apple, or when the Apple identity belongs to another account.
 
 ### Attach rule
 
@@ -100,7 +110,7 @@ way, including Apple from connected accounts.
 7. Offered methods MUST exclude enterprise SSO, the pending provider, and
    the test login outside supported environments.
 
-### Security notice (D6)
+### Security notice
 
 1. After every successful new link, the system MUST send a new sign-in
    method notice to the account primary address.
@@ -108,17 +118,22 @@ way, including Apple from connected accounts.
    identity.
 3. The system MUST NOT send the notice for the test login.
 4. A notice send failure MUST NOT fail the link.
+5. The notice MUST name the provider and the linked identity, and MUST
+   tell the reader to remove the method if they did not add it.
 
-### Mobile contract (D7)
+### Mobile contract
 
 1. A native sign-in request MAY carry a pending link token.
 2. An eligible different-provider refusal MUST return the pending link
    token, provider, email, methods, email-code eligibility, and expiry.
 3. A successful sign-in that carried a token MUST report the link result.
 4. A failed link MUST NOT fail the sign-in itself.
-5. A device authorization request MAY carry a pending link token.
-6. When an approved device code is consumed, the system MUST evaluate the
-   pending link against the approving user and report the result.
+5. A device authorization request MAY carry a live pending link token. A
+   token that is not live MUST be refused when the request is created.
+6. The approval page MUST name the pending link, and the approver MUST
+   choose whether to add it. Approving without adding MUST attach nothing.
+7. The link MUST be evaluated against the approving user only after the
+   device credentials are issued.
 
 ### Sign-in gates
 
@@ -151,4 +166,6 @@ way, including Apple from connected accounts.
 
 ### 2026-11-09 -- Initial spec
 
-- Created from the OAuth pending account linking design contract (D1-D7).
+- Created for pending account linking.
+- Added confirmation before attach, host-only cookie, link-code binding,
+  send cap, and device approval consent.

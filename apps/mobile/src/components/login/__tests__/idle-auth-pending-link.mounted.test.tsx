@@ -33,6 +33,7 @@ vi.mock('@/lib/auth/use-native-auth', () => ({
     clearSsoRecovery: vi.fn(),
     handleSsoError: vi.fn(),
     pendingLinkFailure: nativeAuth.pendingLinkFailure,
+    clearPendingLinkFailure: vi.fn(),
   }),
 }));
 
@@ -95,6 +96,7 @@ const renderers: R[] = [];
 async function mount(props: {
   start?: StartFn;
   pendingLink: PendingLinkOffer | null;
+  pendingLinkRefused?: boolean;
   onClearPendingLink?: () => void;
 }): Promise<R> {
   const ref: { current: R | undefined } = { current: undefined };
@@ -103,6 +105,7 @@ async function mount(props: {
       createElement(IdleAuth, {
         start: props.start ?? vi.fn<StartFn>(),
         pendingLink: props.pendingLink,
+        pendingLinkRefused: props.pendingLinkRefused,
         onPendingLink: vi.fn<(link: PendingLinkOffer) => void>(),
         onClearPendingLink: props.onClearPendingLink ?? vi.fn<() => void>(),
       })
@@ -262,6 +265,13 @@ describe('IdleAuth pending account link', () => {
 
   it('opens already expired when the link lapsed while the screen was away', async () => {
     const renderer = await mount({ pendingLink: offer({ expiresAt: NOW - 1 }) });
+
+    expect(texts(renderer.root)).toContain('This request to add GitHub has expired.');
+    expect(buttonLabels(renderer.root)).toEqual(['Start again']);
+  });
+
+  it('shows the expired state when the browser start refused the link early', async () => {
+    const renderer = await mount({ pendingLink: offer(), pendingLinkRefused: true });
 
     expect(texts(renderer.root)).toContain('This request to add GitHub has expired.');
     expect(buttonLabels(renderer.root)).toEqual(['Start again']);

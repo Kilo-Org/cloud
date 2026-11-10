@@ -241,7 +241,8 @@
     "failedWrongAccount": "Ez da {{provider}} gehitu, beste kontu batean hasi duzulako saioa.",
     "failedAccountAlreadyLinked": "Ez da {{provider}} gehitu, dagoeneko beste kontu bati lotuta dagoelako.",
     "failedProviderAlreadyLinked": "Ez da {{provider}} gehitu, zure kontuak dagoeneko beste {{provider}} saio-hasiera bat duelako.",
-    "failedLinking": "Ezin izan da {{provider}} zure kontuan gehitu."
+    "failedLinking": "Ezin izan da {{provider}} zure kontuan gehitu.",
+    "notAdded": "Saioa hasi duzu. Ez da {{provider}} zure kontuan gehitu."
   },
   "profile": {
     "codeReviewerSubtitle": "PR-ak automatikoki berrikustea",

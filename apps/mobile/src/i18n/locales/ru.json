@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} не добавлен: вы вошли в другой аккаунт.",
     "failedAccountAlreadyLinked": "{{provider}} не добавлен: он уже привязан к другому аккаунту.",
     "failedProviderAlreadyLinked": "{{provider}} не добавлен: в вашем аккаунте уже есть другой вход через {{provider}}.",
-    "failedLinking": "Не удалось добавить {{provider}} в ваш аккаунт."
+    "failedLinking": "Не удалось добавить {{provider}} в ваш аккаунт.",
+    "notAdded": "Вход выполнен. {{provider}} не добавлен в ваш аккаунт."
   },
   "profile": {
     "codeReviewerSubtitle": "Автоматические проверки PR",

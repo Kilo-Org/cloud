@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} לא נוסף כי נכנסת לחשבון אחר.",
     "failedAccountAlreadyLinked": "{{provider}} לא נוסף כי הוא כבר מקושר לחשבון אחר.",
     "failedProviderAlreadyLinked": "{{provider}} לא נוסף כי בחשבון שלך כבר יש כניסה אחרת באמצעות {{provider}}.",
-    "failedLinking": "לא ניתן היה להוסיף את {{provider}} לחשבון שלך."
+    "failedLinking": "לא ניתן היה להוסיף את {{provider}} לחשבון שלך.",
+    "notAdded": "נכנסת לחשבון. {{provider}} לא נוסף לחשבון שלך."
   },
   "profile": {
     "codeReviewerSubtitle": "סקירות PR אוטומטיות",

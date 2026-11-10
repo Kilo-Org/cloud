@@ -53,8 +53,21 @@
                   "
                 >
                   {{ provider_name }} was added as a sign-in method for your Kilo Code account. If
-                  this was you, no action is needed. If this was not you, remove the method from
-                  your connected accounts and contact support.
+                  this was you, no action is needed. If this wasn't you, remove it from Connected
+                  accounts now and contact support.
+                </p>
+                <p
+                  style="
+                    margin: 0 0 20px;
+                    font-size: 14px;
+                    line-height: 1.5;
+                    color: #555;
+                    font-family:
+                      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+                      sans-serif;
+                  "
+                >
+                  Linked identity: {{ linked_identity }}
                 </p>
 
                 <!-- Code -->
@@ -107,7 +120,7 @@
                     "
                   >
                     <strong style="color: #1a1a1a">Security Notice:</strong> Review your sign-in
-                    methods at {{ connected_accounts_url }}.
+                    methods at {{ connected_accounts_link }}.
                   </p>
                 </div>
               </td>
@@ -119,19 +132,6 @@
                 <p
                   style="
                     margin: 0;
-                    font-size: 13px;
-                    line-height: 18px;
-                    color: #555;
-                    font-family:
-                      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-                      sans-serif;
-                  "
-                >
-                  If you didn't request this email, you can safely ignore it.
-                </p>
-                <p
-                  style="
-                    margin: 12px 0 0;
                     font-size: 13px;
                     line-height: 18px;
                     color: #555;

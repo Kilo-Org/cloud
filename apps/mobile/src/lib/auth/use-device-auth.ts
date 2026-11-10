@@ -4,7 +4,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
 import { openAuthBrowser, resolveAuthBrowserKind } from '@/lib/auth/auth-browser';
 import { getDeviceAuth429Error } from '@/lib/auth/poll-response';
-import { parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
+import { parseAuthError, parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
   deviceAuthErrorKey,
@@ -174,6 +174,15 @@ export function useDeviceAuth(): DeviceAuthResult {
               | undefined;
             setState(errorDeviceAuthState(undefined, getDeviceAuth429Error(body), undefined));
             return;
+          }
+          // A link that lapsed or was used elsewhere cannot start a browser sign-in. The
+          // pending-link screen shows its own expired state, so this is no error banner.
+          if (response.status === 400 && pendingLinkToken) {
+            const refusal = parseAuthError(await response.json().catch(() => undefined));
+            if (refusal?.code === 'PENDING_LINK_EXPIRED') {
+              setState({ ...idleDeviceAuthState(), expiredPendingLinkToken: pendingLinkToken });
+              return;
+            }
           }
           setState(
             errorDeviceAuthState(

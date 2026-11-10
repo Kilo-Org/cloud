@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} jäi lisamata, sest logisid sisse teise kontoga.",
     "failedAccountAlreadyLinked": "{{provider}} jäi lisamata, sest see on juba seotud teise kontoga.",
     "failedProviderAlreadyLinked": "{{provider}} jäi lisamata, sest sinu kontol on juba teine {{provider}} sisselogimine.",
-    "failedLinking": "{{provider}} ei õnnestunud sinu kontole lisada."
+    "failedLinking": "{{provider}} ei õnnestunud sinu kontole lisada.",
+    "notAdded": "Oled sisse logitud. {{provider}} jäi sinu kontole lisamata."
   },
   "profile": {
     "codeReviewerSubtitle": "Automaatsed PR-ülevaatused",

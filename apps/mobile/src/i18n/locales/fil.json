@@ -241,7 +241,8 @@
     "failedWrongAccount": "Hindi naidagdag ang {{provider}} dahil nag-sign in ka sa ibang account.",
     "failedAccountAlreadyLinked": "Hindi naidagdag ang {{provider}} dahil naka-link na ito sa ibang account.",
     "failedProviderAlreadyLinked": "Hindi naidagdag ang {{provider}} dahil may ibang {{provider}} sign-in na ang iyong account.",
-    "failedLinking": "Hindi maidagdag ang {{provider}} sa iyong account."
+    "failedLinking": "Hindi maidagdag ang {{provider}} sa iyong account.",
+    "notAdded": "Naka-sign in ka na. Hindi naidagdag ang {{provider}} sa iyong account."
   },
   "profile": {
     "codeReviewerSubtitle": "Awtomatikong pagsusuri ng PR",

@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} haikuongezwa kwa sababu uliingia kwenye akaunti tofauti.",
     "failedAccountAlreadyLinked": "{{provider}} haikuongezwa kwa sababu tayari imeunganishwa na akaunti nyingine.",
     "failedProviderAlreadyLinked": "{{provider}} haikuongezwa kwa sababu akaunti yako tayari ina njia nyingine ya kuingia ya {{provider}}.",
-    "failedLinking": "Imeshindikana kuongeza {{provider}} kwenye akaunti yako."
+    "failedLinking": "Imeshindikana kuongeza {{provider}} kwenye akaunti yako.",
+    "notAdded": "Umeingia. {{provider}} haikuongezwa kwenye akaunti yako."
   },
   "profile": {
     "codeReviewerSubtitle": "Ukaguzi wa kiotomatiki wa PR",

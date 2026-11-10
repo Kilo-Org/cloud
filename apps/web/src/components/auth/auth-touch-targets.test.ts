@@ -357,6 +357,7 @@ describe('sign-in touch targets', () => {
         viewerToken: 'viewer-token',
         isAppMode: true,
         requestingClient: null,
+        pendingLink: null,
         user: { name: 'Ada Lovelace', email: 'ada@kilo.ai', imageUrl: '' },
       })
     );

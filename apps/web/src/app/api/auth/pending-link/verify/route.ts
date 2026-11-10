@@ -65,7 +65,10 @@ export const POST = withRestTiming('/api/auth/pending-link/verify', async (reque
     return NextResponse.json({ error: eligibility.errorCode }, { status: eligibility.status });
   }
 
-  const challengeId = row.email_code_challenge_id ?? undefined;
+  if (!row.email_code_challenge_id) {
+    return NextResponse.json({ error: 'CODE_NOT_REQUESTED' }, { status: 409 });
+  }
+  const challengeId = row.email_code_challenge_id;
   const reserve = await reserveSignInCode(user.google_user_email, parsed.data.code, challengeId);
   if (reserve === 'invalid') {
     return NextResponse.json(

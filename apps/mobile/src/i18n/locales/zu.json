@@ -241,7 +241,8 @@
     "failedWrongAccount": "I-{{provider}} ayizange yengezwe ngoba ungene kwenye i-akhawunti.",
     "failedAccountAlreadyLinked": "I-{{provider}} ayizange yengezwe ngoba isivele ixhunywe kwenye i-akhawunti.",
     "failedProviderAlreadyLinked": "I-{{provider}} ayizange yengezwe ngoba i-akhawunti yakho isivele inokungena okuhlukile kwe-{{provider}}.",
-    "failedLinking": "I-{{provider}} ayikwazanga ukwengezwa ku-akhawunti yakho."
+    "failedLinking": "I-{{provider}} ayikwazanga ukwengezwa ku-akhawunti yakho.",
+    "notAdded": "Ungenile. I-{{provider}} ayizange yengezwe ku-akhawunti yakho."
   },
   "profile": {
     "codeReviewerSubtitle": "Ukuhlolwa kwe-PR okuzenzakalelayo",

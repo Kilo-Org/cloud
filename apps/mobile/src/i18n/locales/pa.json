@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} ਨਹੀਂ ਜੋੜਿਆ ਗਿਆ ਕਿਉਂਕਿ ਤੁਸੀਂ ਕਿਸੇ ਹੋਰ ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕੀਤਾ।",
     "failedAccountAlreadyLinked": "{{provider}} ਨਹੀਂ ਜੋੜਿਆ ਗਿਆ ਕਿਉਂਕਿ ਇਹ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਹੋਰ ਖਾਤੇ ਨਾਲ ਲਿੰਕ ਹੈ।",
     "failedProviderAlreadyLinked": "{{provider}} ਨਹੀਂ ਜੋੜਿਆ ਗਿਆ ਕਿਉਂਕਿ ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚ ਪਹਿਲਾਂ ਹੀ ਕੋਈ ਹੋਰ {{provider}} ਸਾਈਨ-ਇਨ ਹੈ।",
-    "failedLinking": "{{provider}} ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚ ਨਹੀਂ ਜੋੜਿਆ ਜਾ ਸਕਿਆ।"
+    "failedLinking": "{{provider}} ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚ ਨਹੀਂ ਜੋੜਿਆ ਜਾ ਸਕਿਆ।",
+    "notAdded": "ਤੁਸੀਂ ਸਾਈਨ ਇਨ ਕਰ ਲਿਆ ਹੈ। {{provider}} ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚ ਨਹੀਂ ਜੋੜਿਆ ਗਿਆ।"
   },
   "profile": {
     "codeReviewerSubtitle": "ਆਪਣੇ ਆਪ ਹੋਣ ਵਾਲੀਆਂ PR ਸਮੀਖਿਆਵਾਂ",

@@ -241,7 +241,8 @@
     "failedWrongAccount": "Chafodd {{provider}} mo'i ychwanegu oherwydd i chi fewngofnodi i gyfrif gwahanol.",
     "failedAccountAlreadyLinked": "Chafodd {{provider}} mo'i ychwanegu oherwydd ei fod eisoes wedi'i gysylltu â chyfrif arall.",
     "failedProviderAlreadyLinked": "Chafodd {{provider}} mo'i ychwanegu oherwydd bod gan eich cyfrif ddull mewngofnodi {{provider}} gwahanol yn barod.",
-    "failedLinking": "Doedd dim modd ychwanegu {{provider}} at eich cyfrif."
+    "failedLinking": "Doedd dim modd ychwanegu {{provider}} at eich cyfrif.",
+    "notAdded": "Rydych chi wedi mewngofnodi. Chafodd {{provider}} mo'i ychwanegu at eich cyfrif."
   },
   "profile": {
     "codeReviewerSubtitle": "Adolygiadau PR awtomatig",

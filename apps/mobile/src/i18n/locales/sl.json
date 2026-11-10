@@ -241,7 +241,8 @@
     "failedWrongAccount": "Storitev {{provider}} ni bila dodana, ker si se prijavil v drug račun.",
     "failedAccountAlreadyLinked": "Storitev {{provider}} ni bila dodana, ker je že povezana z drugim računom.",
     "failedProviderAlreadyLinked": "Storitev {{provider}} ni bila dodana, ker ima tvoj račun že drugo prijavo s storitvijo {{provider}}.",
-    "failedLinking": "Storitve {{provider}} ni bilo mogoče dodati tvojemu računu."
+    "failedLinking": "Storitve {{provider}} ni bilo mogoče dodati tvojemu računu.",
+    "notAdded": "Prijavljen si. Storitev {{provider}} ni bila dodana tvojemu računu."
   },
   "profile": {
     "codeReviewerSubtitle": "Samodejni pregledi PR",

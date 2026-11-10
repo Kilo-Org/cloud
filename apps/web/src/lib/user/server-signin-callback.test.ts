@@ -54,6 +54,8 @@ import {
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { user_auth_provider } from '@kilocode/db/schema';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
@@ -185,6 +187,57 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(cookieStore.get('pending-auth-link')?.value).toBeTruthy();
     expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses the Apple bounce when the target already has an Apple method', async () => {
+    const owner = await insertTestUser({ google_user_email: 'cb-apple-dup@example.com' });
+    await db.insert(user_auth_provider).values({
+      kilo_user_id: owner.id,
+      provider: 'apple',
+      provider_account_id: 'cb-apple-existing-sub',
+      email: 'cb-apple-dup@example.com',
+      avatar_url: '',
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'apple',
+      createdAt: Date.now(),
+    });
+
+    const result = await signIn({
+      user: { id: 'x', email: 'cb-apple-dup@example.com', name: 'CB Apple', image: '' },
+      account: { provider: 'apple', providerAccountId: 'cb-apple-new-sub', type: 'oauth' },
+      profile: { email_verified: 'true', email: 'cb-apple-dup@example.com' },
+    } as never);
+
+    expect(result).toBe('/connected-accounts?error=PROVIDER-ALREADY-LINKED');
+    expect(cookieStore.get('pending-auth-link')).toBeUndefined();
+  });
+
+  it('refuses the Apple bounce when the Apple identity belongs to another user', async () => {
+    const owner = await insertTestUser({ google_user_email: 'cb-apple-owner@example.com' });
+    const other = await insertTestUser({ google_user_email: 'cb-apple-other@example.com' });
+    await db.insert(user_auth_provider).values({
+      kilo_user_id: other.id,
+      provider: 'apple',
+      provider_account_id: 'cb-apple-shared-sub',
+      email: 'cb-apple-other@example.com',
+      avatar_url: '',
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'apple',
+      createdAt: Date.now(),
+    });
+
+    const result = await signIn({
+      user: { id: 'x', email: 'cb-apple-owner@example.com', name: 'CB Apple', image: '' },
+      account: { provider: 'apple', providerAccountId: 'cb-apple-shared-sub', type: 'oauth' },
+      profile: { email_verified: 'true', email: 'cb-apple-owner@example.com' },
+    } as never);
+
+    expect(result).toBe('/connected-accounts?error=ACCOUNT-ALREADY-LINKED');
+    expect(cookieStore.get('pending-auth-link')).toBeUndefined();
   });
 
   it('passes autoLink=true for an email (magic link) sign-in', async () => {

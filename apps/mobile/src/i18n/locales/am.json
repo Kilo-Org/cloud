@@ -241,7 +241,8 @@
     "failedWrongAccount": "ወደ ሌላ መለያ ስለገቡ {{provider}} አልታከለም።",
     "failedAccountAlreadyLinked": "{{provider}} አስቀድሞ ከሌላ መለያ ጋር ስለተገናኘ አልታከለም።",
     "failedProviderAlreadyLinked": "መለያዎ አስቀድሞ ሌላ የ{{provider}} መግቢያ ስላለው {{provider}} አልታከለም።",
-    "failedLinking": "{{provider}}ን ወደ መለያዎ ማከል አልተቻለም።"
+    "failedLinking": "{{provider}}ን ወደ መለያዎ ማከል አልተቻለም።",
+    "notAdded": "ገብተዋል። {{provider}} ወደ መለያዎ አልታከለም።"
   },
   "profile": {
     "codeReviewerSubtitle": "በራስ ሰር የሚደረጉ የPR ግምገማዎች",

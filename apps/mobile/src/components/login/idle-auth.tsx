@@ -39,6 +39,7 @@ export function IdleAuth({
   onBusyChange,
   onSignInStart,
   pendingLink = null,
+  pendingLinkRefused = false,
   onPendingLink,
   onClearPendingLink,
 }: Readonly<{
@@ -51,6 +52,8 @@ export function IdleAuth({
   onSignInStart?: () => void;
   /** The pending link being resolved. The shell owns it so a browser attempt cannot lose it. */
   pendingLink?: PendingLinkOffer | null;
+  /** The browser sign-in route refused `pendingLink` as no longer live. */
+  pendingLinkRefused?: boolean;
   /** Without it a `DIFFERENT-OAUTH` refusal stays a toast, as before pending links existed. */
   onPendingLink?: (offer: PendingLinkOffer) => void;
   onClearPendingLink?: () => void;
@@ -69,6 +72,7 @@ export function IdleAuth({
     clearSsoRecovery,
     handleSsoError,
     pendingLinkFailure,
+    clearPendingLinkFailure,
   } = useNativeAuth(onPendingLink ? { pendingLink, onPendingLinkOffer: onPendingLink } : undefined);
   const { t } = useTranslation();
   // The wrapper's label: the translated parts joined the way the row renders
@@ -223,7 +227,10 @@ export function IdleAuth({
       <EmailOtpForm
         email={otpEmail.trim().toLowerCase()}
         busy={busy}
-        error={verifyError}
+        // A resend that fails has no field to sit under here, and the pending-link options are off
+        // screen, so the code step shows that refusal in its own slot. Without a pending link the
+        // hook toasts it instead and this stays the verify message alone.
+        error={verifyError ?? pendingLinkFailure?.message}
         onVerify={code => {
           const attempt = verifyAttemptRef.current;
           void (async () => {
@@ -241,10 +248,12 @@ export function IdleAuth({
           // disowns any verify attempt still in flight for the old code.
           verifyAttemptRef.current += 1;
           setVerifyError(undefined);
+          clearPendingLinkFailure();
         }}
         onResend={() => {
           verifyAttemptRef.current += 1;
           setVerifyError(undefined);
+          clearPendingLinkFailure();
           void (async () => {
             const ok = await requestEmailCode(otpEmail);
             if (ok) {
@@ -255,6 +264,7 @@ export function IdleAuth({
         onBack={() => {
           verifyAttemptRef.current += 1;
           setVerifyError(undefined);
+          clearPendingLinkFailure();
           setView('main');
         }}
       />
@@ -316,6 +326,7 @@ export function IdleAuth({
           })}
           busy={busy}
           browserStarting={browserAuthStarting}
+          refused={pendingLinkRefused}
           // An address the code route rejects has no field here, so it reads beside the options.
           failure={
             pendingLinkFailure ??

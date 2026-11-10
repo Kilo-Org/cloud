@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} lama darin sababtoo ah waxaad soo gashay akoon kale.",
     "failedAccountAlreadyLinked": "{{provider}} lama darin sababtoo ah horey ayuu ugu xiran yahay akoon kale.",
     "failedProviderAlreadyLinked": "{{provider}} lama darin sababtoo ah akoonkaagu horey ayuu u leeyahay soo galis {{provider}} oo kale.",
-    "failedLinking": "{{provider}} laguma dari karin akoonkaaga."
+    "failedLinking": "{{provider}} laguma dari karin akoonkaaga.",
+    "notAdded": "Waad soo gashay. {{provider}} laguma darin akoonkaaga."
   },
   "profile": {
     "codeReviewerSubtitle": "Dib-u-eegisyada tooska ah ee PR",

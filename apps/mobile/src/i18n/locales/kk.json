@@ -241,7 +241,8 @@
     "failedWrongAccount": "Басқа аккаунтқа кіргендіктен, {{provider}} қосылмады.",
     "failedAccountAlreadyLinked": "{{provider}} басқа аккаунтқа әлдеқашан байланыстырылғандықтан, қосылмады.",
     "failedProviderAlreadyLinked": "Аккаунтыңызда басқа {{provider}} кіру әдісі бар болғандықтан, {{provider}} қосылмады.",
-    "failedLinking": "{{provider}} аккаунтыңызға қосылмады."
+    "failedLinking": "{{provider}} аккаунтыңызға қосылмады.",
+    "notAdded": "Сіз кірдіңіз. {{provider}} аккаунтыңызға қосылмады."
   },
   "profile": {
     "codeReviewerSubtitle": "PR сұрауларын автоматты тексеру",

@@ -241,7 +241,8 @@
     "failedWrongAccount": "لم تتم إضافة {{provider}} لأنك سجّلت الدخول إلى حساب مختلف.",
     "failedAccountAlreadyLinked": "لم تتم إضافة {{provider}} لأنه مرتبط بالفعل بحساب آخر.",
     "failedProviderAlreadyLinked": "لم تتم إضافة {{provider}} لأن حسابك يحتوي بالفعل على تسجيل دخول مختلف عبر {{provider}}.",
-    "failedLinking": "تعذّرت إضافة {{provider}} إلى حسابك."
+    "failedLinking": "تعذّرت إضافة {{provider}} إلى حسابك.",
+    "notAdded": "لقد سجّلت الدخول. لم تتم إضافة {{provider}} إلى حسابك."
   },
   "profile": {
     "codeReviewerSubtitle": "مراجعات PR تلقائية",

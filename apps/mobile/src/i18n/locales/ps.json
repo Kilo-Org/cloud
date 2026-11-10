@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} زیات نه شو ځکه چې تاسو بل حساب ته ننوتلي یاست.",
     "failedAccountAlreadyLinked": "{{provider}} زیات نه شو ځکه چې دمخه له بل حساب سره تړل شوی دی.",
     "failedProviderAlreadyLinked": "{{provider}} زیات نه شو ځکه چې ستاسو حساب دمخه د {{provider}} بل ننوتل لري.",
-    "failedLinking": "{{provider}} ستاسو حساب ته زیات نه شو."
+    "failedLinking": "{{provider}} ستاسو حساب ته زیات نه شو.",
+    "notAdded": "تاسو ننوتلي یاست. {{provider}} ستاسو حساب ته زیات نه شو."
   },
   "profile": {
     "codeReviewerSubtitle": "د PR اوتومات بیاکتنې",

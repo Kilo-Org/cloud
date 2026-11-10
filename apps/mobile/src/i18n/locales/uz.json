@@ -241,7 +241,8 @@
     "failedWrongAccount": "Boshqa hisobga kirganingiz uchun {{provider}} qo'shilmadi.",
     "failedAccountAlreadyLinked": "{{provider}} allaqachon boshqa hisobga bog'langani uchun qo'shilmadi.",
     "failedProviderAlreadyLinked": "Hisobingizda allaqachon boshqa {{provider}} orqali kirish mavjudligi uchun {{provider}} qo'shilmadi.",
-    "failedLinking": "{{provider}} hisobingizga qo'shib bo'lmadi."
+    "failedLinking": "{{provider}} hisobingizga qo'shib bo'lmadi.",
+    "notAdded": "Siz tizimga kirdingiz. {{provider}} hisobingizga qo'shilmadi."
   },
   "profile": {
     "codeReviewerSubtitle": "PR tekshiruvlarini avtomatik bajarish",

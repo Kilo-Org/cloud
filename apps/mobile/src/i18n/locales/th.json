@@ -241,7 +241,8 @@
     "failedWrongAccount": "ไม่ได้เพิ่ม {{provider}} เนื่องจากคุณลงชื่อเข้าใช้บัญชีอื่น",
     "failedAccountAlreadyLinked": "ไม่ได้เพิ่ม {{provider}} เนื่องจากลิงก์กับบัญชีอื่นอยู่แล้ว",
     "failedProviderAlreadyLinked": "ไม่ได้เพิ่ม {{provider}} เนื่องจากบัญชีของคุณมีการลงชื่อเข้าใช้ {{provider}} อื่นอยู่แล้ว",
-    "failedLinking": "ไม่สามารถเพิ่ม {{provider}} ในบัญชีของคุณได้"
+    "failedLinking": "ไม่สามารถเพิ่ม {{provider}} ในบัญชีของคุณได้",
+    "notAdded": "คุณลงชื่อเข้าใช้แล้ว ไม่ได้เพิ่ม {{provider}} ในบัญชีของคุณ"
   },
   "profile": {
     "codeReviewerSubtitle": "การตรวจสอบ PR อัตโนมัติ",

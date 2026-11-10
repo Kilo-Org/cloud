@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} lades inte till eftersom du loggade in på ett annat konto.",
     "failedAccountAlreadyLinked": "{{provider}} lades inte till eftersom det redan är kopplat till ett annat konto.",
     "failedProviderAlreadyLinked": "{{provider}} lades inte till eftersom ditt konto redan har en annan {{provider}}-inloggning.",
-    "failedLinking": "{{provider}} kunde inte läggas till i ditt konto."
+    "failedLinking": "{{provider}} kunde inte läggas till i ditt konto.",
+    "notAdded": "Du är inloggad. {{provider}} lades inte till i ditt konto."
   },
   "profile": {
     "codeReviewerSubtitle": "Automatiska PR-granskningar",

@@ -241,7 +241,8 @@
     "failedWrongAccount": "ඔබ වෙනත් ගිණුමකට පිවිසි නිසා {{provider}} එක් නොකෙරිණි.",
     "failedAccountAlreadyLinked": "{{provider}} දැනටමත් වෙනත් ගිණුමකට සම්බන්ධ කර ඇති නිසා එක් නොකෙරිණි.",
     "failedProviderAlreadyLinked": "ඔබේ ගිණුමට දැනටමත් වෙනත් {{provider}} පිවිසුමක් ඇති නිසා {{provider}} එක් නොකෙරිණි.",
-    "failedLinking": "{{provider}} ඔබේ ගිණුමට එක් කළ නොහැකි විය."
+    "failedLinking": "{{provider}} ඔබේ ගිණුමට එක් කළ නොහැකි විය.",
+    "notAdded": "ඔබ පිවිස ඇත. {{provider}} ඔබේ ගිණුමට එක් නොකෙරිණි."
   },
   "profile": {
     "codeReviewerSubtitle": "ස්වයංක්‍රීය PR සමාලෝචන",

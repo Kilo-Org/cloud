@@ -15,6 +15,9 @@ const COMPLETE_URL = '/api/auth/pending-link/complete';
 const summarySchema = z.object({
   provider: AuthProviderIdSchema,
   email: z.string(),
+  displayName: z.string().nullable(),
+  accountEmail: z.string(),
+  kind: z.enum(['existing_account', 'explicit_link']),
   methods: z.array(AuthProviderIdSchema),
   emailCode: z.boolean(),
   expiresAt: z.string(),
@@ -24,6 +27,57 @@ const verifyResponseSchema = z.object({
   token: z.string(),
   callbackUrl: z.string(),
 });
+
+const completeResponseSchema = z.object({
+  redirectTo: z.string(),
+});
+
+const TERMINAL_ERRORS = ['ACCOUNT-ALREADY-LINKED', 'PROVIDER-ALREADY-LINKED'] as const;
+type TerminalError = (typeof TERMINAL_ERRORS)[number];
+
+function isTerminalError(error: string | undefined): error is TerminalError {
+  return TERMINAL_ERRORS.some(code => code === error);
+}
+
+/** The message shown for each error code the pending-link routes return. */
+export function pendingLinkErrorMessage(error: string): string {
+  switch (error) {
+    case 'SESSION_REQUIRED':
+      return 'Sign in first, then come back to finish adding this method.';
+    case 'WRONG_ACCOUNT':
+      return 'You signed in with a different account.';
+    case 'LINKING-FAILED':
+      return 'The sign-in method could not be added. Try again.';
+    case 'ACCOUNT-ALREADY-LINKED':
+      return 'This account is already linked to another user.';
+    case 'PROVIDER-ALREADY-LINKED':
+      return 'This account already has this type of sign-in method linked.';
+    case 'EXPIRED':
+      return 'This request has expired. Start again from sign-in.';
+    case 'CODE_NOT_REQUESTED':
+      return 'Request a code first, then enter it here.';
+    case 'CODE_IN_PROGRESS':
+      return 'This code is being verified. Wait a moment and try again.';
+    case 'INVALID_CODE':
+      return 'That code is not correct. Try again.';
+    case 'TOO_MANY_ATTEMPTS':
+      return 'Too many incorrect codes. Request a new code.';
+    case 'TOO_MANY_CODES':
+      return 'No more codes can be sent for this request. Sign in with an existing method, or start again.';
+    case 'RATE_LIMITED':
+      return 'Too many codes requested. Wait a few minutes and try again.';
+    case 'EMAIL_CODE_NOT_ALLOWED':
+      return 'A code cannot be sent for this account. Sign in with an existing method.';
+    case 'EMAIL_DELIVERY_FAILED':
+      return 'The code could not be sent. Try again.';
+    case 'BLOCKED':
+      return 'This account cannot sign in.';
+    case 'INVALID_ORIGIN':
+      return 'This confirmation could not be verified. Try again from this page.';
+    default:
+      return 'Something went wrong. Try again.';
+  }
+}
 
 const errorResponseSchema = z.object({
   error: z.string(),
@@ -38,10 +92,21 @@ type ViewState =
   | { kind: 'ready'; summary: Summary }
   | { kind: 'load-error' };
 
-export function PendingLinkForm({ initialError }: { initialError?: string }) {
+export function PendingLinkForm({
+  initialError,
+  confirm = false,
+}: {
+  initialError?: string;
+  confirm?: boolean;
+}) {
   const [view, setView] = useState<ViewState>({ kind: 'loading' });
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
+  const [codeCapReached, setCodeCapReached] = useState(false);
+  const [bannerError, setBannerError] = useState<string | null>(initialError ?? null);
+  const [terminalError, setTerminalError] = useState<TerminalError | null>(
+    isTerminalError(initialError) ? initialError : null
+  );
   const [notice, setNotice] = useState<string | null>(null);
   const [retryableError, setRetryableError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -90,10 +155,13 @@ export function PendingLinkForm({ initialError }: { initialError?: string }) {
       const error = parsed.success ? parsed.data.error : 'UNKNOWN';
       if (error === 'EXPIRED') {
         setView({ kind: 'expired' });
-      } else if (error === 'RATE_LIMITED') {
-        setRetryableError('Too many codes requested. Wait a few minutes and try again.');
+      } else if (error === 'TOO_MANY_CODES') {
+        setCodeCapReached(true);
+        setRetryableError(pendingLinkErrorMessage(error));
+      } else if (isTerminalError(error)) {
+        setTerminalError(error);
       } else {
-        setRetryableError('The code could not be sent. Try again.');
+        setRetryableError(pendingLinkErrorMessage(error));
       }
     } catch {
       setRetryableError('The code could not be sent. Try again.');
@@ -128,18 +196,25 @@ export function PendingLinkForm({ initialError }: { initialError?: string }) {
       const error = parsed.success ? parsed.data.error : 'UNKNOWN';
       if (error === 'EXPIRED') {
         setView({ kind: 'expired' });
+      } else if (error === 'CODE_NOT_REQUESTED') {
+        setCodeSent(false);
+        setRetryableError(pendingLinkErrorMessage(error));
       } else if (error === 'INVALID_CODE') {
         const left = parsed.success ? parsed.data.attemptsLeft : undefined;
         setRetryableError(
           left !== undefined
             ? `That code is not correct. ${left} attempt${left === 1 ? '' : 's'} left.`
-            : 'That code is not correct. Try again.'
+            : pendingLinkErrorMessage(error)
         );
       } else if (error === 'TOO_MANY_ATTEMPTS') {
-        setRetryableError('Too many incorrect codes. Request a new code.');
+        setRetryableError(pendingLinkErrorMessage(error));
         setCodeSent(false);
+      } else if (isTerminalError(error)) {
+        setTerminalError(error);
+      } else if (error === 'WRONG_ACCOUNT') {
+        setBannerError(error);
       } else {
-        setRetryableError('The code could not be verified. Try again.');
+        setRetryableError(pendingLinkErrorMessage(error));
       }
     } catch {
       setRetryableError('The code could not be verified. Try again.');
@@ -147,6 +222,38 @@ export function PendingLinkForm({ initialError }: { initialError?: string }) {
       setBusy(false);
     }
   }, [code]);
+
+  const confirmComplete = useCallback(async () => {
+    setBusy(true);
+    setRetryableError(null);
+    try {
+      const response = await fetch(COMPLETE_URL, { method: 'POST' });
+      if (response.ok) {
+        const parsed = completeResponseSchema.safeParse(await response.json());
+        if (!parsed.success) {
+          setRetryableError(pendingLinkErrorMessage('LINKING-FAILED'));
+          return;
+        }
+        window.location.assign(parsed.data.redirectTo);
+        return;
+      }
+      const parsed = errorResponseSchema.safeParse(await response.json().catch(() => null));
+      const error = parsed.success ? parsed.data.error : 'UNKNOWN';
+      if (error === 'EXPIRED') {
+        setView({ kind: 'expired' });
+      } else if (isTerminalError(error)) {
+        setTerminalError(error);
+      } else if (error === 'WRONG_ACCOUNT' || error === 'SESSION_REQUIRED') {
+        setBannerError(error);
+      } else {
+        setRetryableError(pendingLinkErrorMessage(error));
+      }
+    } catch {
+      setRetryableError(pendingLinkErrorMessage('LINKING-FAILED'));
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   const handleTurnstileSuccess = useCallback(
     async (token: string) => {
@@ -237,8 +344,34 @@ export function PendingLinkForm({ initialError }: { initialError?: string }) {
     );
   }
 
+  if (terminalError) {
+    return (
+      <div className="w-full max-w-sm text-center">
+        <h1 className="text-foreground mb-4 text-2xl font-semibold">This method cannot be added</h1>
+        <p role="alert" className="mb-8 rounded-md bg-red-950 p-4 text-sm text-red-300">
+          {pendingLinkErrorMessage(terminalError)}
+        </p>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/connected-accounts"
+            className="bg-primary text-primary-foreground hover:bg-primary-hover focus-visible:ring-ring inline-block rounded-md px-4 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-11 pointer-coarse:content-center"
+          >
+            Back to Connected accounts
+          </Link>
+          <Link
+            href="/users/sign_in"
+            className="text-muted-foreground text-sm underline pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center pointer-coarse:justify-center"
+          >
+            Back to sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const { summary } = view;
   const providerName = getProviderById(summary.provider).name;
+  const identityLabel = summary.displayName || summary.email;
   const oauthMethods = summary.methods.filter(
     method => method !== 'email' && method !== 'passkey' && method !== 'fake-login'
   );
@@ -247,39 +380,86 @@ export function PendingLinkForm({ initialError }: { initialError?: string }) {
     summary.methods.includes('fake-login') ||
     (summary.methods.includes('email') && !summary.emailCode);
 
+  const wrongAccountBanner = bannerError === 'WRONG_ACCOUNT' && (
+    <div role="alert" className="mb-6 rounded-md bg-red-950 p-4 text-sm text-red-300">
+      <p className="mb-3">
+        You signed in with a different account. Sign out, then sign in with the account that uses{' '}
+        {summary.accountEmail}.
+      </p>
+      <button
+        type="button"
+        onClick={() => void signOut({ callbackUrl: '/users/pending-link' })}
+        className="underline pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
+      >
+        Sign out and retry
+      </button>
+    </div>
+  );
+  const sessionRequiredBanner = bannerError === 'SESSION_REQUIRED' && (
+    <div role="alert" className="mb-6 rounded-md bg-red-950 p-4 text-sm text-red-300">
+      <p className="mb-3">{pendingLinkErrorMessage('SESSION_REQUIRED')}</p>
+      <Link
+        href="/users/sign_in"
+        className="underline pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
+      >
+        Go to sign in
+      </Link>
+    </div>
+  );
+
+  if (confirm) {
+    return (
+      <div className="w-full max-w-sm">
+        <h1 className="text-foreground mb-4 text-center text-2xl font-semibold">
+          Add {providerName} to your account
+        </h1>
+        <p className="text-muted-foreground mb-8 text-center text-sm">
+          Add {providerName} ({identityLabel}) to {summary.accountEmail}?
+        </p>
+        {wrongAccountBanner}
+        {sessionRequiredBanner}
+        {retryableError && (
+          <p role="alert" className="mb-6 rounded-md bg-red-950 p-4 text-sm text-red-300">
+            {retryableError}
+          </p>
+        )}
+        <div className="flex flex-col gap-3">
+          <SignInButton onClick={() => void confirmComplete()} disabled={busy}>
+            Add {providerName}
+          </SignInButton>
+          <Link
+            href={summary.kind === 'explicit_link' ? '/connected-accounts' : '/users/pending-link'}
+            className="text-muted-foreground text-center text-sm underline pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center pointer-coarse:justify-center"
+          >
+            Not now
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-sm">
       <h1 className="text-foreground mb-4 text-center text-2xl font-semibold">
         Add {providerName} to your account
       </h1>
       <p className="text-muted-foreground mb-8 text-center text-sm">
-        An account already uses {summary.email}. Prove the account is yours and {providerName} is
-        added as a sign-in method.
+        {summary.kind === 'explicit_link'
+          ? `Finish adding ${providerName} (${identityLabel}) as a sign-in method for ${summary.accountEmail}.`
+          : `An account already uses ${summary.accountEmail}. Prove the account is yours and ${providerName} is added as a sign-in method.`}
       </p>
 
-      {initialError === 'WRONG_ACCOUNT' && (
-        <div role="alert" className="mb-6 rounded-md bg-red-950 p-4 text-sm text-red-300">
-          <p className="mb-3">
-            You signed in with a different account. Sign out, then sign in with the account that
-            uses {summary.email}.
+      {wrongAccountBanner}
+      {sessionRequiredBanner}
+      {bannerError &&
+        bannerError !== 'WRONG_ACCOUNT' &&
+        bannerError !== 'SESSION_REQUIRED' &&
+        bannerError !== 'EXPIRED' &&
+        !isTerminalError(bannerError) && (
+          <p role="alert" className="mb-6 rounded-md bg-red-950 p-4 text-sm text-red-300">
+            {pendingLinkErrorMessage(bannerError)}
           </p>
-          <button
-            type="button"
-            onClick={() => void signOut({ callbackUrl: '/users/pending-link' })}
-            className="underline pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
-          >
-            Sign out and retry
-          </button>
-        </div>
-      )}
-      {(initialError === 'ACCOUNT-ALREADY-LINKED' ||
-        initialError === 'PROVIDER-ALREADY-LINKED') && (
-        <div role="alert" className="mb-6 rounded-md bg-red-950 p-4 text-sm text-red-300">
-          {initialError === 'ACCOUNT-ALREADY-LINKED'
-            ? 'This account is already linked to another user.'
-            : 'This account already has this type of sign-in method linked.'}
-        </div>
-      )}
+        )}
       {notice && (
         <p className="mb-6 rounded-md bg-emerald-950 p-4 text-sm text-emerald-300" role="status">
           {notice}
@@ -294,9 +474,11 @@ export function PendingLinkForm({ initialError }: { initialError?: string }) {
       {summary.emailCode && (
         <div className="mb-8 space-y-3">
           {!codeSent ? (
-            <SignInButton onClick={() => void sendCode()} disabled={busy}>
-              Email me a code
-            </SignInButton>
+            !codeCapReached && (
+              <SignInButton onClick={() => void sendCode()} disabled={busy}>
+                Email me a code
+              </SignInButton>
+            )
           ) : (
             <>
               <label className="text-foreground block text-sm font-medium" htmlFor="pending-code">
@@ -313,14 +495,16 @@ export function PendingLinkForm({ initialError }: { initialError?: string }) {
               <SignInButton onClick={() => void verifyCode()} disabled={busy || code.length !== 6}>
                 Verify and add {providerName}
               </SignInButton>
-              <button
-                type="button"
-                onClick={() => void sendCode()}
-                disabled={busy}
-                className="text-muted-foreground mx-auto block text-sm underline pointer-coarse:min-h-11"
-              >
-                Send a new code
-              </button>
+              {!codeCapReached && (
+                <button
+                  type="button"
+                  onClick={() => void sendCode()}
+                  disabled={busy}
+                  className="text-muted-foreground mx-auto block text-sm underline pointer-coarse:min-h-11"
+                >
+                  Send a new code
+                </button>
+              )}
             </>
           )}
         </div>

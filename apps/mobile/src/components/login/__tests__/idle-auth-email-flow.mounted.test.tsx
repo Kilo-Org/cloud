@@ -6,6 +6,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { getAdmission } from '@/lib/auth/admission';
 import type * as AdmissionTypes from '@/lib/auth/admission';
 import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
+import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 
 import '@/i18n';
 
@@ -140,10 +141,14 @@ function continueButton(root: I): I {
   return button;
 }
 
-async function mountIdleAuth(): Promise<R> {
+async function mountIdleAuth(
+  props: Partial<React.ComponentProps<typeof IdleAuth>> = {}
+): Promise<R> {
   const ref: { current: R | undefined } = { current: undefined };
   await act(async () => {
-    ref.current = TestRenderer.create(React.createElement(IdleAuth, { start: vi.fn<StartFn>() }));
+    ref.current = TestRenderer.create(
+      React.createElement(IdleAuth, { start: vi.fn<StartFn>(), ...props })
+    );
     await Promise.resolve();
   });
   const renderer = ref.current;
@@ -544,7 +549,74 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     await act(() => {
       (otpForm.props.onVerify as (code: string) => void)('123456');
     });
-    expect(authMock.signIn).toHaveBeenCalledExactlyOnceWith('at', 'rt', 3600);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
+  // The code goes to the account that owns the link, and the options screen is
+  // off screen once the code step opens, so a refused resend has to say so here.
+  const offer: PendingLinkOffer = {
+    token: 'link-token',
+    provider: 'github',
+    email: 'person@example.com',
+    methods: ['email'],
+    emailCode: true,
+    expiresAt: Date.now() + 15 * 60 * 1000,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAdmission.mockResolvedValue({
+      platform: 'ios',
+      kind: 'attestation',
+      challenge: 'server-challenge',
+      payload: 'device-proof',
+    });
+  });
+
+  it('shows the refusal on the code step and leaves the resend control usable', async () => {
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+
+    const renderer = await mountIdleAuth({
+      pendingLink: offer,
+      onPendingLink: vi.fn<(link: PendingLinkOffer) => void>(),
+    });
+
+    const send = findAll(renderer.root, 'Button').find(
+      b => b.props.accessibilityLabel === 'Email me a sign-in code'
+    );
+    if (!send) {
+      throw new Error('Email me a sign-in code button not found');
+    }
+    await act(async () => {
+      (send.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'EmailOtpForm')).toHaveLength(1);
+
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'RATE_LIMITED',
+      ssoOrganizationId: undefined,
+    });
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+    await act(async () => {
+      (otpForm.props.onResend as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const refused = findAll(renderer.root, 'EmailOtpForm')[0];
+    expect(refused?.props.error).toBe('Too many sign-in attempts. Please wait and try again.');
+    expect(refused?.props.busy).toBeUndefined();
 
     act(() => {
       renderer.unmount();

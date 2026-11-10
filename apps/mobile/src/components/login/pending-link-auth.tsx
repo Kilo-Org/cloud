@@ -41,6 +41,7 @@ export function PendingLinkAuth({
   options,
   busy,
   browserStarting,
+  refused,
   failure,
   onApple,
   onGoogle,
@@ -53,6 +54,8 @@ export function PendingLinkAuth({
   options: PendingLinkOptions;
   busy: BusyAction;
   browserStarting: boolean;
+  /** The server already refused this link as no longer live, ahead of `expiresAt`. */
+  refused: boolean;
   failure: PendingLinkFailure | undefined;
   onApple: () => void;
   onGoogle: () => void;
@@ -62,7 +65,7 @@ export function PendingLinkAuth({
   onStartAgain: () => void;
 }>) {
   const { t } = useTranslation();
-  const expired = useExpired(offer.expiresAt);
+  const expired = useExpired(offer.expiresAt) || refused;
   const view = resolvePendingLinkView({ offer, options, expired, failure });
   const disabled = busy !== undefined || browserStarting;
 

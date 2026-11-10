@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} nije dodat jer si se prijavio na drugi nalog.",
     "failedAccountAlreadyLinked": "{{provider}} nije dodat jer je već povezan sa drugim nalogom.",
     "failedProviderAlreadyLinked": "{{provider}} nije dodat jer tvoj nalog već ima drugu {{provider}} prijavu.",
-    "failedLinking": "{{provider}} nije moguće dodati na tvoj nalog."
+    "failedLinking": "{{provider}} nije moguće dodati na tvoj nalog.",
+    "notAdded": "Prijavljen si. {{provider}} nije dodat na tvoj nalog."
   },
   "profile": {
     "codeReviewerSubtitle": "Automatski pregledi PR-ova",

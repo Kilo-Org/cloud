@@ -241,7 +241,8 @@
     "failedWrongAccount": "別のアカウントにサインインしたため、{{provider}} は追加されませんでした。",
     "failedAccountAlreadyLinked": "{{provider}} はすでに別のアカウントにリンクされているため、追加されませんでした。",
     "failedProviderAlreadyLinked": "アカウントにすでに別の {{provider}} サインインがあるため、{{provider}} は追加されませんでした。",
-    "failedLinking": "{{provider}} をアカウントに追加できませんでした。"
+    "failedLinking": "{{provider}} をアカウントに追加できませんでした。",
+    "notAdded": "サインインしました。{{provider}} はアカウントに追加されませんでした。"
   },
   "profile": {
     "codeReviewerSubtitle": "PRの自動レビュー",

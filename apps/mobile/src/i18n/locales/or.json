@@ -241,7 +241,8 @@
     "failedWrongAccount": "ଆପଣ ଏକ ଭିନ୍ନ ଆକାଉଣ୍ଟରେ ସାଇନ୍ ଇନ୍ କରିଥିବାରୁ {{provider}} ଯୋଡ଼ାଗଲା ନାହିଁ।",
     "failedAccountAlreadyLinked": "{{provider}} ପୂର୍ବରୁ ଅନ୍ୟ ଏକ ଆକାଉଣ୍ଟ ସହ ଲିଙ୍କ୍ ହୋଇଥିବାରୁ ଯୋଡ଼ାଗଲା ନାହିଁ।",
     "failedProviderAlreadyLinked": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ପୂର୍ବରୁ ଏକ ଭିନ୍ନ {{provider}} ସାଇନ୍ ଇନ୍ ଥିବାରୁ {{provider}} ଯୋଡ଼ାଗଲା ନାହିଁ।",
-    "failedLinking": "{{provider}} ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଯୋଡ଼ାଯାଇପାରିଲା ନାହିଁ।"
+    "failedLinking": "{{provider}} ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଯୋଡ଼ାଯାଇପାରିଲା ନାହିଁ।",
+    "notAdded": "ଆପଣ ସାଇନ୍ ଇନ୍ କରିଛନ୍ତି। {{provider}} ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଯୋଡ଼ାଗଲା ନାହିଁ।"
   },
   "profile": {
     "codeReviewerSubtitle": "ସ୍ୱୟଂଚାଳିତ PR ସମୀକ୍ଷା",

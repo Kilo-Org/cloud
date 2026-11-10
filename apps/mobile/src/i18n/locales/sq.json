@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} nuk u shtua sepse hyre në një llogari tjetër.",
     "failedAccountAlreadyLinked": "{{provider}} nuk u shtua sepse është lidhur tashmë me një llogari tjetër.",
     "failedProviderAlreadyLinked": "{{provider}} nuk u shtua sepse llogaria jote ka tashmë një hyrje tjetër me {{provider}}.",
-    "failedLinking": "{{provider}} nuk mund të shtohej në llogarinë tënde."
+    "failedLinking": "{{provider}} nuk mund të shtohej në llogarinë tënde.",
+    "notAdded": "Ke hyrë. {{provider}} nuk u shtua në llogarinë tënde."
   },
   "profile": {
     "codeReviewerSubtitle": "Rishikime automatike të PR",

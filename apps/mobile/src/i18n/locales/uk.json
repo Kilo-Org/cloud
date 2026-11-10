@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} не додано, бо ви увійшли в інший обліковий запис.",
     "failedAccountAlreadyLinked": "{{provider}} не додано, бо його вже пов’язано з іншим обліковим записом.",
     "failedProviderAlreadyLinked": "{{provider}} не додано, бо у вашому обліковому записі вже є інший вхід через {{provider}}.",
-    "failedLinking": "Не вдалося додати {{provider}} до вашого облікового запису."
+    "failedLinking": "Не вдалося додати {{provider}} до вашого облікового запису.",
+    "notAdded": "Ви увійшли. {{provider}} не додано до вашого облікового запису."
   },
   "profile": {
     "codeReviewerSubtitle": "Автоматичні перевірки PR",

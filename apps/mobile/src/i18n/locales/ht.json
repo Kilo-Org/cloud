@@ -241,7 +241,8 @@
     "failedWrongAccount": "Yo pa t ajoute {{provider}} paske ou te konekte nan yon lòt kont.",
     "failedAccountAlreadyLinked": "Yo pa t ajoute {{provider}} paske li deja lye ak yon lòt kont.",
     "failedProviderAlreadyLinked": "Yo pa t ajoute {{provider}} paske kont ou deja gen yon lòt koneksyon {{provider}}.",
-    "failedLinking": "Nou pa t ka ajoute {{provider}} nan kont ou."
+    "failedLinking": "Nou pa t ka ajoute {{provider}} nan kont ou.",
+    "notAdded": "Ou konekte. Yo pa t ajoute {{provider}} nan kont ou."
   },
   "profile": {
     "codeReviewerSubtitle": "Revizyon otomatik PR yo",

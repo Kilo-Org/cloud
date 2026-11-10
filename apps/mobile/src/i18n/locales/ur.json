@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} شامل نہیں کیا گیا کیونکہ آپ نے کسی دوسرے اکاؤنٹ میں سائن ان کیا۔",
     "failedAccountAlreadyLinked": "{{provider}} شامل نہیں کیا گیا کیونکہ یہ پہلے ہی کسی دوسرے اکاؤنٹ سے منسلک ہے۔",
     "failedProviderAlreadyLinked": "{{provider}} شامل نہیں کیا گیا کیونکہ آپ کے اکاؤنٹ میں پہلے ہی ایک مختلف {{provider}} سائن ان موجود ہے۔",
-    "failedLinking": "{{provider}} آپ کے اکاؤنٹ میں شامل نہیں کیا جا سکا۔"
+    "failedLinking": "{{provider}} آپ کے اکاؤنٹ میں شامل نہیں کیا جا سکا۔",
+    "notAdded": "آپ سائن ان ہو چکے ہیں۔ {{provider}} آپ کے اکاؤنٹ میں شامل نہیں کیا گیا۔"
   },
   "profile": {
     "codeReviewerSubtitle": "خودکار PR جائزے",

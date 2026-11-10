@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} nebyl přidán, protože jste se přihlásili k jinému účtu.",
     "failedAccountAlreadyLinked": "{{provider}} nebyl přidán, protože už je propojen s jiným účtem.",
     "failedProviderAlreadyLinked": "{{provider}} nebyl přidán, protože váš účet už má jiné přihlášení přes {{provider}}.",
-    "failedLinking": "{{provider}} se nepodařilo přidat k vašemu účtu."
+    "failedLinking": "{{provider}} se nepodařilo přidat k vašemu účtu.",
+    "notAdded": "Jste přihlášeni. {{provider}} nebyl přidán k vašemu účtu."
   },
   "profile": {
     "codeReviewerSubtitle": "Automatické kontroly PR",

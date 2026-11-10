@@ -241,7 +241,8 @@
     "failedWrongAccount": "Το {{provider}} δεν προστέθηκε επειδή συνδέθηκες σε διαφορετικό λογαριασμό.",
     "failedAccountAlreadyLinked": "Το {{provider}} δεν προστέθηκε επειδή είναι ήδη συνδεδεμένο με άλλον λογαριασμό.",
     "failedProviderAlreadyLinked": "Το {{provider}} δεν προστέθηκε επειδή ο λογαριασμός σου έχει ήδη διαφορετική σύνδεση {{provider}}.",
-    "failedLinking": "Δεν ήταν δυνατή η προσθήκη του {{provider}} στον λογαριασμό σου."
+    "failedLinking": "Δεν ήταν δυνατή η προσθήκη του {{provider}} στον λογαριασμό σου.",
+    "notAdded": "Έχεις συνδεθεί. Το {{provider}} δεν προστέθηκε στον λογαριασμό σου."
   },
   "profile": {
     "codeReviewerSubtitle": "Αυτόματοι έλεγχοι PR",

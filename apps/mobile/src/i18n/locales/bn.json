@@ -241,7 +241,8 @@
     "failedWrongAccount": "আপনি অন্য একটি অ্যাকাউন্টে সাইন ইন করেছেন, তাই {{provider}} যোগ করা হয়নি।",
     "failedAccountAlreadyLinked": "{{provider}} ইতিমধ্যে অন্য একটি অ্যাকাউন্টের সঙ্গে লিংক করা আছে, তাই এটি যোগ করা হয়নি।",
     "failedProviderAlreadyLinked": "আপনার অ্যাকাউন্টে ইতিমধ্যে একটি ভিন্ন {{provider}} সাইন-ইন আছে, তাই {{provider}} যোগ করা হয়নি।",
-    "failedLinking": "{{provider}} আপনার অ্যাকাউন্টে যোগ করা যায়নি।"
+    "failedLinking": "{{provider}} আপনার অ্যাকাউন্টে যোগ করা যায়নি।",
+    "notAdded": "আপনি সাইন ইন করেছেন। {{provider}} আপনার অ্যাকাউন্টে যোগ করা হয়নি।"
   },
   "profile": {
     "codeReviewerSubtitle": "স্বয়ংক্রিয় PR রিভিউ",

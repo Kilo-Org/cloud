@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}}-palvelua ei lisätty, koska kirjauduit eri tilille.",
     "failedAccountAlreadyLinked": "{{provider}}-palvelua ei lisätty, koska se on jo yhdistetty toiseen tiliin.",
     "failedProviderAlreadyLinked": "{{provider}}-palvelua ei lisätty, koska tililläsi on jo toinen {{provider}}-kirjautuminen.",
-    "failedLinking": "{{provider}}-palvelua ei voitu lisätä tiliisi."
+    "failedLinking": "{{provider}}-palvelua ei voitu lisätä tiliisi.",
+    "notAdded": "Olet kirjautunut sisään. {{provider}}-palvelua ei lisätty tiliisi."
   },
   "profile": {
     "codeReviewerSubtitle": "Automaattiset PR-katselmoinnit",

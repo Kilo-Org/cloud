@@ -16,6 +16,7 @@ import {
   getDeviceAuthAppModeFromRequestUrl,
 } from '@/app/device-auth/device-auth-url';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
 
 /**
  * The optional body of a pairing request. A caller that names the OAuth client
@@ -56,6 +57,13 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
   const requestingClient = await readRequestingClient(request);
   if (!requestingClient.ok) {
     return NextResponse.json({ error: 'Invalid requesting client' }, { status: 400 });
+  }
+
+  if (
+    requestingClient.pendingLinkToken &&
+    !(await getPendingLinkBySecret(requestingClient.pendingLinkToken))
+  ) {
+    return NextResponse.json({ error: 'PENDING_LINK_EXPIRED' }, { status: 400 });
   }
 
   try {

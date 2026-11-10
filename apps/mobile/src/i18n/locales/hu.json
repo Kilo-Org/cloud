@@ -241,7 +241,8 @@
     "failedWrongAccount": "A(z) {{provider}} nem lett hozzáadva, mert egy másik fiókba jelentkeztél be.",
     "failedAccountAlreadyLinked": "A(z) {{provider}} nem lett hozzáadva, mert már egy másik fiókhoz van kapcsolva.",
     "failedProviderAlreadyLinked": "A(z) {{provider}} nem lett hozzáadva, mert a fiókodhoz már tartozik egy másik {{provider}}-bejelentkezés.",
-    "failedLinking": "A(z) {{provider}} nem adható hozzá a fiókodhoz."
+    "failedLinking": "A(z) {{provider}} nem adható hozzá a fiókodhoz.",
+    "notAdded": "Bejelentkeztél. A(z) {{provider}} nem lett hozzáadva a fiókodhoz."
   },
   "profile": {
     "codeReviewerSubtitle": "Automatikus PR-ellenőrzések",

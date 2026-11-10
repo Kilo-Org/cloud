@@ -241,7 +241,8 @@
     "failedWrongAccount": "သင် အခြားအကောင့်သို့ ဝင်ခဲ့သဖြင့် {{provider}} ကို မထည့်ရသေးပါ။",
     "failedAccountAlreadyLinked": "{{provider}} သည် အခြားအကောင့်နှင့် ချိတ်ဆက်ထားပြီးဖြစ်သဖြင့် မထည့်ရသေးပါ။",
     "failedProviderAlreadyLinked": "သင့်အကောင့်တွင် အခြား {{provider}} အကောင့်ဝင်နည်း ရှိပြီးဖြစ်သဖြင့် {{provider}} ကို မထည့်ရသေးပါ။",
-    "failedLinking": "{{provider}} ကို သင့်အကောင့်တွင် ထည့်၍ မရပါ။"
+    "failedLinking": "{{provider}} ကို သင့်အကောင့်တွင် ထည့်၍ မရပါ။",
+    "notAdded": "သင် အကောင့်ဝင်ပြီးပါပြီ။ {{provider}} ကို သင့်အကောင့်တွင် မထည့်ရသေးပါ။"
   },
   "profile": {
     "codeReviewerSubtitle": "အလိုအလျောက် PR သုံးသပ်မှုများ",

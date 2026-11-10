@@ -9,8 +9,10 @@ import { AUTH_PROVIDER_DISPLAY_NAMES } from '@kilocode/web-shared/lib/auth/const
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import {
+  claimEmailCodeSend,
   getPendingLinkBySecret,
   readPendingLinkSecret,
+  releaseEmailCodeSend,
   setPendingLinkEmailChallenge,
 } from '@/lib/auth/pending-link';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
@@ -49,6 +51,16 @@ export const POST = withRestTiming(
       return NextResponse.json({ error: eligibility.errorCode }, { status: eligibility.status });
     }
 
+    if (!(await claimEmailCodeSend(secret))) {
+      if (!(await getPendingLinkBySecret(secret))) {
+        return NextResponse.json({ error: 'EXPIRED' }, { status: 404 });
+      }
+      return NextResponse.json(
+        { error: 'TOO_MANY_CODES', message: 'No more codes can be sent for this request.' },
+        { status: 429 }
+      );
+    }
+
     const { code, challengeId } = await createSignInCode(user.google_user_email);
     await setPendingLinkEmailChallenge(secret, challengeId);
     const result = await sendAccountLinkCodeEmail(
@@ -57,6 +69,7 @@ export const POST = withRestTiming(
       AUTH_PROVIDER_DISPLAY_NAMES[row.provider]
     );
     if (!result.sent) {
+      await releaseEmailCodeSend(secret);
       await deleteSignInCode(user.google_user_email, code);
       return NextResponse.json(
         { error: 'EMAIL_DELIVERY_FAILED', message: 'The code could not be sent. Try again.' },

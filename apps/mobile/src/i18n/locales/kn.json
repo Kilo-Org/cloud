@@ -241,7 +241,8 @@
     "failedWrongAccount": "ನೀವು ಬೇರೆ ಖಾತೆಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿದ್ದರಿಂದ {{provider}} ಅನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
     "failedAccountAlreadyLinked": "{{provider}} ಈಗಾಗಲೇ ಬೇರೆ ಖಾತೆಗೆ ಲಿಂಕ್ ಆಗಿರುವುದರಿಂದ ಅದನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
     "failedProviderAlreadyLinked": "ನಿಮ್ಮ ಖಾತೆಯಲ್ಲಿ ಈಗಾಗಲೇ ಬೇರೆ {{provider}} ಸೈನ್ ಇನ್ ಇರುವುದರಿಂದ {{provider}} ಅನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
-    "failedLinking": "{{provider}} ಅನ್ನು ನಿಮ್ಮ ಖಾತೆಗೆ ಸೇರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+    "failedLinking": "{{provider}} ಅನ್ನು ನಿಮ್ಮ ಖಾತೆಗೆ ಸೇರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "notAdded": "ನೀವು ಸೈನ್ ಇನ್ ಮಾಡಿದ್ದೀರಿ. {{provider}} ಅನ್ನು ನಿಮ್ಮ ಖಾತೆಗೆ ಸೇರಿಸಲಾಗಿಲ್ಲ."
   },
   "profile": {
     "codeReviewerSubtitle": "ಸ್ವಯಂಚಾಲಿತ PR ಪರಿಶೀಲನೆಗಳು",

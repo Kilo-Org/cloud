@@ -241,7 +241,8 @@
     "failedWrongAccount": "നിങ്ങൾ മറ്റൊരു അക്കൗണ്ടിലേക്ക് സൈൻ ഇൻ ചെയ്തതിനാൽ {{provider}} ചേർത്തില്ല.",
     "failedAccountAlreadyLinked": "{{provider}} ഇതിനകം മറ്റൊരു അക്കൗണ്ടുമായി ലിങ്ക് ചെയ്തിട്ടുള്ളതിനാൽ ചേർത്തില്ല.",
     "failedProviderAlreadyLinked": "നിങ്ങളുടെ അക്കൗണ്ടിൽ ഇതിനകം മറ്റൊരു {{provider}} സൈൻ ഇൻ ഉള്ളതിനാൽ {{provider}} ചേർത്തില്ല.",
-    "failedLinking": "{{provider}} നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് ചേർക്കാനായില്ല."
+    "failedLinking": "{{provider}} നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് ചേർക്കാനായില്ല.",
+    "notAdded": "നിങ്ങൾ സൈൻ ഇൻ ചെയ്തിട്ടുണ്ട്. {{provider}} നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് ചേർത്തില്ല."
   },
   "profile": {
     "codeReviewerSubtitle": "സ്വയമേവയുള്ള PR അവലോകനങ്ങൾ",

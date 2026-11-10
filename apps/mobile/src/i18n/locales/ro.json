@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} nu a fost adăugat pentru că te-ai autentificat în alt cont.",
     "failedAccountAlreadyLinked": "{{provider}} nu a fost adăugat pentru că este deja asociat cu alt cont.",
     "failedProviderAlreadyLinked": "{{provider}} nu a fost adăugat pentru că contul tău are deja o altă autentificare {{provider}}.",
-    "failedLinking": "{{provider}} nu a putut fi adăugat în contul tău."
+    "failedLinking": "{{provider}} nu a putut fi adăugat în contul tău.",
+    "notAdded": "Te-ai autentificat. {{provider}} nu a fost adăugat în contul tău."
   },
   "profile": {
     "codeReviewerSubtitle": "Revizuiri automate de PR",

@@ -1,5 +1,5 @@
 {
-  "id": "93e775a7-0ab6-45e2-a6f9-ee2cd95882f5",
+  "id": "72372c44-f196-4cfb-8354-db4b867a3a79",
   "prevId": "5cbcc798-84cb-4ecc-8667-fdd13f1c7dcd",
   "version": "7",
   "dialect": "postgresql",
@@ -28515,6 +28515,13 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": true
+        },
+        "email_code_send_count": {
+          "name": "email_code_send_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "email_code_challenge_id": {
           "name": "email_code_challenge_id",

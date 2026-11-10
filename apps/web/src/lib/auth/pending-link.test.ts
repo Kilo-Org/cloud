@@ -9,15 +9,25 @@ import {
   type CreateOrUpdateUserArgs,
 } from '@/lib/user';
 import {
+  claimEmailCodeSend,
   completePendingLink,
   createPendingLink,
   createPendingLinkForDifferentOAuth,
   getPendingLinkMethods,
+  MAX_EMAIL_CODE_SENDS_PER_PENDING_LINK,
+  releaseEmailCodeSend,
 } from './pending-link';
+import type * as UserModule from '@/lib/user';
 
 jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendNewSignInMethodEmail: jest.fn(async () => ({ sent: true })),
 }));
+jest.mock('@/lib/user', () => {
+  const actual = jest.requireActual<typeof UserModule>('@/lib/user');
+  return { ...actual, linkAccountToExistingUser: jest.fn(actual.linkAccountToExistingUser) };
+});
+
+const mockLinkAccount = jest.mocked(linkAccountToExistingUser);
 
 const mockSendNotice = jest.mocked(sendNewSignInMethodEmail);
 const createdUserIds: string[] = [];
@@ -53,7 +63,7 @@ function githubIdentity(email: string, accountId = 'github-pending-1'): CreateOr
     hosted_domain: '@@github@@',
     provider: 'github',
     provider_account_id: accountId,
-    display_name: null,
+    display_name: 'octo-pending',
   };
 }
 
@@ -160,7 +170,52 @@ describe('pending auth link attach rule', () => {
       reason: 'EXPIRED',
     });
     expect(mockSendNotice).toHaveBeenCalledTimes(1);
-    expect(mockSendNotice).toHaveBeenCalledWith(user.google_user_email, 'GitHub');
+    expect(mockSendNotice).toHaveBeenCalledWith(user.google_user_email, 'GitHub', {
+      email: user.google_user_email,
+      displayName: 'octo-pending',
+    });
+  });
+
+  it('restores the claim when the link call throws, then links on retry', async () => {
+    const user = await makeUser('pending-throws@example.com');
+    const { secret, pendingLink } = await createPendingLink({
+      kiloUserId: user.id,
+      kind: 'existing_account',
+      identity: githubIdentity(user.google_user_email),
+      emailCodeAllowed: true,
+    });
+    mockLinkAccount.mockRejectedValueOnce(new Error('database unavailable'));
+
+    await expect(completePendingLink(secret, user.id)).rejects.toThrow('database unavailable');
+    const [row] = await db
+      .select()
+      .from(pending_auth_links)
+      .where(eq(pending_auth_links.id, pendingLink.id));
+    expect(row.consumed_at).toBeNull();
+
+    await expect(completePendingLink(secret, user.id)).resolves.toEqual({
+      status: 'linked',
+      provider: 'github',
+    });
+  });
+
+  it('caps email code sends per pending row and returns a released send', async () => {
+    const user = await makeUser('pending-code-cap@example.com');
+    const { secret } = await createPendingLink({
+      kiloUserId: user.id,
+      kind: 'existing_account',
+      identity: githubIdentity(user.google_user_email),
+      emailCodeAllowed: true,
+    });
+
+    for (let i = 0; i < MAX_EMAIL_CODE_SENDS_PER_PENDING_LINK; i++) {
+      await expect(claimEmailCodeSend(secret)).resolves.toBe(true);
+    }
+    await expect(claimEmailCodeSend(secret)).resolves.toBe(false);
+
+    await releaseEmailCodeSend(secret);
+    await expect(claimEmailCodeSend(secret)).resolves.toBe(true);
+    await expect(claimEmailCodeSend(secret)).resolves.toBe(false);
   });
 
   it('links exactly once under concurrent completion', async () => {

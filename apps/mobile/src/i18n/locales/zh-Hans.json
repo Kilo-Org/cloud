@@ -241,7 +241,8 @@
     "failedWrongAccount": "你登录了其他账户，未能添加 {{provider}}。",
     "failedAccountAlreadyLinked": "{{provider}} 已关联到其他账户，未能添加。",
     "failedProviderAlreadyLinked": "你的账户已有另一个 {{provider}} 登录方式，未能添加 {{provider}}。",
-    "failedLinking": "无法将 {{provider}} 添加到你的账户。"
+    "failedLinking": "无法将 {{provider}} 添加到你的账户。",
+    "notAdded": "你已登录，但未能将 {{provider}} 添加到你的账户。"
   },
   "profile": {
     "codeReviewerSubtitle": "自动 PR 审查",

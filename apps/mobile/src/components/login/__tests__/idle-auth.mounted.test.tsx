@@ -74,6 +74,8 @@ vi.mock('@/lib/auth/use-native-auth', () => ({
     ssoRecovery: ssoRecovery.value,
     clearSsoRecovery: vi.fn(),
     handleSsoError: vi.fn(),
+    pendingLinkFailure: undefined,
+    clearPendingLinkFailure: vi.fn(),
   }),
 }));
 

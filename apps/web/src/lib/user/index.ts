@@ -151,6 +151,7 @@ import {
 import { sendNewSignInMethodEmail } from '@kilocode/web-shared/lib/email';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
+import { runAfterResponse } from '@/lib/after-response';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
@@ -279,6 +280,12 @@ export type CreateOrUpdateUserOptions = {
    * set it on any path a user can reach.
    */
   skipSignupAdmission?: boolean;
+  /**
+   * Resolves whether the sign-in credential proved ownership of its email.
+   * Called only when the sign-in email already belongs to an account, so a
+   * proof that costs a provider request is not spent on ordinary sign-ins.
+   */
+  resolveEmailProof?: () => Promise<boolean>;
 };
 
 /**
@@ -649,11 +656,17 @@ export async function createOrUpdateUser(
     const accountHasVerifiedPrimaryAddress =
       existingProviders.length === 0 ||
       hasVerifiedPrimaryAddress(userByEmail.google_user_email, existingProviders);
-    const workosSettles = args.provider === 'workos' && autoLinkToExistingUser;
+    // A lazy proof is resolved only here, where an email collision makes it
+    // decisive, so a provider that must ask its API pays that cost only when
+    // the answer can change the outcome.
+    const provesEmailOwnership =
+      autoLinkToExistingUser ||
+      (options.resolveEmailProof ? await options.resolveEmailProof() : false);
+    const workosSettles = args.provider === 'workos' && provesEmailOwnership;
     const shouldLink =
       workosSettles ||
       (!hasThisProvider &&
-        (onlyHasFakeLogin || (autoLinkToExistingUser && accountHasVerifiedPrimaryAddress)));
+        (onlyHasFakeLogin || (provesEmailOwnership && accountHasVerifiedPrimaryAddress)));
 
     if (shouldLink) {
       let linkedUser = userByEmail;
@@ -1059,22 +1072,29 @@ export async function linkAccountToExistingUser(
   );
 
   if (!isNoOpRelink && authProviderData.provider !== 'fake-login') {
-    try {
-      const notice = await sendNewSignInMethodEmail(
-        existingUser.google_user_email,
-        AUTH_PROVIDER_DISPLAY_NAMES[authProviderData.provider]
-      );
-      if (!notice.sent) {
-        console.warn('[auth] New sign-in method notice was not sent', {
+    // Sent after the response: the notice must never delay or fail the sign-in.
+    await runAfterResponse(async () => {
+      try {
+        const notice = await sendNewSignInMethodEmail(
+          existingUser.google_user_email,
+          AUTH_PROVIDER_DISPLAY_NAMES[authProviderData.provider],
+          {
+            email: authProviderData.google_user_email,
+            displayName: authProviderData.display_name ?? null,
+          }
+        );
+        if (!notice.sent) {
+          console.warn('[auth] New sign-in method notice was not sent', {
+            provider: authProviderData.provider,
+            reason: notice.reason,
+          });
+        }
+      } catch {
+        console.warn('[auth] New sign-in method notice failed', {
           provider: authProviderData.provider,
-          reason: notice.reason,
         });
       }
-    } catch {
-      console.warn('[auth] New sign-in method notice failed', {
-        provider: authProviderData.provider,
-      });
-    }
+    });
   }
 
   // Log the account linking event

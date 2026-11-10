@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} blev ikke tilføjet, fordi du loggede ind på en anden konto.",
     "failedAccountAlreadyLinked": "{{provider}} blev ikke tilføjet, fordi det allerede er knyttet til en anden konto.",
     "failedProviderAlreadyLinked": "{{provider}} blev ikke tilføjet, fordi din konto allerede har et andet {{provider}}-login.",
-    "failedLinking": "{{provider}} kunne ikke føjes til din konto."
+    "failedLinking": "{{provider}} kunne ikke føjes til din konto.",
+    "notAdded": "Du er logget ind. {{provider}} blev ikke føjet til din konto."
   },
   "profile": {
     "codeReviewerSubtitle": "Automatiske PR-gennemgange",

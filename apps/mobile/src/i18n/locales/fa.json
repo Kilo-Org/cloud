@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} افزوده نشد، چون به حساب دیگری وارد شدید.",
     "failedAccountAlreadyLinked": "{{provider}} افزوده نشد، چون از قبل به حساب دیگری پیوند داده شده است.",
     "failedProviderAlreadyLinked": "{{provider}} افزوده نشد، چون حساب شما از قبل ورود دیگری با {{provider}} دارد.",
-    "failedLinking": "افزودن {{provider}} به حساب شما ممکن نشد."
+    "failedLinking": "افزودن {{provider}} به حساب شما ممکن نشد.",
+    "notAdded": "وارد شده‌اید. {{provider}} به حساب شما افزوده نشد."
   },
   "profile": {
     "codeReviewerSubtitle": "بازبینی خودکار PR",

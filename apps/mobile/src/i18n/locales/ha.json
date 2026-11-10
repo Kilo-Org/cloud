@@ -241,7 +241,8 @@
     "failedWrongAccount": "Ba a ƙara {{provider}} ba saboda ka shiga wani asusu daban.",
     "failedAccountAlreadyLinked": "Ba a ƙara {{provider}} ba saboda an riga an haɗa shi da wani asusu.",
     "failedProviderAlreadyLinked": "Ba a ƙara {{provider}} ba saboda asusunka yana da wata shigar {{provider}} daban tuni.",
-    "failedLinking": "An kasa ƙara {{provider}} zuwa asusunka."
+    "failedLinking": "An kasa ƙara {{provider}} zuwa asusunka.",
+    "notAdded": "Ka shiga. Ba a ƙara {{provider}} zuwa asusunka ba."
   },
   "profile": {
     "codeReviewerSubtitle": "Bitar PR ta atomatik",

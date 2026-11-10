@@ -241,7 +241,8 @@
     "failedWrongAccount": "Níor cuireadh {{provider}} leis mar gur shínigh tú isteach i gcuntas eile.",
     "failedAccountAlreadyLinked": "Níor cuireadh {{provider}} leis mar go bhfuil sé nasctha le cuntas eile cheana.",
     "failedProviderAlreadyLinked": "Níor cuireadh {{provider}} leis mar go bhfuil síniú isteach {{provider}} eile ag do chuntas cheana.",
-    "failedLinking": "Níorbh fhéidir {{provider}} a chur le do chuntas."
+    "failedLinking": "Níorbh fhéidir {{provider}} a chur le do chuntas.",
+    "notAdded": "Tá tú sínithe isteach. Níor cuireadh {{provider}} le do chuntas."
   },
   "profile": {
     "codeReviewerSubtitle": "Athbhreithnithe PR uathoibríocha",

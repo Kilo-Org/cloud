@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} is nie bygevoeg nie omdat jy by 'n ander rekening aangemeld het.",
     "failedAccountAlreadyLinked": "{{provider}} is nie bygevoeg nie omdat dit reeds aan 'n ander rekening gekoppel is.",
     "failedProviderAlreadyLinked": "{{provider}} is nie bygevoeg nie omdat jou rekening reeds 'n ander {{provider}}-aanmelding het.",
-    "failedLinking": "{{provider}} kon nie by jou rekening gevoeg word nie."
+    "failedLinking": "{{provider}} kon nie by jou rekening gevoeg word nie.",
+    "notAdded": "Jy is aangemeld. {{provider}} is nie by jou rekening gevoeg nie."
   },
   "profile": {
     "codeReviewerSubtitle": "Outomatiese PR-hersienings",

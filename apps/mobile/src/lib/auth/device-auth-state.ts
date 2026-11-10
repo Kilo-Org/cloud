@@ -32,6 +32,8 @@ export type DeviceAuthState = {
   resumed?: boolean;
   /** What happened to the pending link the approved code carried. */
   pendingLink?: PendingLinkResult;
+  /** The pending-link token the device-code route refused as no longer live. */
+  expiredPendingLinkToken?: string;
 };
 
 export function errorDeviceAuthState(

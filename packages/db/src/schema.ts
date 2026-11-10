@@ -2670,6 +2670,7 @@ export const pending_auth_links = pgTable(
     display_name: text(),
     hosted_domain: text(),
     email_code_allowed: boolean().notNull(),
+    email_code_send_count: integer().default(0).notNull(),
     email_code_challenge_id: uuid(),
     callback_path: text(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),

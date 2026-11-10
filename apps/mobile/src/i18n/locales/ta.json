@@ -241,7 +241,8 @@
     "failedWrongAccount": "நீங்கள் வேறு கணக்கில் உள்நுழைந்ததால் {{provider}} சேர்க்கப்படவில்லை.",
     "failedAccountAlreadyLinked": "{{provider}} ஏற்கெனவே வேறொரு கணக்குடன் இணைக்கப்பட்டுள்ளதால் சேர்க்கப்படவில்லை.",
     "failedProviderAlreadyLinked": "உங்கள் கணக்கில் ஏற்கெனவே வேறொரு {{provider}} உள்நுழைவு இருப்பதால் {{provider}} சேர்க்கப்படவில்லை.",
-    "failedLinking": "{{provider}} ஐ உங்கள் கணக்கில் சேர்க்க முடியவில்லை."
+    "failedLinking": "{{provider}} ஐ உங்கள் கணக்கில் சேர்க்க முடியவில்லை.",
+    "notAdded": "நீங்கள் உள்நுழைந்துவிட்டீர்கள். {{provider}} உங்கள் கணக்கில் சேர்க்கப்படவில்லை."
   },
   "profile": {
     "codeReviewerSubtitle": "தானியங்கி PR மதிப்பாய்வுகள்",

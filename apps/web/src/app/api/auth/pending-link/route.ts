@@ -16,6 +16,9 @@ export const GET = withRestTiming('/api/auth/pending-link', async () => {
   return NextResponse.json({
     provider: summary.provider,
     email: summary.email,
+    displayName: summary.displayName,
+    accountEmail: summary.accountEmail,
+    kind: summary.kind,
     methods: summary.methods,
     emailCode: summary.emailCode,
     expiresAt: summary.expiresAt,

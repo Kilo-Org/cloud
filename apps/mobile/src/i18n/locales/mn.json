@@ -241,7 +241,8 @@
     "failedWrongAccount": "Та өөр бүртгэлээр нэвтэрсэн тул {{provider}} нэмэгдсэнгүй.",
     "failedAccountAlreadyLinked": "{{provider}} өөр бүртгэлтэй аль хэдийн холбогдсон тул нэмэгдсэнгүй.",
     "failedProviderAlreadyLinked": "Таны бүртгэлд өөр {{provider}} нэвтрэлт аль хэдийн байгаа тул {{provider}} нэмэгдсэнгүй.",
-    "failedLinking": "{{provider}}-г таны бүртгэлд нэмж чадсангүй."
+    "failedLinking": "{{provider}}-г таны бүртгэлд нэмж чадсангүй.",
+    "notAdded": "Та нэвтэрсэн байна. {{provider}} таны бүртгэлд нэмэгдсэнгүй."
   },
   "profile": {
     "codeReviewerSubtitle": "PR-ийн автомат хяналт",

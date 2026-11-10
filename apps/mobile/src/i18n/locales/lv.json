@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} netika pievienots, jo tu pierakstījies citā kontā.",
     "failedAccountAlreadyLinked": "{{provider}} netika pievienots, jo tas jau ir saistīts ar citu kontu.",
     "failedProviderAlreadyLinked": "{{provider}} netika pievienots, jo tavam kontam jau ir cita {{provider}} pierakstīšanās.",
-    "failedLinking": "{{provider}} nevarēja pievienot tavam kontam."
+    "failedLinking": "{{provider}} nevarēja pievienot tavam kontam.",
+    "notAdded": "Tu esi pierakstījies. {{provider}} netika pievienots tavam kontam."
   },
   "profile": {
     "codeReviewerSubtitle": "Automātiskas PR pārbaudes",

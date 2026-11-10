@@ -3,9 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 import {
-  announcePendingLinkResult,
+  announcePendingLinkOutcome,
   pendingLinkFailure,
   pendingLinkOptions,
+  pendingLinkOutcome,
   pendingLinkTokenBody,
   resolvePendingLinkView,
 } from '@/lib/auth/pending-link';
@@ -128,9 +129,9 @@ describe('resolvePendingLinkView', () => {
   });
 });
 
-describe('announcePendingLinkResult', () => {
+describe('announcePendingLinkOutcome', () => {
   it('confirms a linked provider by name', () => {
-    announcePendingLinkResult({ status: 'linked', provider: 'openai' }, offer);
+    announcePendingLinkOutcome({ status: 'linked', provider: 'openai' }, offer);
     expect(announcingToast.success).toHaveBeenCalledWith('ChatGPT was added to your account.');
   });
 
@@ -147,13 +148,26 @@ describe('announcePendingLinkResult', () => {
     ],
     ['LINKING-FAILED', "GitHub couldn't be added to your account."],
   ] as const)('warns without blocking for %s', (reason, message) => {
-    announcePendingLinkResult({ status: 'failed', reason }, offer);
+    announcePendingLinkOutcome({ status: 'failed', reason }, offer);
     expect(announcingToast.warning).toHaveBeenCalledWith(message);
     expect(announcingToast.error).not.toHaveBeenCalled();
   });
 
-  it('stays silent when the sign-in carried no link result', () => {
-    announcePendingLinkResult(undefined, offer);
+  it('says the provider was not added when the sign-in carried no result', () => {
+    announcePendingLinkOutcome(pendingLinkOutcome(undefined), offer);
+    expect(announcingToast.warning).toHaveBeenCalledWith(
+      "You're signed in. GitHub wasn't added to your account."
+    );
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
+  it('keeps the linked result of a sign-in whose offer is already gone', () => {
+    announcePendingLinkOutcome({ status: 'linked', provider: 'gitlab' }, null);
+    expect(announcingToast.success).toHaveBeenCalledWith('GitLab was added to your account.');
+  });
+
+  it('stays silent when nothing was recorded', () => {
+    announcePendingLinkOutcome(undefined, offer);
     expect(announcingToast.success).not.toHaveBeenCalled();
     expect(announcingToast.warning).not.toHaveBeenCalled();
   });

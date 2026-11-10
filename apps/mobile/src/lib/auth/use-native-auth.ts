@@ -33,9 +33,10 @@ import {
   signInWithPasskey as runPasskeySignIn,
 } from '@/lib/auth/passkey-client';
 import {
-  announcePendingLinkResult,
+  announcePendingLinkOutcome,
   type PendingLinkFailure,
   pendingLinkFailure,
+  pendingLinkOutcome,
   pendingLinkTokenBody,
 } from '@/lib/auth/pending-link';
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
@@ -101,6 +102,7 @@ type NativeAuthResult = {
   handleSsoError: (email: string, ssoOrganizationId: string | undefined) => void;
   /** The last refusal while a pending link is being resolved; that screen shows it inline. */
   pendingLinkFailure: PendingLinkFailure | undefined;
+  clearPendingLinkFailure: () => void;
 };
 
 type PendingLinkBinding = {
@@ -127,6 +129,12 @@ export function useNativeAuth(binding?: PendingLinkBinding): NativeAuthResult {
 
   const clearEmailError = useCallback(() => {
     setEmailErrorKey(undefined);
+  }, []);
+
+  // The two surfaces that show a pending-link refusal — the options and the code step — retire
+  // it on the same user steps, so the message never outlives the attempt it belongs to.
+  const clearPendingLinkFailure = useCallback(() => {
+    setLinkFailure(undefined);
   }, []);
 
   const startAction = useCallback(
@@ -182,7 +190,7 @@ export function useNativeAuth(binding?: PendingLinkBinding): NativeAuthResult {
       if (outcome.created === true) {
         announcingToast.success(i18n.t('login.accountCreated'));
       }
-      announcePendingLinkResult(outcome.pendingLink, pendingLink);
+      announcePendingLinkOutcome(pendingLinkOutcome(outcome.pendingLink), pendingLink);
     },
     [pendingLink]
   );
@@ -525,5 +533,6 @@ export function useNativeAuth(binding?: PendingLinkBinding): NativeAuthResult {
     clearSsoRecovery,
     handleSsoError,
     pendingLinkFailure: linkFailure,
+    clearPendingLinkFailure,
   };
 }

@@ -241,7 +241,8 @@
     "failedWrongAccount": "{{provider}} tidak ditambahkan karena kamu masuk ke akun lain.",
     "failedAccountAlreadyLinked": "{{provider}} tidak ditambahkan karena sudah ditautkan ke akun lain.",
     "failedProviderAlreadyLinked": "{{provider}} tidak ditambahkan karena akunmu sudah memiliki metode masuk {{provider}} yang berbeda.",
-    "failedLinking": "{{provider}} tidak dapat ditambahkan ke akunmu."
+    "failedLinking": "{{provider}} tidak dapat ditambahkan ke akunmu.",
+    "notAdded": "Kamu sudah masuk. {{provider}} tidak ditambahkan ke akunmu."
   },
   "profile": {
     "codeReviewerSubtitle": "Tinjauan PR otomatis",

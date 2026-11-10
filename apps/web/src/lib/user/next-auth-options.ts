@@ -46,7 +46,11 @@ import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizat
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
-import { linkAccountToExistingUser } from '@/lib/user';
+import {
+  findUserIdByAuthProvider,
+  getUserAuthProviders,
+  linkAccountToExistingUser,
+} from '@/lib/user';
 import {
   createPendingLink,
   createPendingLinkForDifferentOAuth,
@@ -1186,6 +1190,17 @@ export const authOptions: NextAuthOptions = {
               if (await isEmailBlacklistedByDomainAsync(accountInfo.google_user_email)) {
                 return redirectUrlForCode('BLOCKED');
               }
+              const appleOwnerId = await findUserIdByAuthProvider(
+                'apple',
+                accountInfo.provider_account_id
+              );
+              if (appleOwnerId && appleOwnerId !== linkingSession.existingUserId) {
+                return redirectUrlForCode('ACCOUNT-ALREADY-LINKED');
+              }
+              const targetProviders = await getUserAuthProviders(linkingSession.existingUserId);
+              if (targetProviders.some(p => p.provider === 'apple')) {
+                return redirectUrlForCode('PROVIDER-ALREADY-LINKED');
+              }
               const created = await createPendingLink({
                 kiloUserId: linkingSession.existingUserId,
                 kind: 'explicit_link',
@@ -1400,11 +1415,17 @@ export const authOptions: NextAuthOptions = {
         // Auto-link only when the credential proves ownership of the email:
         // a magic link consumes an inbox token; fake-login is dev-only; an
         // OAuth profile proves it via the provider's email_verified claim.
-        // Methods without proof keep the DIFFERENT-OAUTH refusal.
-        const oauthProvesEmailOwnership =
+        // Methods without proof keep the DIFFERENT-OAUTH refusal. The GitHub
+        // email list is read lazily, only when the email collides.
+        const oauthProvesEmailOwnership = profileProvesEmailOwnership(profile, account.provider);
+        const githubEmailProof =
           account.provider === 'github' && account.access_token
-            ? await fetchGitHubEmailVerified(account.access_token, accountInfo.google_user_email)
-            : profileProvesEmailOwnership(profile, account.provider);
+            ? fetchGitHubEmailVerified.bind(
+                null,
+                account.access_token,
+                accountInfo.google_user_email
+              )
+            : undefined;
         const autoLinkToExistingUser = isEmailAuth || isFakeLogin || oauthProvesEmailOwnership;
         if (isAccountLinking) {
           logImpactReferralDebug('Auth flow skipped Impact tracking context extraction', {
@@ -1436,7 +1457,10 @@ export const authOptions: NextAuthOptions = {
                 autoLinkToExistingUser,
                 requestHeaders,
                 affiliateTrackingId,
-                { ...trackingContext, watchwood }
+                { ...trackingContext, watchwood },
+                false,
+                undefined,
+                githubEmailProof ? { resolveEmailProof: githubEmailProof } : {}
               );
 
         if (result.success === false) {

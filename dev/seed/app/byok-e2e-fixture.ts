@@ -15,7 +15,10 @@ const KEY_PREFIX = 'dev-seed:byok-e2e';
 const MARKER_TAG = 'dev-seed:byok-e2e';
 const VERCEL_MODELS_URL = 'https://ai-gateway.vercel.sh/v1/models';
 
+const ORIGINAL_BODY_KEY = 'dev_seed_original';
+
 const StoredModelListSchema = z.object({ data: z.array(z.record(z.string(), z.unknown())) });
+const FixtureEndpointsRowSchema = z.object({ [ORIGINAL_BODY_KEY]: z.unknown().optional() });
 
 function vercelModelEndpointsUrl(modelId: string) {
   return `${VERCEL_MODELS_URL}/${modelId}/endpoints`;
@@ -102,16 +105,31 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       throw new Error('Failed to create the fixture BYOK key');
     }
 
-    // Remove every endpoints row and list entry this topic ever wrote, across all models.
-    // The marker never occurs in upstream bodies, so refreshed metadata is never removed.
-    await tx
-      .delete(ai_gateway_metadata_cache)
+    // Undo every endpoints row this topic ever wrote, across all models: restore the upstream
+    // body it replaced, or remove it when it replaced none. The marker never occurs in upstream
+    // bodies, so refreshed metadata is never touched.
+    const fixtureRows = await tx
+      .select({ url: ai_gateway_metadata_cache.url, data: ai_gateway_metadata_cache.data })
+      .from(ai_gateway_metadata_cache)
       .where(
         and(
           like(ai_gateway_metadata_cache.url, vercelModelEndpointsUrl('%')),
           sql`${ai_gateway_metadata_cache.data} -> 'data' -> 'endpoints' @> ${JSON.stringify([{ tag: MARKER_TAG }])}::jsonb`
         )
       );
+    for (const row of fixtureRows) {
+      const original = FixtureEndpointsRowSchema.parse(row.data)[ORIGINAL_BODY_KEY];
+      if (original === undefined) {
+        await tx
+          .delete(ai_gateway_metadata_cache)
+          .where(eq(ai_gateway_metadata_cache.url, row.url));
+      } else {
+        await tx
+          .update(ai_gateway_metadata_cache)
+          .set({ data: original })
+          .where(eq(ai_gateway_metadata_cache.url, row.url));
+      }
+    }
 
     // Keep the other stored models, so same-provider models stay flagged. The gateway
     // rejects a list of fewer than 100 models as truncated, so a real list is required.
@@ -132,7 +150,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         ? listedModels
         : [...listedModels, { id: modelId, name: modelId, type: 'language', dev_seed: MARKER_TAG }],
     };
-    const endpoints = { data: { endpoints: [{ provider_name: provider, tag: MARKER_TAG }] } };
+    const [upstreamEndpoints] = await tx
+      .select({ data: ai_gateway_metadata_cache.data })
+      .from(ai_gateway_metadata_cache)
+      .where(eq(ai_gateway_metadata_cache.url, vercelModelEndpointsUrl(modelId)));
+    const endpoints = {
+      data: { endpoints: [{ provider_name: provider, tag: MARKER_TAG }] },
+      ...(upstreamEndpoints && { [ORIGINAL_BODY_KEY]: upstreamEndpoints.data }),
+    };
 
     // Prove both rows parse the way the gateway later reads them.
     const parsedList = ModelsSchema.safeParse(list);

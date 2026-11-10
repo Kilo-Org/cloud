@@ -15,7 +15,10 @@ import {
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import type { GitLabCredentialActor } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { isPlatformIntegrationSuspended } from '@/lib/integrations/core/health';
+import {
+  isPlatformIntegrationHealthy,
+  isPlatformIntegrationSuspended,
+} from '@/lib/integrations/core/health';
 import {
   requireNumericPlatformRepositories,
   shouldSyncProviderRepositories,
@@ -138,6 +141,26 @@ const missingIntegrationResponse = (message: string): GitLabRepositoriesResult =
   errorMessage: message,
 });
 
+/**
+ * The message a stored GitLab connection answers with when the shared health
+ * predicate declines it. A suspension is reported first: the disconnect and
+ * authorizing-user-removal writers both set a credential marker as well, and
+ * the reconnect step is the action that helps.
+ */
+const unavailableMessageForIntegration = (integration: {
+  integration_status: string | null;
+  suspended_at: string | null;
+  auth_invalid_at: string | null;
+}): string => {
+  if (isPlatformIntegrationSuspended(integration)) {
+    return 'GitLab integration is suspended';
+  }
+  if (integration.auth_invalid_at) {
+    return 'GitLab integration requires reauthorization';
+  }
+  return 'GitLab integration is not properly configured';
+};
+
 type GitLabMetadata = {
   access_token?: string;
   refresh_token?: string;
@@ -183,7 +206,9 @@ export async function getGitLabTokenForUser(userId: string): Promise<string | un
 
 /**
  * Fetch GitLab repositories for an organization
- * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true
+ * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true.
+ * Only a connection the shared health predicate accepts answers from the
+ * snapshot; any other connection answers the unavailable result.
  */
 export async function fetchGitLabRepositoriesForOrganization(
   organizationId: string,
@@ -196,8 +221,8 @@ export async function fetchGitLabRepositoriesForOrganization(
     return missingIntegrationResponse('No GitLab integration found for this organization');
   }
 
-  if (isPlatformIntegrationSuspended(integration)) {
-    return missingIntegrationResponse('GitLab integration is suspended');
+  if (!isPlatformIntegrationHealthy(integration)) {
+    return missingIntegrationResponse(unavailableMessageForIntegration(integration));
   }
 
   const metadata = integration.metadata as GitLabMetadata | null;
@@ -245,7 +270,9 @@ export async function fetchGitLabRepositoriesForOrganization(
 
 /**
  * Fetch GitLab repositories for a user
- * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true
+ * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true.
+ * Only a connection the shared health predicate accepts answers from the
+ * snapshot; any other connection answers the unavailable result.
  */
 export async function fetchGitLabRepositoriesForUser(
   userId: string,
@@ -257,8 +284,8 @@ export async function fetchGitLabRepositoriesForUser(
     return missingIntegrationResponse('No GitLab integration found for this user');
   }
 
-  if (isPlatformIntegrationSuspended(integration)) {
-    return missingIntegrationResponse('GitLab integration is suspended');
+  if (!isPlatformIntegrationHealthy(integration)) {
+    return missingIntegrationResponse(unavailableMessageForIntegration(integration));
   }
 
   const metadata = integration.metadata as GitLabMetadata | null;
@@ -342,12 +369,12 @@ export type GitLabRequesterAccess = { outcome: 'allowed' } | { outcome: 'refused
  * `allowed` means the project read succeeded under the account's own
  * credential and the instance reports Developer or above for that credential,
  * which is the level that can push. `refused`: the account holds no GitLab
- * connection of its own, its connection is suspended, the instance keeps the
- * project from its credential (404, or a 401/403 the account's own credential
- * cannot clear), or the reported level is below Developer. All of these are
- * verdicts about this requester, so the caller answers with the refusal line
- * and starts no session. A suspended connection is refused before any
- * credential or project read.
+ * connection of its own, the health predicate declines its connection, the
+ * instance keeps the project from its credential (404, or a 401/403 the
+ * account's own credential cannot clear), or the reported level is below
+ * Developer. All of these are verdicts about this requester, so the caller
+ * answers with the refusal line and starts no session. A declined connection
+ * is answered without a credential or project read.
  *
  * Everything else (a 5xx, a rate limit, a transport failure, a credential
  * resolution outage) propagates: the caller's failure path answers with the
@@ -360,7 +387,7 @@ export async function getGitLabProjectAccessForRequester(
   projectPath: string
 ): Promise<GitLabRequesterAccess> {
   const integration = await getGitLabIntegration({ type: 'user', id: userId });
-  if (!integration || isPlatformIntegrationSuspended(integration)) {
+  if (!integration || !isPlatformIntegrationHealthy(integration)) {
     return { outcome: 'refused' };
   }
 

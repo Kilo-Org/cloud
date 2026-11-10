@@ -9,8 +9,11 @@ import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/or
 import type { Organization } from '@kilocode/db/schema';
 import { redirect } from 'next/navigation';
 import type { JSX } from 'react';
+import { getLiveOrganizationName } from '@/lib/organizations/organization-name';
+import { supportAccessNeededContent } from '@/lib/organizations/support-access-needed-content';
 import { OrganizationTrialWrapper } from './OrganizationTrialWrapper';
 import { SupportAccessBanner } from './SupportAccessBanner';
+import { SupportAccessNeeded } from './SupportAccessNeeded';
 
 export async function OrganizationByPageLayout({
   params,
@@ -50,6 +53,28 @@ export async function OrganizationByPageLayout({
   if (!result.success) {
     if (result.nextResponse.status === 401) {
       redirect(await signInUrlWithCallbackPath());
+    }
+    const denial = result.denial;
+    if (
+      denial !== undefined &&
+      denial.isPlatformAdmin &&
+      isSupportAccessEnabled() &&
+      (denial.status === 403 || denial.status === 503)
+    ) {
+      const organizationName = await getLiveOrganizationName(organizationId);
+      const content = supportAccessNeededContent({
+        organizationId,
+        organizationName,
+        reason: denial.reason,
+        dashboardIsCurrent: supportRead,
+      });
+      return (
+        <SupportAccessNeeded
+          organizationId={organizationId}
+          organizationName={organizationName}
+          content={content}
+        />
+      );
     }
     redirect('/profile');
   }

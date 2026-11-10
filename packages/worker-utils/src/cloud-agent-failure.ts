@@ -237,6 +237,7 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'managed_provider_unavailable',
   'managed_provider_authentication',
   'managed_model_configuration',
+  'model_catalog_unavailable',
   'provider_unavailable',
   'provider_disconnect',
   'gateway_unavailable',
@@ -302,6 +303,7 @@ export const CLOUD_AGENT_ASSISTANT_FAILURE_REASONS = [
   'output_limit',
   'content_filter',
   'structured_output',
+  'model_catalog_unavailable',
   'unknown',
 ] as const;
 export const CloudAgentAssistantFailureReasonSchema = z.enum(CLOUD_AGENT_ASSISTANT_FAILURE_REASONS);
@@ -423,11 +425,15 @@ function classifyAdmissionFailure(
  * provider are indistinguishable from the cloud agent's point of view, so
  * ownership does not change the responsibility for a provider outage, rate
  * limit, timeout or model-availability failure. Only a failure whose handling
- * the cloud agent platform itself controls stays `platform`.
+ * the cloud agent platform itself controls stays `platform`, such as a model
+ * catalog path that the runtime credential proxy does not allow.
  */
 function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClassification {
   if (input.code === 'payment_required' || input.assistantReason === 'insufficient_credits') {
     return classified('user', 'insufficient_credits');
+  }
+  if (input.assistantReason === 'model_catalog_unavailable') {
+    return classified('platform', 'model_catalog_unavailable');
   }
   if (input.assistantReason === 'rate_limited') return classified('provider', 'rate_limited');
   if (input.code === 'model_missing' || input.assistantReason === 'model_unavailable') {

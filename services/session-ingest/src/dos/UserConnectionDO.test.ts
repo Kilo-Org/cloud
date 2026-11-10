@@ -5176,6 +5176,40 @@ describe('UserConnectionDO', () => {
       warn.mockRestore();
     });
 
+    it('drops an inherited trim marker when a later write fits', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      capAttachment(cliWs);
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      expect(cliWs.deserializeAttachment()).toHaveProperty('sessionsTrimmed');
+
+      // A status event spreads the socket's previous attachment, which still
+      // carries the marker.
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 'ses-cap-0',
+          previousStatus: 'busy',
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: '2026-11-10T10:00:00.000Z',
+        },
+      });
+      const trimmedAgain = cliWs.deserializeAttachment() as { sessionsTrimmed?: number };
+      expect(trimmedAgain.sessionsTrimmed).toBeGreaterThan(0);
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: [makeSession('s1')] })
+      );
+      const fitted = cliWs.deserializeAttachment() as { sessionsTrimmed?: number };
+      expect(fitted).not.toHaveProperty('sessionsTrimmed');
+    });
+
     it('waits for the next heartbeat instead of failing a command for a shed row', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');

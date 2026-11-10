@@ -2025,6 +2025,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.connectionProtocolVersion.delete(connectionId);
     this.connectionCapabilities.delete(connectionId);
     this.lastHeartbeatAt.delete(connectionId);
+    this.trimReport.delete(connectionId);
 
     console.log('CLI socket disconnected', {
       connectionId,
@@ -2598,10 +2599,11 @@ export class UserConnectionDO extends DurableObject<Env> {
         });
       }
     }
+    // A notify or hibernation stamp spreads the socket's previous attachment, so
+    // an inherited marker must not survive a write that no longer trims.
+    const { sessionsTrimmed: _inheritedTrim, ...rest } = fitted.attachment;
     const value: CliAttachment =
-      fitted.droppedSessions > 0
-        ? { ...fitted.attachment, sessionsTrimmed: fitted.droppedSessions }
-        : fitted.attachment;
+      fitted.droppedSessions > 0 ? { ...rest, sessionsTrimmed: fitted.droppedSessions } : rest;
     try {
       ws.serializeAttachment(value);
       return;
@@ -2615,7 +2617,8 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // The JSON estimate can undershoot structured-clone overhead. Metadata
+    // The JSON measurement overestimates clone for the row shapes measured above,
+    // but a shape with long or multi-byte values can undercount it. Metadata
     // alone is small next to the frame limit, so this nearly always fits.
     const { sessions: _sessions, ...metadata } = value;
     try {

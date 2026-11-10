@@ -243,28 +243,17 @@ describe('NewSessionStartButton', () => {
     renderer.unmount();
   });
 
-  // The shared dark disabled primary fill is a light neutral that reads as an
-  // enabled plate on the near-black page, so a disabled Start takes the
-  // inactive control fill and an ink that still contrasts on it. A busy Start
-  // keeps the brand fill and its spinner, and never the inactive pair.
-  it('draws a disabled Start in the inactive pair, and a busy one in the brand fill', async () => {
-    const disabled = await mountButton({ isStartDisabled: true });
-    const disabledButton = hostByType(disabled.root, 'Pressable')[0];
-    const disabledClasses = String(disabledButton?.props.className).split(' ');
-    expect(disabledClasses).toContain('bg-primary-disabled');
-    expect(disabledClasses).toContain('dark:bg-control-idle');
-    const disabledLabel = hostByType(disabled.root, 'Text')[0];
-    expect(disabledLabel?.props.className).toContain('dark:text-ink2');
-    disabled.unmount();
+  // A disabled Start keeps the shared disabled primary pair in both schemes, so
+  // it reads as the same control the rest of the app disables. A dark-only
+  // inactive fill leaves the control 1.67:1 off the near-black page, where it
+  // merges with the background instead of standing as the primary action.
+  it('draws a disabled Start in the shared disabled primary pair', async () => {
+    const renderer = await mountButton({ isStartDisabled: true });
+    const button = hostByType(renderer.root, 'Pressable')[0];
+    const classes = String(button?.props.className).split(' ');
+    expect(classes).toContain('bg-primary-disabled');
+    expect(classes).not.toContain('dark:bg-control-idle');
 
-    const busy = await mountButton({ isStartDisabled: true, isStarting: true });
-    const busyButton = hostByType(busy.root, 'Pressable')[0];
-    const busyClasses = String(busyButton?.props.className).split(' ');
-    expect(busyClasses).toContain('bg-primary');
-    expect(busyClasses).not.toContain('bg-primary-disabled');
-    expect(busyClasses).not.toContain('dark:bg-control-idle');
-    const busyLabel = hostByType(busy.root, 'Text')[0];
-    expect(busyLabel?.props.className).toBeUndefined();
-    busy.unmount();
+    renderer.unmount();
   });
 });

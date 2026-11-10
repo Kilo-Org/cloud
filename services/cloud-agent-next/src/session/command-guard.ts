@@ -442,6 +442,11 @@ function matchesKiloPermissionPattern(input: string, pattern: string): boolean {
   return new RegExp(`^${escaped}$`, 's').test(input.replaceAll('\\', '/'));
 }
 
+// The runtime classifies a shell call per parsed command node: the CLI collects
+// one pattern for each command in the call and refuses the call when one
+// pattern resolves to deny. This resolver classifies the command text of a
+// single node with the same pattern rules, so a caller passes one node's text
+// and never a joined shell line.
 export function resolveCommandGuardBashPermission(
   permissions: Record<string, string>,
   command: string

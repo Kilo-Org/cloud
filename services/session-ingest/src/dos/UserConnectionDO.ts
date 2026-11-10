@@ -104,6 +104,8 @@ type WSAttachment =
       kiloUserId?: string;
     };
 
+type CliAttachment = Extract<WSAttachment, { role: 'cli' }>;
+
 // Type re-export so test files and other internal callers can reference the
 // connection-row shape from a single place.
 // Instance metadata stays optional for old producers and hibernated attachments.
@@ -124,6 +126,71 @@ export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
 // serialized PendingCommandEntry framing overhead while preserving enough
 // payload for most retry scenarios.
 export const MAX_DURABLE_RESULT_BYTES = 120 * 1024;
+
+/**
+ * workerd rejects a socket attachment above this size, and the failed write
+ * stores nothing. A heartbeat that trips it never reaches `heartbeat_ack`, so
+ * the CLI's 30 s inactivity watchdog reconnects and the session loses its
+ * owning socket until the next heartbeat.
+ */
+const ATTACHMENT_FRAME_LIMIT_BYTES = 16_384;
+
+/**
+ * Persisted CLI attachment budget. Below the frame limit because structured
+ * clone costs more per value than the JSON measurement below; the write ladder
+ * handles any remaining overshoot.
+ */
+const CLI_ATTACHMENT_BUDGET_BYTES = 12_288;
+
+const ATTACHMENT_CAPACITY_ERROR = /^A WebSocket 'attachment' cannot be larger than \d+ bytes\./;
+
+function isAttachmentCapacityError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.name === 'Error' &&
+    ATTACHMENT_CAPACITY_ERROR.test(error.message)
+  );
+}
+
+function attachmentBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
+/**
+ * Keep the session rows that fit the budget, in the CLI's order. Attention
+ * rows fit first: a pending approval or question must survive a hibernation
+ * wake. The in-memory list stays complete, so every reader and broadcast is
+ * unaffected; a wake before the next heartbeat (≤10 s on every CLI) sees the
+ * shorter snapshot instead of no snapshot at all.
+ */
+function fitCliAttachment(
+  attachment: CliAttachment,
+  budgetBytes: number
+): { readonly attachment: CliAttachment; readonly droppedSessions: number } {
+  if (attachmentBytes(attachment) <= budgetBytes) {
+    return { attachment, droppedSessions: 0 };
+  }
+  const keep = new Set<number>();
+  let bytes = attachmentBytes({ ...attachment, sessions: [] });
+  for (const attentionFirst of [true, false]) {
+    attachment.sessions.forEach((session, index) => {
+      if (isAttentionStatus(session.status) !== attentionFirst) return;
+      const cost = attachmentBytes(session) + (keep.size === 0 ? 0 : 1);
+      if (bytes + cost > budgetBytes) return;
+      bytes += cost;
+      keep.add(index);
+    });
+  }
+  const sessions = attachment.sessions.filter((_session, index) => keep.has(index));
+  return {
+    attachment: { ...attachment, sessions },
+    droppedSessions: attachment.sessions.length - sessions.length,
+  };
+}
+
+function isAttentionStatus(status: string): boolean {
+  return status === 'permission' || status === 'question';
+}
 
 // Maximum allowed mutationId length used as a durable storage key prefix.
 const MAX_MUTATION_ID_LENGTH = 128;
@@ -415,7 +482,9 @@ export class UserConnectionDO extends DurableObject<Env> {
         const heartbeatAt = attachment.heartbeatAt ?? Date.now();
         this.lastHeartbeatAt.set(connectionId, heartbeatAt);
         if (attachment.heartbeatAt === undefined) {
-          ws.serializeAttachment({ ...attachment, heartbeatAt });
+          // A hibernated attachment may predate the frame budget: stamping it
+          // must not throw inside state reconstruction.
+          this.persistCliAttachment(ws, { ...attachment, heartbeatAt });
         }
       } else {
         if (attachment.replaced) continue;
@@ -762,7 +831,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    const updatedAttachment: WSAttachment = {
+    const updatedAttachment: CliAttachment = {
       role: 'cli',
       connectionId,
       sessions,
@@ -772,32 +841,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       kiloUserId: attachment.kiloUserId,
       ...(instance ? { instance } : {}),
     };
-    try {
-      ws.serializeAttachment(updatedAttachment);
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        error.name !== 'Error' ||
-        !/^A WebSocket 'attachment' cannot be larger than 16384 bytes\.'attachment' was \d+ bytes\.$/.test(
-          error.message
-        ) ||
-        !instance ||
-        (instance.kind === undefined &&
-          instance.startedAt === undefined &&
-          instance.gitBranch === undefined)
-      ) {
-        throw error;
-      }
-      // The native regression verifies this capacity error and failed-write atomicity.
-      // Retry the current heartbeat in the old metadata-free form, never a stale one.
-      // Remove only after old producers/attachments retire and enriched heartbeats
-      // have proven native capacity safety.
-      const legacyInstance = { ...instance };
-      delete legacyInstance.kind;
-      delete legacyInstance.startedAt;
-      delete legacyInstance.gitBranch;
-      ws.serializeAttachment({ ...updatedAttachment, instance: legacyInstance });
-    }
+    this.persistCliAttachment(ws, updatedAttachment);
 
     if (attachment.kiloUserId) {
       const changedSessionIds = new Set<string>();
@@ -2347,7 +2391,7 @@ export class UserConnectionDO extends DurableObject<Env> {
             ...(status === 'scheduled' && scheduledAt ? { scheduledAt } : {}),
           };
         });
-        socket.serializeAttachment({ ...attachment, sessions });
+        this.persistCliAttachment(socket, { ...attachment, sessions });
         this.connectionSessions.set(attachment.connectionId, sessions);
 
         const currentRoots = this.aggregateSessions();
@@ -2446,6 +2490,58 @@ export class UserConnectionDO extends DurableObject<Env> {
       ws.send(JSON.stringify(msg));
     } catch (err) {
       console.warn('sendToWeb failed:', err);
+    }
+  }
+
+  /**
+   * Persist the CLI attachment without ever letting a write failure escape: a
+   * throw skips the acknowledgement and every broadcast that follows it, and
+   * the CLI then reconnects on its inactivity watchdog. Shed payload instead,
+   * keeping the acknowledgement and the live in-memory state.
+   */
+  private persistCliAttachment(ws: WebSocket, attachment: CliAttachment): void {
+    const fitted = fitCliAttachment(attachment, CLI_ATTACHMENT_BUDGET_BYTES);
+    if (fitted.droppedSessions > 0) {
+      console.warn('Trimmed the CLI socket attachment to the frame budget', {
+        connectionId: attachment.connectionId,
+        sessions: attachment.sessions.length,
+        persistedSessions: fitted.attachment.sessions.length,
+        droppedSessions: fitted.droppedSessions,
+      });
+    }
+    try {
+      ws.serializeAttachment(fitted.attachment);
+      return;
+    } catch (error) {
+      if (!isAttachmentCapacityError(error)) {
+        console.error('Failed to persist the CLI socket attachment', {
+          connectionId: attachment.connectionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+    }
+
+    // The JSON estimate can undershoot structured-clone overhead. Metadata
+    // alone is small next to the frame limit, so this nearly always fits.
+    const { sessions: _sessions, ...metadata } = fitted.attachment;
+    try {
+      ws.serializeAttachment({ ...metadata, sessions: [] });
+      console.error(
+        'CLI socket attachment exceeded the frame after trimming; dropped every session',
+        {
+          connectionId: attachment.connectionId,
+          sessions: attachment.sessions.length,
+        }
+      );
+    } catch (error) {
+      // The previous attachment is still stored (a failed write is atomic),
+      // and the next heartbeat retries the whole list.
+      console.error('CLI socket attachment is unsaveable even without sessions', {
+        connectionId: attachment.connectionId,
+        limitBytes: ATTACHMENT_FRAME_LIMIT_BYTES,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

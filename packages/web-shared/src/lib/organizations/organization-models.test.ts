@@ -81,6 +81,9 @@ const mockAvailability = jest.fn(
   ) => models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
 );
 const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
+const mockTagClaudeBilling = jest.fn(
+  async (_owner: unknown, models: OpenRouterModel[], _requesterEmail: string | null) => models
+);
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
   requireCustomLlmsById: async () => new Map(),
@@ -143,6 +146,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/routing', () => ({
+  tagClaudeBillingByokModels: mockTagClaudeBilling,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   openAiChatGptSharedServicesOwner: (organizationId: string) => ({
@@ -274,6 +280,7 @@ beforeEach(async () => {
     .mockReset()
     .mockResolvedValue([catalogModel('kilo-internal/private', { mayTrainOnYourPrompts: true })]);
   mockTagChatGpt.mockReset().mockImplementation(async (_owner, models) => models);
+  mockTagClaudeBilling.mockReset().mockImplementation(async (_owner, models) => models);
   [producer, cache, enkrypt] = await Promise.all([
     import('./organization-models'),
     import('@kilocode/web-shared/lib/model-stats/model-stats-cache'),
@@ -555,6 +562,43 @@ describe('organization model producer publication', () => {
     expect(result.data.find(model => model.id === 'provider/allowed')?.hasUserByokAvailable).toBe(
       true
     );
+  });
+
+  it('tags Claude billing models from the connection the audience routes through', async () => {
+    mockTagClaudeBilling.mockImplementation(async (_owner, models: OpenRouterModel[]) =>
+      models.map(model =>
+        model.id === 'provider/training' ? { ...model, hasUserByokAvailable: true } : model
+      )
+    );
+
+    const memberResult = await producer.getAvailableModelsForOrganization(
+      'fixture-org',
+      subject,
+      'member',
+      { countryCode: null, requesterEmail: 'member@kilocode.ai' }
+    );
+    expect(mockTagClaudeBilling).toHaveBeenLastCalledWith(
+      { kind: 'member', kiloUserId: 'fixture-user', organizationId: 'fixture-org' },
+      expect.any(Array),
+      'member@kilocode.ai'
+    );
+    expect(
+      memberResult?.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable
+    ).toBe(true);
+    expect(mockTagChatGpt.mock.invocationCallOrder[0]).toBeLessThan(
+      mockTagClaudeBilling.mock.invocationCallOrder[0] ?? 0
+    );
+
+    await resultFor(subject, 'shared_services');
+    expect(mockTagClaudeBilling).toHaveBeenLastCalledWith(
+      { kind: 'shared_services', organizationId: 'fixture-org' },
+      expect.any(Array),
+      null
+    );
+
+    mockTagClaudeBilling.mockClear();
+    await resultFor({ type: 'defaultAccess' });
+    expect(mockTagClaudeBilling).not.toHaveBeenCalled();
   });
 
   it('lists denied models only when an inference provider key the policy admits serves them', async () => {

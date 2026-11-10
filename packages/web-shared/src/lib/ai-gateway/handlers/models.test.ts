@@ -28,6 +28,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: jest.fn((_userId: string, models: unknown[]) => models),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/routing', () => ({
+  getClaudeBillingByokModelIds: jest.fn(async () => new Set()),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
@@ -52,6 +55,9 @@ const { addUserByokAvailability, getUserByokProviderIds } = jest.requireMock(
 const { tagOpenAiChatGptByokModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing'
 );
+const { getClaudeBillingByokModelIds } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing'
+);
 const { getAvailableModelsForOrganization } = jest.requireMock(
   '@kilocode/web-shared/lib/organizations/organization-models'
 );
@@ -72,6 +78,7 @@ const mockedGetDirectByokCatalogModelIds = jest.mocked(getDirectByokCatalogModel
 const mockedAddUserByokAvailability = jest.mocked(addUserByokAvailability);
 const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
 const mockedTagOpenAiChatGptByokModels = jest.mocked(tagOpenAiChatGptByokModels);
+const mockedGetClaudeBillingByokModelIds = jest.mocked(getClaudeBillingByokModelIds);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
@@ -113,6 +120,7 @@ describe('GET /api/openrouter/models', () => {
     mockedTagOpenAiChatGptByokModels.mockImplementation(
       (_userId: string, models: OpenRouterModel[]) => models
     );
+    mockedGetClaudeBillingByokModelIds.mockResolvedValue(new Set());
     mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
     mockedGetCachedRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
@@ -127,7 +135,7 @@ describe('GET /api/openrouter/models', () => {
 
   test('builds the organization catalog for the request country', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
-      user: { id: 'user-id' },
+      user: { id: 'user-id', google_user_email: 'user@kilocode.ai' },
       organizationId: 'org-1',
       authFailedResponse: null,
     } as never);
@@ -139,8 +147,9 @@ describe('GET /api/openrouter/models', () => {
       'org-1',
       { type: 'member', kiloUserId: 'user-id' },
       'member',
-      { fromDb: {}, countryCode: 'CU' }
+      { fromDb: {}, countryCode: 'CU', requesterEmail: 'user@kilocode.ai' }
     );
+    expect(mockedGetClaudeBillingByokModelIds).not.toHaveBeenCalled();
   });
 
   test('builds an unrestricted catalog without a request country', async () => {
@@ -219,6 +228,36 @@ describe('GET /api/openrouter/models', () => {
     expect(mockedTagOpenAiChatGptByokModels).toHaveBeenCalledWith(
       { kiloUserId: 'user-id', organizationId: null },
       [openAiModel, otherModel]
+    );
+  });
+
+  test('tags models a personal Claude billing connection can serve', async () => {
+    const claudeModel = makeModel('anthropic/claude-sonnet-4.6');
+    const otherModel = makeModel('openai/gpt-5-nano');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id', google_user_email: 'user@kilocode.ai' },
+      organizationId: null,
+      authFailedResponse: null,
+    } as never);
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [claudeModel, otherModel] });
+    mockedAddUserByokAvailability.mockImplementation(async (models: OpenRouterModel[]) =>
+      models.map(model => ({ ...model, hasUserByokAvailable: false }))
+    );
+    mockedGetClaudeBillingByokModelIds.mockResolvedValue(new Set([claudeModel.id]));
+
+    const response = await handleModelsRequest(request());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: [
+        { ...claudeModel, hasUserByokAvailable: true },
+        { ...otherModel, hasUserByokAvailable: false },
+      ],
+    });
+    expect(mockedGetClaudeBillingByokModelIds).toHaveBeenCalledWith(
+      { kind: 'personal', kiloUserId: 'user-id' },
+      [claudeModel.id, otherModel.id],
+      'user@kilocode.ai'
     );
   });
 

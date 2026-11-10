@@ -263,6 +263,7 @@ function MessageBubbleImpl({
             <Button
               variant="outline"
               size="sm"
+              className={STATE_ACTION_CLASS}
               onPress={() => {
                 onCopyToComposer(copyText);
               }}

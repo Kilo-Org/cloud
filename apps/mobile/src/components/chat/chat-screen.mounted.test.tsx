@@ -7,6 +7,7 @@ import { i18n } from '@/i18n';
 import { ChatScreen } from '@/components/chat/chat-screen';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
 import { backendTargetId, CREDITS_FAILURE_KEY, localTargetId } from '@/lib/chat/backend-target';
 
@@ -307,13 +308,19 @@ const buttonLabels = (tree: ReactTestRenderer): unknown[] =>
     .findAll(node => (node.type as string) === 'Button')
     .map(button => button.find(node => (node.type as string) === 'Text').props.children);
 
-function press(tree: ReactTestRenderer, label: unknown): void {
+/** The button carrying the given label, for the props a press alone cannot show. */
+function buttonOf(tree: ReactTestRenderer, label: unknown) {
   const button = tree.root
     .findAll(node => (node.type as string) === 'Button')
     .find(node => node.find(child => (child.type as string) === 'Text').props.children === label);
   if (button === undefined) {
     throw new TypeError(`No button ${String(label)}`);
   }
+  return button;
+}
+
+function press(tree: ReactTestRenderer, label: unknown): void {
+  const button = buttonOf(tree, label);
   const { onPress } = button.props;
   if (!isHandler(onPress)) {
     throw new TypeError(`The ${String(label)} button has no press handler`);
@@ -688,6 +695,11 @@ describe('a retained chat failure', () => {
     /* The question kept in the transcript carries the only Retry; the row adds
        the one action the message cannot offer. */
     expect(buttonLabels(tree)).toEqual([i18n.t('addCredits.cta')]);
+    /* That action is the row's only recovery, so it carries the same 48 dp
+       frame the Retry button in this row uses. */
+    expect(String(buttonOf(tree, i18n.t('addCredits.cta')).props.className)).toContain(
+      STATE_ACTION_CLASS
+    );
     press(tree, i18n.t('addCredits.cta'));
     expect(router.push).toHaveBeenCalledWith('/(app)/credits');
     expect(state.retry).not.toHaveBeenCalled();

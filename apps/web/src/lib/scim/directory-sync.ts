@@ -30,6 +30,7 @@ import { createOrUpdateUser, findUserByNormalizedEmail } from '@/lib/user';
 import {
   listDnsVerifiedDomains,
   VerifiedDomainLookupError,
+  VerifiedDomainOwnerMissingError,
 } from '@/lib/scim/directory-verified-domains';
 
 import type {
@@ -650,8 +651,19 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
   try {
     verified = await listDnsVerifiedDomains(owner.externalOrgId);
   } catch (error) {
-    // Not a refusal: WorkOS could not be asked, so whether this address is
-    // allowed is still unknown. Rethrown so the route answers 500 and the
+    // A WorkOS organization that does not exist is a completed answer, so it
+    // refuses terminally and the event parks. Retrying cannot conjure one, and
+    // holding instead would stall the single shared cursor for every other
+    // directory (rule 7).
+    if (error instanceof VerifiedDomainOwnerMissingError) {
+      return refuse(
+        'domain_not_captured',
+        `the organization's WorkOS record ${owner.externalOrgId} no longer exists, so no domain can be verified`
+      );
+    }
+
+    // Anything else means WorkOS could not be asked, so whether this address
+    // is allowed is still unknown. Rethrown so the route answers 500 and the
     // caller holds its cursor, rather than parking a bind that may be valid.
     throw error instanceof VerifiedDomainLookupError
       ? error

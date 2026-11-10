@@ -20,7 +20,11 @@ const { __getOrganization: getOrganization } = jest.requireMock<{ __getOrganizat
   '@workos-inc/node'
 );
 
-import { listDnsVerifiedDomains, VerifiedDomainLookupError } from './directory-verified-domains';
+import {
+  listDnsVerifiedDomains,
+  VerifiedDomainLookupError,
+  VerifiedDomainOwnerMissingError,
+} from './directory-verified-domains';
 
 function domain(name: string, state: string, verificationStrategy: string) {
   return {
@@ -67,12 +71,29 @@ describe('listDnsVerifiedDomains', () => {
     await expect(listDnsVerifiedDomains('org_1')).rejects.toBeInstanceOf(VerifiedDomainLookupError);
   });
 
-  test('treats a missing organization as a lookup failure, not as zero domains', async () => {
+  test('separates a missing organization from an outage, so the event can park', async () => {
+    // A 404 is a completed answer. Reported as a lookup failure it would reach
+    // the Worker as a 5xx, which it classifies `unavailable` and never parks,
+    // holding the one shared cursor for every directory.
     const notFound = Object.assign(new Error('Not found'), { status: 404 });
     getOrganization.mockRejectedValueOnce(notFound);
 
     await expect(listDnsVerifiedDomains('org_gone')).rejects.toBeInstanceOf(
+      VerifiedDomainOwnerMissingError
+    );
+    // And not the transient class, which is what decides hold versus park.
+    getOrganization.mockRejectedValueOnce(notFound);
+    await expect(listDnsVerifiedDomains('org_gone')).rejects.not.toBeInstanceOf(
       VerifiedDomainLookupError
     );
+  });
+
+  test('answers no verified domains when WorkOS omits the field', async () => {
+    // Typed as present by the SDK, but read as optional elsewhere in this repo.
+    // Dereferencing it would throw a TypeError the caller turns into the same
+    // un-parkable 500.
+    getOrganization.mockResolvedValueOnce({});
+
+    await expect(listDnsVerifiedDomains('org_1')).resolves.toEqual([]);
   });
 });

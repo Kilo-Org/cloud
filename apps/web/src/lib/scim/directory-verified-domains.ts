@@ -1,5 +1,5 @@
 import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
-import { WorkOS } from '@workos-inc/node';
+import { WorkOS, type Organization } from '@workos-inc/node';
 import 'server-only';
 
 /**
@@ -31,12 +31,26 @@ import 'server-only';
 const workos = new WorkOS(WORKOS_API_KEY);
 
 /**
- * Raised when WorkOS could not be asked. Separate from "the domain is not
- * verified", because the two are not the same answer: a refusal is terminal
- * and parks the event, while an unreachable WorkOS is transient and must hold
- * the caller's cursor so no bind is wrongly refused during an outage.
+ * Raised when WorkOS could not be asked: a 5xx, a timeout, a transport error,
+ * a rejected key. Separate from "the domain is not verified", because the two
+ * are not the same answer — a refusal is terminal and parks the event, while
+ * an unreachable WorkOS is transient and must hold the caller's cursor so no
+ * bind is wrongly refused during an outage.
  */
 export class VerifiedDomainLookupError extends Error {}
+
+/**
+ * Raised when WorkOS answers 404: the organization behind
+ * `organizations.external_org_id` is gone, or the binding is stale.
+ *
+ * Distinct from `VerifiedDomainLookupError` because it is a *completed*
+ * answer. Retrying cannot produce an organization that does not exist, so the
+ * caller turns this into a terminal conflict and the event parks — rather than
+ * a 500, which the Worker classifies `unavailable` and never parks, holding
+ * the one shared cursor and stalling every other directory behind it
+ * (`.specs/organization-sso.md`, Directory Sync rule 7).
+ */
+export class VerifiedDomainOwnerMissingError extends Error {}
 
 /**
  * Lowercased domains the organization has verified through DNS.
@@ -45,15 +59,26 @@ export class VerifiedDomainLookupError extends Error {}
  * sync writes when it binds the directory.
  */
 export async function listDnsVerifiedDomains(workOSOrganizationId: string): Promise<string[]> {
-  let organization;
+  let organization: Organization;
   try {
     organization = await workos.organizations.getOrganization(workOSOrganizationId);
   } catch (error) {
-    // Includes the 404 for an organization that no longer exists. Even that is
-    // reported as a lookup failure rather than an empty set: answering "no
-    // verified domains" would refuse the bind terminally and park the event,
-    // and a deleted WorkOS organization is an operator problem rather than a
-    // statement about this address.
+    // A 404 is a completed answer, not an outage. The organization is gone, or
+    // the binding is stale, and no retry changes that — so it must not become
+    // a lookup failure: the caller turns those into a 500, the Worker reads a
+    // 5xx as `unavailable`, and that class never parks, which would hold the
+    // single shared cursor forever and stall every other directory
+    // (`.specs/organization-sso.md`, Directory Sync rule 7).
+    if (isNotFound(error)) {
+      throw new VerifiedDomainOwnerMissingError(
+        `WorkOS organization ${workOSOrganizationId} does not exist`
+      );
+    }
+
+    // Everything else is outage-shaped: a 5xx, a timeout, a transport error,
+    // or a rejected key. Whether this address is allowed is still unknown, so
+    // the caller holds its cursor rather than refusing a bind that may be
+    // valid.
     throw new VerifiedDomainLookupError(
       `Could not read WorkOS organization ${workOSOrganizationId}: ${
         error instanceof Error ? error.message : String(error)
@@ -61,8 +86,23 @@ export async function listDnsVerifiedDomains(workOSOrganizationId: string): Prom
     );
   }
 
-  return organization.domains
+  // `?? []` because the SDK types `domains` as present but other readers in
+  // this repo do not trust that (`organization-sso-router.ts:150,158,182`).
+  // Without it an omitted field throws a TypeError, which the caller wraps as
+  // a lookup failure and turns into the same un-parkable 500.
+  return (organization.domains ?? [])
     .filter(domain => domain.state === 'verified' && domain.verificationStrategy === 'dns')
     .map(domain => domain.domain.trim().toLowerCase())
     .filter(domain => domain !== '');
+}
+
+/**
+ * WorkOS answers 404 with a `status` on the thrown error. Checked
+ * structurally rather than by error class, because the SDK's
+ * `NotFoundException` is not exported from its `workerd`-conditioned entry and
+ * `organization-sso-router.ts` reads the same field the same way.
+ */
+function isNotFound(error: unknown): boolean {
+  // `in` narrows the property to `unknown`, so the comparison needs no cast.
+  return typeof error === 'object' && error !== null && 'status' in error && error.status === 404;
 }

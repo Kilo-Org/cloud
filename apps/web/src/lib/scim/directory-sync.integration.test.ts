@@ -88,6 +88,10 @@ beforeEach(() => {
   workOSOrganizationId = `org_${suffix}`;
   externalId = `directory_user_${suffix}`;
   email = `scim-${suffix}@example.test`;
+  // Default to no verified domains, so a `mockResolvedValueOnce` in one test
+  // cannot leak into the next and silently admit a bind it asserts is refused.
+  verifiedDomains.listDnsVerifiedDomains.mockReset();
+  verifiedDomains.listDnsVerifiedDomains.mockResolvedValue([]);
 });
 
 afterEach(async () => {
@@ -500,6 +504,19 @@ describe('upsertDirectoryUser', () => {
     expect(row.external_id).toBe(externalId);
     expect(row.google_user_email).toBe(email);
     expect(verifiedDomains.listDnsVerifiedDomains).toHaveBeenCalledWith(workOSOrganizationId);
+  });
+
+  test('creates a user at a DNS-verified domain when the organization has no SSO domain', async () => {
+    // No `sso_domain`, so the Effective SSO policy is `not_required`. DNS
+    // verification is itself the proof of ownership and does not depend on
+    // which domain is the SSO authority, so the bind is allowed — rule 13.
+    await seedOrganization();
+    verifiedDomains.listDnsVerifiedDomains.mockResolvedValueOnce(['example.test']);
+
+    const userId = await seedUser();
+
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, userId));
+    expect(row.external_id).toBe(externalId);
   });
 
   test('refuses a domain WorkOS verified by hand rather than through DNS', async () => {

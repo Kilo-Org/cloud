@@ -21,7 +21,13 @@ import { load } from 'js-yaml';
 import { DEPENDENCY_INPUTS } from './affected-workspaces.mjs';
 
 const workflows = Object.fromEntries(
-  ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
+  [
+    'ci.yml',
+    'extension-ci.yml',
+    'kilo-app-ci.yml',
+    'mobile-native-build.yml',
+    'explorer-ios-release.yml',
+  ].map(file => [
     file,
     load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')),
   ])
@@ -1262,6 +1268,93 @@ test('the changes job installs the root project only for a dependency input', ()
   assert.ok(
     steps.indexOf(install) > steps.indexOf(local),
     'the install reads an answer the check wrote'
+  );
+});
+
+// The extension changes job is the serialized prelude of every extension CI
+// run: `verify`, `build-firefox` and `e2e-chrome` all need it, so an install it
+// does not need costs every run. It reads the repository for the same reason as
+// the ci.yml job above, over the same detector set, so it carries one gate:
+// these assertions compare the two step definitions, and a new detector input
+// added to one gate without the other fails here.
+test('the extension changes job carries the shared dependency-input install gate', () => {
+  const steps = workflows['extension-ci.yml'].jobs.changes.steps;
+  const shared = ciJobs.changes.steps;
+  const sharedStep = id => shared.find(step => step.id === id);
+  const step = id => steps.find(candidate => candidate.id === id);
+
+  const filter = step('filter_resources');
+  const retry = step('filter_resources_retry');
+  const base = step('resources_base');
+  assert.ok(filter, 'extension-ci changes: the dependency-input filter is missing');
+  assert.ok(retry, 'extension-ci changes: the dependency-input filter retry is missing');
+  assert.ok(base, 'extension-ci changes: the detector-base dependency-input check is missing');
+
+  assert.equal(
+    filter.with.filters,
+    sharedStep('filter_resources').with.filters,
+    'both changes jobs filter the same dependency inputs'
+  );
+  assert.equal(
+    filter['continue-on-error'],
+    sharedStep('filter_resources')['continue-on-error'],
+    'the first attempt tolerates a transient failure'
+  );
+  assert.equal(
+    retry.if,
+    sharedStep('filter_resources_retry').if,
+    'the retry runs only after a failed first attempt'
+  );
+  assert.equal(
+    retry.with.filters,
+    filter.with.filters,
+    'the retry evaluates the same paths as the attempt it replaces'
+  );
+  assert.equal(
+    retry['continue-on-error'],
+    sharedStep('filter_resources_retry')['continue-on-error'],
+    'the retry shares the shared changes job retry contract'
+  );
+  assert.equal(
+    retry['continue-on-error'],
+    undefined,
+    'a persistent filter failure fails the job instead of installing nothing'
+  );
+  assert.equal(
+    base.env.BASE_SHA,
+    sharedStep('resources_base').env.BASE_SHA,
+    'both changes jobs diff the base their detector diffs'
+  );
+  assert.equal(
+    base.run,
+    sharedStep('resources_base').run,
+    'one detector-base check serves both jobs, so the input set stays in one place'
+  );
+
+  const install = steps.find(candidate => candidate.name === 'Install root dependencies');
+  const sharedInstall = shared.find(candidate => candidate.name === 'Install root dependencies');
+  assert.equal(
+    install.run,
+    sharedInstall.run,
+    'the gate removes the install from the run, never changes what it installs'
+  );
+  assert.equal(
+    install.if,
+    sharedInstall.if,
+    'the extension and the shared changes job gate the install on the same answers'
+  );
+  assert.ok(
+    steps.indexOf(install) > steps.indexOf(retry) && steps.indexOf(install) > steps.indexOf(base),
+    'the install reads answers both detections already wrote'
+  );
+  assert.ok(
+    steps.indexOf(install) < steps.indexOf(step('workspaces')),
+    'the detector that may need js-yaml runs after the install it can ask for'
+  );
+  assert.equal(
+    workflows['extension-ci.yml'].jobs.changes.outputs.extension,
+    "${{ steps.filter.outputs.extension == 'true' || steps.workspaces.outputs.extension == 'true' }}",
+    'the gate leaves the job output that the three downstream jobs read'
   );
 });
 

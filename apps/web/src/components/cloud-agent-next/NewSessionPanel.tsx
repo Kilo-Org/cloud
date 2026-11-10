@@ -1707,8 +1707,8 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         </div>
 
         {/* Session context (outside prompt box): code source left, sandbox setup right */}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="@container/context flex flex-col gap-1.5">
+          <div className="flex flex-col items-start gap-2 @xl/context:flex-row @xl/context:items-center">
             <div className={contextGroupClassName}>
               {stackedTarget ? (
                 <span
@@ -1959,7 +1959,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               )}
             </div>
 
-            <div className={cn(contextGroupClassName, 'ml-auto')}>
+            <div className={cn(contextGroupClassName, '@xl/context:ml-auto')}>
               <RepositoryEnvironmentChip
                 organizationId={organizationId}
                 repository={environmentRepository}
@@ -1972,17 +1972,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 }}
                 selectedProfileId={selectedProfileId}
               />
-              {sandboxOptions.isError ? (
-                <span className="text-muted-foreground text-xs">Compute price unavailable</span>
-              ) : (
-                <ComputePrice
-                  destination={
-                    sandboxOptions.data?.effectiveDestination ??
-                    sandboxOptions.data?.defaultDestination
-                  }
-                  label="Compute"
-                />
-              )}
               <ProfilePickerPopover
                 organizationId={organizationId}
                 selectedOverrideProfileId={selectedProfileId}
@@ -1993,6 +1982,19 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               />
             </div>
           </div>
+          {sandboxOptions.isError ? (
+            <span className="text-muted-foreground self-end text-xs">
+              Compute price unavailable
+            </span>
+          ) : (
+            <ComputePrice
+              destination={
+                sandboxOptions.data?.effectiveDestination ?? sandboxOptions.data?.defaultDestination
+              }
+              label="Compute"
+              className="self-end text-xs"
+            />
+          )}
           {stackedTarget && !stackedSource && stackedSourceQuery.isError && (
             <p className="text-status-destructive text-xs" role="status">
               This workspace is being deleted or no longer exists. Remove the stack target and start

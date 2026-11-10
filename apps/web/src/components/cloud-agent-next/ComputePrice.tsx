@@ -4,13 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { SandboxDestination } from '@kilocode/worker-utils/sandbox-allocation';
 import { formatComputePrice } from '@/lib/cloud-agent/compute-price';
+import { cn } from '@/lib/utils';
 
 export function ComputePrice({
   destination,
   label,
+  className,
 }: {
   destination: SandboxDestination | undefined;
   label?: string;
+  className?: string;
 }) {
   const trpc = useTRPC();
   const native =
@@ -19,7 +22,7 @@ export function ComputePrice({
   if (!native) return null;
   const rate = rates.data?.find(rate => rate.instance === destination.instanceType);
   return (
-    <span className="text-muted-foreground whitespace-nowrap">
+    <span className={cn('text-muted-foreground whitespace-nowrap', className)}>
       {label} ·{' '}
       {rates.isLoading
         ? 'Loading price…'

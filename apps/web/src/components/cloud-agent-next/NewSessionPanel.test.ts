@@ -19,6 +19,7 @@ const mockQueryClient = {
 const mockCreateLocalSession = jest.fn((_draft: unknown) => 'local-session-1');
 const mockReleaseMutate = jest.fn(async (_input: unknown) => undefined);
 let mockEnvironmentListFailed = true;
+let mockSandboxState: 'native' | 'external' | 'error' = 'external';
 let mockUploadUrlRequest:
   | { messageUuid: string; attachmentId: string; contentLength: number }
   | undefined;
@@ -95,6 +96,24 @@ function mockQueryResult(options: { __testKind?: string }) {
   }
   if (kind.endsWith('recentRepositories')) {
     return { ...base, data: { repositories: [] } };
+  }
+  if (kind.endsWith('getSandboxSelectionOptions')) {
+    return {
+      ...base,
+      isError: mockSandboxState === 'error',
+      data:
+        mockSandboxState === 'native'
+          ? {
+              effectiveDestination: {
+                provider: { id: 'cloudflare-containers', account: 'kilo' },
+                instanceType: 'standard-1',
+              },
+            }
+          : undefined,
+    };
+  }
+  if (kind === 'computeBilling.rates') {
+    return { ...base, data: [{ instance: 'standard-1', hourlyUsd: 1.20312 }] };
   }
   if (kind === 'cloudEnvironments.list') {
     return {
@@ -508,6 +527,56 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
         if (mounted) act(() => root.unmount());
         dom.cleanup();
         delete (globalThis as { XMLHttpRequest?: typeof XMLHttpRequest }).XMLHttpRequest;
+      }
+    }
+  );
+});
+
+describe.each(scenarios)('$label NewSessionPanel context layout', scenario => {
+  afterEach(() => {
+    mockSandboxState = 'external';
+  });
+
+  it.each(['native', 'external', 'error'] as const)(
+    'keeps %s compute pricing outside the context controls',
+    async sandboxState => {
+      mockSandboxState = sandboxState;
+      mockRepositories = [mockRepository];
+      mockEnvironments = [];
+      mockEnvironmentListFailed = false;
+      const dom = installLinkedomDom();
+      const root = createRoot(dom.container);
+
+      try {
+        act(() =>
+          root.render(createElement(NewSessionPanel, { organizationId: scenario.organizationId }))
+        );
+        await waitForStartButton(dom.container);
+
+        const environmentButton = Array.from(dom.container.querySelectorAll('button')).find(
+          button => button.textContent === 'Choose test environment'
+        );
+        const setupGroup = environmentButton?.parentElement;
+        const contextRow = setupGroup?.parentElement;
+        const context = contextRow?.parentElement;
+        expect(setupGroup?.classList.contains('min-w-min')).toBe(true);
+        expect(context?.className).toContain('@container/context');
+        expect(contextRow?.className).toContain('@xl/context:flex-row');
+        expect(contextRow?.className).not.toContain('flex-wrap');
+
+        if (sandboxState === 'external') {
+          expect(context?.children).toHaveLength(1);
+        } else {
+          const price = context?.lastElementChild;
+          expect(price?.textContent).toBe(
+            sandboxState === 'error' ? 'Compute price unavailable' : 'Compute · $1.20312/hour'
+          );
+          expect(price?.className).toContain('self-end');
+          expect(contextRow?.contains(price ?? null)).toBe(false);
+        }
+      } finally {
+        act(() => root.unmount());
+        dom.cleanup();
       }
     }
   );

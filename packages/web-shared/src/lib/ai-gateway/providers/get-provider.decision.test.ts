@@ -1170,7 +1170,7 @@ describe('getProvider BYOK failover candidates', () => {
     });
   });
 
-  test('never lists the ChatGPT connection ranked between the keys', async () => {
+  test('never lists an unavailable ChatGPT connection among the failover keys', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [
       { providerId: 'zai-coding', catalogMode: true, priority: 0 },
@@ -1179,13 +1179,7 @@ describe('getProvider BYOK failover candidates', () => {
     jest
       .mocked(findDirectByokCatalogModels)
       .mockResolvedValue([catalogModel('zai-coding', ['chat_completions', 'responses'])]);
-    jest.mocked(checkOpenAiChatGptByok).mockResolvedValue({
-      kind: 'provider',
-      provider: { ...OPENROUTER, type: 'openai-chatgpt' },
-      userByok: null,
-      bypassAccessCheck: false,
-      skipBalanceCheck: true,
-    });
+    jest.mocked(checkOpenAiChatGptByok).mockResolvedValue(null);
 
     const result = await routeProvider({
       requestedModel: MODEL,
@@ -1196,7 +1190,7 @@ describe('getProvider BYOK failover candidates', () => {
 
     expect(result.userByok?.map(byok => byok.providerId)).toEqual(['zai-coding']);
     expect(failoverProviderIds(result)).toEqual(['moonshotai']);
-    expect(checkOpenAiChatGptByok).not.toHaveBeenCalled();
+    expect(checkOpenAiChatGptByok).toHaveBeenCalledTimes(1);
   });
 
   test('has no later key when the only serving key is selected', async () => {

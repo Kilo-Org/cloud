@@ -41,30 +41,34 @@ export function TextWithLinks({ text }: { text: string }) {
   return <>{parts}</>;
 }
 
-/**
- * Compaction separator component - shown when context is compacted. It carries
- * the group's first message id because the compactor message is the only thing
- * a compaction-only group renders: the resume link's `?at=` anchor resolves
- * through `[data-message-id]`, and without it the separator would be the one
- * group a recorded position could not land on.
- */
 export function CompactionSeparator({
-  messageId,
   compactionPart,
   timestamp,
+  status = 'completed',
 }: {
-  messageId?: string;
   compactionPart: CompactionPart;
   timestamp: number | string;
+  status?: 'running' | 'completed' | 'failed';
 }) {
   const isAuto = compactionPart.auto;
 
   return (
-    <div className="flex items-center gap-3 py-2" data-message-id={messageId}>
+    <div className="flex items-center gap-3 py-2">
       <div className="bg-border h-px flex-1" />
       <div className="text-muted-foreground flex items-center gap-2 text-xs">
-        <Scissors className="h-3 w-3" />
-        <span>Context compacted{isAuto ? ' (auto)' : ''}</span>
+        {status === 'running' ? (
+          <LoaderCircle className="h-3 w-3 animate-spin motion-reduce:animate-none" />
+        ) : (
+          <Scissors className="h-3 w-3" />
+        )}
+        <span role={status === 'running' ? 'status' : undefined}>
+          {status === 'running'
+            ? 'Compacting context…'
+            : status === 'failed'
+              ? 'Context compaction failed'
+              : 'Context compacted'}
+          {isAuto ? ' (auto)' : ''}
+        </span>
         <span className="text-muted-foreground/60">·</span>
         <TimeAgo timestamp={timestamp} className="text-muted-foreground/60" />
       </div>

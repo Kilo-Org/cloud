@@ -41,10 +41,7 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
   const parts = presentation.parts.map(part => part.source);
   const isUser = first.info.role === 'user';
   const text = isUser ? getUserTextContent(parts) : getAssistantTextContent(parts);
-  const compaction =
-    isUser && parts.length > 0 && parts.every(isCompactionPart)
-      ? parts.find(isCompactionPart)
-      : undefined;
+  const compaction = parts.find(isCompactionPart);
   const error = first.info.role === 'assistant' ? first.info.error : undefined;
   const showError = !presentation.isStreaming && error != null;
   const interrupted = error != null && isAssistantInterruptError(error);
@@ -62,7 +59,7 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
     <MessageErrorBoundary>
       {visible && (
         <MessagePrimitive.Root
-          data-message-id={compaction && !child ? undefined : presentation.id}
+          data-message-id={presentation.id}
           data-message-role={first.info.role}
           className={
             child
@@ -92,10 +89,22 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
               </div>
             </>
           ) : compaction ? (
-            <CompactionSeparator
-              compactionPart={compaction}
-              timestamp={presentation.displayTimestamp}
-            />
+            <>
+              <CompactionSeparator
+                compactionPart={compaction}
+                timestamp={presentation.displayTimestamp}
+                status={
+                  error != null
+                    ? 'failed'
+                    : first.info.role === 'assistant' && first.info.time.completed === undefined
+                      ? 'running'
+                      : 'completed'
+                }
+              />
+              {error != null && (
+                <p className="text-destructive text-sm">{getAssistantErrorMessage(error)}</p>
+              )}
+            </>
           ) : isUser ? (
             <>
               <div

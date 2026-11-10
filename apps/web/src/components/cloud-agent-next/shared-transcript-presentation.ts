@@ -1,6 +1,7 @@
 import type { Part, StoredMessage, ToolPart } from '@/components/cloud-agent-next/types';
 import {
   isAssistantMessage,
+  isCompactionPart,
   isFilePart,
   isPatchPart,
   isReasoningPart,
@@ -56,7 +57,9 @@ export function groupConsecutiveAssistantMessages(messages: StoredMessage[]): St
       lastTurn &&
       lastMessage &&
       isAssistantMessage(lastMessage.info) &&
-      isAssistantMessage(message.info)
+      isAssistantMessage(message.info) &&
+      !lastMessage.parts.some(isCompactionPart) &&
+      !message.parts.some(isCompactionPart)
     ) {
       lastTurn.push(message);
       continue;

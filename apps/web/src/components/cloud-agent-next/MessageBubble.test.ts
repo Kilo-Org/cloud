@@ -18,6 +18,8 @@ jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', (
 import { MessageBubble } from './assistant-ui/test-renderers';
 import { CloudChatRuntimeProvider } from './assistant-ui/CloudChatRuntimeProvider';
 import { CloudThread } from './assistant-ui/CloudThread';
+import { CloudSharedTranscript } from './assistant-ui/CloudSharedTranscript';
+import { readKilo2Messages } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 
 Object.assign(globalThis, { React });
 
@@ -78,6 +80,87 @@ function userMessage(text: string): StoredMessage {
 }
 
 describe('MessageBubble', () => {
+  it.each([
+    ['pending', 'Compacting context…'],
+    ['running', 'Compacting context…'],
+    ['completed', 'Context compacted'],
+    ['failed', 'Context compaction failed'],
+  ])('renders a %s V2 compaction after rebuilding the transcript', (status, label) => {
+    const messages = readKilo2Messages(
+      {
+        id: 'ses-1',
+        location: { directory: '/workspace' },
+        time: { created: 1, updated: 5 },
+      },
+      [
+        { id: 'msg_user', type: 'user', text: 'Hello', time: { created: 1 } },
+        {
+          id: 'msg_before',
+          type: 'assistant',
+          content: [{ type: 'text', text: 'Before compaction' }],
+          time: { created: 2, completed: 3 },
+        },
+        {
+          id: 'msg_compaction',
+          type: 'compaction',
+          status,
+          reason: 'manual',
+          summary: 'Internal context summary',
+          time: { created: 4 },
+          ...(status === 'failed'
+            ? { error: { type: 'model', message: 'Model unavailable' } }
+            : {}),
+        },
+        ...(status === 'completed'
+          ? [
+              {
+                id: 'msg_after',
+                type: 'assistant',
+                content: [{ type: 'text', text: 'After compaction' }],
+                time: { created: 5, completed: 6 },
+              },
+            ]
+          : []),
+      ]
+    );
+    const render = () =>
+      renderToStaticMarkup(
+        React.createElement(CloudChatRuntimeProvider, {
+          projection: { messages, isStreaming: status === 'running' },
+          state: {
+            isLoading: false,
+            isRunning: status === 'running',
+            isReadOnly: false,
+            isSendDisabled: false,
+            canInterrupt: false,
+          },
+          onNew: async () => {},
+          children: React.createElement(CloudThread),
+        })
+      );
+    const html = render();
+    expect(html).toContain(label);
+    expect(html).toContain('Before compaction');
+    expect(html).not.toContain('Internal context summary');
+    expect(html.match(/data-message-id="msg_compaction"/g)).toHaveLength(1);
+    if (status === 'completed') {
+      expect(html).toContain('After compaction');
+      expect(html.indexOf('Before compaction')).toBeLessThan(html.indexOf(label));
+      expect(html.indexOf(label)).toBeLessThan(html.indexOf('After compaction'));
+    }
+    if (status === 'failed') {
+      expect(html).toContain('Model unavailable');
+      expect(html).not.toContain('Context compacted');
+    }
+    expect(render()).toBe(html);
+    const sharedHtml = renderToStaticMarkup(
+      React.createElement(CloudSharedTranscript, { messages })
+    );
+    expect(sharedHtml).toContain(label);
+    expect(sharedHtml).not.toContain('Internal context summary');
+    expect(sharedHtml.match(/data-message-id="msg_compaction"/g)).toHaveLength(1);
+  });
+
   it('keeps one resume anchor for a compaction-only group', () => {
     const message = userMessage('');
     message.parts = [

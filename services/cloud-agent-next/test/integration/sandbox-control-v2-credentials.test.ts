@@ -2522,6 +2522,33 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(await readRouteRow(stub, SESSION)).toBeNull();
   });
 
+  it('leaves the policy and the sandbox alone when the released session holds no route', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+    );
+    const policyCalls = provider.policyCalls.length;
+    const framesBefore = wrapper.receivedFrames();
+
+    // The unregistered session owns no alias here, so its release must not
+    // rebuild the policy the live route shares: a rebuild that fails would stop
+    // the sandbox and take that route with it.
+    provider.failPolicy = true;
+    await stub.release({ sessionId: SESSION_NEXT });
+
+    expect(provider.policyCalls.length).toBe(policyCalls);
+    expect((await stub.getAllocationState()).kind).toBe('connected');
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+    expect(wrapper.receivedFrames()).toBe(framesBefore);
+    expect(await wrapper.next(50)).toBeNull();
+    wrapper.close();
+  });
+
   it('stops a live Vercel sandbox when the provider adapter lacks the policy hook', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();

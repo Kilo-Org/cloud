@@ -1296,15 +1296,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.ctx.storage.delete(`${COMMAND_FAILURE_NOTE_KEY_PREFIX}${sessionId}`);
     this.fenceWorkspaceSnapshot('release', sessionId);
     const released = await readRoute(this.db, sessionId);
+    if (released === null) {
+      // The session holds no route here (never registered, or already
+      // released), so it owns no alias, no path rules and no wrapper path on
+      // this sandbox. A policy rebuild would re-apply the live rules that other
+      // sessions' routes share, and a transient provider failure there would
+      // stop the sandbox over a release this session does not own.
+      await this.armAlarm(await this.readAllocation());
+      return;
+    }
     // A shared canonical handle survives on the other members, so removing
     // this route's path rules is not worth a policy rebuild: a transient
     // provider failure there would stop the sandbox and kill the survivor. The
     // facade already denies the released root. Last-member release, a real
     // alias retirement and wrapper replacement still rebuild fail-closed.
-    const sharedHandleSurvives = sharedCanonicalHandleSurvivesRelease(
-      released?.grant ?? null,
-      sessionId
-    );
+    const sharedHandleSurvives = sharedCanonicalHandleSurvivesRelease(released.grant, sessionId);
     await deleteRoute(this.db, this.ctx.storage.kv, sessionId);
     if (!sharedHandleSurvives) {
       // Rebuild the policy inside the queue; if it cannot apply, stop the

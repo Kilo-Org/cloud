@@ -525,7 +525,9 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   wrapper receives `session.release`, ending organization-scoped execution instead of letting it
   run to grant expiry. One session's failed close does not skip the remaining sessions of the same
   member, and a later grant renewal that proves the loss retires that session's route from the
-  Sandbox DO itself, so the same end does not depend on the close call.
+  Sandbox DO itself, so the same end does not depend on the close call. A session that holds no
+  route at that sandbox owns nothing there: its release changes no policy, keeps the shared rules of
+  the other sessions and sends no wrapper frame.
 - Worktree deletion commits the authoritative ingest content removal before runtime cleanup, then
   attempts every journaled runtime location. Missing runtime history or an unconfirmed provider
   stop returns the logical deletion as successful with `cleanup: 'pending'`, retains the deletion

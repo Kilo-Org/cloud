@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usage } from './usage.test-fixture';
+import { enkryptRecord } from './enkrypt-usage.test-fixture';
 import {
   MAX_WRITER_RESPONSE_BYTES,
   recordUsage,
   USAGE_WRITER_TIMEOUT_MS,
+  recordEnkryptUsage,
 } from '@kilocode/worker-utils/usage-writer-client';
 
 const config = {
@@ -33,6 +35,9 @@ afterEach(() => {
     config.secret,
     config.protectionBypass,
     usage.metadata.user_prompt_prefix,
+    enkryptRecord.kiloUserId,
+    enkryptRecord.sessionId,
+    enkryptRecord.organizationId,
   ]) {
     if (sensitive) expect(logs).not.toContain(sensitive);
   }
@@ -161,6 +166,21 @@ describe('usage writer client', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('logs only the error name when an LLM 429 body is malformed', async () => {
+    fetchMock.mockResolvedValue(new Response(`{"secret":"${config.secret}"`, { status: 429 }));
+    expect(await recordUsage(usage, config)).toEqual({
+      kind: 'unavailable',
+      reason: 'http_error',
+      status: 429,
+    });
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith('usage writer unavailable', {
+      usageId: usage.core.id,
+      reason: 'http_error',
+      status: 429,
+      error: 'SyntaxError',
+    });
+  });
 
   it('does not parse a503 error body as admission', async () => {
     const response = Response.json(
@@ -337,7 +357,7 @@ describe('usage writer client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('contains transport failures and logs only the usage ID and safe outcome', async () => {
+  it('contains transport failures and logs only the usage ID, safe outcome and error name', async () => {
     fetchMock.mockRejectedValue(
       new Error(
         `${config.url} ${config.secret} ${config.protectionBypass} ${usage.metadata.user_prompt_prefix}`
@@ -350,6 +370,173 @@ describe('usage writer client', () => {
     expect(console.warn).toHaveBeenCalledExactlyOnceWith('usage writer unavailable', {
       usageId: usage.core.id,
       reason: 'request_failed',
+      error: 'Error',
     });
   });
+});
+
+describe('Enkrypt usage writer client', () => {
+  const enkryptConfig = {
+    url: 'https://writer.example.test/api/internal/enkrypt-usage/record',
+    secret: config.secret,
+    source: 'queue' as const,
+  };
+
+  it.each(['recorded', 'duplicate'] as const)(
+    'posts the record unchanged and accepts a %s echo of its id',
+    async status => {
+      fetchMock.mockResolvedValue(Response.json({ status, usageId: enkryptRecord.id }));
+      expect(await recordEnkryptUsage(enkryptRecord, enkryptConfig)).toEqual({
+        kind: status,
+        result: { status, usageId: enkryptRecord.id },
+      });
+      expect(fetchMock).toHaveBeenCalledExactlyOnceWith(enkryptConfig.url, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': config.secret,
+          'x-usage-write-source': 'queue',
+        },
+        body: JSON.stringify(enkryptRecord),
+        signal: expect.any(AbortSignal),
+      });
+      expect(console.info).toHaveBeenCalledExactlyOnceWith('usage writer acknowledged', {
+        usageId: enkryptRecord.id,
+        usageKind: 'enkrypt_usage',
+        outcome: status,
+      });
+    }
+  );
+
+  it.each([
+    ['another usage id', { status: 'recorded', usageId: '7b2d3f4a-5c6e-4f7a-9b8c-0d1e2f3a4b5c' }],
+    ['a missing usage id', { status: 'duplicate' }],
+    ['an LLM acknowledgement', { status: 'recorded', result: { usageId: enkryptRecord.id } }],
+    ['not_recorded', { status: 'not_recorded', usageId: enkryptRecord.id }],
+    ['an extra key', { status: 'recorded', usageId: enkryptRecord.id, extra: true }],
+  ])('rejects %s as an invalid response', async (_label, body) => {
+    fetchMock.mockResolvedValue(Response.json(body));
+    expect(await recordEnkryptUsage(enkryptRecord, enkryptConfig)).toEqual({
+      kind: 'unavailable',
+      reason: 'invalid_response',
+    });
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith('usage writer unavailable', {
+      usageId: enkryptRecord.id,
+      usageKind: 'enkrypt_usage',
+      reason: 'invalid_response',
+    });
+  });
+
+  it('reuses the bounded admission 429 parsing', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({ error: 'Usage writer overloaded', reason: 'pool_busy' }, { status: 429 })
+    );
+    expect(await recordEnkryptUsage(enkryptRecord, enkryptConfig)).toEqual({
+      kind: 'unavailable',
+      reason: 'http_error',
+      status: 429,
+      admissionReason: 'pool_busy',
+    });
+  });
+
+  it('keeps an unreadable 429 body a generic overload and logs only the error name', async () => {
+    fetchMock.mockResolvedValue(new Response(`{"secret":"${config.secret}"`, { status: 429 }));
+    expect(await recordEnkryptUsage(enkryptRecord, enkryptConfig)).toEqual({
+      kind: 'unavailable',
+      reason: 'http_error',
+      status: 429,
+    });
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith('usage writer unavailable', {
+      usageId: enkryptRecord.id,
+      usageKind: 'enkrypt_usage',
+      reason: 'http_error',
+      status: 429,
+      error: 'SyntaxError',
+    });
+  });
+
+  it('does no network I/O without a writer URL', async () => {
+    expect(await recordEnkryptUsage(enkryptRecord, { secret: config.secret })).toEqual({
+      kind: 'unavailable',
+      reason: 'missing_config',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('times out with the shared writer timeout', async () => {
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      expect(ms).toBe(USAGE_WRITER_TIMEOUT_MS);
+      return timeout(5);
+    });
+    fetchMock.mockImplementation(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          const signal = options?.signal;
+          if (!signal) throw new Error('Expected abort signal');
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        })
+    );
+    expect(await recordEnkryptUsage(enkryptRecord, enkryptConfig)).toEqual({
+      kind: 'unavailable',
+      reason: 'timeout',
+    });
+  });
+});
+
+describe('unread response release', () => {
+  it.each([
+    ['a truncated 429 rejection', 429],
+    ['a truncated acknowledgement', 200],
+  ])('does not report a release failure after %s errored the read body', async (_label, status) => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{"status":'));
+            controller.error(new TypeError('synthetic body failure'));
+          },
+        }),
+        { status }
+      )
+    );
+    await recordUsage(usage, config);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(console.warn).toHaveBeenCalledOnce();
+    expect(console.warn).not.toHaveBeenCalledWith(
+      'usage writer response release failed',
+      expect.anything()
+    );
+  });
+
+  it.each([
+    ['LLM', () => recordUsage(usage, config), { usageId: usage.core.id }],
+    [
+      'Enkrypt',
+      () =>
+        recordEnkryptUsage(enkryptRecord, {
+          ...config,
+          url: 'https://writer.example.test/api/internal/enkrypt-usage/record',
+        }),
+      { usageId: enkryptRecord.id, usageKind: 'enkrypt_usage' },
+    ],
+  ])(
+    'logs only the error name when releasing a %s error body fails and keeps the outcome',
+    async (_label, write, identity) => {
+      const body = new ReadableStream<Uint8Array>({
+        cancel() {
+          throw new TypeError(`release failed ${config.secret}`);
+        },
+      });
+      fetchMock.mockResolvedValue(new Response(body, { status: 503 }));
+      expect(await write()).toEqual({ kind: 'unavailable', reason: 'http_error', status: 503 });
+      await vi.waitFor(() =>
+        expect(console.warn).toHaveBeenCalledWith('usage writer response release failed', {
+          ...identity,
+          error: 'TypeError',
+        })
+      );
+    }
+  );
 });

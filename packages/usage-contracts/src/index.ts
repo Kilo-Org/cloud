@@ -15,11 +15,13 @@ export {
 export type { ExaAllowedPath, ExaUsageRecord, ExaUsageWriteResponse } from './exa';
 export {
   ENKRYPT_USAGE_WRITE_PATH,
+  EnkryptUsageQueueMessageSchema,
   EnkryptUsageWriteResponseSchema,
   EnkryptUsageWriteSchema,
   MAX_ENKRYPT_CREDITS_PER_CALL,
 } from './enkrypt';
 export type {
+  EnkryptUsageQueueMessage,
   EnkryptUsageWrite,
   EnkryptUsageWriteInput,
   EnkryptUsageWriteResponse,

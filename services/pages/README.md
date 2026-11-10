@@ -69,11 +69,18 @@ Losing it only signs browser sessions out; a new keyring can replace it.
 - A refused upload answers 401 with a body of 200 bytes up to 6 MB unread.
 - An invalid API key is refused after a live check with Anaconda.
 - The Worker created its tables in `pages-dev-auth` on first use.
+- A signed-in round trip with an Anaconda API key passes: list, create, read,
+  edit, comment, read changes, upload an image to R2, place it, read it back
+  byte for byte, and trash the Page. An anonymous read of the image answers 401.
+
+Timings from that round trip, one client in North America: the first
+`list_pages` on a cold Worker took 2.7 s and `create_page` 1.2 s. Later calls
+took 70 to 480 ms.
 
 ## Not checked yet
 
-- A signed-in round trip with a real API key: create, read, edit, comment.
+- Browser sign-in. It arrives with Kilo sign-in.
 - Live sync over WebSocket between two clients.
-- Image upload and import against R2.
+- Image import from a ChatGPT attachment.
 - Memory limits, hibernation and cold-start time. The limits in this build are
   sized for a large single host, not for Workers.

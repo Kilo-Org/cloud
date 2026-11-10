@@ -19,8 +19,14 @@ import { POST } from './route';
 const nativeFetch = globalThis.fetch;
 const authorized = { 'x-internal-api-key': INTERNAL_API_SECRET };
 const fromQueue = { ...authorized, 'x-usage-write-source': 'queue' };
+const SHARED_LIMIT = 8;
+const NON_LLM_CEILING = 2;
+
+type HeldSlot = { release: () => void };
+const heldSlots: HeldSlot[] = [];
 
 afterEach(() => {
+  for (const slot of heldSlots.splice(0)) slot.release();
   globalThis.fetch = nativeFetch;
   jest.restoreAllMocks();
 });
@@ -87,6 +93,31 @@ function heldWrite() {
     return transaction(...args);
   });
   return { started: started.promise, settle: settle.resolve };
+}
+
+async function holdNonLlmSlots(): Promise<HeldSlot[]> {
+  const held: HeldSlot[] = [];
+  for (let attempt = 0; attempt <= SHARED_LIMIT; attempt++) {
+    const slot = await queueWriterAdmission.acquire('queue', randomUUID(), {
+      maxWaitMs: 0,
+      writerClass: 'non_llm',
+    });
+    if (!slot.admitted) break;
+    held.push(slot);
+    heldSlots.push(slot);
+  }
+  return held;
+}
+
+function holdLlmSlots(): HeldSlot[] {
+  const held: HeldSlot[] = [];
+  for (let attempt = 0; attempt <= SHARED_LIMIT; attempt++) {
+    const slot = queueWriterAdmission.tryAcquire('queue', randomUUID());
+    if (!slot.admitted) break;
+    held.push(slot);
+    heldSlots.push(slot);
+  }
+  return held;
 }
 
 describe('POST /api/internal/enkrypt-usage/record', () => {
@@ -266,10 +297,47 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
     expect(acquire).toHaveBeenCalledWith('queue', usageWrite.id, {
       maxWaitMs: 250,
       signal: expect.any(AbortSignal),
+      writerClass: 'non_llm',
     });
     expect(transaction).not.toHaveBeenCalled();
     expect(await ledgerRows(usageWrite.organizationId)).toEqual([]);
     expect(await microdollarsUsed(usageWrite.organizationId)).toBe(0);
+  });
+
+  test('rejects a queue write over the non-LLM ceiling with 429 and no write, leaving LLM slots free', async () => {
+    const usageWrite = await usageWriteForNewOrganization();
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const transaction = jest.spyOn(db, 'transaction');
+    const nonLlm = await holdNonLlmSlots();
+
+    const response = await post(usageWrite, fromQueue);
+
+    expect(nonLlm).toHaveLength(NON_LLM_CEILING);
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({
+      error: 'Usage writer overloaded',
+      reason: 'queue_limit',
+    });
+    expect(transaction).not.toHaveBeenCalled();
+    expect(await ledgerRows(usageWrite.organizationId)).toEqual([]);
+    expect(await microdollarsUsed(usageWrite.organizationId)).toBe(0);
+    const llm = holdLlmSlots();
+    expect(llm).toHaveLength(SHARED_LIMIT - NON_LLM_CEILING);
+  });
+
+  test('returns the non-LLM slot after a queue write succeeds and after it throws', async () => {
+    const recorded = await usageWriteForNewOrganization();
+    const failed = await usageWriteForNewOrganization();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(db, 'transaction').mockRejectedValueOnce(new Error('synthetic write failure'));
+
+    expect((await post(failed, fromQueue)).status).toBe(500);
+    expect((await post(recorded, fromQueue)).status).toBe(200);
+
+    const nonLlm = await holdNonLlmSlots();
+    expect(nonLlm).toHaveLength(NON_LLM_CEILING);
+    expect(await ledgerRows(recorded.organizationId)).toHaveLength(1);
+    expect(await ledgerRows(failed.organizationId)).toEqual([]);
   });
 
   test('keeps the admission slot until a queue write commits', async () => {

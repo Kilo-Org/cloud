@@ -402,9 +402,22 @@ batch size at 6 in production and 2 in staging; retry settings also stay unchang
 There is no new environment knob; merging this change activates queue rejection
 when the normal automatic deployment reaches the writer.
 
+Queue writes to the Enkrypt writer (`/api/internal/enkrypt-usage/record`) use the
+same guard and the same shared limit, as writer class `non_llm`. That class has
+its own ceiling inside the shared limit: `max(1, min(2, limit - 1))`, currently
+**2 of 8**. A `non_llm` call over the ceiling gets the same HTTP 429 body with
+reason `queue_limit` and is not written. Its active plus queued calls never exceed
+the ceiling, so it cannot fill the FIFO either. LLM queue writes can still use all
+8 slots; the ceiling only stops non-LLM writes from taking more than 2. When the
+shared limit is 1 (pool maximum 3 or less), the ceiling is 1 and a non-LLM call
+can take the only slot. The total limit is unchanged. Like the shared limit, this
+is a per-runtime counter, not a connection reservation, and it makes no
+fleet-wide fairness claim.
+
 `usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
 all rejected decisions. Fields contain only the bounded caller/outcome/reason,
-active count/limit, pool gauges/max, and sample rate; diagnostic failures cannot
+`writer_class` (`queue` or `non_llm`), active count/limit, `active_non_llm` and
+`non_llm_limit`, pool gauges/max, and sample rate; diagnostic failures cannot
 change admission or persistence results.
 
 The source policy remains finite: initial delivery plus up to **20 retries**

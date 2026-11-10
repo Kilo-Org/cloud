@@ -310,8 +310,10 @@ it('emits redacted bounded admission diagnostics and preserves writes when loggi
   expect(admission.map(line => line.outcome)).toEqual(['admitted', 'rejected']);
   expect(Object.keys(admission[0]).sort()).toEqual([
     'active',
+    'active_non_llm',
     'event',
     'limit',
+    'non_llm_limit',
     'outcome',
     'pool',
     'pool_max',
@@ -319,6 +321,7 @@ it('emits redacted bounded admission diagnostics and preserves writes when loggi
     'sample_rate',
     'slot_wait_ms',
     'writer_caller',
+    'writer_class',
   ]);
   expect(admission[1]).toEqual({
     ...admission[0],

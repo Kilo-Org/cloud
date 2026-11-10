@@ -1,12 +1,6 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useCallback, useRef, useState } from 'react';
-import {
-  type LayoutChangeEvent,
-  ScrollView,
-  type ScrollViewInstance,
-  View,
-  type ViewInstance,
-} from 'react-native';
+import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
 import {
   KeyboardAvoidingView,
   useKeyboardState,
@@ -36,7 +30,6 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
-import { keyboardAvoidingViewProps } from '@/lib/keyboard-avoiding-view-props';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
@@ -183,16 +176,18 @@ export function NewSessionConfigureForm({
   const { bottom } = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { height: keyboardHeight, isVisible: keyboardVisible } = useKeyboardState();
-  const [containerFrame, setContainerFrame] = useState({ y: 0, height: 0 });
-  const containerRef = useRef<ViewInstance | null>(null);
+  const [containerHeight, setContainerHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(0);
-  // `containerY` is the view's top as the window places it, the same space the
-  // library measures its keyboard lift in. A parent-relative top would claim the
-  // view ends at the window's bottom edge while it really ends above it — inside
-  // the Tour modal's sheet — so the fit would read room the lift takes away.
+  // The wrapper's top in the window, derived from the height it measured. Its
+  // bottom is the window's bottom edge on every entry — a full-screen push and
+  // the Tour modal's sheet alike — while a measured *position* is not portable:
+  // inside the sheet the native position arrives in the sheet's own space, one
+  // sheet inset below the window's. The lift and the prompt fit both subtract
+  // from the window's height, so both take this same top.
+  const containerTop = Math.max(windowHeight - containerHeight, 0);
   const frame = {
-    containerY: containerFrame.y,
-    containerHeight: containerFrame.height,
+    containerY: containerTop,
+    containerHeight,
     footerHeight,
     windowHeight,
     keyboardVerticalOffset: keyboardInsetOffset(bottom),
@@ -230,24 +225,8 @@ export function NewSessionConfigureForm({
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
 
   function handleContainerLayout(event: LayoutChangeEvent) {
-    const layout = event.nativeEvent.layout;
-    const container = containerRef.current;
-    // The lift pads against where the window puts this view, so the fit asks the
-    // same question. The view's rect inside its parent answers a different one:
-    // inside the Tour modal's sheet its top is the sheet's, not the window's.
-    if (container === null) {
-      setContainerFrame(current =>
-        current.y === layout.y && current.height === layout.height ? current : layout
-      );
-      return;
-    }
-    container.measureInWindow((_x, windowY) => {
-      setContainerFrame(current =>
-        current.y === windowY && current.height === layout.height
-          ? current
-          : { y: windowY, height: layout.height }
-      );
-    });
+    const nextHeight = event.nativeEvent.layout.height;
+    setContainerHeight(current => (current === nextHeight ? current : nextHeight));
   }
 
   // The composer's scroll body, so the advanced configuration can bring its
@@ -466,26 +445,26 @@ export function NewSessionConfigureForm({
   );
 
   // Shrink the scroll viewport with the keyboard; a footer-only lift grows
-  // below its full-height sibling and leaves Start behind the keyboard. This
-  // form also renders inside the Tour modal, above the window's own bottom
-  // edge, so the lift is measured where the window places the view; the
-  // Android navigation-bar correction stays the separate vertical offset the
-  // content's own bottom padding needs.
+  // below its full-height sibling and leaves Start behind the keyboard. The
+  // scroll body and the footer share one lift, and the lift is the overlap this
+  // wrapper really has with the keyboard: the keyboard's top edge in the
+  // window, less the wrapper's own bottom edge in the same space.
   //
-  // The frame the prompt fits into is measured on the wrapper, not on the lift:
-  // the library's view keeps its keyboard props, and the wrapper's window
-  // position is where that identical frame sits.
+  // The offset is this form's own measurement, not the library's
+  // `automaticOffset`. That option asks the native layer for the view's
+  // position, which a presented screen reports in its own space: inside the
+  // Tour modal's sheet the value arrives one sheet inset from the window's, so
+  // the same route lifted the footer to the keyboard's top on one open and a
+  // sheet inset away from it on the next. The wrapper's height is
+  // presentation-independent, so the lift and the prompt fit both take the
+  // window-space top derived from it. The Android navigation-bar correction
+  // stays the separate vertical offset the content's own bottom padding needs.
   return (
-    <View
-      ref={containerRef}
-      className="flex-1"
-      style={sideInsetStyle}
-      onLayout={handleContainerLayout}
-    >
+    <View className="flex-1" style={sideInsetStyle} onLayout={handleContainerLayout}>
       <KeyboardAvoidingView
         className="flex-1 bg-background"
-        {...keyboardAvoidingViewProps()}
-        keyboardVerticalOffset={keyboardInsetOffset(bottom)}
+        behavior="padding"
+        keyboardVerticalOffset={keyboardInsetOffset(bottom) + containerTop}
       >
         {body}
         {footer}

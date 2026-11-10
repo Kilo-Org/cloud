@@ -188,6 +188,46 @@ describe('resolveNewSessionStartDisabled', () => {
       )
     ).toBe(false);
   });
+
+  // The composer state a photo plus a typed prompt reaches: the upload settles
+  // and the chip stops counting as an upload in flight, so the attachment adds
+  // no further precondition. A file is not content for Cloud Agent, though —
+  // prompt text is — so this state starts only once the repository, the model,
+  // and the profile are settled too.
+  describe('a settled attachment with prompt text', () => {
+    it('enables Start with the repository, the model, and the profile settled', () => {
+      expect(resolveNewSessionStartDisabled(startInput({ attachmentsIsUploading: false }))).toBe(
+        false
+      );
+    });
+
+    it('blocks Start while that upload is still in flight', () => {
+      expect(resolveNewSessionStartDisabled(startInput({ attachmentsIsUploading: true }))).toBe(
+        true
+      );
+    });
+
+    it('blocks Start while a chip is failed', () => {
+      expect(resolveNewSessionStartDisabled(startInput({ attachmentsHasFailed: true }))).toBe(true);
+    });
+
+    it('still blocks Start without prompt text, because an attachment is not content', () => {
+      expect(resolveNewSessionStartDisabled(startInput({ hasPrompt: false }))).toBe(true);
+    });
+
+    it('names the repository step when only the attachment, the prompt, and the model are set', () => {
+      expect(
+        resolveNewSessionStartBlockedReason(
+          newSessionReasonInput({
+            hasRepositories: true,
+            hasConnectableProvider: true,
+            hasAttachments: true,
+            gate: newSessionGate({ attachmentsIsUploading: false }),
+          })
+        )
+      ).toBe('select-repository');
+    });
+  });
 });
 
 describe('resolveRemoteStartMissingContent', () => {

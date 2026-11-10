@@ -35,6 +35,7 @@ where
     and mu.total_output_tokens > 0
     and mu.is_user_byok = false
     and mu.requested_model not ilike '%mercury-edit%'
+    and mu.model is distinct from 'auto-routing/classifier'
 group by 1, 2
 order by 4 desc;
 `;

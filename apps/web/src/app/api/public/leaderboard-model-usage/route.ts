@@ -28,6 +28,7 @@ where
     mu.usage_date >= dateadd(week, -1, current_date())
     and mu.usage_date < current_date()
     and mu.total_input_tokens > 0
+    and mu.model is distinct from 'auto-routing/classifier'
     and (
         mu.provider != 'custom'
         or coalesce(mu.requested_model, mu.model) = 'reflection/beam-free'

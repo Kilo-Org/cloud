@@ -299,6 +299,19 @@ describe('parseLocalConfigArchive', () => {
     expect(preview.config.agents).toEqual([]);
   });
 
+  test('positions every duplicate property in a config full of repeats', () => {
+    const lines = ['{'];
+    for (let index = 0; index < 200; index += 1) lines.push('  "agent": {},');
+    lines.push('  "x": 1', '}');
+    const preview = parseFiles({ 'kilo.json': lines.join('\n') });
+
+    const issues = preview.issues.filter(candidate => candidate.code === 'duplicate-definition');
+    expect(issues).toHaveLength(199);
+    expect(issues.at(-1)?.message).toBe(
+      'Duplicate property "agent" at line 2, column 3 and line 201, column 3 in kilo.json; import is ambiguous'
+    );
+  });
+
   test('ignores remote instruction URLs and globs that match no files', () => {
     const preview = parseFiles({
       'kilo.json': JSON.stringify({

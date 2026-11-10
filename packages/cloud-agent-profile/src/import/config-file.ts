@@ -49,20 +49,29 @@ const TOKEN_CLOSE_BRACKET = scanTokenKind(']');
 const TOKEN_EOF = scanTokenKind('');
 
 /**
- * A 1-based `line 3, column 16` position for a character offset, so an issue
- * points at a place the user can open instead of a raw index into the file.
+ * A `line 3, column 16` formatter for one document, so an issue points at a
+ * place the user can open instead of a raw index into the file.
+ *
+ * The line starts are collected in one pass and searched per offset, because a
+ * config can hold many duplicate properties and re-scanning the prefix per
+ * issue would cost the square of the document length.
  */
-function describePosition(text: string, offset: number): string {
-  const end = Math.min(offset, text.length);
-  let line = 1;
-  let lineStart = 0;
-  for (let index = 0; index < end; index += 1) {
-    if (text[index] === '\n') {
-      line += 1;
-      lineStart = index + 1;
-    }
+function createPositionFormatter(text: string): (offset: number) => string {
+  const lineStarts = [0];
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === '\n') lineStarts.push(index + 1);
   }
-  return `line ${line}, column ${end - lineStart + 1}`;
+  return offset => {
+    const end = Math.min(Math.max(offset, 0), text.length);
+    let low = 0;
+    let high = lineStarts.length - 1;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if (lineStarts[middle] <= end) low = middle;
+      else high = middle - 1;
+    }
+    return `line ${low + 1}, column ${end - lineStarts[low] + 1}`;
+  };
 }
 
 /**
@@ -232,6 +241,7 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
   const parsed: unknown = parseJsonc(configEntry.content, errors, { allowTrailingComma: true });
   if (errors.length > 0) {
     const [firstError] = errors;
+    const positionOf = createPositionFormatter(configEntry.content);
     state.issues.push(
       makeIssue(
         'error',
@@ -239,7 +249,7 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
         'config',
         configEntry.path,
         null,
-        `Could not parse ${configEntry.path}: ${printParseErrorCode(firstError.error)} at ${describePosition(configEntry.content, firstError.offset)}`
+        `Could not parse ${configEntry.path}: ${printParseErrorCode(firstError.error)} at ${positionOf(firstError.offset)}`
       )
     );
     return sections;
@@ -262,6 +272,7 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
   const tree = parseTree(configEntry.content, undefined, { allowTrailingComma: true });
   if (tree) collectDuplicateProperties(tree, duplicates);
   if (duplicates.length > 0) {
+    const positionOf = createPositionFormatter(configEntry.content);
     for (const duplicate of duplicates) {
       state.issues.push(
         makeIssue(
@@ -270,7 +281,7 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
           'config',
           `${configEntry.path}#${duplicate.path}`,
           null,
-          `Duplicate property "${duplicate.path}" at ${describePosition(configEntry.content, duplicate.firstOffset)} and ${describePosition(configEntry.content, duplicate.secondOffset)} in ${configEntry.path}; import is ambiguous`
+          `Duplicate property "${duplicate.path}" at ${positionOf(duplicate.firstOffset)} and ${positionOf(duplicate.secondOffset)} in ${configEntry.path}; import is ambiguous`
         )
       );
     }

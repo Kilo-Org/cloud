@@ -16,8 +16,8 @@ ready for that. The dev Worker is deployed by hand from a profile.
 | Worker | `pages-dev` |
 | Address | `https://pages-dev.kiloapps.io` |
 | First deployed | 2026-11-10, from `nteract/nteract` at `3c22117f7`, version `e11cd161-d009-4619-8cdb-b8464a0a17a1` |
-| Running now | `nteract/nteract` main at `5aeffeae6`, version `9a91405c-8a83-40e6-9e43-0965513121f8` |
-| Build id | `2ec15ab8a18b` (reported by `/health`) |
+| Running now | `nteract/nteract` main at `5a177c7c8`, version `b754e822-f7b8-4a04-9cd0-b727841d3e57` |
+| Build id | `bc5143b9fb5e` (reported by `/health`) |
 | D1, auth and catalog | `pages-dev-auth` (`13db1af4-e01e-447d-ae51-cc37625d5f77`) |
 | D1, usage | `pages-dev-usage` (`8691d489-5105-49f4-bbec-63ecbca319e9`) |
 | R2 | `pages-dev-assets` |
@@ -72,6 +72,24 @@ agent sign-in path for Kilo accounts lands.
 The address is public. Anyone with a Kilo account can sign in, and any
 Anaconda account holder with an API key can create Pages. Treat its data as
 disposable.
+
+## Which agents can connect
+
+The Worker is its own OAuth server for `/mcp`. A person signs in with their
+Kilo account and approves a consent page; the client gets a Pages token, never
+a Kilo one.
+
+`PAGES_OAUTH_ANY_CLIENT_DOCUMENT` is not set in the profile, so the Worker
+reads a client ID metadata document only for the clients it names: Claude
+(web, desktop and mobile), Claude Code and ChatGPT. The Kilo CLI connects with
+its fixed id, `pages-kilo`. Any other client is refused before anything is
+fetched. Setting the variable to `true` admits any client that publishes a
+document; read "Outbound requests" in nteract's `apps/pages/DEPLOYMENT.md`
+before turning it on.
+
+Checked signed out on 2026-11-10: the authorize page answers "Connect an
+app" for both Claude client ids and "Connect Kilo" for the Kilo CLI, and 400
+for a document on another site. No client has finished a connection yet.
 
 ## Deploy again
 

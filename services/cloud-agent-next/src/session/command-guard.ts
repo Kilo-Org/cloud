@@ -226,7 +226,23 @@ const CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS = [
   'git diff *--output*',
   'git log *--output*',
   'git show *--output*',
+  'git diff *--ext-diff*',
+  'git log *--ext-diff*',
+  'git show *--ext-diff*',
+  'git diff *--text*',
+  'git log *--text*',
+  'git show *--text*',
 ];
+
+// The policy denies the edit tool, so a review session writes no file. An output
+// redirect on an allow-listed command is the one write form a pattern can name,
+// and it is refused for every command the policy allows. A heredoc payload is
+// not part of the classified command text, so the forge publication commands
+// keep working; they need no output redirect.
+const CODE_REVIEW_WRITE_REDIRECT_DENIED_PATTERNS = [
+  ...CODE_REVIEW_ALLOWED_COMMANDS,
+  ...CODE_REVIEW_GIT_READ_SUBCOMMANDS.map(subcommand => `git ${subcommand}`),
+].map(command => `${command} *>*`);
 
 const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
   'ls',
@@ -377,7 +393,10 @@ export function getCommandGuardPolicy(
         `git ${subcommand}`,
         `git ${subcommand} *`,
       ]),
-      deniedAfterAllowedOverrides: CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS,
+      deniedAfterAllowedOverrides: [
+        ...CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS,
+        ...CODE_REVIEW_WRITE_REDIRECT_DENIED_PATTERNS,
+      ],
     };
   }
 

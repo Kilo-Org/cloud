@@ -249,6 +249,11 @@ describe('code-review command guard policy', () => {
       'git diff HEAD --output=notes.txt',
       'git log --output=notes.txt -5',
       'git show --output=notes.txt HEAD',
+      'git diff --ext-diff HEAD',
+      'git log --ext-diff -1',
+      'git show --ext-diff HEAD',
+      'git diff --textconv HEAD',
+      'git log --text -1',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }
@@ -256,8 +261,53 @@ describe('code-review command guard policy', () => {
     for (const command of [
       'git diff',
       'git diff HEAD~1..HEAD',
+      'git diff --no-ext-diff --no-textconv HEAD',
       'git log --oneline -5',
       'git show HEAD:src/app.ts',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+    }
+  });
+
+  it('keeps a review session from writing a file with an output redirect', () => {
+    const policy = getCommandGuardPolicy('code-review');
+    if (!policy) throw new Error('Expected code-review command guard policy');
+    const permissions = buildCommandGuardBashPermissions(policy);
+
+    for (const command of [
+      'echo "[diff]" >> .git/config',
+      'echo "	external = ./helper" >> .git/config',
+      'cat > .git/config',
+      'cat > .git/hooks/pre-merge-commit',
+      'head -20 src/app.ts > notes.txt',
+      'tail -n 40 src/app.ts >> notes.txt',
+      'grep -rn "createSession" src > matches.txt',
+      'jq . package.json > copy.json',
+      'find src -name "*.ts" > files.txt',
+      'gh pr view 1 --jq \'"[diff]"\' > .git/config',
+      'glab mr view 1 > .git/config',
+      'gh api repos/o/r/pulls/7/comments > notes.json',
+      'git diff HEAD > .git/config',
+      'git log --oneline -5 > history.txt',
+      'git show HEAD:src/app.ts > copy.ts',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
+    for (const command of [
+      'echo hi',
+      'cat src/app.ts',
+      'head -20 src/app.ts',
+      'jq . package.json',
+      'git diff HEAD',
+      'git log --oneline -5',
+      // Review publication keeps working. The classified text of a call is one
+      // parsed command node, so a heredoc payload is not part of it; the CLI
+      // run in the pull request covers that path.
+      'gh api repos/o/r/pulls/7/reviews --input -',
+      'gh pr view 7 --json headRefOid',
+      'glab mr diff 7',
+      'glab api --method POST projects/o%2Fr/merge_requests/7/notes',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
     }

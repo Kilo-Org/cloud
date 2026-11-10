@@ -136,11 +136,13 @@ export const MAX_DURABLE_RESULT_BYTES = 120 * 1024;
 const ATTACHMENT_FRAME_LIMIT_BYTES = 16_384;
 
 /**
- * Persisted CLI attachment budget. Below the frame limit because structured
- * clone costs more per value than the JSON measurement below; the write ladder
- * handles any remaining overshoot.
+ * Persisted CLI attachment budget. Measured against workerd: a row list whose
+ * JSON text is 17,097 bytes still clones into 16,384, so the JSON measurement
+ * overestimates structured clone for these repeated-key rows. Seven eighths of
+ * the frame keeps a margin for a longer string value and still persists most
+ * rows; the write ladder covers any remaining overshoot.
  */
-const CLI_ATTACHMENT_BUDGET_BYTES = 12_288;
+const CLI_ATTACHMENT_BUDGET_BYTES = (ATTACHMENT_FRAME_LIMIT_BYTES * 7) / 8;
 
 const ATTACHMENT_CAPACITY_ERROR = /^A WebSocket 'attachment' cannot be larger than \d+ bytes\./;
 

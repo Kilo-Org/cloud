@@ -57,12 +57,14 @@ export function BYOKContent({
         <div className="space-y-4">
           <ClaudeBillingCard organizationId={organizationId} />
           {/*
-          The ChatGPT connection is personal, so every member manages their own
-          for this organization and sees only that card. The pasted-key manager
-          stays owner/admin only, so a member never sees the access-denied block.
+          The Claude and ChatGPT connections are personal, so every member manages
+          their own for this organization and sees only that card. The
+          shared-services and pasted-key managers stay owner/admin only, so a
+          member never sees the access-denied block.
         */}
           {hasPermission ? (
             <div className="space-y-4">
+              <ClaudeBillingCard organizationId={organizationId} scope="shared_services" />
               {chatGptCard}
               <BYOKKeysManager organizationId={organizationId} />
             </div>

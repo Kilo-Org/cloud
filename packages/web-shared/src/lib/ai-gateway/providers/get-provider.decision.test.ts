@@ -231,7 +231,7 @@ describe('getProvider routing decision', () => {
         ? await createTestOrganization('Claude requester', user.id, 0)
         : null;
       await db.insert(claude_billing_connections).values({
-        kilo_user_id: org ? null : user.id,
+        kilo_user_id: user.id,
         organization_id: org?.id ?? null,
         user_profile_id: `uprof_${user.id}`,
         status: 'connected',

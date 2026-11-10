@@ -449,6 +449,7 @@ async function selectProvider(
     userId: isAnonymousContext(user) ? null : user.id,
     requesterEmail: isAnonymousContext(user) ? null : user.google_user_email,
     organizationId,
+    botId,
   });
   if (claudeBilling?.kind === 'unavailable') {
     decision.step({ step: 'claude-billing', outcome: 'rejected', reason: 'unavailable' });

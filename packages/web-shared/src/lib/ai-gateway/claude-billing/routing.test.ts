@@ -11,6 +11,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
 jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
   isClaudePlatformOAuthEnabled: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
+  findUserById: jest.fn(),
+}));
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -18,6 +21,7 @@ import { getClaudeBillingConnection } from './store';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 import { checkClaudeBilling } from './routing';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const row: ClaudeBillingConnectionRow = {
   id: 'row',
@@ -31,7 +35,17 @@ const row: ClaudeBillingConnectionRow = {
   last_refusal_at: null,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
-  created_by: 'user',
+  created_by: 'connector',
+};
+
+const SHARED_ORG_ID = '00000000-0000-4000-8000-000000000001';
+
+const SHARED_ROW: ClaudeBillingConnectionRow = {
+  ...row,
+  kilo_user_id: null,
+  organization_id: SHARED_ORG_ID,
+  user_profile_id: 'uprof_shared',
+  created_by: 'connector',
 };
 
 beforeEach(() => {
@@ -39,6 +53,10 @@ beforeEach(() => {
   jest.mocked(getClaudeOperatorToken).mockReset().mockResolvedValue('operator-token');
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(true);
   jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
+  jest
+    .mocked(findUserById)
+    .mockReset()
+    .mockResolvedValue({ id: 'connector', google_user_email: 'connector@kilocode.ai' } as never);
 });
 
 function request(kind: 'messages' | 'chat_completions'): GatewayRequest {
@@ -59,7 +77,13 @@ function input(kind: 'messages' | 'chat_completions' = 'messages') {
     userId: 'user',
     requesterEmail: 'requester@kilocode.ai',
     organizationId: undefined,
+    botId: undefined,
   };
+}
+
+/** The connection the routing read for the organization's shared services. */
+function sharedOwner() {
+  return { kind: 'shared_services', organizationId: SHARED_ORG_ID } as const;
 }
 
 describe('Claude customer-billed routing', () => {
@@ -124,27 +148,117 @@ describe('Claude customer-billed routing', () => {
     jest.mocked(getClaudeBillingConnection).mockResolvedValue(null);
     expect(await checkClaudeBilling({ ...input(), organizationId: 'organization' })).toBeNull();
     expect(getClaudeBillingConnection).toHaveBeenCalledWith(
-      { kind: 'organization', organizationId: 'organization' },
+      { kind: 'member', kiloUserId: 'user', organizationId: 'organization' },
       expect.anything()
     );
   });
 
-  it.each([true, false])(
-    'gates the requester of an organization connection (%s)',
-    async enabled => {
-      jest
-        .mocked(isClaudePlatformOAuthEnabled)
-        .mockImplementation(async email => enabled && email === 'requester@kilocode.ai');
-      const result = await checkClaudeBilling({ ...input(), organizationId: 'organization' });
-      expect(result?.kind).toBe(enabled ? 'provider' : 'unavailable');
-      expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('requester@kilocode.ai');
-      expect(getClaudeBillingConnection).toHaveBeenCalledWith(
-        { kind: 'organization', organizationId: 'organization' },
-        expect.anything()
+  it.each([true, false])('gates the requester of a member connection (%s)', async enabled => {
+    jest
+      .mocked(isClaudePlatformOAuthEnabled)
+      .mockImplementation(async email => enabled && email === 'requester@kilocode.ai');
+    const result = await checkClaudeBilling({ ...input(), organizationId: 'organization' });
+    expect(result?.kind).toBe(enabled ? 'provider' : 'unavailable');
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('requester@kilocode.ai');
+    expect(getClaudeBillingConnection).toHaveBeenCalledWith(
+      { kind: 'member', kiloUserId: 'user', organizationId: 'organization' },
+      expect.anything()
+    );
+    if (!enabled) expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('serves a service run from the shared-services connection first', async () => {
+    jest.mocked(getClaudeBillingConnection).mockImplementation(async owner => {
+      if (owner.kind === 'shared_services') return SHARED_ROW;
+      return null;
+    });
+    const result = await checkClaudeBilling({
+      ...input(),
+      organizationId: SHARED_ORG_ID,
+      botId: 'reviewer',
+    });
+    expect(result?.kind).toBe('provider');
+    if (result?.kind !== 'provider') throw new Error('Expected shared-services provider');
+    expect(getClaudeBillingConnection).toHaveBeenNthCalledWith(1, sharedOwner(), expect.anything());
+    expect(result.provider.claudeBillingUserProfileId).toBe('uprof_shared');
+  });
+
+  it('gates the shared-services connection on the person who connected it', async () => {
+    jest
+      .mocked(getClaudeBillingConnection)
+      .mockImplementation(async owner => (owner.kind === 'shared_services' ? SHARED_ROW : null));
+    const result = await checkClaudeBilling({
+      ...input(),
+      requesterEmail: 'code-review-bot@kilocode.local',
+      organizationId: SHARED_ORG_ID,
+      botId: 'reviewer',
+    });
+    expect(result?.kind).toBe('provider');
+    expect(findUserById).toHaveBeenCalledWith('connector', expect.anything());
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('connector@kilocode.ai');
+  });
+
+  it('fails a shared-services request whose connector is no longer eligible', async () => {
+    jest
+      .mocked(getClaudeBillingConnection)
+      .mockImplementation(async owner => (owner.kind === 'shared_services' ? SHARED_ROW : null));
+    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
+    expect(
+      await checkClaudeBilling({
+        ...input(),
+        organizationId: SHARED_ORG_ID,
+        botId: 'reviewer',
+      })
+    ).toMatchObject({ kind: 'unavailable' });
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the caller connection when the organization has no shared one', async () => {
+    jest
+      .mocked(getClaudeBillingConnection)
+      .mockImplementation(async owner =>
+        owner.kind === 'member' ? { ...row, kilo_user_id: 'user' } : null
       );
-      if (!enabled) expect(getClaudeOperatorToken).not.toHaveBeenCalled();
-    }
-  );
+    const result = await checkClaudeBilling({
+      ...input(),
+      organizationId: SHARED_ORG_ID,
+      botId: 'reviewer',
+    });
+    expect(result?.kind).toBe('provider');
+    expect(getClaudeBillingConnection).toHaveBeenNthCalledWith(
+      2,
+      {
+        kind: 'member',
+        kiloUserId: 'user',
+        organizationId: SHARED_ORG_ID,
+      },
+      expect.anything()
+    );
+  });
+
+  it('never falls back to the member connection when the shared one cannot bill', async () => {
+    jest.mocked(getClaudeBillingConnection).mockImplementation(async owner => {
+      if (owner.kind === 'shared_services') return { ...SHARED_ROW, status: 'billing_unavailable' };
+      return row;
+    });
+    const result = await checkClaudeBilling({
+      ...input(),
+      organizationId: SHARED_ORG_ID,
+      botId: 'reviewer',
+    });
+    expect(result).toMatchObject({ kind: 'unavailable' });
+    expect(getClaudeBillingConnection).toHaveBeenCalledTimes(1);
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('ignores a bot id without an organization', async () => {
+    const result = await checkClaudeBilling({ ...input(), botId: 'reviewer' });
+    expect(result?.kind).toBe('provider');
+    expect(getClaudeBillingConnection).toHaveBeenCalledWith(
+      { kind: 'personal', kiloUserId: 'user' },
+      expect.anything()
+    );
+  });
 
   it.each([undefined, 'organization'])(
     'refuses a connected payer when the authenticated requester email is absent (org=%s)',

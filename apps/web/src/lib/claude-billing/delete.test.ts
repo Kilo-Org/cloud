@@ -4,12 +4,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => (
 }));
 
 import { afterEach, describe, expect, it } from '@jest/globals';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { claude_billing_connections } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getClaudeBillingConnection } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
-import { ClaudeProfileDeletionError, deletePersonalClaudeProfile } from './delete';
+import { ClaudeProfileDeletionError, deleteUserClaudeProfiles } from './delete';
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -32,7 +33,7 @@ describe('Personal Claude profile erasure', () => {
   it('does not call the provider when no personal profile exists', async () => {
     const user = await insertTestUser();
     const fetchMock = jest.spyOn(globalThis, 'fetch');
-    await deletePersonalClaudeProfile(user.id);
+    await deleteUserClaudeProfiles(user.id);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -43,10 +44,41 @@ describe('Personal Claude profile erasure', () => {
       .mockResolvedValue(
         new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status })
       );
-    await deletePersonalClaudeProfile(user.id);
+    await deleteUserClaudeProfiles(user.id);
     expect(
       await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
     ).toMatchObject({ user_profile_id: `uprof_${user.id}`, status: 'billing_unavailable' });
+  });
+
+  it("deletes the profiles of the person's own connections and keeps the organization's shared one", async () => {
+    const user = await connectedUser();
+    const organization = await createTestOrganization('Claude erasure', user.id, 0);
+    await db.insert(claude_billing_connections).values([
+      {
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        user_profile_id: `uprof_member_${user.id}`,
+        created_by: user.id,
+        status: 'connected',
+      },
+      {
+        organization_id: organization.id,
+        user_profile_id: `uprof_shared_${user.id}`,
+        created_by: user.id,
+        status: 'connected',
+      },
+    ]);
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+    await deleteUserClaudeProfiles(user.id);
+    const deleted = fetchMock.mock.calls.map(([url]) => String(url).split('/').at(-1));
+    expect(deleted.sort()).toEqual([`uprof_${user.id}`, `uprof_member_${user.id}`].sort());
+    expect(
+      await getClaudeBillingConnection({ kind: 'shared_services', organizationId: organization.id })
+    ).toMatchObject({ status: 'connected' });
   });
 
   it.each([
@@ -59,7 +91,7 @@ describe('Personal Claude profile erasure', () => {
     async (status, retryable) => {
       const user = await connectedUser();
       jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status }));
-      await expect(deletePersonalClaudeProfile(user.id)).rejects.toMatchObject({ retryable });
+      await expect(deleteUserClaudeProfiles(user.id)).rejects.toMatchObject({ retryable });
       expect(
         await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
       ).toMatchObject({ user_profile_id: `uprof_${user.id}`, status: 'connected' });
@@ -69,7 +101,7 @@ describe('Personal Claude profile erasure', () => {
   it('requires operator configuration before local erasure can discard the profile identifier', async () => {
     const user = await connectedUser();
     jest.mocked(isClaudeOperatorConfigured).mockReturnValue(false);
-    await expect(deletePersonalClaudeProfile(user.id)).rejects.toBeInstanceOf(
+    await expect(deleteUserClaudeProfiles(user.id)).rejects.toBeInstanceOf(
       ClaudeProfileDeletionError
     );
     expect(

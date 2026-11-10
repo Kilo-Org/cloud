@@ -460,7 +460,7 @@ export function NewSessionConfigureForm({
   // window-space top derived from it. The Android navigation-bar correction
   // stays the separate vertical offset the content's own bottom padding needs.
   return (
-    <View className="flex-1" style={sideInsetStyle} onLayout={handleContainerLayout}>
+<View className="flex-1" style={sideInsetStyle} onLayout={handleContainerLayout} testID="new-session-form">
       <KeyboardAvoidingView
         className="flex-1 bg-background"
         behavior="padding"

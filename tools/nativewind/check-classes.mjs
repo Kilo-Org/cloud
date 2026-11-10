@@ -19,14 +19,14 @@
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { endOfComment, endOfQuoted, endOfQuotedOrComment } from '../lib/js-scan.mjs';
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
-const ROOT = new URL('../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src'), join(ROOT, 'packages/app-shared/src')];
 
 /** Utilities that take a colour, so `<utility>-black/<alpha>` can appear. */

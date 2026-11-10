@@ -1471,8 +1471,14 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the session-sync closure, the database closure the root `drizzle`
+      # script executes in packages/db, and the root project are installed:
+      # every step below runs `pnpm drizzle` or `pnpm --filter
+      # cloudflare-session-sync`, and its suite imports @kilocode/db and
+      # @kilocode/worker-utils, both declared. Widen the filter when a step
+      # here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'cloudflare-session-sync...' --filter '@kilocode/db...' --filter kilocode-monorepo
 
       # The exchange suite reads the real account tables. Avoid the Jest worker
       # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.

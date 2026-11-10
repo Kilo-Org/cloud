@@ -1466,6 +1466,32 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
 });
 
+// The account database job runs the root `drizzle` script, which executes
+// drizzle-kit inside packages/db, and one session-sync suite whose workspace
+// imports are @kilocode/db and @kilocode/worker-utils, both declared by the
+// service. The install names those closures, and packages/db stays listed
+// because the migrate step resolves drizzle-kit there. A step that starts
+// reading another workspace widens the filter; it does not restore the full
+// install.
+const sessionSyncPostgresInstall =
+  "pnpm install --frozen-lockfile --filter 'cloudflare-session-sync...' --filter '@kilocode/db...' --filter kilocode-monorepo";
+
+test('the session-sync Postgres job installs the closure its steps read', () => {
+  const job = ciJobs['session-sync-postgres'];
+  const installs = job.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    [sessionSyncPostgresInstall],
+    'one install links the session-sync closure, the database closure and the root project'
+  );
+  const run = job.steps.find(step => step.name === 'Run session-sync account database tests');
+  assert.equal(
+    run.run,
+    'NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-sync test:postgres',
+    'the migrate and suite commands are unchanged'
+  );
+});
+
 // The wiring job reads the root project and executes Wrangler's real config
 // parser from the usage-ingest closure, so one frozen install selects both. A
 // second install step would resolve and link the same lockfile again on the

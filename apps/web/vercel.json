@@ -168,7 +168,7 @@
     },
     {
       "path": "/api/cron/backfill-safety-identifiers",
-      "schedule": "*/3 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/recover-code-reviews",

@@ -182,9 +182,8 @@ function findButton(root: I, label: string): I {
 }
 
 /**
- * The block the landing view renders under its email field: the primary action,
- * the legal sentence, and the remaining options. It reports its height so the
- * login shell reserves what the keyboard actually covers.
+ * The block that reports the action under the landing view's email field, so
+ * the login shell reserves what the keyboard actually covers there.
  */
 function belowFieldBlock(root: I): I {
   const field = root.findByType('FormField');
@@ -1251,16 +1250,24 @@ describe('IdleAuth layout repairs', () => {
 
     // A step change clears the previous step's block before the new one lays out.
     expect(reportBelowField).toHaveBeenCalledWith(0);
-    const below = belowFieldBlock(renderer.root);
-    act(() => {
-      (below.props.onLayout as (event: { nativeEvent: { layout: { height: number } } }) => void)({
-        nativeEvent: { layout: { height: 142 } },
-      });
-    });
-    expect(reportBelowField).toHaveBeenLastCalledWith(142);
 
-    // The code step clears the landing view's height, so that block never sizes
-    // the code step; the code step then reports its own.
+    const layout = (height: number, y = 0) => ({
+      nativeEvent: { layout: { height, y, width: 336, x: 0 } },
+    });
+    const field = renderer.root.findByType('FormField');
+    const action = belowFieldBlock(renderer.root);
+    act(() => {
+      // The field block grows by the message under the input (`text-sm` plus
+      // its 6pt inner gap), which the input's own frame marks.
+      (field.props.containerOnLayout as (event: unknown) => void)(layout(100));
+      (field.props.onLayout as (event: unknown) => void)(layout(44, 32));
+      (action.props.onLayout as (event: unknown) => void)(layout(142));
+    });
+    // Everything under the input: 100 − (32 + 44) of message, then the action.
+    expect(reportBelowField).toHaveBeenLastCalledWith(166);
+
+    // The code step clears the landing view's height, so that content never
+    // sizes the code step; the code step then reports its own.
     nativeAuth.requestEmailCode.mockResolvedValue(true);
     await act(async () => {
       await (
@@ -1277,12 +1284,11 @@ describe('IdleAuth layout repairs', () => {
     const field = renderer.root.findByType('FormField');
     const button = findButton(renderer.root, 'Continue with email');
     // The block under the field is its next sibling in the screen's `gap-3`
-    // column, and that block carries the same shared gap, so with no reserved
-    // slot the visible input-to-Continue space is still exactly `gap-3`
-    // (10.5pt / 21px at 2.02 px per point).
+    // column, so with no reserved slot the visible input-to-Continue space is
+    // still exactly `gap-3` (10.5pt / 21px at 2.02 px per point).
     expect(field.parent?.props.className).toBe('gap-3');
     const below = belowFieldBlock(renderer.root);
-    expect(below.props.className).toBe('gap-3');
+    expect(below.parent).toBe(field.parent);
     expect(button.parent).toBe(below);
     const siblings = field.parent?.children ?? [];
     expect(siblings[siblings.indexOf(field) + 1]).toBe(below);

@@ -118,6 +118,14 @@ export function IdleAuth({
     [onBelowFieldHeightChange]
   );
 
+  // The landing step's own frames. A message under the input lives inside the
+  // field's block, so what the keyboard can cover below the input is the block
+  // past the input plus the action under it; the two form gaps around that
+  // content belong to the shell's reserve.
+  const [emailBlockHeight, setEmailBlockHeight] = useState(0);
+  const [emailInputBottom, setEmailInputBottom] = useState(0);
+  const [emailActionHeight, setEmailActionHeight] = useState(0);
+
   // A step's measured block describes only that step: the code step's
   // refusal-and-action block must not size the reserve on the landing view after
   // Back, and the landing view's block must not size the code step. Reset on
@@ -125,7 +133,17 @@ export function IdleAuth({
   const pendingLinkTokenForReset = pendingLink?.token;
   useEffect(() => {
     reportBelowFieldHeight(0);
+    setEmailBlockHeight(0);
+    setEmailInputBottom(0);
+    setEmailActionHeight(0);
   }, [reportBelowFieldHeight, view, pendingLinkTokenForReset]);
+
+  useEffect(() => {
+    if (view !== 'main' || emailBlockHeight === 0 || emailActionHeight === 0) {
+      return;
+    }
+    reportBelowFieldHeight(Math.max(0, emailBlockHeight - emailInputBottom) + emailActionHeight);
+  }, [emailActionHeight, emailBlockHeight, emailInputBottom, reportBelowFieldHeight, view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -432,15 +450,23 @@ export function IdleAuth({
           clearEmailError();
           setLoginEmailDraft(value);
         }}
-      />
-      {/* Everything below the email field. A rejected address renders its
-          message under that field through `FormField`, so the block's measured
-          height is what the shell reserves between the focused field and the
-          keyboard; a wrapped message is covered by the measurement. */}
-      <View
-        className="gap-3"
+        // The field block grows when it renders a message under the input, and
+        // the input's own frame says where that message starts.
+        containerOnLayout={event => {
+          setEmailBlockHeight(event.nativeEvent.layout.height);
+        }}
         onLayout={event => {
-          reportBelowFieldHeight(event.nativeEvent.layout.height);
+          const { height, y } = event.nativeEvent.layout;
+          setEmailInputBottom(y + height);
+        }}
+      />
+      {/* The action's own box, so what the keyboard can cover below the input is
+          the message (the field block past the input) plus this action. The
+          legal row and the remaining options stay out of it, so they never lift
+          the field. */}
+      <View
+        onLayout={event => {
+          setEmailActionHeight(event.nativeEvent.layout.height);
         }}
       >
         <Button
@@ -457,110 +483,110 @@ export function IdleAuth({
               (`font-semibold`) and the brand fill. */}
           <Text className="text-[17px]">{t('common.continue')}</Text>
         </Button>
-        {/* The sentence is one accessible element: Android's screen reader does
-              not keep the row's visual order once the line wraps (in pt-BR the
-              tree read the Privacy link before Terms), so the wrapper carries the
-              whole visible-order sentence as its label and exposes each link as a
-              custom accessibility action. The children keep their classes and
-              hit slops — the row's layout and the links' 44pt touch targets are
-              unchanged — and `no-hide-descendants` (plus
-              `accessibilityElementsHidden` for iOS) removes the flattened links
-              from the tree, leaving the wrapper the only focusable node. */}
-        <View
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={legalSentence}
-          accessibilityActions={LEGAL_LINK_ACTIONS.map(action => ({
-            name: action.name,
-            label: t(action.labelKey),
-          }))}
-          onAccessibilityAction={event => {
-            const action = LEGAL_LINK_ACTIONS.find(
-              item => item.name === event.nativeEvent.actionName
-            );
-            if (action) {
-              void WebBrowser.openBrowserAsync(action.url);
-            }
-          }}
-          className={cn('flex-row flex-wrap items-center justify-center', INLINE_LINK_ROW_CLASS)}
-        >
-          {/* The sentence is a row of nodes, not one Text with nested handlers: an
-              inline link's own box is what the control-size audit measures, so
-              each link carries the shared inline-link box and its own per-side
-              reach — 4dp toward the connector, 12dp away — which still adds to
-              44pt from the 28dp floor. The box adds no height to the line (its
-              28dp floor is cancelled by the shared layout-neutral form), so the
-              only gaps between the words are the sentence's own spaces, and the
-              connector's min-width keeps both 4dp facing reaches apart in a
-              catalog with a short conjunction. The 12.25dp `text-sm` copy is
-              DESIGN.md's label step: the smaller `text-xs` sat below every other
-              line on the screen and its 8dp wrapped-line gap left the two lines
-              of the sentence reading as separate items. The row's 5dp margin
-              still holds the links' vertical reach clear of the buttons above and
-              below. A long locale wraps the sentence, so the row also keeps the
-              shared wrapped-line gap (`INLINE_LINK_LINE_GAP_CLASS`); a sentence
-              that fits one line never sees it. */}
-
-          <Text
-            importantForAccessibility="no-hide-descendants"
-            accessibilityElementsHidden
-            className="text-sm text-muted-foreground"
-          >
-            {t('login.termsPrefix')}
-          </Text>
-          <Pressable
-            importantForAccessibility="no-hide-descendants"
-            accessibilityElementsHidden
-            className={INLINE_LINK_BOX_CLASS}
-            hitSlop={inlineLinkHitSlop('start')}
-            accessibilityRole="link"
-            accessibilityLabel={t('login.termsInSentence')}
-            onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
-          >
-            <Text className="text-sm text-primary underline">{t('login.termsInSentence')}</Text>
-          </Pressable>
-          <Text
-            importantForAccessibility="no-hide-descendants"
-            accessibilityElementsHidden
-            className={cn('text-sm text-muted-foreground', INLINE_LINK_CONNECTOR_CLASS)}
-          >
-            {t('login.termsConnector')}
-          </Text>
-          <Pressable
-            importantForAccessibility="no-hide-descendants"
-            accessibilityElementsHidden
-            className={INLINE_LINK_BOX_CLASS}
-            hitSlop={inlineLinkHitSlop('end')}
-            accessibilityRole="link"
-            accessibilityLabel={t('common.privacyPolicy')}
-            onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
-          >
-            <Text className="text-sm text-primary underline">{t('common.privacyPolicy')}</Text>
-          </Pressable>
-          <Text
-            importantForAccessibility="no-hide-descendants"
-            accessibilityElementsHidden
-            className="text-sm text-muted-foreground"
-          >
-            {t('login.termsSuffix')}
-          </Text>
-        </View>
-        <Button
-          // A text action that opens the browser sign-in options. It wears the
-          // same underlined primary link treatment as the Terms and Privacy
-          // Policy links above, so it reads as tappable rather than as plain bold
-          // text with no affordance.
-          variant="link"
-          className="active:opacity-60"
-          disabled={authBusy}
-          onPress={() => {
-            void startBrowserAuth();
-          }}
-          accessibilityLabel={t('login.moreSignInOptions')}
-        >
-          <Text className="underline">{t('login.moreSignInOptions')}</Text>
-        </Button>
       </View>
+      {/* The sentence is one accessible element: Android's screen reader does
+            not keep the row's visual order once the line wraps (in pt-BR the
+            tree read the Privacy link before Terms), so the wrapper carries the
+            whole visible-order sentence as its label and exposes each link as a
+            custom accessibility action. The children keep their classes and
+            hit slops — the row's layout and the links' 44pt touch targets are
+            unchanged — and `no-hide-descendants` (plus
+            `accessibilityElementsHidden` for iOS) removes the flattened links
+            from the tree, leaving the wrapper the only focusable node. */}
+      <View
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel={legalSentence}
+        accessibilityActions={LEGAL_LINK_ACTIONS.map(action => ({
+          name: action.name,
+          label: t(action.labelKey),
+        }))}
+        onAccessibilityAction={event => {
+          const action = LEGAL_LINK_ACTIONS.find(
+            item => item.name === event.nativeEvent.actionName
+          );
+          if (action) {
+            void WebBrowser.openBrowserAsync(action.url);
+          }
+        }}
+        className={cn('flex-row flex-wrap items-center justify-center', INLINE_LINK_ROW_CLASS)}
+      >
+        {/* The sentence is a row of nodes, not one Text with nested handlers: an
+            inline link's own box is what the control-size audit measures, so
+            each link carries the shared inline-link box and its own per-side
+            reach — 4dp toward the connector, 12dp away — which still adds to
+            44pt from the 28dp floor. The box adds no height to the line (its
+            28dp floor is cancelled by the shared layout-neutral form), so the
+            only gaps between the words are the sentence's own spaces, and the
+            connector's min-width keeps both 4dp facing reaches apart in a
+            catalog with a short conjunction. The 12.25dp `text-sm` copy is
+            DESIGN.md's label step: the smaller `text-xs` sat below every other
+            line on the screen and its 8dp wrapped-line gap left the two lines
+            of the sentence reading as separate items. The row's 5dp margin
+            still holds the links' vertical reach clear of the buttons above and
+            below. A long locale wraps the sentence, so the row also keeps the
+            shared wrapped-line gap (`INLINE_LINK_LINE_GAP_CLASS`); a sentence
+            that fits one line never sees it. */}
+
+        <Text
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+          className="text-sm text-muted-foreground"
+        >
+          {t('login.termsPrefix')}
+        </Text>
+        <Pressable
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+          className={INLINE_LINK_BOX_CLASS}
+          hitSlop={inlineLinkHitSlop('start')}
+          accessibilityRole="link"
+          accessibilityLabel={t('login.termsInSentence')}
+          onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
+        >
+          <Text className="text-sm text-primary underline">{t('login.termsInSentence')}</Text>
+        </Pressable>
+        <Text
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+          className={cn('text-sm text-muted-foreground', INLINE_LINK_CONNECTOR_CLASS)}
+        >
+          {t('login.termsConnector')}
+        </Text>
+        <Pressable
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+          className={INLINE_LINK_BOX_CLASS}
+          hitSlop={inlineLinkHitSlop('end')}
+          accessibilityRole="link"
+          accessibilityLabel={t('common.privacyPolicy')}
+          onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
+        >
+          <Text className="text-sm text-primary underline">{t('common.privacyPolicy')}</Text>
+        </Pressable>
+        <Text
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+          className="text-sm text-muted-foreground"
+        >
+          {t('login.termsSuffix')}
+        </Text>
+      </View>
+      <Button
+        // A text action that opens the browser sign-in options. It wears the
+        // same underlined primary link treatment as the Terms and Privacy
+        // Policy links above, so it reads as tappable rather than as plain bold
+        // text with no affordance.
+        variant="link"
+        className="active:opacity-60"
+        disabled={authBusy}
+        onPress={() => {
+          void startBrowserAuth();
+        }}
+        accessibilityLabel={t('login.moreSignInOptions')}
+      >
+        <Text className="underline">{t('login.moreSignInOptions')}</Text>
+      </Button>
     </View>
   );
 }

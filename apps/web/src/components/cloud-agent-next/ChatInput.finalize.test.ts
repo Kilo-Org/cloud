@@ -27,9 +27,8 @@ jest.mock('@/hooks/useCloudAgentAttachmentUpload', () => ({
 jest.mock('./BrowseCommandsDialog', () => ({ BrowseCommandsDialog: () => null }));
 jest.mock('./MobileToolbarPopover', () => ({ MobileToolbarPopover: () => null }));
 jest.mock('./AttachmentPreviewStrip', () => ({ AttachmentPreviewStrip: () => null }));
-jest.mock('@/components/shared/ModeCombobox', () => ({
-  ModeCombobox: () => null,
-  NEXT_MODE_OPTIONS: [],
+jest.mock('./CloudAgentModeCombobox', () => ({
+  CloudAgentModeCombobox: () => null,
 }));
 jest.mock('@/components/shared/ModelCombobox', () => ({ ModelCombobox: () => null }));
 jest.mock('@/components/shared/VariantCombobox', () => ({ VariantCombobox: () => null }));

@@ -36,6 +36,14 @@ export function useCloudAgentSettings(options: UseCloudAgentSettingsOptions = {}
 
 export type CloudAgentSettingsData = NonNullable<ReturnType<typeof useCloudAgentSettings>['data']>;
 
+export function useBuiltinAgentSettings() {
+  const trpc = useTRPC();
+
+  return useQuery(
+    trpc.cloudAgentSettings.getBuiltinAgents.queryOptions(undefined, { staleTime: 30_000 })
+  );
+}
+
 export function useCloudAgentSettingsCanManage(options: UseCloudAgentSettingsOptions = {}) {
   const { organizationId, enabled = true } = options;
   const trpc = useTRPC();
@@ -108,11 +116,13 @@ export function useRemoveRepositorySettingsMutation(organizationId?: string) {
 export function useSetBuiltinAgentsMutation(organizationId?: string) {
   const invalidateCurrent = useInvalidateCloudAgentSettings(organizationId);
   const invalidatePersonal = useInvalidateCloudAgentSettings();
+  const queryClient = useQueryClient();
   const trpc = useTRPC();
 
   return useMutation(
     trpc.cloudAgentSettings.setBuiltinAgents.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async ({ agents }) => {
+        queryClient.setQueryData(trpc.cloudAgentSettings.getBuiltinAgents.queryKey(), agents);
         await Promise.all([invalidateCurrent(), invalidatePersonal()]);
       },
     })

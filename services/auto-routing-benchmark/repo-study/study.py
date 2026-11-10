@@ -910,6 +910,10 @@ def charge_evidence(usage, classifier_allowance=Decimal(0)):
     return ChargeEvidence(True, cost + allowance, floor, "non-byok")
 
 
+def outbound_messages(messages):
+    return [{"role": message["role"], "content": message["content"]} for message in messages]
+
+
 def build_payload(candidate, prepared_messages, contract, cfg):
     """Outbound gateway payload with independently deep-copied variant controls."""
     return {"model": candidate["model"], "messages": prepared_messages, "max_tokens": cfg["max_output_tokens"], **copy.deepcopy(contract["resolved_variant"]), "stream": False}
@@ -937,7 +941,7 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
         def query(self, messages, **kwargs):
             require_paid_callbacks(reservation, transport_admission, state_guard, input_bounder)
             diagnostics = {"input_token_bound": None, "native_prompt_tokens": None, "native_completion_tokens": None}
-            prepared = [{"role": message["role"], "content": message["content"]} for message in self._prepare_messages_for_api(messages)]
+            prepared = outbound_messages(self._prepare_messages_for_api(messages))
             input_bound = input_bounder.bound(prepared)
             diagnostics["input_token_bound"] = input_bound
             if input_bound > min(cfg["max_input_tokens"], candidate["context_length"] - cfg["max_output_tokens"]):

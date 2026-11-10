@@ -37,9 +37,14 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
 // empty set is what the real run saw, and the user binds are refused for the
 // same reason there.
 jest.mock('@/lib/scim/directory-verified-domains', () => {
+  // Both classes: `directory-sync` branches on
+  // `instanceof VerifiedDomainOwnerMissingError`, and an omitted export is
+  // `undefined` there, which throws a TypeError for every rejected lookup.
   class VerifiedDomainLookupError extends Error {}
+  class VerifiedDomainOwnerMissingError extends Error {}
   return {
     VerifiedDomainLookupError,
+    VerifiedDomainOwnerMissingError,
     listDnsVerifiedDomains: jest.fn().mockResolvedValue([]),
   };
 });

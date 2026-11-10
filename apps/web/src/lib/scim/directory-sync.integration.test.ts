@@ -34,10 +34,18 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
 // key), and the domain gate now asks it which domains the organization
 // verified through DNS. Default to none, so the existing cases still exercise
 // the refusal path, and let a case opt into a verified set.
+// Both error classes are exported, not just the lookup one: `directory-sync`
+// branches on `instanceof VerifiedDomainOwnerMissingError` first, and an
+// omitted export is `undefined` at that site, which throws
+// `TypeError: Right-hand side of 'instanceof' is not callable` for *every*
+// rejected lookup. A test asserting only `instanceof Error` would stay green
+// on that TypeError while exercising none of the classification.
 jest.mock('@/lib/scim/directory-verified-domains', () => {
   class VerifiedDomainLookupError extends Error {}
+  class VerifiedDomainOwnerMissingError extends Error {}
   return {
     VerifiedDomainLookupError,
+    VerifiedDomainOwnerMissingError,
     listDnsVerifiedDomains: jest.fn().mockResolvedValue([]),
   };
 });
@@ -45,6 +53,7 @@ jest.mock('@/lib/scim/directory-verified-domains', () => {
 const verifiedDomains = jest.requireMock<{
   listDnsVerifiedDomains: jest.Mock;
   VerifiedDomainLookupError: new (message: string) => Error;
+  VerifiedDomainOwnerMissingError: new (message: string) => Error;
 }>('@/lib/scim/directory-verified-domains');
 
 const organizationBilling = jest.requireMock<{
@@ -589,7 +598,39 @@ describe('upsertDirectoryUser', () => {
     // would park the event, discarding a bind that may well be valid. An
     // unreachable WorkOS has to answer 500 so the Worker holds its cursor.
     expect(failure).not.toBeInstanceOf(DirectorySyncConflictError);
-    expect(failure).toBeInstanceOf(Error);
+    // The exact class, not merely `Error`: a bare `instanceof Error` also
+    // accepts the TypeError thrown when the module mock omits an error class
+    // the gate branches on, which would leave this assertion green while
+    // exercising none of the classification it describes.
+    expect(failure).toBeInstanceOf(verifiedDomains.VerifiedDomainLookupError);
+    expect(failure instanceof Error ? failure.message : '').toContain('WorkOS unavailable');
+  });
+
+  test('parks when the WorkOS organization no longer exists', async () => {
+    await seedOrganizationWithDomain(`primary-${suffix}.test`);
+    verifiedDomains.listDnsVerifiedDomains.mockRejectedValueOnce(
+      new verifiedDomains.VerifiedDomainOwnerMissingError('org gone')
+    );
+
+    const failure = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    }).catch((error: unknown) => error);
+
+    // The other half of hold-versus-park: a 404 is a completed answer, so it
+    // refuses terminally and the event parks rather than holding the one
+    // shared cursor for every other directory.
+    expect(failure).toBeInstanceOf(DirectorySyncConflictError);
+    expect((failure as DirectorySyncConflictError).code).toBe('domain_not_captured');
+    expect(failure instanceof Error ? failure.message : '').toContain('no longer exists');
+
+    const rows = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.external_id, externalId));
+    expect(rows).toEqual([]);
   });
 
   test('refuses to create a user at a domain the organization never captured', async () => {

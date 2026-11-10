@@ -22,7 +22,7 @@ export function useComputePrice(): (
     )
       return undefined;
     const rate = rates.data.find(rate => rate.instance === destination.instanceType);
-    if (rate?.available === false) return 'Unavailable';
+    if (rate?.available === false) return 'Price unavailable';
     return formatComputePrice(rate?.hourlyUsd);
   };
 }

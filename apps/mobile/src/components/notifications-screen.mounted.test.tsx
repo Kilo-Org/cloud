@@ -858,11 +858,11 @@ describe('NotificationsScreen sections below the master gate', () => {
     try {
       expect(textWithChildren(renderer.root, 'Categories')).toHaveLength(0);
       expect(textWithChildren(renderer.root, 'Message previews')).toHaveLength(0);
-      expect(switchesByLabel(renderer.root, 'Chat messages')).toHaveLength(0);
+      expect(switchesByLabel(renderer.root, 'Agent updates')).toHaveLength(0);
 
       permission.resolve('denied');
       await waitFor(() => textWithChildren(renderer.root, 'Categories').length === 1);
-      expect(switchesByLabel(renderer.root, 'Chat messages')).toHaveLength(1);
+      expect(switchesByLabel(renderer.root, 'Agent updates')).toHaveLength(1);
       expect(textWithChildren(renderer.root, 'Message previews')).toHaveLength(1);
     } finally {
       unmount();

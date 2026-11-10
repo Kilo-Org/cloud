@@ -97,6 +97,17 @@ function actionLabel(root: TestRenderer.ReactTestInstance, accessibilityLabel: s
     .find(node => typeof node.type === 'string' && (node.type as string) === 'Text');
 }
 
+/**
+ * The catalog message with the address pulled flush against its neighbours:
+ * the layout break that puts the address on its own line replaces the space
+ * beside it, so the rendered text without breaks is the sentence without those
+ * two spaces.
+ */
+function withoutAddressGaps(message: string, email: string): string {
+  const [before = '', after = ''] = message.split(email);
+  return `${before.trimEnd()}${email}${after.trimStart()}`;
+}
+
 afterEach(async () => {
   act(() => renderer?.unmount());
   renderer = undefined;
@@ -113,11 +124,16 @@ describe('EmailOtpForm destination layout', () => {
       const { mounted } = mount();
       const text = destination(mounted.root).props.children as string;
       const lines = text.split('\n');
+      const message = i18n.t('login.enterCodeSentTo', { email: reportedEmail });
 
-      // Removing the layout line breaks reproduces the catalog message exactly.
-      expect(text.replaceAll('\n', '')).toBe(
-        i18n.t('login.enterCodeSentTo', { email: reportedEmail })
-      );
+      // The break beside the address replaces the space it separates: aside from
+      // those breaks and the spaces they replaced, the catalog message is intact.
+      expect(text.replaceAll('\n', '')).toBe(withoutAddressGaps(message, reportedEmail));
+      // No line starts or ends with the space a break replaced, so the wrapped
+      // line never renders indented (Hindi reported `…\n पर भेजा गया…`).
+      for (const line of lines) {
+        expect(line).toBe(line.trim());
+      }
       // The address begins a line, so a long address cannot break mid-word.
       expect(lines.some(line => line.startsWith(reportedEmail))).toBe(true);
       // Sentence text and its punctuation stay attached: no lone "." line.
@@ -133,7 +149,10 @@ describe('EmailOtpForm destination layout', () => {
     const displayedEmail = `${email.slice(0, 24)}…${email.slice(-23)}`;
     const text = destination(mounted.root, displayedEmail).props.children as string;
     expect(text.replaceAll('\n', '')).toBe(
-      i18n.t('login.enterCodeSentTo', { email: displayedEmail })
+      withoutAddressGaps(
+        i18n.t('login.enterCodeSentTo', { email: displayedEmail }),
+        displayedEmail
+      )
     );
     expect(text).not.toContain(email);
     const node = destination(mounted.root, displayedEmail);

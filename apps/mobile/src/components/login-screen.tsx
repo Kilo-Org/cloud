@@ -1,11 +1,11 @@
-/* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard padding, and language picker together. */
+/* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard inset, and language picker together. */
 import * as Clipboard from 'expo-clipboard';
 import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
-import { useKeyboardState } from 'react-native-keyboard-controller';
+import { Pressable, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
@@ -13,7 +13,7 @@ import logo from '@/../assets/images/logo.png';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { CenteredState } from '@/components/centered-state';
 import { IdleAuth } from '@/components/login/idle-auth';
-import { errorMessage, resolveKeyboardBottomPadding } from '@/components/login-screen-state';
+import { errorMessage, resolveBottomChromePadding } from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,6 +40,14 @@ import {
 } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 import { useScreenInsets } from '@/lib/screen-insets';
+
+/**
+ * The room the scrolled form keeps between a focused field and the keyboard: one
+ * primary-action height plus the form's gap above it, and the same gap again to
+ * the keyboard, so the action never sits on the keyboard edge. Without it the
+ * scroller only clipped the action, and the clip left it too short to tap.
+ */
+const KEYBOARD_FIELD_ACTION_OFFSET = 68;
 
 export function LoginScreen() {
   const { sessionEnded, signIn, token: publishedToken } = useAuth();
@@ -184,11 +192,9 @@ export function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- persistToken is stable except for signIn identity; only re-run on a newly approved token
   }, [status, token]);
 
-  // The `KeyboardProvider` at the root measures the keyboard once in native
-  // code, so this screen reads the height instead of listening to React Native's
-  // keyboard events. The provider also clears the height when the app leaves the
-  // foreground, which the listener pair used to do itself.
-  const keyboardHeight = useKeyboardState(state => state.height);
+  // The keyboard is reserved by the scroll view below: `KeyboardAwareScrollView`
+  // owns the IME inset and scrolls the focused field into view, so this screen
+  // neither reads the height nor pads for it.
 
   if (status === 'approved') {
     if (persistFailed) {
@@ -220,14 +226,9 @@ export function LoginScreen() {
   }
 
   // One padded wrapper for both platforms: the bottom inset is reserved at
-  // rest, and while the IME is up the provider's keyboard height is reserved
-  // instead (see `resolveKeyboardBottomPadding`). The ScrollView's centered form
-  // then re-centres in the space that stays above the keyboard, so "Continue" is
-  // never left under the keyboard, the navigation bar, or the home indicator.
-  const bottomPadding = resolveKeyboardBottomPadding({
-    keyboardHeight,
-    bottomInset: insets.bottom,
-  });
+  // rest, and the scroll view reserves the keyboard itself. The scroll content
+  // then stays clear of the navigation bar, the home indicator, and the IME.
+  const bottomPadding = resolveBottomChromePadding({ bottomInset: insets.bottom });
   // The Globe stays enabled on idle, denied, expired, and error (those render
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
@@ -254,12 +255,12 @@ export function LoginScreen() {
 
   return (
     // One wrapper owns the vertical space on both platforms: it paints the
-    // screen background and reserves the bottom padding resolved above, so the
-    // ScrollView's centered form stays above the keyboard, the navigation bar,
-    // and the home indicator.
+    // screen background and reserves the bottom chrome resolved above, so the
+    // centered form stays clear of the navigation bar and the home indicator.
+    // The keyboard inset belongs to the scroll view inside it.
     <View
       className="flex-1 bg-background"
-      // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard and safe-area padding
+      // eslint-disable-next-line react-native/no-inline-styles -- dynamic chrome and safe-area padding
       style={{
         paddingBottom: bottomPadding,
         paddingLeft: insets.left,
@@ -284,10 +285,16 @@ export function LoginScreen() {
           <Globe size={22} color={colors.foreground} />
         </Pressable>
       </View>
-      <ScrollView
+      <KeyboardAwareScrollView
         className="flex-1 bg-background"
         contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
         keyboardShouldPersistTaps="handled"
+        // The room the form keeps below the focused field while the keyboard is
+        // up: the primary action under the field, the form's gap above it, and
+        // the same gap again to the keyboard. Without it the scroller clipped
+        // the action, because the IME leaves less room than the form needs and
+        // nothing scrolled it into view.
+        bottomOffset={KEYBOARD_FIELD_ACTION_OFFSET}
       >
         <View className="w-full max-w-sm items-center gap-2">
           <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />
@@ -407,7 +414,7 @@ export function LoginScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

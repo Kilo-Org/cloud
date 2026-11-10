@@ -29,13 +29,16 @@ const DESTINATION_SUFFIX_CHARS = 23;
  * Puts the address on its own line without assuming the translation's word
  * order. Punctuation or a particle written directly after the slot stays on the
  * address line (Arabic `{{email}}.`); a space-separated phrase starts the next
- * line. Removing the inserted line breaks reproduces the catalog message
- * exactly, so the sentence keeps its own punctuation attached.
+ * line. Each line break replaces the space it separates, never adds one beside
+ * it: a break inserted before the space left the wrapped line indented by a
+ * visible space (Hindi `…\n पर भेजा गया…`). Removing the breaks and restoring
+ * one space for each reproduces the catalog message exactly, so the sentence
+ * keeps its own punctuation attached.
  */
 function formatCodeDestination(message: string, email: string): string {
   const [before = '', after = ''] = message.split(ADDRESS_SLOT);
-  const lead = before ? `${before}\n` : '';
-  const trail = after.startsWith(' ') ? `\n${after}` : after;
+  const lead = before ? `${before.trimEnd()}\n` : '';
+  const trail = after.startsWith(' ') ? `\n${after.slice(1)}` : after;
   const destination =
     email.length > DESTINATION_MAX_CHARS
       ? `${email.slice(0, DESTINATION_PREFIX_CHARS)}…${email.slice(-DESTINATION_SUFFIX_CHARS)}`

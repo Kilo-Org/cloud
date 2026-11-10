@@ -143,7 +143,57 @@ successful processing; missing configuration retries instead of discarding usage
 The shared helper makes one attempt with a 160-second timeout. HTTP 200
 `not_recorded`, malformed or mismatched acknowledgements, redirects, and transport
 failures are unavailable outcomes. Responses are limited to 4 KiB; helper logs
-contain only the usage ID and categorical outcome or HTTP status.
+contain only the usage ID, the usage kind for tagged writes, categorical outcome or
+HTTP status, and for a caught transport, parse or stream failure its error name
+(never its message). An unread error body is released; if that release fails, the
+helper logs `usage writer response release failed` with the usage ID, usage kind
+and error name only, and the write outcome is unchanged. A body that was already
+read is not released again.
+
+### Tagged Enkrypt usage
+
+The same queue can also carry Enkrypt guardrail usage. Such a message is a tagged
+envelope, `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
+(`EnkryptUsageQueueMessageSchema` in `@kilocode/usage-contracts`). LLM usage stays
+untagged and unchanged; its ingress schema strips unknown keys, so a body with its
+own `kind` key is always a tagged message. Nothing produces Enkrypt messages yet:
+the ingress and the gateway producer, behind a default-off flag, follow separately.
+
+The consumer reads the tag before anything else:
+
+| Body | Writer call | ACK on | Retry on |
+|---|---|---|---|
+| Untagged | Existing LLM writer at `USAGE_WRITER_URL` | Unchanged | Unchanged |
+| `enkrypt_usage`, `v: 1`, valid record | `/api/internal/enkrypt-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
+| `enkrypt_usage`, `v: 1`, invalid record or extra key | None | Never | Conservative retry (`invalid_event`) |
+| Any other `kind`, or another `v` | None | Never | Conservative retry (`unsupported_kind`) |
+
+A message that never ACKs exhausts the shared 20-retry budget and goes to the DLQ,
+so the DLQ can hold both kinds. A recognized admission 429 takes the admission
+retry schedule, and HTTP 429/503 rejects the invocation, exactly as for LLM usage.
+The invocation launch budget is shared. Consumer settings are unchanged. On the
+writer, these queue writes take the `non_llm` admission class described under
+[writer admission protection](#writer-admission-protection); its ceiling rejection
+is a recognized `queue_limit` 429.
+
+The Enkrypt writer URL is `USAGE_WRITER_URL` with its documented
+`/api/internal/usage/record` suffix replaced by the Enkrypt path, so no new
+variable is needed. If `USAGE_WRITER_URL` is missing or does not end with that
+suffix, Enkrypt messages retry as `missing_config` without network I/O. The writer
+credential, bypass and 160-second timeout are shared.
+
+Tagged messages add `usage_kind` to `usage_ingest_handler_entry`,
+`usage_ingest_processing` and the writer helper logs (`usageKind` there):
+`enkrypt_usage`, or `unknown` for an unrecognized tag (the raw tag is not logged).
+Untagged LLM logs keep exactly their existing fields, so filter LLM-only counts
+with a missing `usage_kind`. Enkrypt logs carry only the usage id and kind: no
+payer, user, session, cost or `occurredAt`-derived age.
+
+Deploy order: this consumer first, then the ingress, then the producer with its
+flag off. Never roll the consumer back to an LLM-only version while tagged
+messages may be in flight or retrying: an LLM-only consumer fails them as invalid
+events and they reach the DLQ after 20 retries. To stop tagged traffic, turn the
+producer flag off and let the consumer drain.
 
 ## Observability
 

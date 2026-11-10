@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   ENKRYPT_USAGE_WRITE_PATH,
+  EnkryptUsageQueueMessageSchema,
   EnkryptUsageWriteResponseSchema,
   EnkryptUsageWriteSchema,
   MAX_ENKRYPT_CREDITS_PER_CALL,
@@ -234,5 +235,31 @@ describe('EnkryptUsageWriteResponseSchema', () => {
     ],
   ])('rejects %s', (_label, body) => {
     expect(EnkryptUsageWriteResponseSchema.safeParse(body).success).toBe(false);
+  });
+});
+
+describe('EnkryptUsageQueueMessageSchema', () => {
+  test('accepts the version 1 envelope around a valid write', () => {
+    const message = { kind: 'enkrypt_usage', v: 1, record: validWrite() };
+    expect(EnkryptUsageQueueMessageSchema.parse(message)).toStrictEqual(message);
+  });
+
+  test('applies the write defaults to the enveloped record', () => {
+    const message = { kind: 'enkrypt_usage', v: 1, record: writeWithout('guardrail') };
+    expect(EnkryptUsageQueueMessageSchema.parse(message).record.guardrail).toBe('input');
+  });
+
+  test.each([
+    ['another kind', { kind: 'exa_usage', v: 1, record: validWrite() }],
+    ['another version', { kind: 'enkrypt_usage', v: 2, record: validWrite() }],
+    ['a string version', { kind: 'enkrypt_usage', v: '1', record: validWrite() }],
+    ['a missing version', { kind: 'enkrypt_usage', record: validWrite() }],
+    ['an extra key', { kind: 'enkrypt_usage', v: 1, record: validWrite(), extra: true }],
+    ['an invalid record', { kind: 'enkrypt_usage', v: 1, record: writeWith({ id: 'x' }) }],
+    ['an unknown record key', { kind: 'enkrypt_usage', v: 1, record: writeWith({ prompt: 'x' }) }],
+    ['a missing record', { kind: 'enkrypt_usage', v: 1 }],
+    ['a bare record', validWrite()],
+  ])('rejects %s', (_label, message) => {
+    expect(EnkryptUsageQueueMessageSchema.safeParse(message).success).toBe(false);
   });
 });

@@ -67,3 +67,15 @@ export const EnkryptUsageWriteResponseSchema = z.strictObject({
 });
 
 export type EnkryptUsageWriteResponse = z.infer<typeof EnkryptUsageWriteResponseSchema>;
+
+/**
+ * Body of an Enkrypt usage message on the shared usage queue. The kind tag is what separates it
+ * from an LLM usage message, which is always sent untagged.
+ */
+export const EnkryptUsageQueueMessageSchema = z.strictObject({
+  kind: z.literal('enkrypt_usage'),
+  v: z.literal(1),
+  record: EnkryptUsageWriteSchema,
+});
+
+export type EnkryptUsageQueueMessage = z.infer<typeof EnkryptUsageQueueMessageSchema>;

@@ -397,7 +397,7 @@ describe('environment snapshot launch', () => {
       provider.launchOptions.every(options => options?.snapshot?.snapshotId === 'snap-env')
     ).toBe(true);
     expect(environmentSnapshotDetails(peer).at(-1)).toBe(
-      'Could not restore the environment snapshot. Rebuild the environment.'
+      'Environment snapshot is unavailable. Rebuild the environment.'
     );
     expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed');
   });
@@ -474,7 +474,7 @@ describe('environment snapshot launch', () => {
         state: 'preparing',
         attemptId: expect.any(String),
         step: 'environment_snapshot',
-        detail: 'Using environment snapshot; cached files may use older settings',
+        detail: 'Using environment snapshot',
         snapshotCapturedAt: 1,
       })
     );
@@ -542,7 +542,7 @@ describe('environment snapshot launch', () => {
     await waitForFailed(peer);
     expect(provider.launchEnvs).toHaveLength(0);
     expect(environmentSnapshotDetails(peer)).toContain(
-      'Could not check the environment snapshot. Try again.'
+      'Environment snapshot is temporarily unavailable. Try again.'
     );
   });
 
@@ -551,13 +551,13 @@ describe('environment snapshot launch', () => {
       name: 'retired shared sandbox path',
       directory: '/workspace/org/user/sessions/s1',
       snapshots: true,
-      detail: 'This session cannot use environment snapshots. Start a new session.',
+      detail: 'This session cannot use the environment snapshot. Start a new session.',
     },
     {
       name: 'provider without snapshots',
       directory: ISOLATED_DIRECTORY,
       snapshots: false,
-      detail: 'This sandbox does not support environment snapshots.',
+      detail: 'Environment snapshots are not supported for this session.',
     },
   ])(
     'fails at once without an image start or a build link when no environment snapshot can serve it: $name',

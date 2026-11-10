@@ -5,7 +5,6 @@ import {
   environmentLaunchCandidate,
   environmentSnapshotDecision,
   environmentSnapshotStartBlock,
-  environmentStartDetail,
   lookupEnvironmentSnapshot,
   snapshotStart,
 } from './environment-snapshot-launch.js';
@@ -232,67 +231,38 @@ describe('environment snapshot lookup', () => {
       })
     ).resolves.toEqual({ kind: 'unavailable' });
   });
-
-  it('uses the short snapshot label when configuration revisions match', () => {
-    expect(
-      environmentStartDetail(
-        { ...REFERENCE, configurationRevision: 1 },
-        {
-          kind: 'resolved',
-          resolution: { ...RESOLVED, admission: { status: 'not_needed' } },
-        }
-      )
-    ).toBe('Using environment snapshot');
-  });
-
-  it('keeps only the cached-settings warning without formatting dates', () => {
-    expect(environmentStartDetail(REFERENCE, { kind: 'resolved', resolution: RESOLVED })).toBe(
-      'Using environment snapshot; cached files may use older settings'
-    );
-    expect(
-      environmentStartDetail(REFERENCE, {
-        kind: 'resolved',
-        resolution: {
-          snapshot: null,
-          reason: 'missing',
-          admission: { status: 'skipped', reason: 'backoff', retryAt: 5 },
-        },
-      })
-    ).toBe('Preparing environment from scratch');
-    expect(environmentStartDetail(REFERENCE, { kind: 'timeout' })).toBe(
-      'Preparing environment from scratch'
-    );
-  });
 });
 
-describe.each(ADMISSIONS)('environment start text with admission %j', admission => {
+describe.each(ADMISSIONS)('environment snapshot selection with admission %j', admission => {
   it.each([null, 'revision', 'age', 'image'] as const)(
-    'does not show rollout or background build details for staleness %s',
+    'selects a snapshot without status text for staleness %s',
     stale => {
       const resolution: SnapshotResolution = {
         ...RESOLVED,
         snapshot: { ...RESOLVED.snapshot!, stale },
         admission,
       };
-      expect(
-        environmentStartDetail(
-          { ...REFERENCE, configurationRevision: 1 },
-          { kind: 'resolved', resolution }
-        )
-      ).toBe('Using environment snapshot');
-      expect(environmentStartDetail(REFERENCE, { kind: 'resolved', resolution })).toBe(
-        'Using environment snapshot; cached files may use older settings'
-      );
+      for (const configurationRevision of [1, 2]) {
+        expect(
+          environmentSnapshotDecision(
+            { ...CANDIDATE, reference: { ...REFERENCE, configurationRevision }, buildCommands: 1 },
+            { kind: 'resolved', resolution }
+          )
+        ).toEqual({
+          kind: 'start',
+          snapshot: { snapshotId: 'snap-1', baseImage: 'registry.example/app:1' },
+        });
+      }
     }
   );
 
-  it('describes a fresh start without background build details', () => {
+  it('does not add snapshot status text to an image start', () => {
     expect(
-      environmentStartDetail(REFERENCE, {
+      environmentSnapshotDecision(CANDIDATE, {
         kind: 'resolved',
         resolution: { snapshot: null, reason: 'missing', admission },
       })
-    ).toBe('Preparing environment from scratch');
+    ).toEqual({ kind: 'start', snapshot: undefined });
   });
 });
 
@@ -301,7 +271,7 @@ describe('environmentSnapshotDecision', () => {
     [
       'unsupported',
       'environment_not_supported',
-      'Environment snapshots are unavailable for this environment.',
+      'Environment snapshots are not supported for this session.',
     ],
     [
       'deleted',
@@ -311,22 +281,22 @@ describe('environmentSnapshotDecision', () => {
     [
       'scope_mismatch',
       'environment_snapshot_unavailable',
-      'This snapshot cannot be used for this session. Start a new session.',
+      'This session cannot use the environment snapshot. Start a new session.',
     ],
     [
       'newer_than_session',
       'environment_snapshot_unavailable',
-      'This snapshot cannot be used for this session. Start a new session.',
+      'This session cannot use the environment snapshot. Start a new session.',
     ],
     [
       'expired',
       'environment_snapshot_expired',
-      'Environment snapshot expired. Rebuild the environment.',
+      'Environment snapshot is unavailable. Rebuild the environment.',
     ],
     [
       'incompatible',
       'environment_snapshot_incompatible',
-      'Environment snapshot is out of date. Rebuild the environment.',
+      'Environment snapshot is unavailable. Rebuild the environment.',
     ],
   ] as const)(
     'explains a %s snapshot without exposing build IDs',
@@ -368,7 +338,7 @@ describe('environmentSnapshotDecision', () => {
     [
       'revision_superseded',
       'environment_snapshot_unavailable',
-      'Environment settings changed. Start a new session.',
+      'This session cannot use the environment snapshot. Start a new session.',
     ],
     [
       'environment_deleted',
@@ -378,12 +348,12 @@ describe('environmentSnapshotDecision', () => {
     [
       'unsupported',
       'environment_not_supported',
-      'Environment snapshots are unavailable for this environment.',
+      'Environment snapshots are not supported for this session.',
     ],
     [
       'unavailable',
       'environment_build_unavailable',
-      'Environment build is unavailable. Try again.',
+      'Environment snapshot is temporarily unavailable. Try again.',
     ],
   ] as const)('explains a build skipped for %s', (reason, blockReason, detail) => {
     expect(
@@ -449,7 +419,6 @@ describe('environmentSnapshotDecision', () => {
     ).toEqual({
       kind: 'start',
       snapshot: undefined,
-      detail: 'Preparing environment from scratch',
     });
   });
 
@@ -460,7 +429,6 @@ describe('environmentSnapshotDecision', () => {
     ).toEqual({
       kind: 'start',
       snapshot: { snapshotId: 'snap-1', baseImage: 'registry.example/app:1' },
-      detail: expect.stringContaining('Using environment snapshot'),
     });
   });
 
@@ -545,7 +513,7 @@ describe('environmentSnapshotDecision', () => {
       kind: 'blocked',
       block: {
         reason: 'environment_lookup_timeout',
-        detail: 'Checking the environment snapshot timed out. Try again.',
+        detail: 'Environment snapshot is temporarily unavailable. Try again.',
         environmentId: REFERENCE.environmentId,
         buildId: null,
       },
@@ -554,7 +522,7 @@ describe('environmentSnapshotDecision', () => {
       kind: 'blocked',
       block: {
         reason: 'environment_lookup_unavailable',
-        detail: 'Could not check the environment snapshot. Try again.',
+        detail: 'Environment snapshot is temporarily unavailable. Try again.',
         buildId: null,
       },
     });
@@ -575,15 +543,12 @@ describe('environmentSnapshotDecision', () => {
       snapshotId: 'snap-1',
       baseImage: 'registry.example/app:2',
     });
-    expect(environmentStartDetail(REFERENCE, { kind: 'resolved', resolution })).toBe(
-      'Using environment snapshot; cached files may use older settings'
-    );
   });
 
   it('names the rebuild action after a required snapshot start fails', () => {
     expect(environmentSnapshotStartBlock({ ...CANDIDATE, buildCommands: 1 }, BUILD_ID)).toEqual({
       reason: 'environment_snapshot_start_failed',
-      detail: 'Could not restore the environment snapshot. Rebuild the environment.',
+      detail: 'Environment snapshot is unavailable. Rebuild the environment.',
       environmentId: REFERENCE.environmentId,
       buildId: BUILD_ID,
     });

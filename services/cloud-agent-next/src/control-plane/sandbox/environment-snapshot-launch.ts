@@ -161,8 +161,17 @@ export type EnvironmentSnapshotBlock = {
 };
 
 export type EnvironmentSnapshotDecision =
-  | { kind: 'start'; snapshot: ProviderSnapshotStart | undefined; detail: string }
+  | { kind: 'start'; snapshot: ProviderSnapshotStart | undefined }
   | { kind: 'blocked'; block: EnvironmentSnapshotBlock };
+
+// Keep user-facing recovery instructions consistent while retaining precise
+// failure reasons in the control plane and diagnostics.
+export const ENVIRONMENT_SNAPSHOT_MESSAGES = {
+  rebuild: 'Environment snapshot is unavailable. Rebuild the environment.',
+  retry: 'Environment snapshot is temporarily unavailable. Try again.',
+  unsupported: 'Environment snapshots are not supported for this session.',
+  newSession: 'This session cannot use the environment snapshot. Start a new session.',
+} as const;
 
 function buildIdOf(resolution: SnapshotResolution): string | null {
   if (resolution.admission.status === 'admitted' || resolution.admission.status === 'active') {
@@ -192,7 +201,7 @@ function blockedEnvironment(
     case 'unsupported':
       return {
         reason: 'environment_not_supported',
-        detail: 'Environment snapshots are unavailable for this environment.',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.unsupported,
         environmentId,
         buildId,
       };
@@ -207,21 +216,21 @@ function blockedEnvironment(
     case 'newer_than_session':
       return {
         reason: 'environment_snapshot_unavailable',
-        detail: 'This snapshot cannot be used for this session. Start a new session.',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.newSession,
         environmentId,
         buildId,
       };
     case 'expired':
       return {
         reason: 'environment_snapshot_expired',
-        detail: 'Environment snapshot expired. Rebuild the environment.',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
         environmentId,
         buildId,
       };
     case 'incompatible':
       return {
         reason: 'environment_snapshot_incompatible',
-        detail: 'Environment snapshot is out of date. Rebuild the environment.',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
         environmentId,
         buildId,
       };
@@ -279,14 +288,14 @@ function blockedEnvironment(
         case 'unsupported':
           return {
             reason: 'environment_not_supported',
-            detail: 'Environment snapshots are unavailable for this environment.',
+            detail: ENVIRONMENT_SNAPSHOT_MESSAGES.unsupported,
             environmentId,
             buildId,
           };
         case 'revision_superseded':
           return {
             reason: 'environment_snapshot_unavailable',
-            detail: 'Environment settings changed. Start a new session.',
+            detail: ENVIRONMENT_SNAPSHOT_MESSAGES.newSession,
             environmentId,
             buildId,
           };
@@ -300,7 +309,7 @@ function blockedEnvironment(
         case 'unavailable':
           return {
             reason: 'environment_build_unavailable',
-            detail: 'Environment build is unavailable. Try again.',
+            detail: ENVIRONMENT_SNAPSHOT_MESSAGES.retry,
             environmentId,
             buildId,
           };
@@ -323,10 +332,7 @@ function blockedLookup(
   return {
     reason:
       lookup.kind === 'timeout' ? 'environment_lookup_timeout' : 'environment_lookup_unavailable',
-    detail:
-      lookup.kind === 'timeout'
-        ? 'Checking the environment snapshot timed out. Try again.'
-        : 'Could not check the environment snapshot. Try again.',
+    detail: ENVIRONMENT_SNAPSHOT_MESSAGES.retry,
     environmentId: candidate.reference.environmentId,
     buildId: null,
   };
@@ -339,7 +345,7 @@ export function environmentSnapshotStartBlock(
 ): EnvironmentSnapshotBlock {
   return {
     reason: 'environment_snapshot_start_failed',
-    detail: 'Could not restore the environment snapshot. Rebuild the environment.',
+    detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
     environmentId: candidate.reference.environmentId,
     buildId,
   };
@@ -360,7 +366,6 @@ export function environmentSnapshotDecision(
       ? {
           kind: 'start',
           snapshot: undefined,
-          detail: environmentStartDetail(candidate.reference, lookup),
         }
       : { kind: 'blocked', block: blockedLookup(candidate, lookup) };
   }
@@ -369,31 +374,7 @@ export function environmentSnapshotDecision(
     return {
       kind: 'start',
       snapshot,
-      detail: environmentStartDetail(candidate.reference, lookup),
     };
   }
   return { kind: 'blocked', block: blockedEnvironment(candidate, lookup.resolution) };
-}
-
-/**
- * Keep successful starts focused on the snapshot being used, not background
- * rebuilds or image rollouts. Changed settings can affect cached files, so that
- * warning stays visible without exposing internal configuration revisions.
- */
-export function environmentStartDetail(
-  reference: SessionEnvironmentReference,
-  lookup: EnvironmentLookup
-): string {
-  if (lookup.kind !== 'resolved') {
-    return 'Preparing environment from scratch';
-  }
-  const { snapshot } = lookup.resolution;
-  if (snapshot === null) {
-    return 'Preparing environment from scratch';
-  }
-  const settings =
-    snapshot.revision === reference.configurationRevision
-      ? ''
-      : '; cached files may use older settings';
-  return `Using environment snapshot${settings}`;
 }

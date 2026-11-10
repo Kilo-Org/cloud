@@ -50,16 +50,33 @@ describe('summarizePreparationAttempt', () => {
     expect(phaseDisplayText(step({ key, latestDetail }))).toBe(latestDetail);
   });
 
-  it('preserves the short cached-settings warning alongside the local capture time', () => {
+  it.each([
+    'Using environment snapshot; environment settings have changed',
+    'Using environment snapshot; cached files may use older settings',
+    'Using environment snapshot; built for an earlier image; using it during the rollout window; a replacement build was started',
+  ])('keeps older successful snapshot status compact: %s', latestDetail => {
     const capturedAt = Date.parse('2026-10-24T21:32:19Z');
-    const latestDetail = 'Using environment snapshot; cached files may use older settings';
-    expect(
-      phaseDisplayText(
-        step({ key: 'environment_snapshot', latestDetail, snapshotCapturedAt: capturedAt })
-      )
-    ).toBe(
-      `Using environment snapshot · ${formatSnapshotTime(capturedAt)}; cached files may use older settings`
+    const snapshotStep = step({
+      key: 'environment_snapshot',
+      latestDetail,
+      snapshotCapturedAt: capturedAt,
+    });
+    const text = `Using environment snapshot · ${formatSnapshotTime(capturedAt)}`;
+    expect(phaseDisplayText(snapshotStep)).toBe(text);
+    expect(summarizePreparationAttempt(attempt({ steps: [snapshotStep] }))).toEqual({
+      kind: 'phase',
+      text,
+    });
+    expect(phaseDisplayText({ ...snapshotStep, snapshotCapturedAt: undefined })).toBe(
+      'Using environment snapshot'
     );
+  });
+
+  it('does not replace an environment snapshot failure with the success label', () => {
+    const latestDetail = 'Environment snapshot is unavailable. Rebuild the environment.';
+    expect(
+      phaseDisplayText(step({ key: 'environment_snapshot', status: 'failed', latestDetail }))
+    ).toBe(latestDetail);
   });
 
   it('reports starting while no step is running yet', () => {

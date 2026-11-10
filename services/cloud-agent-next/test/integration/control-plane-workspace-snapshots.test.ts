@@ -227,6 +227,18 @@ async function setup(
       instance => readWorkspaceSnapshot(instance['db'], workspaceId) ?? undefined
     );
   }
+  async function expectRestoreFailure(retry = false) {
+    const descriptor = await snapshot();
+    if (descriptor === undefined) throw new Error('Missing checkpoint');
+    const retryDetail = retry ? ' Send a message to retry.' : '';
+    const detail = `Could not restore the workspace snapshot.${retryDetail} Start fresh discards changes since ${new Date(descriptor.capturedAt).toISOString()}.`;
+    await waitFor(async () => {
+      const attempts = await session.getPreparationAttempts();
+      expect(attempts.flatMap(attempt => attempt.steps.map(step => step.latestDetail))).toContain(
+        detail
+      );
+    });
+  }
   const alarm = async (settle = true) => {
     await runInDurableObject(sandbox, instance => instance.alarm());
     if (settle)
@@ -341,6 +353,7 @@ async function setup(
     start,
     idle,
     snapshot,
+    expectRestoreFailure,
     cold,
     checkpoint,
     registerSibling,
@@ -888,6 +901,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(1);
+    await test.expectRestoreFailure(true);
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     expect(fields.mock.calls.map(call => call[0])).toContainEqual(
       expect.objectContaining({
@@ -1291,6 +1305,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(1);
+    await test.expectRestoreFailure();
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     expect(fields.mock.calls.map(call => call[0])).toContainEqual(
       expect.objectContaining({
@@ -1404,6 +1419,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(3);
+    await test.expectRestoreFailure(true);
     for (const options of test.launchOptions.slice(1)) {
       expect(options?.snapshot?.snapshotId).toBe('session-snapshot');
     }
@@ -1467,6 +1483,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(2);
+    await test.expectRestoreFailure();
     expect(test.launchOptions[1]?.snapshot?.snapshotId).toBe('session-snapshot');
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     test.wrappers.forEach(wrapper => wrapper.close());
@@ -1520,6 +1537,7 @@ describe('idle workspace disk checkpoint', () => {
       })
     );
     // No image relaunch and no descriptor deletion.
+    await test.expectRestoreFailure();
     expect(test.launchEnvs).toHaveLength(2);
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     expect(await test.sandbox.getWorkspaceSnapshotRecovery({ sessionId: test.sessionId })).toEqual({

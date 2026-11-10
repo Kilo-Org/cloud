@@ -386,6 +386,12 @@ export const controlPlaneWorkspaceRootSchema = z
     branch: z.string().min(1).max(256),
     /** The branch is the session's generated one: create it when the remote has none. */
     branchMode: z.literal('working').optional(),
+    /** Stacked workspace base of the launch repository; other roots never carry one. */
+    baseBranch: z.string().min(1).max(256).optional(),
+    baseSha: z
+      .string()
+      .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+      .optional(),
   })
   .strict();
 export type ControlPlaneWorkspaceRoot = z.infer<typeof controlPlaneWorkspaceRootSchema>;

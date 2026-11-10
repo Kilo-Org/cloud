@@ -65,6 +65,7 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ mutedForeground: '#000000' }),
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));

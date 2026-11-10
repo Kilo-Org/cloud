@@ -89,6 +89,7 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ mutedForeground: '#000000', primary: '#000000' }),
 }));
 vi.mock('@rn-primitives/dialog', () => ({

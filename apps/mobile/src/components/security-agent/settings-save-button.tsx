@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
  * Header Save action shared by Security Agent settings screens: disabled
@@ -34,6 +34,7 @@ export function SettingsSaveButton({
 }>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const { t } = useTranslation();
   // A settings header holds this one action, and a filled primary is the
   // loudest thing on the screen. It should not outshout the content's own way
@@ -46,7 +47,7 @@ export function SettingsSaveButton({
   // is `primaryForeground`, the quiet variant's is the body foreground; a
   // hard-coded primary ink vanished when the draft turned invalid while a save
   // was in flight and the header fell back to the quiet style.
-  const spinnerColor = actionable ? colors.primaryForeground : colors.foreground;
+  const spinnerColor = actionable ? mutedDisabledInk : colors.foreground;
 
   return (
     <Button

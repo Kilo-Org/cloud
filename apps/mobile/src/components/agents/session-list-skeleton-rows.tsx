@@ -18,7 +18,7 @@ export function SessionRowSkeleton({
       testID="session-row-skeleton"
       className="flex-row gap-3 border-b-[0.5px] border-hair-soft px-[22px] py-[13px]"
     >
-      <Skeleton className="w-[3px] rounded-[2px]" />
+      <Skeleton className="w-[3px] rounded-[2px] bg-session-strip" />
       <View className="flex-1">
         <View className="mb-[3px] h-[14px] justify-center">
           <Skeleton className="h-2 w-20 rounded-full" />

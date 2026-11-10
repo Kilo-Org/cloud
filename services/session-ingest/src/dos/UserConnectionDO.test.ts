@@ -5091,6 +5091,35 @@ describe('UserConnectionDO', () => {
       expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
     });
 
+    it('persists the root row that surfaces a subagent raise', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      capAttachment(cliWs);
+      const sessions = [
+        ...oversizedSessions(),
+        {
+          id: 'ses-cap-root',
+          status: 'busy',
+          title: 'Root waiting on a subagent',
+        },
+        {
+          id: 'ses-cap-child',
+          status: 'permission',
+          title: 'Subagent approval',
+          parentSessionId: 'ses-cap-root',
+        },
+      ];
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions })
+      );
+
+      const persisted = cliWs.deserializeAttachment() as { sessions: Array<{ id: string }> };
+      expect(persisted.sessions.map(session => session.id)).toContain('ses-cap-root');
+      expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
+    });
+
     it('delivers status events when the owning CLI attachment cannot hold the full list', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');

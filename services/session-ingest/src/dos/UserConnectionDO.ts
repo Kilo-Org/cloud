@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
 import { hoistedAttentionChanges, hoistedChildAttention } from './child-attention';
+import { isNeedsInputStatus } from './session-ingest-attention';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import { refreshGlanceableSessions } from '../remote-session-notifications';
 import { prUrlMatchesGitUrl } from '../ingest/metadata';
@@ -161,9 +162,10 @@ function attachmentBytes(value: unknown): number {
 /**
  * Keep the session rows that fit the budget, in the CLI's order. Attention
  * rows fit first: a pending approval or question must survive a hibernation
- * wake. The in-memory list stays complete, so every reader and broadcast is
- * unaffected; a wake before the next heartbeat (≤10 s on every CLI) sees the
- * shorter snapshot instead of no snapshot at all.
+ * wake, including the root row that surfaces a subagent raise. The in-memory
+ * list stays complete, so every reader and broadcast is unaffected; a wake
+ * before the next heartbeat (≤10 s on every CLI) sees the shorter snapshot
+ * instead of no snapshot at all.
  */
 function fitCliAttachment(
   attachment: CliAttachment,
@@ -172,11 +174,15 @@ function fitCliAttachment(
   if (attachmentBytes(attachment) <= budgetBytes) {
     return { attachment, droppedSessions: 0 };
   }
+  const attentionIds = new Set(hoistedChildAttention(attachment.sessions).keys());
+  for (const session of attachment.sessions) {
+    if (isNeedsInputStatus(session.status)) attentionIds.add(session.id);
+  }
   const keep = new Set<number>();
   let bytes = attachmentBytes({ ...attachment, sessions: [] });
   for (const attentionFirst of [true, false]) {
     attachment.sessions.forEach((session, index) => {
-      if (isAttentionStatus(session.status) !== attentionFirst) return;
+      if (attentionIds.has(session.id) !== attentionFirst) return;
       const cost = attachmentBytes(session) + (keep.size === 0 ? 0 : 1);
       if (bytes + cost > budgetBytes) return;
       bytes += cost;
@@ -188,10 +194,6 @@ function fitCliAttachment(
     attachment: { ...attachment, sessions },
     droppedSessions: attachment.sessions.length - sessions.length,
   };
-}
-
-function isAttentionStatus(status: string): boolean {
-  return status === 'permission' || status === 'question';
 }
 
 // Maximum allowed mutationId length used as a durable storage key prefix.

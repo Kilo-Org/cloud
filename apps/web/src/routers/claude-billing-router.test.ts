@@ -122,4 +122,20 @@ describe('claudeBillingRouter.sharePersonal', () => {
       code: 'CONFLICT',
     });
   });
+
+  it('forbids sharing over a bearer token outside a browser session', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('Claude router bearer', user.id, 0);
+    await seedConnectedPersonal(user.id);
+    const bearerCaller = createCaller({
+      user,
+      credential: 'human_bearer',
+      authViaToken: true,
+      headersList: new Headers(),
+    });
+
+    await expect(bearerCaller.sharePersonal({ organizationId: org.id })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
 });

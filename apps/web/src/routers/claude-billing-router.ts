@@ -165,6 +165,12 @@ export const claudeBillingRouter = createTRPCRouter({
         input.organizationId,
         input.scope
       );
+      if (ctx.authViaToken || ctx.credential !== 'session') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Share your personal Claude link from the Kilo web app.',
+        });
+      }
       if (owner.kind === 'personal') {
         throw new TRPCError({
           code: 'BAD_REQUEST',

@@ -3914,7 +3914,7 @@
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"
     },
-    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość. Doładuj konto i spróbuj ponownie."
+    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość."
   },
   "settingsTools": {
     "confirmTitle": "Potwierdzić tę zmianę?"
@@ -4375,5 +4375,8 @@
     "noEnabledContexts": "Brak kontekstów z włączonymi zaplanowanymi raportami",
     "sourceBlocker": "Sesja wymaga uwagi",
     "sourceMetadata": "Zapisane metadane sesji"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nie udało się otworzyć tego wyniku wyszukiwania"
   }
 }

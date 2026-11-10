@@ -4,7 +4,7 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { encryptCredential, requireEncryptionKey } from '../lib/byok';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { isValidEmail, resolveSeedUserId } from '../lib/users';
 import type { SeedResult } from '../index';
 
@@ -61,6 +61,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`Unknown arguments: ${rest.join(' ')}`);
   }
 
+  assertLocalSeedDatabase('app:byok-e2e-fixture');
   const userId = await resolveSeedUserId(email);
   const db = getSeedDb();
 

@@ -925,9 +925,9 @@ async function connect(
 }
 
 describe('control-plane turn cap and accepted backstop', () => {
-  it('derives the 125-minute accepted backstop from the 120-minute cap', () => {
-    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(7_200_000);
-    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(7_500_000);
+  it('derives the 12-hour 5-minute accepted backstop from the 12-hour cap', () => {
+    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(43_200_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(43_500_000);
 
     const margin =
       CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs;
@@ -937,9 +937,9 @@ describe('control-plane turn cap and accepted backstop', () => {
     );
 
     const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
-    expect(scaled.wrapper.turnHardCapMs).toBe(72_000);
+    expect(scaled.wrapper.turnHardCapMs).toBe(432_000);
     // The accepted-backstop margin is not scaled, so it does not shrink with the cap.
-    expect(scaled.session.acceptedBackstopMs).toBe(372_000);
+    expect(scaled.session.acceptedBackstopMs).toBe(732_000);
     expect(scaled.session.acceptedBackstopMs).toBe(scaled.wrapper.turnHardCapMs + margin);
     expect(scaled.session.acceptedBackstopMs).toBeGreaterThan(scaled.wrapper.turnHardCapMs);
   });

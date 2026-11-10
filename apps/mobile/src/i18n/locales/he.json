@@ -3858,7 +3858,7 @@
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"
     },
-    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו. הוסף קרדיטים ונסה שוב."
+    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו."
   },
   "settingsTools": {
     "confirmTitle": "לאשר את השינוי הזה?"
@@ -4309,5 +4309,8 @@
     "noEnabledContexts": "אין הקשרים שבהם מופעלים דוחות מתוזמנים",
     "sourceBlocker": "הסשן דורש תשומת לב",
     "sourceMetadata": "מטא־נתונים של הסשן שנלכדו"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "לא ניתן היה לפתוח את תוצאת החיפוש הזו"
   }
 }

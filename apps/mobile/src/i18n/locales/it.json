@@ -3858,7 +3858,7 @@
     "reasoningEffort": {
       "modelFlag": "Questo modello supporta il livello di ragionamento"
     },
-    "creditsRequired": "Crediti insufficienti per inviare questo messaggio: aggiungi crediti e riprova."
+    "creditsRequired": "Crediti insufficienti per inviare questo messaggio."
   },
   "settingsTools": {
     "confirmTitle": "Confermare questa modifica?"
@@ -4309,5 +4309,8 @@
     "noEnabledContexts": "Nessun contesto abilitato per i briefing programmati",
     "sourceBlocker": "La sessione richiede attenzione",
     "sourceMetadata": "Metadati della sessione acquisiti"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Impossibile aprire questo risultato di ricerca"
   }
 }

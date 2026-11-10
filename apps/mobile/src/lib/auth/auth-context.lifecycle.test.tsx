@@ -295,6 +295,12 @@ vi.mock('@/lib/native-system-search', () => ({
   clearSystemSearchIndex: vi.fn().mockResolvedValue(undefined),
 }));
 
+// The App Intents catalog clear reaches the same entry through the app-action
+// bridge, so it is a no-op here too.
+vi.mock('@/lib/app-actions/session-catalog', () => ({
+  clearSessionCatalogBestEffort: vi.fn(),
+}));
+
 vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
 
 vi.mock('@/lib/consent', () => ({

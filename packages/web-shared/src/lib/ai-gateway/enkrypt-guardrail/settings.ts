@@ -84,7 +84,7 @@ export function readStoredEnkryptOutputDetectors(
  * The organization's input guardrail, or null when Kilo admins have not granted the feature
  * (`kilo_encrypt`), or the guardrail is absent, disabled, invalid in settings, or selects no
  * detector. Organizations that never saved detectors get Kilo Default. Only the configurable
- * detectors follow the saved settings; see `enforcedEnkryptInputDetectors`. Every input is
+ * detectors run, as saved; see `enforcedEnkryptInputDetectors`. Every input is
  * checked, including tool results, whatever `scan_tool_results` says.
  */
 export function resolveEnkryptInputGuardrail(

@@ -3808,7 +3808,7 @@
     "reasoningEffort": {
       "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
     },
-    "creditsRequired": "Tsy ampy kireditra handefasana ity hafatra ity, ka ampio kireditra ary andramo indray."
+    "creditsRequired": "Tsy ampy kireditra handefasana ity hafatra ity."
   },
   "settingsTools": {
     "confirmTitle": "Hamafiso ity fanovana ity?"
@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "Tsy misy toe-javatra nandefasana tatitra voalahatra",
     "sourceBlocker": "Mila fikarakarana ny fotoam-piasana",
     "sourceMetadata": "Metadata momba ny fotoam-piasana voarakitra"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"
   }
 }

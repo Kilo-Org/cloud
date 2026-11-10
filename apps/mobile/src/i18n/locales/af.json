@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Hierdie model ondersteun denkinspanning"
     },
-    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie. Voeg krediete by en probeer weer."
+    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie."
   },
   "settingsTools": {
     "confirmTitle": "Bevestig hierdie verandering?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Geen kontekste vir geskeduleerde verslae geaktiveer nie",
     "sourceBlocker": "Sessie benodig aandag",
     "sourceMetadata": "Vasgelegde sessiemetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kon nie hierdie soektogresultaat oopmaak nie"
   }
 }

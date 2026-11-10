@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
     },
-    "creditsRequired": "Salio halitoshi kutuma ujumbe huu, ongeza salio kisha ujaribu tena."
+    "creditsRequired": "Salio halitoshi kutuma ujumbe huu."
   },
   "settingsTools": {
     "confirmTitle": "Thibitisha mabadiliko haya?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Hakuna miktadha iliyowezeshwa kwa ripoti zilizoratibiwa",
     "sourceBlocker": "Kipindi kinahitaji kushughulikiwa",
     "sourceMetadata": "Metadata za kipindi zilizohifadhiwa"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"
   }
 }

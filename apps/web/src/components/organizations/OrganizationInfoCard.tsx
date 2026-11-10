@@ -166,9 +166,6 @@ function Inner(props: InnerProps) {
     deleted_at,
     auto_top_up_enabled,
   } = info;
-  // The member variant omits the Stripe customer id, so read it only on the
-  // admin-and-above variant. The field is rendered only in the admin dashboard.
-  const stripe_customer_id = info.callerRole === 'member' ? null : info.stripe_customer_id;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
@@ -494,24 +491,6 @@ function Inner(props: InnerProps) {
                 </Button>
               </div>
             </div>
-            {stripe_customer_id && (
-              <div>
-                <label className="text-muted-foreground text-sm font-medium">
-                  Stripe Customer ID
-                </label>
-                <p className="font-mono text-sm">
-                  {stripe_customer_id}
-                  <a
-                    href={`https://dashboard.stripe.com/${process.env.NODE_ENV === 'development' ? 'test/' : ''}customers/${stripe_customer_id}`}
-                    target="_blank"
-                    className="ml-1 inline-flex items-center rounded-full bg-purple-900 px-2 py-1 text-xs font-medium text-purple-200 transition-colors hover:bg-purple-800"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    View in Stripe
-                  </a>
-                </p>
-              </div>
-            )}
             <div>
               <label className="text-muted-foreground text-sm font-medium">Seats Required</label>
               <div className="mt-1 flex items-center gap-2">

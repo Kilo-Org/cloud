@@ -3858,7 +3858,7 @@
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
     },
-    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj. Adaugă credite și încearcă din nou."
+    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj."
   },
   "settingsTools": {
     "confirmTitle": "Confirmi această modificare?"
@@ -4309,5 +4309,8 @@
     "noEnabledContexts": "Niciun context activat pentru rapoarte programate",
     "sourceBlocker": "Sesiunea necesită atenție",
     "sourceMetadata": "Metadate capturate ale sesiunii"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nu s-a putut deschide acest rezultat de căutare"
   }
 }

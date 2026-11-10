@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "此模型支援思考程度"
     },
-    "creditsRequired": "點數不足，無法傳送此訊息。請加值點數後再試一次。"
+    "creditsRequired": "點數不足，無法傳送此訊息。"
   },
   "settingsTools": {
     "confirmTitle": "確認此變更？"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "未為任何情境啟用排定的簡報",
     "sourceBlocker": "工作階段需要留意",
     "sourceMetadata": "已擷取的工作階段中繼資料"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "無法開啟此搜尋結果"
   }
 }

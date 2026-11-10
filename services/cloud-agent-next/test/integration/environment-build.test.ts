@@ -918,7 +918,7 @@ describe('environment snapshot resolution', () => {
     harness.environment.revision = 1;
   });
 
-  it('skips a snapshot for another sandbox image and admits its replacement', async () => {
+  it('uses a previous-image snapshot inside the rollout window and admits its replacement', async () => {
     const harness = await setup();
     const { auth } = await readyBuild(harness);
     await harness.stub.runnerResult(auth, {
@@ -936,9 +936,15 @@ describe('environment snapshot resolution', () => {
         actorUserId: 'user-1',
       })
     ).resolves.toMatchObject({
-      reason: 'incompatible',
-      snapshot: null,
+      reason: 'eligible',
+      snapshot: {
+        revision: 1,
+        stale: 'image',
+        baseImage: 'registry.example/runtime-free:1',
+      },
+      currentBaseImage: 'registry.example/runtime-free:2',
       admission: { status: 'admitted' },
+      build: { state: 'queued', outcome: null, failureReason: null },
     });
     const view = await status(harness);
     expect(view.published).toMatchObject({ revision: 1, stale: 'image' });

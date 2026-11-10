@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
     },
-    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này, hãy nạp tiền và thử lại."
+    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này."
   },
   "settingsTools": {
     "confirmTitle": "Xác nhận thay đổi này?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Chưa bật bản tin theo lịch cho ngữ cảnh nào",
     "sourceBlocker": "Phiên cần được chú ý",
     "sourceMetadata": "Siêu dữ liệu phiên đã ghi lại"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Không thể mở kết quả tìm kiếm này"
   }
 }

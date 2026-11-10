@@ -526,10 +526,7 @@ describe('scanRequestWithVerdictCache', () => {
     expect(result.cacheEntry).toBeNull();
   });
 
-  it.each<[string, () => Response]>([
-    ['fails', () => new Response('unavailable', { status: 500 })],
-    ['reports a detector error', () => enkryptResponse({ pii: -1 })],
-  ])('returns no entry to cache when a log-only scan %s and allows', async (_name, respond) => {
+  describe('log-only scans', () => {
     const logOnlyConfig = {
       scanToolResults: true,
       status: 'ready',
@@ -537,25 +534,111 @@ describe('scanRequestWithVerdictCache', () => {
       blockingDetectors: [],
     } satisfies EnkryptGuardrailRequest['config'];
 
-    const result = await scanRequestWithVerdictCache(
-      makeRequest(conversation, { config: logOnlyConfig }),
-      deps(memoryStore(), respond)
-    );
+    it.each<[string, () => Response]>([
+      ['detects', () => enkryptResponse({ pii: 1 })],
+      ['fails', () => new Response('unavailable', { status: 500 })],
+      ['is rate limited', () => new Response('slow down', { status: 429 })],
+      ['reports a detector error', () => enkryptResponse({ pii: -1 })],
+      ['returns an invalid response', () => new Response('{}', { status: 200 })],
+    ])('returns an allow entry for the final key when the scan %s', async (_name, respond) => {
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(conversation, { config: logOnlyConfig }),
+        deps(memoryStore(), respond)
+      );
 
-    expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.cacheEntry).toBeNull();
-  });
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(result.cacheEntry).toEqual({
+        key: keysFor(conversation, { config: logOnlyConfig }).at(-1),
+        verdict: 'allow',
+      });
+    });
 
-  it('returns no entry to cache when a log-only scan is too large to send', async () => {
-    const result = await scanRequestWithVerdictCache(
-      makeRequest(['a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1)], {
-        config: { ...config, blockingDetectors: [] },
-      }),
-      deps(memoryStore())
-    );
+    it('returns an allow entry when the request is too large to send', async () => {
+      const segments = ['a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1)];
+      const dependencies = deps(memoryStore());
 
-    expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.cacheEntry).toBeNull();
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(segments, { config: logOnlyConfig }),
+        dependencies
+      );
+
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(result.cacheEntry).toEqual({
+        key: keysFor(segments, { config: logOnlyConfig }).at(-1),
+        verdict: 'allow',
+      });
+    });
+
+    it('returns an allow entry without an API key', async () => {
+      const dependencies = deps(memoryStore());
+      dependencies.apiKey = undefined;
+
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(conversation, { config: logOnlyConfig }),
+        dependencies
+      );
+
+      expect(result.cacheEntry?.verdict).toBe('allow');
+    });
+
+    it('returns no entry to cache when the client disconnected', async () => {
+      const dependencies = deps(memoryStore());
+      dependencies.signal = AbortSignal.abort();
+
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(conversation, { config: logOnlyConfig }),
+        dependencies
+      );
+
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(result.cacheEntry).toBeNull();
+    });
+
+    it('scans only the new suffix after a failed scan', async () => {
+      const history = ['tool definitions', 'x'.repeat(10_000), `${'y'.repeat(4_000)}END`];
+      const store = memoryStore();
+      const failed = await scanRequestWithVerdictCache(
+        makeRequest(history, { config: logOnlyConfig }),
+        deps(store, () => enkryptResponse({ pii: -1 }))
+      );
+      if (!failed.cacheEntry) throw new Error('expected a cacheable allow');
+      await rememberRequestVerdict(failed.cacheEntry, store);
+      const dependencies = deps(store, () => enkryptResponse({ pii: 0 }));
+
+      await scanRequestWithVerdictCache(
+        makeRequest([...history, 'tool result', 'another question'], { config: logOnlyConfig }),
+        dependencies
+      );
+
+      expect(scannedTexts(dependencies)).toEqual([
+        `${'y'.repeat(ENKRYPT_SCAN_OVERLAP_CHARACTERS - 3)}END\n\ntool result\n\nanother question`,
+      ]);
+    });
+
+    it('does not let a blocking scan of the same detectors reuse its entries', async () => {
+      const store = memoryStore();
+      const failed = await scanRequestWithVerdictCache(
+        makeRequest(conversation, { config: logOnlyConfig }),
+        deps(store, () => new Response('unavailable', { status: 500 }))
+      );
+      if (!failed.cacheEntry) throw new Error('expected a cacheable allow');
+      await rememberRequestVerdict(failed.cacheEntry, store);
+      const blockingConfig = {
+        ...logOnlyConfig,
+        blockingDetectors: ['pii'],
+      } satisfies EnkryptGuardrailRequest['config'];
+      const dependencies = deps(store, () => enkryptResponse({ pii: 1 }));
+
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(conversation, { config: blockingConfig }),
+        dependencies
+      );
+
+      expect(scannedTexts(dependencies)).toEqual([conversation.join('\n\n')]);
+      expect(result.verdict.action).toBe('block');
+    });
   });
 
   it.each(['missing API key', 'aborted request'])(

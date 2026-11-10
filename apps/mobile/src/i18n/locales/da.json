@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"
     },
-    "creditsRequired": "Ikke nok kreditter til at sende denne besked. Tilføj kreditter, og prøv igen."
+    "creditsRequired": "Ikke nok kreditter til at sende denne besked."
   },
   "settingsTools": {
     "confirmTitle": "Bekræft denne ændring?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Ingen kontekster er aktiveret for planlagte briefinger",
     "sourceBlocker": "Sessionen kræver opmærksomhed",
     "sourceMetadata": "Gemte sessionsmetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kunne ikke åbne dette søgeresultat"
   }
 }

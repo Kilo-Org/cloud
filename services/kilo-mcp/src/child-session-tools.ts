@@ -17,10 +17,16 @@ import { JsonRpcFailure, type Catalog, type ForwardedAuth } from './types';
 
 const childOperations = [
   {
+    name: 'list_environments',
+    procedure: 'cloudEnvironments.list',
+    description:
+      'List the Cloud Agent repository environments configured for one GitHub repository in the parent\'s fixed personal or organization scope. Pass repository as {platform:"github",fullName:"owner/repo"}. Returns environment summaries with id, name, repository identity, and configuration counts; pass a returned id as requestedEnvironment.id to spawn_session. This is read-only: it returns environments only for the requested repository and cannot list environments across repositories, get one by id, or create, update, or delete anything.',
+  },
+  {
     name: 'spawn_session',
     procedure: 'prepareSession',
     description:
-      'Create and start an independent child Cloud Agent workspace with its own sandbox, worktree, and multi-chat support. Use only when the user explicitly asks to launch a Cloud Agent, not to explore the current worktree. First use search_models to resolve the requested model to its exact id and supported variant. Supply a complete task brief including constraints, verification, and Git/PR requirements; the parent conversation is not the task prompt. Generate one UUID operationKey for this launch and retain it for reconciliation; never replace it to retry an unknown outcome. Set callbackTarget to {"url":"workspace:new-chat"} to open a new chat in the parent workspace with the result as its first message, or to {"url":"workspace:<session-id>"} using the session id from the cloud-agent-context to notify this chat; omit for no notification. Returns cloudAgentSessionId and kiloSessionId; successful creation is admission, not task completion. Organization and parent platform are inherited server-side. Children cannot spawn grandchildren.',
+      'Create and start an independent child Cloud Agent workspace with its own sandbox, worktree, and multi-chat support. Use only when the user explicitly asks to launch a Cloud Agent, not to explore the current worktree. First use search_models to resolve the requested model to its exact id and supported variant. If the user selected a repository environment, call list_environments for the launch repository and pass the returned id as requestedEnvironment {id}; for an additional repository of a multi-repository environment, include {repoFullName,branch} in requestedEnvironment.repositories. Omit requestedEnvironment to leave environment selection to the server\'s automatic/default behavior. Supply a complete task brief including constraints, verification, and Git/PR requirements; the parent conversation is not the task prompt. Generate one UUID operationKey for this launch and retain it for reconciliation; never replace it to retry an unknown outcome. Set callbackTarget to {"url":"workspace:new-chat"} to open a new chat in the parent workspace with the result as its first message, or to {"url":"workspace:<session-id>"} using the session id from the cloud-agent-context to notify this chat; omit for no notification. Returns cloudAgentSessionId and kiloSessionId; successful creation is admission, not task completion. Organization and parent platform are inherited server-side. Children cannot spawn grandchildren.',
   },
   {
     name: 'list_child_sessions',
@@ -100,7 +106,7 @@ export const CHILD_SESSION_INSTRUCTIONS = [
   "This MCP connection manages direct child Cloud Agent sessions through dedicated tools, not API search/call. It belongs to the workspace's canonical parent session, the original root chat, not to the sibling chat that invoked this tool.",
   'Launch a child only when the user explicitly asks to spin up a new Cloud Agent session. Each child has its own sandbox and worktree with multi-chat support; use children to fan out independent tasks, not to explore or work in this worktree.',
   'First call search_models with the requested model name; copy the returned id exactly into model and use only a returned variant, passed separately. If no model was requested, use an already-established user preference and resolve it with search_models; otherwise browse search_models with {} and ask the user to choose. There is no implicit model default; isPreferred is a recommendation, not a selected account default. Omit variant unless requested. Do not guess model identifiers, silently substitute models, or treat catalog discovery as proof of organization policy approval.',
-  "Call spawn_session with a complete task brief and a fresh UUID operationKey. Organization and createdOnPlatform come from trusted parent state, not caller input. Automatic commit/push is not requested when autoCommit is omitted; set true explicitly on the launch and each follow-up where authorized, because follow-ups do not inherit it. When publication is forbidden, set false and also forbid commit/push/PR actions in the task prompt; false alone does not restrict the child agent's Git tools. PR creation must be requested in the task prompt.",
+  'Call spawn_session with a complete task brief and a fresh UUID operationKey. To use a repository environment, first call list_environments with {repository:{platform:"github",fullName:"owner/repo"}} and pass a returned id as requestedEnvironment {id}; include requestedEnvironment.repositories for additional repositories of a multi-repository environment. Omit requestedEnvironment to leave environment selection to the server\'s automatic/default behavior. Organization and createdOnPlatform come from trusted parent state, not caller input. Automatic commit/push is not requested when autoCommit is omitted; set true explicitly on the launch and each follow-up where authorized, because follow-ups do not inherit it. When publication is forbidden, set false and also forbid commit/push/PR actions in the task prompt; false alone does not restrict the child agent\'s Git tools. PR creation must be requested in the task prompt.',
   'Include callbackTarget: { url: "workspace:new-chat" } to create a new chat in the parent workspace with the result as its first message, or callbackTarget: { url: "workspace:<session-id>" } using the cloud-agent-context session id to notify this chat; omit for no notification. Prefer callbacks over polling. Do not poll or wait in a tool for a callback; keep any status check bounded.',
   'Use list_child_sessions to recover IDs, get_session for status, get_message_result for a specific message outcome, send_message for authorized follow-ups, and interrupt_session for authorized Stop. Before each new follow-up, call generate_message_id with {} and copy the returned messageId into send_message; this only generates an ID and does not send work. Keep that ID for reconciliation and retries of the same submission; never generate a replacement after an uncertain send. For the initial task, use initialMessageId from list_child_sessions when recorded; if absent, report the missing ID rather than generating a replacement.',
   "Use list_folders to discover existing folder IDs in the fixed parent scope, then assign_workspace_to_folder with the direct child's cloudAgentSessionId and worktreeId to file its entire workspace; folderId:null removes the assignment. Folder tools cannot organize unrelated workspaces or create, edit, delete, or reorder folders.",
@@ -123,6 +129,10 @@ const fieldDescriptions: Record<string, string> = {
   autoCommit:
     "Whether this message requests automatic commit/push on finalization. Omitted means no request; follow-ups do not inherit the earlier setting. Set true only when authorized. If publication is forbidden, set false and forbid commit/push/PR actions in the prompt too; false does not restrict agent Git tools or cancel another prompt's request. PR creation must be requested in the prompt.",
   upstreamBranch: 'Repository branch to start from; omit to use the repository default.',
+  requestedEnvironment:
+    "Repository environment the user selected, discovered with list_environments for the launch repository. Pass its id; include repositories with repoFullName and optional branch for each additional repository of a multi-repository environment. Omit to leave environment selection to the server's automatic/default behavior.",
+  repository:
+    'GitHub repository identity in {platform:"github",fullName:"owner/repo"} form. Spawn currently supports only GitHub repositories, so this is the launch repository whose environments to list.',
   callbackTarget:
     'Set {"url":"workspace:new-chat"} to open a new chat in the parent workspace with the result as its first message, or {"url":"workspace:<session-id>"} using the cloud-agent-context session id to notify this chat. Omit for no callback.',
   cloudAgentSessionId:
@@ -171,9 +181,11 @@ export function childSessionTools(authority: CloudAgentAuthority) {
       },
     },
     ...childOperations.map(tool => {
-      const path = tool.procedure.startsWith('workspaceFolders.')
-        ? tool.procedure
-        : `${prefix}.${tool.procedure}`;
+      const path =
+        tool.procedure === 'cloudEnvironments.list' ||
+        tool.procedure.startsWith('workspaceFolders.')
+          ? tool.procedure
+          : `${prefix}.${tool.procedure}`;
       const schema = cloudAgentAuthorityInputSchema(authority, path);
       const properties = { ...(schema.properties as Record<string, Record<string, unknown>>) };
       delete properties.organizationId;
@@ -193,6 +205,7 @@ export function childSessionTools(authority: CloudAgentAuthority) {
         'getSession',
         'getMessageResult',
         'workspaceFolders.list',
+        'cloudEnvironments.list',
       ].includes(tool.procedure);
       return {
         name: tool.name,
@@ -292,7 +305,10 @@ export async function runChildSessionTool(options: {
   const prefix =
     authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
   const folderOperation = operation.procedure.startsWith('workspaceFolders.');
-  const path = folderOperation ? operation.procedure : `${prefix}.${operation.procedure}`;
+  const path =
+    operation.procedure === 'cloudEnvironments.list' || folderOperation
+      ? operation.procedure
+      : `${prefix}.${operation.procedure}`;
   const row = catalog[path];
   if (!row)
     throw new JsonRpcFailure(-32000, 'Child session operation is unavailable in the Kilo catalog.');

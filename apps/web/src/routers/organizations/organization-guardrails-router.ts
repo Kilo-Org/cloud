@@ -15,11 +15,16 @@ import {
   enabledEnkryptOutputDetectorIds,
   ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
   enforcedEnkryptInputDetectors,
+  storableEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import {
   readStoredEnkryptDetectors,
   readStoredEnkryptOutputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import {
+  isOrganizationFeatureEnabled,
+  readOrganizationFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { mutateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -45,8 +50,8 @@ const OrganizationGuardrailsConfigSchema = z.object({
 });
 
 /**
- * Saves cap policies at fewer rules than saved settings may hold. `output` is optional so a page
- * loaded before response checks existed can still save.
+ * Saves cap policies at fewer rules than saved settings may hold. Omitting `output` preserves
+ * output guardrails when their configuration UI is unavailable.
  */
 const OrganizationGuardrailsUpdateSchema = OrganizationGuardrailsConfigSchema.extend({
   detectors: EnkryptInputDetectorsUpdateSchema,
@@ -61,9 +66,10 @@ export type OrganizationGuardrailsConfig = z.infer<typeof OrganizationGuardrails
  * `invalid_saved_detectors`: the saved input detectors no longer validate, so the gateway rejects
  * every scanned request while the guardrail is enabled. `detectors` then holds Kilo Default as a
  * starting point for the admin to review and save. `invalid_saved_output_detectors` is the same for
- * the response guardrail, which then withholds every response and starts from no detector.
+ * the output guardrail, which then withholds every response and starts from no detector.
  */
 const OrganizationGuardrailsResponseSchema = OrganizationGuardrailsConfigSchema.extend({
+  output_available: z.boolean(),
   invalid_saved_detectors: z.boolean(),
   invalid_saved_output_detectors: z.boolean(),
 });
@@ -108,8 +114,8 @@ export function describeGuardrailsConfig(config: OrganizationGuardrailsConfig): 
   return [
     `Updated AI guardrails: ${config.enabled ? 'enabled' : 'disabled'}`,
     `detectors: ${describeDetectors(ENKRYPT_DETECTOR_IDS, enforcedEnkryptInputDetectors(config.detectors))}`,
-    `response checks: ${config.output.enabled ? 'enabled' : 'disabled'}`,
-    `response detectors: ${describeDetectors(ENKRYPT_OUTPUT_DETECTOR_IDS, config.output.detectors)}`,
+    `output guardrails: ${config.output.enabled ? 'enabled' : 'disabled'}`,
+    `output detectors: ${describeDetectors(ENKRYPT_OUTPUT_DETECTOR_IDS, config.output.detectors)}`,
   ].join('; ');
 }
 
@@ -149,12 +155,21 @@ function savedOutputGuardrail(organizationId: string, settings: OrganizationSett
   };
 }
 
+async function isOutputGuardrailAvailable(organizationId: string): Promise<boolean> {
+  return isOrganizationFeatureEnabled(
+    await readOrganizationFeatures(db),
+    'enkrypt_output_guardrail',
+    organizationId
+  );
+}
+
 export const organizationGuardrailsRouter = createTRPCRouter({
   get: organizationAdminProcedure
     .output(OrganizationGuardrailsResponseSchema)
     .query(async ({ input }) => {
       const organization = await requireGuardrailsOrganization(input.organizationId);
       return {
+        output_available: await isOutputGuardrailAvailable(input.organizationId),
         ...savedInputGuardrail(input.organizationId, organization.settings),
         ...savedOutputGuardrail(input.organizationId, organization.settings),
       };
@@ -166,6 +181,13 @@ export const organizationGuardrailsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, output: requestedOutput, ...inputGuardrail } = input;
       const { settings } = await requireGuardrailsOrganization(organizationId);
+      const outputAvailable = await isOutputGuardrailAvailable(organizationId);
+      if (requestedOutput && !outputAvailable) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Enkrypt output guardrails are not available for this organization.',
+        });
+      }
       const { output, invalid_saved_output_detectors } = requestedOutput
         ? { output: requestedOutput, invalid_saved_output_detectors: false }
         : savedOutputGuardrail(organizationId, settings);
@@ -174,7 +196,10 @@ export const organizationGuardrailsRouter = createTRPCRouter({
         inputGuardrail.enabled &&
         !ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.some(id => inputGuardrail.detectors[id].enabled)
       ) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Turn on at least one detector.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Turn on at least one input detector.',
+        });
       }
       if (
         requestedOutput?.enabled &&
@@ -182,7 +207,7 @@ export const organizationGuardrailsRouter = createTRPCRouter({
       ) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Turn on at least one response detector.',
+          message: 'Turn on at least one output detector.',
         });
       }
       await db.transaction(async tx => {
@@ -193,7 +218,11 @@ export const organizationGuardrailsRouter = createTRPCRouter({
             enkrypt: {
               ...organization.settings.enkrypt,
               // Still written so a rollback to a version that reads it keeps scanning every input.
-              input_guardrail: { ...inputGuardrail, scan_tool_results: true },
+              input_guardrail: {
+                ...inputGuardrail,
+                detectors: storableEnkryptInputDetectors(inputGuardrail.detectors),
+                scan_tool_results: true,
+              },
               ...(requestedOutput ? { output_guardrail: requestedOutput } : {}),
             },
           }),
@@ -209,6 +238,11 @@ export const organizationGuardrailsRouter = createTRPCRouter({
           tx,
         });
       });
-      return { ...config, invalid_saved_detectors: false, invalid_saved_output_detectors };
+      return {
+        ...config,
+        output_available: outputAvailable,
+        invalid_saved_detectors: false,
+        invalid_saved_output_detectors,
+      };
     }),
 });

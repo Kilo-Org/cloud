@@ -3914,7 +3914,7 @@
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"
     },
-    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila. Dodaj kredite in poskusi znova."
+    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila."
   },
   "settingsTools": {
     "confirmTitle": "Potrdim to spremembo?"
@@ -4375,5 +4375,8 @@
     "noEnabledContexts": "Za načrtovana poročila ni omogočen noben kontekst",
     "sourceBlocker": "Seja zahteva pozornost",
     "sourceMetadata": "Zajeti metapodatki seje"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ni bilo mogoče odpreti tega rezultata iskanja"
   }
 }

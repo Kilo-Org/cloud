@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Awoṣe yìí ṣe àtìlẹ́yìn fún ìwọ̀n ìrònú"
     },
-    "creditsRequired": "Kirẹ́dítì kò tó láti fi ìfiránṣẹ́ yìí ránṣẹ́, fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i."
+    "creditsRequired": "Kirẹ́dítì kò tó láti fi ìfiránṣẹ́ yìí ránṣẹ́."
   },
   "settingsTools": {
     "confirmTitle": "Ìjẹ́rìí ìyípadà yìí?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Kò sí àyíká tí a ti mú ṣiṣẹ́ fún àwọn ìròyìn tí a ṣètò",
     "sourceBlocker": "Ìgbà iṣẹ́ nílò àfiyèsí",
     "sourceMetadata": "Ìsọfúnni àpèjúwe ìgbà iṣẹ́ tí a gbà sílẹ̀"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"
   }
 }

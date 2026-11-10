@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"
     },
-    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet. Fyll på krediter och försök igen."
+    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet."
   },
   "settingsTools": {
     "confirmTitle": "Bekräfta denna ändring?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Inga kontexter är aktiverade för schemalagda rapporter",
     "sourceBlocker": "Sessionen behöver uppmärksamhet",
     "sourceMetadata": "Insamlad sessionsmetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kunde inte öppna det här sökresultatet"
   }
 }

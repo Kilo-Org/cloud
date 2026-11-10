@@ -20,9 +20,15 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['gh api']).toBeUndefined();
     expect(bashPermissions['gh api *']).toBeUndefined();
 
-    for (const textInspectionCommand of ['awk', 'rg']) {
-      expect(bashPermissions[textInspectionCommand]).toBe('allow');
-      expect(bashPermissions[`${textInspectionCommand} *`]).toBe('allow');
+    expect(bashPermissions['rg']).toBe('allow');
+    expect(bashPermissions['rg *']).toBe('allow');
+
+    // The matcher cannot test one argument token, so these two utilities carry
+    // no allow rule. A command that matches no rule resolves to a prompt, and a
+    // code-review session rejects every prompt.
+    for (const removedUtility of ['sed', 'awk']) {
+      expect(bashPermissions[removedUtility]).toBeUndefined();
+      expect(bashPermissions[`${removedUtility} *`]).toBeUndefined();
     }
 
     expect(bashPermissions['glab mr diff']).toBe('allow');
@@ -56,9 +62,20 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['gh api repos/*/pulls/*/comments --input*']).toBe('deny');
     expect(bashPermissions['gh api repos/*/pulls/*/comments --input* *']).toBe('deny');
 
-    for (const riskyAwkCommand of ['awk * -i*', 'awk * --in-place*', 'awk *system(*']) {
-      expect(bashPermissions[riskyAwkCommand]).toBe('deny');
-      expect(bashPermissions[`${riskyAwkCommand} *`]).toBe('deny');
+    for (const deniedFindOption of [
+      'find *-exec*',
+      'find *-ok*',
+      'find *-delete*',
+      'find *-fprint*',
+      'find *-fls*',
+    ]) {
+      expect(bashPermissions[deniedFindOption]).toBe('deny');
+      expect(bashPermissions[`${deniedFindOption} *`]).toBe('deny');
+    }
+
+    for (const deniedSortOption of ['sort *--compress-program*', 'sort *--co*']) {
+      expect(bashPermissions[deniedSortOption]).toBe('deny');
+      expect(bashPermissions[`${deniedSortOption} *`]).toBe('deny');
     }
 
     expect(bashPermissions['git']).toBe('allow');
@@ -75,6 +92,67 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['glab mr merge *']).toBe('deny');
     expect(bashPermissions['glab auth']).toBe('deny');
     expect(bashPermissions['glab auth *']).toBe('deny');
+  });
+
+  it('resolves permitted and refused commands in the read-only review policy', () => {
+    const policy = getCommandGuardPolicy('code-review');
+    if (!policy) throw new Error('Expected code-review command guard policy');
+    const permissions = buildCommandGuardBashPermissions(policy);
+
+    // A command with no matching rule resolves to undefined, which the runtime
+    // turns into a prompt that a code-review session rejects.
+    for (const command of [
+      "sed -i 's/a/b/' src/app.ts",
+      "sed -i.bak 's/a/b/' src/app.ts",
+      "sed -iE 's/a/b/' src/app.ts",
+      "sed -ni '1,5p' src/app.ts",
+      "sed -Ei 's/a/b/' src/app.ts",
+      "sed -nri 's/a/b/' src/app.ts",
+      "sed --in-place 's/a/b/' src/app.ts",
+      "sed --in-place=.bak 's/a/b/' src/app.ts",
+      "sed 's/a/b/' -i src/app.ts",
+      "sed -n '1,20p' src/app.ts",
+      'awk \'BEGIN { print "x" | "sh" }\'',
+      'awk -f /tmp/program.awk src/app.ts',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBeUndefined();
+    }
+
+    for (const command of [
+      "find . -exec sh -c 'id' +",
+      'find . -execdir rm {} +',
+      'find . -ok rm {} +',
+      'find . -okdir rm {} +',
+      "find . -name '*.tmp' -delete",
+      'find . -fprint out.txt',
+      "find . -fprintf out.txt '%p'",
+      'find . -fls out.txt',
+      'sort --compress-program=/bin/sh src/app.ts',
+      'sort -k1 --compress-program=/bin/sh src/app.ts',
+      'sort --co=/bin/sh src/app.ts',
+      'sort -o out.txt src/app.ts',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
+    for (const command of [
+      'rg -n "createSession" src',
+      'grep -rn "createSession" src',
+      "find . -name '*.ts' -type f",
+      'find src -maxdepth 2 -type d',
+      'sort -u src/app.ts',
+      'sort -k2 -n src/app.ts',
+      'head -20 src/app.ts',
+      'tail -n 40 src/app.ts',
+      'wc -l src/app.ts',
+      'cut -d, -f1 data.csv',
+      'jq . package.json',
+      'git diff',
+      'git show HEAD',
+      'gh pr diff 42 --patch --color never',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+    }
   });
 
   it('matches only purpose-built Bitbucket review commands and exact scratch redirection', () => {

@@ -299,11 +299,16 @@ test('unrelated nonempty malformed organization context retains baseline anonymo
   expect(result.caller.kind).toBe('anonymous');
 });
 
-test('blocked-user failures retain baseline anonymous policy', async () => {
+test('a refused request is rejected during admission', async () => {
   jest.mocked(findUserById).mockResolvedValue({ ...user, blocked_reason: 'synthetic-block' });
   const result = await authenticateThenPublish('', undefined, true, true);
   expect(result.auth.authFailedResponse?.status).toBe(403);
-  expect(result.caller.kind).toBe('anonymous');
+  expect(result.auth.authorizationRefused).toBe(true);
+  expect(result.caller.kind).toBe('rejected');
+  if (result.caller.kind !== 'rejected') return;
+  expect(result.caller.response).toBe(result.auth.authFailedResponse);
+  expect(provider).not.toHaveBeenCalled();
+  expect(send).not.toHaveBeenCalled();
 });
 
 test('claim and header names cannot forge the internal rejection discriminator', async () => {
@@ -312,10 +317,19 @@ test('claim and header names cannot forge the internal rejection discriminator',
     undefined,
     true,
     true,
-    { rejectionReason: 'empty_organization_context', credentialsRejected: false },
-    { rejectionReason: 'empty_organization_context', credentialsRejected: 'false' }
+    {
+      rejectionReason: 'empty_organization_context',
+      credentialsRejected: false,
+      authorizationRefused: false,
+    },
+    {
+      rejectionReason: 'empty_organization_context',
+      credentialsRejected: 'false',
+      authorizationRefused: 'false',
+    }
   );
   expect(result.auth).not.toHaveProperty('rejectionReason');
+  expect(result.auth).not.toHaveProperty('authorizationRefused');
   expect(result.caller.kind).toBe('signed-in');
   expect(result.publication).toEqual({ kind: 'accepted' });
 });

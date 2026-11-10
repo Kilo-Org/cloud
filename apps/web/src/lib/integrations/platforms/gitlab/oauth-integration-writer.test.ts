@@ -756,6 +756,52 @@ describe('GitLab OAuth integration writer', () => {
     expect(reconnected.integration_status).toBe('active');
   });
 
+  it('clears the credential marker when the reconnect stores credentials', async () => {
+    const user = await insertTestUser();
+    const providerBaseUrl = 'https://gitlab.example.com/root';
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'gitlab',
+        integration_type: 'oauth',
+        platform_account_id: '101',
+        platform_account_login: 'old-login',
+        integration_status: 'suspended',
+        auth_invalid_at: '2026-11-01T00:00:00.000Z',
+        auth_invalid_reason: 'authorizing_user_deleted',
+        metadata: {
+          gitlab_instance_url: providerBaseUrl,
+          webhook_secret: 'preserved-webhook-secret',
+          auth_type: 'oauth',
+        },
+      })
+      .returning();
+    if (!integration) throw new Error('Expected existing integration');
+
+    await storeGitLabOAuthIntegration({
+      owner: { type: 'user', id: user.id },
+      authorizedByUserId: user.id,
+      providerBaseUrl,
+      providerUser: { id: '101', login: 'old-login' },
+      accessToken: 'new-access-secret',
+      refreshToken: 'new-refresh-secret',
+      accessTokenExpiresAt: '2031-01-01T00:00:00.000Z',
+      oauthClientId: null,
+      oauthClientSecret: null,
+      scopes: ['api', 'read_user'],
+      repositories: null,
+    });
+
+    const [reconnected] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    expect(reconnected.integration_status).toBe('active');
+    expect(reconnected.auth_invalid_at).toBeNull();
+    expect(reconnected.auth_invalid_reason).toBeNull();
+  });
+
   it('keeps a kept project token when the reconnect grants no api scope', async () => {
     const user = await insertTestUser();
     const providerBaseUrl = 'https://gitlab.example.com/root';

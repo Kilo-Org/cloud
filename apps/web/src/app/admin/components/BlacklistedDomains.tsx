@@ -30,6 +30,7 @@ function EditTab() {
 
   const [inputValue, setInputValue] = useState('');
   const [tldInputValue, setTldInputValue] = useState('');
+  const [loadedVersion, setLoadedVersion] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [tldHasChanges, setTldHasChanges] = useState(false);
 
@@ -37,6 +38,7 @@ function EditTab() {
     if (data) {
       setInputValue(data.domains.join('\n'));
       setTldInputValue((data.blocked_signup_tlds ?? []).join('\n'));
+      setLoadedVersion(data.version);
       setHasChanges(false);
       setTldHasChanges(false);
     }
@@ -81,6 +83,8 @@ function EditTab() {
   );
 
   function handleSave() {
+    if (!data || loadedVersion !== data.version) return;
+
     const domains = inputValue
       .split(/[\n|]/)
       .map(part => part.trim().toLowerCase())
@@ -93,11 +97,22 @@ function EditTab() {
 
     // Only send the TLD list when it was edited, so a tab opened before a
     // deploy cannot reset a list it never loaded.
-    mutation.mutate({ domains, ...(tldHasChanges ? { blocked_tlds } : {}) });
+    mutation.mutate({
+      domains,
+      expected_version: loadedVersion,
+      ...(tldHasChanges ? { blocked_tlds } : {}),
+    });
   }
 
   if (isLoading) {
     return <div className="text-muted-foreground py-8 text-sm">Loading...</div>;
+  }
+  if (!data) {
+    return (
+      <div role="alert" className="text-destructive py-8 text-sm">
+        Failed to load the blacklist. Reload this page before editing.
+      </div>
+    );
   }
 
   const domainCount = data?.domains.length ?? 0;
@@ -127,10 +142,10 @@ function EditTab() {
         {data && data.dropped_domains > 0 && (
           <p className="text-destructive flex items-center gap-2 text-xs">
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            The stored list has {data.dropped_domains.toLocaleString()} more entries than the{' '}
-            {domainCount.toLocaleString()} shown here. Those entries are not shown or enforced, and
-            saving writes exactly this list, so it permanently discards them, even when only the
-            signup TLDs change.
+            All {domainCount.toLocaleString()} entries are shown and preserved on save. Redis access
+            checks still use only the first {(domainCount - data.dropped_domains).toLocaleString()}{' '}
+            entries; the remaining {data.dropped_domains.toLocaleString()} are not enforced by those
+            checks.
           </p>
         )}
         <Textarea
@@ -173,8 +188,12 @@ function EditTab() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
-            {mutation.isPending ? 'Saving...' : 'Save'}
+          <Button
+            onClick={handleSave}
+            disabled={mutation.isPending || loadedVersion !== data.version}
+            size="sm"
+          >
+            {mutation.isPending ? 'Saving...' : hasChanges ? 'Save' : 'Sync'}
           </Button>
           {data?.updated_by_email && (
             <span className="text-muted-foreground text-sm">
@@ -188,7 +207,8 @@ function EditTab() {
           <p>
             Domains and signup TLDs are stored in Redis, so changes apply without a deploy. Auth
             checks cache the lists for up to a minute. The BLACKLIST_DOMAINS and BLOCKED_SIGNUP_TLDS
-            env vars are fallbacks when Redis has no data.
+            env vars are fallbacks when Redis has no data. Each save or sync also copies the
+            complete domain list to Postgres; access checks continue to use Redis.
           </p>
         </div>
       </CardContent>

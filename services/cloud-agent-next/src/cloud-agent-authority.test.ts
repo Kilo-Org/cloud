@@ -229,6 +229,54 @@ describe('Cloud Agent spawn authority', () => {
     ).toThrow();
   });
 
+  it('accepts a requested environment and rejects widened nested fields on scoped preparation', () => {
+    const organizationId = '22345678-1234-4234-8234-123456789abc';
+    const organizationScope: CloudAgentAuthority = { ...scope, organizationId };
+    const requestedEnvironment = {
+      id: '32345678-1234-4234-8234-123456789abc',
+      repositories: [{ repoFullName: 'acme/other', branch: 'feature/child' }],
+    };
+    const input = {
+      ...webForwardedLaunch,
+      kilocodeOrganizationId: organizationId,
+      requestedEnvironment,
+    };
+
+    expect(validateScopedWorkerPreparation(organizationScope, input)).toEqual({
+      ...launch,
+      organizationId,
+      requestedEnvironment,
+    });
+
+    for (const invalid of [
+      { ...requestedEnvironment, extra: true },
+      { ...requestedEnvironment, id: 'not-a-uuid' },
+      {
+        ...requestedEnvironment,
+        repositories: [{ repoFullName: 'acme/other', branch: 'b'.repeat(256) }],
+      },
+      {
+        ...requestedEnvironment,
+        repositories: [{ repoFullName: 'acme/other', extra: true }],
+      },
+    ]) {
+      expect(() =>
+        validateScopedWorkerPreparation(organizationScope, {
+          ...input,
+          requestedEnvironment: invalid,
+        })
+      ).toThrow();
+    }
+    for (const requireEnvironmentChoice of [true, false]) {
+      expect(() =>
+        validateScopedWorkerPreparation(organizationScope, {
+          ...input,
+          requireEnvironmentChoice,
+        })
+      ).toThrow();
+    }
+  });
+
   it('rejects a malformed trusted GitHub integration identity', () => {
     expect(() =>
       validateScopedWorkerPreparation(scope, {

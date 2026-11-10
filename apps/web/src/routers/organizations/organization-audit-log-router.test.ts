@@ -11,6 +11,12 @@ const STAFF_ACTOR = {
   actor_name: 'Staff Engineer',
 };
 
+const SECOND_DOMAIN_STAFF_ACTOR = {
+  actor_id: 'second-domain-staff-actor',
+  actor_email: 'engineer@anaconda.com',
+  actor_name: 'Second Domain Engineer',
+};
+
 const CUSTOMER_ACTOR = {
   actor_id: 'customer-actor',
   actor_email: 'owner@example.test',
@@ -37,6 +43,12 @@ async function seedOrganizationWithAuditEntries() {
       action: 'organization.settings.change',
       message: 'staff change',
       ...STAFF_ACTOR,
+    },
+    {
+      organization_id: organization.id,
+      action: 'organization.settings.change',
+      message: 'second domain staff change',
+      ...SECOND_DOMAIN_STAFF_ACTOR,
     },
     {
       organization_id: organization.id,
@@ -76,7 +88,7 @@ function actorsByMessage(logs: ListedLog[]) {
 describe('organizations.auditLog.list actor details follow the account permission', () => {
   afterEach(cleanupDbForTest);
 
-  it('requires the platform admin permission for an organization billing member', async () => {
+  it('shows generic actor fields to a billing member', async () => {
     const organization = await seedOrganizationWithAuditEntries();
     const billingMember = await insertTestUser({
       google_user_email: 'billing-manager@kilocode.ai',
@@ -90,10 +102,11 @@ describe('organizations.auditLog.list actor details follow the account permissio
     const actors = actorsByMessage(logs);
 
     expect(actors['staff change']).toEqual(MASKED_ACTOR);
+    expect(actors['second domain staff change']).toEqual(MASKED_ACTOR);
     expect(actors['customer change']).toEqual(CUSTOMER_ACTOR);
   });
 
-  it('reads actor details when the account has the platform admin permission', async () => {
+  it('shows stored actor fields to a platform admin', async () => {
     const organization = await seedOrganizationWithAuditEntries();
     const admin = await insertTestUser({
       google_user_email: 'administrator@example.test',
@@ -108,6 +121,7 @@ describe('organizations.auditLog.list actor details follow the account permissio
     const actors = actorsByMessage(logs);
 
     expect(actors['staff change']).toEqual(STAFF_ACTOR);
+    expect(actors['second domain staff change']).toEqual(SECOND_DOMAIN_STAFF_ACTOR);
     expect(actors['customer change']).toEqual(CUSTOMER_ACTOR);
   });
 

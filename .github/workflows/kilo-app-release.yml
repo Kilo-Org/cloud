@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read # read the release tags
-      actions: read # look up the kilo-app CI run this same push started
+      actions: read # look up the kilo-app CI run of this commit
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
       allowed: ${{ steps.cap.outputs.allowed }}
@@ -162,10 +162,15 @@ jobs:
       # A push to main starts the kilo-app CI run and this release run from the
       # same commit, and every path that triggers this workflow is inside that
       # workflow's change detection, so its run always executes the suite for
-      # this commit. Publishing that run's id lets the `reuse` job wait for its
-      # conclusion instead of the suite running a second time. Every other case
-      # keeps the in-workflow suite: the hourly schedule and a manual dispatch
-      # have no push run for this commit, a lookup that fails proves nothing,
+      # this commit. Publishing that run's id lets the `reuse` job consume its
+      # conclusion instead of the suite running a second time. The hourly
+      # schedule and a manual run of main stand on the tip of main, which the
+      # push that put it there already validated, so they reuse that same run
+      # as well — but only once it has concluded successfully and proven that
+      # it executed the suite, because kilo-app CI skips every suite job for a
+      # commit that touched no app path while the run still reports success.
+      # Every other case keeps the in-workflow suite: a manual run of another
+      # ref has no push run for its commit, a lookup that fails proves nothing,
       # and a run that already concluded unsuccessfully is not a validation for
       # this commit. The default `reuse=false` is therefore the fail-closed
       # value, and only a lookup that succeeded can turn it true.
@@ -178,17 +183,32 @@ jobs:
           set -euo pipefail
           echo "reuse=false" >> "$GITHUB_OUTPUT"
 
-          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
-            echo "Not a push run — the suite runs in this workflow."
-            exit 0
-          fi
+          # A push starts both runs, so its suite run may still be in flight:
+          # publish its id and let the `reuse` job wait for the conclusion. A
+          # schedule or a manual run of main reuses only a run that has already
+          # finished, because a suite it did not start is not something it
+          # waits on.
+          case "$GITHUB_EVENT_NAME" in
+            push) REUSE_RUNNING=true ;;
+            schedule) REUSE_RUNNING=false ;;
+            workflow_dispatch)
+              if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+                echo "Manual run of $GITHUB_REF — the suite runs in this workflow."
+                exit 0
+              fi
+              REUSE_RUNNING=false
+              ;;
+            *)
+              echo "Neither a push, a schedule nor a manual run of main — the suite runs in this workflow."
+              exit 0
+              ;;
+          esac
 
-          # Both runs are created by the same push event, but the runs list can
-          # lag behind the run it should describe, and a lookup that matches
-          # nothing still prints an empty row (`[null,null,""] | @tsv`). The id
-          # is therefore the field that proves the run exists: wait for it
-          # briefly, then fall back to the suite. The release never rests on an
-          # unproven lookup.
+          # The runs list can lag behind the run it should describe, and a
+          # lookup that matches nothing still prints an empty row
+          # (`[null,null,""] | @tsv`). The id is therefore the field that
+          # proves the run exists: wait for it briefly, then fall back to the
+          # suite. The release never rests on an unproven lookup.
           ID=""
           ROW=""
           for attempt in $(seq 1 12); do
@@ -219,12 +239,38 @@ jobs:
             exit 0
           fi
 
+          # Only a push started the run it is about to wait for. A schedule or
+          # a manual run of main reuses a run that already concluded, so one
+          # still in flight here leaves the suite to this workflow.
+          if [ "$STATUS" != "completed" ] && [ "$REUSE_RUNNING" = "false" ]; then
+            echo "The suite run for this commit is still $STATUS — the suite runs in this workflow instead."
+            exit 0
+          fi
+
+          # A run's success does not prove that the suite ran for this commit:
+          # kilo-app CI skips every suite job when the pushed range touched no
+          # app path, and a skipped job still reports success. The tip of main
+          # can be such a commit while the app change being released is older,
+          # so the shard job is the proof that this run executed the suite.
+          if [ "$REUSE_RUNNING" = "false" ]; then
+            if ! SHARD=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ID/jobs?per_page=100&filter=latest" \
+                --jq '[.jobs[] | select(.name == "mobile-test (1/4)") | .conclusion // ""] | .[0] // ""'); then
+              echo "::warning::could not read the jobs of kilo-app CI run $ID — the suite runs in this workflow"
+              exit 0
+            fi
+            if [ "$SHARD" != "success" ]; then
+              echo "kilo-app CI run $ID did not execute the mobile suite for this commit (mobile-test 1/4: ${SHARD:-absent}) — the suite runs in this workflow instead."
+              exit 0
+            fi
+          fi
+
           echo "reuse=true" >> "$GITHUB_OUTPUT"
           echo "suite_run=$ID" >> "$GITHUB_OUTPUT"
 
   # The push-triggered release consumes the kilo-app CI conclusion instead of
-  # running the suite a second time; `validate` below keeps the in-workflow
-  # suite for the schedule and manual paths. This job only runs when
+  # running the suite a second time, and so does a schedule or a manual run of
+  # main, which stands on a commit an earlier push validated. `validate` below
+  # keeps the in-workflow suite for every other path. This job only runs when
   # check-changes found a suite run for this exact commit, and it publishes
   # whether that run settled the validation: `passed`, or `fallback` for any
   # other end. Only a passed run is reused, so no store submission precedes a

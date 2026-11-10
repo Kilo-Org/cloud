@@ -7,6 +7,7 @@ import {
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 import { enqueueVercelUsage } from '@kilocode/usage-queue/vercel/publisher';
 import { USAGE_VERCEL_QUEUE_ENABLED } from '@kilocode/usage-queue/vercel/config';
+import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 
 export const USAGE_ENQUEUE_TIMEOUT_MS = 2_000;
 export const USAGE_ENQUEUE_MAX_ATTEMPTS = 4;
@@ -34,11 +35,6 @@ const RETRY_MAX_DELAY_MS = 2_000;
  */
 export type UsageEnqueueOutcome = { kind: 'accepted' } | { kind: 'unavailable'; reason: string };
 
-export function getUsagePublisherExecutionRegion() {
-  const region = process.env.VERCEL_REGION;
-  return region === 'fra1' || region === 'sfo1' ? region : 'unknown';
-}
-
 function reportUnavailable(
   usageId: string,
   reason: string,
@@ -47,7 +43,7 @@ function reportUnavailable(
   const outcome = { kind: 'unavailable', reason } as const;
   console.warn('usage enqueue unavailable', {
     usageId,
-    execution_region: getUsagePublisherExecutionRegion(),
+    execution_region: getVercelExecutionRegion(),
     ...outcome,
     ...(duplicatePossible && { duplicate_possible: true }),
   });
@@ -149,7 +145,7 @@ export async function enqueueUsage(
     );
     console.warn('usage enqueue retrying', {
       usageId: payload.core.id,
-      execution_region: getUsagePublisherExecutionRegion(),
+      execution_region: getVercelExecutionRegion(),
       reason,
       attempt,
       ...(duplicatePossible && { duplicate_possible: true }),

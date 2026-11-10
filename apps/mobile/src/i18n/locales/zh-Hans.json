@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "此模型支持思考强度"
     },
-    "creditsRequired": "额度不足，无法发送此消息。请充值额度后重试。"
+    "creditsRequired": "额度不足，无法发送此消息。"
   },
   "settingsTools": {
     "confirmTitle": "确认此更改？"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "未为定时简报启用任何上下文",
     "sourceBlocker": "会话需要关注",
     "sourceMetadata": "已采集的会话元数据"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "无法打开此搜索结果"
   }
 }

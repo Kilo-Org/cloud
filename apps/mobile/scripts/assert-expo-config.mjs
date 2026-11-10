@@ -149,13 +149,15 @@ check(
 check(config.android?.package === ANDROID_PACKAGE, `android.package must be "${ANDROID_PACKAGE}"`);
 check(config.scheme === SCHEME, `scheme must be "${SCHEME}"`);
 
-// Rotation contract: all device orientations enabled (portrait + both
-// landscapes on iOS, all orientations on Android), while iPad multitasking
-// stays off — requireFullScreen keeps Split View/Slide Over out of scope.
+// Rotation and resizing contract: all device orientations enabled (portrait +
+// both landscapes on iOS, all orientations on Android) and continuous window
+// resizing. `UIRequiresFullScreen` is deprecated in iOS 27 and asks only for
+// discrete resizing, so the app must not require it; Expo then also emits the
+// four iPad orientations that App Store validation needs of a resizable app.
 check(config.orientation === 'default', `orientation must be "default"`);
 check(
-  config.ios?.requireFullScreen === true,
-  'ios.requireFullScreen must be true (iPad Split View/Slide Over stays out of scope)'
+  config.ios?.requireFullScreen !== true,
+  'ios.requireFullScreen must not be true (it requests discrete resizing; the iOS 27 SDK resizes windows regardless)'
 );
 
 // Platforms contract: the app is iOS and Android only (apps/mobile/AGENTS.md).

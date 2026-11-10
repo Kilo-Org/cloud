@@ -8,11 +8,14 @@ import {
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
+  CONTROL_PLANE_COMMAND_FAILURES_MAX,
   CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH,
   type AttachmentSpec,
+  type ControlPlaneCommandFailure,
   type ControlPlanePreparationStep,
   type ControlPlaneRouteSpec,
   type ControlPlaneSessionCredentialsPayload,
+  type ControlPlaneSetupCommandKind,
   type ControlPlaneWorkspaceOutcome,
   type ControlPlaneWrapperFrame,
   type WorkspaceConfig,
@@ -648,12 +651,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
    * root has a stamp from this allocation needs nothing, a root with one from
    * another allocation is a restored environment snapshot to adopt, and anything
    * else is cloned. An adopt failure fails the preparation; it never clears the
-   * root to clone over the snapshot. Setup and start commands run once, at the
-   * route directory, after every root is in place. A workspace restored entirely
-   * from the environment snapshot skips only the environment's setup; the
-   * session's setup and start commands still run. A workspace tail snapshot
-   * restore runs only start commands. Repository stamps stay per root.
-   * Registered workspace identity is stamped after runtime preparation succeeds.
+   * root to clone over the snapshot. Environment build commands run only in an
+   * environment build, so every start skips them. Session setup and start
+   * commands run once, at the route directory, after every root is in place;
+   * their failures are reported non-fatally. A workspace tail snapshot restore
+   * runs no commands at all. Repository stamps stay per root. Registered
+   * workspace identity is stamped after runtime preparation succeeds.
    */
   async function prepareWorkspace(
     spec: ControlPlaneRouteSpec,
@@ -667,6 +670,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   ): Promise<{
     outcome: ControlPlaneWorkspaceOutcome;
     deferredStamps: Array<{ directory: string; commit: string; workspacePrepared?: false }> | null;
+    /** Non-fatal session setup/start failures, reported on `session.ready`. */
+    commandFailures: ControlPlaneCommandFailure[];
   }> {
     const workspaceStartedAt = Date.now();
     let sessionInspection: WorkspaceInspection | undefined;
@@ -734,8 +739,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         `control-plane workspace inspect session=${spec.sessionId} inspection=${sessionInspection} elapsedMs=${Date.now() - workspaceStartedAt}`
       );
       if (sessionInspection === 'same' || sessionStamp?.allocationId === deps.allocationId)
-        return { outcome: 'same', deferredStamps: null };
-      emitProgress(spec.sessionId, 'restore', 'Restoring workspace tail snapshot');
+        return { outcome: 'same', deferredStamps: null, commandFailures: [] };
+      emitProgress(spec.sessionId, 'restore', 'Using workspace snapshot');
       await withinStep('restore', timers.restoreMs, async signal => {
         for (const root of roots) {
           if (!root.spec.git) continue;
@@ -748,16 +753,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           );
         }
       });
-      // The restored workspace keeps every file setup produced, but no process
-      // survives it, so the start commands run again.
-      if ((spec.startCommands?.length ?? 0) > 0) setStep('setup');
-      await runPreparationCommands(
-        spec,
-        spec.startCommands ?? [],
-        env,
-        redact,
-        new AbortController().signal
-      );
+      // A workspace snapshot restores files and no processes. Nothing setup or
+      // start produced is running, and the agent can start what it needs, so no
+      // command runs on this path.
       return {
         outcome: 'adopted',
         deferredStamps: [
@@ -767,6 +765,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             ...(sessionStamp?.workspacePrepared === false ? { workspacePrepared: false } : {}),
           },
         ],
+        commandFailures: [],
       };
     }
     const inspectStartedAt = Date.now();
@@ -794,29 +793,40 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(
       `control-plane workspace inspect session=${spec.sessionId} inspection=${reconciled.inspections.join(',')} elapsedMs=${Date.now() - inspectStartedAt}`
     );
-    if (reconciled.kind === 'same') return { outcome: 'same', deferredStamps: null };
+    if (reconciled.kind === 'same')
+      return { outcome: 'same', deferredStamps: null, commandFailures: [] };
     const { adopted, cloning } = reconciled;
     setStep('setup');
     const fromEnvironmentSnapshot = reconciled.inspections.every(
       inspection => inspection === 'foreign'
     );
-    const skippedSetupCommands = fromEnvironmentSnapshot
-      ? (spec.environmentSetupCommandCount ?? 0)
-      : 0;
+    // The leading commands belong to the environment's build and run only there.
+    // This applies to a fresh start too, not only an adopted snapshot.
+    const skippedSetupCommands = spec.environmentSetupCommandCount ?? 0;
     const setupCommands = (spec.setupCommands ?? []).slice(skippedSetupCommands);
+    const startCommands = spec.startCommands ?? [];
     log(
-      `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} setupCommands=${setupCommands.length} startCommands=${spec.startCommands?.length ?? 0}`
+      `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} environmentBuildCommands=${skippedSetupCommands} sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
     );
     if (skippedSetupCommands > 0) {
-      emitProgress(spec.sessionId, 'setup', 'Setup already ran in the environment snapshot');
+      emitProgress(
+        spec.sessionId,
+        'setup',
+        fromEnvironmentSnapshot
+          ? 'Setup already ran in the environment snapshot'
+          : 'Environment build commands run in the environment build'
+      );
     }
+    const commandFailures: ControlPlaneCommandFailure[] = [];
     await runPreparationCommands(
       spec,
-      [...setupCommands, ...(spec.startCommands ?? [])],
+      setupCommands,
+      'session_setup',
       env,
       redact,
-      new AbortController().signal
+      commandFailures
     );
+    await runPreparationCommands(spec, startCommands, 'start', env, redact, commandFailures);
     // The callback reports whether the recovery steps actually applied. A clone
     // with no `.git` yet, or a surviving workspace, never runs it.
     const recoveryApplied =
@@ -832,7 +842,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       log(
         `control-plane workspace stamp deferred session=${spec.sessionId} elapsedMs=${Date.now() - workspaceStartedAt}`
       );
-      return { outcome: adopted ? 'adopted' : 'cloned', deferredStamps: stamps };
+      return {
+        outcome: adopted ? 'adopted' : 'cloned',
+        deferredStamps: stamps,
+        commandFailures: commandFailures.slice(0, CONTROL_PLANE_COMMAND_FAILURES_MAX),
+      };
     }
     for (const stamp of stamps) {
       await writeStamp(stamp.directory, { allocationId: deps.allocationId, commit: stamp.commit });
@@ -840,30 +854,43 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(
       `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
     );
-    return { outcome: adopted ? 'adopted' : 'cloned', deferredStamps: null };
+    return {
+      outcome: adopted ? 'adopted' : 'cloned',
+      deferredStamps: null,
+      commandFailures: commandFailures.slice(0, CONTROL_PLANE_COMMAND_FAILURES_MAX),
+    };
   }
 
-  /** Setup and start commands run as one list, at the route directory. */
+  /**
+   * Run one command list at the route directory. Session setup and start
+   * commands are non-fatal: failures are collected for `session.ready` and the
+   * next command still runs.
+   */
   async function runPreparationCommands(
     spec: ControlPlaneRouteSpec,
     commands: readonly string[],
+    kind: ControlPlaneSetupCommandKind,
     env: Record<string, string>,
     redact: (text: string) => string,
-    signal: AbortSignal
+    failures: ControlPlaneCommandFailure[]
   ): Promise<void> {
     if (commands.length === 0) return;
-    emitProgress(spec.sessionId, 'setup');
+    // The setup events create the kind-specific preparation phase; a generic
+    // `setup` progress line would leave an empty phase before them.
     // The Session renders the setup events as per-command preparation steps.
-    await repository.runSetupCommands({
+    const reported = await repository.runSetupCommands({
       commands: [...commands],
+      kind,
       directory: spec.directory,
       env,
       redact,
-      signal,
+      signal: new AbortController().signal,
+      continueOnFailure: true,
       onEvent: event =>
         deps.emit({ type: 'session.events', sessionId: spec.sessionId, events: [event] }),
-      logContext: `sessionId=${spec.sessionId} kiloSessionId=${spec.kiloSessionId} attemptId=${spec.attemptId}`,
+      logContext: `sessionId=${spec.sessionId} kiloSessionId=${spec.kiloSessionId} attemptId=${spec.attemptId} kind=${kind}`,
     });
+    failures.push(...reported);
   }
 
   async function resolveKiloSession(
@@ -1116,6 +1143,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // directory and inspect the stamp inside the lock, so a waiting session
       // sees the finished workspace and skips the work.
       let workspace: ControlPlaneWorkspaceOutcome | undefined;
+      let workspaceCommandFailures: ControlPlaneCommandFailure[] = [];
       let replacementWorkspace = false;
       let localRecoveryApplied = false;
       let deferredRuntimeStarted = false;
@@ -1249,6 +1277,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           }
         );
         workspace = preparedWorkspace.outcome;
+        workspaceCommandFailures = preparedWorkspace.commandFailures;
         if (spec.git) {
           for (const root of roots) {
             const origin = await normalizeOriginCredential({
@@ -1350,7 +1379,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (owner.released) return;
       deps.onPreparedRoute?.(spec);
       emitSessionReadyNative(sessionId);
-      deps.emit({ type: 'session.ready', sessionId, ...(workspace ? { workspace } : {}) });
+      deps.emit({
+        type: 'session.ready',
+        sessionId,
+        ...(workspace ? { workspace } : {}),
+        ...(workspaceCommandFailures.length > 0
+          ? { commandFailures: workspaceCommandFailures }
+          : {}),
+      });
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
     } catch (error) {
       if (owner.released) return;

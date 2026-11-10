@@ -4,6 +4,7 @@ export {
   classifyOrganizationEntitlement,
   getDaysRemainingInTrial,
   getOrgTrialStatusFromDays,
+  PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES,
 } from '@kilocode/organization-entitlement';
 export type {
   OrganizationEntitlementBypassReason,

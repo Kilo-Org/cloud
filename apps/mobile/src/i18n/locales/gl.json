@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esforzo de razoamento"
     },
-    "creditsRequired": "Non hai créditos suficientes para enviar esta mensaxe. Engade créditos e téntao de novo."
+    "creditsRequired": "Non hai créditos suficientes para enviar esta mensaxe."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar este cambio?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Non hai contextos activados para os informes programados",
     "sourceBlocker": "A sesión precisa atención",
     "sourceMetadata": "Metadatos da sesión capturados"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Non se puido abrir este resultado da busca"
   }
 }

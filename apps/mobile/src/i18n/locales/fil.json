@@ -3808,7 +3808,7 @@
     "reasoningEffort": {
       "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
     },
-    "creditsRequired": "Kulang ang kredito para ipadala ang mensaheng ito. Magdagdag ng kredito at subukang muli."
+    "creditsRequired": "Kulang ang kredito para ipadala ang mensaheng ito."
   },
   "settingsTools": {
     "confirmTitle": "Kumpirmahin ang pagbabagong ito?"
@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "Walang naka-enable na konteksto para sa mga naka-iskedyul na briefing",
     "sourceBlocker": "Kailangang asikasuhin ang session",
     "sourceMetadata": "Naitalang metadata ng session"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Hindi mabuksan ang resulta ng paghahanap na ito"
   }
 }

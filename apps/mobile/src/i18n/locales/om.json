@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Moodeelli kun sadarkaa xiinxalaa ni deeggara"
     },
-    "creditsRequired": "Kiriiditiin ergaa kanaa erguuf gahaa miti. Kiriiditii dabaliitii irra deebi'ii yaali."
+    "creditsRequired": "Kiriiditiin ergaa kanaa erguuf gahaa miti."
   },
   "settingsTools": {
     "confirmTitle": "Jijjiirama kana mirkaneessuu?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Gabaasota saganteeffamaniif haalawwan dandeessifaman hin jiran",
     "sourceBlocker": "Taa'umsi xiyyeeffannoo barbaada",
     "sourceMetadata": "Meetadaataa taa'umsaa galmaa'e"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Bu'aa barbaachuu kana banuun hin danda'amne"
   }
 }

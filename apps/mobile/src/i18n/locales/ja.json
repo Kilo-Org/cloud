@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"
     },
-    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。クレジットを追加して再試行してください。"
+    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。"
   },
   "settingsTools": {
     "confirmTitle": "この変更を確認しますか？"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "スケジュールされたブリーフが有効なコンテキストはありません",
     "sourceBlocker": "セッションに対応が必要",
     "sourceMetadata": "取得したセッションのメタデータ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "この検索結果を開けませんでした"
   }
 }

@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Ihe nlereanya a na-akwado mgbalị iche echiche"
     },
-    "creditsRequired": "Ego ojiji ezughị oke izipu ozi a. Tinye ego ojiji ma nwaa ọzọ."
+    "creditsRequired": "Ego ojiji ezughị oke izipu ozi a."
   },
   "settingsTools": {
     "confirmTitle": "Kwenye mgbanwe a?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Enweghị ọnọdụ akwadoro maka akụkọ a haziri oge ha",
     "sourceBlocker": "Nnọkọ chọrọ nlebara anya",
     "sourceMetadata": "Ozi nkọwa nnọkọ e dekọrọ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"
   }
 }

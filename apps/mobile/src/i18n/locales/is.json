@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"
     },
-    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð. Bættu við inneign og reyndu aftur."
+    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð."
   },
   "settingsTools": {
     "confirmTitle": "Staðfesta þessa breytingu?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Engin samhengi eru virkjuð fyrir áætluð yfirlit",
     "sourceBlocker": "Lota þarfnast athygli",
     "sourceMetadata": "Vistuð lýsigögn lotu"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ekki tókst að opna þessa leitarniðurstöðu"
   }
 }

@@ -146,6 +146,58 @@ describe('leaderboard Snowflake database and schema', () => {
   });
 });
 
+describe('leaderboard model alias attribution', () => {
+  test.each([
+    {
+      route: 'leaderboard-model-usage',
+      loadRoute: () => import('../leaderboard-model-usage/route'),
+    },
+    {
+      route: 'leaderboard-model-provider-usage',
+      loadRoute: () => import('../leaderboard-model-provider-usage/route'),
+    },
+  ])('$route groups tilde aliases by the model that served each request', async ({ loadRoute }) => {
+    await jest.isolateModulesAsync(async () => {
+      const snowflake = await import('@/lib/snowflake');
+      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+      const executeStatement = jest.mocked(snowflake.executeSnowflakeStatement);
+      executeStatement.mockReset().mockResolvedValue([]);
+      const { GET } = await loadRoute();
+
+      expect((await GET()).status).toBe(200);
+      const statement = executeStatement.mock.calls[0][0].statement;
+      const modelExpression = statement.match(
+        /(case[\s\S]*?end|coalesce\(mu\.requested_model, mu\.model\)|mu\.requested_model) as "model"/
+      )?.[1];
+      if (!modelExpression) {
+        throw new Error('Missing leaderboard model projection');
+      }
+
+      const usage = await db.execute<{ model: string; tokens: number }>(sql`
+        select ${sql.raw(modelExpression)} as model, sum(mu.tokens)::integer as tokens
+        from (values
+          ('~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-0813', 6000000),
+          ('deepseek/deepseek-v4-pro-0813', 'deepseek/deepseek-v4-pro-0813', 6000000),
+          ('~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-1101', 12000000),
+          ('deepseek/deepseek-v4-pro-0813:free', 'deepseek/deepseek-v4-pro-0813', 3000000),
+          ('~deepseek/unresolved-latest', null, 2000000),
+          ('acme/model~latest', 'upstream/model', 1000000)
+        ) as mu(requested_model, model, tokens)
+        group by 1
+        order by 2 desc, 1
+      `);
+
+      expect(usage.rows).toEqual([
+        { model: 'deepseek/deepseek-v4-pro-0813', tokens: 12000000 },
+        { model: 'deepseek/deepseek-v4-pro-1101', tokens: 12000000 },
+        { model: 'deepseek/deepseek-v4-pro-0813:free', tokens: 3000000 },
+        { model: '~deepseek/unresolved-latest', tokens: 2000000 },
+        { model: 'acme/model~latest', tokens: 1000000 },
+      ]);
+    });
+  });
+});
+
 describe('public custom model leaderboard usage', () => {
   test.each([
     {
@@ -233,6 +285,90 @@ describe('public custom model leaderboard usage', () => {
 });
 
 describe('GET /api/public/leaderboard-model-provider-usage', () => {
+  test('aggregates Particle AI aliases before filtering by minimum tokens and calculating ratios', async () => {
+    await jest.isolateModulesAsync(async () => {
+      const snowflake = await import('@/lib/snowflake');
+      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+      jest.mocked(snowflake.executeSnowflakeStatement).mockResolvedValue([
+        [
+          'synthetic/alias-test-model',
+          'Particle AI',
+          '6000000',
+          '6000000',
+          '4000000',
+          '1000000',
+          '30',
+          '0',
+        ],
+        [
+          'synthetic/alias-test-model',
+          'particle',
+          '18000000',
+          '6000000',
+          '8000000',
+          '2000000',
+          '70',
+          '0',
+        ],
+      ]);
+      const { GET } = await import('../leaderboard-model-provider-usage/route');
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual([
+        {
+          model: 'alias-test-model',
+          provider: 'Particle AI',
+          sumTokens: 12_000_000,
+          costPerRequest: 0.24,
+          costPerMillionTokens: 2,
+          cacheRatio: 0.25,
+          errorRate: 0,
+          percentageOfModel: 100,
+        },
+      ]);
+    });
+  });
+
+  test('keeps Claude Platform on AWS separate from Amazon Bedrock for the same model', async () => {
+    await jest.isolateModulesAsync(async () => {
+      const snowflake = await import('@/lib/snowflake');
+      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+      jest.mocked(snowflake.executeSnowflakeStatement).mockResolvedValue([
+        ['synthetic/model', 'claudeaws', '0', '10000000', '8000000', '0', '100', '0'],
+        ['synthetic/model', 'bedrock', '0', '10000000', '8000000', '0', '100', '0'],
+      ]);
+      const { GET } = await import('../leaderboard-model-provider-usage/route');
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual([
+        {
+          model: 'model',
+          provider: 'Amazon Bedrock',
+          sumTokens: 10_000_000,
+          costPerRequest: 0,
+          costPerMillionTokens: 0,
+          cacheRatio: 0,
+          errorRate: 0,
+          percentageOfModel: 50,
+        },
+        {
+          model: 'model',
+          provider: 'Claude Platform on AWS',
+          sumTokens: 10_000_000,
+          costPerRequest: 0,
+          costPerMillionTokens: 0,
+          cacheRatio: 0,
+          errorRate: 0,
+          percentageOfModel: 50,
+        },
+      ]);
+    });
+  });
+
   test('beautifies the Meituan inference provider', async () => {
     await jest.isolateModulesAsync(async () => {
       const snowflake = await import('@/lib/snowflake');

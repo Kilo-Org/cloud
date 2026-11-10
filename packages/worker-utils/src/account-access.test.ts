@@ -242,12 +242,14 @@ describe('BlacklistDomainsConfigSchema domain bound', () => {
   const domains = (count: number) =>
     Array.from({ length: count }, (_, index) => `bulk-${index}.example`);
 
-  it('parses a stored list at the cap', () => {
-    const parsed = BlacklistDomainsConfigSchema.safeParse(
+  it('enforces the 200,000th stored entry at the cap', () => {
+    expect(MAX_BLACKLIST_DOMAINS).toBe(200_000);
+    const parsed = BlacklistDomainsConfigSchema.parse(
       blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS) })
     );
 
-    expect(parsed.success).toBe(true);
+    expect(parsed.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
+    expect(isEmailBlacklistedByDomain('user@MAIL.BULK-199999.EXAMPLE', parsed.domains)).toBe(true);
   });
 
   it('rejects a stored list one entry over the cap', () => {
@@ -264,13 +266,32 @@ describe('parseBlacklistDomainsConfig', () => {
     Array.from({ length: count }, (_, index) => `bulk-${index}.example`);
 
   it('keeps the first capped entries of a stored list over the cap', () => {
+    const metadata = {
+      blocked_signup_tlds: ['asia'],
+      updated_at: 't1',
+      updated_by: 'test-operator',
+      updated_by_email: 'operator@example.test',
+    };
     const parsed = parseBlacklistDomainsConfig(
-      blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS + 50) })
+      blocklistConfig({ ...metadata, domains: domains(MAX_BLACKLIST_DOMAINS + 50) })
     );
 
     expect(parsed.config.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
     expect(parsed.config.domains[0]).toBe('bulk-0.example');
     expect(parsed.config.domains.at(-1)).toBe(`bulk-${MAX_BLACKLIST_DOMAINS - 1}.example`);
+    expect(parsed.config).toMatchObject(metadata);
+    expect(
+      isEmailBlacklistedByDomain(
+        `user@bulk-${MAX_BLACKLIST_DOMAINS - 1}.example`,
+        parsed.config.domains
+      )
+    ).toBe(true);
+    expect(
+      isEmailBlacklistedByDomain(
+        `user@bulk-${MAX_BLACKLIST_DOMAINS}.example`,
+        parsed.config.domains
+      )
+    ).toBe(false);
     expect(parsed.droppedDomains).toBe(50);
   });
 

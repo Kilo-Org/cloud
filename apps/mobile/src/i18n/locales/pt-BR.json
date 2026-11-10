@@ -3864,7 +3864,7 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo aceita esforço de raciocínio"
     },
-    "creditsRequired": "Créditos insuficientes para enviar esta mensagem. Adicione créditos e tente novamente."
+    "creditsRequired": "Créditos insuficientes para enviar esta mensagem."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar esta alteração?"
@@ -4315,5 +4315,8 @@
     "noEnabledContexts": "Nenhum contexto ativado para relatórios agendados",
     "sourceBlocker": "A sessão precisa de atenção",
     "sourceMetadata": "Metadados da sessão capturados"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Não foi possível abrir este resultado da pesquisa"
   }
 }

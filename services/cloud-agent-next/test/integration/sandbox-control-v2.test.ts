@@ -2948,4 +2948,23 @@ describe('SandboxControlV2 previewTarget', () => {
     expect(observed.result).toEqual({ status: 'not_running' });
     expect(observed.enqueueCalls).toBe(0);
   });
+
+  it('answers an unrouted preview service inquiry as not_running and never enqueues', async () => {
+    const stub = sandboxNamespace.getByName(`${SANDBOX_ID}__preview_services`);
+    const observed = await runInDurableObject(stub, async instance => {
+      const target = instance as unknown as {
+        enqueue: (task: () => Promise<unknown>) => Promise<unknown>;
+      };
+      let enqueueCalls = 0;
+      const original = target.enqueue.bind(instance);
+      target.enqueue = task => {
+        enqueueCalls += 1;
+        return original(task);
+      };
+      const result = await instance.previewServices('workspace_preview_unrouted');
+      return { result, enqueueCalls };
+    });
+    expect(observed.result).toEqual({ services: [], status: 'not_running' });
+    expect(observed.enqueueCalls).toBe(0);
+  });
 });

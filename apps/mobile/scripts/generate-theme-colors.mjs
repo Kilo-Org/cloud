@@ -102,13 +102,29 @@ function normalizeColorValue(value) {
   return value.startsWith('#') ? value.toUpperCase() : value;
 }
 
-function formatObject(declarations) {
+/**
+ * Encodes a declaration value as a single-quoted string literal that holds the
+ * value as data. JSON.stringify supplies the escaping for quotes, backslashes
+ * and control characters; its double quotes are unescaped and single quotes
+ * escaped, so the literal keeps the repository's single-quote style.
+ */
+function formatValueSource(value) {
+  const unquote = String.raw`\"`;
+  const quote = String.raw`\'`;
+  const escaped = JSON.stringify(value)
+    .slice(1, -1)
+    .replaceAll(unquote, '"')
+    .replaceAll(`'`, quote);
+  return `'${escaped}'`;
+}
+
+export function formatObject(declarations) {
   const lines = TOKEN_KEYS.map(([jsKey, cssVar]) => {
     const value = declarations[cssVar];
     if (value === undefined) {
       throw new Error(`${CSS_PATH}: missing ${cssVar} declaration`);
     }
-    return `  ${jsKey}: '${value}',`;
+    return `  ${jsKey}: ${formatValueSource(value)},`;
   });
   return `{\n${lines.join('\n')}\n} as const;`;
 }

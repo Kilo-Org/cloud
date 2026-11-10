@@ -24,7 +24,7 @@ export function ChatFailureRow({
     <View className="flex-row items-center gap-3 px-4 py-2">
       <AccessibleStatus message={t(failureKey)} tone="error" className="flex-1 text-sm" />
       {onAddCredits ? (
-        <Button variant="outline" size="sm" onPress={onAddCredits}>
+        <Button variant="outline" size="sm" className={STATE_ACTION_CLASS} onPress={onAddCredits}>
           <Text>{t('addCredits.cta')}</Text>
         </Button>
       ) : null}

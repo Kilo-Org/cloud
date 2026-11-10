@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
     },
-    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden. Lade Guthaben auf und versuche es erneut."
+    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden."
   },
   "settingsTools": {
     "confirmTitle": "Diese Änderung bestätigen?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Keine Kontexte für geplante Briefings aktiviert",
     "sourceBlocker": "Sitzung erfordert Aufmerksamkeit",
     "sourceMetadata": "Erfasste Sitzungsmetadaten"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Dieses Suchergebnis konnte nicht geöffnet werden"
   }
 }

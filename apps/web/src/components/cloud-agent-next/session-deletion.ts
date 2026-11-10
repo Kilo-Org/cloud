@@ -19,7 +19,6 @@ type DbSessions = (DbSession | DbSessionV2)[];
 type RemoveDeletedSessionInput = SessionQueryContext & {
   sessionId: string;
   setDbSessions: (update: (sessions: DbSessions) => DbSessions) => void;
-  deleteSessionFromStore: (sessionId: string) => Promise<void>;
 };
 type RemoveDeletedSessionsInput = Omit<RemoveDeletedSessionInput, 'sessionId'> & {
   sessionIds: readonly string[];
@@ -78,7 +77,6 @@ export async function removeDeletedSession({
   queryClient,
   trpc,
   setDbSessions,
-  deleteSessionFromStore,
 }: RemoveDeletedSessionInput): Promise<void> {
   await Promise.all([
     queryClient.cancelQueries(trpc.cliSessionsV2.list.pathFilter()),
@@ -111,12 +109,6 @@ export async function removeDeletedSession({
         sessions: current.sessions.filter(session => session.id !== sessionId),
       }
   );
-
-  try {
-    await deleteSessionFromStore(sessionId);
-  } catch (error) {
-    console.error('Error deleting session from IndexedDB:', error);
-  }
 }
 
 type TrpcErrorLike = {

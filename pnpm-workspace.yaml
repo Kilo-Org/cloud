@@ -323,6 +323,9 @@ patchedDependencies:
   # headers report. The patch hard-codes 6.1.0, so it is pinned to that release
   # instead of widening to every later one.
   expo-server-sdk@6.1.0: patches/expo-server-sdk@6.1.0.patch
+  # Correlate native recognition callbacks with their originating run; the app
+  # consumes only kiloEvent, and old native teardown owns only old resources.
+  expo-speech-recognition@57.1.1: patches/expo-speech-recognition@57.1.1.patch
   # Android: keep the React host after a headless expo-task-manager run. The
   # loader destroyed the host after each background task, and a destroyed host
   # keeps its native memory, so each background push or refresh added a new

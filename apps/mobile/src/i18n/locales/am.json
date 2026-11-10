@@ -3808,7 +3808,7 @@
     "reasoningEffort": {
       "modelFlag": "ይህ ሞዴል የማሰብ ጥረትን ይደግፋል"
     },
-    "creditsRequired": "ይህን መልዕክት ለመላክ በቂ ክሬዲት የለም። ክሬዲት ያክሉ እና እንደገና ይሞክሩ።"
+    "creditsRequired": "ይህን መልዕክት ለመላክ በቂ ክሬዲት የለም።"
   },
   "settingsTools": {
     "confirmTitle": "ይህን ለውጥ ያረጋግጡ?"
@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "ለመርሃ ግብር ሪፖርቶች የነቁ አውዶች የሉም",
     "sourceBlocker": "ክፍለ ጊዜው ትኩረት ይፈልጋል",
     "sourceMetadata": "የተቀመጠ የክፍለ ጊዜ ሜታዳታ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ይህን የፍለጋ ውጤት መክፈት አልተቻለም"
   }
 }

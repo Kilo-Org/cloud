@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 // Select the workspaces whose typecheck and lint results a change can alter.
 //
-// Usage: node scripts/affected-workspaces.mjs <base-sha>
+// Usage: node scripts/affected-workspaces.mjs <base-sha> [--worktree]
 //        node scripts/affected-workspaces.mjs --groups
 // Prints JSON: { base, full, reasons, full_checks, dirs, packages,
 // test_only_dirs, test_only_packages, test_only_files }, where `base` is the
 // revision the selection was computed for. `dirs` is also the selection the test
-// matrix consumes (scripts/changed-workspaces.sh), so it already carries the
-// workspace-despite-document rule: paths no check reads select nothing. `base`
-// lets that consumer reuse this document instead of selecting a second time in
-// one CI run.
+// matrix consumes (scripts/changed-workspaces.sh), and `full`, `full_checks` and
+// `packages` are the selection scripts/typecheck-all.sh checks, so a consumer
+// reads this document instead of selecting a second time: changed-workspaces.sh
+// reuses it within one CI run, and typecheck-all.sh's incremental run and its CI
+// groups both decide from it. With `--worktree` the comparison covers the
+// working tree instead of the committed head, so a local run selects edits that
+// are not committed yet.
 // With --groups it instead prints the CI matrix groups for the selection JSON on
 // standard input.
 //
@@ -29,19 +32,28 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { posix } from 'node:path';
 
-// Root paths that change how every workspace is checked.
+// Root paths that change how every workspace is checked. A dependency patch is
+// not one of them: its content enters the resolved closure of the workspaces
+// that carry the patched selector, so it is a dependency input
+// (DEPENDENCY_INPUTS below).
 const GLOBAL = [
-  /^(package\.json|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|\.oxlintrc\.json|\.oxfmtrc\.json|oxlint-plugin-drizzle\.js|tsconfig[^/]*\.json)$/,
-  /^(patches|tools\/oxlint)\//,
+  /^(package\.json|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|tsconfig[^/]*\.json)$/,
   /^\.github\/workflows\/(ci|kilo-app-ci)\.yml$/,
   /^\.github\/actions\//,
   /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs|build-key-inputs\.mjs|trpc-declaration-key\.mjs|harness-sdk-build-key\.mjs|ttsc-plugin-key\.mjs)$/,
 ];
 
-// Root scripts that change one check for every workspace, and nothing else.
-const CHECK_SCRIPTS = [
+// Root paths that change one check for every workspace, and nothing else: the
+// scripts that run a check, and the inputs only one check reads. A lint config
+// or an oxlint plugin cannot change a type program, so it selects the lint rows
+// alone; every workspace is still linted. A workspace that runs its own lint
+// with these inputs keeps that check: kilo-app CI names tools/oxlint in its own
+// change detection, because the app's oxlint configs load those plugins.
+const CHECK_INPUTS = [
   [/^scripts\/typecheck-all\.sh$/, 'typecheck'],
   [/^scripts\/lint-all\.sh$/, 'lint'],
+  [/^(\.oxlintrc\.json|oxlint-plugin-drizzle\.js)$/, 'lint'],
+  [/^tools\/oxlint\//, 'lint'],
 ];
 
 // Root paths whose effect belongs to one workspace.
@@ -58,11 +70,13 @@ const EXTRA_INPUTS = [
   [/^apps\/web\/\.env(\.test)?$/, 'apps/ai-gateway'],
 ];
 
-// Root paths that no typecheck or lint reads.
+// Root paths that no typecheck or lint reads. The formatter config belongs here:
+// the ci.yml format-check job runs on every run, so a change to it needs no
+// workspace selection.
 const NEUTRAL = [
   /\.md$/,
   /^(\.specs|\.plans|docs|dev|\.kilo|\.agents|\.vscode|\.husky|\.cursor|script|\.github|scripts)\//,
-  /^(LICENSE|skills-lock\.json|kilo\.json|flake\.nix|flake\.lock|\.syft\.yaml|\.gitignore|\.gitattributes|\.envrc|\.kilocodeignore|\.prettierignore|\.env\.local\.example)$/,
+  /^(LICENSE|skills-lock\.json|kilo\.json|flake\.nix|flake\.lock|\.syft\.yaml|\.gitignore|\.gitattributes|\.envrc|\.kilocodeignore|\.prettierignore|\.oxfmtrc\.json|\.env\.local\.example)$/,
 ];
 
 // Paths that no check reads on its own: documents, and the root locations above
@@ -72,12 +86,28 @@ export function isNeutral(file) {
   return NEUTRAL.some(pattern => pattern.test(file));
 }
 
-// Manifests whose effect reaches one workspace at a time through its resolved
-// dependency graph (scripts/changed-dependencies.mjs). They select the
-// workspaces whose graph moved, and everything only when the graph cannot
-// attribute the change: a root or unscoped dependency, a workspace glob or an
-// installation-policy key, or an unreadable manifest.
-const DEPENDENCY_MANIFESTS = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml']);
+// Dependency inputs whose effect reaches one workspace at a time through its
+// resolved dependency graph (scripts/changed-dependencies.mjs): the manifests,
+// and the patch content those closures carry. They select the workspaces whose
+// graph moved, and everything only when the graph cannot attribute the change:
+// a root or unscoped dependency, a workspace glob, an installation-policy key
+// that can change the installed tree, a patch that the root importer or no
+// importer resolves, or an unreadable manifest. A workspace test that reads one
+// of these files as data runs that workspace's tests alone (`test_only_*`).
+export const DEPENDENCY_MANIFESTS = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml']);
+
+// The patch content those closures carry. A patch reaches a workspace only when
+// that workspace resolves the patched selector, so it is not a global input.
+export const PATCH_DIR = 'patches/';
+
+// Every path whose diff makes the detector parse a dependency with
+// scripts/changed-dependencies.mjs, in the paths-filter glob syntax the ci.yml
+// install gate lists.
+export const DEPENDENCY_INPUTS = [...DEPENDENCY_MANIFESTS, `${PATCH_DIR}**`];
+
+const isPatchFile = file => file.startsWith(PATCH_DIR);
+
+export const isDependencyInput = file => DEPENDENCY_MANIFESTS.has(file) || isPatchFile(file);
 
 const SOURCE_GLOBS = ['ts', 'tsx', 'mts', 'cts', 'js', 'mjs', 'cjs', 'json', 'jsonc'];
 
@@ -246,6 +276,19 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
   // [reader, test file]: the test file reads changed data.
   const tested = [];
 
+  // The workspaces that read a root path: a test that reads it as data runs the
+  // reader's tests alone, and any other reader is a normal reader.
+  const readRootPath = file => {
+    const reading = rootReads.filter(
+      ([target]) => file === target || file.startsWith(`${target}/`)
+    );
+    for (const [, reader, testFile] of reading) {
+      if (testFile) tested.push([reader, testFile]);
+      else changed.add(reader);
+    }
+    return reading.length > 0;
+  };
+
   const reasons = [];
   const fullChecks = new Set();
   const changed = new Set();
@@ -265,30 +308,33 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
       reasons.push(`${file} changes how every workspace is checked`);
       continue;
     }
-    const script = CHECK_SCRIPTS.find(([pattern]) => pattern.test(file));
-    if (script) {
-      fullChecks.add(script[1]);
+    const input = CHECK_INPUTS.find(([pattern]) => pattern.test(file));
+    if (input) {
+      fullChecks.add(input[1]);
       continue;
     }
-    if (DEPENDENCY_MANIFESTS.has(file)) {
+    if (isDependencyInput(file)) {
+      // The closure names workspaces alone, so a test that reads the file as
+      // data still needs its own workspace's tests.
+      readRootPath(file);
       if (dependencyDirs.includes('*') || dependencyDirs.includes('.')) {
         reasons.push(`${file} changes root or unscoped dependencies`);
+        continue;
       }
-      for (const dependencyDir of dependencyDirs) {
-        if (readers.has(dependencyDir)) changed.add(dependencyDir);
+      const consumers = dependencyDirs.filter(dependencyDir => readers.has(dependencyDir));
+      // A patch that no workspace resolves cannot be attributed: widen rather
+      // than check no workspace at all.
+      if (consumers.length === 0 && isPatchFile(file)) {
+        reasons.push(`${file} changes a dependency patch that no workspace resolves`);
+        continue;
       }
+      for (const consumer of consumers) changed.add(consumer);
       continue;
     }
-    const rootReaders = rootReads.filter(
-      ([target]) => file === target || file.startsWith(`${target}/`)
-    );
-    for (const [, reader, testFile] of rootReaders) {
-      if (testFile) tested.push([reader, testFile]);
-      else changed.add(reader);
-    }
+    const rootRead = readRootPath(file);
     const owned = OWNED.find(([pattern]) => pattern.test(file));
     if (owned) changed.add(owned[1]);
-    if (owned || rootReaders.length || isNeutral(file)) continue;
+    if (owned || rootRead || isNeutral(file)) continue;
     reasons.push(`${file} is outside every workspace`);
   }
 
@@ -367,7 +413,7 @@ export function selectGroups({ full_checks: fullChecks = [], dirs = [], packages
   return { typecheck_groups, lint_groups };
 }
 
-function detect(base) {
+function detect(base, worktree) {
   const items = workspaces();
   const valid =
     /^[0-9a-f]{40}$/.test(base) &&
@@ -380,9 +426,11 @@ function detect(base) {
       }
     })();
   const changedFiles = valid
-    ? git('diff', '--name-only', base, 'HEAD').split('\n').filter(Boolean)
+    ? git('diff', '--name-only', ...(worktree ? [base] : [base, 'HEAD']))
+        .split('\n')
+        .filter(Boolean)
     : ['<no base revision>'];
-  const dependencyDirs = changedFiles.some(file => DEPENDENCY_MANIFESTS.has(file))
+  const dependencyDirs = changedFiles.some(isDependencyInput)
     ? execFileSync('node', ['scripts/changed-dependencies.mjs', base], { encoding: 'utf8' })
         .split('\n')
         .filter(Boolean)
@@ -403,5 +451,5 @@ function printGroups() {
 
 if (import.meta.main) {
   if (process.argv[2] === '--groups') printGroups();
-  else detect(process.argv[2] ?? '');
+  else detect(process.argv[2] ?? '', process.argv.includes('--worktree'));
 }

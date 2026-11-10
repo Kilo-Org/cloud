@@ -3858,7 +3858,7 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
     },
-    "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu, tāpēc papildiniet kredītus un mēģiniet vēlreiz."
+    "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu."
   },
   "settingsTools": {
     "confirmTitle": "Apstiprināt šo izmaiņu?"
@@ -4309,5 +4309,8 @@
     "noEnabledContexts": "Plānotajām atskaitēm nav iespējots neviens konteksts",
     "sourceBlocker": "Sesijai jāpievērš uzmanība",
     "sourceMetadata": "Fiksētie sesijas metadati"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Neizdevās atvērt šo meklēšanas rezultātu"
   }
 }

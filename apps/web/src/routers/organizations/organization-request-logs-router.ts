@@ -14,6 +14,8 @@ import {
   mode,
 } from '@kilocode/db/schema';
 import type { EnkryptGuardrailDirection } from '@kilocode/db/schema-types';
+import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { readAiProviderMetadata } from '@kilocode/web-shared/lib/r2/ai-provider-metadata-bucket';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
@@ -179,7 +181,10 @@ export const organizationRequestLogsRouter = createTRPCRouter({
       input_tokens: row.input_tokens,
       output_tokens: row.output_tokens,
       cache_hit_tokens: row.cache_hit_tokens,
-      is_user_byok: row.is_user_byok,
+      is_user_byok:
+        row.provider === OPENAI_CHATGPT_PROVIDER_ID ||
+        row.provider === CLAUDE_BILLING_PROVIDER_ID ||
+        row.is_user_byok,
       has_error: row.has_error,
       project_id: row.project_id,
       feature: row.feature,

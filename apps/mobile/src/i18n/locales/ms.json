@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Model ini menyokong tahap pemikiran"
     },
-    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini. Tambah kredit dan cuba lagi."
+    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini."
   },
   "settingsTools": {
     "confirmTitle": "Sahkan perubahan ini?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Tiada konteks didayakan untuk laporan berjadual",
     "sourceBlocker": "Sesi memerlukan perhatian",
     "sourceMetadata": "Metadata sesi yang dirakam"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
   }
 }

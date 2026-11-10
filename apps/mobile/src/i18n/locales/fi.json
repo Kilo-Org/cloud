@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
     },
-    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen – lisää krediittejä ja yritä uudelleen."
+    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen."
   },
   "settingsTools": {
     "confirmTitle": "Vahvistetaanko tämä muutos?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Ajastetut katsaukset eivät ole käytössä missään kontekstissa",
     "sourceBlocker": "Istunto vaatii huomiota",
     "sourceMetadata": "Tallennetut istunnon metatiedot"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"
   }
 }

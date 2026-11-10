@@ -48,6 +48,8 @@ import {
 import type { SendMessagePayload } from './types.js';
 import {
   baseGetMessageResultNextOutputSchema,
+  baseListPreviewServicesNextOutputSchema,
+  type ListPreviewServicesOutput,
   workerPreviewOptionsSchema,
 } from '@/routers/cloud-agent-next-schemas';
 import {
@@ -631,6 +633,12 @@ type CloudAgentNextTRPCClient = {
   deleteSession: {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
+  removeWorkspaceSnapshot: {
+    mutate: (input: { sessionId: string }) => Promise<{ success: true }>;
+  };
+  getWorkspaceSnapshotRecovery: {
+    query: (input: { sessionId: string }) => Promise<{ capturedAt: number | null } | null>;
+  };
   deleteHostedWorkspaceSession: {
     mutate: (input: { workspaceId: string; sessionId: string; operationKey: string }) => Promise<{
       success: true;
@@ -683,6 +691,9 @@ type CloudAgentNextTRPCClient = {
   };
   getPreviewOptions: {
     query: (input: { cloudAgentSessionId: string; organizationId?: string }) => Promise<unknown>;
+  };
+  listPreviewServices: {
+    query: (input: { cloudAgentSessionId: string }) => Promise<unknown>;
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
@@ -831,6 +842,41 @@ export class CloudAgentNextClient {
         extra: { sessionId },
       });
       return { success: false };
+    }
+  }
+
+  /**
+   * Remove the session's workspace snapshot so its next start uses the
+   * environment snapshot or the base image. This discards workspace changes
+   * made since the snapshot was captured.
+   */
+  async removeWorkspaceSnapshot(sessionId: string): Promise<{ success: true }> {
+    try {
+      return await this.client.removeWorkspaceSnapshot.mutate({ sessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'removeWorkspaceSnapshot' },
+        extra: { sessionId },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * The capture time of the session's workspace snapshot, or null when the
+   * workspace has none. A non-null value is what makes "Start fresh" available.
+   */
+  async getWorkspaceSnapshotRecovery(
+    sessionId: string
+  ): Promise<{ capturedAt: number | null } | null> {
+    try {
+      return await this.client.getWorkspaceSnapshotRecovery.query({ sessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'getWorkspaceSnapshotRecovery' },
+        extra: { sessionId },
+      });
+      throw error;
     }
   }
 
@@ -1091,6 +1137,14 @@ export class CloudAgentNextClient {
     cloudAgentSessionId: string;
   }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
     return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
+  }
+
+  async listPreviewServices(input: {
+    cloudAgentSessionId: string;
+  }): Promise<ListPreviewServicesOutput> {
+    return baseListPreviewServicesNextOutputSchema.parse(
+      await this.client.listPreviewServices.query(input)
+    );
   }
 
   /**

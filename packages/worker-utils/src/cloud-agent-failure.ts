@@ -57,6 +57,8 @@ export const WORKSPACE_FAILURE_SUBTYPES = [
   'kilo_import_failed',
   'setup_command_timeout',
   'setup_command_failed',
+  'workspace_snapshot_start_failed',
+  'environment_snapshot_required',
   'workspace_setup_unknown',
 ] as const;
 
@@ -105,6 +107,8 @@ const WORKSPACE_FAILURE_MESSAGES = {
   kilo_import_failed: 'Session import failed',
   setup_command_timeout: 'Setup command timed out',
   setup_command_failed: 'Setup command failed',
+  workspace_snapshot_start_failed: 'Workspace snapshot could not be restored',
+  environment_snapshot_required: 'Environment snapshot is required but unavailable',
   workspace_setup_unknown: 'Workspace setup failed',
 } as const satisfies Record<WorkspaceFailureSubtype, string>;
 
@@ -339,6 +343,12 @@ function classifyWorkspaceFailure(
       return classified('user', 'setup_command_timeout');
     case 'setup_command_failed':
       return classified('user', 'setup_command');
+    case 'environment_snapshot_required':
+      return classified('user', 'setup_command');
+    case 'workspace_snapshot_start_failed':
+      // The workspace snapshot cannot start (most often a sandbox image change)
+      // and waits for the user to choose "Start fresh"; it must not page.
+      return classified('user', 'workspace_unknown');
     case 'sandbox_storage_full':
       return classified('platform', 'sandbox_capacity');
     case 'git_rate_limited':

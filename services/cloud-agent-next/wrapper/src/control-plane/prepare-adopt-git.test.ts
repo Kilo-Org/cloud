@@ -380,7 +380,7 @@ describe('adopting an environment snapshot against a real repository', () => {
       }
     );
 
-    it('runs setup and start commands after a fresh clone', async () => {
+    it('runs start commands after a fresh clone and skips environment build commands', async () => {
       const fresh = manager('alloc-image');
       await fresh.prepared.prepare(
         spec({
@@ -391,7 +391,7 @@ describe('adopting an environment snapshot against a real repository', () => {
       );
 
       expect(ready(fresh.frames)).toMatchObject({ workspace: 'cloned' });
-      expect(setupRun(fresh.runSetup.mock.calls)).toEqual(['install', 'serve']);
+      expect(setupRun(fresh.runSetup.mock.calls)).toEqual(['serve']);
     });
 
     it('runs neither for a workspace this allocation already prepared', async () => {
@@ -472,6 +472,9 @@ describe('restoring a private workspace disk snapshot', () => {
     await restored.prepared.prepare(restoredSpec);
 
     expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(
+      restored.frames.filter(frame => frame.type === 'session.progress' && frame.step === 'restore')
+    ).toContainEqual(expect.objectContaining({ detail: 'Using workspace snapshot' }));
     expect(git(directory, 'status', '--porcelain=v1', '--untracked-files=all')).toBe(status);
     expect(git(directory, 'show-ref', '--heads')).toBe(refs);
     expect(git(directory, 'branch', '--show-current')).toBe('local-work');
@@ -498,7 +501,7 @@ describe('restoring a private workspace disk snapshot', () => {
     ).toBe(false);
   });
 
-  it('runs only the start commands, because no process survives the restored snapshot', async () => {
+  it('runs no commands after restoring a workspace snapshot', async () => {
     await manager('alloc-source').prepared.prepare(workspaceSpec());
     const restored = manager('alloc-restored');
     await restored.prepared.prepare(
@@ -511,7 +514,7 @@ describe('restoring a private workspace disk snapshot', () => {
     );
 
     expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
-    expect((restored.runSetup.mock.calls as unknown[][]).map(call => call[0])).toEqual(['serve']);
+    expect(restored.runSetup).not.toHaveBeenCalled();
   });
 
   it('restores every repository of a workspace without replaying checkout or setup', async () => {

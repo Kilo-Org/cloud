@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Denne modellen støtter resonneringsinnsats"
     },
-    "creditsRequired": "Ikke nok kreditter til å sende denne meldingen – fyll på kreditter og prøv igjen."
+    "creditsRequired": "Ikke nok kreditter til å sende denne meldingen."
   },
   "settingsTools": {
     "confirmTitle": "Bekrefte denne endringen?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Ingen kontekster er aktivert for planlagte briefer",
     "sourceBlocker": "Økten krever oppmerksomhet",
     "sourceMetadata": "Lagrede øktmetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kunne ikke åpne dette søkeresultatet"
   }
 }

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
+import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -167,9 +168,10 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   });
 
   it('answers anonymous callers the same for a custom LLM as for an unknown id', async () => {
+    const unauthorized = new Response('unauthorized', { status: 401 });
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
-      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      authFailedResponse: unauthorized,
       organizationId: undefined,
     } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
     await insertCustomLlmForTest('acme/transcribe-custom-model');
@@ -183,9 +185,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
         )
       );
 
-      expect(customResponse.status).toBe(401);
-      expect(unknownResponse.status).toBe(401);
-      expect(await customResponse.json()).toEqual(await unknownResponse.json());
+      expect(customResponse).toBe(unauthorized);
+      expect(unknownResponse).toBe(unauthorized);
       expect(mockedFetch).not.toHaveBeenCalled();
     } finally {
       await deleteCustomLlmForTest('acme/transcribe-custom-model');
@@ -450,6 +451,36 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(response.status).toBe(401);
     expect(response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
     await expect(response.json()).resolves.toMatchObject({ error: { code: INVALID_TOKEN_CODE } });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('returns the authorization response for a refused account', async () => {
+    const authFailedResponse = NextResponse.json(
+      { success: false as const, error: 'Access denied (R1)' },
+      { status: 403 }
+    );
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse,
+      authorizationRefused: true,
+      organizationId: undefined,
+    });
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response).toBe(authFailedResponse);
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Access denied (R1)',
+    });
     expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
   });

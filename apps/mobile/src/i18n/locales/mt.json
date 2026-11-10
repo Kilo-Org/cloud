@@ -3970,7 +3970,7 @@
     "reasoningEffort": {
       "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
     },
-    "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ. Żid krediti u erġa' pprova."
+    "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ."
   },
   "settingsTools": {
     "confirmTitle": "Tikkonferma din il-bidla?"
@@ -4441,5 +4441,8 @@
     "noEnabledContexts": "L-ebda kuntest mixgħul għall-briefings skedati",
     "sourceBlocker": "Is-sessjoni teħtieġ attenzjoni",
     "sourceMetadata": "Metadata maqbuda tas-sessjoni"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
   }
 }

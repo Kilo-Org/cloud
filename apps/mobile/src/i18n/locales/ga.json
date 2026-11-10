@@ -3970,7 +3970,7 @@
     "reasoningEffort": {
       "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"
     },
-    "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh. Cuir creidmheasanna leis agus bain triail eile as."
+    "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh."
   },
   "settingsTools": {
     "confirmTitle": "An bhfuil tú cinnte faoin athrú seo?"
@@ -4441,5 +4441,8 @@
     "noEnabledContexts": "Níl aon chomhthéacsanna cumasaithe le haghaidh tuarascálacha sceidealaithe",
     "sourceBlocker": "Tá aird de dhíth ar an seisiún",
     "sourceMetadata": "Meiteashonraí seisiúin gafa"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Níorbh fhéidir an toradh cuardaigh seo a oscailt"
   }
 }

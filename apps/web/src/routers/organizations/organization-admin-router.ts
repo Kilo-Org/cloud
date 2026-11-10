@@ -178,6 +178,7 @@ const AdminOrganizationDetailsSchema = z.object({
   created_by_kilo_user_id: z.string().nullable(),
   created_by_user_email: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
+  stripe_customer_id: z.string().nullable(),
   integrations: z.array(
     z.object({
       platform: z.string(),
@@ -561,6 +562,7 @@ export const organizationAdminRouter = createTRPCRouter({
             created_by_kilo_user_id: organizations.created_by_kilo_user_id,
             created_by_user_email: kilocode_users.google_user_email,
             created_by_user_name: kilocode_users.google_user_name,
+            stripe_customer_id: organizations.stripe_customer_id,
           })
           .from(organizations)
           .leftJoin(kilocode_users, eq(organizations.created_by_kilo_user_id, kilocode_users.id))

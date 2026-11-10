@@ -3,6 +3,7 @@ import {
   classifyOrganizationEntitlement,
   getDaysRemainingInTrial,
   getOrgTrialStatusFromDays,
+  PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES,
   type OrganizationEntitlementOrganization,
   type OrganizationSeatPurchaseSubscriptionStatus,
 } from '..';
@@ -93,18 +94,8 @@ describe('classifyOrganizationEntitlement', () => {
     });
   });
 
-  it.each([
-    'active',
-    'pending_cancel',
-    'incomplete',
-    'incomplete_expired',
-    'trialing',
-    'past_due',
-    'canceled',
-    'unpaid',
-    'paused',
-  ] satisfies OrganizationSeatPurchaseSubscriptionStatus[])(
-    'treats %s seat purchases as paid entitlement until ended',
+  it.each(PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES)(
+    'treats %s seat purchases as paid entitlement',
     subscriptionStatus => {
       expect(classify({}, subscriptionStatus)).toMatchObject({
         bypassReason: 'paid_seat_purchase',
@@ -116,15 +107,28 @@ describe('classifyOrganizationEntitlement', () => {
     }
   );
 
-  it('does not treat ended seat purchases as paid entitlement', () => {
-    expect(classify({}, 'ended')).toMatchObject({
-      bypassReason: null,
-      displayStatus: 'trial_expired_hard',
-      hasEntitlement: false,
-      hasPaidSeatEntitlement: false,
-      isTrialExpiredForEnforcement: true,
-    });
-  });
+  it.each([
+    'ended',
+    'pending_cancel',
+    'incomplete',
+    'incomplete_expired',
+    'canceled',
+    'unpaid',
+    'paused',
+    'an_unrecognized_provider_status',
+  ] satisfies OrganizationSeatPurchaseSubscriptionStatus[])(
+    'keeps a hard-expired trial enforced for %s seat purchases',
+    subscriptionStatus => {
+      expect(classify({}, subscriptionStatus)).toMatchObject({
+        bypassReason: null,
+        displayStatus: 'trial_expired_hard',
+        hasEntitlement: false,
+        hasPaidSeatEntitlement: false,
+        isTrialExpiredForEnforcement: true,
+        trialStatus: 'trial_expired_hard',
+      });
+    }
+  );
 
   it.each([
     ['require_seats_disabled', { require_seats: false }],

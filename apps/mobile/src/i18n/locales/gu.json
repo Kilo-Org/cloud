@@ -3808,7 +3808,7 @@
     "reasoningEffort": {
       "modelFlag": "આ મોડેલ વિચારના સ્તરને સપોર્ટ કરે છે"
     },
-    "creditsRequired": "આ સંદેશ મોકલવા માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરો અને ફરી પ્રયાસ કરો."
+    "creditsRequired": "આ સંદેશ મોકલવા માટે પૂરતા ક્રેડિટ નથી."
   },
   "settingsTools": {
     "confirmTitle": "આ ફેરફારની પુષ્ટિ કરવી?"
@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "શેડ્યૂલ કરેલા રિપોર્ટ માટે કોઈ સંદર્ભ ચાલુ નથી",
     "sourceBlocker": "સત્ર પર ધ્યાન આપવાની જરૂર છે",
     "sourceMetadata": "સાચવેલ સત્ર મેટાડેટા"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "આ શોધ પરિણામ ખોલી શકાયું નહીં"
   }
 }

@@ -3858,7 +3858,7 @@
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava nivo razmišljanja"
     },
-    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke. Dodajte kredite i pokušajte ponovo."
+    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke."
   },
   "settingsTools": {
     "confirmTitle": "Potvrditi ovu promenu?"
@@ -4309,5 +4309,8 @@
     "noEnabledContexts": "Nijedan kontekst nije omogućen za zakazane izveštaje",
     "sourceBlocker": "Sesija zahteva pažnju",
     "sourceMetadata": "Zabeleženi metapodaci sesije"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
   }
 }

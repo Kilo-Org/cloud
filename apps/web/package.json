@@ -60,6 +60,7 @@
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/organization-entitlement": "workspace:*",
+    "@kilocode/scim-contracts": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
     "@kilocode/web-shared": "workspace:*",

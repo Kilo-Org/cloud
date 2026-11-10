@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Dit model ondersteunt denkinspanning"
     },
-    "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden. Vul je tegoed aan en probeer het opnieuw."
+    "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden."
   },
   "settingsTools": {
     "confirmTitle": "Deze wijziging bevestigen?"
@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Geen contexten ingeschakeld voor geplande briefings",
     "sourceBlocker": "Sessie heeft aandacht nodig",
     "sourceMetadata": "Vastgelegde sessiemetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Dit zoekresultaat kon niet worden geopend"
   }
 }

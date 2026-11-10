@@ -2,7 +2,6 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
-  Platform,
   ScrollView,
   type ScrollViewInstance,
   View,
@@ -187,29 +186,25 @@ export function NewSessionConfigureForm({
   const { height: windowHeight } = useWindowDimensions();
   const { height: keyboardHeight, isVisible: keyboardVisible } = useKeyboardState();
   // The footer reserves the platform inset while the keyboard is closed. With
-  // the keyboard open, iOS's lift has already cleared the home indicator, so
-  // the whole inset would be reserved a second time directly above the
-  // keyboard — and the footer, which is where the disabled Start and its
-  // reason line sit, would float a navigation-bar height above the keys while
-  // the composer loses that room. Interpolating it on the keyboard's own
-  // progress keeps the lift and the inset in one transition, the rule the chat
-  // composer's inset follows (flipping it on the visible flag moves the footer
-  // a second time, after the keyboard has stopped).
-  //
-  // Android keeps the inset: `keyboardInsetOffset` already subtracts it from
-  // the lift, which only stays correct while the content pads it.
-  const openFooterInset = Platform.OS === 'android' ? bottomClearance : KEYBOARD_FOOTER_GAP;
+  // it open the lift has already cleared the home indicator, so the whole
+  // inset would be reserved a second time directly above the keyboard — and
+  // the footer, which is where the disabled Start and its reason line sit,
+  // would float a navigation-bar height away from the keys instead of ending
+  // at them. Interpolating it on the keyboard's own progress keeps the lift
+  // and the inset in one transition, the rule the chat composer's inset
+  // follows (flipping it on the visible flag moves the footer a second time,
+  // after the keyboard has stopped).
   const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
   const footerInset = useAnimatedStyle(
     () => ({
       paddingBottom: interpolate(
         keyboardProgress.value,
         [0, 1],
-        [bottomClearance, openFooterInset],
+        [bottomClearance, KEYBOARD_FOOTER_GAP],
         Extrapolation.CLAMP
       ),
     }),
-    [bottomClearance, openFooterInset]
+    [bottomClearance]
   );
   const [containerFrame, setContainerFrame] = useState({ y: 0, height: 0 });
   const containerRef = useRef<ViewInstance | null>(null);

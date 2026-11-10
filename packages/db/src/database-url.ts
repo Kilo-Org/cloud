@@ -78,3 +78,6 @@ function resolveSslFromSslmode(databaseUrl: URL): ClientConfig['ssl'] {
 
   return { rejectUnauthorized: VERIFY_CERTIFICATE_BY_SSLMODE[sslmode] };
 }
+
+// Temporary: this comment only changes this file's bytes.
+

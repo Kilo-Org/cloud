@@ -346,6 +346,9 @@ function getSidebarSessionItemSortTime(
     const time = sortPins.get(session.sessionId) ?? getStoredSessionActivityTime(session);
     if (time > latest) latest = time;
   }
+  for (const layer of item.stackLayers ?? []) {
+    latest = Math.max(latest, getSidebarSessionItemSortTime(layer, sortPins));
+  }
   return Number.isFinite(latest) ? latest : getStoredSessionActivityTime(item.latestSession);
 }
 
@@ -489,13 +492,29 @@ export function groupSidebarSessionsByDate(
   worktreeDetails: Record<string, SidebarWorktreeDetails> = {},
   sortPins: SidebarSortPins = new Map()
 ): SidebarSessionDateGroup[] {
+  return groupSidebarItemsByDate(
+    groupSidebarSessions(sessions, worktreeDetails, sortPins),
+    now,
+    sortPins
+  );
+}
+
+export function groupSidebarItemsByDate(
+  items: readonly SidebarSessionItem[],
+  now = new Date(),
+  sortPins: SidebarSortPins = new Map()
+): SidebarSessionDateGroup[] {
   const today: SidebarSessionItem[] = [];
   const yesterday: SidebarSessionItem[] = [];
   const namedDayBuckets = new Map<string, { daysAgo: number; items: SidebarSessionItem[] }>();
   const older: SidebarSessionItem[] = [];
   const todayStart = startOfDay(now);
 
-  for (const item of groupSidebarSessions(sessions, worktreeDetails, sortPins)) {
+  const sortedItems = [...items].sort(
+    (a, b) =>
+      getSidebarSessionItemSortTime(b, sortPins) - getSidebarSessionItemSortTime(a, sortPins)
+  );
+  for (const item of sortedItems) {
     const date = new Date(getSidebarSessionItemSortTime(item, sortPins));
     if (isSameDay(date, now)) {
       today.push(item);

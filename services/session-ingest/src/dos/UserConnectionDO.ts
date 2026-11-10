@@ -1643,8 +1643,16 @@ export class UserConnectionDO extends DurableObject<Env> {
     let targetCli: WebSocket | undefined;
 
     if (msg.sessionId && msg.connectionId) {
-      targetCli = this.findCliByConnectionId(msg.connectionId);
-      if (this.sessionOwners.get(msg.sessionId) !== msg.connectionId || !targetCli) {
+      const sessionId = msg.sessionId;
+      const connectionId = msg.connectionId;
+      // Viewers send both fields, so a shed row arrives here with no owner at
+      // all. Wait for the heartbeat that restores it before reporting a change;
+      // a different owner is still rejected at once.
+      if (!this.sessionOwners.has(sessionId)) {
+        await this.waitForTrimmedOwner(sessionId, connectionId);
+      }
+      targetCli = this.findCliByConnectionId(connectionId);
+      if (this.sessionOwners.get(sessionId) !== connectionId || !targetCli) {
         this.sendToWeb(ws, {
           type: 'response',
           id: msg.id,
@@ -2535,13 +2543,18 @@ export class UserConnectionDO extends DurableObject<Env> {
    * for a shed row finds no owner until the next heartbeat restores it. Wait for
    * that heartbeat instead of failing the command. Only a connection that
    * reports a trim can be missing a live session, so every other unowned id
-   * still fails immediately.
+   * still fails immediately. Pass `connectionId` to require that specific
+   * connection, which is the shape a viewer sends.
    */
-  private waitForTrimmedOwner(sessionId: string): Promise<boolean> {
+  private waitForTrimmedOwner(sessionId: string, connectionId?: string): Promise<boolean> {
     if (this.sessionOwners.has(sessionId)) return Promise.resolve(true);
     const trimmed = this.ctx.getWebSockets('cli').some(ws => {
       const attachment = ws.deserializeAttachment() as WSAttachment | null;
-      return attachment?.role === 'cli' && attachment.sessionsTrimmed !== undefined;
+      return (
+        attachment?.role === 'cli' &&
+        attachment.sessionsTrimmed !== undefined &&
+        (connectionId === undefined || attachment.connectionId === connectionId)
+      );
     });
     if (!trimmed) return Promise.resolve(false);
 

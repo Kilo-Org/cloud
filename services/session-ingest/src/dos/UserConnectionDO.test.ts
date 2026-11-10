@@ -5212,6 +5212,42 @@ describe('UserConnectionDO', () => {
       expect(allSent(webWs).some(message => message.error)).toBe(false);
     });
 
+    it('waits for the next heartbeat when the viewer names the owning connection', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      capAttachment(cliWs);
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      const restored = new UserConnectionDO(mockCtx.build() as never, {} as Env);
+      webWs.send.mockClear();
+
+      const command = restored.webSocketMessage(
+        webWs as never,
+        JSON.stringify({
+          type: 'command',
+          id: 'cmd-1',
+          command: 'send_message',
+          sessionId: 'ses-cap-199',
+          connectionId: 'cli-1',
+          data: {},
+        })
+      );
+      await flushAsync();
+      expect(allSent(webWs)).toEqual([]);
+
+      await restored.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      await command;
+
+      expect(allSent(cliWs).some(message => message.type === 'command')).toBe(true);
+      expect(allSent(webWs).some(message => message.error)).toBe(false);
+    });
+
     it('fails an unknown session immediately when nothing was trimmed', async () => {
       const { doInstance, mockCtx } = setup();
       addCliSocket(mockCtx, 'cli-1', [makeSession('s1')]);

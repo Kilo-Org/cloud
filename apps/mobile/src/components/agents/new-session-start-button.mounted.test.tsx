@@ -55,7 +55,6 @@ async function mountButton(props: {
   isStarting?: boolean;
   startBlockedReason?: string | null;
   startBlockedAction?: { label: string; onPress: () => void; isBusy?: boolean } | null;
-  blockedByPlan?: boolean;
 }): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
@@ -67,7 +66,6 @@ async function mountButton(props: {
         isStarting: props.isStarting ?? false,
         startBlockedReason: props.startBlockedReason ?? null,
         startBlockedAction: props.startBlockedAction ?? null,
-        blockedByPlan: props.blockedByPlan ?? false,
         onStartSession: vi.fn<() => void>(),
       })
     );
@@ -245,27 +243,28 @@ describe('NewSessionStartButton', () => {
     renderer.unmount();
   });
 
-  // The plan explanation keeps Start disabled. On a dark screen the disabled
-  // primary fill is a light neutral that reads as an enabled plate, so this
-  // state takes the inactive control fill and an ink that still contrasts on
-  // it; a Start disabled for any other reason keeps the disabled primary pair.
-  it('draws a plan-blocked Start in the inactive fill on a dark screen', async () => {
-    const blocked = await mountButton({ blockedByPlan: true, isStartDisabled: true });
-    const blockedButton = hostByType(blocked.root, 'Pressable')[0];
-    const blockedClasses = String(blockedButton?.props.className).split(' ');
-    expect(blockedClasses).toContain('bg-primary-disabled');
-    expect(blockedClasses).toContain('dark:bg-control-idle');
-    const blockedLabel = hostByType(blocked.root, 'Text')[0];
-    expect(blockedLabel?.props.className).toContain('dark:text-ink2');
-    blocked.unmount();
+  // The shared dark disabled primary fill is a light neutral that reads as an
+  // enabled plate on the near-black page, so a disabled Start takes the
+  // inactive control fill and an ink that still contrasts on it. A busy Start
+  // keeps the brand fill and its spinner, and never the inactive pair.
+  it('draws a disabled Start in the inactive pair, and a busy one in the brand fill', async () => {
+    const disabled = await mountButton({ isStartDisabled: true });
+    const disabledButton = hostByType(disabled.root, 'Pressable')[0];
+    const disabledClasses = String(disabledButton?.props.className).split(' ');
+    expect(disabledClasses).toContain('bg-primary-disabled');
+    expect(disabledClasses).toContain('dark:bg-control-idle');
+    const disabledLabel = hostByType(disabled.root, 'Text')[0];
+    expect(disabledLabel?.props.className).toContain('dark:text-ink2');
+    disabled.unmount();
 
-    const ordinary = await mountButton({ isStartDisabled: true });
-    const ordinaryButton = hostByType(ordinary.root, 'Pressable')[0];
-    const ordinaryClasses = String(ordinaryButton?.props.className).split(' ');
-    expect(ordinaryClasses).toContain('bg-primary-disabled');
-    expect(ordinaryClasses).not.toContain('dark:bg-control-idle');
-    const ordinaryLabel = hostByType(ordinary.root, 'Text')[0];
-    expect(ordinaryLabel?.props.className).toBeUndefined();
-    ordinary.unmount();
+    const busy = await mountButton({ isStartDisabled: true, isStarting: true });
+    const busyButton = hostByType(busy.root, 'Pressable')[0];
+    const busyClasses = String(busyButton?.props.className).split(' ');
+    expect(busyClasses).toContain('bg-primary');
+    expect(busyClasses).not.toContain('bg-primary-disabled');
+    expect(busyClasses).not.toContain('dark:bg-control-idle');
+    const busyLabel = hostByType(busy.root, 'Text')[0];
+    expect(busyLabel?.props.className).toBeUndefined();
+    busy.unmount();
   });
 });

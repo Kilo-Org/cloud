@@ -269,7 +269,7 @@ describe('organization group deletion with an input guardrail', () => {
         kilo_encrypt: true,
         data_collection: 'deny',
         enkrypt: {
-          input_guardrail: { enabled: false, scan_tool_results: true, group_id: groupId },
+          input_guardrail: { enabled: false, group_id: groupId },
         },
       }),
     },
@@ -278,7 +278,7 @@ describe('organization group deletion with an input guardrail', () => {
       settings: groupId => ({
         data_collection: 'deny',
         enkrypt: {
-          input_guardrail: { enabled: true, scan_tool_results: true, group_id: groupId },
+          input_guardrail: { enabled: true, group_id: groupId },
         },
       }),
     },

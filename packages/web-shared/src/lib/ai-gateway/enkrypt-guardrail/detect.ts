@@ -391,7 +391,6 @@ export async function scanRequest(
       session_id: scan.sessionId,
       client_request_id: scan.clientRequestId,
       api_kind: scan.apiKind,
-      scan_tool_results: config.scanToolResults,
     },
     report: {
       scan: kind,

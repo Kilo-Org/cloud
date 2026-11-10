@@ -29,14 +29,13 @@ import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
  * schema, so every scanned request is rejected as if Enkrypt were unavailable rather than falling
  * back to a weaker policy.
  */
-export type EnkryptInputGuardrailConfig = { scanToolResults: boolean } & (
+export type EnkryptInputGuardrailConfig =
   | {
       status: 'ready';
       detectors: EnkryptDetectRequestDetectors;
       blockingDetectors: EnkryptDetectorId[];
     }
-  | { status: 'invalid' }
-);
+  | { status: 'invalid' };
 
 type Stored<Detectors> =
   | { status: 'missing' }
@@ -85,8 +84,8 @@ export function readStoredEnkryptOutputDetectors(
  * (`kilo_encrypt`), or the guardrail is absent, disabled, invalid in settings, or selects no
  * detector. Organizations that never saved detectors get Kilo Default.
  * Only the configurable detectors run, as saved; see `enforcedEnkryptInputDetectors`. Every input
- * is checked, including tool results, whatever `scan_tool_results` says. It applies only to
- * members of `enkryptInputGuardrailGroupId`, when that is set.
+ * is checked, including tool results. It applies only to members of `enkryptInputGuardrailGroupId`,
+ * when that is set.
  */
 export function resolveEnkryptInputGuardrail(
   organizationId: string,
@@ -105,13 +104,12 @@ export function resolveEnkryptInputGuardrail(
   }
   if (!parsed.data.enabled) return null;
   const stored = readStoredEnkryptDetectors(organizationId, parsed.data.detectors);
-  if (stored.status === 'invalid') return { scanToolResults: true, status: 'invalid' };
+  if (stored.status === 'invalid') return { status: 'invalid' };
   const detectors = enforcedEnkryptInputDetectors(
     stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors()
   );
   if (enabledEnkryptDetectorIds(detectors).length === 0) return null;
   return {
-    scanToolResults: true,
     status: 'ready',
     detectors: buildEnkryptDetectRequestDetectors(detectors),
     blockingDetectors: blockingEnkryptDetectorIds(detectors),
@@ -146,8 +144,7 @@ export function enkryptInputGuardrailAppliesTo(
  * The organization's output guardrail, or null when Kilo admins have not granted the feature
  * (`kilo_encrypt`), or the guardrail is absent, disabled, invalid in settings, or selects no
  * detector. Unlike the input guardrail it has no default, so an organization that never saved
- * output detectors scans no response. Responses have no tool results, so `scanToolResults` is
- * false.
+ * output detectors scans no response.
  */
 export function resolveEnkryptOutputGuardrail(
   organizationId: string,
@@ -169,10 +166,9 @@ export function resolveEnkryptOutputGuardrail(
 
   const stored = readStoredEnkryptOutputDetectors(organizationId, parsed.data.detectors);
   if (stored.status === 'missing') return null;
-  if (stored.status === 'invalid') return { scanToolResults: false, status: 'invalid' };
+  if (stored.status === 'invalid') return { status: 'invalid' };
   if (enabledEnkryptOutputDetectorIds(stored.detectors).length === 0) return null;
   return {
-    scanToolResults: false,
     status: 'ready',
     detectors: buildEnkryptDetectRequestDetectors(
       enkryptOutputDetectorsAsInputDetectors(stored.detectors)

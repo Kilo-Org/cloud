@@ -163,10 +163,6 @@ function GuardrailReportBody({
             value: <ToneBadge tone={verdictDetails.tone}>{verdictDetails.label}</ToneBadge>,
           },
           { label: 'Added latency', value: formatDurationMs(addedLatencyMs) },
-          {
-            label: 'Scans tool results',
-            value: settings ? yesNo(settings.scan_tool_results) : ABSENT,
-          },
           ...(unavailableReason
             ? [
                 {

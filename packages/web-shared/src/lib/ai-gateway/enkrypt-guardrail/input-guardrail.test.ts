@@ -54,7 +54,6 @@ const detectors = {
 } satisfies EnkryptDetectRequestDetectors;
 
 const config = {
-  scanToolResults: true,
   status: 'ready',
   detectors: { injection_attack: detectors.injection_attack },
   blockingDetectors: ['injection_attack'],
@@ -73,7 +72,6 @@ const scan: EnkryptGuardrailRequest = {
 const mixedScan: EnkryptGuardrailRequest = {
   ...scan,
   config: {
-    scanToolResults: true,
     status: 'ready',
     detectors,
     blockingDetectors: ['injection_attack'],
@@ -83,7 +81,6 @@ const mixedScan: EnkryptGuardrailRequest = {
 const logOnlyScan: EnkryptGuardrailRequest = {
   ...scan,
   config: {
-    scanToolResults: true,
     status: 'ready',
     detectors: { pii: detectors.pii },
     blockingDetectors: [],
@@ -504,7 +501,6 @@ describe('startEnkryptInputGuardrail', () => {
     expect(await guardrail.report()).toEqual({
       settings: {
         status: 'ready',
-        scan_tool_results: true,
         detectors: [
           { detector: 'injection_attack', action: 'block' },
           { detector: 'pii', action: 'log', pii_entities: ['secrets'] },
@@ -575,7 +571,6 @@ describe('startEnkryptInputGuardrail', () => {
     expect(await guardrail.report()).toEqual({
       settings: {
         status: 'ready',
-        scan_tool_results: true,
         detectors: [{ detector: 'pii', action: 'log', pii_entities: ['secrets'] }],
       },
       verdict: 'skip',

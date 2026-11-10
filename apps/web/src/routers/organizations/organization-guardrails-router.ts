@@ -287,11 +287,9 @@ export const organizationGuardrailsRouter = createTRPCRouter({
             ...organization.settings,
             enkrypt: {
               ...organization.settings.enkrypt,
-              // Still written so a rollback to a version that reads it keeps scanning every input.
               input_guardrail: {
                 ...inputGuardrail,
                 detectors: storableEnkryptInputDetectors(inputGuardrail.detectors),
-                scan_tool_results: true,
               },
               ...(requestedOutput ? { output_guardrail: requestedOutput } : {}),
             },

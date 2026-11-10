@@ -5894,7 +5894,6 @@ describe('Enkrypt input guardrail', () => {
     expect(record.enkrypt).toEqual({
       settings: {
         status: 'ready',
-        scan_tool_results: true,
         detectors: [{ detector: 'injection_attack', action: 'block' }],
       },
       verdict: 'block',
@@ -6069,9 +6068,10 @@ describe('Enkrypt input guardrail', () => {
   );
 
   it('scans tool results even when a saved setting turned them off', async () => {
+    const legacySettings = { scan_tool_results: false };
     setOrganization({
       enkrypt: {
-        input_guardrail: { enabled: true, scan_tool_results: false, detectors: blockingDetectors },
+        input_guardrail: { ...legacySettings, enabled: true, detectors: blockingDetectors },
       },
     });
     enkryptAnswers(injection);
@@ -6350,7 +6350,7 @@ describe('Enkrypt input guardrail', () => {
       banned_keywords: ['Project Phoenix'],
     };
     setOrganization({
-      enkrypt: { input_guardrail: { enabled: true, scan_tool_results: false, detectors } },
+      enkrypt: { input_guardrail: { enabled: true, detectors } },
     });
     enkryptAnswers({ summary: {}, result_message: null });
 

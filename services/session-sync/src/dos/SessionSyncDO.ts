@@ -1,5 +1,6 @@
 import { sha256Hex } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
+import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -149,9 +150,8 @@ export class SessionSyncDO extends DurableObject<Env> {
   /** Whether this object already holds the session schema. */
   private hasStoredSchema(): boolean {
     return (
-      this.ctx.storage.sql
-        .exec("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'session'")
-        .toArray().length > 0
+      this.db.all(sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session'`)
+        .length > 0
     );
   }
 

@@ -141,8 +141,8 @@ export type SnapshotEligibility =
  * Whether a session admitted at `reference` may start from `published`. An
  * older revision or an age-stale snapshot stays usable while its replacement
  * builds; a newer one must not introduce later setup into an older session.
- * A snapshot for another base image stays usable only inside the rollout
- * window, and another runtime ABI is always incompatible. Instance size and
+ * A snapshot for an earlier base image stays usable until it expires, and
+ * another runtime ABI is always incompatible. Instance size and
  * runtime release are not part of compatibility.
  */
 export function snapshotEligibility(

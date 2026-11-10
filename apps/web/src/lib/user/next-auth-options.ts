@@ -1194,7 +1194,7 @@ export const authOptions: NextAuthOptions = {
             // link and bounce to the same-site completion route, which has
             // the session and performs the equality check there.
             if (account.provider === 'apple') {
-              if (await isEmailBlacklistedByDomainAsync(accountInfo.google_user_email)) {
+              if (await isEmailBlacklisted(accountInfo.google_user_email)) {
                 return redirectUrlForCode('BLOCKED');
               }
               const appleOwnerId = await findUserIdByAuthProvider(

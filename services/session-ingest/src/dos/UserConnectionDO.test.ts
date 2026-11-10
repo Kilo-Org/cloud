@@ -5266,6 +5266,47 @@ describe('UserConnectionDO', () => {
       });
     });
 
+    it('rejects a different owner at once while the named connection is trimmed', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      addCliSocket(mockCtx, 'cli-2', [makeSession('ses-elsewhere')]);
+      const webWs = addWebSocket(mockCtx);
+      capAttachment(cliWs);
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      // `ses-elsewhere` is owned by the other connection while the named one
+      // reports a trim, so the wait must not mask a real ownership change.
+      const restored = new UserConnectionDO(mockCtx.build() as never, {} as Env);
+      webWs.send.mockClear();
+
+      const command = restored.webSocketMessage(
+        webWs as never,
+        JSON.stringify({
+          type: 'command',
+          id: 'cmd-1',
+          command: 'send_message',
+          sessionId: 'ses-elsewhere',
+          connectionId: 'cli-1',
+          data: {},
+        })
+      );
+      await flushAsync();
+      await command;
+
+      expect(allSent(webWs)).toContainEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+      expect(allSent(cliWs).some(message => message.type === 'command')).toBe(false);
+    });
+
     it('fails a shed session once the owner wait elapses without a heartbeat', async () => {
       vi.useFakeTimers();
       try {

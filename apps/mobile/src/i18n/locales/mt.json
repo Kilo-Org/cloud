@@ -2551,7 +2551,7 @@
       "discardWithUploadsMessage": "L-istruzzjoni tiegħek u kull fajl imtella' li għadu mhux mehmuż ma' messaġġ mibgħut se jitħassru.",
       "discardFailed": "Ma setax jitwarrab l-abbozz. Erġa' pprova.",
       "remoteHint": "Biex taħdem fuq il-kompjuter tiegħek, ibda Kilo hemm u ħallih jaħdem.",
-      "continueFrom": "Qed tkompli s-sessjoni {{title}}.",
+      "continueFrom": "Qed tkompli s-sessjoni “{{title}}”.",
       "importingSession": "Qed tiġi importata s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
       "importFailed": "Ma setgħetx tiġi importata din is-sessjoni.",

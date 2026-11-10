@@ -2425,7 +2425,7 @@
       "discardWithUploadsMessage": "Enstriksyon ou yo ak tout fichye ou voye ki poko atache ak yon mesaj ap efase.",
       "discardFailed": "Nou pa t ka jete bouyon an. Tanpri eseye ankò.",
       "remoteHint": "Pou egzekite sou òdinatè w la, lanse Kilo la epi kite li ap mache.",
-      "continueFrom": "Nou ap kontinye {{title}}.",
+      "continueFrom": "Nou ap kontinye «{{title}}».",
       "importingSession": "Ap enpòte sesyon an",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
       "importFailed": "Nou pa t ka enpòte sesyon sa a.",

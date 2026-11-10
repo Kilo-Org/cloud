@@ -2431,7 +2431,7 @@
       "discardWithUploadsMessage": "Hofafana ny toromarikanao sy ny rakitra nampakarina nefa mbola tsy nampiarahina tamin'ny hafatra nalefa.",
       "discardFailed": "Tsy nahomby ny fanariana ny volavola. Andramo indray azafady.",
       "remoteHint": "Mba hampandehanana azy amin'ny solosainao dia alefaso an'i Kilo any amin'ilay solosaina ary avelao hitohy ny fiasany.",
-      "continueFrom": "Mitohy ny {{title}}.",
+      "continueFrom": "Mitohy ny «{{title}}».",
       "importingSession": "Manafatra fotoam-piasana",
       "cliCannotContinue": "Tsy afaka manohy fotoam-piasana ity CLI ity. Safidio ny Cloud Agent na CLI hafa.",
       "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity.",

@@ -1887,7 +1887,7 @@
       "discardWithUploadsMessage": "İstemin ve henüz bir mesaja eklenmemiş tüm yüklemeler silinecek.",
       "discardFailed": "Taslak silinemedi. Tekrar dene.",
       "remoteHint": "Bilgisayarında çalıştırmak için Kilo'yu orada başlat ve çalışır halde bırak.",
-      "continueFrom": "{{title}} oturumuna devam ediliyor.",
+      "continueFrom": "“{{title}}” oturumuna devam ediliyor.",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
       "importFailed": "Bu oturum içe aktarılamadı.",

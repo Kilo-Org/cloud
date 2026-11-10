@@ -1813,7 +1813,7 @@
       "discardWithUploadsMessage": "Votre consigne et les fichiers transférés qui ne sont liés à aucun message envoyé seront supprimés.",
       "discardFailed": "Impossible de supprimer le brouillon. Réessayez.",
       "remoteHint": "Pour l'exécuter sur votre ordinateur, démarrez Kilo sur celui-ci et laissez-le en cours d'exécution.",
-      "continueFrom": "La session {{title}} reprend.",
+      "continueFrom": "La session « {{title}} » reprend.",
       "importingSession": "Importation de la session…",
       "cliCannotContinue": "Cette CLI ne permet pas de reprendre une session. Choisissez Cloud Agent ou une autre CLI.",
       "importFailed": "Impossible d'importer cette session.",

@@ -2425,7 +2425,7 @@
       "discardWithUploadsMessage": "Sorğun və heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
       "discardFailed": "Qaralamanı silmək mümkün olmadı. Yenidən cəhd et.",
       "remoteHint": "Seansın kompüterində işləməsi üçün Kilonu orada başlat və işlək vəziyyətdə saxla.",
-      "continueFrom": "{{title}} davam etdirilir.",
+      "continueFrom": "“{{title}}” davam etdirilir.",
       "importingSession": "Sessiya idxal olunur",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seç.",
       "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",

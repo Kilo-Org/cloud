@@ -420,9 +420,10 @@ describe('scanRequestWithVerdictCache', () => {
   });
 
   it.each(['allow', 'block'] as const)(
-    'expires a cached %s after six hours without renewing it on hits',
+    'expires a cached %s after seven days without renewing it on hits',
     async action => {
       const startedAt = Date.now();
+      const expiresAt = startedAt + 7 * 24 * 60 * 60 * 1_000;
       const now = jest.spyOn(Date, 'now').mockReturnValue(startedAt);
       const store = memoryStore();
       const original = await scanRequestWithVerdictCache(
@@ -431,7 +432,7 @@ describe('scanRequestWithVerdictCache', () => {
       );
       if (!original.cacheEntry) throw new Error('expected a cacheable verdict');
       await rememberRequestVerdict(original.cacheEntry, store);
-      now.mockReturnValue(startedAt + ENKRYPT_VERDICT_CACHE_TTL_SECONDS * 1_000 - 1);
+      now.mockReturnValue(expiresAt - 1);
       const hitDependencies = deps(store);
 
       const hit = await scanRequestWithVerdictCache(makeRequest(conversation), hitDependencies);
@@ -440,7 +441,7 @@ describe('scanRequestWithVerdictCache', () => {
       expect(hit.cacheEntry).toBeNull();
       expect(hitDependencies.fetch).not.toHaveBeenCalled();
       expect(store.set).toHaveBeenCalledTimes(1);
-      now.mockReturnValue(startedAt + ENKRYPT_VERDICT_CACHE_TTL_SECONDS * 1_000);
+      now.mockReturnValue(expiresAt);
       const expiredDependencies = deps(store);
 
       const expired = await scanRequestWithVerdictCache(

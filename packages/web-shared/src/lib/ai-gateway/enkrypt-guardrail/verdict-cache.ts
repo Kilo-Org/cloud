@@ -24,7 +24,7 @@ export const ENKRYPT_VERDICT_CACHE_ENABLED = true;
  */
 const VERDICT_CACHE_VERSION = 2;
 
-export const ENKRYPT_VERDICT_CACHE_TTL_SECONDS = 6 * 60 * 60;
+export const ENKRYPT_VERDICT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 /**
  * Already-scanned text sent ahead of the uncached suffix, so content split across the boundary is

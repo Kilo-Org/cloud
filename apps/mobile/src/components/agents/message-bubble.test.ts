@@ -487,6 +487,20 @@ describe('MessageBubble failure footer', () => {
     ).toBeNull();
   });
 
+  it('gives both recovery controls the shared state-surface target', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-targets'), {
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+    /* The footer's actions are the failure's whole recovery, so both take the
+       48 dp frame the shared state surface gives them. */
+    for (const label of ['Retry', 'Copy to composer']) {
+      const control = findElementByType(tree, 'Button', p => p.accessibilityLabel === label);
+      expect(String(control?.props.className).split(' ')).toContain('min-h-[48px]');
+    }
+  });
+
   it('omits the Retry button for a non-retryable assistant error', async () => {
     const tree = await renderBubbleWithHandlers(
       assistantMessageWithError('m-asst-nr', 'ProviderAuthError'),

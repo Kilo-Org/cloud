@@ -48,6 +48,13 @@ export function hasOwnAdminCheck(pathname: string): boolean {
   return ADMIN_API_ROUTE_WITH_OWN_ADMIN_CHECK.test(pathname);
 }
 
+/**
+ * The `isAdmin` claim this middleware reads is a coarse first layer. Each admin
+ * API handler confirms the current admin, blocked and session state from the
+ * database on every request, through `getUserFromAuth({ adminOnly: true })` or
+ * an admin tRPC procedure, and `withAuthenticatedAdminApiRoutes.test.ts` fails
+ * when a handler stops doing that.
+ */
 export const withAuthenticatedAdminApiRoutes: MiddlewareFactory = nextMiddleware => {
   return async (request: NextRequestWithAuth, nextFetchEvent: NextFetchEvent) => {
     if (

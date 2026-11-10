@@ -159,44 +159,47 @@ jobs:
       - name: Restore or build tRPC declarations
         uses: ./.github/actions/trpc-declarations
 
+      # Prove the Firefox MV3 target still builds (the Chrome build runs inside e2e).
+      # It reuses this job's install and tRPC declarations, so it needs no job of
+      # its own: the target is proven on every run without a second workspace install.
+      - name: Build (Firefox MV3)
+        run: pnpm --filter kilo-extension build:firefox
+
       - name: Verify (typecheck, lint, unit tests)
         env:
           KILO_TYPECHECK_TRPC_BUILT: '1'
         run: pnpm --filter kilo-extension verify
 
-  # Prove the Firefox MV3 target still builds (the Chrome build runs inside e2e).
-  build-firefox:
+  # Chrome end-to-end tests. The Playwright suite runs one worker at a time, so it
+  # is split into two shard jobs; the `e2e-chrome` job below reports their
+  # combined result under the check name this workflow has always published.
+  #
+  # `--shard` divides the suite by whole test file, so the shards do not hold the
+  # same amount of work and the heavier one sets the row's duration. It is still
+  # well under the single job it replaces.
+  #
+  # Each shard builds the Chrome MV3 bundle instead of copying it from a build
+  # job. The build takes a few seconds, while a separate build job would put a
+  # checkout, a whole-workspace install and an artifact round trip in series
+  # before either shard starts — longer than the duplicate build. The Chrome
+  # target is therefore proven twice per run, which costs less than proving it
+  # once and shipping it.
+  #
+  # Firefox Selenium e2e (`e2e:firefox`) is intentionally not run here: it
+  # relies on geckodriver tab detection that is unreliable headless.
+  e2e-chrome-shard:
     needs: changes
     if: needs.changes.outputs.extension == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
-    steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build (Firefox MV3)
-        run: pnpm --filter kilo-extension build:firefox
-
-  # Chrome end-to-end tests. `e2e:chrome` builds the Chrome MV3 bundle first, so this
-  # also covers the Chrome build. Firefox Selenium e2e (`e2e:firefox`) is intentionally
-  # not run here: it relies on geckodriver tab detection that is unreliable headless.
-  e2e-chrome:
-    needs: changes
-    if: needs.changes.outputs.extension == 'true'
-    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
+    name: e2e-chrome (${{ matrix.shard }}/2)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    # The suite drives one browser and one Node process, so it does not use the
+    # large runner the single job used: measured end to end, the heavier shard
+    # takes the same time on 4 vCPU. Repo variables are not exposed to fork pull
+    # requests, so the job falls back to ubuntu-latest there.
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     env:
       CI: 'true'
@@ -217,6 +220,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Builds the bundle the shard loads, with the analytics key the analytics
+      # specs need at build time. A build failure fails this shard before the
+      # browser download starts.
+      - name: Build the Chrome MV3 bundle
+        run: pnpm --filter kilo-extension run e2e:build:chrome
+
       # The version comes from the dependency graph this install just built, so
       # a bump to @playwright/test changes the key and downloads the matching
       # build. No restore-keys: an older browser tree never satisfies the
@@ -235,16 +244,35 @@ jobs:
         # No --with-deps: the runner image already ships the Chromium system libraries, and the apt-get behind --with-deps hangs until the job timeout whenever the runner fleet's apt egress degrades (measured: four 20-minute hangs on 2026-08-12). A missing library would fail the browser launch with an explicit list instead.
         run: pnpm --filter kilo-extension exec playwright install chromium
 
-      - name: Run Chrome e2e (builds the Chrome MV3 bundle first)
-        run: pnpm --filter kilo-extension e2e:chrome
+      - name: Run Chrome e2e shard
+        run: pnpm --filter kilo-extension run e2e:chrome:shard --shard=${{ matrix.shard }}/2
 
+      # One artifact name per shard: two uploads under one name collide.
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
-          name: extension-playwright-report
+          name: extension-playwright-report-${{ matrix.shard }}
           path: |
             apps/extension/playwright-report
             apps/extension/test-results
           retention-days: 7
           if-no-files-found: ignore
+
+  # The check name this workflow published before the suite was sharded. A
+  # skipped run (nothing relevant changed) passes; a failed or cancelled shard
+  # fails this job, and `changes` failing reaches it the same way.
+  e2e-chrome:
+    needs: [changes, e2e-chrome-shard]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Check e2e results
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
+            exit 1
+          fi

@@ -694,6 +694,66 @@ describe('admin.supportAccess viewAccess', () => {
     expect(active.map(item => item.id)).toContain(grant.id);
   });
 
+  test('getActiveForOrganization returns only grants that are live at the organization and its parent', async () => {
+    const viewer = await insertRequester();
+    const liveHolder = await insertRequester();
+    const orgHolder = await insertRequester();
+    const parentHolder = await insertRequester();
+    const { parent, child } = await parentOrgWithChild();
+    const now = Date.now();
+    const at = (offsetSeconds: number) => new Date(now + offsetSeconds * 1000).toISOString();
+
+    const [live, endedOnOrg, endedOnParent] = await db
+      .insert(support_access_grants)
+      .values([
+        {
+          actor_kilo_user_id: liveHolder.id,
+          organization_id: child.id,
+          action_class: 'support_read',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: at(-60),
+          expires_at: at(1800),
+        },
+        {
+          actor_kilo_user_id: orgHolder.id,
+          organization_id: child.id,
+          action_class: 'support_read',
+          reason: 'investigating a second customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: at(-3600),
+          expires_at: at(-60),
+        },
+        {
+          actor_kilo_user_id: parentHolder.id,
+          organization_id: parent.id,
+          action_class: 'support_read',
+          reason: 'investigating a third customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: at(-3600),
+          expires_at: at(-60),
+        },
+      ])
+      .returning();
+
+    const caller = await stepUpCaller(viewer.id);
+    const active = await caller.admin.supportAccess.getActiveForOrganization({
+      organizationId: child.id,
+    });
+    const listedIds = active.map(item => item.id);
+    expect(listedIds).toContain(live.id);
+    expect(listedIds).not.toContain(endedOnOrg.id);
+    expect(listedIds).not.toContain(endedOnParent.id);
+
+    const stored = await db.query.support_access_grants.findMany({
+      where: inArray(support_access_grants.id, [endedOnOrg.id, endedOnParent.id]),
+    });
+    expect(stored.map(row => row.status)).toEqual(['active', 'active']);
+  });
+
   test('an admin who is a member needs no grant', async () => {
     const admin = await insertRequester();
     const organization = await createTestOrganization(

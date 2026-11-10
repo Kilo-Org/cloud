@@ -1418,6 +1418,7 @@ describe('auto routing worker', () => {
             classification: 'cache',
             cacheHit: true,
             classifierCostCredits: classifierResult.cost,
+            classifierGenerationId: result === 'success' ? 'gen-classifier-1' : null,
             sampled: false,
             timings: { classifierMs: expect.any(Number) },
           });
@@ -1427,6 +1428,9 @@ describe('auto routing worker', () => {
             expect.objectContaining({
               doubles: [0, classifierResult.cost, mockClassification.confidence, 1],
             })
+          );
+          expect(writeDataPoint.mock.calls[0]?.[0]?.blobs[9]).toBe(
+            result === 'success' ? 'gen-classifier-1' : ''
           );
           await expectClassifierUsage(
             input as NormalizedClassifierInput,

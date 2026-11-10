@@ -191,10 +191,17 @@ type DecisionOutcome =
   | { kind: 'cache_hit'; classifierModel: string; classification: ClassifierOutput }
   | ClassifierOutcome;
 
-function classifierOutcomeCost(outcome: ClassifierOutcome): number {
-  return outcome.kind === 'model'
-    ? (outcome.classifier.cost ?? 0)
-    : (getClassifierFailureMetadata(outcome.error).cost ?? 0);
+type SpeculativeCall = { cost: number; generationId: string | null };
+
+function speculativeCall(outcome: ClassifierOutcome): SpeculativeCall {
+  if (outcome.kind === 'model') {
+    return {
+      cost: outcome.classifier.cost ?? 0,
+      generationId: outcome.classifier.call.generationId,
+    };
+  }
+  const metadata = getClassifierFailureMetadata(outcome.error);
+  return { cost: metadata.cost ?? 0, generationId: metadata.call?.generationId ?? null };
 }
 
 type DecisionSummary = {
@@ -265,11 +272,14 @@ function recordDecision(
     ? 'cache'
     : 'sync',
   lowConfidence = false,
-  speculativeCost?: number,
+  speculative?: SpeculativeCall,
   shadow: ShadowDecision | null = null
 ): void {
   const summary = summarizeOutcome(outcome);
-  if (speculativeCost !== undefined) summary.cost = speculativeCost;
+  if (speculative) {
+    summary.cost = speculative.cost;
+    summary.generationId = speculative.generationId;
+  }
   summary.details.timings = { ...ctx.timings, totalMs: durationMs };
 
   writeClassifierMetricsDataPoint(env, {
@@ -298,7 +308,7 @@ function recordDecision(
 
   const isFailure = summary.status !== 'classified';
   const paidSpeculation =
-    (classification === 'speculative' || speculativeCost !== undefined) && (summary.cost ?? 0) > 0;
+    (classification === 'speculative' || speculative !== undefined) && (summary.cost ?? 0) > 0;
   const alwaysLog = isFailure || switched || paidSpeculation;
   if (!alwaysLog && Math.random() >= ctx.successSampleRate) {
     return;
@@ -654,7 +664,7 @@ export async function runDecision(
             sticky,
             'background',
             isLowConfidence(routingTable, classifier.classification.confidence),
-            speculative ? (classifier.cost ?? 0) : undefined,
+            speculative ? speculativeCall({ kind: 'model', classifier }) : undefined,
             shadowRoutingTable === null
               ? null
               : computeShadowDecision(
@@ -680,7 +690,7 @@ export async function runDecision(
               sticky,
               'background',
               false,
-              getClassifierFailureMetadata(error).cost ?? 0
+              speculativeCall({ kind: 'error', error })
             );
           }
           console.warn(
@@ -746,7 +756,7 @@ export async function runDecision(
             sticky,
             'cache',
             isLowConfidence(routingTable, cached.confidence),
-            classifierOutcomeCost(result),
+            speculativeCall(result),
             shadow
           );
         })
@@ -762,7 +772,7 @@ export async function runDecision(
         sticky,
         'cache',
         isLowConfidence(routingTable, cached.confidence),
-        speculative?.outcome ? classifierOutcomeCost(speculative.outcome) : undefined,
+        speculative?.outcome ? speculativeCall(speculative.outcome) : undefined,
         shadow
       );
     }

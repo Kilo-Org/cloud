@@ -4942,6 +4942,7 @@ describe('UserConnectionDO', () => {
         role: 'cli',
         connectionId: 'cli-1',
         sessions: [],
+        sessionsTrimmed: 1,
         heartbeatAt: now,
         protocolVersion: '1',
         capabilities: heartbeat.capabilities,
@@ -5152,6 +5153,63 @@ describe('UserConnectionDO', () => {
       expect(
         new TextEncoder().encode(JSON.stringify(cliWs.deserializeAttachment())).byteLength
       ).toBeLessThanOrEqual(ATTACHMENT_FRAME_BYTES);
+    });
+
+    it('reports a steady trim once, not once per heartbeat', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      capAttachment(cliWs);
+      const warn = vi.spyOn(console, 'warn');
+      const heartbeat = JSON.stringify({
+        type: 'heartbeat',
+        protocolVersion: '1',
+        sessions: oversizedSessions(),
+      });
+
+      await doInstance.webSocketMessage(cliWs as never, heartbeat);
+      await doInstance.webSocketMessage(cliWs as never, heartbeat);
+
+      const trims = warn.mock.calls.filter(call =>
+        String(call[0]).includes('Trimmed the CLI socket attachment')
+      );
+      expect(trims).toHaveLength(1);
+      warn.mockRestore();
+    });
+
+    it('waits for the next heartbeat instead of failing a command for a shed row', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      capAttachment(cliWs);
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      // Rebuild in-memory ownership from the trimmed attachment, the state a
+      // hibernation wake produces.
+      const restored = new UserConnectionDO(mockCtx.build() as never, {} as Env);
+      webWs.send.mockClear();
+
+      const command = restored.webSocketMessage(
+        webWs as never,
+        JSON.stringify({
+          type: 'command',
+          id: 'cmd-1',
+          command: 'send_message',
+          sessionId: 'ses-cap-199',
+        })
+      );
+      await flushAsync();
+      expect(allSent(webWs)).toEqual([]);
+
+      await restored.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      await command;
+
+      expect(allSent(cliWs).some(message => message.type === 'command')).toBe(true);
+      expect(allSent(webWs).some(message => message.error)).toBe(false);
     });
   });
 

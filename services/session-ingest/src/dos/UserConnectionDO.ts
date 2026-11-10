@@ -93,6 +93,11 @@ type WSAttachment =
       // in-memory map or hibernation reconstruction — keeps the response
       // fresh and avoids stale instance rows on restart.
       instance?: Instance;
+      // Rows the frame budget shed from the list above. Present only while the
+      // live list is larger than one attachment can hold, and the reason a
+      // command for one of those rows can arrive with no known owner until the
+      // next heartbeat restores the full list.
+      sessionsTrimmed?: number;
     }
   | {
       role: 'web';
@@ -401,9 +406,18 @@ export class UserConnectionDO extends DurableObject<Env> {
   private static readonly CLI_ABSENCE_ATTENTION_RESET_MS = CLI_ABSENCE_ATTENTION_RESET_MS;
   /** Backoff before retrying a clear whose SessionIngestDO delegate failed. */
   private static readonly ATTENTION_RESET_RETRY_BACKOFF_MS = 5_000;
+  /**
+   * Longest a command waits for the next heartbeat to restore the owner of a
+   * session the attachment budget shed. Every CLI heartbeats every 10 s.
+   */
+  private static readonly TRIMMED_OWNER_WAIT_MS = 12_000;
 
   // Which CLI connection owns each session
   private sessionOwners = new Map<string, string>();
+  // Last reported attachment shape per CLI connection, so a steady trim logs once
+  private trimReport = new Map<string, string>();
+  // Commands waiting for a heartbeat to restore the owner of a shed session
+  private ownerWaiters = new Map<string, Set<(owned: boolean) => void>>();
   // Which web sockets want events for a session
   private webSubscriptions = new Map<string, Set<WebSocket>>();
   // Live session snapshots from heartbeats and authoritative status notifications.
@@ -815,6 +829,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       // on is answerable again, so the absence window is over.
       this.cancelPendingAttentionReset(session.id);
     }
+    this.settleOwnerWaiters();
 
     // Offline rename catch-up: re-emit stored renames whose heartbeat title still
     // differs; delete entries once the CLI title matches (self-cleaning).
@@ -1641,6 +1656,12 @@ export class UserConnectionDO extends DurableObject<Env> {
       targetCli = this.findCliByConnectionId(msg.connectionId);
     } else if (msg.sessionId) {
       targetCli = this.findCliForSession(msg.sessionId);
+      if (!targetCli) {
+        const sessionId = msg.sessionId;
+        if (await this.waitForTrimmedOwner(sessionId)) {
+          targetCli = this.findCliForSession(sessionId);
+        }
+      }
     } else {
       const cliSockets = this.ctx.getWebSockets('cli');
       targetCli = cliSockets[0];
@@ -2498,6 +2519,51 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   /**
+   * Resolve every command waiting for a heartbeat to restore a shed owner.
+   * Called once per heartbeat, after the ownership map is updated.
+   */
+  private settleOwnerWaiters(): void {
+    for (const [sessionId, waiters] of this.ownerWaiters) {
+      if (!this.sessionOwners.has(sessionId)) continue;
+      this.ownerWaiters.delete(sessionId);
+      for (const settle of waiters) settle(true);
+    }
+  }
+
+  /**
+   * A trimmed attachment holds fewer rows than the live heartbeat, so a command
+   * for a shed row finds no owner until the next heartbeat restores it. Wait for
+   * that heartbeat instead of failing the command. Only a connection that
+   * reports a trim can be missing a live session, so every other unowned id
+   * still fails immediately.
+   */
+  private waitForTrimmedOwner(sessionId: string): Promise<boolean> {
+    if (this.sessionOwners.has(sessionId)) return Promise.resolve(true);
+    const trimmed = this.ctx.getWebSockets('cli').some(ws => {
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      return attachment?.role === 'cli' && attachment.sessionsTrimmed !== undefined;
+    });
+    if (!trimmed) return Promise.resolve(false);
+
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const settle = (owned: boolean) => {
+      clearTimeout(timer);
+      const waiters = this.ownerWaiters.get(sessionId);
+      waiters?.delete(settle);
+      if (waiters?.size === 0) this.ownerWaiters.delete(sessionId);
+      resolve(owned);
+    };
+    const timer = setTimeout(() => settle(false), UserConnectionDO.TRIMMED_OWNER_WAIT_MS);
+    let waiters = this.ownerWaiters.get(sessionId);
+    if (!waiters) {
+      waiters = new Set();
+      this.ownerWaiters.set(sessionId, waiters);
+    }
+    waiters.add(settle);
+    return promise;
+  }
+
+  /**
    * Persist the CLI attachment without ever letting a write failure escape: a
    * throw skips the acknowledgement and every broadcast that follows it, and
    * the CLI then reconnects on its inactivity watchdog. Shed payload instead,
@@ -2505,16 +2571,26 @@ export class UserConnectionDO extends DurableObject<Env> {
    */
   private persistCliAttachment(ws: WebSocket, attachment: CliAttachment): void {
     const fitted = fitCliAttachment(attachment, CLI_ATTACHMENT_BUDGET_BYTES);
-    if (fitted.droppedSessions > 0) {
-      console.warn('Trimmed the CLI socket attachment to the frame budget', {
-        connectionId: attachment.connectionId,
-        sessions: attachment.sessions.length,
-        persistedSessions: fitted.attachment.sessions.length,
-        droppedSessions: fitted.droppedSessions,
-      });
+    // The trim is steady state for a busy connection, so report it on a change
+    // of shape rather than once per heartbeat.
+    const signature = `${fitted.attachment.sessions.length}/${fitted.droppedSessions}`;
+    if (this.trimReport.get(attachment.connectionId) !== signature) {
+      this.trimReport.set(attachment.connectionId, signature);
+      if (fitted.droppedSessions > 0) {
+        console.warn('Trimmed the CLI socket attachment to the frame budget', {
+          connectionId: attachment.connectionId,
+          sessions: attachment.sessions.length,
+          persistedSessions: fitted.attachment.sessions.length,
+          droppedSessions: fitted.droppedSessions,
+        });
+      }
     }
+    const value: CliAttachment =
+      fitted.droppedSessions > 0
+        ? { ...fitted.attachment, sessionsTrimmed: fitted.droppedSessions }
+        : fitted.attachment;
     try {
-      ws.serializeAttachment(fitted.attachment);
+      ws.serializeAttachment(value);
       return;
     } catch (error) {
       if (!isAttachmentCapacityError(error)) {
@@ -2528,9 +2604,13 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     // The JSON estimate can undershoot structured-clone overhead. Metadata
     // alone is small next to the frame limit, so this nearly always fits.
-    const { sessions: _sessions, ...metadata } = fitted.attachment;
+    const { sessions: _sessions, ...metadata } = value;
     try {
-      ws.serializeAttachment({ ...metadata, sessions: [] });
+      ws.serializeAttachment({
+        ...metadata,
+        sessions: [],
+        sessionsTrimmed: attachment.sessions.length,
+      });
       console.error(
         'CLI socket attachment exceeded the frame after trimming; dropped every session',
         {

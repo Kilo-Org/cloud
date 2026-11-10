@@ -428,6 +428,12 @@ repository.
 1. The user MUST be able to open a terminal on the environment as a tab beside
    the chat, and close it. A read-only session MUST NOT offer terminals.
 2. A pull request the session opened MUST be visible with its current state.
+   In a worktree, a same-repository pull request on the branch the worktree has
+   checked out belongs to the worktree: every chat in it MUST show that pull
+   request without any chat reporting it, an open or draft pull request MUST win
+   over a closed or merged one, and it MUST only match within the worktree's
+   personal or organization scope. Outside worktrees a branch name alone MUST
+   NOT link a pull request.
 3. Open workspace tabs — the workspace terminal and file tabs, their order, and
    the active tab — MUST survive refresh and navigation between worktrees, and
    MUST remain scoped to the current user and personal or organization context.
@@ -786,6 +792,11 @@ The following use SHOULD and are not enforced today:
      load the `AGENTS.md` or skills of each repository.
 
 ## Changelog
+
+### 2026-11-10 -- Worktree pull requests
+
+- A pull request on a worktree's checked-out branch now belongs to the worktree
+  and shows on every chat in it, without the agent reporting a link.
 
 ### 2026-11-04 -- Environment start commands
 

@@ -33,6 +33,7 @@ import {
   watchPrProjectionSchema,
 } from './watch-pr-events';
 import { replayWatchPrCiEvents } from './watch-pr-ci-inbox';
+import { readWorkspacePullRequest } from '@/lib/session-associated-pr';
 
 type WatchContext = Parameters<typeof ensureOrganizationAccess>[0];
 
@@ -85,7 +86,30 @@ async function ownedSession(ctx: WatchContext, sessionId: string) {
   });
   if (!session) throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   if (session.organization_id) await ensureOrganizationAccess(ctx, session.organization_id);
-  return session;
+  return withWorkspacePullRequest(session);
+}
+
+/**
+ * A chat in a Cloud Agent workspace watches the workspace's PR (a PR on the
+ * branch the workspace has checked out) even without a link of its own. The
+ * PR is presented as the session's link, reported on the workspace branch, so
+ * `verifySource` still checks it against GitHub before any watch starts.
+ */
+async function withWorkspacePullRequest(session: CliSessionV2): Promise<CliSessionV2> {
+  if (!session.cloud_agent_worktree_id) return session;
+  const workspacePr = await readWorkspacePullRequest(session);
+  if (!workspacePr) return session;
+  return {
+    ...session,
+    git_url: workspacePr.gitUrl,
+    git_branch: workspacePr.gitBranch,
+    platform: 'github',
+    pr_url: workspacePr.prUrl,
+    pr_number: workspacePr.prNumber,
+    pr_head_ref: workspacePr.gitBranch,
+    pr_head_sha: null,
+    pr_link_verified_at: session.pr_link_verified_at ?? new Date().toISOString(),
+  };
 }
 
 async function ownedWatch(ctx: WatchContext, watchId: string) {

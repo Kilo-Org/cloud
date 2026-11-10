@@ -6653,6 +6653,11 @@ export const cloud_agent_worktrees = pgTable(
     }),
     base_branch: text(),
     base_sha: text(),
+    // The repository and the branch checked out in the workspace, as last
+    // reported by its chats. A pull request on this repository and branch in
+    // the workspace's tenant is the workspace's pull request.
+    git_url: text(),
+    git_branch: text(),
     sidebar_position: text(),
     name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -6680,6 +6685,11 @@ export const cloud_agent_worktrees = pgTable(
     index('IDX_cloud_agent_worktrees_parent_worktree_id')
       .on(table.parent_worktree_id)
       .where(isNotNull(table.parent_worktree_id))
+      .concurrently(),
+    // Supports the pull_request webhook, which finds workspaces by repository and branch.
+    index('IDX_cloud_agent_worktrees_git_url_branch')
+      .on(table.git_url, table.git_branch)
+      .where(isNotNull(table.git_branch))
       .concurrently(),
     check(
       'cloud_agent_worktrees_deletion_check',
@@ -7361,9 +7371,13 @@ export const github_branch_pull_requests = pgTable(
       .on(table.git_url, table.pr_number, table.owned_by_user_id)
       .where(isNotNull(table.pr_number))
       .concurrently(),
-    // Reads resolve a PR by identity (git_url, pr_number); branch columns are
-    // no longer part of the join key.
+    // Session reads resolve a PR by identity (git_url, pr_number).
     index('IDX_github_branch_prs_url_pr_number').on(table.git_url, table.pr_number).concurrently(),
+    // Cloud Agent workspace reads resolve their PR by the workspace's repository and branch.
+    index('IDX_github_branch_prs_url_branch')
+      .on(table.git_url, table.git_branch)
+      .where(isNotNull(table.pr_number))
+      .concurrently(),
     check(
       'github_branch_pull_requests_owner_check',
       sql`(

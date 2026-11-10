@@ -2138,3 +2138,123 @@ describe('cliSessionsV2 deleteWorktree adapter', () => {
     }
   );
 });
+
+describe('cliSessionsV2 Cloud Agent workspace PR', () => {
+  async function insertWorkspace(
+    overrides: Partial<typeof cloud_agent_worktrees.$inferInsert> = {}
+  ) {
+    await db.insert(cloud_agent_worktrees).values({
+      worktree_id: WORKTREE_ID,
+      kilo_user_id: USER_ID,
+      organization_id: null,
+      git_url: GIT_URL,
+      git_branch: BRANCH,
+      ...overrides,
+    });
+  }
+
+  async function insertPr(
+    prNumber: number,
+    overrides: Partial<typeof github_branch_pull_requests.$inferInsert> = {}
+  ) {
+    await db.insert(github_branch_pull_requests).values({
+      git_url: GIT_URL,
+      git_branch: BRANCH,
+      owned_by_user_id: USER_ID,
+      pr_url: `${GIT_URL}/pull/${prNumber}`,
+      pr_number: prNumber,
+      pr_state: 'open',
+      pr_title: `PR ${prNumber}`,
+      review_decision_pending: false,
+      ...overrides,
+    });
+  }
+
+  async function listedPr(sessionId = SESSION_ID) {
+    const result = await createCaller({ user }).list({
+      organizationId: null,
+      worktreeId: WORKTREE_ID,
+    });
+    return result.cliSessions.find(session => session.session_id === sessionId)?.associatedPr;
+  }
+
+  it('shows a PR on the workspace branch on every chat without a link of its own', async () => {
+    await insertWorkspace();
+    await insertPr(42);
+    const sibling = await insertSession();
+
+    expect(await listedPr()).toMatchObject({ number: 42, state: 'open', title: 'PR 42' });
+    expect(await listedPr(sibling.session_id)).toMatchObject({ number: 42, state: 'open' });
+    const details = await createCaller({ user }).worktreeDetails({
+      worktreeIds: [WORKTREE_ID],
+      organizationId: null,
+    });
+    expect(details.worktrees[WORKTREE_ID].prSession?.associatedPr).toMatchObject({ number: 42 });
+  });
+
+  it('prefers the open PR on the branch over an older merged one', async () => {
+    await insertWorkspace();
+    await insertPr(41, { pr_state: 'merged' });
+    await insertPr(43);
+
+    expect(await listedPr()).toMatchObject({ number: 43, state: 'open' });
+  });
+
+  it('still shows a merged PR when it is the only PR on the branch', async () => {
+    await insertWorkspace();
+    await insertPr(41, { pr_state: 'merged' });
+
+    expect(await listedPr()).toMatchObject({ number: 41, state: 'merged' });
+  });
+
+  it('shows no PR for another branch, another tenant, or a deleting workspace', async () => {
+    await insertWorkspace();
+    await insertPr(44, { git_branch: 'other-branch' });
+    await insertPr(45, { owned_by_user_id: OTHER_USER_ID });
+    expect(await listedPr()).toBeNull();
+
+    await insertPr(46);
+    await db
+      .update(cloud_agent_worktrees)
+      .set({ deletion_started_at: LATER_TIME })
+      .where(eq(cloud_agent_worktrees.worktree_id, WORKTREE_ID));
+    const details = await createCaller({ user }).worktreeDetails({
+      worktreeIds: [WORKTREE_ID],
+      organizationId: null,
+    });
+    expect(details.worktrees[WORKTREE_ID]).toBeUndefined();
+  });
+
+  it("prefers the workspace PR over a chat's own verified link to a closed PR", async () => {
+    await insertWorkspace();
+    await insertPr(47);
+    await insertPr(30, { git_branch: 'old-branch', pr_state: 'closed' });
+    await db
+      .update(cli_sessions_v2)
+      .set({
+        git_url: GIT_URL,
+        platform: 'github',
+        pr_url: `${GIT_URL}/pull/30`,
+        pr_number: 30,
+        pr_link_verified_at: INITIAL_TIME,
+      })
+      .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+
+    expect(await listedPr()).toMatchObject({ number: 47, state: 'open' });
+  });
+
+  it("keeps a local session's own verified link and ignores branch-only PRs", async () => {
+    await insertPr(48, { git_branch: 'local-branch' });
+    const local = await insertSession({
+      cloud_agent_worktree_id: null,
+      cloud_agent_session_id: null,
+      created_on_platform: 'cli',
+      git_url: GIT_URL,
+      git_branch: 'local-branch',
+    });
+    const result = await createCaller({ user }).list({ organizationId: null });
+    expect(
+      result.cliSessions.find(session => session.session_id === local.session_id)?.associatedPr
+    ).toBeNull();
+  });
+});

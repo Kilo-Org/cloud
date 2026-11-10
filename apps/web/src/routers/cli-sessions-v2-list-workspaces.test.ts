@@ -548,3 +548,35 @@ describe('cloudAgentSettings workspace order', () => {
     expect(await settingsCaller().getWorkspaceOrder()).toEqual({ workspaceOrder: 'created' });
   });
 });
+
+describe('cliSessionsV2 listWorkspaces Cloud Agent workspace PR', () => {
+  it("shows the PR on a workspace's checked-out branch without a chat link", async () => {
+    const worktree = worktreeId();
+    await insertWorktree(worktree, { git_url: GIT_URL, git_branch: 'kilo/workspace-pr' });
+    await db
+      .insert(cli_sessions_v2)
+      .values(
+        makeSession('ses_300000000000000000000001', worktree, { git_branch: 'kilo/workspace-pr' })
+      );
+    await db.insert(github_branch_pull_requests).values({
+      git_url: GIT_URL,
+      git_branch: 'kilo/workspace-pr',
+      owned_by_user_id: USER_ID,
+      pr_url: `${GIT_URL}/pull/77`,
+      pr_number: 77,
+      pr_state: 'open',
+      pr_title: 'Workspace pull request',
+    });
+
+    const result = await sessionCaller().listWorkspaces({ organizationId: null });
+    expect(result.workspaces.find(workspace => workspace.worktreeId === worktree)).toMatchObject({
+      pr: { number: 77, state: 'open', title: 'Workspace pull request' },
+    });
+
+    const searched = await sessionCaller().listWorkspaces({
+      organizationId: null,
+      search: '#77',
+    });
+    expect(searched.workspaces.map(workspace => workspace.worktreeId)).toEqual([worktree]);
+  });
+});

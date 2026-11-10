@@ -1,5 +1,10 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { cli_sessions_v2, github_branch_pull_requests, organizations } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  cloud_agent_worktrees,
+  github_branch_pull_requests,
+  organizations,
+} from '@kilocode/db/schema';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -171,6 +176,11 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
   });
 
   afterAll(async () => {
+    if (userIdsToCleanup.length > 0) {
+      await db
+        .delete(cloud_agent_worktrees)
+        .where(inArray(cloud_agent_worktrees.kilo_user_id, userIdsToCleanup));
+    }
     if (sessionIdsToCleanup.length > 0) {
       await db
         .delete(cli_sessions_v2)
@@ -1974,6 +1984,104 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
 
       const rows = await readUserRow({ userId: testUserId, prNumber: 808 });
       expect(rows[0].review_decision_pending).toBe(true);
+    });
+  });
+
+  describe('Cloud Agent workspace branch', () => {
+    async function seedWorkspace(args: {
+      branch: string;
+      owner?: WebhookInstallationOwner;
+      deleting?: boolean;
+    }) {
+      const owner = args.owner ?? testOwner;
+      await db.insert(cloud_agent_worktrees).values({
+        worktree_id: `worktree_${crypto.randomUUID()}`,
+        kilo_user_id: owner.kind === 'user' ? owner.userId : testUserId,
+        organization_id: owner.kind === 'organization' ? owner.organizationId : null,
+        git_url: NORMALIZED_GIT_URL,
+        git_branch: args.branch,
+        deletion_started_at: args.deleting ? new Date().toISOString() : null,
+      });
+    }
+
+    it('writes the PR when a workspace has its branch checked out, without any session link', async () => {
+      const branch = 'kilo/workspace-open';
+      await seedWorkspace({ branch });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 901, headRef: branch, headSha: 'sha-901' }),
+        testOwner
+      );
+
+      expect(written).toBe(1);
+      const [row] = await readUserRow({ userId: testUserId, prNumber: 901 });
+      expect(row).toMatchObject({ git_branch: branch, pr_state: 'open', pr_head_sha: 'sha-901' });
+    });
+
+    it('keeps the PR state current through merge', async () => {
+      const branch = 'kilo/workspace-merge';
+      await seedWorkspace({ branch });
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 902, headRef: branch, headSha: 'sha-902' }),
+        testOwner
+      );
+
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'closed',
+          prNumber: 902,
+          state: 'closed',
+          merged: true,
+          headRef: branch,
+          headSha: 'sha-902',
+        }),
+        testOwner
+      );
+
+      const [row] = await readUserRow({ userId: testUserId, prNumber: 902 });
+      expect(row.pr_state).toBe('merged');
+    });
+
+    it('ignores another branch, a deleting workspace, and another tenant', async () => {
+      const otherUser = await insertTestUser();
+      userIdsToCleanup.push(otherUser.id);
+      await seedWorkspace({ branch: 'kilo/workspace-elsewhere' });
+      await seedWorkspace({ branch: 'kilo/workspace-deleting', deleting: true });
+      await seedWorkspace({
+        branch: 'kilo/workspace-other-tenant',
+        owner: { kind: 'user', userId: otherUser.id },
+      });
+
+      for (const [prNumber, branch] of [
+        [903, 'kilo/workspace-unknown'],
+        [904, 'kilo/workspace-deleting'],
+        [905, 'kilo/workspace-other-tenant'],
+      ] as const) {
+        const written = await upsertCliSessionPullRequestsFromWebhook(
+          makePayload({ action: 'opened', prNumber, headRef: branch, headSha: `sha-${prNumber}` }),
+          testOwner
+        );
+        expect(written).toBe(0);
+        expect(await readUserRow({ userId: testUserId, prNumber })).toHaveLength(0);
+      }
+    });
+
+    it('ignores a fork PR on the workspace branch', async () => {
+      const branch = 'kilo/workspace-fork';
+      await seedWorkspace({ branch });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'opened',
+          prNumber: 906,
+          headRef: branch,
+          headSha: 'sha-906',
+          headRepo: 'someone/widgets',
+        }),
+        testOwner
+      );
+
+      expect(written).toBe(0);
     });
   });
 });

@@ -23,6 +23,7 @@ import {
 } from './watch-pr';
 import { emptyWatchPrProjection } from './watch-pr-events';
 import { replayWatchPrCiEvents } from './watch-pr-ci-inbox';
+import { readWorkspacePullRequest } from '@/lib/session-associated-pr';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
@@ -37,6 +38,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     select: jest.fn(),
     update: jest.fn(),
   },
+}));
+jest.mock('@/lib/session-associated-pr', () => ({
+  readWorkspacePullRequest: jest.fn(async () => null),
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
@@ -316,6 +320,40 @@ describe('watch lookup identity', () => {
       expect(db.query.cloud_agent_worktrees.findFirst).not.toHaveBeenCalled();
     }
   );
+
+  it("looks up the workspace's PR for a chat without a link of its own", async () => {
+    jest.mocked(db.query.cli_sessions_v2.findFirst).mockResolvedValue({
+      ...session,
+      platform: null,
+      pr_url: null,
+      pr_number: null,
+      pr_head_ref: null,
+      pr_head_sha: null,
+      pr_link_verified_at: null,
+      git_branch: 'stale-branch',
+    });
+    jest.mocked(readWorkspacePullRequest).mockResolvedValueOnce({
+      prUrl: 'https://github.com/kilo/widgets/pull/12',
+      prNumber: 12,
+      gitUrl: 'https://github.com/kilo/widgets',
+      gitBranch: 'repair',
+    });
+    jest.mocked(db.query.cloud_agent_pr_watches.findFirst).mockResolvedValue(undefined);
+
+    await expect(getWatchPr(ctx, queryInput)).resolves.toBeNull();
+
+    expect(readWorkspacePullRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ session_id: session.session_id, kilo_user_id: ctx.user.id })
+    );
+    const where = jest.mocked(db.query.cloud_agent_pr_watches.findFirst).mock.calls[0]?.[0]?.where;
+    if (!where || typeof where === 'function') throw new Error('Expected SQL predicate');
+    expect(new PgDialect().sqlToQuery(where).params).toEqual([
+      ctx.user.id,
+      session.cloud_agent_worktree_id,
+      12,
+      'https://github.com/kilo/widgets',
+    ]);
+  });
 
   it.each([{ pr_link_verified_at: null }, { cloud_agent_worktree_id: null }])(
     'does not fall back to another worktree watch for invalid link %j',

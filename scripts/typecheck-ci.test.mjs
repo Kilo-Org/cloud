@@ -749,9 +749,11 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   );
 });
 
-// Every workflow that runs the declaration action must install the same
-// closure. The action's program is the whole input: a wider install links
-// workspaces the build never reads, and a narrower one breaks the build.
+// Every producer that builds the declarations for other jobs must install the
+// same closure. The action's program is the whole input: a wider install links
+// workspaces the build never reads, and a narrower one breaks the build. The
+// jobs that build and then use the tree in one job install the whole workspace,
+// so they are not producers and this test does not cover them.
 test('kilo-app CI installs the closure the declaration action needs', () => {
   const install = (file, job) =>
     workflows[file].jobs[job].steps.find(step =>

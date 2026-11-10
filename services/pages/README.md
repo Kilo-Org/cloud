@@ -16,7 +16,7 @@ ready for that. The dev Worker is deployed by hand from a profile.
 | Worker | `pages-dev` |
 | Address | `https://pages-dev.kiloapps.io` |
 | First deployed | 2026-11-10, from `nteract/nteract` at `3c22117f7`, version `e11cd161-d009-4619-8cdb-b8464a0a17a1` |
-| Running now | `nteract/nteract` PR 4963 at `5f3379fb7` (main at `a3bd8130f` plus the packaging change), version `a9ff34e1-750a-4f87-b422-da8708cc7c6d` |
+| Running now | `nteract/nteract` main at `c293adb0e`, version `0338be24-80cb-4fae-9b43-459cef1cb76a` |
 | Build id | `cdb234a8943e` (reported by `/health`) |
 | D1, auth and catalog | `pages-dev-auth` (`13db1af4-e01e-447d-ae51-cc37625d5f77`) |
 | D1, usage | `pages-dev-usage` (`8691d489-5105-49f4-bbec-63ecbca319e9`) |
@@ -40,8 +40,8 @@ the profile has `workers_dev: false`, and that address answers 404. Nothing
 was ever pointed at it.
 
 The profile names the hostname and its zone under `custom_domain`, and the
-packaging script turns that into the route (nteract/nteract PR 4963). Until
-that PR merges, deploy from its branch, `pages/cloudflare-profile-domain`.
+packaging script turns that into the route (nteract/nteract PR 4963, on main
+from `c293adb0e`).
 Do not use `wrangler deploy --domain`: it can't name the zone, and the API
 answers "Can't infer zone from route".
 

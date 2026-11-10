@@ -202,11 +202,9 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'vitest',
 ];
 
-// The matcher anchors a rule at both ends of the whole command text, and git
-// accepts global options before the subcommand. The read-only policy therefore
-// denies git broadly, grants the read subcommands a review needs, and then
-// denies each write subcommand. The map is inserted in that order and the last
-// matching rule wins, so a write verdict holds when a read rule matches too.
+// A permission rule is anchored at both ends of the whole command text, so a
+// read rule names the subcommand directly after git. Every other git form keeps
+// the git denial, including a read that carries a global option.
 const CODE_REVIEW_GIT_READ_SUBCOMMANDS = [
   'diff',
   'fetch',
@@ -216,41 +214,6 @@ const CODE_REVIEW_GIT_READ_SUBCOMMANDS = [
   'show',
   'status',
 ];
-
-const CODE_REVIEW_GIT_WRITE_SUBCOMMANDS = [
-  'add',
-  'am',
-  'apply',
-  'branch',
-  'checkout',
-  'cherry-pick',
-  'clean',
-  'commit',
-  'config',
-  'merge',
-  'mv',
-  'push',
-  'rebase',
-  'remote set-url',
-  'reset',
-  'restore',
-  'rm',
-  'stash',
-  'switch',
-  'tag',
-  'worktree',
-];
-
-// `git <subcommand>` covers the plain form, `git <subcommand> *` covers it with
-// arguments, and `git -*` covers any run of global options before the
-// subcommand.
-function gitSubcommandRules(subcommands: string[]): string[] {
-  return subcommands.flatMap(subcommand => [
-    `git ${subcommand}`,
-    `git ${subcommand} *`,
-    `git -* ${subcommand}*`,
-  ]);
-}
 
 const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
   'ls',
@@ -394,14 +357,13 @@ export function getCommandGuardPolicy(
     return {
       policyName: 'code-review-read-only',
       allowed: CODE_REVIEW_ALLOWED_COMMANDS,
-      denied: [
-        ...DEFAULT_DENIED_COMMAND_PATTERNS,
-        ...CODE_REVIEW_DENIED_COMMAND_PATTERNS,
-        'git',
-        'git *',
-      ],
-      allowedAfterDenied: gitSubcommandRules(CODE_REVIEW_GIT_READ_SUBCOMMANDS),
-      deniedAfterAllowedOverrides: gitSubcommandRules(CODE_REVIEW_GIT_WRITE_SUBCOMMANDS),
+      denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS, 'git'],
+      // The read set is installed after the git denial, and the last matching
+      // rule wins.
+      allowedAfterDenied: CODE_REVIEW_GIT_READ_SUBCOMMANDS.flatMap(subcommand => [
+        `git ${subcommand}`,
+        `git ${subcommand} *`,
+      ]),
     };
   }
 

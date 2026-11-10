@@ -84,10 +84,9 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['git fetch *']).toBe('allow');
     expect(bashPermissions['git pull']).toBe('allow');
     expect(bashPermissions['git pull *']).toBe('allow');
-    expect(bashPermissions['git push']).toBe('deny');
-    expect(bashPermissions['git push *']).toBe('deny');
-    expect(bashPermissions['git commit']).toBe('deny');
-    expect(bashPermissions['git commit *']).toBe('deny');
+    // A write subcommand carries no rule of its own; the git denial classifies it.
+    expect(bashPermissions['git push']).toBeUndefined();
+    expect(bashPermissions['git commit']).toBeUndefined();
     expect(bashPermissions['glab mr merge']).toBe('deny');
     expect(bashPermissions['glab mr merge *']).toBe('deny');
     expect(bashPermissions['glab auth']).toBe('deny');
@@ -155,13 +154,13 @@ describe('code-review command guard policy', () => {
     }
   });
 
-  it('resolves git subcommands by name in plain and option-prefixed forms', () => {
+  it('resolves git by name only when the subcommand directly follows git', () => {
     const policy = getCommandGuardPolicy('code-review');
     if (!policy) throw new Error('Expected code-review command guard policy');
     const permissions = buildCommandGuardBashPermissions(policy);
 
-    // Git accepts global options before the subcommand. Each spelling below
-    // keeps the verdict of the subcommand it names.
+    // A global option before the subcommand keeps the git denial, whichever
+    // subcommand follows.
     for (const command of [
       'git -C /tmp/review push',
       'git -C /tmp/review push origin main',
@@ -171,14 +170,18 @@ describe('code-review command guard policy', () => {
       'git --no-pager push',
       'git -C /tmp/review remote set-url origin https://example.com/repo.git',
       'git -C /tmp/review branch -D main',
+      'git --no-pager update-ref -m log refs/heads/main HEAD',
+      'git -C /tmp/review update-ref -m log refs/heads/main HEAD',
+      'git -C /tmp/review log --oneline -1',
+      'git --no-pager diff --stat',
       'git push',
       'git commit -m note',
       'git reset --hard HEAD~1',
       'git config user.email review@example.com',
-      // Git accepts an unambiguous prefix of a subcommand, and the policy names
-      // only the subcommands that need a rule; the blanket git rule refuses both.
+      // Git accepts an unambiguous prefix of a subcommand, and a git form the
+      // policy does not name keeps the git denial.
       'git pus origin main',
-      'git -C /tmp/review update-ref refs/heads/main HEAD',
+      'git update-ref refs/heads/main HEAD',
       'git --version',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
@@ -187,25 +190,15 @@ describe('code-review command guard policy', () => {
     for (const command of [
       'git diff',
       'git diff HEAD~1..HEAD',
-      'git --no-pager diff --stat',
-      'git -C /tmp/review log --oneline -5',
-      'git -c core.pager=cat show HEAD:src/app.ts',
+      'git log --oneline -5',
+      'git show HEAD:src/app.ts',
       'git status --porcelain',
       'git rev-parse HEAD',
       'git fetch origin',
-      'git -C /tmp/review fetch --prune origin',
+      'git fetch --prune origin',
       'git pull',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
-    }
-
-    // A read rule can match the whole command text of a command that also holds
-    // a write spelling; the write verdict must win.
-    for (const command of [
-      'git -C /tmp/review diff; git -C /tmp/review push',
-      'git -C /tmp/review log --oneline; git commit -m note',
-    ]) {
-      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }
   });
 

@@ -398,7 +398,8 @@ describe('migrated origin permissions', () => {
               curl: 'deny',
             }
           : {
-              'git push': 'deny',
+              'git *': 'deny',
+              'git diff': 'allow',
               'gh pr create': 'deny',
               'gh api repos/*/issues/*/comments --input*': 'allow',
               'gh api repos/*/issues/comments/* -X PATCH*': 'allow',

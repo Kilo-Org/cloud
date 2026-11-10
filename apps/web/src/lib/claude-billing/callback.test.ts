@@ -82,7 +82,6 @@ async function seed(scope: Scope = 'personal') {
       kilo_user_id: user.id,
       organization_id: null,
       provider_id: 'anthropic',
-      encrypted_api_key: { encryptedData: 'fake' } as never,
       created_by: user.id,
     },
     ...(org
@@ -91,7 +90,6 @@ async function seed(scope: Scope = 'personal') {
             kilo_user_id: null,
             organization_id: org.id,
             provider_id: 'anthropic',
-            encrypted_api_key: { encryptedData: 'fake' } as never,
             created_by: user.id,
           },
         ]

@@ -27,7 +27,7 @@ import type * as encryptionModule from '@kilocode/web-shared/lib/ai-gateway/byok
 import type * as chatGptRoutingModule from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { getOpenAiChatGptCandidateModel } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import type * as gatewayModelsCacheModule from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import {
   canRouteToVercel,
   shouldRouteToVercel,
@@ -41,9 +41,12 @@ import {
   type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys, type User } from '@kilocode/db/schema';
+import {
+  testByokEnvelope,
+  useFakeByokKms,
+} from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 
@@ -322,6 +325,8 @@ async function createOwner(user: User, index: number): Promise<ByokOwner> {
   return { type: 'organization', id: organization.id };
 }
 
+useFakeByokKms();
+
 beforeEach(() => {
   jest.mocked(findDirectByokCatalogModels).mockResolvedValue(CATALOG_MODELS);
   jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai']);
@@ -338,7 +343,7 @@ describe('previewByokRouting', () => {
           keys.map(({ providerId, isEnabled, catalogMode }) => ({
             ...(owner.type === 'user' ? { kilo_user_id: owner.id } : { organization_id: owner.id }),
             provider_id: providerId,
-            encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+            encrypted_api_key_envelope: testByokEnvelope(`${providerId}-secret`),
             created_by: user.id,
             is_enabled: isEnabled,
             settings: { serve_catalog_models: catalogMode },
@@ -412,7 +417,7 @@ describe('previewByokRouting', () => {
         (['zai-coding', 'synthetic'] as const).map(providerId => ({
           kilo_user_id: user.id,
           provider_id: providerId,
-          encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+          encrypted_api_key_envelope: testByokEnvelope(`${providerId}-secret`),
           created_by: user.id,
           settings: { serve_catalog_models: true, priority: priorities?.[providerId] },
         }))
@@ -477,7 +482,7 @@ describe('previewByokRouting', () => {
         order.map((providerId, priority) => ({
           kilo_user_id: user.id,
           provider_id: providerId,
-          encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+          encrypted_api_key_envelope: testByokEnvelope(`${providerId}-secret`),
           created_by: user.id,
           settings: { serve_catalog_models: providerId === 'zai-coding', priority },
         }))
@@ -531,7 +536,7 @@ describe('previewByokRouting', () => {
     await db.insert(byok_api_keys).values({
       kilo_user_id: user.id,
       provider_id: 'zai-coding',
-      encrypted_api_key: encryptApiKey('zai-coding-secret', BYOK_ENCRYPTION_KEY),
+      encrypted_api_key_envelope: testByokEnvelope('zai-coding-secret'),
       created_by: user.id,
       settings: { serve_catalog_models: true },
     });
@@ -564,14 +569,17 @@ describe('previewByokRouting', () => {
         {
           kilo_user_id: user.id,
           provider_id: 'zai-coding',
-          encrypted_api_key: encryptApiKey('zai-coding-secret', BYOK_ENCRYPTION_KEY),
+          encrypted_api_key_envelope: testByokEnvelope('zai-coding-secret'),
           created_by: user.id,
           settings: { serve_catalog_models: true, priority: catalogPriority },
         },
         {
           kilo_user_id: user.id,
           provider_id: 'moonshotai',
-          encrypted_api_key: encryptApiKey('moonshotai-secret', randomBytes(32).toString('base64')),
+          encrypted_api_key_envelope: testByokEnvelope(
+            'moonshotai-secret',
+            randomBytes(32).toString('base64')
+          ),
           created_by: user.id,
           settings: { priority: 1 },
         },
@@ -607,14 +615,17 @@ describe('previewByokRouting', () => {
       {
         kilo_user_id: user.id,
         provider_id: 'openrouter',
-        encrypted_api_key: encryptApiKey('openrouter-secret', BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope('openrouter-secret'),
         created_by: user.id,
         settings: { priority: 0 },
       },
       {
         kilo_user_id: user.id,
         provider_id: 'zai-coding',
-        encrypted_api_key: encryptApiKey('zai-coding-secret', randomBytes(32).toString('base64')),
+        encrypted_api_key_envelope: testByokEnvelope(
+          'zai-coding-secret',
+          randomBytes(32).toString('base64')
+        ),
         created_by: user.id,
         settings: { serve_catalog_models: true, priority: 1 },
       },
@@ -643,21 +654,21 @@ describe('previewByokRouting', () => {
       {
         kilo_user_id: user.id,
         provider_id: 'openrouter',
-        encrypted_api_key: encryptApiKey('openrouter-secret', BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope('openrouter-secret'),
         created_by: user.id,
         settings: { priority: 0 },
       },
       {
         kilo_user_id: user.id,
         provider_id: 'anthropic',
-        encrypted_api_key: encryptApiKey('anthropic-secret', BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope('anthropic-secret'),
         created_by: user.id,
         settings: { priority: 1 },
       },
       {
         kilo_user_id: user.id,
         provider_id: 'moonshotai',
-        encrypted_api_key: encryptApiKey('moonshotai-secret', BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope('moonshotai-secret'),
         created_by: user.id,
       },
     ]);
@@ -693,7 +704,7 @@ describe('previewByokRouting', () => {
       (['anthropic', 'bedrock'] as const).map((providerId, priority) => ({
         kilo_user_id: user.id,
         provider_id: providerId,
-        encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope(`${providerId}-secret`),
         created_by: user.id,
         settings: { priority },
       }))
@@ -733,7 +744,7 @@ describe('previewByokRouting', () => {
         providerIds.map((providerId, priority) => ({
           kilo_user_id: user.id,
           provider_id: providerId,
-          encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+          encrypted_api_key_envelope: testByokEnvelope(`${providerId}-secret`),
           created_by: user.id,
           settings: { priority },
         }))
@@ -781,7 +792,7 @@ describe('previewByokRouting', () => {
       (['openrouter', 'zai-coding'] as const).map((providerId, priority) => ({
         kilo_user_id: user.id,
         provider_id: providerId,
-        encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope(`${providerId}-secret`),
         created_by: user.id,
         settings: { serve_catalog_models: providerId === 'zai-coding', priority },
       }))
@@ -818,7 +829,7 @@ describe('getProvider with an organization provider allow-list', () => {
       providerIds.map((providerId, index) => ({
         organization_id: organization.id,
         provider_id: providerId,
-        encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope(`${providerId}-secret`),
         created_by: user.id,
         created_at: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
       }))
@@ -872,13 +883,13 @@ describe('getProvider with an organization provider allow-list', () => {
       {
         organization_id: organization.id,
         provider_id: 'moonshotai',
-        encrypted_api_key: encryptApiKey('moonshotai-secret', wrongKey),
+        encrypted_api_key_envelope: testByokEnvelope('moonshotai-secret', wrongKey),
         created_by: user.id,
       },
       {
         organization_id: organization.id,
         provider_id: 'anthropic',
-        encrypted_api_key: encryptApiKey('anthropic-secret', BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope('anthropic-secret'),
         created_by: user.id,
       },
     ]);

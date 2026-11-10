@@ -1313,6 +1313,11 @@ test('the extension changes job carries the shared dependency-input install gate
   assert.equal(
     retry['continue-on-error'],
     sharedStep('filter_resources_retry')['continue-on-error'],
+    'the retry shares the shared changes job retry contract'
+  );
+  assert.equal(
+    retry['continue-on-error'],
+    undefined,
     'a persistent filter failure fails the job instead of installing nothing'
   );
   assert.equal(

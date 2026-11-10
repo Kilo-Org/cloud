@@ -40,6 +40,7 @@ import {
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
   getStoredSessionActivityTime,
+  groupSidebarItemsByDate,
   groupSidebarSessionsByDate,
   type SidebarForegroundSessionStatus,
   type SidebarSortPins,
@@ -99,6 +100,7 @@ import {
 } from './workspace-folders';
 import { filterLiveSidebarSessions } from './live-sidebar-sessions';
 import type { ActiveSession } from './hooks/useActiveSessions';
+import { sidebarUpdatedSince } from './hooks/sidebar-queries';
 
 type ChatSidebarProps = {
   sessions: StoredSession[];
@@ -1116,15 +1118,39 @@ export function ChatSidebar({
       }),
     [workspaceDestinations, workspaceFolders?.folders]
   );
-  const phase4Ungrouped = workspaceDestinations.unfiled;
+  const phase4Ungrouped = useMemo(() => {
+    if (searchQuery.trim()) return workspaceDestinations.unfiled;
+    const cutoff = new Date(sidebarUpdatedSince(new Date())).getTime();
+    return workspaceDestinations.unfiled.filter(group =>
+      [group.root, ...group.layers].some(row => new Date(row.lastActivityAt).getTime() >= cutoff)
+    );
+  }, [searchQuery, workspaceDestinations.unfiled]);
   const phase4SessionGroups = useMemo(
     () =>
-      dateGroups.flatMap(group => {
-        const items = group.items.filter(item => item.type === 'session');
-        return items.length > 0 ? [{ ...group, items }] : [];
-      }),
-    [dateGroups]
+      groupSidebarSessionsByDate(
+        sessions.filter(session => !session.worktreeId),
+        undefined,
+        {},
+        sortPins
+      ),
+    [sessions, sortPins]
   );
+  const phase4DateGroups = useMemo(() => {
+    const worktrees = phase4Ungrouped.flatMap(group => {
+      const worktree = workspaceGroupsById.get(group.root.worktreeId);
+      return worktree ? [worktree] : [];
+    });
+    return groupSidebarItemsByDate(
+      [...worktrees, ...phase4SessionGroups.flatMap(group => group.items)],
+      undefined,
+      sortPins
+    );
+  }, [phase4SessionGroups, phase4Ungrouped, sortPins, workspaceGroupsById]);
+  const hasStoredRows = hasWorkspaceGroups
+    ? phase4Ungrouped.length > 0 ||
+      phase4SessionGroups.length > 0 ||
+      phase4FolderSections.length > 0
+    : sessions.length > 0 || folderGroups.length > 0;
   const workspaceRootIds = useMemo(
     () => new Set(orderedWorkspaceGroups.map(group => group.root.worktreeId)),
     [orderedWorkspaceGroups]
@@ -1140,15 +1166,15 @@ export function ChatSidebar({
 
   const workspaceGroupsInContainer = useCallback(
     (folderId: string | null): SidebarWorkspaceGroup[] => {
-      if (folderId === null) return phase4Ungrouped;
+      if (folderId === null) return workspaceDestinations.unfiled;
       const folder = workspaceFolders?.folders.find(candidate => candidate.id === folderId);
-      if (!folder) return phase4Ungrouped;
+      if (!folder) return workspaceDestinations.unfiled;
       if (folder.kind === 'smart' && folder.smartPreset) {
         return workspaceDestinations.smart.get(folder.smartPreset) ?? [];
       }
       return workspaceDestinations.manual.get(folder.id) ?? [];
     },
-    [phase4Ungrouped, workspaceDestinations, workspaceFolders?.folders]
+    [workspaceDestinations, workspaceFolders?.folders]
   );
 
   const rowDropPlacement = useCallback((event: DragEvent<HTMLDivElement>): 'before' | 'after' => {
@@ -1687,11 +1713,12 @@ export function ChatSidebar({
         )}
         {isLoading || workspaceFolders?.isFirstLoadPending ? (
           <SidebarListSkeleton />
-        ) : sessions.length === 0 &&
-          liveOnlySessions.length === 0 &&
-          folderGroups.length === 0 &&
-          orderedWorkspaceGroups.length === 0 ? (
-          <div className="text-muted-foreground py-8 text-center text-sm">No sessions yet</div>
+        ) : !hasStoredRows && liveOnlySessions.length === 0 ? (
+          <div className="text-muted-foreground py-8 text-center text-sm">
+            {workspaceGroups?.length
+              ? 'No recent sessions. Use search to find older sessions.'
+              : 'No sessions yet'}
+          </div>
         ) : (
           <>
             {hasWorkspaceGroups && workspaceFolders
@@ -1829,27 +1856,38 @@ export function ChatSidebar({
                   {phase4FolderSections.length > 0 && phase4Ungrouped.length === 0 && (
                     <p className="text-muted-foreground px-3 py-3 text-xs">Drop workspaces here</p>
                   )}
-                  {phase4Ungrouped.map(renderWorkspaceGroup)}
+                  {workspaceOrder !== 'activity' && phase4Ungrouped.map(renderWorkspaceGroup)}
                   {workspaceRowsTruncated && (
                     <p className="text-muted-foreground px-3 py-2 text-xs">
-                      Showing the first 200 open workspaces. Use search to find older ones.
+                      Workspace list limited to 200. Use search to find more workspaces.
                     </p>
                   )}
-                  {phase4SessionGroups.map((group, groupIdx) => (
-                    <div key={group.label}>
-                      <div
-                        className={cn(
-                          'text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase',
-                          groupIdx === 0 ? 'pt-4' : 'pt-3'
-                        )}
-                      >
-                        {group.label}
+                  {workspaceOrder !== 'activity' &&
+                    phase4Ungrouped.length > 0 &&
+                    phase4SessionGroups.length > 0 && (
+                      <div className="text-muted-foreground px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wider uppercase">
+                        Sessions
                       </div>
-                      {group.items.map(item =>
-                        item.type === 'session' ? renderSession(item.session) : null
-                      )}
-                    </div>
-                  ))}
+                    )}
+                  {(workspaceOrder === 'activity' ? phase4DateGroups : phase4SessionGroups).map(
+                    (group, groupIdx) => (
+                      <div key={group.label}>
+                        <div
+                          className={cn(
+                            'text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase',
+                            groupIdx === 0 ? 'pt-4' : 'pt-3'
+                          )}
+                        >
+                          {group.label}
+                        </div>
+                        {group.items.map(item =>
+                          item.type === 'session'
+                            ? renderSession(item.session)
+                            : renderWorktree(item)
+                        )}
+                      </div>
+                    )
+                  )}
                 </>
               ) : (
                 <>

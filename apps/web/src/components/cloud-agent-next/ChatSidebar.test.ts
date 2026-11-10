@@ -1255,11 +1255,13 @@ describe('ChatSidebar phase 4 drag ordering', () => {
 
   function phase4Group(
     index: number,
-    sidebarPosition: string | null
+    sidebarPosition: string | null,
+    overrides: Partial<StoredSession> = {}
   ): NonNullable<ChatSidebarProps['workspaceGroups']>[number] {
     const session = makeSession(index, {
       worktreeId: `worktree_drag_${index}`,
       cloudAgentSessionId: `workspace_${index}`,
+      ...overrides,
     });
     return {
       type: 'worktree',
@@ -1336,6 +1338,168 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     return { dataTransfer };
   }
 
+  it.each(['manual', 'created', 'activity'] as const)(
+    'limits Ungrouped to recent activity with %s ordering',
+    workspaceOrder => {
+      jest.useFakeTimers({ now: new Date(2026, 10, 9, 12) });
+      try {
+        const cutoff = new Date(2026, 10, 4).toISOString();
+        const old = phase4Group(0, null, {
+          createdAt: new Date(2026, 8, 1).toISOString(),
+          lastActivityAt: new Date(2026, 8, 1).toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        const recent = phase4Group(1, null, {
+          createdAt: new Date(2026, 8, 1).toISOString(),
+          lastActivityAt: cutoff,
+        });
+        const beforeCutoff = phase4Group(2, null, {
+          createdAt: new Date(2026, 10, 3, 23, 59, 59).toISOString(),
+        });
+        renderSidebar({ workspaceGroups: [old, recent, beforeCutoff], workspaceOrder });
+
+        expect(dom.container.querySelector('[data-worktree-id="worktree_drag_0"]')).toBeNull();
+        expect(dom.container.querySelector('[data-worktree-id="worktree_drag_1"]')).not.toBeNull();
+        expect(dom.container.querySelector('[data-worktree-id="worktree_drag_2"]')).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    }
+  );
+
+  it('keeps old workspaces accessible in search and saved folders', () => {
+    const old = phase4Group(0, null, {
+      createdAt: new Date(2026, 0, 1).toISOString(),
+    });
+    renderSidebar({ workspaceGroups: [old], searchQuery: 'Workspace 0' });
+    expect(dom.container.querySelector('[data-worktree-id="worktree_drag_0"]')).not.toBeNull();
+
+    const folders = workspaceFolders();
+    const folder = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Saved',
+      color: 'default',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
+      worktreeIds: [old.worktreeId],
+    } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>['folders'][number];
+    renderSidebar({
+      workspaceGroups: [{ ...old, details: { ...old.details!, folderId: folder.id } }],
+      workspaceFolders: { ...folders, folders: [folder] },
+    });
+    expect(
+      dom.container.querySelector(`[data-folder-id="${folder.id}"] [data-worktree-id]`)
+    ).not.toBeNull();
+    expect(
+      dom.container.querySelector('[data-folder-drop="ungrouped"] [data-worktree-id]')
+    ).toBeNull();
+  });
+
+  it('shows a searchable empty state when all ungrouped workspaces have aged out', () => {
+    renderSidebar({
+      workspaceGroups: [phase4Group(0, null, { createdAt: new Date(2026, 0, 1).toISOString() })],
+    });
+    expect(dom.container.querySelector('[data-worktree-id]')).toBeNull();
+    expect(dom.container.textContent).toContain(
+      'No recent sessions. Use search to find older sessions.'
+    );
+  });
+
+  it('interleaves recent workspaces and standalone sessions under shared date headings', () => {
+    jest.useFakeTimers({ now: new Date(2026, 10, 9, 12) });
+    try {
+      const yesterday = phase4Group(0, null, {
+        createdAt: new Date(2026, 10, 8, 12).toISOString(),
+      });
+      const thursday = phase4Group(1, null, {
+        createdAt: new Date(2026, 10, 5, 12).toISOString(),
+      });
+      const todayWorkspace = phase4Group(4, null, {
+        createdAt: new Date(2026, 10, 9, 9).toISOString(),
+      });
+      const today = makeSession(2, { createdAt: new Date(2026, 10, 9, 10).toISOString() });
+      const friday = makeSession(3, { createdAt: new Date(2026, 10, 6, 12).toISOString() });
+      renderSidebar({
+        workspaceGroups: [thursday, yesterday, todayWorkspace],
+        workspaceOrder: 'activity',
+        sessions: [...yesterday.sessions, ...thursday.sessions, friday, today],
+      });
+
+      const ungrouped = dom.container.querySelector('[data-folder-drop="ungrouped"]');
+      const sections = Array.from(ungrouped?.children ?? []).filter(element =>
+        element.querySelector('[data-worktree-id], [title^="Prompt"]')
+      );
+      expect(sections.map(section => section.firstElementChild?.textContent)).toEqual([
+        'Today',
+        'Yesterday',
+        'Friday',
+        'Thursday',
+      ]);
+      expect(
+        sections.map(section =>
+          Array.from(section.querySelectorAll('[data-worktree-id], [title^="Prompt"]')).map(
+            row => row.getAttribute('title') ?? row.querySelector('button span')?.textContent
+          )
+        )
+      ).toEqual([[today.prompt, 'Workspace 4'], ['Workspace 0'], [friday.prompt], ['Workspace 1']]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps a stack visible when a child workspace has recent activity', () => {
+    const old = phase4Group(0, null, { createdAt: new Date(2026, 0, 1).toISOString() });
+    const child = phase4Group(1, null);
+    renderSidebar({
+      workspaceGroups: [{ ...old, stackLayers: [child] }],
+      workspaceOrder: 'activity',
+    });
+    expect(dom.container.querySelector('[data-worktree-id="worktree_drag_0"]')).not.toBeNull();
+    const ungrouped = dom.container.querySelector('[data-folder-drop="ungrouped"]');
+    expect(ungrouped?.textContent).toContain('Today');
+    expect(ungrouped?.textContent).not.toContain('Older');
+  });
+
+  it('preserves manual workspace positions and labels the separate sessions list', () => {
+    const first = phase4Group(0, 'a2');
+    const second = phase4Group(1, 'a1');
+    renderSidebar({
+      workspaceGroups: [first, second],
+      workspaceOrder: 'manual',
+      sessions: [makeSession(2)],
+    });
+    const ungrouped = dom.container.querySelector('[data-folder-drop="ungrouped"]');
+    expect(
+      Array.from(ungrouped?.querySelectorAll('[data-worktree-id]') ?? []).map(row =>
+        row.getAttribute('data-worktree-id')
+      )
+    ).toEqual([second.worktreeId, first.worktreeId]);
+    expect(ungrouped?.textContent).toContain('Sessions');
+  });
+
+  it('does not let workspace dates consume the standalone-session weekday headings', () => {
+    jest.useFakeTimers({ now: new Date(2026, 10, 9, 12) });
+    try {
+      const workspaces = [7, 6, 5].map((day, index) =>
+        phase4Group(index, null, { createdAt: new Date(2026, 10, day, 12).toISOString() })
+      );
+      renderSidebar({
+        workspaceGroups: workspaces,
+        workspaceOrder: 'manual',
+        sessions: [
+          ...workspaces.flatMap(group => group.sessions),
+          makeSession(3, { createdAt: new Date(2026, 10, 4, 12).toISOString() }),
+        ],
+      });
+      const ungrouped = dom.container.querySelector('[data-folder-drop="ungrouped"]');
+      expect(ungrouped?.textContent).toContain('Wednesday');
+      expect(ungrouped?.textContent).not.toContain('Older');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('initializes the whole unpositioned container on the first drag, writing the desired order', () => {
     const folders = workspaceFolders();
     renderSidebar({
@@ -1379,6 +1543,60 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     expect(folderId).toBeNull();
     expect(typeof position).toBe('string');
     expect((position as string) > 'a2').toBe(true);
+  });
+
+  it('includes aged-out workspaces when initializing Ungrouped positions', () => {
+    const folders = workspaceFolders();
+    renderSidebar({
+      workspaceFolders: folders,
+      workspaceGroups: [
+        phase4Group(0, null),
+        phase4Group(1, null),
+        phase4Group(2, 'a1', { createdAt: new Date(2026, 0, 1).toISOString() }),
+      ],
+    });
+
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    expect(rows).toHaveLength(2);
+    const sourceTitle = rows[0]?.querySelector('button span');
+    if (!rows[0] || !rows[1] || !sourceTitle) throw new Error('Rows missing');
+
+    dragRows(sourceTitle, rows[1], 35);
+
+    expect(folders.initializeWorktreePositions).toHaveBeenCalledTimes(1);
+    expect(folders.initializeWorktreePositions).toHaveBeenCalledWith(
+      ['worktree_drag_1', 'worktree_drag_0', 'worktree_drag_2'],
+      null
+    );
+    expect(folders.moveWorktree).not.toHaveBeenCalled();
+  });
+
+  it('uses aged-out neighbors when reordering positioned Ungrouped workspaces', () => {
+    const folders = workspaceFolders();
+    renderSidebar({
+      workspaceFolders: folders,
+      workspaceGroups: [
+        phase4Group(0, 'a1'),
+        phase4Group(1, 'a2'),
+        phase4Group(2, 'a3', { createdAt: new Date(2026, 0, 1).toISOString() }),
+      ],
+    });
+
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    expect(rows).toHaveLength(2);
+    const sourceTitle = rows[0]?.querySelector('button span');
+    if (!rows[0] || !rows[1] || !sourceTitle) throw new Error('Rows missing');
+
+    dragRows(sourceTitle, rows[1], 35);
+
+    expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+    expect(folders.moveWorktree).toHaveBeenCalledTimes(1);
+    const [worktreeId, folderId, position] = folders.moveWorktree.mock.calls[0] ?? [];
+    expect(worktreeId).toBe('worktree_drag_0');
+    expect(folderId).toBeNull();
+    if (typeof position !== 'string') throw new Error('Position missing');
+    expect(position > 'a2').toBe(true);
+    expect(position < 'a3').toBe(true);
   });
 
   it('places before the first row when dropped on its top half', () => {

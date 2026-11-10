@@ -4,6 +4,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import {
   applyKiloDefaultPreset,
+  configKey,
   createPolicyRule,
   draftsEqual,
   fromDraft,
@@ -33,6 +34,7 @@ function policyRules(count: number) {
 function enabledDraft(): EnkryptGuardrailsDraft {
   return toDraft({
     enabled: true,
+    group_id: null,
     detectors: createKiloDefaultEnkryptInputDetectors(),
     output: offOutput(),
   });
@@ -68,6 +70,7 @@ describe('draft conversion', () => {
     outputDetectors.topic_detector = { enabled: true, action: 'block', topic: ['weapons'] };
     const config = {
       enabled: true,
+      group_id: 'bbbbbbbb-2222-4222-8222-222222222222',
       detectors: createKiloDefaultEnkryptInputDetectors(),
       output: { enabled: true, detectors: outputDetectors },
     };
@@ -77,6 +80,7 @@ describe('draft conversion', () => {
       action: 'block',
       topic: 'weapons',
     });
+    expect(draft.group_id).toBe(config.group_id);
     expect(fromDraft(draft)).toEqual(config);
   });
 });
@@ -90,6 +94,7 @@ describe('draftsEqual', () => {
         Object.entries(draft.detectors).reverse()
       ) as EnkryptGuardrailsDraft['detectors'],
       enabled: draft.enabled,
+      group_id: draft.group_id,
     };
     expect(draftsEqual(draft, reordered)).toBe(true);
 
@@ -113,25 +118,39 @@ describe('draftsEqual', () => {
     edited.enabled = false;
     expect(draftsEqual(saved, edited, false)).toBe(false);
   });
+
+  it('treats a different group as a change, with or without output', () => {
+    const saved = enabledDraft();
+    const edited = { ...enabledDraft(), group_id: 'bbbbbbbb-2222-4222-8222-222222222222' };
+
+    expect(draftsEqual(saved, edited)).toBe(false);
+    expect(draftsEqual(saved, edited, false)).toBe(false);
+    expect(configKey(fromDraft(saved), false)).not.toBe(configKey(fromDraft(edited), false));
+    expect(configKey(fromDraft(edited), false)).toContain(
+      '"group_id":"bbbbbbbb-2222-4222-8222-222222222222"'
+    );
+
+    expect(draftsEqual(edited, { ...enabledDraft(), group_id: edited.group_id }, false)).toBe(true);
+  });
 });
 
 describe('applyKiloDefaultPreset', () => {
-  it('restores the default detector selection and turns on the Kilo default policy text', () => {
+  it('restores the default detector selection and turns on the Kilo default policy text, logging', () => {
     const { detectors } = enabledDraft();
     const rules = [{ ...createPolicyRule([]), text: 'No customer data.' }];
-    detectors.injection_attack = { enabled: true, action: 'log' };
+    detectors.injection_attack = { enabled: true, action: 'block' };
     detectors.toxicity.enabled = true;
     detectors.keyword_detector = { enabled: true, action: 'log', banned_keywords: 'Acme' };
     detectors.policy_violation = {
       enabled: false,
-      action: 'log',
+      action: 'block',
       format: 'rules',
       policy_text: 'Old policy.',
       rules,
     };
 
     const preset = applyKiloDefaultPreset(detectors);
-    expect(preset.injection_attack).toEqual({ enabled: true, action: 'block' });
+    expect(preset.injection_attack).toEqual({ enabled: true, action: 'log' });
     expect(preset.toxicity.enabled).toBe(false);
     expect(preset.keyword_detector).toEqual({
       enabled: false,
@@ -140,7 +159,7 @@ describe('applyKiloDefaultPreset', () => {
     });
     expect(preset.policy_violation).toEqual({
       enabled: true,
-      action: 'block',
+      action: 'log',
       format: 'policy_text',
       policy_text: KILO_DEFAULT_POLICY_TEXT,
       rules,

@@ -15,7 +15,7 @@ import {
   blockingEnkryptDetectorIds,
   blockingEnkryptOutputDetectorIds,
   buildEnkryptDetectRequestDetectors,
-  createKiloDefaultEnkryptInputDetectors,
+  createLegacyEnkryptInputDetectors,
   enabledEnkryptDetectorIds,
   enabledEnkryptOutputDetectorIds,
   enforcedEnkryptInputDetectors,
@@ -83,9 +83,10 @@ export function readStoredEnkryptOutputDetectors(
 /**
  * The organization's input guardrail, or null when Kilo admins have not granted the feature
  * (`kilo_encrypt`), or the guardrail is absent, disabled, invalid in settings, or selects no
- * detector. Organizations that never saved detectors get Kilo Default. Only the configurable
- * detectors run, as saved; see `enforcedEnkryptInputDetectors`. Every input is
- * checked, including tool results, whatever `scan_tool_results` says.
+ * detector. Organizations that enabled it before detectors were saved get the legacy detectors.
+ * Only the configurable detectors run, as saved; see `enforcedEnkryptInputDetectors`. Every input
+ * is checked, including tool results, whatever `scan_tool_results` says. It applies only to
+ * members of `enkryptInputGuardrailGroupId`, when that is set.
  */
 export function resolveEnkryptInputGuardrail(
   organizationId: string,
@@ -106,7 +107,7 @@ export function resolveEnkryptInputGuardrail(
   const stored = readStoredEnkryptDetectors(organizationId, parsed.data.detectors);
   if (stored.status === 'invalid') return { scanToolResults: true, status: 'invalid' };
   const detectors = enforcedEnkryptInputDetectors(
-    stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors()
+    stored.status === 'found' ? stored.detectors : createLegacyEnkryptInputDetectors()
   );
   if (enabledEnkryptDetectorIds(detectors).length === 0) return null;
   return {
@@ -115,6 +116,26 @@ export function resolveEnkryptInputGuardrail(
     detectors: buildEnkryptDetectRequestDetectors(detectors),
     blockingDetectors: blockingEnkryptDetectorIds(detectors),
   };
+}
+
+/**
+ * The organization group the input guardrail is limited to, or null when it applies to every
+ * member. Only meaningful while `resolveEnkryptInputGuardrail` returns a guardrail.
+ */
+export function enkryptInputGuardrailGroupId(
+  settings: OrganizationSettings | undefined
+): string | null {
+  const parsed = EnkryptInputGuardrailSettingsSchema.safeParse(settings?.enkrypt?.input_guardrail);
+  return (parsed.success && parsed.data.group_id) || null;
+}
+
+/** Whether the input guardrail applies to a member who belongs to `memberGroupIds`. */
+export function enkryptInputGuardrailAppliesTo(
+  settings: OrganizationSettings | undefined,
+  memberGroupIds: readonly string[]
+): boolean {
+  const groupId = enkryptInputGuardrailGroupId(settings);
+  return groupId === null || memberGroupIds.includes(groupId);
 }
 
 /**

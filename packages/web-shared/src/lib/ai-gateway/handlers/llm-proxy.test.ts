@@ -25,7 +25,10 @@ import {
   getBalanceAndOrgSettings,
   type BalancePayer,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
+import {
+  getOrganizationGroupPolicyContext,
+  type OrganizationGroupPolicyContext,
+} from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import {
   getProvider,
@@ -5720,6 +5723,47 @@ describe('Enkrypt input guardrail', () => {
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
+  describe('limited to a group', () => {
+    const groupId = '00000000-0000-4000-8000-0000000000a1';
+    const otherGroupId = '00000000-0000-4000-8000-0000000000a2';
+
+    function memberOf(groupIds: string[]) {
+      jest
+        .mocked(getOrganizationGroupPolicyContext)
+        .mockResolvedValueOnce({ groupIds } as unknown as OrganizationGroupPolicyContext);
+    }
+
+    it('makes no Enkrypt call for a member outside the group', async () => {
+      setOrganization({ enkrypt: { input_guardrail: { enabled: true, group_id: groupId } } });
+      memberOf([otherGroupId]);
+      enkryptAnswers(injection);
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+      expect(response.status).toBe(200);
+      expect(enkryptRequestBodies()).toEqual([]);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(getOrganizationGroupPolicyContext)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: 'org-1',
+          subject: { type: 'member', kiloUserId: 'user-123' },
+        })
+      );
+    });
+
+    it('scans and blocks a member of the group', async () => {
+      setOrganization({ enkrypt: { input_guardrail: { enabled: true, group_id: groupId } } });
+      memberOf([otherGroupId, groupId]);
+      enkryptAnswers(injection);
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+      expect(response.status).toBe(400);
+      expect(enkryptRequestBodies()).toEqual(kiloDefaultScans('hello'));
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+  });
+
   it('scans the full conversation and sends an allowed request upstream', async () => {
     setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
     enkryptAnswers({ summary: { injection_attack: 0, pii: 0 }, result_message: null });
@@ -6300,6 +6344,7 @@ describe('Enkrypt input guardrail', () => {
 
     function setBlockingInjectionAndLogOnlyPolicy() {
       const detectors = createKiloDefaultEnkryptInputDetectors();
+      detectors.injection_attack.action = 'block';
       detectors.policy_violation = {
         enabled: true,
         action: 'log',
@@ -6857,6 +6902,7 @@ describe('Enkrypt input guardrail', () => {
 
     it('passes a getter to the response rewrite that waits for the delayed log-only input call', async () => {
       const detectors = createKiloDefaultEnkryptInputDetectors();
+      detectors.injection_attack.action = 'block';
       detectors.policy_violation = {
         enabled: true,
         action: 'log',

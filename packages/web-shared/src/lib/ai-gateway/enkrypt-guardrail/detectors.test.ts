@@ -17,6 +17,7 @@ import {
   buildEnkryptDetectRequestDetectors,
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
+  createLegacyEnkryptInputDetectors,
   enabledEnkryptDetectorIds,
   enabledEnkryptOutputDetectorIds,
   ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
@@ -293,18 +294,33 @@ describe('detector metadata', () => {
 
 describe('blockingEnkryptDetectorIds', () => {
   it('blocks only on enabled configurable detectors set to block', () => {
-    expect(blockingEnkryptDetectorIds(createKiloDefaultEnkryptInputDetectors())).toEqual([
-      'injection_attack',
-    ]);
     expect(blockingEnkryptDetectorIds(allEnabled())).toEqual([
       'injection_attack',
       'policy_violation',
     ]);
   });
 
+  it('logs prompt injection without blocking for Kilo Default', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+
+    expect(enabledEnkryptDetectorIds(detectors)).toEqual(['injection_attack']);
+    expect(blockingEnkryptDetectorIds(detectors)).toEqual([]);
+  });
+
+  it('blocks prompt injection for guardrails enabled before detectors were saved', () => {
+    const detectors = createLegacyEnkryptInputDetectors();
+
+    expect(issueMessages(detectors)).toEqual([]);
+    expect(detectors).toEqual({
+      ...createKiloDefaultEnkryptInputDetectors(),
+      injection_attack: { enabled: true, action: 'block' },
+    });
+    expect(enabledEnkryptDetectorIds(detectors)).toEqual(['injection_attack']);
+    expect(blockingEnkryptDetectorIds(detectors)).toEqual(['injection_attack']);
+  });
+
   it('only logs configurable detectors set to log only', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.injection_attack.action = 'log';
     detectors.policy_violation = { ...allEnabled().policy_violation, action: 'log' };
 
     expect(enabledEnkryptDetectorIds(detectors)).toEqual(['injection_attack', 'policy_violation']);

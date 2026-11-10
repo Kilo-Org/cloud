@@ -22,6 +22,11 @@ import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { mutateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  enkryptInputGuardrailGroupId,
+  resolveEnkryptInputGuardrail,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { normalizeRegisteredOrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/registry.server';
 import {
   DEFAULT_ORGANIZATION_GROUP_POLICIES,
@@ -698,6 +703,37 @@ export async function setOrganizationMemberGroups(params: {
   );
 }
 
+/**
+ * A group that an active Enkrypt input guardrail is limited to cannot be deleted, because the
+ * guardrail would then scan nobody. An inactive guardrail forgets the group, so it applies to every
+ * member if it is turned on again.
+ */
+async function releaseEnkryptInputGuardrailGroup(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  groupId: string
+) {
+  await mutateOrganizationSettings(
+    organizationId,
+    ({ settings }) => {
+      const inputGuardrail = settings.enkrypt?.input_guardrail;
+      if (!inputGuardrail || enkryptInputGuardrailGroupId(settings) !== groupId) return settings;
+      if (resolveEnkryptInputGuardrail(organizationId, settings) !== null) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            'Input guardrails are limited to this group. Choose another group on the AI Guardrails page first.',
+        });
+      }
+      return {
+        ...settings,
+        enkrypt: { ...settings.enkrypt, input_guardrail: { ...inputGuardrail, group_id: null } },
+      };
+    },
+    tx
+  );
+}
+
 export async function deleteOrganizationGroup(params: {
   organizationId: string;
   groupId: string;
@@ -708,6 +744,7 @@ export async function deleteOrganizationGroup(params: {
     params.actor.id,
     async ({ tx }) => {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
+      await releaseEnkryptInputGuardrailGroup(tx, params.organizationId, group.id);
       await tx
         .delete(organization_groups)
         .where(

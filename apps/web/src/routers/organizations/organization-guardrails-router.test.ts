@@ -9,6 +9,7 @@ import {
 import {
   admin_action_audit_logs,
   organization_audit_logs,
+  organization_groups,
   type Organization,
   type User,
 } from '@kilocode/db/schema';
@@ -16,6 +17,7 @@ import type { EnkryptPolicyRule } from '@kilocode/db/schema-types';
 import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
+  createLegacyEnkryptInputDetectors,
   storableEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
@@ -34,6 +36,7 @@ let organization: Organization;
 
 function savedConfig() {
   const detectors = createKiloDefaultEnkryptInputDetectors();
+  detectors.injection_attack = { enabled: true, action: 'block' };
   detectors.keyword_detector = {
     enabled: true,
     action: 'block',
@@ -48,6 +51,7 @@ function savedConfig() {
   };
   return {
     enabled: true,
+    group_id: null,
     detectors,
     output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
   };
@@ -63,6 +67,28 @@ function policyRules(count: number) {
     severity: 'high',
     frameworks: [],
   }));
+}
+
+async function insertGroup(organizationId: string, name: string) {
+  const [group] = await db
+    .insert(organization_groups)
+    .values({ organization_id: organizationId, name })
+    .returning({ id: organization_groups.id, name: organization_groups.name });
+  return group;
+}
+
+async function latestAuditMessage(organizationId: string) {
+  const [auditLog] = await db
+    .select()
+    .from(organization_audit_logs)
+    .where(eq(organization_audit_logs.organization_id, organizationId))
+    .orderBy(desc(organization_audit_logs.created_at))
+    .limit(1);
+  return auditLog?.message;
+}
+
+async function createGuardrailsOrganization(name: string) {
+  return await createTestOrganization(name, owner.id, 0, { kilo_encrypt: true }, false);
 }
 
 function savedOutputConfig() {
@@ -108,8 +134,10 @@ describe('organization guardrails router', () => {
       caller.organizations.guardrails.get({ organizationId: organization.id })
     ).resolves.toEqual({
       enabled: false,
+      group_id: null,
       detectors: createKiloDefaultEnkryptInputDetectors(),
       output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
+      groups: [],
       output_available: true,
       invalid_saved_detectors: false,
       invalid_saved_output_detectors: false,
@@ -127,6 +155,7 @@ describe('organization guardrails router', () => {
 
     expect(saved).toEqual({
       ...config,
+      groups: [],
       output_available: true,
       invalid_saved_detectors: false,
       invalid_saved_output_detectors: false,
@@ -188,8 +217,7 @@ describe('organization guardrails router', () => {
   });
 
   it('reads input detectors saved before they had an action as blocking', async () => {
-    const { injection_attack, policy_violation, ...others } =
-      createKiloDefaultEnkryptInputDetectors();
+    const { injection_attack, policy_violation, ...others } = createLegacyEnkryptInputDetectors();
     const legacyOrganization = await createTestOrganization(
       'Legacy Action Guardrails Org',
       owner.id,
@@ -219,9 +247,50 @@ describe('organization guardrails router', () => {
     await expect(
       caller.organizations.guardrails.get({ organizationId: legacyOrganization.id })
     ).resolves.toMatchObject({
-      detectors: createKiloDefaultEnkryptInputDetectors(),
+      detectors: createLegacyEnkryptInputDetectors(),
       invalid_saved_detectors: false,
     });
+  });
+
+  it('shows the blocking legacy detectors for a guardrail enabled before detectors were saved', async () => {
+    const legacyOrganization = await createTestOrganization(
+      'Legacy Enabled Guardrails Org',
+      owner.id,
+      0,
+      { kilo_encrypt: true, enkrypt: { input_guardrail: { enabled: true } } },
+      false
+    );
+    const caller = await createCallerForUser(owner.id);
+
+    const config = await caller.organizations.guardrails.get({
+      organizationId: legacyOrganization.id,
+    });
+
+    expect(config).toMatchObject({
+      enabled: true,
+      group_id: null,
+      detectors: createLegacyEnkryptInputDetectors(),
+      invalid_saved_detectors: false,
+    });
+    expect(config.detectors.injection_attack).toEqual({ enabled: true, action: 'block' });
+  });
+
+  it('starts a disabled guardrail without saved detectors from logging Kilo Default', async () => {
+    const disabledOrganization = await createTestOrganization(
+      'Disabled Without Detectors Guardrails Org',
+      owner.id,
+      0,
+      { kilo_encrypt: true, enkrypt: { input_guardrail: { enabled: false } } },
+      false
+    );
+    const caller = await createCallerForUser(owner.id);
+
+    const config = await caller.organizations.guardrails.get({
+      organizationId: disabledOrganization.id,
+    });
+
+    expect(config.detectors).toEqual(createKiloDefaultEnkryptInputDetectors());
+    expect(config.detectors.injection_attack).toEqual({ enabled: true, action: 'log' });
   });
 
   it('saves the output guardrail separately from the input guardrail', async () => {
@@ -370,7 +439,7 @@ describe('organization guardrails router', () => {
       .limit(1);
     expect(auditLog.action).toBe('organization.settings.change');
     expect(auditLog.message).toBe(
-      'Updated AI guardrails: enabled; detectors: injection_attack (block), policy_violation (block, policy text); output guardrails: disabled; output detectors: none'
+      'Updated AI guardrails: enabled; applies to: all members; detectors: injection_attack (block), policy_violation (block, policy text); output guardrails: disabled; output detectors: none'
     );
     expect(auditLog.message).not.toContain('Phoenix');
     expect(auditLog.message).not.toContain('customer records');
@@ -556,8 +625,10 @@ describe('organization guardrails router', () => {
       caller.organizations.guardrails.get({ organizationId: invalidOrganization.id })
     ).resolves.toEqual({
       enabled: true,
+      group_id: null,
       detectors: createKiloDefaultEnkryptInputDetectors(),
       output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
+      groups: [],
       output_available: false,
       invalid_saved_detectors: true,
       invalid_saved_output_detectors: false,
@@ -602,5 +673,123 @@ describe('organization guardrails router', () => {
     expect(
       (await getOrganizationById(invalidOrganization.id))?.settings.enkrypt?.output_guardrail
     ).toEqual({ enabled: true, detectors: { pii: true } });
+  });
+
+  describe('group scoping', () => {
+    it('lists the organization groups by name and no other organization groups', async () => {
+      const scoped = await createGuardrailsOrganization('Group List Guardrails Org');
+      const other = await createGuardrailsOrganization('Other Group List Guardrails Org');
+      const support = await insertGroup(scoped.id, 'Support');
+      const engineering = await insertGroup(scoped.id, 'Engineering');
+      await insertGroup(other.id, 'Elsewhere');
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.guardrails.get({ organizationId: scoped.id })
+      ).resolves.toMatchObject({ group_id: null, groups: [engineering, support] });
+    });
+
+    it('limits the input guardrail to an organization group and names it in the audit log', async () => {
+      const scoped = await createGuardrailsOrganization('Scoped Guardrails Org');
+      const group = await insertGroup(scoped.id, 'Engineering');
+      const caller = await createCallerForUser(owner.id);
+      const { output: _output, ...inputOnly } = savedConfig();
+
+      const saved = await caller.organizations.guardrails.update({
+        organizationId: scoped.id,
+        ...inputOnly,
+        group_id: group.id,
+      });
+
+      expect(saved).toMatchObject({ group_id: group.id, groups: [group] });
+      await expect(
+        caller.organizations.guardrails.get({ organizationId: scoped.id })
+      ).resolves.toEqual(saved);
+      expect(
+        (await getOrganizationById(scoped.id))?.settings.enkrypt?.input_guardrail?.group_id
+      ).toBe(group.id);
+      expect(await latestAuditMessage(scoped.id)).toBe(
+        `Updated AI guardrails: enabled; applies to: group "Engineering" (${group.id}); detectors: injection_attack (block), policy_violation (block, policy text); output guardrails: disabled; output detectors: none`
+      );
+    });
+
+    it('rejects a group from another organization or one that does not exist', async () => {
+      const scoped = await createGuardrailsOrganization('Rejecting Guardrails Org');
+      const other = await createGuardrailsOrganization('Foreign Group Guardrails Org');
+      const foreignGroup = await insertGroup(other.id, 'Foreign');
+      const caller = await createCallerForUser(owner.id);
+      const { output: _output, ...inputOnly } = savedConfig();
+      await caller.organizations.guardrails.update({ organizationId: scoped.id, ...inputOnly });
+      const previous = await getOrganizationById(scoped.id);
+      const previousAudit = await latestAuditMessage(scoped.id);
+
+      for (const group_id of [foreignGroup.id, crypto.randomUUID()]) {
+        await expect(
+          caller.organizations.guardrails.update({
+            organizationId: scoped.id,
+            ...inputOnly,
+            group_id,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'Choose an existing group.' });
+      }
+
+      expect((await getOrganizationById(scoped.id))?.settings).toEqual(previous?.settings);
+      expect(await latestAuditMessage(scoped.id)).toBe(previousAudit);
+    });
+
+    it('keeps the saved group when an update omits group_id and clears it with null', async () => {
+      const scoped = await createGuardrailsOrganization('Preserving Guardrails Org');
+      const group = await insertGroup(scoped.id, 'Engineering');
+      const caller = await createCallerForUser(owner.id);
+      const { output: _output, group_id: _groupId, ...withoutGroup } = savedConfig();
+      await caller.organizations.guardrails.update({
+        organizationId: scoped.id,
+        ...withoutGroup,
+        group_id: group.id,
+      });
+
+      const preserved = await caller.organizations.guardrails.update({
+        organizationId: scoped.id,
+        ...withoutGroup,
+        enabled: false,
+      });
+
+      expect(preserved).toMatchObject({ enabled: false, group_id: group.id });
+      expect(
+        (await getOrganizationById(scoped.id))?.settings.enkrypt?.input_guardrail
+      ).toMatchObject({ enabled: false, group_id: group.id });
+      expect(await latestAuditMessage(scoped.id)).toContain(
+        `Updated AI guardrails: disabled; applies to: group "Engineering" (${group.id});`
+      );
+
+      const cleared = await caller.organizations.guardrails.update({
+        organizationId: scoped.id,
+        ...withoutGroup,
+        group_id: null,
+      });
+
+      expect(cleared.group_id).toBeNull();
+      expect(
+        (await getOrganizationById(scoped.id))?.settings.enkrypt?.input_guardrail?.group_id
+      ).toBeNull();
+      expect(await latestAuditMessage(scoped.id)).toContain(
+        'Updated AI guardrails: enabled; applies to: all members;'
+      );
+      await expect(
+        caller.organizations.guardrails.get({ organizationId: scoped.id })
+      ).resolves.toMatchObject({ group_id: null, groups: [group] });
+    });
+
+    it('rejects a group_id that is not a UUID', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.guardrails.update({
+          organizationId: organization.id,
+          ...savedConfig(),
+          group_id: 'engineering',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
   });
 });

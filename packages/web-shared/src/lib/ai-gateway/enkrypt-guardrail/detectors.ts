@@ -43,12 +43,12 @@ export const ENKRYPT_SUMMARY_DETECTORS: Record<string, EnkryptDetectorId> = {
 };
 
 /**
- * Kilo Default: prompt injection blocks. Detectors without input controls stay off; see
- * `enforcedEnkryptInputDetectors`.
+ * Kilo Default: prompt injection is logged, not blocked. Detectors without input controls stay off;
+ * see `enforcedEnkryptInputDetectors`.
  */
 export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors {
   return {
-    injection_attack: { enabled: true, action: 'block' },
+    injection_attack: { enabled: true, action: 'log' },
     pii: { enabled: false, action: 'log', entities: ['secrets'] },
     keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
     topic_detector: { enabled: false, topic: [] },
@@ -63,6 +63,17 @@ export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors 
     nsfw: { enabled: false },
     bias: { enabled: false, action: 'log' },
     sponge_attack: { enabled: false },
+  };
+}
+
+/**
+ * What a guardrail enabled before detectors were saved enforces: prompt injection blocks, as Kilo
+ * Default did then. Those organizations keep blocking until an admin saves detectors.
+ */
+export function createLegacyEnkryptInputDetectors(): EnkryptInputDetectors {
+  return {
+    ...createKiloDefaultEnkryptInputDetectors(),
+    injection_attack: { enabled: true, action: 'block' },
   };
 }
 

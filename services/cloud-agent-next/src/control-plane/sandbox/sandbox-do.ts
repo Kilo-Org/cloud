@@ -352,7 +352,7 @@ import {
   environmentLaunchCandidate,
   environmentSnapshotDecision,
   environmentSnapshotStartBlock,
-  environmentStartDetail,
+  ENVIRONMENT_SNAPSHOT_MESSAGES,
   lookupEnvironmentSnapshot,
   type EnvironmentLaunchCandidate,
   type EnvironmentLookup,
@@ -538,10 +538,8 @@ class EnvironmentSnapshotRequiredError extends Error {
 type EnvironmentSnapshotUnusableReason = 'provider_no_snapshots' | 'not_isolated';
 
 const ENVIRONMENT_SNAPSHOT_UNUSABLE_DETAIL: Record<EnvironmentSnapshotUnusableReason, string> = {
-  provider_no_snapshots:
-    'This sandbox provider does not support environment snapshots yet, so it cannot start an environment with build commands.',
-  not_isolated:
-    'This session uses a retired sandbox type that cannot use an environment with build commands. Start a new session.',
+  provider_no_snapshots: ENVIRONMENT_SNAPSHOT_MESSAGES.unsupported,
+  not_isolated: ENVIRONMENT_SNAPSHOT_MESSAGES.newSession,
 };
 
 /**
@@ -596,20 +594,8 @@ function workspaceSnapshotFailureDetail(
     capturedAt === undefined
       ? 'Start fresh to discard this workspace snapshot.'
       : `Start fresh discards changes since ${new Date(capturedAt).toISOString()}.`;
-  switch (reason) {
-    case 'expired':
-      return `The workspace snapshot expired. ${since}`;
-    case 'invalid_descriptor':
-      return `The workspace snapshot metadata is invalid. ${since}`;
-    case 'ownership_mismatch':
-      return `The workspace snapshot belongs to another workspace. ${since}`;
-    case 'runtime_mismatch':
-      return `The workspace snapshot was captured with a different runtime. ${since}`;
-    case 'image_unavailable':
-      return `The sandbox image for the workspace snapshot could not be resolved. Send a message to retry. ${since}`;
-    case 'unsupported':
-      return `This sandbox provider cannot restore the workspace snapshot. ${since}`;
-  }
+  const retry = reason === 'image_unavailable' ? ' Send a message to retry.' : '';
+  return `Could not restore the workspace snapshot.${retry} ${since}`;
 }
 
 function errorClassName(error: unknown): string {
@@ -5601,13 +5587,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
       stale:
         lookup.kind === 'resolved' ? (lookup.resolution.snapshot?.stale ?? undefined) : undefined,
     });
-    await notifyPreparingRoutes(this.routeContext(state), {
-      step: 'environment_snapshot',
-      detail: environmentStartDetail(candidate.reference, lookup),
-      ...(lookup.kind === 'resolved' && lookup.resolution.snapshot !== null
-        ? { snapshotCapturedAt: lookup.resolution.snapshot.capturedAt }
-        : {}),
-    });
+    if (decision.snapshot !== undefined) {
+      await notifyPreparingRoutes(this.routeContext(state), {
+        step: 'environment_snapshot',
+        detail: 'Using environment snapshot',
+        ...(lookup.kind === 'resolved' && lookup.resolution.snapshot !== null
+          ? { snapshotCapturedAt: lookup.resolution.snapshot.capturedAt }
+          : {}),
+      });
+    }
     return {
       options: decision.snapshot === undefined ? {} : { snapshot: decision.snapshot },
       selection:
@@ -5630,23 +5618,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'multiple_environments':
         return {
           reason: 'environment_snapshot_unavailable',
-          detail:
-            'The sessions use different environment revisions, so no single environment snapshot applies. Align the environment revision and retry.',
+          detail: 'Sessions use different environment settings. Use matching settings and retry.',
           environmentId: blockedEnvironmentId,
           buildId: null,
         };
       case 'no_actor':
         return {
           reason: 'environment_snapshot_unavailable',
-          detail:
-            'The environment snapshot owner could not be identified. Retry from an authenticated session.',
+          detail: 'Could not verify the snapshot owner. Sign in again and retry.',
           environmentId: blockedEnvironmentId,
           buildId: null,
         };
       default:
         return {
           reason: 'environment_not_built',
-          detail: 'The session requires an environment build, but no environment is available.',
+          detail: 'No environment is selected. Choose an environment to start.',
           environmentId: blockedEnvironmentId,
           buildId: null,
         };
@@ -5779,26 +5765,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ): SnapshotStartFailureError {
     if (selection?.source === 'workspace') {
       const since = `Start fresh discards changes since ${new Date(selection.capturedAt).toISOString()}.`;
-      const detail =
-        reason === 'expired'
-          ? `The workspace snapshot expired. ${since}`
-          : reason === 'missing'
-            ? `The workspace snapshot is missing. ${since}`
-            : reason === 'image_mismatch'
-              ? `The workspace snapshot was captured from a different sandbox image. ${since}`
-              : reason === 'provenance'
-                ? `The workspace snapshot failed its provenance check. ${since}`
-                : reason === 'unsupported'
-                  ? `The provider did not restore the workspace snapshot. ${since}`
-                  : `The workspace snapshot could not start. Send a message to retry. ${since}`;
+      const retry = reason === 'transient' ? ' Send a message to retry.' : '';
+      const detail = `Could not restore the workspace snapshot.${retry} ${since}`;
       return new SnapshotStartFailureError('workspace', reason, detail);
     }
-    const detail =
-      reason === 'transient'
-        ? 'The environment snapshot could not start. Rebuild the environment and retry.'
-        : reason === 'expired'
-          ? 'The environment snapshot expired. Rebuild the environment and retry.'
-          : 'The environment snapshot cannot start. Rebuild the environment and retry.';
+    const detail = ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild;
     const block =
       selection?.source === 'environment'
         ? environmentSnapshotStartBlock(selection.candidate, selection.buildId ?? null)
@@ -6463,7 +6434,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
               const capturedAt = readWorkspaceSnapshot(this.db, disk.owner.workspaceId)?.capturedAt;
               await notifyPreparingRoutes(ctx, {
                 step: 'restore',
-                detail: `The workspace snapshot could not be prepared. ${
+                detail: `Could not restore the workspace snapshot. ${
                   capturedAt === undefined
                     ? 'Start fresh to discard it and start again.'
                     : `Start fresh discards changes since ${new Date(capturedAt).toISOString()}.`

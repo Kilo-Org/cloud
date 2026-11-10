@@ -927,15 +927,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(
       `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} environmentBuildCommands=${skippedSetupCommands} sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
     );
-    if (skippedSetupCommands > 0) {
-      emitProgress(
-        spec.sessionId,
-        'setup',
-        fromEnvironmentSnapshot
-          ? 'Setup already ran in the environment snapshot'
-          : 'Environment build commands run in the environment build'
-      );
-    }
     const commandFailures: ControlPlaneCommandFailure[] = [];
     await runPreparationCommands(
       spec,

@@ -145,4 +145,45 @@ describe('syncArtificialAnalysisBenchmarks', () => {
     expect(stored?.speedTokensPerSec).toBe('62.36');
     expect(stored?.benchmarks?.artificialAnalysis?.timeToFirstTokenSeconds).toBe(3.45);
   });
+
+  it('keeps already fetched pro models when a later page is forbidden', async () => {
+    const matched = await insertTestModelStats({
+      openrouterId: 'aa-sync/matched',
+      aaSlug: 'glm-5-3',
+    });
+    mockedFetch
+      .mockResolvedValueOnce(
+        jsonResponse({ data: [model('glm-5-3')], pagination: { has_more: true } })
+      )
+      .mockResolvedValueOnce(jsonResponse({ error: 'forbidden' }, 403));
+
+    await expect(syncArtificialAnalysisBenchmarks()).resolves.toMatchObject({
+      success: true,
+      matchedCount: 1,
+    });
+    expect(mockedFetch.mock.calls.map(call => call[0])).toEqual([
+      'https://artificialanalysis.ai/api/v2/language/models?page=1',
+      'https://artificialanalysis.ai/api/v2/language/models?page=2',
+    ]);
+    const [stored] = await db.select().from(modelStats).where(eq(modelStats.id, matched.id));
+    expect(stored?.speedTokensPerSec).toBe('80.07');
+  });
+
+  it('returns models already fetched when pagination does not end', async () => {
+    const matched = await insertTestModelStats({
+      openrouterId: 'aa-sync/matched',
+      aaSlug: 'glm-5-3',
+    });
+    mockedFetch.mockImplementation(async () =>
+      jsonResponse({ data: [model('glm-5-3')], pagination: { has_more: true } })
+    );
+
+    await expect(syncArtificialAnalysisBenchmarks()).resolves.toMatchObject({
+      success: true,
+      matchedCount: 1,
+    });
+    expect(mockedFetch).toHaveBeenCalledTimes(50);
+    const [stored] = await db.select().from(modelStats).where(eq(modelStats.id, matched.id));
+    expect(stored?.releaseDate).toBe('2026-08-18');
+  });
 });

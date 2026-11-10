@@ -153,7 +153,13 @@ async function fetchModelPages(url: string): Promise<ArtificialAnalysisModel[] |
       }
     );
 
-    if (response.status === 403) return 'forbidden';
+    if (response.status === 403) {
+      if (page === 1) return 'forbidden';
+      console.warn(
+        `[artificial-analysis] Page ${page} returned 403; keeping ${models.length} models already fetched`
+      );
+      return models;
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -167,7 +173,10 @@ async function fetchModelPages(url: string): Promise<ArtificialAnalysisModel[] |
     if (!parsedData.pagination?.has_more) return models;
   }
 
-  throw new Error(`Artificial Analysis API pagination exceeded ${MAX_MODEL_PAGES} pages`);
+  console.warn(
+    `[artificial-analysis] Pagination exceeded ${MAX_MODEL_PAGES} pages; using ${models.length} models already fetched`
+  );
+  return models;
 }
 
 function extractBenchmarkData(aaModel: ArtificialAnalysisModel) {

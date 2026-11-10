@@ -167,6 +167,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/backfill-safety-identifiers",
+      "schedule": "*/3 * * * *"
+    },
+    {
       "path": "/api/cron/recover-code-reviews",
       "schedule": "*/15 * * * *"
     }

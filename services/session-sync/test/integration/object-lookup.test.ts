@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { session } from '../../src/db/sqlite-schema';
 import { getSessionSyncDOStub } from '../../src/dos/SessionSyncDO';
 import { errorBodySchema, sessionStateSchema } from '../../src/protocol';
-import { batch, client, newSessionID, personal, testEnv, type Client } from '../helpers';
+import { batch, client, newSessionID, personal, sha256, testEnv, type Client } from '../helpers';
 
 async function expectNotFound(response: Response): Promise<void> {
   expect(response.status).toBe(404);
@@ -25,15 +25,30 @@ describe('session object lifecycle', () => {
     const api = client(principal);
     const sessionID = newSessionID();
     const stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+    const bytes = new TextEncoder().encode('payload for a session this object does not hold');
+    const hash = await sha256(bytes);
+    const blob = { hash, bytes: bytes.length };
+    const attempt = crypto.randomUUID();
+    const body = JSON.stringify(
+      batch(crypto.randomUUID(), 0, 1, [
+        { op: 'put', kind: 'message', id: 'msg_1', value: { text: 'discarded' } },
+      ])
+    );
+    const notFound = { ok: false, error: { code: 'session_not_found' } };
 
     await expectNotFound(await api.state(sessionID));
     await expectNotFound(await liveTicket(api, sessionID));
     await expectNotFound(await api.entities(sessionID));
+    await expectNotFound(await api.apply(sessionID, JSON.parse(body)));
+    await expectNotFound(await api.putBlob(sessionID, hash, bytes));
+    await expectNotFound(await api.getBlob(sessionID, hash));
     await expectNotFound(await api.remove(sessionID));
-    expect(await stub.authorizeLive({ principal, sessionID })).toMatchObject({
-      ok: false,
-      error: { code: 'session_not_found' },
-    });
+    expect(await stub.authorizeLive({ principal, sessionID })).toMatchObject(notFound);
+    expect(await stub.applyBatch({ principal, sessionID, body })).toMatchObject(notFound);
+    expect(await stub.beginBlob({ principal, sessionID, blob })).toMatchObject(notFound);
+    expect(await stub.abortBlob({ principal, sessionID, blob, attempt })).toMatchObject(notFound);
+    expect(await stub.commitBlob({ principal, sessionID, blob, attempt })).toMatchObject(notFound);
+    expect(await stub.locateBlob({ principal, sessionID, hash })).toMatchObject(notFound);
     expect(await stub.eraseForUser({ principal, sessionID })).toEqual({ ok: true, value: null });
 
     await runInDurableObject(stub, async (_instance, state) => {

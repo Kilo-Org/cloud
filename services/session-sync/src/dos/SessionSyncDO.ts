@@ -149,7 +149,10 @@ export class SessionSyncDO extends DurableObject<Env> {
     });
   }
 
-  /** Whether this object already holds the session schema. */
+  /**
+   * Whether this object already holds the session schema. `initialize()` marks
+   * the answer ready, so a migrated object answers without another probe.
+   */
   private hasStoredSchema(): boolean {
     if (this.schemaReady) return true;
     const name = getTableName(sessionTable);
@@ -382,8 +385,9 @@ export class SessionSyncDO extends DurableObject<Env> {
   async register(input: unknown): Promise<Result<{ created: boolean; state: SessionState }>> {
     const parsed = parse(registerInput, input);
     if (!parsed.ok) return parsed;
-    await this.initialize();
     const { principal, sessionID, request } = parsed.value;
+    // No other request observes a partially migrated schema.
+    await this.ctx.blockConcurrencyWhile(() => this.initialize());
     return this.serial(async () => {
       const existing = session.load(this.db);
       const prior = existing

@@ -53,11 +53,13 @@ const pnpmCleanup = fileURLToPath(
 
 // A required status check matches by context name and app, so two workflows
 // publishing one required name let either workflow's pass satisfy the ruleset.
-// The main-tests ruleset (12440145) requires exactly these contexts. The mobile
-// workflow mirrors work that ci.yml also runs; those jobs carry a `mobile-`
-// prefix so only ci.yml publishes the required name. The names below that the
-// mobile workflow still owns (`i18n-leftover`, `check-unused`) have no other
-// publisher, so a rename there would leave a required check unreported.
+// The main-tests ruleset (12440145) requires these contexts. The mobile three
+// are required as well because ci.yml excludes apps/mobile from its lint and
+// workspace-test rows: without them a mobile-only PR could pass the ruleset on
+// skipped ci.yml rows. The mobile workflow mirrors work ci.yml also runs, so
+// those jobs carry a `mobile-` prefix and only the mobile workflow publishes
+// them. `i18n-leftover` and `check-unused` have no other publisher, so a rename
+// there would leave a required check unreported.
 const requiredContexts = [
   'test',
   'build',
@@ -67,6 +69,9 @@ const requiredContexts = [
   'i18n-leftover',
   'check-unused',
   'lint',
+  'mobile-typecheck',
+  'mobile-lint',
+  'mobile-test-result',
 ];
 
 function publishingJobs(workflow) {
@@ -102,6 +107,21 @@ test('each required check name is published by exactly one pull-request workflow
   assert.equal(publishers.get('test')[0], 'ci.yml:test');
   assert.equal(publishers.get('typecheck')[0], 'ci.yml:typecheck');
   assert.equal(publishers.get('lint')[0], 'ci.yml:lint');
+  // A required context whose name is prefixed must come from the mobile
+  // workflow: no other workflow may publish one.
+  for (const [name, found] of publishers) {
+    if (name.startsWith('mobile-')) {
+      assert.deepEqual(
+        found,
+        [`kilo-app-ci.yml:${name}`],
+        `${name} belongs to the mobile workflow`
+      );
+    }
+  }
+  // These two required contexts exist only in the mobile workflow, so they keep
+  // their unprefixed names and must not move to ci.yml or another workflow.
+  assert.deepEqual(publishers.get('i18n-leftover'), ['kilo-app-ci.yml:i18n-leftover']);
+  assert.deepEqual(publishers.get('check-unused'), ['kilo-app-ci.yml:check-unused']);
 });
 
 test('the mobile workflow publishes no colliding required check name', () => {

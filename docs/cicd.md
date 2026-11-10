@@ -13,6 +13,16 @@ each pinned to the GitHub Actions app (integration id 15368):
 | `catalog (PR)` | `kilo-mcp-catalog.yml` job `catalog (PR)` |
 | `i18n-leftover` | `kilo-app-ci.yml` job `i18n-leftover` |
 | `check-unused` | `kilo-app-ci.yml` job `check-unused` |
+| `mobile-typecheck` | `kilo-app-ci.yml` job `mobile-typecheck` |
+| `mobile-lint` | `kilo-app-ci.yml` job `mobile-lint` |
+| `mobile-test-result` | `kilo-app-ci.yml` job `mobile-test-result` |
+
+The three mobile checks must stay in the required list. `ci.yml` deliberately
+excludes `apps/mobile`: `scripts/affected-workspaces.mjs` keeps it out of the
+rest-lint group and the workspace-test matrix has no `apps/mobile` row. Without
+the mobile checks a mobile-only pull request could satisfy `lint`, `typecheck`
+and `test` with those skipped rows, run the mobile suite nowhere in the
+required gate, and fail only later in the merge queue.
 
 ## Check names must be unique across workflows
 
@@ -25,14 +35,15 @@ the main CI's check failed.
 
 Rules:
 
+- A required context must have exactly one publisher per workflow name: one
+  workflow publishes it, and no other workflow may reuse that name.
 - A job's check name is its `name:` value, or its job id when no name is set.
   Both live in the workflow file, so a rename is complete only when every
   `needs:` and `needs.<id>` reference moves with it.
 - The mobile workflow (`kilo-app-ci.yml`) prefixes every job that mirrors a
-  required context owned by `ci.yml` with `mobile-`:
-  `mobile-typecheck`, `mobile-lint` and `mobile-test-result` (the mobile Vitest
-  aggregator). Its shard jobs are already unique as `mobile-test (1/4)` and so
-  on.
+  context `ci.yml` publishes with `mobile-`: `mobile-typecheck`, `mobile-lint`
+  and `mobile-test-result` (the mobile Vitest aggregator). Its shard jobs are
+  already unique as `mobile-test (1/4)` and so on.
 - `i18n-leftover` and `check-unused` keep their unprefixed names because
   `kilo-app-ci.yml` is their only publisher. Renaming them would make those
   required contexts unsatisfiable until the ruleset or `ci.yml` gains an
@@ -43,8 +54,9 @@ Rules:
 
 `scripts/typecheck-ci.test.mjs` pins this: it derives every publishing workflow
 from the required context list above, asserts each context has exactly one
-publisher, and asserts the mobile workflow has no bare `test`, `typecheck` or
-`lint` job.
+publisher, asserts every `mobile-`-prefixed required context belongs to
+`kilo-app-ci.yml`, and asserts the mobile workflow has no bare `test`,
+`typecheck` or `lint` job.
 
 ## Aggregators
 
@@ -54,8 +66,8 @@ fails or is cancelled. A skipped job satisfies a required check, so an
 unrelated change passes the gate while the work stays skipped.
 
 `mobile-test-result` in `kilo-app-ci.yml` is the mobile fan-in and follows the
-same rule for its shards and producers. It is not a ruleset-required context;
-the `mobile-` prefix keeps it from competing with `ci.yml`'s `test`.
+same rule for its shards and producers. It is required as well: `ci.yml` has no
+`apps/mobile` rows, so the mobile suite is the only gate for that app.
 
 ## Adding or renaming a required check
 
@@ -64,4 +76,7 @@ the `mobile-` prefix keeps it from competing with `ci.yml`'s `test`.
 2. Update the `main-tests` ruleset (12440145) in a separate step: rulesets live
    outside the repository. Because GitHub matches by name, the ruleset must
    name the new context before the old context stops being reported, or PRs
-   stay blocked on an expected check.
+   stay blocked on an expected check. The mobile context rename in this change
+   is followed by a separate ruleset edit that adds `mobile-typecheck`,
+   `mobile-lint` and `mobile-test-result` to the required list; the old `test`,
+   `typecheck` and `lint` contexts stay, now supplied only by `ci.yml`.

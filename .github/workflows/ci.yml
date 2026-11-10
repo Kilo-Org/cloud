@@ -1116,9 +1116,12 @@ jobs:
           # one dependency graph. The lockfile digest keeps its own segment, so
           # the prefix restore-key below still matches this key when only a
           # source file changed, which also reaches the sha-keyed entries left
-          # by earlier runs. The source globs stay inside the app tree, so none
-          # of them walks node_modules.
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**/*', 'apps/web/*.mjs', 'apps/web/*.ts', 'apps/web/*.tsx', 'apps/web/*.json', 'apps/web/.env', 'apps/web/.env.test') }}
+          # by earlier runs. The app compiles its workspace dependencies from
+          # the TypeScript sources their exports point at, so every package
+          # source tree and manifest is a build input too. None of the globs
+          # walks node_modules: pnpm puts it beside src, and each package
+          # manifest is one file.
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**/*', 'apps/web/*.mjs', 'apps/web/*.ts', 'apps/web/*.tsx', 'apps/web/*.json', 'apps/web/.env', 'apps/web/.env.test', 'packages/*/src/**/*', 'packages/*/package.json') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
 
@@ -1171,8 +1174,10 @@ jobs:
           # Same input-keyed scheme as the web build cache: the lockfile digest
           # is its own segment so the prefix restore-key below still matches.
           # The job copies apps/web/.env and apps/web/.env.test into the app
-          # before building, so those files are build inputs here too.
-          key: ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/ai-gateway/src/**/*', 'apps/ai-gateway/*.mjs', 'apps/ai-gateway/*.json', 'apps/web/.env', 'apps/web/.env.test') }}
+          # before building, so those files are build inputs here too. Like the
+          # web build, this one compiles the workspace packages from their own
+          # sources, so each package tree and manifest is an input as well.
+          key: ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/ai-gateway/src/**/*', 'apps/ai-gateway/*.mjs', 'apps/ai-gateway/*.json', 'apps/web/.env', 'apps/web/.env.test', 'packages/*/src/**/*', 'packages/*/package.json') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-
 

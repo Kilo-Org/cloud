@@ -1,5 +1,6 @@
 import { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
 import { z } from 'zod';
+import type { EnkryptUsageQueueMessage } from './enkrypt';
 
 export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
 export type { AbuseClassification, GatewayApiKind } from './schema-types';
@@ -163,6 +164,11 @@ export const UsageRecordRequestSchema = z.object({
 });
 
 export type UsageRecordRequest = z.infer<typeof UsageRecordRequestSchema>;
+
+/** The LLM body on the shared usage queue stays an untagged request for wire compatibility. */
+export type LlmUsageQueueMessage = UsageRecordRequest;
+
+export type UsageQueueMessage = LlmUsageQueueMessage | EnkryptUsageQueueMessage;
 
 /**
  * `duplicate` means the usage row already existed, so this delivery was a retry

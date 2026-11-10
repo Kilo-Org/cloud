@@ -7358,11 +7358,12 @@ export const github_branch_pull_requests = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Identity is the PR, not the branch: the cache is only a state/review
-    // cache for a PR a session already verifiably links. Branch names are
-    // reused and shared across sessions, so (git_url, git_branch) can never
-    // identify which PR belongs to which session. These partial unique indexes
-    // serve as ON CONFLICT targets for the webhook upsert, keyed by PR number.
+    // Identity is the PR, not the branch: the cache holds state/review for a
+    // PR a session verifiably links, or a PR on the branch a Cloud Agent
+    // workspace has checked out. Outside workspaces branch names are reused
+    // and shared across sessions, so (git_url, git_branch) never identifies a
+    // session's PR. These partial unique indexes serve as ON CONFLICT targets
+    // for the webhook upsert, keyed by PR number.
     uniqueIndex('UQ_github_branch_prs_repo_pr_org')
       .on(table.git_url, table.pr_number, table.owned_by_organization_id)
       .where(isNotNull(table.pr_number))

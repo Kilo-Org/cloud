@@ -5,9 +5,14 @@ import { CloudAgentModeCombobox } from './CloudAgentModeCombobox';
 
 let mockAgents: BuiltinAgentSettings | undefined;
 let mockIsLoading = false;
+let mockIsError = false;
 
 jest.mock('@/hooks/useCloudAgentSettings', () => ({
-  useBuiltinAgentSettings: () => ({ data: mockAgents, isLoading: mockIsLoading }),
+  useBuiltinAgentSettings: () => ({
+    data: mockAgents,
+    isLoading: mockIsLoading,
+    isError: mockIsError,
+  }),
 }));
 
 jest.mock('@/components/ui/popover', () => ({
@@ -25,6 +30,7 @@ afterAll(() => {
 beforeEach(() => {
   mockAgents = {};
   mockIsLoading = false;
+  mockIsError = false;
 });
 
 describe.each(['compact', 'full'] as const)('CloudAgentModeCombobox (%s)', variant => {
@@ -86,5 +92,41 @@ describe.each(['compact', 'full'] as const)('CloudAgentModeCombobox (%s)', varia
     const html = render();
     expect(html).not.toContain('>Plan<');
     expect(html).not.toContain('>Reviewer<');
+  });
+
+  it('offers only Code and custom modes when preferences fail to load', () => {
+    mockAgents = undefined;
+    mockIsError = true;
+
+    const html = render();
+    expect(html).toContain('>Code<');
+    expect(html).toContain('>Reviewer<');
+    for (const label of ['Plan', 'Debug', 'Orchestrator', 'Ask']) {
+      expect(html).not.toContain(`>${label}<`);
+    }
+  });
+
+  it('keeps cached visibility preferences when a refresh fails', () => {
+    mockAgents = { plan: { disable: true } };
+    mockIsError = true;
+
+    const html = render();
+    expect(html).not.toContain('>Plan<');
+    for (const label of ['Code', 'Debug', 'Orchestrator', 'Ask', 'Reviewer']) {
+      expect(html).toContain(`>${label}<`);
+    }
+  });
+
+  it('restores default modes when preferences recover with no overrides', () => {
+    mockAgents = undefined;
+    mockIsError = true;
+    expect(render()).not.toContain('>Plan<');
+
+    mockAgents = {};
+    mockIsError = false;
+    const html = render();
+    for (const label of ['Code', 'Plan', 'Debug', 'Orchestrator', 'Ask']) {
+      expect(html).toContain(`>${label}<`);
+    }
   });
 });

@@ -14,7 +14,7 @@ export function CloudAgentModeCombobox({
 }: Omit<ModeComboboxProps<AgentMode>, 'options'>) {
   const { data: agents, isLoading: isLoadingSettings } = useBuiltinAgentSettings();
   const options = NEXT_MODE_OPTIONS.filter(
-    mode => mode.value === 'code' || agents?.[mode.value]?.disable !== true
+    mode => mode.value === 'code' || (agents !== undefined && agents[mode.value]?.disable !== true)
   );
 
   return <ModeCombobox {...props} options={options} isLoading={isLoading || isLoadingSettings} />;

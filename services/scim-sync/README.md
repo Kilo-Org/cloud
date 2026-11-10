@@ -681,9 +681,9 @@ access after a deploy.
 
 ## Deployment
 
-Deployed by `deploy-workers.yml`, which deploys the Worker matrix that
-`detect-worker-changes.yml` builds by auto-discovering any `services/*` folder
-containing a `wrangler.jsonc`. The automatic `deploy-production.yml` run starts
+Deployed by `deploy-workers.yml`, whose `detect-changes` job builds the Worker
+matrix by auto-discovering any `services/*` folder containing a
+`wrangler.jsonc`. The automatic `deploy-production.yml` run starts
 when a main `CI` run completes, and `deploy-staging.yml` does the same ahead of
 it; an hourly poll covers a missed completion. Both deploy the base config and
 `--env staging` from the newest CI-green merge commit.

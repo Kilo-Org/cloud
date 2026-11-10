@@ -14,11 +14,10 @@ ready for that. The dev Worker is deployed by hand from a profile.
 | | |
 | --- | --- |
 | Worker | `pages-dev` |
-| Address | `https://pages-dev.engineering-e11.workers.dev` |
-| First deployed | 2026-11-10 |
-| Source | `nteract/nteract` at `3c22117f7` |
-| Build id | `b9ed1befe0e9` (reported by `/health`) |
-| First version id | `e11cd161-d009-4619-8cdb-b8464a0a17a1` |
+| Address | `https://pages-dev.kiloapps.io` |
+| First deployed | 2026-11-10, from `nteract/nteract` at `3c22117f7`, version `e11cd161-d009-4619-8cdb-b8464a0a17a1` |
+| Running now | `nteract/nteract` at `a3bd8130f`, version `c4b89d58-0f7f-49ee-aee4-610728a47076` |
+| Build id | `70d74a204a5c` (reported by `/health`) |
 | D1, auth and catalog | `pages-dev-auth` (`13db1af4-e01e-447d-ae51-cc37625d5f77`) |
 | D1, usage | `pages-dev-usage` (`8691d489-5105-49f4-bbec-63ecbca319e9`) |
 | R2 | `pages-dev-assets` |
@@ -28,6 +27,29 @@ ready for that. The dev Worker is deployed by hand from a profile.
 
 [profiles/dev.json](profiles/dev.json) is the exact profile the package was
 built from. It holds no secret.
+
+## Hostname
+
+`pages-dev.kiloapps.io` is a Workers custom domain on the `kiloapps.io` zone,
+attached on 2026-11-10. It is the Worker's public origin
+(`NOTEBOOK_CLOUD_PUBLIC_ORIGIN`): links, the MCP metadata and browser origin
+checks all use it.
+
+The first address, `https://pages-dev.engineering-e11.workers.dev`, still
+answers because `workers_dev` is on. Nothing names it as the origin any more,
+so a browser can't use it. Turn `workers_dev` off once nothing calls it.
+
+The packaging script sets no route. The custom domain is added to the staged
+`wrangler.json` by hand before each deploy:
+
+```json
+"routes": [
+  { "pattern": "pages-dev.kiloapps.io", "zone_name": "kiloapps.io", "custom_domain": true }
+]
+```
+
+`wrangler deploy --domain` does not work here: it can't name the zone, and the
+API answers "Can't infer zone from route".
 
 ## Who can sign in
 
@@ -40,12 +62,13 @@ Pages on it. Treat its data as disposable.
 
 ## Deploy again
 
-From a clean checkout of `nteract/nteract`, in
-`docs/memos/authenticated-automerge-app-substrate/experiment`:
+From a clean checkout of `nteract/nteract`, in `apps/pages`. The tree must
+have no untracked files when it is built, or the stage step refuses the build:
 
 ```sh
-npm run build --workspace @nteract/pages-native-experiment
-node pages/scripts/cloudflare-stage.mjs NEW_EMPTY_DIR services/pages/profiles/dev.json
+npm run build
+node scripts/cloudflare-stage.mjs NEW_EMPTY_DIR services/pages/profiles/dev.json
+# add the "routes" entry from the Hostname section to NEW_EMPTY_DIR/wrangler.json
 node_modules/.bin/wrangler deploy --config NEW_EMPTY_DIR/wrangler.json
 ```
 
@@ -76,6 +99,15 @@ Losing it only signs browser sessions out; a new keyring can replace it.
 Timings from that round trip, one client in North America: the first
 `list_pages` on a cold Worker took 2.7 s and `create_page` 1.2 s. Later calls
 took 70 to 480 ms.
+
+## Checked after the hostname change
+
+- `https://pages-dev.kiloapps.io/health` answers `ok` with build `70d74a204a5c`.
+- `/`, `/connect` and `/llms.txt` answer 200, and `/llms.txt` names only the
+  new origin.
+- The OAuth metadata names `https://pages-dev.kiloapps.io` as issuer.
+- Anonymous `/mcp` answers 401. `/api/auth/session` answers signed out.
+- `/api/auth/login` still answers 503: there is no browser sign-in yet.
 
 ## Not checked yet
 

@@ -8,7 +8,7 @@
   },
   "r2_bucket": "pages-dev-assets",
   "vars": {
-    "NOTEBOOK_CLOUD_PUBLIC_ORIGIN": "https://pages-dev.engineering-e11.workers.dev",
+    "NOTEBOOK_CLOUD_PUBLIC_ORIGIN": "https://pages-dev.kiloapps.io",
     "NOTEBOOK_CLOUD_ANACONDA_API_KEY_USERINFO_URL": "https://anaconda.com/api/auth/sessions/whoami",
     "NOTEBOOK_CLOUD_ANACONDA_API_KEY_PRINCIPAL_NAMESPACE": "kilo-pages-dev-anaconda",
     "PAGES_CATALOG_INDEX": "1",

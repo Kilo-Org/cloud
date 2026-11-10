@@ -590,8 +590,6 @@ function workspaceSnapshotFailureDetail(
       return `The workspace snapshot belongs to another workspace. ${since}`;
     case 'runtime_mismatch':
       return `The workspace snapshot was captured with a different runtime. ${since}`;
-    case 'image_mismatch':
-      return `The workspace snapshot was captured from a different sandbox image. ${since}`;
     case 'image_unavailable':
       return `The sandbox image for the workspace snapshot could not be resolved. Send a message to retry. ${since}`;
     case 'unsupported':
@@ -5356,9 +5354,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
         detail: 'Using workspace snapshot',
         snapshotCapturedAt: descriptor.capturedAt,
       });
+      // A tail restores the captured disk, not an image, so a later base image
+      // does not block it; the provider receives the current image identity.
       return {
         snapshotId: descriptor.snapshotId,
-        baseImage: descriptor.baseImage,
+        baseImage,
         capturedAt: descriptor.capturedAt,
       };
     });

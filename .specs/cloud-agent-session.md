@@ -256,13 +256,13 @@ repository.
    Private workspace tail snapshots MUST follow the separate workspace snapshot
    rules below and MUST NOT be published as environment snapshots.
 2. A session whose repository environment has build commands MUST start from
-   that environment's published snapshot when the owner, repository, sandbox
-   image and runtime match and the snapshot revision is not newer than the
+   that environment's published snapshot when the owner, repository and
+   runtime match and the snapshot revision is not newer than the
    session's configuration revision. For a multi-repository environment, the
    environment, owner and the same list of repositories MUST match instead of
-   one repository. A snapshot from the previous image MAY remain eligible for
-   at most 24 hours after capture while a replacement build runs; the runtime
-   ABI MUST still match. A missing, building, failed or backed-off environment
+   one repository. A snapshot from an earlier sandbox image MUST remain
+   eligible while a replacement build runs, until its eligible lifetime ends;
+   the runtime ABI MUST still match. A missing, building, failed or backed-off environment
    or an unavailable lookup MUST fail with a specific reason and a way to open
    the environment build, never start from the base image. When no environment
    snapshot can serve the start at all -- a sandbox provider that cannot restore
@@ -322,9 +322,9 @@ repository.
    resource teardown. Restored disks MUST NOT restore deleted-session authorization or
    recreate a deleted workspace.
 8. When a private workspace snapshot exists, cold startup MUST use it as the only source.
-   Selection MUST validate ownership, enrollment, provider, startup mode, the exact base
-   image and the 30-day lifetime from durable Sandbox DO metadata. A compatible downloaded
-   runtime release MAY update the restored disk.
+   Selection MUST validate ownership, enrollment, provider, startup mode, image class and
+   the 30-day lifetime from durable Sandbox DO metadata. A later base image MUST NOT block
+   the restore. A compatible downloaded runtime release MAY update the restored disk.
 9. Only a confirmed provider restore MAY supply frame-only workspace provenance.
    Every authorized sibling, including later joins, MUST receive it.
    Registration MUST reject supplied restore provenance. Older peers use ordinary recovery.

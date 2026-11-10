@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   SNAPSHOT_ELIGIBLE_LIFETIME_MS,
-  SNAPSHOT_PREVIOUS_IMAGE_COMPATIBILITY_MS,
   SNAPSHOT_STALE_AFTER_MS,
   automaticAdmission,
   cleanupRetryDelay,
@@ -215,28 +214,28 @@ describe('snapshotEligibility', () => {
     });
   });
 
-  it('uses the previous image inside the rollout window and asks for a replacement', () => {
+  it.each([
+    { name: 'a recent', capturedAt: NOW - HOUR },
+    { name: 'an older', capturedAt: NOW - SNAPSHOT_STALE_AFTER_MS + HOUR },
+  ])('uses $name earlier-image snapshot and asks for a replacement', ({ capturedAt }) => {
     const otherImage = { ...CURRENT, baseImage: 'registry.example/app:2' };
-    expect(snapshotEligibility(published(), REFERENCE, NOW, otherImage)).toEqual({
+    const previous = published({ capturedAt });
+    expect(snapshotEligibility(previous, REFERENCE, NOW, otherImage)).toEqual({
       eligible: true,
       stale: true,
       staleReason: 'image',
     });
-    expect(replacementNeeded(published(), 2, NOW, otherImage)).toBe(true);
-    expect(snapshotImageCompatibility(published(), otherImage, NOW)).toBe('previous');
+    expect(replacementNeeded(previous, 2, NOW, otherImage)).toBe(true);
+    expect(snapshotImageCompatibility(previous, otherImage)).toBe('previous');
   });
 
-  it('rejects a previous-image snapshot after the rollout window', () => {
+  it('expires an earlier-image snapshot only at the eligible lifetime', () => {
     const otherImage = { ...CURRENT, baseImage: 'registry.example/app:2' };
-    const previous = published({
-      capturedAt: NOW - SNAPSHOT_PREVIOUS_IMAGE_COMPATIBILITY_MS - 1,
-    });
+    const previous = published({ capturedAt: NOW - SNAPSHOT_ELIGIBLE_LIFETIME_MS });
     expect(snapshotEligibility(previous, REFERENCE, NOW, otherImage)).toEqual({
       eligible: false,
-      reason: 'incompatible',
+      reason: 'expired',
     });
-    expect(replacementNeeded(previous, 2, NOW, otherImage)).toBe(true);
-    expect(snapshotImageCompatibility(previous, otherImage, NOW)).toBe('incompatible');
   });
 
   it('treats another runtime ABI as incompatible and asks for a replacement', () => {

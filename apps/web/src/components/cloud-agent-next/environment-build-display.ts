@@ -121,7 +121,7 @@ export function stalenessText(status: EnvironmentBuildStatus): string | null {
     case 'age':
       return 'The snapshot is older than four days; the next session starts a refresh.';
     case 'image':
-      return 'The snapshot was built for an earlier sandbox image. Refresh it: sessions can use it for at most 24 hours after capture, and only while the runtime is unchanged.';
+      return 'The snapshot was built for an earlier sandbox image. Sessions keep using it until a refresh publishes, unless the runtime changed.';
     default:
       return null;
   }

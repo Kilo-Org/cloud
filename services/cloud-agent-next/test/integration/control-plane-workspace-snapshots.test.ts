@@ -902,9 +902,8 @@ describe('idle workspace disk checkpoint', () => {
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
-  it('fails a tail start when the private snapshot uses a different image, without an environment fallback', async () => {
+  it('restores a tail captured from an earlier base image with the current image identity', async () => {
     const test = await setup();
-    const fields = vi.spyOn(logger, 'withFields');
     await test.checkpoint();
     await test.cold();
     await runInDurableObject(test.sandbox, instance => {
@@ -915,21 +914,13 @@ describe('idle workspace disk checkpoint', () => {
         .run();
     });
     await test.session.send(prompt('m2'));
-    await waitFor(async () => {
-      const route = await runInDurableObject(test.sandbox, instance =>
-        readRoute(instance['db'], test.sessionId)
-      );
-      expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    const { wrapper } = await test.connect(1);
+    expect(test.launchOptions[1]?.snapshot).toEqual({
+      snapshotId: 'session-snapshot',
+      baseImage: 'image:1',
     });
-    expect(test.launchEnvs).toHaveLength(1);
-    expect(test.launchOptions[1]).toBeUndefined();
-    expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
-    expect(fields.mock.calls.map(call => call[0])).toContainEqual(
-      expect.objectContaining({
-        diagnosticEvent: 'workspace_snapshot_launch',
-        reason: 'image_mismatch',
-      })
-    );
+    wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
+    await test.messageState('m2', 'accepted');
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 

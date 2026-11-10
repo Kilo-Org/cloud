@@ -110,6 +110,8 @@ type PendingLinkBinding = {
   pendingLink: PendingLinkOffer | null;
   /** Receives the pending link a `DIFFERENT-OAUTH` refusal offers. */
   onPendingLinkOffer: (offer: PendingLinkOffer) => void;
+  /** Told when a completed sign-in resolved the link, so the screen drops it. */
+  onPendingLinkResolved: () => void;
 };
 
 /**
@@ -120,6 +122,7 @@ export function useNativeAuth(binding?: PendingLinkBinding): NativeAuthResult {
   const { signIn } = useAuth();
   const pendingLink = binding?.pendingLink ?? null;
   const onPendingLinkOffer = binding?.onPendingLinkOffer;
+  const onPendingLinkResolved = binding?.onPendingLinkResolved;
   const [busy, setBusy] = useState<BusyAction>(undefined);
   const [emailErrorKey, setEmailErrorKey] = useState<EmailErrorKey | undefined>(undefined);
   const [linkFailure, setLinkFailure] = useState<PendingLinkFailure | undefined>(undefined);
@@ -191,8 +194,13 @@ export function useNativeAuth(binding?: PendingLinkBinding): NativeAuthResult {
         announcingToast.success(i18n.t('login.accountCreated'));
       }
       announcePendingLinkOutcome(pendingLinkOutcome(outcome.pendingLink), pendingLink);
+      // The sign-in settled, so the link screen is spent: a later login in the
+      // same process must not restore it or its token.
+      if (pendingLink) {
+        onPendingLinkResolved?.();
+      }
     },
-    [pendingLink]
+    [pendingLink, onPendingLinkResolved]
   );
 
   const signInWithApple = useCallback(async () => {

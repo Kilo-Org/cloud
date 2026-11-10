@@ -73,7 +73,15 @@ export function IdleAuth({
     handleSsoError,
     pendingLinkFailure,
     clearPendingLinkFailure,
-  } = useNativeAuth(onPendingLink ? { pendingLink, onPendingLinkOffer: onPendingLink } : undefined);
+  } = useNativeAuth(
+    onPendingLink
+      ? {
+          pendingLink,
+          onPendingLinkOffer: onPendingLink,
+          onPendingLinkResolved: () => onClearPendingLink?.(),
+        }
+      : undefined
+  );
   const { t } = useTranslation();
   // The wrapper's label: the translated parts joined the way the row renders
   // them, so the catalog owns every space in the sentence. `termsPrefix` ends

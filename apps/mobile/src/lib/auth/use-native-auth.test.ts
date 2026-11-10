@@ -889,27 +889,35 @@ function BoundNativeAuthHarness({
   resultRef,
   pendingLink,
   onPendingLinkOffer,
+  onPendingLinkResolved,
 }: {
   resultRef: { current: NativeAuthResult | null };
   pendingLink: PendingLinkOffer | null;
   onPendingLinkOffer: (offer: PendingLinkOffer) => void;
+  onPendingLinkResolved: () => void;
 }) {
-  resultRef.current = useNativeAuth({ pendingLink, onPendingLinkOffer });
+  resultRef.current = useNativeAuth({ pendingLink, onPendingLinkOffer, onPendingLinkResolved });
   return null;
 }
 
 async function mountBoundNativeAuth(
   pendingLink: PendingLinkOffer | null,
-  onPendingLinkOffer = vi.fn<(offer: PendingLinkOffer) => void>()
-): Promise<{ current: NativeAuthResult | null }> {
+  onPendingLinkOffer = vi.fn<(offer: PendingLinkOffer) => void>(),
+  onPendingLinkResolved = vi.fn<() => void>()
+): Promise<{ current: NativeAuthResult | null; onResolved: () => void }> {
   const resultRef: { current: NativeAuthResult | null } = { current: null };
   await act(async () => {
     TestRenderer.create(
-      React.createElement(BoundNativeAuthHarness, { resultRef, pendingLink, onPendingLinkOffer })
+      React.createElement(BoundNativeAuthHarness, {
+        resultRef,
+        pendingLink,
+        onPendingLinkOffer,
+        onPendingLinkResolved,
+      })
     );
     await Promise.resolve();
   });
-  return resultRef;
+  return Object.assign(resultRef, { onResolved: onPendingLinkResolved });
 }
 
 function googleChoosesAccount() {
@@ -1058,6 +1066,25 @@ describe('useNativeAuth pending account link', () => {
     });
 
     expect(mockRunPasskeySignIn).toHaveBeenCalledWith(undefined, 'link-token');
+  });
+
+  it('retires the offer once a sign-in resolved it, and not when no link was open', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'ok', token: 'at' });
+    const bound = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      await bound.current?.signInWithPasskey();
+    });
+
+    expect(bound.onResolved).toHaveBeenCalledTimes(1);
+
+    const plain = await mountBoundNativeAuth(null);
+
+    await act(async () => {
+      await plain.current?.signInWithPasskey();
+    });
+
+    expect(plain.onResolved).not.toHaveBeenCalled();
   });
 
   it('keeps refusals inline and marks the ones no other method can change', async () => {

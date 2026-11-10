@@ -51,11 +51,14 @@ export const EnkryptUsageWriteSchema = z.strictObject({
    */
   detectorsFired: z.array(z.enum(ENKRYPT_DETECTOR_IDS)).nonempty().optional(),
   /**
-   * Characters, in UTF-16 code units, that this call sent to Enkrypt and that its scan covers,
-   * including what the verdict cache already covered. Optional so writes from a gateway deployed
-   * before them stay valid.
+   * UTF-16 code units this call sent to Enkrypt: the part no cached verdict covers, plus an overlap
+   * of already-scanned text. Optional so writes from a gateway deployed before it stay valid.
    */
   scannedCharacters: z.int32().nonnegative().optional(),
+  /**
+   * UTF-16 code units of the full text the scan covers, the whole extracted request or response,
+   * including what the verdict cache covered. Optional like `scannedCharacters`.
+   */
   totalCharacters: z.int32().nonnegative().optional(),
 });
 

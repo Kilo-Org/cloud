@@ -31,6 +31,21 @@ auth returns 401. Invalid JSON/schema returns 400, requests or serialized events
 over 120,000 bytes return 413, and enqueue failure returns a generic 503.
 Unrelated paths return 404; other methods on `/usage` return 405.
 
+Authenticated `POST /enkrypt-usage` accepts one bare Enkrypt usage record that
+parses under `EnkryptUsageWriteSchema` and sends exactly one
+`{kind: 'enkrypt_usage', v: 1, record}` message to the same `USAGE_INGEST_QUEUE`.
+The path names the kind, so this ingress is the only place that builds the
+envelope; an envelope-shaped body, an LLM usage body, or any other unknown key
+returns 400, and an Enkrypt record on `/usage` returns 400. It uses the same
+`USAGE_INGEST_PUBLISH_SECRET`, checked before the body is read, because the
+gateway is the only Enkrypt producer and already holds it. Bodies over 8,192
+bytes return 413; other statuses and the `usage_ingest_rejected`,
+`usage_ingest_enqueue_start` and `usage_ingest_enqueue` events match `/usage`,
+with an added `usage_kind: "enkrypt_usage"`. Body read and send failures also
+log `error_name`, never the error message. Enkrypt schema rejections log only
+issue codes and top-level schema field names. Deploy the consumer that routes tagged Enkrypt
+messages before this ingress, and this ingress before any gateway publishes to it.
+
 | Environment | Worker | Producer and consumer queue | DLQ (no consumer) |
 |---|---|---|---|
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |

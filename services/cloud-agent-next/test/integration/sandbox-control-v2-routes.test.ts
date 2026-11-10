@@ -156,6 +156,9 @@ function configuredPrepareInput(
       ...input.spec,
       directory,
       setupCommands,
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
     },
@@ -279,7 +282,11 @@ async function setup(
 async function connectAndHello(
   provider: FakeProvider,
   wrapperId = 'wr_1',
-  options: { workspaceConfiguration?: boolean; runtimeHarness?: string } = {}
+  options: {
+    workspaceConfiguration?: boolean;
+    runtimeInstructions?: boolean;
+    runtimeHarness?: string;
+  } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const launchEnv = provider.launchEnvs[0];
@@ -287,7 +294,12 @@ async function connectAndHello(
   const credential = launchEnv.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
-  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential, ...options });
+  const wrapper = await FakeWrapper.connect({
+    sandboxId: SANDBOX_ID,
+    credential,
+    runtimeInstructions: true,
+    ...options,
+  });
   const reply = await wrapper.hello({ wrapperId, allocationId });
   expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return { wrapper, credential, allocationId };
@@ -1260,9 +1272,13 @@ describe('SandboxControlV2 routes and forwarding', () => {
     if (first?.type !== 'session.attach') throw new Error('expected session.attach');
     expect(first.spec).not.toHaveProperty('setupCommands');
     expect(first.spec).not.toHaveProperty('runtimeAgents');
+    expect(first.spec).not.toHaveProperty('runtimeInstructions');
     expect(first.spec).not.toHaveProperty('kiloCommands');
     expect(first.spec).not.toHaveProperty('env');
     expect(first.workspace).toMatchObject({
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
       setupCommands: ['echo shared'],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
@@ -1287,6 +1303,38 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(changed.spec).not.toHaveProperty('setupCommands');
     expect(changed.spec).not.toHaveProperty('env');
   });
+
+  it.each([false, true])(
+    'omits profile instructions for pre-deploy wrappers (workspace configuration: %s)',
+    async workspaceConfiguration => {
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+      const { wrapper } = await connectAndHello(provider, 'wr_old', {
+        workspaceConfiguration,
+        runtimeInstructions: false,
+      });
+      try {
+        const frame = await wrapper.next();
+        expect(frame?.type).toBe(workspaceConfiguration ? 'session.attach' : 'session.prepare');
+        if (frame?.type !== 'session.attach' && frame?.type !== 'session.prepare') {
+          throw new Error('expected a preparation frame');
+        }
+        expect(frame.spec).not.toHaveProperty('runtimeInstructions');
+        if (frame.type === 'session.attach') {
+          expect(frame.workspace).not.toHaveProperty('runtimeInstructions');
+        }
+        const row = await readRouteRow(stub, SESSION);
+        expect(JSON.parse(row?.spec ?? '{}').runtimeInstructions).toEqual([
+          { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+        ]);
+        wrapper.send({ type: 'session.ready', sessionId: SESSION });
+        await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
 
   it('binds sibling MCP credentials to the canonical workspace root rather than the attaching chat', async () => {
     const root = 'workspace_12345678-1234-4234-8234-123456789abc';
@@ -1367,6 +1415,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const first = await wrapper.next();
     if (first?.type !== 'session.attach') throw new Error('expected session.attach');
     expect(first.workspace).toBeDefined();
+    expect(first.workspace.runtimeInstructions).toEqual([
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ]);
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
 
@@ -1376,6 +1427,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       sandboxId: SANDBOX_ID,
       credential,
       workspaceConfiguration: true,
+      runtimeInstructions: true,
     });
     try {
       expect(
@@ -1395,7 +1447,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     }
   });
 
-  it('keeps the full legacy session.prepare spec without the capability', async () => {
+  it('keeps the full legacy session.prepare spec without workspace configuration support', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
     await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
@@ -1405,6 +1457,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(frame?.type).toBe('session.prepare');
     if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
     expect(frame.spec.setupCommands).toEqual(['echo shared']);
+    expect(frame.spec.runtimeInstructions).toEqual([
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ]);
     expect(frame.spec.runtimeAgents).toEqual([{ slug: 'helper', name: 'Helper', config: {} }]);
     expect(frame.spec.kiloCommands).toEqual([{ name: 'review', template: 'Review the change' }]);
   });

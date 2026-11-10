@@ -3820,9 +3820,12 @@ describe('control-plane runtime profiles', () => {
     }
   });
 
-  it('materializes skills, agents and commands before Kilo starts and retains them through credential refresh', async () => {
+  it('materializes the profile before Kilo starts and shares it through credential refresh', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-'));
     const profile = {
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
       runtimeSkills: [
         {
           name: 'review',
@@ -3857,6 +3860,9 @@ describe('control-plane runtime profiles', () => {
       beforeEnsure: async () => {
         const env = harness.ensureInputs.at(-1)!.env;
         if (!env.KILO_CONFIG) return;
+        expect(
+          await fs.readFile(path.join(env.HOME, '.kilocode/rules/profile-proof.md'), 'utf8')
+        ).toBe(profile.runtimeInstructions[0].content);
         expect(
           await fs.readFile(path.join(env.HOME, '.kilocode/skills/review/SKILL.md'), 'utf8')
         ).toBe(profile.runtimeSkills[0].rawMarkdown);
@@ -3910,6 +3916,9 @@ describe('control-plane runtime profiles', () => {
       expect(harness.ensureInputs[1].key).toBe(spec.directory);
       expect(siblingEnv.HOME).toBe(env.HOME);
       expect(siblingEnv.KILO_CONFIG).toBe(env.KILO_CONFIG);
+      expect(
+        await fs.readFile(path.join(siblingEnv.HOME, '.kilocode/rules/profile-proof.md'), 'utf8')
+      ).toBe(profile.runtimeInstructions[0].content);
 
       await harness.manager.prepare(
         routeSpec({

@@ -27,11 +27,11 @@ suite('real Kilo v2 harness', () => {
     const directory = path.join(root, 'workspace');
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(path.join(directory, 'AGENTS.md'), 'SYNTHETIC_REPOSITORY_INSTRUCTION');
-    await fs.mkdir(path.join(root, '.kilocode/rules'), { recursive: true });
-    await fs.writeFile(
-      path.join(root, '.kilocode/rules/disabled-proof.md'),
-      'SYNTHETIC_DISABLED_PROFILE_INSTRUCTION'
-    );
+    await createRuntimeProfileMaterializer().materialize(root, {
+      runtimeInstructions: [
+        { name: 'disabled-proof', content: 'SYNTHETIC_DISABLED_PROFILE_INSTRUCTION' },
+      ],
+    });
     const profile = {
       runtimeInstructions: [
         { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },

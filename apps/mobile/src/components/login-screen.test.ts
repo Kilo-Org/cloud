@@ -301,15 +301,16 @@ describe('login-screen bottom chrome padding', () => {
 });
 
 describe('login-screen keyboard field action reserve', () => {
-  it('covers the action, one refusal line, and the form gaps at the default scale', () => {
-    // One action box, one refusal line above it, and a form gap on each side.
-    expect(resolveKeyboardFieldActionOffset(1)).toBe(98);
+  it('floors the reserve at the action and the form gaps around it', () => {
+    // One action box and a form gap on each side; the form's measured height
+    // replaces this as soon as the form lays out.
+    expect(resolveKeyboardFieldActionOffset(1)).toBe(68);
   });
 
   it('grows with the system text scale', () => {
-    // Both the action's label and the refusal line are text; the gaps are not.
-    expect(resolveKeyboardFieldActionOffset(1.5)).toBe(129);
-    expect(resolveKeyboardFieldActionOffset(2)).toBe(160);
+    // The action's label is text; the gaps are fixed lengths.
+    expect(resolveKeyboardFieldActionOffset(1.5)).toBe(90);
+    expect(resolveKeyboardFieldActionOffset(2)).toBe(112);
   });
 });
 
@@ -404,9 +405,12 @@ describe('login-screen language globe', () => {
     // The row clears the status bar before the globe's own 48dp box.
     expect(headerRow.props.style).toMatchObject({ paddingTop: 24 + 8, paddingEnd: 16 });
     expect(globe.props.className).not.toMatch(/\bz-/);
-    // The scroller keeps room under the focused field for its primary action,
-    // the refusal line above it, and the form gaps around them.
-    expect(findByType(renderer.root, 'KeyboardAwareScrollView')[0]?.props.bottomOffset).toBe(98);
+    // The scroller keeps room under the focused field for whatever the form
+    // renders below it, and can scroll that far because the keyboard spacer
+    // participates in layout.
+    const scroller = findByType(renderer.root, 'KeyboardAwareScrollView')[0];
+    expect(scroller?.props.bottomOffset).toBe(resolveKeyboardFieldActionOffset(1));
+    expect(scroller?.props.mode).toBe('layout');
 
     renderer.unmount();
     safeInsets.top = 0;

@@ -31,19 +31,16 @@ const FORM_GAP = 12;
 /** The floor `Button` size `lg` keeps for its box regardless of the label. */
 const PRIMARY_ACTION_MIN_HEIGHT = 44;
 
-/** One line of the refusal a login form shows between a field and its action. */
-const INLINE_MESSAGE_LINE = 18;
-
 /**
- * The room the login scroller keeps between a focused field and the keyboard:
- * the primary action below the field, one form gap on each side of it, and one
- * line for the refusal a field or the code step can show above that action. The
- * action and the message are text, so both terms follow the system text scale;
- * the gaps are fixed lengths. A reserve that ignored either grew past the
- * keyboard exactly in the refusal state.
+ * The space the login scroller keeps below a focused field, before it has
+ * measured the form: the primary action under the field and the form gap on
+ * each side of it, sized for the system text scale because the action's box
+ * grows with its label. Once the form mounts, its own measured height replaces
+ * this floor, so a refusal line that wraps in a long catalog, or any other
+ * content below the field, is covered without a fixed guess.
  */
 export function resolveKeyboardFieldActionOffset(fontScale: number): number {
-  return Math.ceil((PRIMARY_ACTION_MIN_HEIGHT + INLINE_MESSAGE_LINE) * fontScale) + FORM_GAP * 3;
+  return Math.ceil(PRIMARY_ACTION_MIN_HEIGHT * fontScale) + FORM_GAP * 2;
 }
 
 /**

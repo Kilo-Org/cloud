@@ -85,6 +85,8 @@ type ProviderPolicyResult =
   | {
       ok: true;
       providerResult: GetProviderProviderResult;
+      /** The next of the route's BYOK failover keys that the policy admits, or null when none is left. */
+      nextByokFailover: () => Promise<GetProviderProviderResult | null>;
       isNonTrialEnterprise: boolean;
       dataRegion: OrganizationGatewaySettings['dataRegion'];
     }
@@ -211,107 +213,105 @@ export async function resolveProviderAndPolicy(
         : directByokCatalogOnlyResponse(message)
     );
   }
-  // A local, so the type guard narrows it rather than `providerResult.provider.type`.
-  const providerType = providerResult.provider.type;
-  if (providerType === 'claude-billing' && !(await isDirectByokProviderAllowed('anthropic'))) {
-    return reject(modelNotAllowedResponse());
-  }
-  if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
-    return reject(managedGatewayDisabledResponse(providerType));
-  }
-  const providerBaseUrl =
-    providerResult.provider.apiUrlOverrides[request.kind] ?? providerResult.provider.apiUrl;
-  const gatewayByDomain = getManagedGatewayFromUrl(providerBaseUrl);
-  if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
-    return reject(managedGatewayDisabledResponse(gatewayByDomain));
-  }
-  if (orgAutoRouteTarget) {
-    try {
-      const directByokTarget = await getDirectByokModel(orgAutoRouteTarget);
-      if (directByokTarget.provider && providerResult.provider.type !== 'direct-byok') {
-        return reject(
-          organizationAutoConfigurationResponse(
+  /** Why the policy refuses the route, or null when it may serve the request. */
+  const routeRejection = async (
+    route: GetProviderProviderResult
+  ): Promise<NextResponseType<unknown> | null> => {
+    // A local, so the type guard narrows it rather than `route.provider.type`.
+    const providerType = route.provider.type;
+    if (providerType === 'claude-billing' && !(await isDirectByokProviderAllowed('anthropic'))) {
+      return modelNotAllowedResponse();
+    }
+    if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
+      return managedGatewayDisabledResponse(providerType);
+    }
+    const providerBaseUrl = route.provider.apiUrlOverrides[request.kind] ?? route.provider.apiUrl;
+    const gatewayByDomain = getManagedGatewayFromUrl(providerBaseUrl);
+    if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
+      return managedGatewayDisabledResponse(gatewayByDomain);
+    }
+    if (orgAutoRouteTarget) {
+      try {
+        const directByokTarget = await getDirectByokModel(orgAutoRouteTarget);
+        if (directByokTarget.provider && route.provider.type !== 'direct-byok') {
+          return organizationAutoConfigurationResponse(
             `Organization Auto route target '${orgAutoRouteTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
-          )
+          );
+        }
+      } catch {
+        return organizationAutoConfigurationResponse(
+          'Organization Auto could not validate this route target against the current model catalog.'
         );
       }
-    } catch {
-      return reject(
-        organizationAutoConfigurationResponse(
-          'Organization Auto could not validate this route target against the current model catalog.'
-        )
+    }
+
+    if (!route.provider.supportedChatApis.includes(request.kind)) {
+      return apiKindNotSupportedResponse(
+        request.kind,
+        route.provider.supportedChatApis,
+        route.provider.type === 'direct-byok' ? route.userByok?.[0]?.providerId : undefined
       );
     }
-  }
 
-  if (!providerResult.provider.supportedChatApis.includes(request.kind)) {
-    return reject(
-      apiKindNotSupportedResponse(
-        request.kind,
-        providerResult.provider.supportedChatApis,
-        providerResult.provider.type === 'direct-byok'
-          ? providerResult.userByok?.[0]?.providerId
-          : undefined
-      )
-    );
-  }
+    if (modelResolution.kind === 'direct' && (await isUnavailableModel(model))) {
+      console.warn(`User requested unavailable model ${model}; rejecting.`);
+      return unavailableModelResponse();
+    }
 
-  if (modelResolution.kind === 'direct' && (await isUnavailableModel(model))) {
-    console.warn(`User requested unavailable model ${model}; rejecting.`);
-    return reject(unavailableModelResponse());
-  }
+    // Skip balance/org checks for anonymous users - they can only use free models
+    if (!isAnonymousContext(user)) {
+      const creditsBlocked = paidUsageRejection({
+        user,
+        organizationId: input.organizationId,
+        account: await input.balanceAndSettingsPromise,
+        exempt: route.isFree || !!route.userByok || !!route.skipBalanceCheck,
+      });
+      if (creditsBlocked) return await creditsBlocked();
+    }
 
-  // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user)) {
-    const creditsBlocked = paidUsageRejection({
-      user,
-      organizationId: input.organizationId,
-      account: await input.balanceAndSettingsPromise,
-      exempt:
-        providerResult.isFree || !!providerResult.userByok || !!providerResult.skipBalanceCheck,
-    });
-    if (creditsBlocked) return reject(await creditsBlocked());
-  }
-
-  if (!isAnonymous && !providerResult.bypassAccessCheck) {
+    if (isAnonymous || route.bypassAccessCheck) return null;
     const {
       allowedProviders,
-      effectiveProviderConfig,
       groupModelAllowed,
       groupModelAllowedForInferenceProviderUserByok,
       groupProvidersAllowed,
     } = await getAccessCheck();
 
-    if (providerResult.provider.type === 'direct-byok') {
+    if (route.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
       // against the key's provider alone. Routing already skips keys it rejects.
-      const directByokProvider = findDirectByokProvider(
-        providerResult.userByok?.[0]?.providerId ?? ''
-      );
+      const directByokProvider = findDirectByokProvider(route.userByok?.[0]?.providerId ?? '');
       if (
         !directByokProvider ||
         !(await isDirectByokProviderAllowed(getDirectByokPolicyProviderId(directByokProvider)))
       ) {
-        return reject(poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse());
+        return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
       }
-    } else {
-      const modelAllowed = isInferenceProviderUserByok(providerResult.userByok)
-        ? groupModelAllowedForInferenceProviderUserByok
-        : groupModelAllowed;
-      if (!modelAllowed) {
-        return reject(poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse());
-      }
-      if (!groupProvidersAllowed) return reject(modelNotAllowedResponse());
-      if (
-        providerResult.provider.type === 'vercel' &&
-        providerResult.userByok?.some(
-          byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
-        )
-      ) {
-        return reject(modelNotAllowedResponse());
-      }
+      return null;
     }
+    const modelAllowed = isInferenceProviderUserByok(route.userByok)
+      ? groupModelAllowedForInferenceProviderUserByok
+      : groupModelAllowed;
+    if (!modelAllowed) {
+      return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+    }
+    if (!groupProvidersAllowed) return modelNotAllowedResponse();
+    if (
+      route.provider.type === 'vercel' &&
+      route.userByok?.some(
+        byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
+      )
+    ) {
+      return modelNotAllowedResponse();
+    }
+    return null;
+  };
 
+  const rejection = await routeRejection(providerResult);
+  if (rejection) return reject(rejection);
+
+  if (!isAnonymous && !providerResult.bypassAccessCheck) {
+    const { effectiveProviderConfig } = await getAccessCheck();
     if (effectiveProviderConfig) {
       request.body.provider = effectiveProviderConfig;
     }
@@ -342,9 +342,36 @@ export async function resolveProviderAndPolicy(
     }
   }
 
+  const byokFailovers = providerResult.byokFailovers ?? [];
+  let nextFailoverIndex = 0;
+  const nextByokFailover = async (): Promise<GetProviderProviderResult | null> => {
+    while (nextFailoverIndex < byokFailovers.length) {
+      const candidate = byokFailovers[nextFailoverIndex++];
+      let route: GetProviderProviderResult;
+      try {
+        route = await candidate.resolve();
+      } catch (error) {
+        console.error('[byok-failover] Skipping a BYOK key that could not be resolved', {
+          providerId: candidate.providerId,
+          errorType: error instanceof Error ? error.name : 'unknown',
+        });
+        continue;
+      }
+      if (await routeRejection(route)) {
+        console.warn('[byok-failover] Skipping a BYOK key the policy refuses', {
+          providerId: candidate.providerId,
+        });
+        continue;
+      }
+      return route;
+    }
+    return null;
+  };
+
   return {
     ok: true,
     providerResult,
+    nextByokFailover,
     isNonTrialEnterprise,
     dataRegion: organizationGatewaySettings.dataRegion,
   };

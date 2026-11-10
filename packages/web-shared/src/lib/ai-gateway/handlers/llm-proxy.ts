@@ -6,7 +6,7 @@ import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/de
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
+import { sendUpstreamAttemptWithByokFailover } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-failover';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -393,7 +393,7 @@ export async function handleLlmProxyRequest(
     organizationGroupPolicyPromise,
   });
   if (!providerPolicy.ok) return providerPolicy.response;
-  const { providerResult, isNonTrialEnterprise, dataRegion } = providerPolicy;
+  const { providerResult, nextByokFailover, isNonTrialEnterprise, dataRegion } = providerPolicy;
 
   console.debug(`Routing request to ${providerResult.provider.type}`, {
     byokProviderIds: providerResult.userByok?.map(byok => byok.providerId) ?? null,
@@ -474,48 +474,56 @@ export async function handleLlmProxyRequest(
   }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
-  const attempt = await sendUpstreamAttempt({
-    providerContext: providerResult,
-    request: requestBodyParsed,
-    requestedModel: effectiveModelIdLowerCased,
-    fraudHeaders,
-    userId: user.id,
-    organizationId: organizationId ?? null,
-    sessionId: headers.sessionId,
-    taskId: headers.taskId,
-    isNonTrialEnterprise,
-    search: url.search,
-    method: request.method,
-    signal: request.signal,
-    vercelRequestId: headers.vercelRequestId,
-    dataRegion,
-    costLimit:
-      requestCostLimit !== null && requestCostBalance
-        ? {
-            maximumMicrodollars: requestCostLimit,
-            availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
-          }
-        : undefined,
-  });
+  const {
+    attempt,
+    providerContext,
+    request: sentRequest,
+  } = await sendUpstreamAttemptWithByokFailover(
+    {
+      providerContext: providerResult,
+      request: requestBodyParsed,
+      requestedModel: effectiveModelIdLowerCased,
+      fraudHeaders,
+      userId: user.id,
+      organizationId: organizationId ?? null,
+      sessionId: headers.sessionId,
+      taskId: headers.taskId,
+      isNonTrialEnterprise,
+      search: url.search,
+      method: request.method,
+      signal: request.signal,
+      vercelRequestId: headers.vercelRequestId,
+      dataRegion,
+      costLimit:
+        requestCostLimit !== null && requestCostBalance
+          ? {
+              maximumMicrodollars: requestCostLimit,
+              availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
+            }
+          : undefined,
+    },
+    nextByokFailover
+  );
   if (attempt.type === 'invalid-openrouter-model') {
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
   if (attempt.type === 'error') return attempt.response;
+  usageContext.provider = providerContext.provider.type;
 
   const { settings: organizationSettings } = await balanceAndSettingsPromise;
   return await respondToUpstream({
     upstream: attempt,
-    request: requestBodyParsed,
+    request: sentRequest,
     model: effectiveModelIdLowerCased,
     requestedModel: requestedModelLowerCased,
-    providerResult,
+    providerResult: providerContext,
     user,
     organizationId,
     usageContext,
     upstreamSpan: openrouterRequestSpan,
     requestStartedAt,
     briefingSettlementToken: request.headers.get(BRIEFING_SETTLEMENT_HEADER),
-    logging: requestLogging,
+    logging: { ...requestLogging, request: sentRequest },
     enkryptOutputScan:
       organizationId && !isAnonymousContext(user)
         ? resolveEnkryptOutputScan(

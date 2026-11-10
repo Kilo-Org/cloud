@@ -439,6 +439,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       userByok: [{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }],
       isFree: false,
       bypassAccessCheck: false,
+      byokFailovers: [],
     });
     env.restore();
   });
@@ -458,6 +459,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       userByok: credentials,
       isFree: false,
       bypassAccessCheck: false,
+      byokFailovers: [],
     });
     expect(decrypt.mock.calls).toEqual([['anthropic']]);
   });
@@ -496,6 +498,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       userByok: [{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }],
       isFree: false,
       bypassAccessCheck: false,
+      byokFailovers: [],
     });
     env.restore();
   });
@@ -598,6 +601,10 @@ describe('getProvider gateway BYOK routing', () => {
       userByok: [anthropicKey],
       isFree: false,
       bypassAccessCheck: false,
+      byokFailovers: [
+        { providerId: 'vercel-ai-gateway', resolve: expect.any(Function) },
+        { providerId: 'openrouter', resolve: expect.any(Function) },
+      ],
     });
   });
 

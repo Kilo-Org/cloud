@@ -32,8 +32,10 @@ import {
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import {
   getProvider,
+  type ByokFailoverCandidate,
   type GetProviderProviderResult,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   KiloRoutingDecisionRecordSchema,
   type ProviderRoutingDecision,
@@ -7115,5 +7117,326 @@ describe('Enkrypt input guardrail', () => {
         expect(send).not.toHaveBeenCalled();
       }
     );
+  });
+});
+
+describe('BYOK failover', () => {
+  function byokProvider(apiKey: string, overrides: Partial<Provider> = {}): Provider {
+    return { ...provider, apiKey, transformRequest: jest.fn(async () => {}), ...overrides };
+  }
+
+  function byokRoute(
+    providerId: UserByokProviderId,
+    routeProvider: Provider,
+    byokFailovers?: ByokFailoverCandidate[]
+  ): GetProviderProviderResult {
+    return {
+      kind: 'provider',
+      provider: routeProvider,
+      userByok: [{ decryptedAPIKey: routeProvider.apiKey, providerId }],
+      isFree: false,
+      bypassAccessCheck: false,
+      ...(byokFailovers ? { byokFailovers } : {}),
+    };
+  }
+
+  function failover(route: GetProviderProviderResult) {
+    const providerId = route.userByok?.[0]?.providerId;
+    if (!providerId) throw new Error('A failover route needs a BYOK key');
+    return { providerId, resolve: jest.fn(async () => route) };
+  }
+
+  function upstreamWithStatus(status: number) {
+    return {
+      type: 'success' as const,
+      response: upstreamJsonResponse(
+        status < 400
+          ? { id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }
+          : { error: { message: `upstream failed with ${status}` } },
+        status
+      ),
+    };
+  }
+
+  function sentApiKeys() {
+    return mockedUpstreamRequest.mock.calls.map(([args]) => args.provider.apiKey);
+  }
+
+  function sentBodies() {
+    return mockedUpstreamRequest.mock.calls.map(([args]) => args.body);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    for (const method of ['warn', 'error'] as const) {
+      const logger = console[method];
+      if (jest.isMockFunction(logger)) logger.mockRestore();
+    }
+  });
+
+  it.each([401, 429, 500])(
+    'serves the request with the next BYOK key when the first key answers %s',
+    async status => {
+      const primaryProvider = byokProvider('primary-byok-key', {
+        transformRequest: jest.fn(async ({ request }) => {
+          request.body.model = 'primary-upstream-model';
+        }),
+      });
+      const failoverProvider = byokProvider('failover-byok-key', { type: 'direct-byok' });
+      const failoverRoute = byokRoute('zai-coding', failoverProvider);
+      const candidate = failover(failoverRoute);
+      mockedGetProvider.mockResolvedValue(byokRoute('openai', primaryProvider, [candidate]));
+      mockedUpstreamRequest
+        .mockResolvedValueOnce(upstreamWithStatus(status))
+        .mockResolvedValueOnce(upstreamWithStatus(200));
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+      expect(response.status).toBe(200);
+      expect(candidate.resolve).toHaveBeenCalledTimes(1);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(2);
+      expect(sentApiKeys()).toEqual(['primary-byok-key', 'failover-byok-key']);
+      expect(mockedUpstreamRequest.mock.calls[1]?.[0].provider).toBe(failoverProvider);
+      const [firstBody, secondBody] = sentBodies();
+      expect(firstBody).toMatchObject({ model: 'primary-upstream-model' });
+      expect(secondBody).toMatchObject({
+        model: 'openai/gpt-4o',
+        messages: [{ role: 'user', content: 'hello' }],
+      });
+      expect(secondBody).not.toBe(firstBody);
+      expect(failoverProvider.transformRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: failoverProvider,
+          userByok: failoverRoute.userByok,
+        })
+      );
+      expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledTimes(1);
+      expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ provider: 'direct-byok', user_byok: true, status_code: 200 }),
+        expect.anything(),
+        failoverProvider
+      );
+    }
+  );
+
+  it('returns the last failure when every BYOK key fails, never falling back to Kilo', async () => {
+    const second = failover(byokRoute('anthropic', byokProvider('second-byok-key')));
+    const third = failover(byokRoute('openrouter', byokProvider('third-byok-key')));
+    mockedGetProvider.mockResolvedValue(
+      byokRoute('openai', byokProvider('primary-byok-key'), [second, third])
+    );
+    mockedUpstreamRequest
+      .mockResolvedValueOnce(upstreamWithStatus(500))
+      .mockResolvedValueOnce(upstreamWithStatus(429))
+      .mockResolvedValueOnce(upstreamWithStatus(502));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(502);
+    expect(second.resolve).toHaveBeenCalledTimes(1);
+    expect(third.resolve).toHaveBeenCalledTimes(1);
+    expect(mockedGetProvider).toHaveBeenCalledTimes(1);
+    expect(sentApiKeys()).toEqual(['primary-byok-key', 'second-byok-key', 'third-byok-key']);
+    expect(sentApiKeys()).not.toContain(provider.apiKey);
+    for (const body of sentBodies()) expect(body).toMatchObject({ model: 'openai/gpt-4o' });
+  });
+
+  it('fails over when the upstream request itself fails', async () => {
+    const candidate = failover(byokRoute('anthropic', byokProvider('failover-byok-key')));
+    mockedGetProvider.mockResolvedValue(
+      byokRoute('openai', byokProvider('primary-byok-key'), [candidate])
+    );
+    mockedUpstreamRequest
+      .mockResolvedValueOnce({
+        type: 'error',
+        response: NextResponse.json({ error: 'upstream unreachable' }, { status: 503 }),
+      })
+      .mockResolvedValueOnce(upstreamWithStatus(200));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
+    expect(sentApiKeys()).toEqual(['primary-byok-key', 'failover-byok-key']);
+  });
+
+  it('returns the last upstream request failure when it is the final attempt', async () => {
+    const candidate = failover(byokRoute('anthropic', byokProvider('failover-byok-key')));
+    mockedGetProvider.mockResolvedValue(
+      byokRoute('openai', byokProvider('primary-byok-key'), [candidate])
+    );
+    mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(500)).mockResolvedValueOnce({
+      type: 'error',
+      response: NextResponse.json({ error: 'upstream unreachable' }, { status: 503 }),
+    });
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'upstream unreachable' });
+    expect(sentApiKeys()).toEqual(['primary-byok-key', 'failover-byok-key']);
+  });
+
+  it('never resolves a failover key when the first key succeeds', async () => {
+    const candidate = failover(byokRoute('anthropic', byokProvider('failover-byok-key')));
+    const primaryProvider = byokProvider('primary-byok-key');
+    mockedGetProvider.mockResolvedValue(byokRoute('openai', primaryProvider, [candidate]));
+    mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(200));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
+    expect(candidate.resolve).not.toHaveBeenCalled();
+    expect(sentApiKeys()).toEqual(['primary-byok-key']);
+    expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      primaryProvider
+    );
+  });
+
+  it.each([
+    {
+      name: 'a ChatGPT subscription',
+      route: {
+        kind: 'provider',
+        provider: byokProvider('chatgpt-token', { type: 'openai-chatgpt' }),
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+        skipBalanceCheck: true,
+      },
+    },
+    {
+      name: 'Kilo',
+      route: {
+        kind: 'provider',
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      },
+    },
+    {
+      name: 'a BYOK key without later keys',
+      route: byokRoute('openai', byokProvider('primary-byok-key'), []),
+    },
+  ] satisfies { name: string; route: GetProviderProviderResult }[])(
+    'sends one attempt for $name when it fails',
+    async ({ route }) => {
+      mockedGetProvider.mockResolvedValue(route);
+      mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(500));
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+      expect(response.status).toBe(500);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('skips a failover key that cannot be resolved and uses the next one', async () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const unresolvable = {
+      providerId: 'anthropic' as const,
+      resolve: jest.fn(async (): Promise<GetProviderProviderResult> => {
+        throw new Error('KMS unavailable');
+      }),
+    };
+    const next = failover(byokRoute('openrouter', byokProvider('next-byok-key')));
+    mockedGetProvider.mockResolvedValue(
+      byokRoute('openai', byokProvider('primary-byok-key'), [unresolvable, next])
+    );
+    mockedUpstreamRequest
+      .mockResolvedValueOnce(upstreamWithStatus(500))
+      .mockResolvedValueOnce(upstreamWithStatus(200));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
+    expect(unresolvable.resolve).toHaveBeenCalledTimes(1);
+    expect(next.resolve).toHaveBeenCalledTimes(1);
+    expect(sentApiKeys()).toEqual(['primary-byok-key', 'next-byok-key']);
+    expect(error).toHaveBeenCalledWith(
+      '[byok-failover] Skipping a BYOK key that could not be resolved',
+      { providerId: 'anthropic', errorType: 'Error' }
+    );
+  });
+
+  it('skips a failover key the policy refuses and uses the next one', async () => {
+    const refused = failover(
+      byokRoute('anthropic', byokProvider('refused-byok-key', { supportedChatApis: ['messages'] }))
+    );
+    const next = failover(byokRoute('openrouter', byokProvider('next-byok-key')));
+    mockedGetProvider.mockResolvedValue(
+      byokRoute('openai', byokProvider('primary-byok-key'), [refused, next])
+    );
+    mockedUpstreamRequest
+      .mockResolvedValueOnce(upstreamWithStatus(500))
+      .mockResolvedValueOnce(upstreamWithStatus(200));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
+    expect(refused.resolve).toHaveBeenCalledTimes(1);
+    expect(sentApiKeys()).toEqual(['primary-byok-key', 'next-byok-key']);
+  });
+
+  it('returns the failure when no failover key is left after skipping', async () => {
+    const refused = failover(
+      byokRoute('anthropic', byokProvider('refused-byok-key', { supportedChatApis: ['messages'] }))
+    );
+    mockedGetProvider.mockResolvedValue(
+      byokRoute('openai', byokProvider('primary-byok-key'), [refused])
+    );
+    mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(500));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(500);
+    expect(sentApiKeys()).toEqual(['primary-byok-key']);
+  });
+
+  it('does not fail over for a model OpenRouter does not list', async () => {
+    const candidate = failover(byokRoute('anthropic', byokProvider('failover-byok-key')));
+    mockedGetProvider.mockResolvedValue(
+      byokRoute('openai', byokProvider('primary-byok-key'), [candidate])
+    );
+    mockedIsValidOpenRouterModelId.mockResolvedValue(false);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(404);
+    expect(candidate.resolve).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('does not fail over once the client has disconnected', async () => {
+    const controller = new AbortController();
+    const candidate = failover(byokRoute('anthropic', byokProvider('failover-byok-key')));
+    mockedGetProvider.mockResolvedValue(
+      byokRoute('openai', byokProvider('primary-byok-key'), [candidate])
+    );
+    mockedUpstreamRequest.mockImplementationOnce(async () => {
+      controller.abort();
+      return upstreamWithStatus(500);
+    });
+
+    await handleLlmProxyRequest(
+      new NextRequest(makeRequest(makeBody()), { signal: controller.signal })
+    );
+
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(candidate.resolve).not.toHaveBeenCalled();
   });
 });

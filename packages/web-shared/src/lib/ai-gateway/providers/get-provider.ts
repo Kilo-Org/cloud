@@ -109,6 +109,16 @@ export type GetProviderProviderResult = {
    *  outside Kilo credits pays for the request, such as the ChatGPT
    *  subscription, while abuse and organization policy checks still apply. */
   skipBalanceCheck?: boolean;
+  /** The owner's later BYOK keys that serve the request, in route order, for when this key's
+   *  upstream fails. Never the ChatGPT connection or Kilo's route, so a failing key never makes
+   *  another payer, or Kilo, pay. */
+  byokFailovers?: readonly ByokFailoverCandidate[];
+};
+
+export type ByokFailoverCandidate = {
+  providerId: UserByokProviderId;
+  /** Decrypts the key only when failover reaches it. */
+  resolve: () => Promise<GetProviderProviderResult>;
 };
 
 /** A bespoke direct BYOK id whose key serves only catalog ids. */
@@ -513,17 +523,8 @@ async function selectProvider(
   const decryptKey = async (step: KeyPlanStep) =>
     (await loadStoredKeys()).decrypt(step.key.providerId);
 
-  const takeKey = async (step: KeyPlanStep): Promise<GetProviderProviderResult> => {
+  const resolveKey = async (step: KeyPlanStep): Promise<GetProviderProviderResult> => {
     const credential = await decryptKey(step);
-    const { providerId } = step.key;
-    logSelection(providerId);
-    decision.markByokCandidate(step, 'selected');
-    decision.step({
-      step: 'byok-key',
-      outcome: 'selected',
-      route: step.route,
-      provider_id: providerId,
-    });
     return step.route === 'direct-byok'
       ? directByokProviderResult(
           step.provider,
@@ -534,6 +535,36 @@ async function selectProvider(
           true
         )
       : gatewayRoutedByokResult(step, credential, requestedModel);
+  };
+
+  const byokFailoversAfter = (planIndex: number): ByokFailoverCandidate[] =>
+    plan.slice(planIndex + 1).flatMap(step => {
+      const keyStep =
+        step.route === 'ignored-key-fallback'
+          ? step.step
+          : isKeyPlanStep(step) && !reasonToPass(step)
+            ? step
+            : null;
+      return keyStep
+        ? [{ providerId: keyStep.key.providerId, resolve: () => resolveKey(keyStep) }]
+        : [];
+    });
+
+  const takeKey = async (
+    step: KeyPlanStep,
+    planIndex: number
+  ): Promise<GetProviderProviderResult> => {
+    const result = await resolveKey(step);
+    const { providerId } = step.key;
+    logSelection(providerId);
+    decision.markByokCandidate(step, 'selected');
+    decision.step({
+      step: 'byok-key',
+      outcome: 'selected',
+      route: step.route,
+      provider_id: providerId,
+    });
+    return { ...result, byokFailovers: byokFailoversAfter(planIndex) };
   };
 
   // A connection whose credential is terminally dead must fail readably instead of resolving to
@@ -566,13 +597,13 @@ async function selectProvider(
       reason: keySteps.length === 0 ? 'no-candidates' : 'none-served',
     });
 
-  for (const step of plan) {
+  for (const [planIndex, step] of plan.entries()) {
     switch (step.route) {
       case 'direct-byok':
       case 'vercel-byok':
       case 'gateway-byok': {
         const reason = reasonToPass(step);
-        if (!reason) return await takeKey(step);
+        if (!reason) return await takeKey(step, planIndex);
         skipped.push({ providerId: step.key.providerId, reason });
         decision.markByokCandidate(step, 'skipped', reason);
         break;
@@ -587,7 +618,7 @@ async function selectProvider(
           '[getProvider] Using a BYOK key the request ignores, since no other key serves',
           { requestedModel, providerId: step.step.key.providerId }
         );
-        return await takeKey(step.step);
+        return await takeKey(step.step, planIndex);
       case 'unsupported-api-kind': {
         recordNoKeyServed();
         const { provider, model, key } = step.step;

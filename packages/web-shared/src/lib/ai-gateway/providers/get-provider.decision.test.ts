@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import {
+  getProvider,
+  type GetProviderProviderResult,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
 import {
   KiloRoutingDecisionRecordSchema,
@@ -981,6 +984,250 @@ describe('getProvider route order with a ChatGPT connection', () => {
       candidate('direct-byok', 'zai-coding', 1, 'skipped', { priority: 1, reason: 'disabled' }),
       candidate('vercel-byok', 'moonshotai', 2, 'selected', { priority: 2 }),
     ]);
+  });
+});
+
+describe('getProvider BYOK failover candidates', () => {
+  async function routeProvider(
+    input: Omit<Parameters<typeof getProviderInput>[0], 'onDecision'>
+  ): Promise<GetProviderProviderResult> {
+    const result = await getProvider(getProviderInput(input));
+    if (result.kind !== 'provider') throw new Error(`Expected a provider, got ${result.kind}`);
+    return result;
+  }
+
+  function failoverProviderIds(result: GetProviderProviderResult) {
+    return result.byokFailovers?.map(candidate => candidate.providerId);
+  }
+
+  test('lists the later serving keys in route order, skipping disabled and passed-over keys', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'zai-coding', catalogMode: true, priority: 0 },
+      { providerId: 'vercel-ai-gateway', priority: 1 },
+      { providerId: 'moonshotai', priority: 2, isEnabled: false },
+      { providerId: 'anthropic', priority: 3 },
+      { providerId: 'openrouter', priority: 4 },
+    ]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([catalogModel('zai-coding', ['chat_completions'])]);
+    jest
+      .mocked(getModelGatewayUserByokProviders)
+      .mockResolvedValue(['vercel-ai-gateway', 'openrouter']);
+    jest.mocked(canRouteToVercel).mockResolvedValue(false);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = await routeProvider({
+      requestedModel: MODEL,
+      request: request('chat_completions', ['anthropic']),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['zai-coding']);
+    expect(failoverProviderIds(result)).toEqual(['openrouter', 'anthropic']);
+  });
+
+  test('decrypts a failover key only when it is resolved', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'moonshotai', priority: 0 },
+      { providerId: 'openrouter', priority: 1 },
+      { providerId: 'anthropic', priority: 2 },
+    ]);
+
+    const result = await routeProvider({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['moonshotai']);
+    expect(failoverProviderIds(result)).toEqual(['openrouter', 'anthropic']);
+    expect(decryptApiKey).toHaveBeenCalledTimes(1);
+
+    const [openrouter, anthropic] = result.byokFailovers ?? [];
+    const openrouterRoute = await openrouter.resolve();
+    expect(decryptApiKey).toHaveBeenCalledTimes(2);
+    expect(openrouterRoute).toMatchObject({
+      kind: 'provider',
+      provider: { type: 'openrouter', apiKey: 'openrouter-secret' },
+      userByok: [{ providerId: 'openrouter', decryptedAPIKey: 'openrouter-secret' }],
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+    expect(openrouterRoute.byokFailovers).toBeUndefined();
+
+    const anthropicRoute = await anthropic.resolve();
+    expect(decryptApiKey).toHaveBeenCalledTimes(3);
+    expect(anthropicRoute).toMatchObject({
+      kind: 'provider',
+      provider: { type: 'vercel' },
+      userByok: [{ providerId: 'anthropic', decryptedAPIKey: 'anthropic-secret' }],
+    });
+  });
+
+  test('resolves a catalog-mode key to its direct BYOK provider', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'moonshotai', priority: 0 },
+      { providerId: 'zai-coding', catalogMode: true, priority: 1 },
+    ]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([catalogModel('zai-coding', ['chat_completions'])]);
+
+    const result = await routeProvider({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(failoverProviderIds(result)).toEqual(['zai-coding']);
+    await expect(result.byokFailovers?.[0]?.resolve()).resolves.toMatchObject({
+      kind: 'provider',
+      provider: { type: 'direct-byok' },
+      userByok: [{ providerId: 'zai-coding', decryptedAPIKey: 'zai-coding-secret' }],
+    });
+  });
+
+  test('never lists the ChatGPT connection ranked between the keys', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'zai-coding', catalogMode: true, priority: 0 },
+      { providerId: 'moonshotai', priority: 1 },
+    ]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([catalogModel('zai-coding', ['chat_completions', 'responses'])]);
+    jest.mocked(checkOpenAiChatGptByok).mockResolvedValue({
+      kind: 'provider',
+      provider: { ...OPENROUTER, type: 'openai-chatgpt' },
+      userByok: null,
+      bypassAccessCheck: false,
+      skipBalanceCheck: true,
+    });
+
+    const result = await routeProvider({
+      requestedModel: MODEL,
+      request: request('responses'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['zai-coding']);
+    expect(failoverProviderIds(result)).toEqual(['moonshotai']);
+    expect(checkOpenAiChatGptByok).not.toHaveBeenCalled();
+  });
+
+  test('has no later key when the only serving key is selected', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [{ providerId: 'moonshotai' }]);
+
+    const result = await routeProvider({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(failoverProviderIds(result)).toEqual([]);
+  });
+
+  test('has no later key when the request is served by the key it ignores', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [
+      { providerId: 'anthropic', priority: 0 },
+      { providerId: 'moonshotai', priority: 1, isEnabled: false },
+    ]);
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = await routeProvider({
+      requestedModel: MODEL,
+      request: request('chat_completions', ['anthropic']),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['anthropic']);
+    expect(failoverProviderIds(result)).toEqual([]);
+  });
+
+  test('gives the ChatGPT connection no failover keys', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [{ providerId: 'moonshotai' }]);
+    jest.mocked(checkOpenAiChatGptByok).mockResolvedValue({
+      kind: 'provider',
+      provider: { ...OPENROUTER, type: 'openai-chatgpt' },
+      userByok: null,
+      bypassAccessCheck: false,
+      skipBalanceCheck: true,
+    });
+
+    const result = await routeProvider({
+      requestedModel: MODEL,
+      request: request('responses'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(result.provider.type).toBe('openai-chatgpt');
+    expect(result.byokFailovers).toBeUndefined();
+  });
+
+  test('gives Kilo-paid routing no failover keys', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [{ providerId: 'moonshotai', isEnabled: false }]);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+
+    const result = await routeProvider({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(result).toMatchObject({ provider: { type: 'openrouter' }, userByok: null });
+    expect(result.byokFailovers).toBeUndefined();
+  });
+
+  test('gives a catalog key served over another API kind no failover keys', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [{ providerId: 'synthetic', catalogMode: true }]);
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([catalogModel('synthetic', ['chat_completions'])]);
+
+    const result = await routeProvider({
+      requestedModel: MODEL,
+      request: request('responses'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['synthetic']);
+    expect(result.byokFailovers).toBeUndefined();
+  });
+
+  test('gives a provider model id served by its own key no failover keys', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [{ providerId: 'zai-coding' }, { providerId: 'moonshotai' }]);
+    const { provider, model } = catalogModel('zai-coding', ['chat_completions']);
+    jest.mocked(getDirectByokModel).mockResolvedValueOnce({ provider, model });
+
+    const result = await routeProvider({
+      requestedModel: 'zai-coding/kimi-k2.6',
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+    });
+
+    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['zai-coding']);
+    expect(result.byokFailovers).toBeUndefined();
   });
 });
 

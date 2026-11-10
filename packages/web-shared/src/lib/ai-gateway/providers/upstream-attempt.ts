@@ -42,7 +42,7 @@ import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/req
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
-type SendUpstreamAttemptInput = {
+export type SendUpstreamAttemptInput = {
   providerContext: GetProviderProviderResult;
   requestedModel: string;
   request: GatewayRequest;
@@ -60,7 +60,7 @@ type SendUpstreamAttemptInput = {
   dataRegion: OrganizationDataRegion | null;
 };
 
-type SendUpstreamAttemptResult =
+export type SendUpstreamAttemptResult =
   | { type: 'invalid-openrouter-model' }
   | { type: 'error'; response: NextResponse }
   | {

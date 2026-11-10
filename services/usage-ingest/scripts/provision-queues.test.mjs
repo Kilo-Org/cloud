@@ -18,6 +18,12 @@ import test, { describe } from 'node:test';
 import { prepareQueues } from './provision-queues.mjs';
 
 const execute = promisify(execFile);
+const maxRetention = 1_209_600;
+const defaultSettings = {
+  delivery_delay: 0,
+  delivery_paused: false,
+  message_retention_period: 345_600,
+};
 async function createFixture(t, existing = [], environment) {
   const suffix = environment === 'staging' ? '-staging' : '';
   const globalSource = `usage-ingest-processing${suffix}`;
@@ -41,12 +47,13 @@ async function createFixture(t, existing = [], environment) {
   const queues = new Map();
   const calls = [];
   let nextId = 0;
-  const add = name => {
+  const add = (name, settings) => {
     const queue = {
       queue_name: name,
       queue_id: String(++nextId).padStart(32, '0'),
       jurisdiction: name.endsWith('-eu') ? 'eu' : undefined,
       consumers: [],
+      settings: { ...defaultSettings, ...settings },
     };
     queues.set(name, queue);
     return queue;
@@ -61,11 +68,14 @@ async function createFixture(t, existing = [], environment) {
     queues,
     calls,
     fault: undefined,
-    global: () =>
+    selectedDlq: dlq,
+    global: () => {
+      f.selectedDlq = globalDlq;
       writeFileSync(
         join(directory, 'wrangler.jsonc'),
         config.replaceAll(source, globalSource).replaceAll(dlq, globalDlq)
-      ),
+      );
+    },
   };
   const server = createServer(async (req, res) => {
     assert.equal(req.headers.authorization, 'Bearer synthetic-token');
@@ -73,7 +83,7 @@ async function createFixture(t, existing = [], environment) {
     for await (const part of req) text += part;
     const body = text ? JSON.parse(text) : undefined;
     const url = new URL(req.url, 'https://api.cloudflare.com');
-    calls.push({ method: req.method, name: body?.queue_name, path: url.pathname });
+    calls.push({ method: req.method, name: body?.queue_name, path: url.pathname, body });
     if (f.fault === 'network') {
       req.socket.destroy();
       return;
@@ -101,10 +111,39 @@ async function createFixture(t, existing = [], environment) {
         req.socket.destroy();
         return;
       }
+    } else if (req.method === 'PATCH') {
+      const queue = [...queues.values()].find(q => q.queue_id === url.pathname.split('/').at(-1));
+      assert.equal(queue?.queue_name, f.selectedDlq);
+      assert.deepEqual(Object.keys(body), ['settings']);
+      assert.ok(
+        body.settings.message_retention_period >= queue.settings.message_retention_period,
+        'retention must never be lowered'
+      );
+      if (f.fault === 'patch rejected') {
+        res.writeHead(403).end(JSON.stringify({ success: false }));
+        return;
+      }
+      if (f.fault === 'patch clobbers settings')
+        queue.settings = { message_retention_period: body.settings.message_retention_period };
+      else if (f.fault !== 'patch ignored') queue.settings = { ...body.settings };
+      if (f.fault === 'lost patch') {
+        req.socket.destroy();
+        return;
+      }
+      result = queue;
     } else if (req.method === 'POST') {
-      assert.deepEqual(body, { queue_name: body.queue_name, jurisdiction: 'eu' });
+      assert.deepEqual(
+        body,
+        body.queue_name === dlq
+          ? {
+              queue_name: dlq,
+              jurisdiction: 'eu',
+              settings: { message_retention_period: maxRetention },
+            }
+          : { queue_name: body.queue_name, jurisdiction: 'eu' }
+      );
       assert.ok([dlq, source].includes(body.queue_name) && !queues.has(body.queue_name));
-      result = add(body.queue_name);
+      result = add(body.queue_name, f.fault === 'create ignores retention' ? {} : body.settings);
       if (f.fault === 'ignored jurisdiction') delete result.jurisdiction;
       if (f.fault === 'created foreign consumer' && body.queue_name === source)
         result.consumers = [{ ...owned, script: 'foreign-worker' }];
@@ -208,7 +247,9 @@ for (const environment of ['staging', 'production'])
             !error.stderr.includes('synthetic-token') &&
             (fault !== 'HTTP' || /HTTP 503/.test(error.stderr)) &&
             (fault !== 'auth' || /HTTP 401/.test(error.stderr)) &&
-            (fault !== 'invalid JSON' || /invalid JSON \(HTTP 200\)/.test(error.stderr))
+            (fault !== 'invalid JSON' ||
+              /invalid JSON \(HTTP 200, SyntaxError\)/.test(error.stderr)) &&
+            (fault !== 'network' || /request failed \(TypeError\)/.test(error.stderr))
         );
         assert.ok(f.calls.every(c => c.method === 'GET'));
       }
@@ -219,6 +260,125 @@ for (const environment of ['staging', 'production'])
       f.fault = 'ignored jurisdiction';
       await assert.rejects(f.cli(), error => /not verified EU/.test(error.stderr));
       assert.deepEqual([...f.queues.keys()], [dlq]);
+    });
+
+    const patches = f => f.calls.filter(c => c.method === 'PATCH');
+
+    test('missing DLQ is created with maximum retention; the source keeps its default', async t => {
+      const f = await fixture(t);
+      await f.cli();
+      assert.deepEqual(f.queues.get(dlq).settings, {
+        ...defaultSettings,
+        message_retention_period: maxRetention,
+      });
+      assert.deepEqual(f.queues.get(source).settings, defaultSettings);
+      assert.deepEqual(patches(f), []);
+    });
+
+    test('created DLQ that ignored the requested retention is raised before the source is created', async t => {
+      const f = await fixture(t);
+      f.fault = 'create ignores retention';
+      await f.cli();
+      assert.deepEqual(
+        f.calls.filter(c => c.method !== 'GET').map(c => c.method),
+        ['POST', 'PATCH', 'POST']
+      );
+      assert.equal(f.queues.get(dlq).settings.message_retention_period, maxRetention);
+    });
+
+    test('lower DLQ retention is raised, other settings are preserved, and rerun is a no-op', async t => {
+      const f = await fixture(t, [dlq, source]);
+      const queue = f.queues.get(dlq);
+      queue.settings = {
+        delivery_delay: 30,
+        delivery_paused: true,
+        message_retention_period: 86_400,
+      };
+      f.queues.get(source).settings.message_retention_period = 3_600;
+      const sourceBefore = structuredClone(f.queues.get(source));
+      const consumersBefore = structuredClone(queue.consumers);
+      await f.cli();
+      assert.deepEqual(
+        patches(f).map(c => [c.path.split('/').at(-1), c.body]),
+        [
+          [
+            queue.queue_id,
+            {
+              settings: {
+                delivery_delay: 30,
+                delivery_paused: true,
+                message_retention_period: maxRetention,
+              },
+            },
+          ],
+        ]
+      );
+      assert.deepEqual(queue.settings, {
+        delivery_delay: 30,
+        delivery_paused: true,
+        message_retention_period: maxRetention,
+      });
+      assert.equal(queue.jurisdiction, 'eu');
+      assert.deepEqual(queue.consumers, consumersBefore);
+      assert.deepEqual(f.queues.get(source), sourceBefore);
+      await f.cli();
+      assert.equal(patches(f).length, 1);
+    });
+
+    test('equal or higher DLQ retention makes no update call and is never lowered', async t => {
+      for (const retention of [maxRetention, maxRetention + 1]) {
+        const f = await fixture(t, [dlq, source]);
+        f.queues.get(dlq).settings.message_retention_period = retention;
+        await f.cli();
+        assert.deepEqual(patches(f), []);
+        assert.equal(f.queues.get(dlq).settings.message_retention_period, retention);
+      }
+    });
+
+    test('unreadable DLQ retention stops before any write', async t => {
+      for (const settings of [undefined, null, {}, { message_retention_period: '345600' }]) {
+        const f = await fixture(t, [dlq]);
+        f.queues.get(dlq).settings = settings;
+        await assert.rejects(f.cli(), error => /Cannot read .* retention/.test(error.stderr));
+        assert.ok(f.calls.every(c => c.method === 'GET'));
+        assert.ok(!f.queues.has(source));
+      }
+    });
+
+    test('retention readback mismatch stops before creating the source', async t => {
+      for (const fault of ['patch ignored', 'patch clobbers settings']) {
+        const f = await fixture(t, [dlq]);
+        f.fault = fault;
+        await assert.rejects(f.cli(), error =>
+          /retention update was not confirmed/.test(error.stderr)
+        );
+        assert.equal(patches(f).length, 1);
+        assert.ok(!f.queues.has(source));
+        assert.ok(f.calls.every(c => c.method !== 'DELETE'));
+      }
+    });
+
+    test('retention update API failure fails closed without leaking secrets; lost update can retry', async t => {
+      const f = await fixture(t, [dlq, globalSource]);
+      f.queues.get(globalSource).consumers = [{ ...owned }];
+      f.fault = 'patch rejected';
+      await assert.rejects(
+        f.cli(),
+        error =>
+          /HTTP 403/.test(error.stderr) &&
+          !error.stderr.includes('synthetic-token') &&
+          !error.stderr.includes('Bearer')
+      );
+      assert.equal(f.queues.get(dlq).settings.message_retention_period, 345_600);
+      assert.ok(!f.queues.has(source));
+      assert.deepEqual(f.queues.get(globalSource).consumers, [owned]);
+      f.fault = 'lost patch';
+      await assert.rejects(f.cli());
+      f.fault = undefined;
+      await f.cli();
+      assert.equal(f.queues.get(dlq).settings.message_retention_period, maxRetention);
+      assert.equal(patches(f).length, 2);
+      assert.deepEqual(f.queues.get(globalSource).consumers, []);
     });
 
     test('lost accepted creation preserves resources and a later run reuses both', async t => {
@@ -248,6 +408,39 @@ for (const environment of ['staging', 'production'])
       assert.equal(calls, 0);
     });
 
+    test('transport and JSON failures keep the original error as the cause without printing it', async () => {
+      const transport = new TypeError('private transport detail');
+      await assert.rejects(
+        prepareQueues(environment, {
+          token: 'synthetic-token',
+          request: async () => {
+            throw transport;
+          },
+        }),
+        error =>
+          error.cause === transport &&
+          /request failed \(TypeError\)/.test(error.message) &&
+          !error.message.includes('private')
+      );
+      const parse = new SyntaxError('private response');
+      await assert.rejects(
+        prepareQueues(environment, {
+          token: 'synthetic-token',
+          request: async () => ({
+            ok: true,
+            status: 200,
+            json: async () => {
+              throw parse;
+            },
+          }),
+        }),
+        error =>
+          error.cause === parse &&
+          /invalid JSON \(HTTP 200, SyntaxError\)/.test(error.message) &&
+          !error.message.includes('private')
+      );
+    });
+
     for (const global of [false, true])
       test(`deployment detaches only the obsolete owned consumer (${global ? 'EU to global' : 'global to EU'}), retry is a no-op`, async t => {
         const f = await fixture(t, [source, dlq, globalSource, globalDlq]);
@@ -260,6 +453,13 @@ for (const environment of ['staging', 'production'])
         assert.deepEqual(obsolete.consumers, []);
         assert.deepEqual(selected.consumers, [owned]);
         assert.equal(f.queues.size, 4);
+        assert.equal(
+          f.queues.get(global ? globalDlq : dlq).settings.message_retention_period,
+          maxRetention
+        );
+        assert.deepEqual(f.queues.get(global ? dlq : globalDlq).settings, defaultSettings);
+        assert.deepEqual(obsolete.settings, defaultSettings);
+        assert.deepEqual(selected.settings, defaultSettings);
         assert.deepEqual(
           f.calls.filter(c => c.method === 'DELETE').map(c => c.path),
           [

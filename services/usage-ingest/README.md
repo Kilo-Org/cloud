@@ -338,13 +338,14 @@ batch 6/par 2, consumer cap 200 and exposure unchanged; admission is per-runtime
 and does not establish aggregate database capacity for larger settings.
 
 Persistent failures still reach the configured DLQ after the finite retry budget;
-a DLQ is a recovery queue, not proof the payload is poison. Before guard rollout,
-verify actual source/DLQ retention, alerting, replay ownership, and a controlled
-stable-ID reconciliation/replay procedure. This change performs no hosted
-retention or DLQ readback. A safe rollback must **not lower retries back to 3 while
-higher-attempt messages remain outstanding**, because their next failure could
-immediately dead-letter them. Preserve stable IDs and reconcile ambiguous writes
-before replay; do not republish to reset attempts or discard accepted events.
+a DLQ is a recovery queue, not proof the payload is poison. DLQ retention is
+enforced at Cloudflare's maximum of 14 days (1209600 seconds); see
+[Retention](#retention). Before guard rollout, verify alerting, replay ownership,
+and a controlled stable-ID reconciliation/replay procedure. A safe rollback must
+**not lower retries back to 3 while higher-attempt messages remain outstanding**,
+because their next failure could immediately dead-letter them. Preserve stable IDs
+and reconcile ambiguous writes before replay; do not republish to reset attempts
+or discard accepted events.
 
 The isolated staging Vercel queue keeps its own retry settings; it shares only the
 bounded writer-response classification. No new environment knob or worker binding
@@ -476,7 +477,8 @@ or `staging`.
 
 Normal production and staging CI prepare their selected EU queues before Worker upload.
 It reads queue names from `wrangler.jsonc`, creates missing resources with
-explicit `jurisdiction: "eu"`, and verifies/reuses existing EU resources.
+explicit `jurisdiction: "eu"`, and verifies/reuses existing EU resources. It keeps
+the selected DLQ at maximum message retention ([Retention](#retention)).
 Unknown jurisdiction or lookup/API errors stop deployment. Both consumer upload
 attempts disable Wrangler's global auto-provisioning for EU selections. Staging
 continues direct HTTP to its writer; production also uses its direct Frankfurt writer. The preparation step also detaches the obsolete
@@ -519,15 +521,31 @@ The Worker has no direct database connection; the authenticated writer owns pers
 
 ## Retention
 
-The retention target is **four days (345600 seconds)** for each source queue and
-DLQ. Retention is managed separately from `wrangler.jsonc`; the pinned Wrangler
-schema does not expose it. Update a queue using its name from the table above:
+Each selected DLQ keeps messages for **14 days (1209600 seconds)**, Cloudflare's
+maximum. Retention is a property of the queue resource, and `wrangler.jsonc`
+cannot set it, so the queue preparation helper enforces it as
+`DLQ_MESSAGE_RETENTION_SECONDS`. It creates a missing DLQ with that retention. For
+an existing DLQ, it raises lower retention with a PATCH that resends the other
+queue settings unchanged, then reads the queue back and stops deployment on any
+mismatch. Retention at or above the value is left alone, so it is never lowered.
+Jurisdiction, consumers and messages are not touched.
 
-```bash
-pnpm --filter cloudflare-usage-ingest exec wrangler queues update <queue-name> --message-retention-period-secs 345600
-```
+The value is applied by CI's preparation step on the next usage-ingest deployment
+of each environment, and every later deployment keeps it at the maximum. Merging
+does not change a live queue. To read it back, open **Queues** in the Cloudflare
+dashboard, select the DLQ from the table above, and check the message retention
+period on its **Settings** tab. The read-only API equivalent is
+`result.settings.message_retention_period` from
+`GET /accounts/{account_id}/queues/{queue_id}`.
 
-See [queue settings](https://developers.cloudflare.com/queues/configuration/configure-queues/).
+Source queues keep Cloudflare's default of four days (345600 seconds), which the
+helper does not change. That is far longer than the source retry window: 20
+retries at the 60-second `retry_delay`, and under nine hours even if all 21
+deliveries ran for the 15-minute invocation limit with the 600-second maximum
+handled retry delay.
+
+See [queue settings](https://developers.cloudflare.com/queues/configuration/configure-queues/#queue-configuration)
+and [limits](https://developers.cloudflare.com/queues/platform/limits/).
 
 ## Verify locally
 

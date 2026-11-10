@@ -3,6 +3,10 @@ import { experimental_readRawConfig } from 'wrangler';
 
 export const supportedEnvironments = ['staging', 'production'];
 
+// Cloudflare's maximum queue message retention (14 days):
+// https://developers.cloudflare.com/queues/configuration/configure-queues/#queue-configuration
+export const DLQ_MESSAGE_RETENTION_SECONDS = 1_209_600;
+
 export async function prepareQueues(
   environment,
   { token = process.env.CLOUDFLARE_API_TOKEN, request = fetch } = {}
@@ -47,15 +51,22 @@ export async function prepareQueues(
           ...(body ? { body: JSON.stringify(body) } : {}),
         }
       );
-    } catch {
-      throw new Error('Queue API request failed; rerun preparation without deleting resources.');
+    } catch (error) {
+      // Only the error name is printed: messages can quote request or response content.
+      throw new Error(
+        `Queue API request failed (${error?.name}); rerun preparation without deleting resources.`,
+        { cause: error }
+      );
     }
     if (!response.ok)
       throw new Error(`Queue API failed (HTTP ${response.status}); check CI token permissions.`);
     try {
       data = await response.json();
-    } catch {
-      throw new Error(`Queue API returned invalid JSON (HTTP ${response.status}).`);
+    } catch (error) {
+      throw new Error(
+        `Queue API returned invalid JSON (HTTP ${response.status}, ${error?.name}).`,
+        { cause: error }
+      );
     }
     if (data?.success !== true) throw new Error(`Queue API failed (HTTP ${response.status}).`);
     return data;
@@ -128,13 +139,37 @@ export async function prepareQueues(
   await verifyConsumer(existing[1]);
   const obsolete = await find(eu ? globalSource : `${globalSource}-eu`);
   const consumer = await verifyConsumer(obsolete);
+  // The API does not document whether PATCH keeps omitted settings, so resend them all.
+  const retainDlqMessages = async queue => {
+    const settings = queue.settings;
+    if (!Number.isFinite(settings?.message_retention_period))
+      throw new Error(`Cannot read ${dlq} message retention; stop deployment.`);
+    if (settings.message_retention_period >= DLQ_MESSAGE_RETENTION_SECONDS) return;
+    const expected = { ...settings, message_retention_period: DLQ_MESSAGE_RETENTION_SECONDS };
+    await api(`/queues/${queue.queue_id}`, { settings: expected }, 'PATCH');
+    const updated = await find(dlq);
+    if (
+      !updated ||
+      updated.jurisdiction !== queue.jurisdiction ||
+      Object.entries(expected).some(([key, value]) => updated.settings?.[key] !== value)
+    )
+      throw new Error(`${dlq} retention update was not confirmed; stop deployment.`);
+  };
   for (const [index, name] of names.entries()) {
-    if (!existing[index]) {
-      await api('/queues', { queue_name: name, jurisdiction: 'eu' });
-      const created = await find(name);
-      verify(created, name);
-      if (index === 1) await verifyConsumer(created);
+    let queue = existing[index];
+    if (!queue) {
+      await api('/queues', {
+        queue_name: name,
+        jurisdiction: 'eu',
+        ...(name === dlq
+          ? { settings: { message_retention_period: DLQ_MESSAGE_RETENTION_SECONDS } }
+          : {}),
+      });
+      queue = await find(name);
+      verify(queue, name);
+      if (name === source) await verifyConsumer(queue);
     }
+    if (name === dlq) await retainDlqMessages(queue);
   }
   // Traffic must already be paused/drained. This detaches, never deletes a queue.
   if (consumer) {

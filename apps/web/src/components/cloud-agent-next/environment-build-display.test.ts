@@ -5,7 +5,6 @@ import {
   failureText,
   formatAge,
   setupBudgetWarning,
-  snapshotBadge,
   stalenessText,
   type EnvironmentBuildStatus,
   type EnvironmentBuildSummary,
@@ -130,24 +129,7 @@ describe('environment build display', () => {
     );
   });
 
-  it.each(['revision', 'age', 'image'] as const)(
-    'shows snapshot age without a stale label for %s staleness in the list',
-    stale => {
-      expect(snapshotBadge(status({ published: { ...PUBLISHED, stale } }), NOW)).toBe(
-        'Snapshot 3 h ago'
-      );
-    }
-  );
-
-  it('summarizes the row status and failures', () => {
-    expect(snapshotBadge(status({ published: PUBLISHED }), NOW)).toBe('Snapshot 3 h ago');
-    expect(snapshotBadge(status({ activeBuild: summary() }), NOW)).toBe('Building snapshot');
-    expect(snapshotBadge(status({ latestBuild: summary({ state: 'failed' }) }), NOW)).toBe(
-      'Snapshot build failed'
-    );
-    expect(snapshotBadge(status({ supported: false }), NOW)).toBeNull();
-    expect(snapshotBadge(undefined, NOW)).toBeNull();
-    expect(snapshotBadge(status(), NOW)).toBe('No snapshot');
+  it('explains failures and formats snapshot age for the detail pane', () => {
     expect(failureText('setup_failed')).toBe('A setup command failed. See the build log.');
     expect(failureText('runtime_base_incompatible')).toBe(
       'The selected runtime release could not be installed.'

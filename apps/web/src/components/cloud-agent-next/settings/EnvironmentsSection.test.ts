@@ -7,7 +7,6 @@ import { createRequire } from 'node:module';
 import type { EnvironmentResponse, EnvironmentSummary } from '@kilocode/cloud-agent-profile';
 import type * as EnvironmentHooks from '@/hooks/useCloudAgentEnvironments';
 import type { EnvironmentRepositoryChoice } from '@/hooks/useEnvironmentRepositoryChoices';
-import type { EnvironmentBuildStatus } from '../environment-build-display';
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
 Object.assign(globalThis, { React });
@@ -22,8 +21,7 @@ let mockListHasData = true;
 let mockListLoading = false;
 let mockListError = false;
 let mockListOptions: { organizationId?: string; enabled?: boolean } | null = null;
-let mockBuildStatusOptions: Record<string, { organizationId?: string; enabled?: boolean }> = {};
-let mockBuildStatuses: Record<string, EnvironmentBuildStatus | undefined> = {};
+const mockBuildStatus = jest.fn(() => ({ data: undefined }));
 
 const mockRefetchList = jest.fn(async () => undefined);
 const mockRefetchDetail = jest.fn(async () => undefined);
@@ -119,13 +117,7 @@ jest.mock('@/hooks/useCloudAgentEnvironments', () => {
       updateEnvironment: usePendingMutation(mockUpdate),
       deleteEnvironment: usePendingMutation(mockDelete),
     }),
-    useEnvironmentBuildStatus: (
-      environmentId: string,
-      options: { organizationId?: string; enabled?: boolean }
-    ) => {
-      mockBuildStatusOptions[environmentId] = options;
-      return { data: mockBuildStatuses[environmentId] };
-    },
+    useEnvironmentBuildStatus: mockBuildStatus,
   };
 });
 
@@ -281,8 +273,6 @@ beforeEach(() => {
   mockListLoading = false;
   mockListError = false;
   mockListOptions = null;
-  mockBuildStatusOptions = {};
-  mockBuildStatuses = {};
   mockConfirm.mockReset();
   mockConfirm.mockReturnValue(true);
   mockToastSuccess.mockClear();
@@ -499,28 +489,7 @@ function renderSection(canManage: boolean): React.ReactElement {
 }
 
 describe('EnvironmentsSection inline detail pane', () => {
-  test('renders snapshot metadata below the repository without provider or status badges', () => {
-    mockBuildStatuses['env-1'] = {
-      environmentId: 'env-1',
-      supported: true,
-      unsupportedReason: null,
-      configurationRevision: 1,
-      activeBuild: null,
-      latestBuild: null,
-      published: {
-        buildId: 'build-1',
-        revision: 1,
-        sourceCommit: 'a'.repeat(40),
-        sourceBranch: 'main',
-        capturedAt: Date.now() - 6 * 24 * 60 * 60_000,
-        size: 100,
-        setupDurationMs: 60_000,
-        stale: 'age',
-        expiresAt: Date.now(),
-      },
-      automaticBackoff: null,
-      sessionPreparationBudgetMs: 12 * 60_000,
-    };
+  test('shows only the name and repository without fetching snapshot status for list rows', () => {
     const mounted = mount(renderSection(true));
     try {
       const row = mounted.container.querySelector(
@@ -530,11 +499,11 @@ describe('EnvironmentsSection inline detail pane', () => {
       expect(metadata.map(span => span.textContent)).toEqual([
         'Kilo Environment',
         'Kilo-Org/kilocode',
-        'Snapshot 6 days ago',
       ]);
       expect(metadata.every(span => span.classList.contains('truncate'))).toBe(true);
       expect(row?.querySelector('[data-slot="badge"]')).toBeNull();
-      expect(row?.textContent).not.toMatch(/\b(GH|stale)\b/);
+      expect(row?.textContent).not.toMatch(/\b(GH|stale|Snapshot)\b/);
+      expect(mockBuildStatus).not.toHaveBeenCalled();
       expect(row?.getAttribute('aria-pressed')).toBe('true');
     } finally {
       mounted.cleanup();
@@ -582,7 +551,6 @@ describe('EnvironmentsSection inline detail pane', () => {
     try {
       expect(mounted.container.textContent).not.toContain('New sessions use');
       expect(mockListOptions).toMatchObject({ enabled: true });
-      expect(mockBuildStatusOptions['env-1']).toMatchObject({ enabled: true });
       expect(selectedLabel(mounted.container)).toBe('Edit environment Kilo Environment');
       const nameInput = mounted.container.querySelector<HTMLInputElement>('#environment-name');
       expect(nameInput?.value).toBe('Kilo Environment');
@@ -733,14 +701,13 @@ describe('EnvironmentsSection inline detail pane', () => {
     }
   });
 
-  test('disables owner and build status queries when inactive', () => {
+  test('disables the owner query when inactive', () => {
     const mounted = mount(
       React.createElement(EnvironmentsSection, { canManage: true, active: false })
     );
     try {
       expect(mockListOptions).toMatchObject({ enabled: false });
-      expect(mockBuildStatusOptions['env-1']).toMatchObject({ enabled: false });
-      expect(mockBuildStatusOptions['env-2']).toMatchObject({ enabled: false });
+      expect(mockBuildStatus).not.toHaveBeenCalled();
     } finally {
       mounted.cleanup();
     }

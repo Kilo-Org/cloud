@@ -171,17 +171,3 @@ export function buildAction(
     disabledReason: options.hasUnsavedChanges ? 'Save your changes before building.' : null,
   };
 }
-
-/** Short status for the environment list row. */
-export function snapshotBadge(
-  status: EnvironmentBuildStatus | undefined,
-  now: number
-): string | null {
-  if (status === undefined || !status.supported) return null;
-  if (isBuildActive(status.activeBuild)) return 'Building snapshot';
-  if (status.published === null) {
-    return status.latestBuild?.state === 'failed' ? 'Snapshot build failed' : 'No snapshot';
-  }
-  const age = formatAge(status.published.capturedAt, now);
-  return `Snapshot ${age}`;
-}

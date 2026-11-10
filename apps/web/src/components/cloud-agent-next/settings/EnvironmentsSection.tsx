@@ -20,12 +20,10 @@ import {
 import {
   environmentMembers,
   useCloudAgentEnvironmentsForOwner,
-  useEnvironmentBuildStatus,
   type EnvironmentRepository,
   type EnvironmentSummary,
 } from '@/hooks/useCloudAgentEnvironments';
 import { EnvironmentDetailPane, type EnvironmentEditorPage } from '../EnvironmentDialog';
-import { snapshotBadge } from '../environment-build-display';
 
 type EnvironmentsSectionProps = {
   organizationId?: string;
@@ -152,9 +150,7 @@ export function EnvironmentsSection({
                 <EnvironmentRow
                   key={environment.id}
                   environment={environment}
-                  organizationId={organizationId}
                   canManage={canManage}
-                  active={active}
                   selected={!createRepository && selectedId === environment.id}
                   disabled={saving}
                   onSelect={() => selectEnvironment(environment.id)}
@@ -284,26 +280,17 @@ export function EnvironmentsSection({
 
 function EnvironmentRow({
   environment,
-  organizationId,
   canManage,
-  active = true,
   selected,
   disabled,
   onSelect,
 }: {
   environment: EnvironmentSummary;
-  organizationId?: string;
   canManage: boolean;
-  active?: boolean;
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
 }) {
-  const { data: buildStatus } = useEnvironmentBuildStatus(environment.id, {
-    organizationId,
-    enabled: active,
-  });
-  const snapshotStatus = snapshotBadge(buildStatus, Date.now());
   const members = environmentMembers(environment);
   return (
     <button
@@ -331,11 +318,6 @@ function EnvironmentRow({
             {member.repoFullName}
           </span>
         ))}
-        {snapshotStatus && (
-          <span className="text-muted-foreground block truncate text-xs" title={snapshotStatus}>
-            {snapshotStatus}
-          </span>
-        )}
       </span>
     </button>
   );

@@ -50,6 +50,13 @@ export const EnkryptUsageWriteSchema = z.strictObject({
    * call without a detection stays compatible with a web app deployed before the field.
    */
   detectorsFired: z.array(z.enum(ENKRYPT_DETECTOR_IDS)).nonempty().optional(),
+  /**
+   * Characters, in UTF-16 code units, that this call sent to Enkrypt and that its scan covers,
+   * including what the verdict cache already covered. Optional so writes from a gateway deployed
+   * before them stay valid.
+   */
+  scannedCharacters: z.int32().nonnegative().optional(),
+  totalCharacters: z.int32().nonnegative().optional(),
 });
 
 export type EnkryptUsageWrite = z.infer<typeof EnkryptUsageWriteSchema>;

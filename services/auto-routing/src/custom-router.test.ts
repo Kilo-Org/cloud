@@ -17,7 +17,10 @@ import {
 import type * as DbModule from '@kilocode/db';
 import { signKiloToken, clearSecretCacheForTest } from '@kilocode/worker-utils';
 import type * as AccountAccessModule from '@kilocode/worker-utils/account-access';
-import type { OrganizationMemberBalanceRow } from '@kilocode/worker-utils/account-access';
+import {
+  DOMAIN_BLACKLIST_GENERATION_REDIS_KEY,
+  type OrganizationMemberBalanceRow,
+} from '@kilocode/worker-utils/account-access';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 import type * as ClassifierConfigModule from './classifier-config';
 import type * as CustomRouterStoreModule from './custom-router-store';
@@ -33,7 +36,6 @@ const findCustomRouterById = vi.hoisted(() => vi.fn());
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const findOrganizationMemberRole = vi.hoisted(() => vi.fn());
 const findOrganizationMemberBalanceRow = vi.hoisted(() => vi.fn());
-const readDomainBlacklistState = vi.hoisted(() => vi.fn());
 const readBlacklistedDomain = vi.hoisted(() => vi.fn());
 const dbRows = vi.hoisted(() => ({
   user: [] as unknown[],
@@ -81,16 +83,14 @@ vi.mock('@kilocode/db', async importOriginal => {
     ...actual,
     getWorkerDb: () => ({
       select: () => ({
-        from: (table: unknown) => ({
-          where: () => ({
-            limit: async () => {
-              if (table === actual.kilocode_users) return dbRows.user;
-              if (table === actual.domain_blacklist_state) return readDomainBlacklistState();
-              if (table === actual.blacklisted_domains) return readBlacklistedDomain();
-              return dbRows.organization;
-            },
-          }),
-        }),
+        from: (table: unknown) => {
+          const limit = async () => {
+            if (table === actual.kilocode_users) return dbRows.user;
+            if (table === actual.blacklisted_domains) return readBlacklistedDomain();
+            return dbRows.organization;
+          };
+          return { where: () => ({ limit }), orderBy: () => ({ limit }) };
+        },
       }),
     }),
   };
@@ -102,6 +102,8 @@ const USER_ID = 'user-1';
 const ORG_ID = '22222222-2222-4222-8222-222222222222';
 const ROUTER_ID = '11111111-1111-4111-8111-111111111111';
 const SONNET = 'anthropic/claude-sonnet-4.6';
+const DOMAIN_GENERATION = '11111111-1111-4111-8111-111111111111';
+const NEXT_DOMAIN_GENERATION = '22222222-2222-4222-8222-222222222222';
 
 const sonnet: CustomRouterEntry = { kind: 'gateway', model: SONNET };
 const ollama: CustomRouterEntry = {
@@ -377,9 +379,7 @@ beforeEach(() => {
   gatewayFailuresLeft = 0;
   gatewayFailureStatus = 503;
   domainCache.clear();
-  readDomainBlacklistState
-    .mockReset()
-    .mockResolvedValue([{ revision: 'revision-1', useEnvFallback: false }]);
+  domainCache.set(DOMAIN_BLACKLIST_GENERATION_REDIS_KEY, DOMAIN_GENERATION);
   readBlacklistedDomain.mockReset().mockResolvedValue([]);
   redisAvailable = true;
   fetchMock.mockReset().mockImplementation(async (input, init) => {
@@ -732,14 +732,17 @@ describe('public custom router decide', () => {
     CUSTOM_ROUTER_EVAL_PLAN_PATH,
     CUSTOM_ROUTER_EVAL_CASE_PATH,
     CUSTOM_ROUTER_EVAL_RESULT_PATH,
-  ])('fails closed with retryable 503 on %s before the blacklist backfill is ready', async path => {
-    readDomainBlacklistState.mockResolvedValue([]);
+  ])('fails closed with retryable 503 on %s when the PG blacklist lookup fails', async path => {
+    readBlacklistedDomain.mockRejectedValue(new Error('database unavailable'));
     const res = await post(path, decideBody());
     expect(res.status).toBe(503);
     expect(res.headers.get('retry-after')).toBe('5');
     expect(await errorCode(res)).toBe('internal_error');
-    expect(redisCommands()).toEqual([]);
-    expect(readBlacklistedDomain).not.toHaveBeenCalled();
+    expect(redisCommands()).toEqual([
+      ['GET', DOMAIN_BLACKLIST_GENERATION_REDIS_KEY],
+      ['GET', `domain-blacklist:${DOMAIN_GENERATION}:host:example.com`],
+    ]);
+    expect(readBlacklistedDomain).toHaveBeenCalledOnce();
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
     expect(benchmarkFetch).not.toHaveBeenCalled();
   });
@@ -760,26 +763,31 @@ describe('public custom router decide', () => {
     expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(blocked ? 403 : 200);
     await drainBackgroundTasks();
     expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(blocked ? 403 : 200);
-    expect(readDomainBlacklistState).toHaveBeenCalledTimes(2);
     expect(readBlacklistedDomain).toHaveBeenCalledOnce();
     expect(redisCommands()).toEqual([
-      ['GET', 'domain-blacklist:revision-1:host:example.com'],
-      ['SET', 'domain-blacklist:revision-1:host:example.com', blocked ? '1' : '0', 'EX', 60],
-      ['GET', 'domain-blacklist:revision-1:host:example.com'],
+      ['GET', DOMAIN_BLACKLIST_GENERATION_REDIS_KEY],
+      ['GET', `domain-blacklist:${DOMAIN_GENERATION}:host:example.com`],
+      [
+        'SET',
+        `domain-blacklist:${DOMAIN_GENERATION}:host:example.com`,
+        blocked ? '1' : '0',
+        'EX',
+        60,
+      ],
+      ['GET', DOMAIN_BLACKLIST_GENERATION_REDIS_KEY],
+      ['GET', `domain-blacklist:${DOMAIN_GENERATION}:host:example.com`],
     ]);
   });
 
   it.each([true, false])(
-    'invalidates cached result %s when the DB revision changes',
+    'invalidates cached result %s when the Redis generation changes',
     async blocked => {
       readBlacklistedDomain.mockResolvedValue(blocked ? [{ domain: 'example.com' }] : []);
       expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(
         blocked ? 403 : 200
       );
       await drainBackgroundTasks();
-      readDomainBlacklistState.mockResolvedValue([
-        { revision: 'revision-2', useEnvFallback: false },
-      ]);
+      domainCache.set(DOMAIN_BLACKLIST_GENERATION_REDIS_KEY, NEXT_DOMAIN_GENERATION);
       readBlacklistedDomain.mockResolvedValue(blocked ? [] : [{ domain: 'example.com' }]);
       expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(
         blocked ? 200 : 403
@@ -789,7 +797,7 @@ describe('public custom router decide', () => {
   );
 
   it('ignores an invalid per-domain cache value and checks the DB', async () => {
-    domainCache.set('domain-blacklist:revision-1:host:example.com', 'invalid');
+    domainCache.set(`domain-blacklist:${DOMAIN_GENERATION}:host:example.com`, 'invalid');
     readBlacklistedDomain.mockResolvedValue([{ domain: 'example.com' }]);
     expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(403);
     expect(readBlacklistedDomain).toHaveBeenCalledOnce();
@@ -797,6 +805,7 @@ describe('public custom router decide', () => {
 
   it('keeps the DB denial when the background cache write fails', async () => {
     fetchMock
+      .mockResolvedValueOnce(Response.json({ result: DOMAIN_GENERATION }))
       .mockResolvedValueOnce(Response.json({ result: null }))
       .mockResolvedValueOnce(new Response('write unavailable', { status: 503 }));
     readBlacklistedDomain.mockResolvedValue([{ domain: 'example.com' }]);
@@ -806,14 +815,15 @@ describe('public custom router decide', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
-  it('returns retryable 503 rather than trusting cached allowance when the state read fails', async () => {
+  it('checks PG rather than trusting cached allowance when the generation read fails', async () => {
     expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(200);
     await drainBackgroundTasks();
-    readDomainBlacklistState.mockRejectedValue(new Error('database unavailable'));
+    redisAvailable = false;
+    readBlacklistedDomain.mockResolvedValue([{ domain: 'example.com' }]);
     const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
-    expect(res.status).toBe(503);
-    expect(res.headers.get('retry-after')).toBe('5');
-    expect(await errorCode(res)).toBe('internal_error');
+    expect(res.status).toBe(403);
+    expect(await errorCode(res)).toBe('forbidden');
+    expect(readBlacklistedDomain).toHaveBeenCalledTimes(2);
   });
 
   it('returns retryable 503 when both cache and DB lookup are unavailable', async () => {
@@ -826,9 +836,41 @@ describe('public custom router decide', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
-  it('preserves the Worker empty fallback when the DB requests environment fallback', async () => {
-    readDomainBlacklistState.mockResolvedValue([{ revision: 'revision-1', useEnvFallback: true }]);
+  it('preserves the Worker empty fallback without probing whole-table emptiness', async () => {
     expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(200);
+    expect(readBlacklistedDomain).toHaveBeenCalledOnce();
+    await drainBackgroundTasks();
+    expect(domainCache.get(`domain-blacklist:${DOMAIN_GENERATION}:host:example.com`)).toBe('0');
+  });
+
+  it('uses the stable initial namespace without a generation key or initialization gate', async () => {
+    domainCache.delete(DOMAIN_BLACKLIST_GENERATION_REDIS_KEY);
+    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(200);
+    await drainBackgroundTasks();
+    expect(domainCache.get('domain-blacklist:initial:host:example.com')).toBe('0');
+    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(200);
+    expect(readBlacklistedDomain).toHaveBeenCalledOnce();
+  });
+
+  it.each([true, false])(
+    'bypasses shared cache for malformed generations (PG blocked %s)',
+    async blocked => {
+      domainCache.set(DOMAIN_BLACKLIST_GENERATION_REDIS_KEY, 'invalid');
+      domainCache.set('domain-blacklist:invalid:host:example.com', blocked ? '0' : '1');
+      readBlacklistedDomain.mockResolvedValue(blocked ? [{ domain: 'example.com' }] : []);
+      expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(
+        blocked ? 403 : 200
+      );
+      expect(redisCommands()).toEqual([['GET', DOMAIN_BLACKLIST_GENERATION_REDIS_KEY]]);
+      expect(readBlacklistedDomain).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('blocks over-bound email domains without a cache lookup or a 500 error', async () => {
+    dbRows.user = [{ ...spentBalanceUser(), google_user_email: `user@${'a'.repeat(1025)}` }];
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(403);
+    expect(await errorCode(res)).toBe('forbidden');
     expect(redisCommands()).toEqual([]);
     expect(readBlacklistedDomain).not.toHaveBeenCalled();
   });

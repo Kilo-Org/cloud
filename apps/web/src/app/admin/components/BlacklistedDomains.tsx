@@ -67,7 +67,8 @@ function EditTab() {
         const warnings = [
           failed && 'Blocking existing accounts failed. Run the backfill to finish.',
           remaining && 'More accounts remain. Run the backfill to finish the rest.',
-          result.legacy_cleanup_failed && 'Legacy Redis cleanup failed. Sync again to retry.',
+          result.cache_refresh_failed &&
+            'Cache refresh or legacy cleanup failed. Sync again to retry.',
         ]
           .filter(Boolean)
           .join(' ');

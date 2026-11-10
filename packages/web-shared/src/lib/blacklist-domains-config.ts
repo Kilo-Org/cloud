@@ -2,8 +2,8 @@ import 'server-only';
 import * as z from 'zod';
 import { captureException } from '@sentry/nextjs';
 import { after } from 'next/server';
-import { asc, eq, gt, sql } from 'drizzle-orm';
-import { blacklisted_domains, domain_blacklist_state } from '@kilocode/db/schema';
+import { asc, gt, sql } from 'drizzle-orm';
+import { blacklisted_domains } from '@kilocode/db/schema';
 import {
   blockedSignupTldsFromConfig,
   isEmailDomainBlacklisted,
@@ -138,13 +138,8 @@ export async function listStoredDomains(fromDb: Pick<typeof db, 'select'>): Prom
 export async function getBlacklistedDomains(
   fromDb: Pick<typeof db, 'select'> = db
 ): Promise<string[]> {
-  const [state] = await fromDb
-    .select({ useEnvFallback: domain_blacklist_state.use_env_fallback })
-    .from(domain_blacklist_state)
-    .where(eq(domain_blacklist_state.id, 1))
-    .limit(1);
-  if (!state) throw new Error('Domain blacklist initialization has not completed');
-  return state.useEnvFallback ? envFallbackDomains : listStoredDomains(fromDb);
+  const domains = await listStoredDomains(fromDb);
+  return domains.length === 0 ? envFallbackDomains : domains;
 }
 
 /**

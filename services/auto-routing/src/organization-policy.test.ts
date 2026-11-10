@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearSecretCacheForTest } from '@kilocode/worker-utils';
+import { DOMAIN_BLACKLIST_GENERATION_REDIS_KEY } from '@kilocode/worker-utils/account-access';
 import { domainBlacklistCache } from './organization-policy';
 
 const env = {
@@ -14,19 +15,23 @@ describe('domainBlacklistCache', () => {
     clearSecretCacheForTest();
   });
 
-  it('reads and writes selective keys through Redis commands with a 200ms timeout', async () => {
+  it('reads the generation and selective keys and writes with a 200ms timeout', async () => {
+    const generation = '11111111-1111-4111-8111-111111111111';
     const fetch = vi
       .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(Response.json({ result: generation }))
       .mockResolvedValueOnce(Response.json({ result: '0' }))
       .mockResolvedValueOnce(Response.json({ result: 'OK' }));
     vi.stubGlobal('fetch', fetch);
     const timeout = vi.spyOn(AbortSignal, 'timeout');
     const cache = domainBlacklistCache(env, { waitUntil: vi.fn() });
-    const key = 'domain-blacklist:revision-1:host:example.com';
+    const key = `domain-blacklist:${generation}:host:example.com`;
 
+    expect(await cache.get(DOMAIN_BLACKLIST_GENERATION_REDIS_KEY)).toBe(generation);
     expect(await cache.get(key)).toBe('0');
     expect(await cache.set(key, '1', 60)).toBe('OK');
     expect(fetch.mock.calls.map(([, init]) => JSON.parse(init?.body as string))).toEqual([
+      ['GET', DOMAIN_BLACKLIST_GENERATION_REDIS_KEY],
       ['GET', key],
       ['SET', key, '1', 'EX', 60],
     ]);
@@ -36,7 +41,7 @@ describe('domainBlacklistCache', () => {
       expect(new Headers(init?.headers).get('authorization')).toBe('Bearer redis-test-token');
       expect(init?.signal).toBeInstanceOf(AbortSignal);
     }
-    expect(timeout.mock.calls).toEqual([[200], [200]]);
+    expect(timeout.mock.calls).toEqual([[200], [200], [200]]);
   });
 
   it('returns null for a cache miss', async () => {

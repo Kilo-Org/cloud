@@ -1,6 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { eq, inArray, sql } from 'drizzle-orm';
-import { getTableConfig } from 'drizzle-orm/pg-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateDrizzleJson, generateMigration } from 'drizzle-kit/api';
@@ -23,126 +22,8 @@ const schemaTestDb = createDrizzleClient({
   poolConfig: { application_name: 'db-schema-test', max: 1 },
 });
 
-const domainBlacklistMigration = fs.readFileSync(
-  path.join(__dirname, 'migrations/0345_chilly_hiroim.sql'),
-  'utf8'
-);
-const [domainBlacklistMigrationDdl, domainBlacklistMigrationSeed] = domainBlacklistMigration.split(
-  '-->  statement-breakpoint'
-);
-
-async function executeDomainBlacklistSeed(
-  domains: readonly string[],
-  runs = 1
-): Promise<(typeof schema.domain_blacklist_state.$inferSelect)[][]> {
-  if (!domainBlacklistMigrationDdl || !domainBlacklistMigrationSeed?.trim()) {
-    throw new Error('Domain blacklist migration DDL or seed is missing');
-  }
-
-  return schemaTestDb.db.transaction(async tx => {
-    await tx.execute(
-      sql`CREATE TEMP TABLE "blacklisted_domains" ("domain" text PRIMARY KEY) ON COMMIT DROP`
-    );
-    const temporaryStateTableDdl = domainBlacklistMigrationDdl
-      .replace('CREATE TABLE ', 'CREATE TEMP TABLE ')
-      .replace(/\);\s*$/, ') ON COMMIT DROP;');
-    await tx.execute(sql.raw(temporaryStateTableDdl));
-
-    for (const domain of domains) {
-      await tx.insert(schema.blacklisted_domains).values({ domain });
-    }
-
-    const states = [];
-    for (let run = 0; run < runs; run++) {
-      await tx.execute(sql.raw(domainBlacklistMigrationSeed));
-      states.push(await tx.select().from(schema.domain_blacklist_state));
-    }
-    return states;
-  });
-}
-
 afterAll(async () => {
   await schemaTestDb.pool.end();
-});
-
-describe('domain blacklist schema', () => {
-  it('defines the blacklisted domain primary key', () => {
-    const blacklist = getTableConfig(schema.blacklisted_domains);
-    expect(blacklist.name).toBe('blacklisted_domains');
-    expect(blacklist.columns).toHaveLength(1);
-    expect(blacklist.columns[0]?.name).toBe('domain');
-    expect(blacklist.columns[0]?.primary).toBe(true);
-    expect(blacklist.columns[0]?.notNull).toBe(true);
-  });
-
-  it('defines a constrained singleton readiness state', () => {
-    const state = getTableConfig(schema.domain_blacklist_state);
-    const columns = new Map(state.columns.map(column => [column.name, column]));
-    expect(state.name).toBe('domain_blacklist_state');
-    expect(state.checks.map(constraint => constraint.name)).toEqual([
-      'domain_blacklist_state_singleton',
-    ]);
-    expect(columns.get('id')?.primary).toBe(true);
-    expect(columns.get('id')?.notNull).toBe(true);
-    expect(columns.get('id')?.default).toBe(1);
-    expect(columns.get('revision')?.notNull).toBe(true);
-    expect(columns.get('revision')?.default).toBeDefined();
-    expect(columns.get('use_env_fallback')?.notNull).toBe(true);
-    expect(columns.get('use_env_fallback')?.default).toBeUndefined();
-    expect(columns.get('migrated_at')?.notNull).toBe(true);
-    expect(columns.get('migrated_at')?.default).toBeDefined();
-  });
-
-  it('creates blacklisted_domains with a primary key in its original migration', () => {
-    const migration = fs.readFileSync(
-      path.join(__dirname, 'migrations/0344_open_jazinda.sql'),
-      'utf8'
-    );
-
-    expect(migration).toContain('CREATE TABLE "blacklisted_domains"');
-    expect(migration).toContain('"domain" text PRIMARY KEY NOT NULL');
-  });
-
-  it('seeds readiness from the PostgreSQL blacklist without writing domain rows', () => {
-    expect(domainBlacklistMigrationDdl).toContain('CREATE TABLE "domain_blacklist_state"');
-    expect(domainBlacklistMigrationDdl).not.toContain('CREATE TABLE "blacklisted_domains"');
-    expect(domainBlacklistMigrationDdl).toContain(
-      'CONSTRAINT "domain_blacklist_state_singleton" CHECK ("domain_blacklist_state"."id" = 1)'
-    );
-    expect(domainBlacklistMigrationSeed).toMatch(
-      /INSERT INTO "domain_blacklist_state" \("id", "use_env_fallback"\)/i
-    );
-    expect(domainBlacklistMigrationSeed).toMatch(
-      /SELECT 1, NOT EXISTS \(SELECT 1 FROM "blacklisted_domains" LIMIT 1\)/i
-    );
-    expect(domainBlacklistMigrationSeed).toMatch(/ON CONFLICT \("id"\) DO NOTHING/i);
-    expect(domainBlacklistMigrationSeed?.trim().split(';').filter(Boolean)).toHaveLength(1);
-    expect(domainBlacklistMigration).not.toMatch(
-      /\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE(?:\s+TABLE)?)\s+"?blacklisted_domains"?/i
-    );
-  });
-
-  it.each([
-    { name: 'non-empty', domains: ['existing.example'], useEnvFallback: false },
-    { name: 'empty', domains: [], useEnvFallback: true },
-  ])(
-    'seeds fallback state for a $name PostgreSQL blacklist',
-    async ({ domains, useEnvFallback }) => {
-      const [state] = await executeDomainBlacklistSeed(domains);
-      expect(state).toHaveLength(1);
-      expect(state?.[0]).toMatchObject({ id: 1, use_env_fallback: useEnvFallback });
-      expect(state?.[0]?.revision).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      );
-      expect(Date.parse(state?.[0]?.migrated_at ?? '')).not.toBeNaN();
-    }
-  );
-
-  it('preserves state and revision when the seed is rerun', async () => {
-    const [firstRun, secondRun] = await executeDomainBlacklistSeed(['existing.example'], 2);
-    expect(firstRun).toHaveLength(1);
-    expect(secondRun).toEqual(firstRun);
-  });
 });
 
 it('webhook profile migration preserves saved rows and only relaxes the explicit profile requirement', async () => {

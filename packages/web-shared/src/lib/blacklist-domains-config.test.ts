@@ -1,10 +1,11 @@
 import { beforeAll, beforeEach, afterEach, describe, expect, jest, test } from '@jest/globals';
-import { blacklisted_domains, domain_blacklist_state } from '@kilocode/db/schema';
+import { blacklisted_domains } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type * as BlacklistConfig from '@kilocode/web-shared/lib/blacklist-domains-config';
 import {
   BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
+  DOMAIN_BLACKLIST_GENERATION_REDIS_KEY,
   MAX_BLACKLIST_DOMAINS,
 } from '@kilocode/worker-utils/account-access';
 import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
@@ -43,24 +44,19 @@ beforeEach(async () => {
   jest.clearAllMocks();
   redisSet.mockResolvedValue('OK');
   redisGet.mockResolvedValue(null);
-  await db.delete(domain_blacklist_state).where(sql`true`);
   await db.delete(blacklisted_domains).where(sql`true`);
 });
 
 afterEach(() => clock.mockRestore());
 
-async function initialize() {
-  await db.insert(domain_blacklist_state).values({ use_env_fallback: false });
-}
-
 describe('Postgres blacklist reads', () => {
-  test('refuses an uninitialized table instead of silently allowing access', async () => {
-    await expect(config.getBlacklistedDomains()).rejects.toThrow('initialization');
-    await expect(config.isEmailBlacklisted('user@example.com')).rejects.toThrow('initialization');
+  test('uses env fallback for an existing empty table without initialization', async () => {
+    await expect(config.listStoredDomains(db)).resolves.toEqual([]);
+    await expect(config.getBlacklistedDomains()).resolves.toEqual(config.envFallbackDomains);
+    expect(redisGet).not.toHaveBeenCalled();
   });
 
   test('enumerates admin entries across bounded pages without truncating them', async () => {
-    await initialize();
     const domains = Array.from(
       { length: 1005 },
       (_, index) => `domain-${String(index).padStart(4, '0')}.example`
@@ -70,10 +66,12 @@ describe('Postgres blacklist reads', () => {
   });
 
   test('defers positive and negative lookup cache writes until after the response', async () => {
-    await initialize();
     await db.insert(blacklisted_domains).values({ domain: 'blocked.example' });
     await expect(config.isEmailBlacklisted('user@sub.blocked.example')).resolves.toBe(true);
     await expect(config.isEmailBlacklisted('user@allowed.example')).resolves.toBe(false);
+    expect(redisGet).toHaveBeenCalledTimes(4);
+    expect(redisGet.mock.calls[0]).toEqual([DOMAIN_BLACKLIST_GENERATION_REDIS_KEY]);
+    expect(redisGet.mock.calls[2]).toEqual([DOMAIN_BLACKLIST_GENERATION_REDIS_KEY]);
     expect(redisSet).not.toHaveBeenCalled();
     for (const [write] of after.mock.calls) {
       if (typeof write === 'function') await write();

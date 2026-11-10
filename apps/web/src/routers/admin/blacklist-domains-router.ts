@@ -8,7 +8,10 @@ import {
   readBlacklistDomainsSettings,
   normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import { BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY } from '@kilocode/worker-utils/account-access';
+import {
+  BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
+  DOMAIN_BLACKLIST_GENERATION_REDIS_KEY,
+} from '@kilocode/worker-utils/account-access';
 import {
   BLACKLIST_DOMAINS_REDIS_KEY,
   BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
@@ -16,9 +19,9 @@ import {
 import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
-import { blacklisted_domains, domain_blacklist_state, kilocode_users } from '@kilocode/db/schema';
+import { blacklisted_domains, kilocode_users } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
-import { sql, count, isNotNull, desc, min, max, eq } from 'drizzle-orm';
+import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';
 import { createHash, randomUUID } from 'node:crypto';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
@@ -40,22 +43,17 @@ const AdminBlacklistDomainsInputSchema = BlacklistDomainsInputSchema.extend({
 });
 
 async function readConfigOrThrow(fromDb: Pick<typeof db, 'select'>) {
-  const [state] = await fromDb
-    .select({ revision: domain_blacklist_state.revision })
-    .from(domain_blacklist_state)
-    .where(eq(domain_blacklist_state.id, 1))
-    .limit(1)
-    .for('share');
-  if (!state) {
-    throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: 'Domain blacklist initialization has not completed.',
-    });
-  }
   const settings = await readBlacklistDomainsSettings();
+  const config: BlacklistDomainsConfig = {
+    domains: await listStoredDomains(fromDb),
+    blocked_signup_tlds: settings.blocked_signup_tlds,
+    updated_at: settings.updated_at,
+    updated_by: settings.updated_by,
+    updated_by_email: settings.updated_by_email,
+  };
   return {
-    config: { ...settings, domains: await listStoredDomains(fromDb) },
-    version: createHash('sha256').update(`postgres:${state.revision}`).digest('hex'),
+    config,
+    version: createHash('sha256').update('postgres:').update(JSON.stringify(config)).digest('hex'),
   };
 }
 
@@ -64,6 +62,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     return db.transaction(async tx => {
       await tx.execute(sql`SET LOCAL lock_timeout = '10s'`);
       await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+      await tx.execute(sql`LOCK TABLE ${blacklisted_domains} IN SHARE MODE`);
       const { config, version } = await readConfigOrThrow(tx);
       return {
         ...config,
@@ -116,10 +115,6 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
             .insert(blacklisted_domains)
             .values(normalizedDomains.slice(offset, offset + 1000).map(domain => ({ domain })));
         }
-        await tx
-          .update(domain_blacklist_state)
-          .set({ revision: randomUUID(), use_env_fallback: normalizedDomains.length === 0 })
-          .where(eq(domain_blacklist_state.id, 1));
         await redisClient.mset({
           [BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY]: JSON.stringify({ ...config, domains: [] }),
           [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: updatedAt,
@@ -138,19 +133,20 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     }
     const { config, addedDomains } = saved;
 
-    let legacyCleanupFailed = false;
+    let cacheRefreshFailed = false;
     try {
       await redisClient.eval(
-        `if redis.call('TTL', KEYS[1]) == -1 then
-          return redis.call('DEL', KEYS[1])
+        `redis.call('SET', KEYS[1], ARGV[1])
+        if redis.call('TTL', KEYS[2]) == -1 then
+          return redis.call('DEL', KEYS[2])
         end
         return 0`,
-        [BLACKLIST_DOMAINS_REDIS_KEY],
-        []
+        [DOMAIN_BLACKLIST_GENERATION_REDIS_KEY, BLACKLIST_DOMAINS_REDIS_KEY],
+        [randomUUID()]
       );
     } catch (error) {
-      captureException(error, { tags: { source: 'blacklist_domains_legacy_cleanup' } });
-      legacyCleanupFailed = true;
+      captureException(error, { tags: { source: 'blacklist_domains_cache_refresh' } });
+      cacheRefreshFailed = true;
     }
 
     // The list is already live for auth checks at this point, so a backfill
@@ -171,7 +167,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       }
     }
 
-    return { ...config, backfill, legacy_cleanup_failed: legacyCleanupFailed };
+    return { ...config, backfill, cache_refresh_failed: cacheRefreshFailed };
   }),
 
   stats: adminProcedure.query(async () => {

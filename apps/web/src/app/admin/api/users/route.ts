@@ -20,7 +20,6 @@ import {
   referral_codes,
   organization_memberships,
   blacklisted_domains,
-  domain_blacklist_state,
 } from '@kilocode/db/schema';
 import {
   ilike,
@@ -207,15 +206,8 @@ export async function GET(
 
     const userDomainSuffixes = users.map(user => emailDomainSuffixes(user.google_user_email));
     const candidateDomains = [...new Set(userDomainSuffixes.flatMap(suffixes => suffixes ?? []))];
-    const [blacklistState] = await db
-      .select({ useEnvFallback: domain_blacklist_state.use_env_fallback })
-      .from(domain_blacklist_state)
-      .where(eq(domain_blacklist_state.id, 1))
-      .limit(1);
-    if (!blacklistState) throw new Error('Domain blacklist initialization has not completed');
-    const blacklistedDomains = blacklistState.useEnvFallback
-      ? envFallbackDomains
-      : candidateDomains.length === 0
+    const blacklistedDomains =
+      candidateDomains.length === 0
         ? []
         : (
             await db
@@ -224,6 +216,22 @@ export async function GET(
               .where(inArray(blacklisted_domains.domain, candidateDomains))
               .limit(candidateDomains.length)
           ).map(row => row.domain);
+    const hasUnmatchedEnvFallbackEmail = users.some(
+      (user, index) =>
+        userDomainSuffixes[index] !== null &&
+        !isEmailBlacklistedByDomain(user.google_user_email, blacklistedDomains) &&
+        isEmailBlacklistedByDomain(user.google_user_email, envFallbackDomains)
+    );
+    const useEnvFallback =
+      hasUnmatchedEnvFallbackEmail &&
+      (
+        await db
+          .select({ domain: blacklisted_domains.domain })
+          .from(blacklisted_domains)
+          .orderBy(asc(blacklisted_domains.domain))
+          .limit(1)
+      ).length === 0;
+    const domainsToCheck = useEnvFallback ? envFallbackDomains : blacklistedDomains;
 
     const usersWithPaymentStatus: UserTableProps[] = users.map((user, index) => ({
       ...user,
@@ -235,7 +243,7 @@ export async function GET(
       admin_notes: notesByUserId.get(user.id)?.map(o => ({ ...o, admin_kilo_user: null })) || [],
       is_blacklisted_by_domain:
         userDomainSuffixes[index] === null ||
-        isEmailBlacklistedByDomain(user.google_user_email, blacklistedDomains),
+        isEmailBlacklistedByDomain(user.google_user_email, domainsToCheck),
     }));
 
     const response: UsersApiResponse = {

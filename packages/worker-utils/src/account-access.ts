@@ -1,7 +1,6 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   blacklisted_domains,
-  domain_blacklist_state,
   organization_memberships,
   organization_user_limits,
   organization_user_usage,
@@ -10,7 +9,7 @@ import {
   type OrganizationUserLimitType,
 } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
-import { and, eq, inArray, isNull, not, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, not, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 // Account access rules shared by the Next.js gateway and Workers that authenticate Kilo users.
@@ -175,7 +174,7 @@ export function canSpendPaidUsage(balance: number): boolean {
   return balance > 0;
 }
 
-// Only explicit settings initialization and retirement touch this legacy snapshot.
+// The legacy snapshot is only a temporary metadata fallback until an admin save retires it.
 export const BLACKLISTED_DOMAINS_REDIS_KEY = 'admin:blacklisted-domains';
 export const BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY = 'admin:blacklisted-domains:settings';
 // Holds the config's updated_at. The admin save writes both keys in one MSET.
@@ -319,6 +318,7 @@ export function isEmailBlacklistedByDomain(
 export const DOMAIN_BLACKLIST_CACHE_TTL_SECONDS = 60;
 export const DOMAIN_BLACKLIST_QUERY_TIMEOUT_MS = 1000;
 export const DOMAIN_BLACKLIST_CACHE_TIMEOUT_MS = 200;
+export const DOMAIN_BLACKLIST_GENERATION_REDIS_KEY = 'domain-blacklist:generation';
 
 async function blacklistOperation<T>(
   operation: PromiseLike<T>,
@@ -366,59 +366,76 @@ export async function isEmailDomainBlacklisted(
 ): Promise<boolean> {
   const suffixes = emailDomainSuffixes(email);
   if (suffixes === null) return true;
-  const [state] = await blacklistOperation(
-    db
-      .select({
-        revision: domain_blacklist_state.revision,
-        useEnvFallback: domain_blacklist_state.use_env_fallback,
-      })
-      .from(domain_blacklist_state)
-      .where(eq(domain_blacklist_state.id, 1))
-      .limit(1),
-    DOMAIN_BLACKLIST_QUERY_TIMEOUT_MS,
-    'Domain blacklist database lookup timed out'
-  );
-  if (!state) throw new Error('Domain blacklist initialization has not completed');
-  if (state.useEnvFallback) return isEmailBlacklistedByDomain(email, fallbackDomains);
   if (suffixes.length === 0) return false;
 
-  // The revision is committed with admin edits, so even a late cache fill cannot revive an old list.
-  const key = `domain-blacklist:${state.revision}:${email.includes('@') ? 'host' : 'suffix'}:${encodeURIComponent(suffixes[0])}`;
+  let key: string | undefined;
+  let pgBlocked: boolean | undefined;
   try {
+    const rawGeneration = await blacklistOperation(
+      cache.get(DOMAIN_BLACKLIST_GENERATION_REDIS_KEY),
+      DOMAIN_BLACKLIST_CACHE_TIMEOUT_MS,
+      'Domain blacklist generation lookup timed out'
+    );
+    const generation = rawGeneration === null ? 'initial' : z.uuid().parse(rawGeneration);
+    key = `domain-blacklist:${generation}:${email.includes('@') ? 'host' : 'suffix'}:${encodeURIComponent(suffixes[0])}`;
     const cached = await blacklistOperation(
       cache.get(key),
       DOMAIN_BLACKLIST_CACHE_TIMEOUT_MS,
       'Domain blacklist cache lookup timed out'
     );
-    if (cached === '1' || cached === '0') return cached === '1';
+    if (cached === '1' || cached === '0') pgBlocked = cached === '1';
   } catch (error) {
     cache.onError(error);
   }
 
-  const matches = await blacklistOperation(
+  if (pgBlocked === undefined) {
+    const matches = await blacklistOperation(
+      db
+        .select({ domain: blacklisted_domains.domain })
+        .from(blacklisted_domains)
+        .where(inArray(blacklisted_domains.domain, suffixes))
+        .limit(1),
+      DOMAIN_BLACKLIST_QUERY_TIMEOUT_MS,
+      'Domain blacklist database lookup timed out'
+    );
+    pgBlocked = matches.length > 0;
+    const expiresAt = Date.now() + DOMAIN_BLACKLIST_CACHE_TTL_SECONDS * 1000;
+    if (key !== undefined) {
+      const cacheKey = key;
+      const value = pgBlocked ? '1' : '0';
+      try {
+        cache.defer(async () => {
+          const ttlSeconds = Math.min(
+            DOMAIN_BLACKLIST_CACHE_TTL_SECONDS,
+            Math.floor((expiresAt - Date.now()) / 1000)
+          );
+          if (ttlSeconds <= 0) return;
+          try {
+            await blacklistOperation(
+              cache.set(cacheKey, value, ttlSeconds),
+              DOMAIN_BLACKLIST_CACHE_TIMEOUT_MS,
+              'Domain blacklist cache write timed out'
+            );
+          } catch (error) {
+            cache.onError(error);
+          }
+        });
+      } catch (error) {
+        cache.onError(error);
+      }
+    }
+  }
+  if (pgBlocked) return true;
+  if (!isEmailBlacklistedByDomain(email, fallbackDomains)) return false;
+
+  const configuredDomains = await blacklistOperation(
     db
       .select({ domain: blacklisted_domains.domain })
       .from(blacklisted_domains)
-      .where(inArray(blacklisted_domains.domain, suffixes))
+      .orderBy(asc(blacklisted_domains.domain))
       .limit(1),
     DOMAIN_BLACKLIST_QUERY_TIMEOUT_MS,
     'Domain blacklist database lookup timed out'
   );
-  const blocked = matches.length > 0;
-  try {
-    cache.defer(async () => {
-      try {
-        await blacklistOperation(
-          cache.set(key, blocked ? '1' : '0', DOMAIN_BLACKLIST_CACHE_TTL_SECONDS),
-          DOMAIN_BLACKLIST_CACHE_TIMEOUT_MS,
-          'Domain blacklist cache write timed out'
-        );
-      } catch (error) {
-        cache.onError(error);
-      }
-    });
-  } catch (error) {
-    cache.onError(error);
-  }
-  return blocked;
+  return configuredDomains.length === 0;
 }

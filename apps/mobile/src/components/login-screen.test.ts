@@ -22,7 +22,11 @@ import {
 } from '@/lib/login-draft';
 import LoginRoute from '@/app/(auth)/login';
 import { LoginScreen } from './login-screen';
-import { errorMessage, resolveBottomChromePadding } from './login-screen-state';
+import {
+  errorMessage,
+  resolveBottomChromePadding,
+  resolveKeyboardFieldActionOffset,
+} from './login-screen-state';
 
 // ── Hoisted mocks for the mounted globe tests ──────────────────────────────
 
@@ -64,6 +68,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
+  useWindowDimensions: () => ({ width: 400, height: 800, fontScale: 1 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeInsets,
@@ -295,6 +300,19 @@ describe('login-screen bottom chrome padding', () => {
   });
 });
 
+describe('login-screen keyboard field action reserve', () => {
+  it('covers the action, one refusal line, and the form gaps at the default scale', () => {
+    // One action box, one refusal line above it, and a form gap on each side.
+    expect(resolveKeyboardFieldActionOffset(1)).toBe(98);
+  });
+
+  it('grows with the system text scale', () => {
+    // Both the action's label and the refusal line are text; the gaps are not.
+    expect(resolveKeyboardFieldActionOffset(1.5)).toBe(129);
+    expect(resolveKeyboardFieldActionOffset(2)).toBe(160);
+  });
+});
+
 describe('login-screen malformed poll boundary', () => {
   it('returns null for a 200 body with no token — prevents signIn call', () => {
     // When the server returns HTTP 200 but parse fails (no token),
@@ -386,9 +404,9 @@ describe('login-screen language globe', () => {
     // The row clears the status bar before the globe's own 48dp box.
     expect(headerRow.props.style).toMatchObject({ paddingTop: 24 + 8, paddingEnd: 16 });
     expect(globe.props.className).not.toMatch(/\bz-/);
-    // The scroller keeps room under the focused field for its primary action
-    // and the gap to the keyboard, instead of clipping the action.
-    expect(findByType(renderer.root, 'KeyboardAwareScrollView')[0]?.props.bottomOffset).toBe(68);
+    // The scroller keeps room under the focused field for its primary action,
+    // the refusal line above it, and the form gaps around them.
+    expect(findByType(renderer.root, 'KeyboardAwareScrollView')[0]?.props.bottomOffset).toBe(98);
 
     renderer.unmount();
     safeInsets.top = 0;

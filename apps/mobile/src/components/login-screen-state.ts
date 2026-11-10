@@ -25,6 +25,27 @@ export function resolveBottomChromePadding({ bottomInset }: { bottomInset: numbe
   return Math.max(bottomInset, MIN_BOTTOM_CHROME_HEIGHT);
 }
 
+/** One form gap between stacked login controls (`gap-3`), in points. */
+const FORM_GAP = 12;
+
+/** The floor `Button` size `lg` keeps for its box regardless of the label. */
+const PRIMARY_ACTION_MIN_HEIGHT = 44;
+
+/** One line of the refusal a login form shows between a field and its action. */
+const INLINE_MESSAGE_LINE = 18;
+
+/**
+ * The room the login scroller keeps between a focused field and the keyboard:
+ * the primary action below the field, one form gap on each side of it, and one
+ * line for the refusal a field or the code step can show above that action. The
+ * action and the message are text, so both terms follow the system text scale;
+ * the gaps are fixed lengths. A reserve that ignored either grew past the
+ * keyboard exactly in the refusal state.
+ */
+export function resolveKeyboardFieldActionOffset(fontScale: number): number {
+  return Math.ceil((PRIMARY_ACTION_MIN_HEIGHT + INLINE_MESSAGE_LINE) * fontScale) + FORM_GAP * 3;
+}
+
 /**
  * The banner text for a terminal device-auth error, in the active language.
  * Denied and expired are translated here from the status so a language switch

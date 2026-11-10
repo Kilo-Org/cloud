@@ -13,7 +13,11 @@ import logo from '@/../assets/images/logo.png';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { CenteredState } from '@/components/centered-state';
 import { IdleAuth } from '@/components/login/idle-auth';
-import { errorMessage, resolveBottomChromePadding } from '@/components/login-screen-state';
+import {
+  errorMessage,
+  resolveBottomChromePadding,
+  resolveKeyboardFieldActionOffset,
+} from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,6 +35,7 @@ import {
   takePendingLinkOutcome,
 } from '@/lib/auth/pending-link-state';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   clearPersistedLoginDrafts,
@@ -40,14 +45,6 @@ import {
 } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 import { useScreenInsets } from '@/lib/screen-insets';
-
-/**
- * The room the scrolled form keeps between a focused field and the keyboard: one
- * primary-action height plus the form's gap above it, and the same gap again to
- * the keyboard, so the action never sits on the keyboard edge. Without it the
- * scroller only clipped the action, and the clip left it too short to tap.
- */
-const KEYBOARD_FIELD_ACTION_OFFSET = 68;
 
 export function LoginScreen() {
   const { sessionEnded, signIn, token: publishedToken } = useAuth();
@@ -71,6 +68,8 @@ export function LoginScreen() {
   const colors = useThemeColors();
   const insets = useScreenInsets();
   const { t } = useTranslation();
+  const fontScale = useLiveFontScale();
+  const fieldActionReserve = resolveKeyboardFieldActionOffset(fontScale);
   const [persistFailed, setPersistFailed] = useState(false);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
@@ -290,11 +289,14 @@ export function LoginScreen() {
         contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
         keyboardShouldPersistTaps="handled"
         // The room the form keeps below the focused field while the keyboard is
-        // up: the primary action under the field, the form's gap above it, and
-        // the same gap again to the keyboard. Without it the scroller clipped
-        // the action, because the IME leaves less room than the form needs and
-        // nothing scrolled it into view.
-        bottomOffset={KEYBOARD_FIELD_ACTION_OFFSET}
+        // up: the primary action, the form gap on each side of it, and the
+        // refusal line a field or the code step can show above that action, all
+        // at the current text scale. Without it the scroller clipped the action,
+        // because the IME leaves less room than the form needs and nothing
+        // scrolled it into view. Layout mode grows the scroll length with that
+        // IME space, so the form can still reach the position.
+        bottomOffset={fieldActionReserve}
+        mode="layout"
       >
         <View className="w-full max-w-sm items-center gap-2">
           <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />

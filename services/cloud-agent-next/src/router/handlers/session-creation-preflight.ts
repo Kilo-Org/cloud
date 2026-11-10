@@ -25,6 +25,7 @@ import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata
 import { SessionProfileBundleSchema } from '../../persistence/schemas.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
+import { isExplicitNoEnvironment } from '../../session/requested-environment-intent.js';
 import { launchRepositoryIdentity } from '../../session/environment-launch.js';
 import { isPolicyBearingAuthToken } from '../../session/policy-bearing-token.js';
 import {
@@ -95,9 +96,12 @@ function environmentOwnerForSession(
  * the security agent) run without it.
  *
  * Several environments can contain the repository. A client that selected one
- * names it in `requestedEnvironment`. Without a selection, a client that marks
+ * names it in `requestedEnvironment`. Without a selection, the repository's
+ * saved default applies. With neither, a client that marks
  * `requireEnvironmentChoice` gets a conflict that names the environments, and
- * every other client runs with no environment.
+ * every other client runs with no environment. An explicit
+ * `requestedEnvironment: { mode: 'none' }` skips all environment lookup, so it
+ * neither applies a saved default nor reports an ambiguity conflict.
  */
 async function resolveEnvironment(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
@@ -105,6 +109,7 @@ async function resolveEnvironment(
   policy: ProfileResolutionPolicy,
   db?: WorkerDb
 ): Promise<EnvironmentForSession | null> {
+  if (isExplicitNoEnvironment(input.requestedEnvironment)) return null;
   if (policy.defaultProfileResolution !== 'include-web-defaults') return null;
   const repository = launchRepositoryIdentity(input.repository);
   if (!repository) return null;
@@ -125,6 +130,16 @@ async function resolveEnvironment(
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: 'The selected environment does not contain this repository',
+      });
+    case 'default-not-found':
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: `The repository's default environment (${resolution.environmentId}) was not found. Update the repository settings or select an environment.`,
+      });
+    case 'default-without-repository':
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `The repository's default environment (${resolution.environmentId}) does not contain this repository. Update the repository settings or select an environment.`,
       });
     case 'conflict':
       if (input.requireEnvironmentChoice !== true) return null;

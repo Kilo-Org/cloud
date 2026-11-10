@@ -53,6 +53,12 @@ describe('requested entry to repository match', () => {
     ]);
   });
 
+  it('treats an explicit no-environment selection as no additional repositories', () => {
+    expect(() =>
+      assertRequestedRepositories({ environment: null, launch, requested: { mode: 'none' } })
+    ).not.toThrow();
+  });
+
   it('rejects the launch repository, a repeated entry, and a V1 environment, naming the repository', () => {
     const named = (repoFullName: string) => ({
       id: environment.environmentId,

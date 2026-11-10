@@ -84,6 +84,26 @@ describe('session create intent fingerprint and the environment selection', () =
     ).not.toBe(FINGERPRINT_AT_HEAD);
   });
 
+  it('hashes an explicit no-environment selection distinctly', async () => {
+    const none = await sessionCreateIntentFingerprint({
+      ...REQUEST,
+      requestedEnvironment: { mode: 'none' },
+    });
+    const named = await sessionCreateIntentFingerprint({
+      ...REQUEST,
+      requestedEnvironment: { id: ENVIRONMENT_ID },
+    });
+
+    expect(none).not.toBe(FINGERPRINT_AT_HEAD);
+    expect(none).not.toBe(named);
+    expect(
+      await sessionCreateIntentFingerprint({
+        ...REQUEST,
+        requestedEnvironment: { mode: 'none' },
+      })
+    ).toBe(none);
+  });
+
   it('hashes the same selection the same way for any entry order, case or empty list', async () => {
     const select = (repositories: { repoFullName: string; branch?: string }[] | undefined) =>
       sessionCreateIntentFingerprint({

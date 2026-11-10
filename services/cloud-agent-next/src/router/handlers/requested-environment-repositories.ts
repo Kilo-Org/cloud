@@ -6,6 +6,7 @@ import {
   type EnvironmentRepositoryIdentity,
 } from '@kilocode/cloud-agent-profile';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
+import { isExplicitNoEnvironment } from '../../session/requested-environment-intent.js';
 
 /**
  * Checks the additional repositories a client named for the environment it
@@ -21,7 +22,10 @@ export function assertRequestedRepositories(args: {
   launch: EnvironmentRepositoryIdentity | undefined;
   requested: SessionCreateRequest['requestedEnvironment'];
 }): void {
-  const entries = args.requested?.repositories ?? [];
+  const entries =
+    args.requested !== undefined && !isExplicitNoEnvironment(args.requested)
+      ? (args.requested.repositories ?? [])
+      : [];
   if (entries.length === 0) return;
 
   const members = args.environment?.repositories;

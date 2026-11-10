@@ -376,8 +376,13 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
  * The environment the user selected, and the branch of each additional
  * repository of a multi-repository environment. The worker checks both against
  * the owner and the launch repository, and validates each branch.
+ *
+ * `{ mode: 'none' }` is an explicit request to run without an environment: it
+ * skips environment lookup and ambiguity conflicts while keeping profile and
+ * sandbox defaults. Both alternatives are strict, so `mode: 'none'` cannot
+ * carry an id or additional repositories.
  */
-const requestedEnvironmentSchema = z
+const namedRequestedEnvironmentSchema = z
   .object({
     id: z.uuid(),
     repositories: z
@@ -393,6 +398,17 @@ const requestedEnvironmentSchema = z
       .optional(),
   })
   .strict();
+
+const noRequestedEnvironmentSchema = z
+  .object({
+    mode: z.literal('none'),
+  })
+  .strict();
+
+const requestedEnvironmentSchema = z.union([
+  namedRequestedEnvironmentSchema,
+  noRequestedEnvironmentSchema,
+]);
 
 /**
  * Shared fields for prepareSession. Discriminated on `cloneFromKiloSessionId`:

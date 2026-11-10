@@ -8,6 +8,7 @@ import {
 import { cloud_agent_user_settings } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import * as z from 'zod';
+import { TRPCError } from '@trpc/server';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
   sandboxSelectionCapabilitiesSchema,
@@ -18,6 +19,8 @@ import {
   canonicalRepoFullName,
   clearContextSandboxAllocation,
   getBuiltinAgentSettings,
+  getRepositoryEnvironmentDefault,
+  getRepositoryEnvironmentDefaults,
   getSandboxAllocationSettings,
   listBindings,
   removeRepositorySettings,
@@ -25,7 +28,10 @@ import {
   setContextSandboxAllocation,
   setRepositorySettings,
   type ProfileOwner,
+  type RepositoryEnvironmentDefaultKey,
+  type RepositoryEnvironmentDefaultSetting,
   type RepositoryPlatform,
+  type RepositorySettingsRepository,
 } from '@kilocode/cloud-agent-profile';
 import {
   assertAllocationOffered,
@@ -35,14 +41,27 @@ import {
 } from '@/lib/cloud-agent-next/sandbox-allocation-offers';
 import { DEFAULT_WORKSPACE_ORDER, workspaceOrderSchema } from '@/lib/cloud-agent/workspace-folders';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { canonicalGitLabCloneUrl } from '@kilocode/worker-utils/git-url';
+import { canonicalGitLabProjectUrl } from '@/lib/cloud-agent/environment-repository-input';
+import {
+  getGitLabInstanceUrlForOrganization,
+  getGitLabInstanceUrlForUser,
+} from '@/lib/cloud-agent/gitlab-integration-helpers';
 
 const RepositoryPlatformSchema = z.enum(['github', 'gitlab']);
+
+const RepositoryEnvironmentDefaultSettingSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('automatic') }),
+  z.object({ mode: z.literal('none') }),
+  z.object({ mode: z.literal('environment'), environmentId: z.uuid() }),
+]);
 
 const RepositorySettingsRowSchema = z.object({
   repositoryFullName: z.string(),
   repositoryPlatform: RepositoryPlatformSchema,
   profileId: z.uuid().nullable(),
   profileName: z.string().nullable(),
+  environment: RepositoryEnvironmentDefaultSettingSchema,
   allocation: z.string().nullable(),
   allocationUnavailableReason: z.string().optional(),
   allocationRepositoryUnavailableReason: z.string().optional(),
@@ -53,7 +72,7 @@ const CloudAgentSettingsSchema = z.object({
   contextAllocation: z.string().nullable(),
   contextUnavailableReason: z.string().optional(),
   builtinAgents: BuiltinAgentSettingsInputSchema,
-  repositories: z.array(RepositorySettingsRowSchema),
+  repositories: z.array(RepositorySettingsRowSchema.extend({ environmentId: z.uuid().nullable() })),
   capabilities: sandboxSelectionCapabilitiesSchema,
   // Repository-scoped capability views so a GitLab row never offers a
   // GitHub-only allocation such as Vercel.
@@ -75,6 +94,64 @@ function toRepositoryPlatform(platform: string): RepositoryPlatform {
   return platform === 'gitlab' ? 'gitlab' : 'github';
 }
 
+async function resolveRepositoryDefaultKey(
+  input: { repoFullName: string; platform: RepositoryPlatform; organizationId?: string },
+  userId: string
+): Promise<RepositoryEnvironmentDefaultKey> {
+  return input.platform === 'github'
+    ? { platform: 'github', repoFullName: input.repoFullName }
+    : {
+        platform: 'gitlab',
+        cloneUrl: await canonicalGitLabProjectUrl(input.repoFullName, userId, input.organizationId),
+      };
+}
+
+async function resolveRepositorySettingsRepository(
+  input: { repoFullName: string; platform: RepositoryPlatform; organizationId?: string },
+  userId: string,
+  withGitLabCloneUrl: boolean
+): Promise<RepositorySettingsRepository> {
+  if (input.platform === 'github') {
+    return { platform: 'github', repoFullName: input.repoFullName };
+  }
+  return withGitLabCloneUrl
+    ? {
+        platform: 'gitlab',
+        repoFullName: input.repoFullName,
+        cloneUrl: await canonicalGitLabProjectUrl(input.repoFullName, userId, input.organizationId),
+      }
+    : { platform: 'gitlab', repoFullName: input.repoFullName };
+}
+
+function requireRepositoryDefaultKey(
+  repository: RepositorySettingsRepository
+): RepositoryEnvironmentDefaultKey {
+  if (repository.platform === 'github') {
+    return { platform: 'github', repoFullName: repository.repoFullName };
+  }
+  if (!repository.cloneUrl) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'A GitLab clone URL is required to save or remove a repository environment default',
+    });
+  }
+  return { platform: 'gitlab', cloneUrl: repository.cloneUrl };
+}
+
+function gitLabCloneUrlBelongsToInstance(cloneUrl: string, instanceUrl: string): boolean {
+  const canonical = canonicalGitLabCloneUrl(cloneUrl);
+  if (!canonical) return false;
+  let base: string;
+  try {
+    const url = new URL(instanceUrl);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+    base = `${url.protocol}//${url.host.toLowerCase()}${url.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return false;
+  }
+  return canonical.startsWith(`${base}/`);
+}
+
 export const cloudAgentSettingsRouter = createTRPCRouter({
   canManage: baseProcedure
     .input(z.object({ organizationId: z.uuid().optional() }))
@@ -83,6 +160,24 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       if (!input.organizationId) return { canManage: true };
       const role = await ensureOrganizationAccess(ctx, input.organizationId);
       return { canManage: canManageOrganization(role) };
+    }),
+
+  getRepositoryEnvironmentDefault: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid().optional(),
+        repoFullName: z.string().min(1).max(500),
+        platform: RepositoryPlatformSchema,
+      })
+    )
+    .output(RepositoryEnvironmentDefaultSettingSchema)
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) await ensureOrganizationAccess(ctx, input.organizationId);
+      return getRepositoryEnvironmentDefault(
+        db,
+        ownerFromInput(input.organizationId, ctx.user.id),
+        await resolveRepositoryDefaultKey(input, ctx.user.id)
+      );
     }),
 
   get: baseProcedure
@@ -94,16 +189,33 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       const canManage = role ? canManageOrganization(role) : true;
       const owner = ownerFromInput(organizationId, ctx.user.id);
 
-      const [capabilities, settings, bindings, builtinAgents] = await Promise.all([
-        loadSandboxCapabilities(ctx.user, ctx.headersList, organizationId),
-        getSandboxAllocationSettings(db, owner),
-        listBindings(db, owner),
-        getBuiltinAgentSettings(db, ctx.user.id),
-      ]);
+      const [capabilities, settings, bindings, builtinAgents, environmentDefaults] =
+        await Promise.all([
+          loadSandboxCapabilities(ctx.user, ctx.headersList, organizationId),
+          getSandboxAllocationSettings(db, owner),
+          listBindings(db, owner),
+          getBuiltinAgentSettings(db, ctx.user.id),
+          getRepositoryEnvironmentDefaults(db, owner),
+        ]);
 
       const rows = new Map<string, z.infer<typeof RepositorySettingsRowSchema>>();
       const rowKey = (fullName: string, platform: RepositoryPlatform) =>
         `${platform}:${fullName.toLowerCase()}`;
+
+      const hasGitLabDefaults = environmentDefaults.some(
+        setting => setting.repositoryPlatform === 'gitlab'
+      );
+      const gitlabInstanceUrl = hasGitLabDefaults
+        ? organizationId
+          ? await getGitLabInstanceUrlForOrganization(organizationId)
+          : await getGitLabInstanceUrlForUser(ctx.user.id)
+        : undefined;
+      const visibleEnvironmentDefaults = environmentDefaults.filter(
+        setting =>
+          setting.repositoryPlatform !== 'gitlab' ||
+          (gitlabInstanceUrl !== undefined &&
+            gitLabCloneUrlBelongsToInstance(setting.repositoryKey, gitlabInstanceUrl))
+      );
 
       for (const binding of bindings) {
         const platform = toRepositoryPlatform(binding.platform);
@@ -113,6 +225,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
           repositoryPlatform: platform,
           profileId: binding.profileId,
           profileName: binding.profileName,
+          environment: { mode: 'automatic' },
           allocation: null,
         });
       }
@@ -125,7 +238,21 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
           repositoryPlatform: setting.repositoryPlatform,
           profileId: existing?.profileId ?? null,
           profileName: existing?.profileName ?? null,
+          environment: existing?.environment ?? { mode: 'automatic' },
           allocation: setting.allocation,
+        });
+      }
+
+      for (const setting of visibleEnvironmentDefaults) {
+        const key = rowKey(setting.repositoryFullName, setting.repositoryPlatform);
+        const existing = rows.get(key);
+        rows.set(key, {
+          repositoryFullName: existing?.repositoryFullName ?? setting.repositoryFullName,
+          repositoryPlatform: setting.repositoryPlatform,
+          profileId: existing?.profileId ?? null,
+          profileName: existing?.profileName ?? null,
+          allocation: existing?.allocation ?? null,
+          environment: setting.environment,
         });
       }
 
@@ -175,7 +302,11 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         contextAllocation: settings.contextAllocation,
         ...(contextReason ? { contextUnavailableReason: contextReason } : {}),
         builtinAgents,
-        repositories,
+        repositories: repositories.map(row => ({
+          ...row,
+          environmentId:
+            row.environment.mode === 'environment' ? row.environment.environmentId : null,
+        })),
         capabilities,
         capabilitiesByPlatform: {
           github: repositoryCapabilities.get('github') ?? capabilities,
@@ -215,13 +346,19 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
 
   setRepositorySettings: baseProcedure
     .input(
-      z.object({
-        organizationId: z.uuid().optional(),
-        repoFullName: z.string().min(1).max(500),
-        platform: RepositoryPlatformSchema,
-        profileId: z.uuid().nullable().optional(),
-        allocation: z.enum(SELECTABLE_SANDBOX_ALLOCATIONS).nullable().optional(),
-      })
+      z
+        .strictObject({
+          organizationId: z.uuid().optional(),
+          repoFullName: z.string().min(1).max(500),
+          platform: RepositoryPlatformSchema,
+          profileId: z.uuid().nullable().optional(),
+          environment: RepositoryEnvironmentDefaultSettingSchema.optional(),
+          environmentId: z.uuid().nullable().optional(),
+          allocation: z.enum(SELECTABLE_SANDBOX_ALLOCATIONS).nullable().optional(),
+        })
+        .refine(input => input.environment === undefined || input.environmentId === undefined, {
+          message: 'Specify either environment or environmentId, not both',
+        })
     )
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
@@ -250,9 +387,35 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         }
       }
 
-      await setRepositorySettings(db, owner, input.repoFullName, input.platform, {
+      const environmentRequested =
+        input.environment !== undefined || input.environmentId !== undefined;
+      const repository = await resolveRepositorySettingsRepository(
+        input,
+        ctx.user.id,
+        environmentRequested
+      );
+
+      let environment: RepositoryEnvironmentDefaultSetting | undefined =
+        input.environment ??
+        (input.environmentId === undefined
+          ? undefined
+          : input.environmentId === null
+            ? { mode: 'automatic' }
+            : { mode: 'environment', environmentId: input.environmentId });
+      if (input.environment === undefined && input.environmentId === null) {
+        const saved = await getRepositoryEnvironmentDefault(
+          db,
+          owner,
+          requireRepositoryDefaultKey(repository)
+        );
+        // Legacy clients round-trip null for the No environment setting they cannot represent.
+        if (saved.mode === 'none') environment = undefined;
+      }
+
+      await setRepositorySettings(db, owner, repository, {
         profileId: input.profileId ?? null,
         allocation: input.allocation ?? null,
+        environment,
       });
       return { success: true };
     }),
@@ -302,7 +465,8 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
       }
       const owner = ownerFromInput(input.organizationId, ctx.user.id);
-      await removeRepositorySettings(db, owner, input.repoFullName, input.platform);
+      const repository = await resolveRepositorySettingsRepository(input, ctx.user.id, true);
+      await removeRepositorySettings(db, owner, repository);
       return { success: true };
     }),
 });

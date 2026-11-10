@@ -1128,7 +1128,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       model: displayModel,
       variant: displayVariant,
       profileId: selectedProfileId ?? undefined,
-      ...(sessionEnvironment.selection.status !== 'unknown'
+      ...(sessionEnvironment.matches !== undefined
         ? { requireEnvironmentChoice: true as const }
         : {}),
       ...(requestedEnvironment ? { requestedEnvironment } : {}),
@@ -1152,7 +1152,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     displayModel,
     displayVariant,
     selectedProfileId,
-    sessionEnvironment.selection.status,
+    sessionEnvironment.matches,
     requestedEnvironment,
     attachmentMessageUuid,
     attachmentUpload.attachments,
@@ -1951,6 +1951,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 repositoryLabel={selectedRepo}
                 environments={sessionEnvironment.matches}
                 environment={repositoryEnvironment}
+                choice={sessionEnvironment.choice}
                 onChooseEnvironment={environmentId => {
                   setStartValidation(null);
                   sessionEnvironment.chooseEnvironment(environmentId);

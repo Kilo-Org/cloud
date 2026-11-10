@@ -451,12 +451,7 @@ export const CloseTerminalOutput = z.object({
   success: z.boolean(),
 });
 
-/**
- * The environment the client selected: its id, and the branch of each
- * additional repository of a multi-repository environment. The server checks
- * both against the owner and the launch repository.
- */
-const requestedEnvironmentSchema = z
+const namedRequestedEnvironmentSchema = z
   .object({
     id: z.string().uuid(),
     repositories: z
@@ -475,6 +470,25 @@ const requestedEnvironmentSchema = z
   .describe(
     'Repository environment the client selected. The server verifies it belongs to the owner and contains the launch repository.'
   );
+
+const noRequestedEnvironmentSchema = z
+  .object({
+    mode: z.literal('none'),
+  })
+  .strict()
+  .describe(
+    'Run without a repository environment. Skips environment lookup and ambiguity conflicts; profile and sandbox defaults still apply.'
+  );
+
+/**
+ * A selection is either a named environment or an explicit request to run
+ * without one. Both alternatives are strict, so additional repositories and an
+ * environment id cannot accompany `mode: 'none'`.
+ */
+const requestedEnvironmentSchema = z.union([
+  namedRequestedEnvironmentSchema,
+  noRequestedEnvironmentSchema,
+]);
 
 /**
  * Input schema for prepareSession endpoint.

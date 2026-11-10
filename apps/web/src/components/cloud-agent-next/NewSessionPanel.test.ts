@@ -19,6 +19,7 @@ const mockQueryClient = {
 const mockCreateLocalSession = jest.fn((_draft: unknown) => 'local-session-1');
 const mockReleaseMutate = jest.fn(async (_input: unknown) => undefined);
 let mockEnvironmentListFailed = true;
+let mockEnvironmentDefaultFailed = false;
 let mockUploadUrlRequest:
   | { messageUuid: string; attachmentId: string; contentLength: number }
   | undefined;
@@ -101,6 +102,13 @@ function mockQueryResult(options: { __testKind?: string }) {
       ...base,
       data: mockEnvironmentListFailed ? undefined : mockEnvironments,
       isError: mockEnvironmentListFailed,
+    };
+  }
+  if (kind === 'cloudAgentSettings.getRepositoryEnvironmentDefault') {
+    return {
+      ...base,
+      data: mockEnvironmentDefaultFailed ? undefined : { mode: 'automatic' },
+      isError: mockEnvironmentDefaultFailed,
     };
   }
   return base;
@@ -230,9 +238,14 @@ jest.mock('./RepositoryEnvironmentChip', () => ({
     onChooseEnvironment: (environmentId: string) => void;
   }) =>
     createElement(
-      'button',
-      { onClick: () => onChooseEnvironment('environment-1') },
-      'Choose test environment'
+      React.Fragment,
+      null,
+      createElement(
+        'button',
+        { onClick: () => onChooseEnvironment('environment-1') },
+        'Choose test environment'
+      ),
+      createElement('button', { onClick: () => onChooseEnvironment('none') }, 'No environment')
     ),
 }));
 jest.mock('./RepositoryProviderOnboardingPanel', () => ({
@@ -415,6 +428,7 @@ const scenarios = [
 describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockEnvironmentDefaultFailed = false;
     mockRepositories = [mockRepository];
     mockEnvironments = [];
     mockUploadUrlRequest = undefined;
@@ -529,6 +543,7 @@ describe.each([
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockEnvironmentDefaultFailed = false;
     mockEnvironmentListFailed = false;
     mockRepositories = field === 'repository' ? [] : [mockRepository];
     mockEnvironments = ['environment-1', 'environment-2'].map(id => ({
@@ -587,6 +602,37 @@ describe.each([
   });
 
   if (field === 'environment') {
+    it('keeps the server ambiguity check when the default lookup fails', () => {
+      mockEnvironmentDefaultFailed = true;
+      act(() => root.render(createElement(NewSessionPanel)));
+      act(() => startButton.click());
+      expect(mockCreateLocalSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          request: expect.objectContaining({
+            input: expect.objectContaining({ requireEnvironmentChoice: true }),
+          }),
+        })
+      );
+    });
+
+    it('permits submission with an explicit No environment choice', () => {
+      act(() => startButton.click());
+      const none = Array.from(dom.container.querySelectorAll('button')).find(
+        button => button.textContent === 'No environment'
+      );
+      if (!none) throw new Error('No environment button missing');
+      act(() => none.click());
+      expect(dom.container.querySelector('[role="alert"]')).toBeNull();
+      act(() => startButton.click());
+      expect(mockCreateLocalSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          request: expect.objectContaining({
+            input: expect.objectContaining({ requestedEnvironment: { mode: 'none' } }),
+          }),
+        })
+      );
+    });
+
     it('dismisses immediately when an environment is chosen and permits submission', () => {
       act(() => startButton.click());
       expect(dom.container.querySelector('[role="alert"]')?.textContent).toBe(message);

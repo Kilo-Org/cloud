@@ -5,6 +5,7 @@ import { Github, Gitlab } from 'lucide-react';
 import type { SelectableSandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import type { CloudAgentSettingsRepositoryRow } from '@/hooks/useCloudAgentSettings';
 import { ProfileSelect, type ProfileOption } from './ProfileSelect';
+import { EnvironmentSelect } from './EnvironmentSelect';
 import { SandboxSelect } from './SandboxSelect';
 import {
   splitRepositoryName,
@@ -15,6 +16,7 @@ import {
 
 type RepositoryRowProps = {
   row: CloudAgentSettingsRepositoryRow;
+  organizationId?: string;
   profiles: ProfileOption[];
   choices: SandboxAllocationChoice[];
   /** Set only where the sandbox cannot be chosen, so the row shows where sessions run. */
@@ -22,23 +24,27 @@ type RepositoryRowProps = {
   disabled: boolean;
   action: ReactNode;
   onProfileChange: (profileId: string | null) => void;
+  onEnvironmentChange: (environment: CloudAgentSettingsRepositoryRow['environment']) => void;
   onAllocationChange: (allocation: SelectableSandboxAllocation | null) => void;
   onManageProfiles: () => void;
 };
 
 export function RepositoryRow({
   row,
+  organizationId,
   profiles,
   choices,
   fixedSandbox,
   disabled,
   action,
   onProfileChange,
+  onEnvironmentChange,
   onAllocationChange,
   onManageProfiles,
 }: RepositoryRowProps) {
   const nameId = useId();
   const profileLabelId = useId();
+  const environmentLabelId = useId();
   const sandboxLabelId = useId();
   const { owner, name } = splitRepositoryName(row.repositoryFullName);
   const isGitLab = row.repositoryPlatform === 'gitlab';
@@ -63,7 +69,7 @@ export function RepositoryRow({
         </span>
         {action}
       </div>
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,3fr)]">
         <div className="flex min-w-0 flex-col gap-1.5">
           <span id={profileLabelId} className="text-muted-foreground text-xs font-medium">
             Profile
@@ -76,6 +82,23 @@ export function RepositoryRow({
             disabled={disabled}
             onChange={onProfileChange}
             onManage={onManageProfiles}
+          />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <span id={environmentLabelId} className="text-muted-foreground text-xs font-medium">
+            Default environment
+          </span>
+          <EnvironmentSelect
+            environment={row.environment}
+            organizationId={organizationId}
+            repository={
+              isGitLab
+                ? { platform: 'gitlab', projectPath: row.repositoryFullName }
+                : { platform: 'github', fullName: row.repositoryFullName }
+            }
+            labelledBy={`${environmentLabelId} ${nameId}`}
+            disabled={disabled}
+            onChange={onEnvironmentChange}
           />
         </div>
         <div className="flex min-w-0 flex-col gap-1.5">

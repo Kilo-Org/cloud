@@ -2,6 +2,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { RepositoryEnvironmentDefaultSetting } from '@kilocode/cloud-agent-profile';
 import { useTRPC } from '@/lib/trpc/utils';
 
 export type CloudAgentSettingsRepositoryRow = {
@@ -9,6 +10,7 @@ export type CloudAgentSettingsRepositoryRow = {
   repositoryPlatform: 'github' | 'gitlab';
   profileId: string | null;
   profileName: string | null;
+  environment: RepositoryEnvironmentDefaultSetting;
   allocation: string | null;
   allocationUnavailableReason?: string;
   allocationRepositoryUnavailableReason?: string;
@@ -59,6 +61,9 @@ export function useInvalidateCloudAgentSettings(organizationId?: string) {
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: trpc.cloudAgentSettings.get.queryKey({ organizationId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.cloudAgentSettings.getRepositoryEnvironmentDefault.queryKey(),
       }),
       queryClient.invalidateQueries({
         queryKey: trpc.agentProfiles.listRepoBindings.queryKey({ organizationId }),

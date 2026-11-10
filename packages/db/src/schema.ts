@@ -8930,6 +8930,53 @@ export type CloudAgentSandboxAllocationSetting =
 export type NewCloudAgentSandboxAllocationSetting =
   typeof cloud_agent_sandbox_allocation_settings.$inferInsert;
 
+export const cloud_agent_repository_environment_defaults = pgTable(
+  'cloud_agent_repository_environment_defaults',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    repository_full_name: text().notNull(),
+    repository_platform: text({ enum: ['github', 'gitlab'] }).notNull(),
+    // Canonical identity: the GitHub full name or the GitLab clone URL.
+    // `repository_full_name` remains the display path.
+    repository_key: text().notNull(),
+    // NULL disables the repository's environment. Retain deleted environment IDs
+    // so launches fail explicitly instead of silently losing setup.
+    environment_id: uuid(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_repo_env_defaults_user')
+      .on(table.owned_by_user_id, table.repository_platform, table.repository_key)
+      .where(isNotNull(table.owned_by_user_id)),
+    uniqueIndex('UQ_cloud_agent_repo_env_defaults_org')
+      .on(table.owned_by_organization_id, table.repository_platform, table.repository_key)
+      .where(isNotNull(table.owned_by_organization_id)),
+    index('IDX_cloud_agent_repo_env_defaults_org').on(table.owned_by_organization_id),
+    index('IDX_cloud_agent_repo_env_defaults_user').on(table.owned_by_user_id),
+    check(
+      'cloud_agent_repo_env_defaults_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CloudAgentRepositoryEnvironmentDefault =
+  typeof cloud_agent_repository_environment_defaults.$inferSelect;
+export type NewCloudAgentRepositoryEnvironmentDefault =
+  typeof cloud_agent_repository_environment_defaults.$inferInsert;
+
 // ============ CLOUD AGENT USER SETTINGS ============
 // One row per user. These personal settings apply to every Cloud Agent session
 // and sidebar of the user, in the personal account and in every organization.

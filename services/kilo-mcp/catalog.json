@@ -7330,41 +7330,58 @@
               "pattern": "^[a-zA-Z]+$"
             },
             "requestedEnvironment": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "repositories": {
-                  "maxItems": 100,
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "repoFullName": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 500
-                      },
-                      "branch": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 255
-                      }
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
-                    "required": [
-                      "repoFullName"
-                    ],
-                    "additionalProperties": false
-                  }
+                    "repositories": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "repoFullName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "branch": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          }
+                        },
+                        "required": [
+                          "repoFullName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "const": "none"
+                    }
+                  },
+                  "required": [
+                    "mode"
+                  ],
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "id"
-              ],
-              "additionalProperties": false
+              ]
             },
             "requireEnvironmentChoice": {
               "type": "boolean",
@@ -7993,41 +8010,58 @@
               "pattern": "^[a-zA-Z]+$"
             },
             "requestedEnvironment": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "repositories": {
-                  "maxItems": 100,
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "repoFullName": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 500
-                      },
-                      "branch": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 255
-                      }
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
-                    "required": [
-                      "repoFullName"
-                    ],
-                    "additionalProperties": false
-                  }
+                    "repositories": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "repoFullName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "branch": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          }
+                        },
+                        "required": [
+                          "repoFullName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "const": "none"
+                    }
+                  },
+                  "required": [
+                    "mode"
+                  ],
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "id"
-              ],
-              "additionalProperties": false
+              ]
             },
             "requireEnvironmentChoice": {
               "type": "boolean",
@@ -9042,6 +9076,46 @@
     ],
     "searchBlob": "cloudAgentSettings.get Get the Cloud Agent settings for the user or organization, including the context sandbox allocation, per-repository profile allocations, and which sandbox options are available. cloudagentsettings get organizationid organizationId"
   },
+  "cloudAgentSettings.getRepositoryEnvironmentDefault": {
+    "path": "cloudAgentSettings.getRepositoryEnvironmentDefault",
+    "kind": "query",
+    "summary": "Get the saved environment default for a repository in the current personal or organization scope.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repoFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab"
+          ]
+        }
+      },
+      "required": [
+        "repoFullName",
+        "platform"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "getrepositoryenvironmentdefault",
+      "organizationid",
+      "repofullname",
+      "platform"
+    ],
+    "searchBlob": "cloudAgentSettings.getRepositoryEnvironmentDefault Get the saved environment default for a repository in the current personal or organization scope. cloudagentsettings getrepositoryenvironmentdefault organizationid repofullname platform organizationId repoFullName platform"
+  },
   "cloudAgentSettings.getWorkspaceOrder": {
     "path": "cloudAgentSettings.getWorkspaceOrder",
     "kind": "query",
@@ -9233,6 +9307,64 @@
             }
           ]
         },
+        "environment": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "const": "automatic"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "const": "none"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "const": "environment"
+                },
+                "environmentId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "mode",
+                "environmentId"
+              ]
+            }
+          ]
+        },
+        "environmentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "allocation": {
           "anyOf": [
             {
@@ -9253,7 +9385,8 @@
       "required": [
         "repoFullName",
         "platform"
-      ]
+      ],
+      "additionalProperties": false
     },
     "tags": [
       "cloudagentsettings",
@@ -9262,9 +9395,11 @@
       "repofullname",
       "platform",
       "profileid",
+      "environment",
+      "environmentid",
       "allocation"
     ],
-    "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
+    "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid environment environmentid allocation organizationId repoFullName platform profileId environment environmentId allocation"
   },
   "cloudAgentSettings.setWorkspaceOrder": {
     "path": "cloudAgentSettings.setWorkspaceOrder",
@@ -19266,41 +19401,58 @@
                   "pattern": "^[a-zA-Z]+$"
                 },
                 "requestedEnvironment": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "repositories": {
-                      "maxItems": 100,
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "repoFullName": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 500
-                          },
-                          "branch": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 255
-                          }
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
-                        "required": [
-                          "repoFullName"
-                        ],
-                        "additionalProperties": false
-                      }
+                        "repositories": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "repoFullName": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              },
+                              "branch": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255
+                              }
+                            },
+                            "required": [
+                              "repoFullName"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "const": "none"
+                        }
+                      },
+                      "required": [
+                        "mode"
+                      ],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": [
-                    "id"
-                  ],
-                  "additionalProperties": false
+                  ]
                 },
                 "requireEnvironmentChoice": {
                   "type": "boolean",
@@ -19935,41 +20087,58 @@
                   "pattern": "^[a-zA-Z]+$"
                 },
                 "requestedEnvironment": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "repositories": {
-                      "maxItems": 100,
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "repoFullName": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 500
-                          },
-                          "branch": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 255
-                          }
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
-                        "required": [
-                          "repoFullName"
-                        ],
-                        "additionalProperties": false
-                      }
+                        "repositories": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "repoFullName": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              },
+                              "branch": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255
+                              }
+                            },
+                            "required": [
+                              "repoFullName"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "const": "none"
+                        }
+                      },
+                      "required": [
+                        "mode"
+                      ],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": [
-                    "id"
-                  ],
-                  "additionalProperties": false
+                  ]
                 },
                 "requireEnvironmentChoice": {
                   "type": "boolean",

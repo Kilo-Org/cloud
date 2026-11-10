@@ -76,6 +76,40 @@ describe('selectEnvironment', () => {
     });
   });
 
+  it.each([undefined, [], [v1('a')], [v1('a'), v1('b')]])(
+    'honors explicit No environment regardless of matches: %j',
+    matches => {
+      const selection = selectEnvironment(matches, 'none', true);
+      expect(selection).toEqual({ status: 'none', chosen: true });
+      expect(environmentBlocksStart(selection)).toBe(false);
+      expect(buildRequestedEnvironment(selection, launch, {})).toEqual({ mode: 'none' });
+    }
+  );
+
+  it('honors repository defaults while allowing explicit selections to override them', () => {
+    const matches = [v1('a'), v1('b')];
+    expect(selectEnvironment(matches, null, false, { mode: 'none' })).toEqual({ status: 'none' });
+    expect(selectEnvironment(matches, 'a', false, { mode: 'none' })).toEqual({
+      status: 'selected',
+      environment: matches[0],
+      chosen: true,
+    });
+    expect(
+      selectEnvironment(matches, null, false, { mode: 'environment', environmentId: 'b' })
+    ).toEqual({ status: 'selected', environment: matches[1], chosen: false });
+    expect(
+      selectEnvironment(matches, 'none', false, { mode: 'environment', environmentId: 'b' })
+    ).toEqual({ status: 'none', chosen: true });
+    expect(
+      selectEnvironment(matches, null, false, { mode: 'environment', environmentId: 'gone' })
+    ).toEqual({ status: 'unknown' });
+  });
+
+  it('sends a single explicitly selected match even when the saved default is none', () => {
+    const selection = selectEnvironment([v1('a')], 'a', false, { mode: 'none' });
+    expect(buildRequestedEnvironment(selection, launch, {})).toEqual({ id: 'a' });
+  });
+
   it('exposes no environment while unknown or not yet chosen', () => {
     const matches = [v1('a'), v1('b')];
     expect(selectedEnvironment(selectEnvironment(undefined, null, false))).toBeUndefined();

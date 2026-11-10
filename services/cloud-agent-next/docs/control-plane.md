@@ -524,7 +524,11 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   builds require an organization-owned environment because managed Bitbucket repository access is
   organization-scoped.
 - **Reference.** For an origin under the `include-web-defaults` profile policy, session preflight
-  looks up the owner's one environment for the repository and stores
+  selects the explicit environment, then the repository's saved default, then the sole matching
+  environment. A saved default must still belong to the owner and contain the launch repository;
+  otherwise preflight fails with a repository-settings error instead of skipping setup. With no
+  selection or default, several matches retain the existing required-choice or no-environment
+  behavior. Preflight stores
   `{ environmentId, owner, repository, configurationRevision }` on the session metadata and on the
   route (`routes.environment`). Its saved sandbox allocation becomes the first saved candidate,
   ahead of the repository override and the owner default. A client-supplied reference or

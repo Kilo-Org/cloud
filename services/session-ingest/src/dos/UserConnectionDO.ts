@@ -501,8 +501,9 @@ export class UserConnectionDO extends DurableObject<Env> {
         this.lastHeartbeatAt.set(connectionId, heartbeatAt);
         if (attachment.heartbeatAt === undefined) {
           // A hibernated attachment may predate the frame budget: stamping it
-          // must not throw inside state reconstruction.
-          this.persistCliAttachment(ws, { ...attachment, heartbeatAt });
+          // must not throw inside state reconstruction. The list is only what
+          // the DO already knew, so it cannot clear a trim marker.
+          this.persistCliAttachment(ws, { ...attachment, heartbeatAt }, false);
         }
       } else {
         if (attachment.replaced) continue;
@@ -860,7 +861,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       kiloUserId: attachment.kiloUserId,
       ...(instance ? { instance } : {}),
     };
-    this.persistCliAttachment(ws, updatedAttachment);
+    this.persistCliAttachment(ws, updatedAttachment, true);
 
     if (attachment.kiloUserId) {
       const changedSessionIds = new Set<string>();
@@ -2425,7 +2426,7 @@ export class UserConnectionDO extends DurableObject<Env> {
             ...(status === 'scheduled' && scheduledAt ? { scheduledAt } : {}),
           };
         });
-        this.persistCliAttachment(socket, { ...attachment, sessions });
+        this.persistCliAttachment(socket, { ...attachment, sessions }, false);
         this.connectionSessions.set(attachment.connectionId, sessions);
 
         const currentRoots = this.aggregateSessions();
@@ -2582,8 +2583,13 @@ export class UserConnectionDO extends DurableObject<Env> {
    * throw skips the acknowledgement and every broadcast that follows it, and
    * the CLI then reconnects on its inactivity watchdog. Shed payload instead,
    * keeping the acknowledgement and the live in-memory state.
+   *
+   * `complete` says whether this list is the CLI's whole live list. Only then
+   * can a write that sheds nothing clear `sessionsTrimmed`; a write built from
+   * what the DO already knows (a status event, or a hibernation stamp) says
+   * nothing about rows it never held, so it keeps the marker.
    */
-  private persistCliAttachment(ws: WebSocket, attachment: CliAttachment): void {
+  private persistCliAttachment(ws: WebSocket, attachment: CliAttachment, complete: boolean): void {
     const fitted = fitCliAttachment(attachment, CLI_ATTACHMENT_BUDGET_BYTES);
     // The trim is steady state for a busy connection, so report it on a change
     // of shape rather than once per heartbeat.
@@ -2599,11 +2605,13 @@ export class UserConnectionDO extends DurableObject<Env> {
         });
       }
     }
-    // A notify or hibernation stamp spreads the socket's previous attachment, so
-    // an inherited marker must not survive a write that no longer trims.
-    const { sessionsTrimmed: _inheritedTrim, ...rest } = fitted.attachment;
-    const value: CliAttachment =
-      fitted.droppedSessions > 0 ? { ...rest, sessionsTrimmed: fitted.droppedSessions } : rest;
+    // A status event or hibernation stamp spreads the socket's previous
+    // attachment and holds only the rows the DO knows, so an inherited marker
+    // must survive it: the CLI may still own rows this write never saw.
+    const { sessionsTrimmed: inheritedTrim, ...rest } = fitted.attachment;
+    const marker = fitted.droppedSessions > 0 ? fitted.droppedSessions : inheritedTrim;
+    const keepMarker = (marker ?? 0) > 0 && (fitted.droppedSessions > 0 || !complete);
+    const value: CliAttachment = keepMarker ? { ...rest, sessionsTrimmed: marker } : rest;
     try {
       ws.serializeAttachment(value);
       return;

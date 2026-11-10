@@ -5176,7 +5176,7 @@ describe('UserConnectionDO', () => {
       warn.mockRestore();
     });
 
-    it('drops an inherited trim marker when a later write fits', async () => {
+    it('keeps the trim marker through a partial write and clears it on a complete one', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       capAttachment(cliWs);
@@ -5186,9 +5186,10 @@ describe('UserConnectionDO', () => {
       );
       expect(cliWs.deserializeAttachment()).toHaveProperty('sessionsTrimmed');
 
-      // A status event spreads the socket's previous attachment, which still
-      // carries the marker.
-      await doInstance.notifySessionEvent({
+      // A hibernation wake knows only the kept rows; a status event then writes
+      // that short list, which fits but cannot prove the CLI owns nothing else.
+      const restored = new UserConnectionDO(mockCtx.build() as never, {} as Env);
+      await restored.notifySessionEvent({
         type: 'session.status.updated',
         data: {
           source: 'v2',
@@ -5199,15 +5200,17 @@ describe('UserConnectionDO', () => {
           changedAt: '2026-11-10T10:00:00.000Z',
         },
       });
-      const trimmedAgain = cliWs.deserializeAttachment() as { sessionsTrimmed?: number };
-      expect(trimmedAgain.sessionsTrimmed).toBeGreaterThan(0);
+      const afterNotify = cliWs.deserializeAttachment() as { sessionsTrimmed?: number };
+      expect(afterNotify.sessionsTrimmed).toBeGreaterThan(0);
+      expect(afterNotify).toHaveProperty('sessionsTrimmed');
 
-      await doInstance.webSocketMessage(
+      // A heartbeat carries the whole live list, so a list that fits means
+      // nothing was shed and the marker goes.
+      await restored.webSocketMessage(
         cliWs as never,
         JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: [makeSession('s1')] })
       );
-      const fitted = cliWs.deserializeAttachment() as { sessionsTrimmed?: number };
-      expect(fitted).not.toHaveProperty('sessionsTrimmed');
+      expect(cliWs.deserializeAttachment()).not.toHaveProperty('sessionsTrimmed');
     });
 
     it('waits for the next heartbeat instead of failing a command for a shed row', async () => {

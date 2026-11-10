@@ -646,8 +646,9 @@ function AgentForm({
               </div>
               {wholeToolAction && (
                 <p className="text-muted-foreground text-xs">
-                  This agent stores one rule for every tool at once, so these switches are
-                  read-only. Edit the agent config to change it.
+                  This agent applies one rule to every tool at once:{' '}
+                  <code className="font-mono">{wholeToolAction}</code>. These switches are
+                  read-only; edit the agent config to change the rule.
                 </p>
               )}
             </div>

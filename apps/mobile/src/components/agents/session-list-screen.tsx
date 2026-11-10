@@ -501,8 +501,10 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         ) : null}
         {/* Android runs edge-to-edge and never resizes the window for the IME,
             so the keyboard is cleared natively: `KeyboardProvider` measures the
-            IME and this view lifts by the overlap it reports. */}
-        <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.owned}>
+            IME and this view lifts by the overlap it reports. `liftEnabled`
+            stays on until the keyboard is confirmed hidden so every hide emits
+            its zero padding (see `use-owned-keyboard.ts`). */}
+        <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.liftEnabled}>
           {region}
         </KeyboardAvoidingView>
         {/* Empty content owns its creation action; the no-match body owns the band. */}

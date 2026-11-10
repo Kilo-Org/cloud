@@ -95,6 +95,48 @@ const focusCallbacks = vi.hoisted(() => ({
 const handleRefetchSpy = vi.hoisted(() => vi.fn());
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 
+// The screen reads the keyboard from `react-native-keyboard-controller`'s
+// provider, so this suite drives that store instead of React Native's
+// `Keyboard` events. `useKeyboardState` is selector-aware, as the real hook is,
+// and `isVisible` follows the height the way the provider reports it: it goes
+// false only when a hide has finished.
+const keyboardStore = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    state: { height: 0 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setHeight: (height: number) => {
+      keyboardStore.state.height = height;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+});
+
+vi.mock('react-native-keyboard-controller', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  const heightOf = () => keyboardStore.state.height;
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    KeyboardChatScrollView: 'KeyboardChatScrollView',
+    useWindowDimensions: () => ({ width: 400, height: 800 }),
+    useKeyboardState: (selector?: (snapshot: Record<string, unknown>) => unknown) => {
+      const height = React.useSyncExternalStore(keyboardStore.subscribe, heightOf, heightOf);
+      const snapshot = { height, isVisible: height > 0, progress: height > 0 ? 1 : 0, duration: 0 };
+      return selector ? selector(snapshot) : snapshot;
+    },
+  };
+});
+
 vi.mock('react-native', () => ({
   View: 'View',
   Modal: 'Modal',
@@ -342,6 +384,7 @@ describe('SessionHistoryScreen', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     platformState.OS = 'ios';
     keyboardState.clear();
+    keyboardStore.setHeight(0);
     listState.storedSessions = [];
     listState.isSearching = false;
     listState.isError = false;
@@ -958,6 +1001,71 @@ describe('SessionHistoryScreen', () => {
 
     expect(findNodeByType(renderer, 'KeyboardAvoidingView')).toBe(container);
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
+  });
+
+  it('drops the keyboard lift for good once the search keyboard closes', async () => {
+    // Device defect: after the search keyboard closed, the list kept its
+    // keyboard-open frame — a blank band above the tab bar that swallowed
+    // swipes — and only a relaunch restored the height. The native container
+    // keeps the last padding it applied and an empty animated style is not an
+    // update, so a container disabled while the keyboard is still on screen
+    // never emits the hide's zero. The lift therefore stays enabled through the
+    // hide and releases only once the keyboard is confirmed hidden.
+    const renderer = await renderScreen();
+    const container = () => findNodeByType(renderer, 'KeyboardAvoidingView');
+    const searchHeader = () => findNodeByType(renderer, 'SessionListSearchHeader');
+
+    act(() => {
+      (searchHeader().props.onFocus as () => void)();
+      keyboardStore.setHeight(320);
+    });
+    expect(container().props.enabled).toBe(true);
+
+    // Opening a session blurs the search field while the keyboard closes.
+    act(() => {
+      (searchHeader().props.onBlur as () => void)();
+    });
+    expect(container().props.enabled).toBe(true);
+
+    act(() => {
+      keyboardStore.setHeight(0);
+    });
+    expect(container().props.enabled).toBe(false);
+
+    // Returning re-runs the focus effect and iOS restores the field, so the
+    // input reports focus again with no keyboard on screen. That may arm the
+    // container, but nothing is left to lift and the body stays mounted.
+    act(() => {
+      fireFocus();
+      (searchHeader().props.onFocus as () => void)();
+    });
+    expect(container().findAllByType('AgentSessionListContent')).toHaveLength(1);
+
+    // A blur on a screen with no keyboard releases it again.
+    act(() => {
+      (searchHeader().props.onBlur as () => void)();
+    });
+    expect(container().props.enabled).toBe(false);
+  });
+
+  it('never lifts for a keyboard this screen did not raise', async () => {
+    const renderer = await renderScreen();
+
+    // Returning while a pushed screen's keyboard is still closing: the field
+    // reports focus, but the keyboard was up before it took focus, so the lift
+    // must stay off through that close.
+    act(() => {
+      keyboardStore.setHeight(320);
+    });
+    act(() => {
+      (findNodeByType(renderer, 'SessionListSearchHeader').props.onFocus as () => void)();
+    });
+    expect(findNodeByType(renderer, 'KeyboardAvoidingView').props.enabled).toBe(false);
+
+    act(() => {
+      keyboardStore.setHeight(0);
+    });
+    expect(findNodeByType(renderer, 'KeyboardAvoidingView').props.enabled).toBe(false);
   });
 
   it('hands a failed next page to the body and retries it from there', async () => {

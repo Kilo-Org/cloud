@@ -259,7 +259,10 @@ export function SessionHistoryScreen() {
           />
         }
       />
-      <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.owned}>
+      {/* One container, enabled until its own keyboard is confirmed hidden: a
+          container disabled while the keyboard is still on screen emits no zero
+          padding and keeps the keyboard-open lift (use-owned-keyboard.ts). */}
+      <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.liftEnabled}>
         {sessionListBody}
       </KeyboardAvoidingView>
       <SessionFilterModal

@@ -1633,11 +1633,17 @@ describe('AgentSessionListScreen live filtering', () => {
   it('ignores a keyboard another screen raised, so the rows and centered states stay put', async () => {
     // A pushed screen's keyboard is still closing when the tab regains focus;
     // reading it padded the body for the length of the close, and the centered
-    // empty state moved down once the keyboard finished hiding.
+    // empty state moved down once the keyboard finished hiding. The claim is a
+    // latch: it arms on the screen's own focus and releases only after the
+    // keyboard is confirmed hidden, because a container disabled mid-hide
+    // emits no zero padding and keeps the lift it already applied.
     state.platform.OS = 'android';
     state.live.activeSessions = [row];
     await renderScreen();
     const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
+    // The surface inset this screen reports with no keyboard ever raised; a
+    // close must come back to it instead of to a stale lift.
+    const noKeyboardInset = surfaceBottomInset();
 
     act(() => {
       showKeyboard(320);
@@ -1660,13 +1666,34 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       hideKeyboard();
     });
+    // The claim stays armed (the hide still owes the container its zero), but
+    // the reported occlusion is zero: no band may outlive the keyboard.
+    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(true);
+    expect(surfaceBottomInset()).toBe(noKeyboardInset);
     act(() => {
       showKeyboard(320);
     });
     expect(listStyle()).toEqual({ marginBottom: 0 });
 
+    // A blur that lands before the keyboard is gone must keep the container
+    // enabled: the hide still owes the view a zero padding, and a container
+    // disabled now would discard it and keep the keyboard-open frame.
     act(() => {
       (requireNode('SessionListSearchHeader').props.onBlur as () => void)();
+    });
+    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(true);
+    expect(listStyle()).toEqual({ marginBottom: 0 });
+
+    act(() => {
+      hideKeyboard();
+    });
+    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+
+    // The latch is released, so a keyboard that belongs to a pushed screen
+    // never lifts this one again.
+    act(() => {
+      showKeyboard(320);
     });
     expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });

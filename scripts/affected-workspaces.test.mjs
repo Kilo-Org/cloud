@@ -109,7 +109,6 @@ test('an unattributable or global change selects everything', () => {
     'scripts/harness-sdk-build-key.mjs',
     'scripts/ttsc-plugin-key.mjs',
     'scripts/build-key-inputs.mjs',
-    'patches/a.patch',
   ]) {
     const result = select([file]);
     assert.equal(result.full, true, file);
@@ -310,6 +309,53 @@ test('dependency manifest changes select the workspaces whose dependencies chang
     'kilo-app',
     'web',
   ]);
+});
+
+test('a dependency patch selects the workspaces that carry it', () => {
+  // scripts/changed-dependencies.mjs reports the importers whose resolved
+  // closure holds the patched selector, and the walk below adds their readers.
+  assert.deepEqual(select(['patches/router@1.0.0.patch'], ['apps/mobile']), {
+    full: false,
+    reasons: [],
+    full_checks: [],
+    dirs: ['apps/mobile'],
+    packages: ['kilo-app'],
+    ...noTests,
+  });
+  assert.deepEqual(select(['patches/parser@1.0.0.patch'], ['packages/db']).packages, [
+    '@kilocode/db',
+    '@kilocode/trpc',
+    'kilo-app',
+    'web',
+  ]);
+});
+
+test('a patch that no workspace resolves keeps the selection full', () => {
+  for (const dependencyDirs of [[], ['*'], ['.']]) {
+    const result = select(['patches/root-only@1.0.0.patch'], dependencyDirs);
+    assert.equal(result.full, true, dependencyDirs.join() || 'no consumer');
+    assert.equal(result.dirs.length, items.length, dependencyDirs.join());
+  }
+  // A manifest with no attributed workspace is still a narrow selection: only a
+  // patch needs a consumer to be attributable.
+  assert.equal(select(['pnpm-workspace.yaml'], []).full, false);
+});
+
+test('a workspace test that reads a dependency input runs its tests alone', () => {
+  // The release-age policy guard test reads the root workspace file as data, so
+  // it runs even though the change selects no check for any workspace.
+  const read = [['apps/mobile/src/lib/policy.test.ts', 'pnpm-workspace.yaml', true]];
+  const result = selectAffected({
+    items,
+    changedFiles: ['pnpm-workspace.yaml'],
+    dependencyDirs: [],
+    references: read,
+  });
+  assert.equal(result.full, false);
+  assert.deepEqual(result.dirs, []);
+  assert.deepEqual(result.test_only_dirs, ['apps/mobile']);
+  assert.deepEqual(result.test_only_packages, ['kilo-app']);
+  assert.deepEqual(selectGroups(result), { typecheck_groups: [], lint_groups: [] });
 });
 
 test('documents and neutral root locations are the shared neutral set', () => {

@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 import { load } from 'js-yaml';
 
-import { DEPENDENCY_MANIFESTS } from './affected-workspaces.mjs';
+import { DEPENDENCY_INPUTS } from './affected-workspaces.mjs';
 
 const workflows = Object.fromEntries(
   ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
@@ -1118,13 +1118,14 @@ test('the matrix step decides from the document the affected step published', ()
 
 // The gating job reads the repository, not node_modules: only
 // scripts/changed-dependencies.mjs imports a package (js-yaml), and the detector
-// calls it only for a resource manifest. The install therefore follows a filter
-// over exactly that set; a manifest the detector gained without the filter
-// would run the detector without js-yaml.
-test('the changes job installs the root project only for a resource manifest', () => {
+// calls it only for a dependency input: a manifest, or a patch the closures
+// carry. The install therefore follows a filter over exactly that set; an input
+// the detector gained without the filter would run the detector without
+// js-yaml.
+test('the changes job installs the root project only for a dependency input', () => {
   const steps = ciJobs.changes.steps;
   const filter = steps.find(step => step.id === 'filter_resources');
-  assert.ok(filter, 'changes: the resource-manifest filter is missing');
+  assert.ok(filter, 'changes: the dependency-input filter is missing');
   assert.deepEqual(
     Object.keys(load(filter.with.filters)),
     ['resources'],
@@ -1132,8 +1133,8 @@ test('the changes job installs the root project only for a resource manifest', (
   );
   assert.deepEqual(
     load(filter.with.filters).resources,
-    [...DEPENDENCY_MANIFESTS],
-    'the filter matches the detector set exactly'
+    DEPENDENCY_INPUTS,
+    'the filter matches the detector inputs exactly, in the glob syntax it reports'
   );
   const install = steps.find(step => step.name === 'Install root dependencies');
   assert.equal(
@@ -1148,28 +1149,28 @@ test('the changes job installs the root project only for a resource manifest', (
   );
   // dorny/paths-filter answers from the pull request's merge-base diff and
   // scripts/affected-workspaces.mjs diffs the base tip, so on a branch that is
-  // behind main their manifest answers can disagree and only the detector's
-  // diff saves the run. The check step must reuse the detector's base, read the
-  // manifest set from it (never hardcode it), and land before the install.
+  // behind main their answers can disagree and only the detector's diff saves
+  // the run. The check step must reuse the detector's base, ask the detector
+  // which inputs those are (never hardcode them), and land before the install.
   const affected = steps.find(step => step.id === 'affected');
   const local = steps.find(step => step.id === 'resources_base');
-  assert.ok(local, 'changes: the detector-base manifest check is missing');
+  assert.ok(local, 'changes: the detector-base dependency-input check is missing');
   assert.equal(
     local.env.BASE_SHA,
     affected.env.BASE_SHA,
     'the check diffs the base the detector diffs, or the answers can drift'
   );
-  assert.match(local.run, /DEPENDENCY_MANIFESTS/);
+  assert.match(local.run, /module\.isDependencyInput/);
   assert.doesNotMatch(
     local.run,
-    /pnpm-(lock|workspace)\.yaml/,
-    'the manifest set stays in scripts/affected-workspaces.mjs'
+    /pnpm-(lock|workspace)\.yaml|patches\//,
+    'the input set stays in scripts/affected-workspaces.mjs'
   );
-  assert.match(local.run, /echo "manifests=\$manifests_changed"/);
+  assert.match(local.run, /echo "manifests=\$answer"/);
   assert.match(
     local.run,
-    /if \[ -z "\$manifests" \]; then[\s\S]*echo "manifests=true"/,
-    'an unreadable detector list keeps the install instead of risking a detector without js-yaml'
+    /if \[ "\$answer" != true \] && \[ "\$answer" != false \]; then[\s\S]*answer=true/,
+    'an unreadable detector keeps the install instead of risking a detector without js-yaml'
   );
   assert.ok(
     steps.indexOf(install) > steps.indexOf(local),

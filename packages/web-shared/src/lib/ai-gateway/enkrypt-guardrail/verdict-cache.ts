@@ -77,8 +77,6 @@ function configHash(config: ReadyConfig): Buffer {
       JSON.stringify({
         detectors: config.detectors,
         blockingDetectors: [...config.blockingDetectors].sort(),
-        // Preserve existing tool-inclusive keys without allowing a tool-result opt-out.
-        scanToolResults: true,
       })
     )
     .digest();

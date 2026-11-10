@@ -183,6 +183,48 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Delete :EXUpdatesEnabled' "$plist" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c 'Add :EXUpdatesEnabled bool false' "$plist"
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesEnabled' "$plist")" == false ]]
+      # The dispatch key binds a build to its commit, so this job recompiles from
+      # an empty tree for every new commit even when the native inputs did not
+      # change. This tree is keyed on those inputs instead, and only a completed
+      # build saves it, so a partial tree cannot take the key. A `cloud_ref` that
+      # predates the key script skips these steps and builds cold, as every
+      # dispatch did before.
+      - name: Hash the Release DerivedData key
+        id: deriveddata
+        if: hashFiles('dev/local/ios-deriveddata-key.ts') != ''
+        run: >-
+          pnpm exec tsx dev/local/ios-deriveddata-key.ts
+          .github/workflows/explorer-ios-release.yml >> "$GITHUB_OUTPUT"
+      - name: Restore the Release DerivedData
+        id: deriveddata-cache
+        if: steps.deriveddata.outputs.key != ''
+        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ${{ runner.temp }}/DerivedData
+          key: deriveddata-release-${{ steps.deriveddata.outputs.key }}
+      # A hit proves the key, not the tree: a restore that stopped halfway, or
+      # one whose runner path moved, leaves a tree xcodebuild cannot continue.
+      # Only a tree that still carries its build database and the Release product
+      # is reused; anything else costs the cold build.
+      - name: Check the restored DerivedData
+        id: restored
+        if: steps.deriveddata.outputs.key != ''
+        run: |
+          set -euo pipefail
+          usable='false'
+          if [ '${{ steps.deriveddata-cache.outputs.cache-hit }}' = 'true' ]; then
+            usable='true'
+            for file in \
+              "$RUNNER_TEMP/DerivedData/Build/Intermediates.noindex/XCBuildData/build.db" \
+              "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator/Kilo.app/main.jsbundle"; do
+              if [ ! -s "$file" ]; then
+                echo "::warning::The restored DerivedData has no usable ${file##*/}"
+                usable='false'
+              fi
+            done
+            if [ "$usable" = 'false' ]; then rm -rf "$RUNNER_TEMP/DerivedData"; fi
+          fi
+          echo "usable=$usable" >> "$GITHUB_OUTPUT"
       - name: Build embedded Release bundle
         run: |
           set -euo pipefail
@@ -195,6 +237,15 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
           test -s "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator/Kilo.app/main.jsbundle"
+      # Saving here rather than in a post step keeps a tree that no build
+      # finished out of the key. It follows the build, so a failed or cancelled
+      # build leaves the previous entry in place.
+      - name: Save the Release DerivedData
+        if: steps.deriveddata.outputs.key != '' && steps.restored.outputs.usable != 'true'
+        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ${{ runner.temp }}/DerivedData
+          key: deriveddata-release-${{ steps.deriveddata.outputs.key }}
       - name: Verify linked simulator keychain entitlements
         run: |
           set -euo pipefail

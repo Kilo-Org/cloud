@@ -1531,14 +1531,14 @@ function productionEnvironment(): CacheEnvironment {
   };
 }
 
-function queryXcodeBuildVersion(): string {
+export function queryXcodeBuildVersion(): string {
   const raw = execFileSync('xcodebuild', ['-version'], { encoding: 'utf8' });
   const match = raw.match(/Build version (\S+)/);
   if (!match) throw new Error('Unable to determine Xcode build version');
   return match[1];
 }
 
-function querySimulatorSdkVersion(): string {
+export function querySimulatorSdkVersion(): string {
   const raw = execFileSync('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-version'], {
     encoding: 'utf8',
   });

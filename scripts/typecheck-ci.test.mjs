@@ -549,6 +549,57 @@ test('explorer-ios-release names its artifact object once', () => {
   }
 });
 
+// The dispatch key binds a build to its commit, so a new commit compiled the
+// Release bundle from an empty tree even when the native inputs did not change.
+// This cache is keyed on those inputs instead, and only a completed build saves
+// it: an entry written by a failed build would serve that partial tree to every
+// later run with the same key.
+test('explorer-ios-release keys the Release derived data on its build inputs', () => {
+  const steps = workflows['explorer-ios-release.yml'].jobs.build.steps;
+  const key = steps.find(step => step.name === 'Hash the Release DerivedData key');
+  const restore = steps.find(step => step.name === 'Restore the Release DerivedData');
+  const restored = steps.find(step => step.name === 'Check the restored DerivedData');
+  const build = steps.find(step => step.run?.includes('xcodebuild'));
+  const save = steps.find(step => step.name === 'Save the Release DerivedData');
+  // A `cloud_ref` can predate the key script, and no key at all must skip the
+  // pair: an empty key would make one entry shared by every commit.
+  assert.equal(key.if, "hashFiles('dev/local/ios-deriveddata-key.ts') != ''");
+  assert.equal(
+    key.run,
+    'pnpm exec tsx dev/local/ios-deriveddata-key.ts .github/workflows/explorer-ios-release.yml >> "$GITHUB_OUTPUT"'
+  );
+  const cacheKey = 'deriveddata-release-${{ steps.deriveddata.outputs.key }}';
+  assert.equal(restore.uses, 'actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(restore.if, "steps.deriveddata.outputs.key != ''");
+  assert.equal(restore.with.path, '${{ runner.temp }}/DerivedData');
+  assert.equal(restore.with.key, cacheKey);
+  assert.equal(
+    restore.with['restore-keys'],
+    undefined,
+    'a restore key would serve another toolchain or another native project'
+  );
+  // A path that moved on the runner restores nothing into the tree xcodebuild
+  // reads, so a hit is only trusted after the tree proves it carries its build.
+  assert.ok(
+    steps.indexOf(key) < steps.indexOf(restore) &&
+      steps.indexOf(restore) < steps.indexOf(restored) &&
+      steps.indexOf(restored) < steps.indexOf(build),
+    'the check runs between the restore and the build'
+  );
+  assert.equal(restored.if, "steps.deriveddata.outputs.key != ''");
+  assert.match(restored.run, /XCBuildData\/build\.db/);
+  assert.match(restored.run, /rm -rf "\$RUNNER_TEMP\/DerivedData"/);
+  assert.equal(build.if, undefined, 'the build is the gate and never depends on a hit');
+  assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(
+    save.if,
+    "steps.deriveddata.outputs.key != '' && steps.restored.outputs.usable != 'true'"
+  );
+  assert.equal(save.with.path, '${{ runner.temp }}/DerivedData');
+  assert.equal(save.with.key, cacheKey, 'the save writes the key the restore read');
+  assert.ok(steps.indexOf(build) < steps.indexOf(save), 'the save follows the build');
+});
+
 // The mobile suite needs one harness SDK build, not one per job: the build
 // resolves the SDK's whole program and, on a miss, compiles the typia
 // transform. Eleven jobs did that concurrently, and actions/cache saves at the

@@ -39,6 +39,8 @@ describe('preparationStepLabel', () => {
         'branch',
         'devcontainer_setup',
         'setup_commands',
+        'session_setup_commands',
+        'start_commands',
         'workspace_restore',
         'workspace_backup',
         'sandbox_provision',
@@ -57,6 +59,8 @@ describe('preparationStepLabel', () => {
       'Setting up branch',
       'Dev container setup',
       'Running setup commands',
+      'Running setup commands',
+      'Running commands',
       'Restoring workspace',
       'Saving workspace',
       'Provisioning sandbox',
@@ -96,6 +100,7 @@ describe('preparationDetailText', () => {
     expect(preparationDetailText('Retrying sandbox creation', t)).toBe('Retrying sandbox creation');
     expect(preparationDetailText('Warm workspace reused', t)).toBe('Warm workspace reused');
     expect(preparationDetailText('Importing session...', t)).toBe('Importing session');
+    expect(preparationDetailText('Running build commands', t)).toBe('Running setup commands');
   });
 
   it('reads a clone retry and git progress with localized numbers', async () => {
@@ -132,6 +137,11 @@ describe('preparationErrorText', () => {
   it('names the wrapper sentences a step failure carries', () => {
     expect(preparationErrorText('Setup command 2 failed', t)).toBe('Setup command 2 failed');
     expect(preparationErrorText('Setup command 1 timed out', t)).toBe('Setup command 1 timed out');
+    expect(preparationErrorText('Session setup command 1 failed', t)).toBe(
+      'Setup command 1 failed'
+    );
+    expect(preparationErrorText('Start command 3 timed out', t)).toBe('Setup command 3 timed out');
+    expect(preparationErrorText('Build command 2 failed', t)).toBe('Setup command 2 failed');
   });
 
   it('falls back to the attempt failure title for an unknown value', () => {

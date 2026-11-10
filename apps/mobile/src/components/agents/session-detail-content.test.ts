@@ -17,10 +17,12 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   type AssociatedPrData,
   type CloudAgentSessionId,
+  type CloudStatus,
   createSessionManager,
   createUserWebConnection,
   type KiloSessionId,
   type MessageDeliveryState,
+  type PreparationAttempt,
   type ReasoningPart,
   type SessionGoal,
   type SessionManager,
@@ -184,8 +186,24 @@ vi.mock('@/lib/a11y/motion', () => ({
   }),
   selectReducedMotionEntrance: <T>(_reducedMotion: boolean, entrance: T) => entrance,
 }));
+const screenSideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 16 }),
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 16,
+    left: screenSideInsets.left,
+    right: screenSideInsets.right,
+  }),
+}));
+// The on-screen entity publisher reaches the app-action bridge, which imports
+// the root `expo` entry and does not parse under the node test environment.
+vi.mock('@/lib/app-actions/native-bridge', () => ({
+  setNativeVisibleSession: vi.fn(() => Promise.resolve()),
+}));
+// The publisher reads the privacy lock's status; outside a provider it would
+// throw, and the status is not the subject of these assertions.
+vi.mock('@/lib/app-unlock-context', () => ({
+  useAppUnlock: () => ({ status: 'unlocked' }),
 }));
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
@@ -4742,6 +4760,32 @@ describe('session detail read-only composer', () => {
     );
   });
 
+  it('keeps the continue section inside the landscape side insets', async () => {
+    screenSideInsets.left = 47;
+    screenSideInsets.right = 59;
+    onTestFinished(() => {
+      screenSideInsets.left = 0;
+      screenSideInsets.right = 0;
+    });
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    // The bar keeps its own full-bleed background, so the padding lands on the
+    // content wrapper around the control rather than on the bar.
+    const paddedContent = continueControl.parent?.parent;
+    expect(paddedContent?.props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    if (paddedContent == null) {
+      throw new Error('the continue control has no side-inset wrapper');
+    }
+    const controlLabels = paddedContent
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(controlLabels).toContain(i18n.t('agentChat.session.continueInNewSession'));
+  });
+
   // The transcript paints a skeleton until its rows stop measuring. The chrome
   // around it reads the same fact: a live continue footer, or a pill settled on
   // a bare ring, beside a loading body is the screen showing two states at once.
@@ -5013,6 +5057,96 @@ describe('session detail duplicate failure state', () => {
       .map(node => node.props.accessibilityLabel);
     expect(labels).toContain(i18n.t('common.retry'));
     expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
+  });
+
+  it('shows the failure line and a usable composer once environment setup gives up', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const question = 'please refactor';
+    const view = await mountDetails([rootUserMessage(question)]);
+    const placeholder = () =>
+      view.renderer.root.find(node => Object.is(node.type, 'ChatComposer')).props.placeholder;
+
+    // While the sandbox is still being prepared the composer states the setup
+    // phase and its send control is locked: the state the reader was stuck in.
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<CloudStatus | null, [CloudStatus | null], unknown>(
+        view.manager.atoms.cloudStatus,
+        {
+          type: 'preparing',
+          step: 'sandbox_create',
+          message: 'Retrying sandbox creation',
+        }
+      );
+    });
+    expect(placeholder()).toBe(i18n.t('agentChat.composer.preparingPlaceholder'));
+    expect(composerProps(view).sendDisabled).toBe(true);
+
+    // Setup gave up: the queued question carries the failure, the send control
+    // is usable, and the composer no longer claims the environment is being set
+    // up.
+    const failedAttempt: PreparationAttempt = {
+      id: 'attempt-1',
+      triggerMessageId: USER_ID,
+      status: 'failed',
+      startedAt: 0,
+      completedAt: 1,
+      safeError: 'sandbox_create_failed',
+      revision: 2,
+      steps: [],
+    };
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
+      view.store.set<CloudStatus | null, [CloudStatus | null], unknown>(
+        view.manager.atoms.cloudStatus,
+        { type: 'error', message: 'sandbox_create_failed' }
+      );
+      view.store.set<readonly PreparationAttempt[], [readonly PreparationAttempt[]], unknown>(
+        view.manager.atoms.preparationAttempts,
+        [failedAttempt]
+      );
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          [
+            USER_ID,
+            { status: 'failed', error: 'The sandbox could not be created', reason: 'execution' },
+          ],
+        ])
+      );
+    });
+
+    const text = renderedText(view.renderer.root);
+    expect(text).toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).toContain(i18n.t('agentChat.messageFailure.deliveryExecution'));
+    expect(placeholder()).toBe(i18n.t('common.message'));
+    expect(composerProps(view).sendDisabled).toBe(false);
+    expect(composerProps(view).sendDisabledReason).toBeNull();
+    const labels = view.renderer.root
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(labels).toContain(i18n.t('common.retry'));
+    expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
+
+    // The queued question is recoverable: Retry re-sends that prompt.
+    const send = vi.spyOn(view.manager, 'send').mockResolvedValue(true);
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
+      payload: { type: 'prompt', prompt: question },
+    });
   });
 
   it.each([false, true])(

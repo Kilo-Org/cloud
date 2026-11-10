@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Vui lòng nhập địa chỉ email của bạn.",
     "or": "hoặc"
   },
+  "pendingLink": {
+    "description": "Đã có tài khoản sử dụng {{email}}. Hãy đăng nhập bằng một trong các phương thức của tài khoản đó để thêm {{provider}}.",
+    "emailCode": "Gửi mã đăng nhập qua email cho tôi",
+    "continueInBrowser": "Tiếp tục trong trình duyệt",
+    "startAgain": "Bắt đầu lại",
+    "expired": "Yêu cầu thêm {{provider}} này đã hết hạn.",
+    "noMethods": "Tài khoản này không có phương thức đăng nhập nào khác nên không thể thêm {{provider}}.",
+    "linked": "Đã thêm {{provider}} vào tài khoản của bạn.",
+    "failedExpired": "Chưa thêm {{provider}} vì yêu cầu đã hết hạn.",
+    "failedWrongAccount": "Chưa thêm {{provider}} vì bạn đã đăng nhập vào một tài khoản khác.",
+    "failedAccountAlreadyLinked": "Chưa thêm {{provider}} vì nó đã được liên kết với một tài khoản khác.",
+    "failedProviderAlreadyLinked": "Chưa thêm {{provider}} vì tài khoản của bạn đã có một phương thức đăng nhập {{provider}} khác.",
+    "failedLinking": "Không thể thêm {{provider}} vào tài khoản của bạn.",
+    "notAdded": "Bạn đã đăng nhập. Chưa thêm {{provider}} vào tài khoản của bạn."
+  },
   "profile": {
     "codeReviewerSubtitle": "Rà soát PR tự động",
     "securityAgentSubtitle": "Tìm và khắc phục lỗ hổng",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Xác nhận xóa",
     "credits": "Số dư",
     "failedToLoadBalance": "Không thể tải số dư. Chạm để thử lại.",
+    "balanceLoadFailed": "Không thể tải số dư",
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Tài khoản thử nghiệm",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO doanh nghiệp",
     "passkeysTitle": "Khóa truy cập",
     "passkeysSubtitle": "Đăng nhập không cần mật khẩu",
@@ -1869,7 +1887,7 @@
       "discardWithUploadsMessage": "Nội dung yêu cầu và các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
       "remoteHint": "Để chạy trên máy tính của bạn, hãy khởi động Kilo trên đó và để ứng dụng tiếp tục chạy.",
-      "continueFrom": "Đang tiếp tục phiên {{title}}.",
+      "continueFrom": "Đang tiếp tục phiên “{{title}}”.",
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không hỗ trợ tiếp tục phiên. Hãy chọn Cloud Agent hoặc CLI khác.",
       "importFailed": "Không thể nhập phiên này.",
@@ -2021,7 +2039,21 @@
       "thought": "Suy luận",
       "showDetails": "Hiển thị chi tiết",
       "pending": "Đang chờ…",
-      "running": "Đang chạy…"
+      "running": "Đang chạy…",
+      "field": {
+        "filePath": "Đường dẫn tệp",
+        "path": "Đường dẫn",
+        "offset": "Dòng bắt đầu",
+        "limit": "Giới hạn",
+        "pattern": "Mẫu",
+        "include": "Bao gồm",
+        "patchText": "Nội dung bản vá",
+        "query": "Truy vấn",
+        "prompt": "Chỉ dẫn",
+        "header": "Tiêu đề",
+        "question": "Câu hỏi",
+        "options": "Tùy chọn"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Không thể hiển thị nội dung."
@@ -2891,7 +2923,6 @@
     },
     "fileList": {
       "filesList": "Danh sách tệp",
-      "filesViewed": "Tệp · Đã xem {{viewed}}/{{total}}",
       "layout": "Bố cục",
       "listed": "(đã liệt kê)",
       "loadingFiles": "Đang tải tệp",
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
     },
-    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này, hãy nạp tiền và thử lại."
+    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này."
   },
   "settingsTools": {
     "confirmTitle": "Xác nhận thay đổi này?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Chưa bật bản tin theo lịch cho ngữ cảnh nào",
     "sourceBlocker": "Phiên cần được chú ý",
     "sourceMetadata": "Siêu dữ liệu phiên đã ghi lại"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Không thể mở kết quả tìm kiếm này"
   }
 }

@@ -229,6 +229,21 @@
     "signInCodeField": "کد ورود",
     "or": "یا"
   },
+  "pendingLink": {
+    "description": "حسابی از قبل از {{email}} استفاده می‌کند. برای افزودن {{provider}} با یکی از روش‌های ورود آن وارد شوید.",
+    "emailCode": "کد ورود را برایم ایمیل کنید",
+    "continueInBrowser": "ادامه در مرورگر",
+    "startAgain": "شروع دوباره",
+    "expired": "مهلت این درخواست برای افزودن {{provider}} تمام شده است.",
+    "noMethods": "این حساب روش ورود دیگری ندارد، بنابراین {{provider}} را نمی‌توان افزود.",
+    "linked": "{{provider}} به حساب شما افزوده شد.",
+    "failedExpired": "{{provider}} افزوده نشد، چون مهلت درخواست تمام شده بود.",
+    "failedWrongAccount": "{{provider}} افزوده نشد، چون به حساب دیگری وارد شدید.",
+    "failedAccountAlreadyLinked": "{{provider}} افزوده نشد، چون از قبل به حساب دیگری پیوند داده شده است.",
+    "failedProviderAlreadyLinked": "{{provider}} افزوده نشد، چون حساب شما از قبل ورود دیگری با {{provider}} دارد.",
+    "failedLinking": "افزودن {{provider}} به حساب شما ممکن نشد.",
+    "notAdded": "وارد شده‌اید. {{provider}} به حساب شما افزوده نشد."
+  },
   "profile": {
     "codeReviewerSubtitle": "بازبینی خودکار PR",
     "securityAgentSubtitle": "یافتن و رفع آسیب‌پذیری‌ها",
@@ -248,6 +263,7 @@
     "confirmDeletion": "تأیید حذف",
     "credits": "اعتبار",
     "failedToLoadBalance": "بارگذاری موجودی ممکن نشد. برای تلاش مجدد ضربه بزنید.",
+    "balanceLoadFailed": "بارگذاری موجودی ممکن نشد",
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
@@ -266,6 +282,8 @@
     "providerTestAccount": "حساب آزمایشی",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO سازمانی",
     "passkeysTitle": "کلیدهای عبور",
     "passkeysSubtitle": "بدون گذرواژه وارد شوید",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "در این درخواست ادغام هیچ فایلی تغییر نکرده است.",
     "fileList": {
       "openNavigator": "باز کردن فهرست فایل‌ها",
-      "filesViewed": "فایل‌ها · {{viewed}} از {{total}} مشاهده‌شده",
       "listed": "(فهرست‌شده)",
       "layout": "چیدمان",
       "unified": "یکپارچه",
@@ -2414,7 +2431,7 @@
       "discardWithUploadsMessage": "متن پیام شما و فایل‌های آپلودشده‌ای که به هیچ پیام ارسالی پیوست نشده‌اند، حذف می‌شوند.",
       "discardFailed": "حذف پیش‌نویس ممکن نشد. لطفاً دوباره تلاش کنید.",
       "remoteHint": "برای اجرا روی رایانهٔ خودتان، Kilo را آن‌جا اجرا کنید و آن را در حال اجرا بگذارید.",
-      "continueFrom": "نشست {{title}} را ادامه می‌دهید.",
+      "continueFrom": "نشست «{{title}}» را ادامه می‌دهید.",
       "importingSession": "در حال وارد کردن نشست",
       "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
       "importFailed": "وارد کردن این نشست ممکن نشد.",
@@ -2566,7 +2583,21 @@
       "thought": "تفکر",
       "showDetails": "نمایش جزئیات",
       "pending": "در انتظار…",
-      "running": "در حال اجرا…"
+      "running": "در حال اجرا…",
+      "field": {
+        "filePath": "مسیر فایل",
+        "path": "مسیر",
+        "offset": "خط شروع",
+        "limit": "محدودیت",
+        "pattern": "الگو",
+        "include": "شامل",
+        "patchText": "متن وصله",
+        "query": "پرس‌وجو",
+        "prompt": "دستورالعمل",
+        "header": "عنوان",
+        "question": "پرسش",
+        "options": "گزینه‌ها"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "نمایش محتوا ممکن نشد."
@@ -3808,7 +3839,7 @@
     "reasoningEffort": {
       "modelFlag": "این مدل از میزان تفکر پشتیبانی می‌کند"
     },
-    "creditsRequired": "اعتبار کافی برای ارسال این پیام وجود ندارد. اعتبار اضافه کنید و دوباره امتحان کنید."
+    "creditsRequired": "اعتبار کافی برای ارسال این پیام وجود ندارد."
   },
   "settingsTools": {
     "confirmTitle": "این تغییر تأیید شود؟"
@@ -4249,5 +4280,8 @@
     "noEnabledContexts": "هیچ بخشی برای گزارش‌های زمان‌بندی‌شده فعال نیست",
     "sourceBlocker": "جلسه به توجه نیاز دارد",
     "sourceMetadata": "فراداده‌های ثبت‌شدهٔ جلسه"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"
   }
 }

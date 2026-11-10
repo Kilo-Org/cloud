@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Digite seu endereço de e-mail.",
     "or": "ou"
   },
+  "pendingLink": {
+    "description": "Uma conta já usa {{email}}. Entre com um dos métodos dela para adicionar {{provider}}.",
+    "emailCode": "Enviar um código de login por e-mail",
+    "continueInBrowser": "Continuar no navegador",
+    "startAgain": "Começar de novo",
+    "expired": "Esta solicitação para adicionar {{provider}} expirou.",
+    "noMethods": "Esta conta não tem outro método de login, então não é possível adicionar {{provider}}.",
+    "linked": "{{provider}} foi adicionado à sua conta.",
+    "failedExpired": "{{provider}} não foi adicionado porque a solicitação expirou.",
+    "failedWrongAccount": "{{provider}} não foi adicionado porque você entrou em outra conta.",
+    "failedAccountAlreadyLinked": "{{provider}} não foi adicionado porque já está vinculado a outra conta.",
+    "failedProviderAlreadyLinked": "{{provider}} não foi adicionado porque sua conta já tem outro login do {{provider}}.",
+    "failedLinking": "Não foi possível adicionar {{provider}} à sua conta.",
+    "notAdded": "Você entrou. {{provider}} não foi adicionado à sua conta."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisões automáticas de PR",
     "securityAgentSubtitle": "Encontrar e corrigir vulnerabilidades",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Confirmar exclusão",
     "credits": "Créditos",
     "failedToLoadBalance": "Não foi possível carregar o saldo. Toque para tentar novamente.",
+    "balanceLoadFailed": "Não foi possível carregar o saldo",
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Conta de teste",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO corporativo",
     "passkeysTitle": "Chaves de acesso",
     "passkeysSubtitle": "Entre sem senha",
@@ -1863,7 +1881,7 @@
       "discardWithUploadsMessage": "Seu prompt e os arquivos enviados ainda não vinculados a uma mensagem serão excluídos.",
       "discardFailed": "Não foi possível descartar o rascunho. Tente novamente.",
       "remoteHint": "Para executar no seu computador, inicie o Kilo nele e mantenha-o em execução.",
-      "continueFrom": "Continuando a sessão {{title}}.",
+      "continueFrom": "Continuando a sessão “{{title}}”.",
       "importingSession": "Importando sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
       "importFailed": "Não foi possível importar esta sessão.",
@@ -2019,7 +2037,21 @@
       "thought": "Raciocínio",
       "showDetails": "Mostrar detalhes",
       "pending": "Pendente…",
-      "running": "Executando…"
+      "running": "Executando…",
+      "field": {
+        "filePath": "Caminho do arquivo",
+        "path": "Caminho",
+        "offset": "Deslocamento",
+        "limit": "Limite",
+        "pattern": "Padrão",
+        "include": "Inclusão",
+        "patchText": "Texto do patch",
+        "query": "Consulta",
+        "prompt": "Instrução",
+        "header": "Cabeçalho",
+        "question": "Pergunta",
+        "options": "Opções"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Não foi possível exibir o conteúdo."
@@ -2937,7 +2969,6 @@
     },
     "fileList": {
       "filesList": "Lista de arquivos",
-      "filesViewed": "Arquivos · {{viewed}} de {{total}} visualizados",
       "layout": "Disposição",
       "listed": "(listados)",
       "loadingFiles": "Carregando arquivos",
@@ -3864,7 +3895,7 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo aceita esforço de raciocínio"
     },
-    "creditsRequired": "Créditos insuficientes para enviar esta mensagem. Adicione créditos e tente novamente."
+    "creditsRequired": "Créditos insuficientes para enviar esta mensagem."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar esta alteração?"
@@ -4315,5 +4346,8 @@
     "noEnabledContexts": "Nenhum contexto ativado para relatórios agendados",
     "sourceBlocker": "A sessão precisa de atenção",
     "sourceMetadata": "Metadados da sessão capturados"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Não foi possível abrir este resultado da pesquisa"
   }
 }

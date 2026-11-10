@@ -26,7 +26,7 @@ describe('model data policy', () => {
           {
             ...baseModel,
             endpoint: {
-              provider_display_name: 'SpaceXAI (ZDR)',
+              provider_display_name: 'SpaceXSI (ZDR)',
               is_free: false,
               pricing: { prompt: '0.000002', completion: '0.000006' },
               data_policy: {

@@ -229,6 +229,21 @@
     "signInCodeField": "លេខកូដចូល",
     "or": "ឬ"
   },
+  "pendingLink": {
+    "description": "មានគណនីមួយកំពុងប្រើ {{email}} រួចហើយ។ សូមចូលដោយប្រើវិធីមួយរបស់គណនីនោះ ដើម្បីបន្ថែម {{provider}}។",
+    "emailCode": "ផ្ញើលេខកូដចូលមកអ៊ីមែលខ្ញុំ",
+    "continueInBrowser": "បន្តនៅក្នុងកម្មវិធីរុករក",
+    "startAgain": "ចាប់ផ្តើមម្តងទៀត",
+    "expired": "សំណើបន្ថែម {{provider}} នេះបានផុតកំណត់ហើយ។",
+    "noMethods": "គណនីនេះគ្មានវិធីចូលផ្សេងទៀតទេ ដូច្នេះមិនអាចបន្ថែម {{provider}} បានទេ។",
+    "linked": "{{provider}} ត្រូវបានបន្ថែមទៅគណនីរបស់អ្នក។",
+    "failedExpired": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះសំណើបានផុតកំណត់។",
+    "failedWrongAccount": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះអ្នកបានចូលគណនីផ្សេង។",
+    "failedAccountAlreadyLinked": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះវាបានភ្ជាប់ទៅគណនីផ្សេងរួចហើយ។",
+    "failedProviderAlreadyLinked": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះគណនីរបស់អ្នកមានការចូល {{provider}} ផ្សេងរួចហើយ។",
+    "failedLinking": "មិនអាចបន្ថែម {{provider}} ទៅគណនីរបស់អ្នកបានទេ។",
+    "notAdded": "អ្នកបានចូលហើយ។ {{provider}} មិនត្រូវបានបន្ថែមទៅគណនីរបស់អ្នកទេ។"
+  },
   "profile": {
     "codeReviewerSubtitle": "ការពិនិត្យ PR ដោយស្វ័យប្រវត្តិ",
     "securityAgentSubtitle": "ស្វែងរក និងដោះស្រាយចំណុចខ្សោយផ្នែកសុវត្ថិភាព",
@@ -248,6 +263,7 @@
     "confirmDeletion": "បញ្ជាក់ការលុប",
     "credits": "ឥណទាន",
     "failedToLoadBalance": "មិនអាចផ្ទុកសមតុល្យបានទេ។ ប៉ះដើម្បីព្យាយាមម្តងទៀត។",
+    "balanceLoadFailed": "មិនអាចផ្ទុកសមតុល្យបានទេ",
     "hideBalance": "លាក់សមតុល្យ",
     "showBalance": "បង្ហាញសមតុល្យ",
     "balanceHidden": "សមតុល្យត្រូវបានលាក់",
@@ -266,6 +282,8 @@
     "providerTestAccount": "គណនីសាកល្បង",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO សម្រាប់សហគ្រាស",
     "passkeysTitle": "កូនសោចូល",
     "passkeysSubtitle": "ចូលដោយគ្មានពាក្យសម្ងាត់",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "សំណើបញ្ចូលកូដនេះមិនមានការកែប្រែឯកសារទេ។",
     "fileList": {
       "openNavigator": "បើកបញ្ជីរុករកឯកសារ",
-      "filesViewed": "ឯកសារ · បានមើល {{viewed}} ក្នុងចំណោម {{total}}",
       "listed": "(បានរាយបញ្ជី)",
       "layout": "ប្លង់",
       "unified": "រួមគ្នា",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "សេចក្តីណែនាំរបស់អ្នក និងឯកសារដែលបានផ្ទុកឡើង តែមិនទាន់ភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវលុប។",
       "discardFailed": "មិនអាចបោះបង់សេចក្តីព្រាងបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "remoteHint": "ដើម្បីដំណើរការនៅលើកុំព្យូទ័ររបស់អ្នក សូមចាប់ផ្តើម Kilo នៅទីនោះ ហើយទុកវាដំណើរការ។",
-      "continueFrom": "កំពុងបន្តវគ្គ {{title}}។",
+      "continueFrom": "កំពុងបន្តវគ្គ «{{title}}»។",
       "importingSession": "កំពុងនាំចូលវគ្គ",
       "cliCannotContinue": "CLI នេះមិនអាចបន្តវគ្គបានទេ។ ជ្រើសរើស Cloud Agent ឬ CLI ផ្សេងទៀត។",
       "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។",
@@ -2560,7 +2577,21 @@
       "thought": "ការគិត",
       "showDetails": "បង្ហាញព័ត៌មានលម្អិត",
       "pending": "កំពុងរង់ចាំ…",
-      "running": "កំពុងដំណើរការ…"
+      "running": "កំពុងដំណើរការ…",
+      "field": {
+        "filePath": "ផ្លូវឯកសារ",
+        "path": "ផ្លូវ",
+        "offset": "គម្លាត",
+        "limit": "ដែនកំណត់",
+        "pattern": "លំនាំ",
+        "include": "រួមបញ្ចូល",
+        "patchText": "អត្ថបទបំណះ",
+        "query": "ពាក្យស្វែងរក",
+        "prompt": "សេចក្តីណែនាំ",
+        "header": "ចំណងជើង",
+        "question": "សំណួរ",
+        "options": "ជម្រើស"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "មិនអាចបង្ហាញមាតិកាបានទេ។"
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "គំរូនេះគាំទ្រកម្រិតនៃការគិត"
     },
-    "creditsRequired": "ឥណទានមិនគ្រប់គ្រាន់ដើម្បីផ្ញើសារនេះទេ។ សូមបន្ថែមឥណទាន ហើយព្យាយាមម្ដងទៀត។"
+    "creditsRequired": "ឥណទានមិនគ្រប់គ្រាន់ដើម្បីផ្ញើសារនេះទេ។"
   },
   "settingsTools": {
     "confirmTitle": "បញ្ជាក់ការផ្លាស់ប្តូរនេះ?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "មិនមានបរិបទណាមួយត្រូវបានបើកសម្រាប់របាយការណ៍តាមកាលវិភាគទេ",
     "sourceBlocker": "វគ្គត្រូវការការយកចិត្តទុកដាក់",
     "sourceMetadata": "ទិន្នន័យមេតារបស់វគ្គដែលបានកត់ត្រា"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "មិនអាចបើកលទ្ធផលស្វែងរកនេះបានទេ"
   }
 }

@@ -229,6 +229,21 @@
     "signInCodeField": "Prijavna koda",
     "or": "ali"
   },
+  "pendingLink": {
+    "description": "Račun z naslovom {{email}} že obstaja. Prijavi se z enim od njegovih načinov, da dodaš {{provider}}.",
+    "emailCode": "Pošlji mi prijavno kodo po e-pošti",
+    "continueInBrowser": "Nadaljuj v brskalniku",
+    "startAgain": "Začni znova",
+    "expired": "Ta zahteva za dodajanje storitve {{provider}} je potekla.",
+    "noMethods": "Ta račun nima drugega načina prijave, zato storitve {{provider}} ni mogoče dodati.",
+    "linked": "Storitev {{provider}} je bila dodana tvojemu računu.",
+    "failedExpired": "Storitev {{provider}} ni bila dodana, ker je zahteva potekla.",
+    "failedWrongAccount": "Storitev {{provider}} ni bila dodana, ker si se prijavil v drug račun.",
+    "failedAccountAlreadyLinked": "Storitev {{provider}} ni bila dodana, ker je že povezana z drugim računom.",
+    "failedProviderAlreadyLinked": "Storitev {{provider}} ni bila dodana, ker ima tvoj račun že drugo prijavo s storitvijo {{provider}}.",
+    "failedLinking": "Storitve {{provider}} ni bilo mogoče dodati tvojemu računu.",
+    "notAdded": "Prijavljen si. Storitev {{provider}} ni bila dodana tvojemu računu."
+  },
   "profile": {
     "codeReviewerSubtitle": "Samodejni pregledi PR",
     "securityAgentSubtitle": "Poišči in odpravi ranljivosti",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Potrdi izbris",
     "credits": "Krediti",
     "failedToLoadBalance": "Stanja ni bilo mogoče naložiti. Tapni za ponovni poskus.",
+    "balanceLoadFailed": "Stanja ni bilo mogoče naložiti",
     "hideBalance": "Skrij stanje",
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Testni račun",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO za podjetja",
     "passkeysTitle": "Ključi za dostop",
     "passkeysSubtitle": "Prijavi se brez gesla",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Ta zahtevek za združitev ne vsebuje sprememb datotek.",
     "fileList": {
       "openNavigator": "Odpri seznam datotek",
-      "filesViewed": "Datoteke · ogledano: {{viewed}} od {{total}}",
       "listed": "(na seznamu)",
       "layout": "Postavitev",
       "unified": "Združeno",
@@ -2492,7 +2509,7 @@
       "discardWithUploadsMessage": "Tvoj poziv in vse naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisani.",
       "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova.",
       "remoteHint": "Za zagon na tvojem računalniku tam zaženi Kilo in ga pusti zagnanega.",
-      "continueFrom": "Nadaljuje se seja {{title}}.",
+      "continueFrom": "Nadaljuje se seja »{{title}}«.",
       "importingSession": "Uvažanje seje",
       "cliCannotContinue": "Ta CLI ne podpira nadaljevanja seje. Izberi Cloud Agent ali drug CLI.",
       "importFailed": "Te seje ni bilo mogoče uvoziti.",
@@ -2652,7 +2669,21 @@
       "thought": "Misel",
       "showDetails": "Prikaži podrobnosti",
       "pending": "Čakanje…",
-      "running": "Izvajanje…"
+      "running": "Izvajanje…",
+      "field": {
+        "filePath": "Pot datoteke",
+        "path": "Pot",
+        "offset": "Odmik",
+        "limit": "Omejitev",
+        "pattern": "Vzorec",
+        "include": "Vključitev",
+        "patchText": "Besedilo popravka",
+        "query": "Poizvedba",
+        "prompt": "Navodilo",
+        "header": "Naslov",
+        "question": "Vprašanje",
+        "options": "Možnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Vsebine ni bilo mogoče prikazati."
@@ -3914,7 +3945,7 @@
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"
     },
-    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila. Dodaj kredite in poskusi znova."
+    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila."
   },
   "settingsTools": {
     "confirmTitle": "Potrdim to spremembo?"
@@ -4375,5 +4406,8 @@
     "noEnabledContexts": "Za načrtovana poročila ni omogočen noben kontekst",
     "sourceBlocker": "Seja zahteva pozornost",
     "sourceMetadata": "Zajeti metapodatki seje"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ni bilo mogoče odpreti tega rezultata iskanja"
   }
 }

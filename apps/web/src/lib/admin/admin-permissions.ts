@@ -18,7 +18,7 @@ export function userCanExportApiRequestLogs(user: User): boolean {
 
 // Permission checks read the primary so a granted or revoked permission
 // applies to a session that is already signed in.
-async function currentUserHasPermission(
+export async function currentUserHasPermission(
   kiloUserId: string,
   hasPermission: (user: User) => boolean
 ): Promise<boolean> {

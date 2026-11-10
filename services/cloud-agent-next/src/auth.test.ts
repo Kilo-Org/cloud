@@ -12,11 +12,21 @@ import {
 
 const secret = 'test-secret';
 
+const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
+const WORKTREE_ID = 'worktree_22222222-2222-4222-8222-222222222222';
+
+const FENCE = {
+  provider: 'cloudflare-containers',
+  logicalSandboxId: 'workspace-container',
+  allocationRef: 'allocation-ref',
+} as const;
+
 describe('preview session token', () => {
   const claims = {
     userId: 'user-1',
-    cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+    cloudAgentSessionId: SESSION_ID,
     port: 5173,
+    ...FENCE,
   } as const;
 
   it('round-trips its claims and organization', () => {
@@ -25,6 +35,51 @@ describe('preview session token', () => {
       success: true,
       claims: { ...claims, organizationId: 'org-1' },
     });
+  });
+
+  it('round-trips a workspace target', () => {
+    const token = mintPreviewSessionToken(
+      { userId: 'user-1', worktreeId: WORKTREE_ID, port: 5173, ...FENCE },
+      secret
+    );
+    expect(validatePreviewSessionToken(token, secret)).toEqual({
+      success: true,
+      claims: { userId: 'user-1', worktreeId: WORKTREE_ID, port: 5173, ...FENCE },
+    });
+  });
+
+  it('rejects a legacy cookie that has no allocation fence', () => {
+    const token = jwt.sign(
+      {
+        type: 'preview_session',
+        userId: 'user-1',
+        cloudAgentSessionId: SESSION_ID,
+        port: 5173,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 3600, audience: 'cloud-agent-preview-session' }
+    );
+    expect(validatePreviewSessionToken(token, secret)).toMatchObject({
+      success: false,
+      error: 'Invalid preview claims',
+    });
+  });
+
+  it('rejects a token that names both target kinds', () => {
+    const ambiguous = jwt.sign(
+      {
+        type: 'preview_session',
+        userId: 'user-1',
+        cloudAgentSessionId: SESSION_ID,
+        worktreeId: WORKTREE_ID,
+        port: 5173,
+        ...FENCE,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      },
+      secret,
+      { algorithm: 'HS256', audience: 'cloud-agent-preview-session' }
+    );
+    expect(validatePreviewSessionToken(ambiguous, secret)).toMatchObject({ success: false });
   });
 
   it('rejects a missing secret and a missing token', () => {
@@ -43,7 +98,7 @@ describe('preview session token', () => {
         type: 'stream_ticket',
         purpose: 'preview',
         userId: 'u',
-        cloudAgentSessionId: 'workspace_x',
+        cloudAgentSessionId: SESSION_ID,
       },
       secret,
       { algorithm: 'HS256', expiresIn: '1 minute', audience: 'cloud-agent-preview-session' }
@@ -93,6 +148,27 @@ describe('preview entry ticket', () => {
     });
   });
 
+  it('accepts a workspace-target entry ticket', () => {
+    const ticket = entryTicket({
+      cloudAgentSessionId: undefined,
+      worktreeId: WORKTREE_ID,
+    });
+    expect(validatePreviewEntryTicket(ticket, secret)).toMatchObject({
+      success: true,
+      claims: {
+        userId: 'user-1',
+        worktreeId: WORKTREE_ID,
+        port: 5173,
+      },
+    });
+  });
+
+  it('rejects an entry ticket that names both target kinds', () => {
+    expect(
+      validatePreviewEntryTicket(entryTicket({ worktreeId: WORKTREE_ID }), secret)
+    ).toMatchObject({ success: false });
+  });
+
   it('rejects an entry ticket without a nonce', () => {
     expect(validatePreviewEntryTicket(entryTicket({ nonce: undefined }), secret)).toMatchObject({
       success: false,
@@ -115,8 +191,9 @@ describe('preview entry ticket', () => {
     const token = mintPreviewSessionToken(
       {
         userId: 'user-1',
-        cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+        cloudAgentSessionId: SESSION_ID,
         port: 5173,
+        ...FENCE,
       },
       secret
     );

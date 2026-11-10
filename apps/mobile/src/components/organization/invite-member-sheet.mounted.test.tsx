@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the invite sheet suites share one mock harness. */
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -32,9 +33,12 @@ const invite = vi.hoisted(() => ({
 // handler on every render, and the test re-runs them to present the sheet
 // again. `useCallback` keeps each identity stable, so a render adds nothing.
 const focus = vi.hoisted(() => ({ effects: [] as (() => void)[] }));
+// The route's own dismissal: one call per leave, however many reasons arrive.
+const popOnce = vi.hoisted(() => vi.fn());
+// The Android Back listener the sheet registers on focus.
+const backPress = vi.hoisted(() => ({ handler: undefined as (() => boolean) | undefined }));
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: vi.fn() }),
   useFocusEffect: (effect: () => void) => {
     if (!focus.effects.includes(effect)) {
       focus.effects.push(effect);
@@ -45,8 +49,14 @@ vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
-  BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
+  BackHandler: {
+    addEventListener: (_event: string, handler: () => boolean) => {
+      backPress.handler = handler;
+      return { remove: () => undefined };
+    },
+  },
 }));
+vi.mock('@/lib/navigation/pop-once', () => ({ usePopOnce: () => popOnce }));
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
 }));
@@ -64,11 +74,15 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 // suite models: the sheet still renders its body as the ScrollView host.
 vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'ScrollView' }));
 // The sheet's own dirty check: what Cancel and Back would ask about.
-const guard = vi.hoisted(() => ({ isDirty: (): boolean => false }));
+const guard = vi.hoisted(() => ({ isDirty: (): boolean => false, requestClose: vi.fn() }));
 vi.mock('@/components/ui/use-sheet-dismiss-guard', () => ({
   useSheetDismissGuard: (options: { isDirty: () => boolean }) => {
     guard.isDirty = options.isDirty;
-    return { requestClose: vi.fn(), requestDismiss: () => true, dialog: null };
+    return {
+      requestClose: guard.requestClose,
+      requestDismiss: () => true,
+      dialog: null,
+    };
   },
 }));
 vi.mock('@/components/ui/radio-group', () => ({
@@ -86,7 +100,8 @@ vi.mock('@/lib/analytics/posthog', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => boundary,
-  isMoneyRole: (role: string) => role === 'owner' || role === 'billing_manager',
+  // canManageOrganizationBilling: an admin may invite, so it may open the sheet.
+  isMoneyRole: (role: string) => role === 'owner' || role === 'admin' || role === 'billing_manager',
 }));
 vi.mock('@/lib/hooks/use-organization-mutations', () => ({
   useOrganizationMutations: () => ({ invite }),
@@ -104,6 +119,9 @@ beforeEach(() => {
   };
   invite.mutate.mockClear();
   invite.reset.mockClear();
+  popOnce.mockClear();
+  guard.requestClose.mockClear();
+  backPress.handler = undefined;
   focus.effects = [];
 });
 
@@ -321,6 +339,142 @@ describe('InviteMemberSheet reopen', () => {
     });
 
     expect(invite.mutate).not.toHaveBeenCalled();
+    rendered.unmount();
+  });
+});
+
+const ROLE_TEXTS: Record<string, true> = { member: true, billing_manager: true, owner: true };
+
+function isRoleLabel(child: unknown): child is string {
+  return typeof child === 'string' && ROLE_TEXTS[child] === true;
+}
+
+/** The role labels the sheet draws, in screen order. */
+function roleLabels(rendered: RenderWithProvidersResult): string[] {
+  return rendered.renderer.root
+    .findAll(node => String(node.type) === 'Text')
+    .map(node => node.props.children)
+    .filter(child => isRoleLabel(child));
+}
+
+describe('InviteMemberSheet roles', () => {
+  it('offers an owner the owner row', async () => {
+    boundary.role = 'owner';
+    const rendered = await openSheet();
+
+    expect(roleLabels(rendered)).toEqual(['member', 'billing_manager', 'owner']);
+    rendered.unmount();
+  });
+
+  it('does not offer an admin the owner row the server always refuses', async () => {
+    boundary.role = 'admin';
+    const rendered = await openSheet();
+
+    expect(roleLabels(rendered)).toEqual(['member', 'billing_manager']);
+    rendered.unmount();
+  });
+
+  it('submits the plain member role to a billing manager', async () => {
+    boundary.role = 'billing_manager';
+    const rendered = await openSheet();
+
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+
+    expect(invite.mutate).toHaveBeenCalledWith(
+      { email: 'dev@example.com', role: 'member' },
+      expect.anything()
+    );
+    rendered.unmount();
+  });
+
+  it('never submits a selection the caller lost the authority for', async () => {
+    boundary.role = 'owner';
+    const rendered = await openSheet();
+    act(() => {
+      roleRowProps(rendered, 2).onPress();
+    });
+    expect(roleLabels(rendered)).toContain('owner');
+
+    // The membership changed underneath the open form: an admin cannot assign
+    // owner, and the row is gone from the list.
+    boundary.role = 'admin';
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    expect(roleLabels(rendered)).toEqual(['member', 'billing_manager']);
+
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+
+    expect(invite.mutate).toHaveBeenCalledWith(
+      { email: 'dev@example.com', role: 'member' },
+      expect.anything()
+    );
+    rendered.unmount();
+  });
+});
+
+describe('InviteMemberSheet dismissal', () => {
+  it('dismisses the route once when the invite succeeds', async () => {
+    const rendered = await openSheet();
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+
+    const [, options] = invite.mutate.mock.calls[0] as [unknown, { onSuccess: () => void }];
+    act(() => {
+      options.onSuccess();
+    });
+
+    expect(popOnce).toHaveBeenCalledOnce();
+    rendered.unmount();
+  });
+
+  it('keeps the sheet up while the invite is in flight', async () => {
+    const rendered = await openSheet();
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+    invite.isPending = true;
+    // A real render is what re-reads the pending flag the Back handler
+    // consults: clear the field, which changes canSubmit, then retype it.
+    act(() => {
+      fieldProps(rendered).onChangeText('');
+    });
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+
+    let consumed = false;
+    act(() => {
+      consumed = backPress.handler?.() ?? false;
+    });
+
+    expect(consumed).toBe(true);
+    expect(guard.requestClose).not.toHaveBeenCalled();
+    rendered.unmount();
+  });
+
+  it('asks the discard guard on Back when nothing is in flight', async () => {
+    const rendered = await openSheet();
+
+    act(() => {
+      backPress.handler?.();
+    });
+
+    expect(guard.requestClose).toHaveBeenCalledOnce();
     rendered.unmount();
   });
 });

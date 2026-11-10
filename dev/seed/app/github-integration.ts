@@ -1,7 +1,7 @@
 import { kilocode_users, platform_integrations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import {
   fetchSeedGitHubInstallationDetails,
   fetchSeedGitHubRepositories,
@@ -126,6 +126,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const options = parseArgs(args);
+  assertLocalSeedDatabase('app:github-integration');
   const db = getSeedDb();
 
   const [user] = await db

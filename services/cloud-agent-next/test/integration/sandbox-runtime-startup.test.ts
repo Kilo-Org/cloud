@@ -43,7 +43,6 @@ const scopedEnv = {
   NATIVE_RUNTIME_IMAGE: 'runtime-free',
 };
 const SCOPED_SANDBOX = `sbx-${'1'.repeat(48)}`;
-const SCOPED_FALLBACK_SANDBOX = `sbx-${'2'.repeat(48)}`;
 const EXCLUDED_SANDBOX = `sbx-${'3'.repeat(48)}`;
 const NON_WEB_SANDBOX = `sbx-${'4'.repeat(48)}`;
 const ABSENT_PLATFORM_SANDBOX = `sbx-${'5'.repeat(48)}`;
@@ -113,9 +112,7 @@ it('loads a hash-selected descriptor through a real R2 binding before rendering 
   }
 });
 
-function fakeProvider(
-  options: { holdFirst?: boolean; holdSecond?: boolean; snapshotFailed?: boolean } = {}
-) {
+function fakeProvider(options: { holdFirst?: boolean; snapshotFailed?: boolean } = {}) {
   const launches: {
     env: Record<string, string>;
     command: ProviderStartupCommand;
@@ -132,7 +129,7 @@ function fakeProvider(
     async launch(_ref, startup, launchOptions) {
       const index = launches.length;
       launches.push({ ...startup, options: launchOptions });
-      if ((index === 0 && options.holdFirst) || (index === 1 && options.holdSecond))
+      if (index === 0 && options.holdFirst)
         await new Promise<void>(resolve => {
           releases[index] = resolve;
         });
@@ -206,6 +203,7 @@ async function setup(
 }
 type PrepareOptions = {
   orgId?: string;
+  billingOrigin?: string;
   createdOnPlatform?: string;
   sandboxKind?: 'isolated' | 'isolated-standard' | 'code-review' | 'shared';
 };
@@ -226,6 +224,7 @@ async function requestPrepare(h: Harness, options: PrepareOptions = {}) {
       ...(options.createdOnPlatform === undefined
         ? {}
         : { createdOnPlatform: options.createdOnPlatform }),
+      ...(options.billingOrigin === undefined ? {} : { billingOrigin: options.billingOrigin }),
       repository: { type: 'github', repo: 'acme/widgets' },
       scopeId: SESSION,
     },
@@ -306,26 +305,6 @@ describe('downloaded startup in the allocation owner', () => {
     await release(h, 0);
     expect(h.provider.launches.length).toBe(1);
     expect((await record(h))?.startupMode).toBe('downloaded');
-  });
-  it('rotates the credential before the one baseline image fallback when provider failure wins', async () => {
-    const h = await setup('sbx__runtime_provider_first', {
-      snapshotFailed: true,
-      holdSecond: true,
-    });
-    await prepare(h);
-    await waitFor(() => expect(h.provider.launches.length).toBe(2));
-    expect(h.provider.launches[1]?.options?.snapshot).toBeUndefined();
-    expect(h.provider.launches[0]?.command === h.provider.launches[1]?.command).toBe(true);
-    expect(await report(h, 0, 'artifact_invalid')).toBe(false);
-    expect(await report(h, 1, 'artifact_invalid')).toBe(true);
-    await release(h, 1);
-    await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('stopped'));
-    expect(h.provider.launches.length).toBe(2);
-    expect(
-      h.peer
-        .routeUpdatesFor(SESSION)
-        .some(x => x.state === 'failed' && x.reason === 'runtime_artifact_invalid')
-    ).toBe(true);
   });
   it.each([true, false])(
     'keeps base incompatibility retryable when creating=%s',
@@ -462,28 +441,18 @@ describe('downloaded startup in the allocation owner', () => {
       expect(startup.options?.nativeImage).toBe('runtime-free');
     }
   );
-  it('retains the scoped selection through the snapshot-to-image fallback', async () => {
-    const h = await setup(SCOPED_FALLBACK_SANDBOX, { snapshotFailed: true }, scopedEnv);
-    await prepare(h, {
-      orgId: TARGET_ORG,
-      createdOnPlatform: 'cloud-agent-web',
-      sandboxKind: 'isolated',
-    });
-    await waitFor(() => expect(h.provider.launches.length).toBe(2));
-    const [first, fallback] = h.provider.launches;
-    expect(first?.options?.nativeImage).toBe('runtime-free');
-    expect(fallback?.options?.nativeImage).toBe('runtime-free');
-    expect(fallback?.options?.snapshot).toBeUndefined();
-    expect(fallback?.command).toEqual(first?.command);
-    expect((await record(h))?.startupMode).toBe('downloaded');
-  });
   describe('runtime harness', () => {
     const harnessOf = (h: Harness, index: number) =>
       h.provider.launches[index]?.command.argv[2]
         ?.split('\n')
         .findLast(line => line.startsWith('exec '))
         ?.match(/KILO_RUNTIME_HARNESS='([a-z0-9]+)'/)?.[1];
-    const isolatedTarget = { orgId: TARGET_ORG, sandboxKind: 'isolated' } as const;
+    const isolatedTarget = {
+      orgId: TARGET_ORG,
+      billingOrigin: 'cloud-agent-web',
+      sandboxKind: 'isolated',
+      createdOnPlatform: 'cloud-agent-web',
+    } as const;
     async function recreate(h: Harness, envChange: Record<string, string>) {
       await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('starting'));
       await runInDurableObject(h.stub, instance => {
@@ -523,6 +492,17 @@ describe('downloaded startup in the allocation owner', () => {
         expect.objectContaining({ container })
       );
     });
+    it.each(['cloud-agent', 'code-review', 'desktop', 'agent-manager', 'slack', undefined])(
+      'starts v1 when a client claims web but the trusted origin is %s',
+      async billingOrigin => {
+        const h = await setup(KILO2_SANDBOX, {}, kilo2Env);
+        await prepare(h, { ...isolatedTarget, billingOrigin });
+        expect(harnessOf(h, 0)).toBe('kilo');
+        await runInDurableObject(h.stub, async (_instance, state) => {
+          expect(await state.storage.get('runtime_harness')).toBe('kilo');
+        });
+      }
+    );
     it('keeps an unlisted organization sandbox on v1 after the organization joins the list', async () => {
       const h = await setup(
         UNLISTED_KILO2_SANDBOX,

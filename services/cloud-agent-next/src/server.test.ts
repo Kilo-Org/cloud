@@ -1288,6 +1288,51 @@ describe('server runtime credential proxy', () => {
     vi.unstubAllGlobals();
   });
 
+  it('forwards the organization model catalog with a kilo-api attestation', async () => {
+    const env = createEnv();
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://api.kilo.ai:backing-token',
+        organizationId: 'org_proxy',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'workspace_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn(async (request: Request) => {
+      expect(request.method).toBe('GET');
+      expect(request.url).toBe('https://api.kilo.ai/api/gateway/organizations/org_proxy/models');
+      await expect(
+        verifyRuntimeProxyAttestation({
+          value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+          secret,
+          audience: 'kilo-api',
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'workspace_proxy',
+          bearer: 'https://api.kilo.ai:backing-token',
+        })
+      ).resolves.toBe(true);
+      return new Response('{}', { headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/organizations/org_proxy/models',
+          { headers: { Authorization: `Bearer ${await handle()}` } }
+        ),
+        env
+      );
+      expect(response.status).toBe(200);
+      expect(upstream).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('forwards allowlisted Exa requests with a kilo-gateway attestation', async () => {
     const env = createEnv();
     const backingToken = jwt.sign({ exp: 4_000_000_000 }, secret);
@@ -1623,9 +1668,80 @@ describe('server runtime credential proxy', () => {
         upstreamVercelId: 'fra1::abc-123',
         upstreamVercelMitigated: 'deny',
         upstreamErrorExcerpt: '403 Forbidden',
+        proxyRoute: 'provider',
+        requestMethod: 'POST',
+        pathShape: '/api/openrouter/chat/completions',
         sessionId: 'workspace_proxy',
         kiloSessionId: 'kilo_proxy',
       });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('emits one bounded route diagnostic for a path outside the allowlist', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://api.kilo.ai:backing-token',
+        organizationId: 'org_proxy',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'workspace_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const otherOrganizationId = '22222222-2222-4222-8222-222222222222';
+    try {
+      const proxyHandle = await handle();
+      for (const [method, path, pathShape] of [
+        [
+          'GET',
+          `/api/openrouter/organizations/${otherOrganizationId}/models?apiKey=sk-query-secret`,
+          '/api/openrouter/organizations/:id/models',
+        ],
+        [
+          'DELETE',
+          '/api/openrouter/organizations/org_proxy/models',
+          '/api/openrouter/organizations/:organizationId/models',
+        ],
+      ] as const) {
+        loggerWithFieldsMock.mockClear();
+        const response = await fetchWorker(
+          new Request(`https://worker.test${path}`, {
+            method,
+            headers: { Authorization: `Bearer ${proxyHandle}` },
+          }),
+          env
+        );
+        expect(response.status).toBe(404);
+        expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
+        expect(loggerWithFieldsMock).toHaveBeenCalledWith({
+          logTag: 'runtime_proxy_request_failed',
+          upstreamAttempted: false,
+          rejectionStage: 'route',
+          proxyRoute: 'provider',
+          requestMethod: method,
+          pathShape,
+          sessionId: 'workspace_proxy',
+          kiloSessionId: 'kilo_proxy',
+        });
+        const serialized = JSON.stringify(loggerWithFieldsMock.mock.calls[0]?.[0]);
+        for (const sensitive of [
+          otherOrganizationId,
+          'org_proxy',
+          'apiKey',
+          'sk-query-secret',
+          'backing-token',
+          proxyHandle,
+        ]) {
+          expect(serialized).not.toContain(sensitive);
+        }
+      }
+      expect(upstream).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }

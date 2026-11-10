@@ -54,6 +54,8 @@ import {
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { user_auth_provider } from '@kilocode/db/schema';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
@@ -131,6 +133,124 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
     expect(result).toBe(true);
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(false);
+  });
+
+  it('refuses a provider profile that shares no email address', async () => {
+    setValidTurnstileCookie();
+
+    const result = await signIn({
+      user: { id: 'x', email: null, name: 'CB Discord', image: '' },
+      account: { provider: 'discord', providerAccountId: 'cb-discord-no-email', type: 'oauth' },
+      profile: { verified: true },
+    } as never);
+
+    expect(result).toBe('/users/sign_in?error=EMAIL-REQUIRED');
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('passes autoLink=true for a Discord profile with verified true', async () => {
+    setValidTurnstileCookie();
+
+    const result = await signIn({
+      user: { id: 'x', email: 'cb-discord@example.com', name: 'CB Discord', image: '' },
+      account: { provider: 'discord', providerAccountId: 'cb-discord-id', type: 'oauth' },
+      profile: { verified: true },
+    } as never);
+
+    expect(result).toBe(true);
+    expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(true);
+  });
+
+  it('redirects to the pending link page on an eligible DIFFERENT-OAUTH', async () => {
+    setValidTurnstileCookie();
+    const owner = await insertTestUser({ google_user_email: 'cb-pending@example.com' });
+    mockCreateOrUpdateUser.mockResolvedValueOnce({
+      success: false,
+      error: 'DIFFERENT-OAUTH',
+      targetUserId: owner.id,
+      accountHasVerifiedPrimaryAddress: true,
+      providerAlreadyPresent: false,
+    });
+
+    const result = await signIn({
+      user: { id: 'x', email: 'cb-pending@example.com', name: 'CB Pending', image: '' },
+      account: { provider: 'github', providerAccountId: 'cb-pending-github', type: 'oauth' },
+      profile: { login: 'cbpending' },
+    } as never);
+
+    expect(result).toBe('/users/pending-link');
+    expect(cookieStore.get('pending-auth-link')?.value).toBeTruthy();
+  });
+
+  it('bounces an Apple account link without a session to pending completion', async () => {
+    const owner = await insertTestUser({ google_user_email: 'cb-apple-link@example.com' });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'apple',
+      createdAt: Date.now(),
+    });
+
+    const result = await signIn({
+      user: { id: 'x', email: 'cb-apple-link@example.com', name: 'CB Apple', image: '' },
+      account: { provider: 'apple', providerAccountId: 'cb-apple-link-sub', type: 'oauth' },
+      profile: { email_verified: 'true', email: 'cb-apple-link@example.com' },
+    } as never);
+
+    expect(result).toBe('/api/auth/pending-link/complete');
+    expect(cookieStore.get('pending-auth-link')?.value).toBeTruthy();
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses the Apple bounce when the target already has an Apple method', async () => {
+    const owner = await insertTestUser({ google_user_email: 'cb-apple-dup@example.com' });
+    await db.insert(user_auth_provider).values({
+      kilo_user_id: owner.id,
+      provider: 'apple',
+      provider_account_id: 'cb-apple-existing-sub',
+      email: 'cb-apple-dup@example.com',
+      avatar_url: '',
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'apple',
+      createdAt: Date.now(),
+    });
+
+    const result = await signIn({
+      user: { id: 'x', email: 'cb-apple-dup@example.com', name: 'CB Apple', image: '' },
+      account: { provider: 'apple', providerAccountId: 'cb-apple-new-sub', type: 'oauth' },
+      profile: { email_verified: 'true', email: 'cb-apple-dup@example.com' },
+    } as never);
+
+    expect(result).toBe('/connected-accounts?error=PROVIDER-ALREADY-LINKED');
+    expect(cookieStore.get('pending-auth-link')).toBeUndefined();
+  });
+
+  it('refuses the Apple bounce when the Apple identity belongs to another user', async () => {
+    const owner = await insertTestUser({ google_user_email: 'cb-apple-owner@example.com' });
+    const other = await insertTestUser({ google_user_email: 'cb-apple-other@example.com' });
+    await db.insert(user_auth_provider).values({
+      kilo_user_id: other.id,
+      provider: 'apple',
+      provider_account_id: 'cb-apple-shared-sub',
+      email: 'cb-apple-other@example.com',
+      avatar_url: '',
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'apple',
+      createdAt: Date.now(),
+    });
+
+    const result = await signIn({
+      user: { id: 'x', email: 'cb-apple-owner@example.com', name: 'CB Apple', image: '' },
+      account: { provider: 'apple', providerAccountId: 'cb-apple-shared-sub', type: 'oauth' },
+      profile: { email_verified: 'true', email: 'cb-apple-owner@example.com' },
+    } as never);
+
+    expect(result).toBe('/connected-accounts?error=ACCOUNT-ALREADY-LINKED');
+    expect(cookieStore.get('pending-auth-link')).toBeUndefined();
   });
 
   it('passes autoLink=true for an email (magic link) sign-in', async () => {
@@ -494,21 +614,29 @@ describe('authOptions.callbacks.signIn for Claude', () => {
     jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValueOnce(false);
     setValidTurnstileCookie();
 
-    const result = await claudeSignIn({ email_verified: true });
+    const result = await claudeSignIn({});
 
     expect(result).toEqual(expect.stringContaining('error=UNKNOWN-ERROR'));
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 
-  it('settles an issuer-qualified Claude account using the verified provider email', async () => {
+  it('settles an issuer-qualified Claude account from a token without email_verified', async () => {
     setValidTurnstileCookie();
-    await expect(claudeSignIn({ email_verified: true })).resolves.toBe(true);
+    await expect(claudeSignIn({})).resolves.toBe(true);
     expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('claude-cb@example.com');
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[0]).toMatchObject({
       provider: 'claude',
       provider_account_id: `${CLAUDE_OIDC_ISSUER}#pairwise-sub`,
       hosted_domain: '@@claude@@',
     });
+    // Without a verified-email claim the sign-in must not attach to an account
+    // that already owns this email.
+    expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(false);
+  });
+
+  it('lets a verified-email claim auto-link, like every other provider', async () => {
+    setValidTurnstileCookie();
+    await expect(claudeSignIn({ email_verified: true })).resolves.toBe(true);
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(true);
   });
 
@@ -519,10 +647,11 @@ describe('authOptions.callbacks.signIn for Claude', () => {
         access_token: 'private-access-value',
         id_token: 'private-id-value',
         private_claim: 'private-claim-value',
+        email: undefined,
       });
       expect(warn.mock.calls[0]?.[1]).toMatchObject({
         reason: 'invalid_profile_claims',
-        rejectedClaims: ['email_verified'],
+        rejectedClaims: ['email'],
       });
       const diagnostic = JSON.stringify(warn.mock.calls);
       for (const value of [
@@ -543,21 +672,22 @@ describe('authOptions.callbacks.signIn for Claude', () => {
   });
 
   it.each([
-    {},
+    { email: undefined },
+    { email: null },
+    { email: 'not-an-email' },
+    { email: 'different@kilocode.ai' },
     { email_verified: false },
-    { email_verified: true, email: undefined },
-    { email_verified: true, email: null },
-    { email_verified: 'true' },
-    { email_verified: true, email: 'not-an-email' },
-    { email_verified: true, email: 'different@kilocode.ai' },
-  ])('refuses unverified or mismatched Claude claims before flag evaluation: %s', async profile => {
-    setValidTurnstileCookie();
-    await expect(claudeSignIn(profile)).resolves.toEqual(
-      expect.stringContaining('error=UNKNOWN-ERROR')
-    );
-    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
-    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
-  });
+  ])(
+    'refuses a missing, unverified, or mismatched Claude email before flag evaluation: %s',
+    async profile => {
+      setValidTurnstileCookie();
+      await expect(claudeSignIn(profile)).resolves.toEqual(
+        expect.stringContaining('error=UNKNOWN-ERROR')
+      );
+      expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('Claude explicit linking persistence', () => {
@@ -657,9 +787,18 @@ describe('Claude explicit linking persistence', () => {
   });
 
   it.each(['absent', 'different'])(
-    'requires email verification with an %s link intent',
+    'treats an %s link intent as a plain sign-in that cannot attach the subject',
     async intentState => {
       const link = await prepareLink();
+      // The sign-in email already belongs to another Kilo account, so a plain
+      // sign-in for it must be refused instead of attaching the Claude subject.
+      const email = `external-${randomUUID()}@example.net`;
+      await insertTestUser({ google_user_email: email });
+      setValidTurnstileCookie();
+      mockResolveSsoAuthorityForDomain.mockResolvedValue({
+        status: 'not_required',
+        domain: 'example.net',
+      });
       mockGetAccountLinkingSession
         .mockReset()
         .mockResolvedValue(
@@ -667,9 +806,30 @@ describe('Claude explicit linking persistence', () => {
             ? { existingUserId: link.owner.id, targetProvider: 'google', createdAt: Date.now() }
             : null
         );
-      await expect(link.complete()).resolves.toEqual(
-        expect.stringContaining('error=UNKNOWN-ERROR')
-      );
+      // Settlement finds the existing account that owns this email and another
+      // provider's subject.
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: false,
+        error: 'DIFFERENT-OAUTH',
+        targetUserId: link.owner.id,
+        accountHasVerifiedPrimaryAddress: false,
+        providerAlreadyPresent: true,
+      });
+      const result = await signIn({
+        user: { id: link.subject, email, name: 'External' },
+        account: { provider: 'claude', providerAccountId: link.subject, type: 'oauth' },
+        profile: { sub: link.subject, email },
+      } as never);
+      expect(result).toEqual(expect.stringContaining('error=DIFFERENT-OAUTH'));
+      // A plain sign-in reaches settlement for its own email without the
+      // auto-link step, so it cannot attach the subject to another account.
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(1);
+      expect(mockCreateOrUpdateUser.mock.calls[0]?.[0]).toMatchObject({
+        google_user_email: email,
+        provider_account_id: `${CLAUDE_OIDC_ISSUER}#${link.subject}`,
+      });
+      expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(false);
+      expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
       expect(await link.providers()).toEqual([]);
     }
   );

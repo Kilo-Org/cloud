@@ -20,6 +20,7 @@ import { CloudChatRuntimeProvider } from './CloudChatRuntimeProvider';
 
 type CloudThreadProps = {
   active?: boolean;
+  collapseTools?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
   onOpenPreparationDetails?: (attemptId: string) => void;
@@ -35,6 +36,7 @@ function ChildMessage() {
 }
 /** Uses the host's viewport. Cloud owns follow, anchors and history position. */
 function CloudThreadBody({
+  collapseTools = false,
   getChildMessages,
   onOpenChildSession,
   onOpenPreparationDetails,
@@ -62,6 +64,7 @@ function CloudThreadBody({
   }, [messageComponent, child]);
   const actions = useMemo(
     () => ({
+      collapseTools,
       getChildMessages,
       onOpenChildSession,
       onOpenPreparationDetails,
@@ -86,6 +89,7 @@ function CloudThreadBody({
       ),
     }),
     [
+      collapseTools,
       getChildMessages,
       onOpenChildSession,
       onOpenPreparationDetails,
@@ -113,7 +117,10 @@ export const CloudThread = React.memo(
       <CloudThreadBody {...props} />
     );
   },
-  (previous, next) => previous.active === false && next.active === false
+  (previous, next) =>
+    previous.active === false &&
+    next.active === false &&
+    previous.collapseTools === next.collapseTools
 );
 function CloudThreadWithLiveFacts({
   manager,

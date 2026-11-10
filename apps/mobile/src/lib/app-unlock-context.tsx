@@ -16,7 +16,17 @@ import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 
 // Device-local, not account metadata. The only stored values are enabled/disabled.
 const STORAGE_KEY = 'app-unlock-enabled';
-const BACKGROUND_LOCK_MS = 300_000;
+
+/**
+ * How long the app may stay in the background before the lock engages.
+ *
+ * Exported because it is not only the surface's business: the App Intents
+ * entity catalog answers from a background launch, so the same interval reaches
+ * the native catalog store (`system-search-index-mount.tsx`), which withholds
+ * the stored titles once it has passed. The two readings have to be one number.
+ */
+export const BACKGROUND_LOCK_MS = 300_000;
+
 const nativeResultSchema = z.discriminatedUnion('success', [
   // iOS includes nullable error and warning fields even after success.
   z.strictObject({

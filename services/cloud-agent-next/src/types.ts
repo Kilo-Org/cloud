@@ -465,9 +465,6 @@ export type GitTokenService = {
 
 export type Env = {
   AI?: Ai;
-  CLOUD_AGENT_CONTAINER_BILLING_ENABLED?: string;
-  CLOUD_AGENT_CONTAINER_BILLING_USER_IDS?: string;
-  CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS?: string;
   CONTAINER_BILLING_HEARTBEAT_SECONDS?: string;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
@@ -501,7 +498,7 @@ export type Env = {
   RUNTIME_INTERACTIVE_ORG_IDS?: string;
   /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
   RUNTIME_RELEASE_DESCRIPTOR?: string;
-  /** Comma-separated org UUIDs whose new downloaded sandboxes run the Kilo v2 harness. */
+  /** Comma-separated org UUIDs whose new downloaded cloud-agent-web sandboxes run Kilo v2. */
   RUNTIME_KILO2_ORG_IDS?: string;
   /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
   RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
@@ -552,7 +549,7 @@ export type Env = {
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */
   GITHUB_APP_BOT_USER_ID?: string;
-  /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
+  /** 'true' skips blocked-account admission and the meter's concurrent-container cap marker. Disposable e2e Workers only. */
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** User or organization IDs enrolled in customer-paid Vercel compute. */
   BYOC_VERCEL_IDS?: string;
@@ -571,8 +568,8 @@ export type Env = {
   VERCEL_SANDBOX_RUNTIME?: string;
   VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
-  WORKSPACE_SNAPSHOT_ORG_IDS?: string;
-  WORKSPACE_SNAPSHOT_USER_IDS?: string;
+  /** Comma-separated user or organization IDs allowed workspace snapshots; `*` includes everyone. */
+  WORKSPACE_SNAPSHOT_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

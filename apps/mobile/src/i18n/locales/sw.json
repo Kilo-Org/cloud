@@ -229,6 +229,21 @@
     "signInCodeField": "Msimbo wa kuingia",
     "or": "au"
   },
+  "pendingLink": {
+    "description": "Akaunti tayari inatumia {{email}}. Ingia kwa mojawapo ya njia zake za kuingia ili kuongeza {{provider}}.",
+    "emailCode": "Nitumie msimbo wa kuingia kwa barua pepe",
+    "continueInBrowser": "Endelea kwenye kivinjari",
+    "startAgain": "Anza tena",
+    "expired": "Ombi hili la kuongeza {{provider}} limeisha muda.",
+    "noMethods": "Akaunti hii haina njia nyingine ya kuingia, kwa hivyo {{provider}} haiwezi kuongezwa.",
+    "linked": "{{provider}} imeongezwa kwenye akaunti yako.",
+    "failedExpired": "{{provider}} haikuongezwa kwa sababu ombi liliisha muda.",
+    "failedWrongAccount": "{{provider}} haikuongezwa kwa sababu uliingia kwenye akaunti tofauti.",
+    "failedAccountAlreadyLinked": "{{provider}} haikuongezwa kwa sababu tayari imeunganishwa na akaunti nyingine.",
+    "failedProviderAlreadyLinked": "{{provider}} haikuongezwa kwa sababu akaunti yako tayari ina njia nyingine ya kuingia ya {{provider}}.",
+    "failedLinking": "Imeshindikana kuongeza {{provider}} kwenye akaunti yako.",
+    "notAdded": "Umeingia. {{provider}} haikuongezwa kwenye akaunti yako."
+  },
   "profile": {
     "codeReviewerSubtitle": "Ukaguzi wa kiotomatiki wa PR",
     "securityAgentSubtitle": "Tafuta na urekebishe udhaifu wa usalama",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Thibitisha kufuta",
     "credits": "Salio",
     "failedToLoadBalance": "Imeshindikana kupakia salio. Gusa ili ujaribu tena.",
+    "balanceLoadFailed": "Imeshindikana kupakia salio",
     "hideBalance": "Ficha salio",
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Akaunti ya majaribio",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ya biashara",
     "passkeysTitle": "Vifunguo vya kuingia",
     "passkeysSubtitle": "Ingia bila nenosiri",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Ombi hili la kuunganisha halina mabadiliko ya faili.",
     "fileList": {
       "openNavigator": "Fungua kivinjari cha faili",
-      "filesViewed": "Faili · {{viewed}} kati ya {{total}} zimeangaliwa",
       "listed": "(zimeorodheshwa)",
       "layout": "Mpangilio",
       "unified": "Pamoja",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Maagizo yako na faili zozote zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",
       "discardFailed": "Imeshindikana kufuta rasimu. Tafadhali jaribu tena.",
       "remoteHint": "Ili kuendesha kwenye kompyuta yako, anzisha Kilo hapo na iache ikiendeshwa.",
-      "continueFrom": "Kikao {{title}} kinaendelea.",
+      "continueFrom": "Kikao “{{title}}” kinaendelea.",
       "importingSession": "Inaingiza kikao",
       "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
       "importFailed": "Imeshindikana kuingiza kikao hiki.",
@@ -2560,7 +2577,21 @@
       "thought": "Wazo",
       "showDetails": "Onyesha maelezo",
       "pending": "Inasubiri…",
-      "running": "Inaendelea…"
+      "running": "Inaendelea…",
+      "field": {
+        "filePath": "Njia ya faili",
+        "path": "Njia",
+        "offset": "Kianzio",
+        "limit": "Kikomo",
+        "pattern": "Muundo",
+        "include": "Kujumuisha",
+        "patchText": "Kiraka",
+        "query": "Hoji",
+        "prompt": "Maelekezo",
+        "header": "Kichwa",
+        "question": "Swali",
+        "options": "Chaguo"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Imeshindikana kuonyesha maudhui."
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
     },
-    "creditsRequired": "Salio halitoshi kutuma ujumbe huu, ongeza salio kisha ujaribu tena."
+    "creditsRequired": "Salio halitoshi kutuma ujumbe huu."
   },
   "settingsTools": {
     "confirmTitle": "Thibitisha mabadiliko haya?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Hakuna miktadha iliyowezeshwa kwa ripoti zilizoratibiwa",
     "sourceBlocker": "Kipindi kinahitaji kushughulikiwa",
     "sourceMetadata": "Metadata za kipindi zilizohifadhiwa"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"
   }
 }

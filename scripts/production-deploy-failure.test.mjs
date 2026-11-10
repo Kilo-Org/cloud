@@ -5,29 +5,13 @@ import { runInNewContext } from 'node:vm';
 
 import { load } from 'js-yaml';
 
+import { wiringCommand } from './ci-wiring-suites.mjs';
+
 function readWorkflow(name) {
   return load(readFileSync(new URL(`../.github/workflows/${name}.yml`, import.meta.url), 'utf8'));
 }
 
 const workflow = readWorkflow('notify-production-deploy-failure');
-// ci-wiring runs the wiring suites in one `node --test` invocation; pin the
-// exact command so this suite cannot silently leave the job.
-const wiringSuites = [
-  'scripts/stacked-ci.test.mjs',
-  'scripts/changed-dependencies.test.mjs',
-  'scripts/build-key-inputs.test.mjs',
-  'scripts/ttsc-plugin-key.test.mjs',
-  'scripts/affected-workspaces.test.mjs',
-  'scripts/changed-workspaces.test.mjs',
-  'scripts/changes-filter-retry.test.mjs',
-  'scripts/typecheck-ci.test.mjs',
-  'scripts/deployment-workflows.test.mjs',
-  'scripts/main-workflow-failure.test.mjs',
-  'scripts/production-deploy-failure.test.mjs',
-  'scripts/meta-janitor-approve.test.mjs',
-  'scripts/mobile-sbom-workflow.test.mjs',
-];
-const wiringCommand = `node --test ${wiringSuites.join(' ')}`;
 const job = workflow.jobs.notify;
 const failedRun = {
   name: 'Deploy to Production',
@@ -63,8 +47,9 @@ test('watches completed production deployments on main without checkout or token
   assert.ok(job.steps.every(step => step.uses && !step.uses.includes('checkout')));
 });
 
-test('notifies for the scheduled production failure independently of the failed job', () => {
+test('notifies for the scheduled and CI-triggered production failure independently of the failed job', () => {
   assert.equal(shouldNotify(failedRun), true);
+  assert.equal(shouldNotify({ ...failedRun, event: 'workflow_run' }), true);
   assert.equal(shouldNotify({ ...failedRun, run_attempt: 2 }), true);
   assert.equal(
     readWorkflow('notify-main-failure').on.workflow_run.workflows.includes(failedRun.name),
@@ -78,7 +63,7 @@ for (const conclusion of ['cancelled', 'success', 'skipped', 'neutral', 'timed_o
   });
 }
 
-for (const event of ['push', 'pull_request', 'workflow_dispatch', 'workflow_run']) {
+for (const event of ['push', 'pull_request', 'workflow_dispatch']) {
   test(`does not notify for ${event} deployments`, () => {
     assert.equal(shouldNotify({ ...failedRun, event }), false);
   });
@@ -104,8 +89,8 @@ test('Slack payload links the failed deployment and safely serializes its metada
       },
     }
   );
-  assert.equal(payload.text, `Scheduled production deployment failed on main: ${run.html_url}`);
-  assert.equal(payload.blocks[0].text.text, 'Scheduled production deployment failed');
+  assert.equal(payload.text, `Production deployment failed on main: ${run.html_url}`);
+  assert.equal(payload.blocks[0].text.text, 'Production deployment failed');
   assert.deepEqual(payload.blocks[1].text, { type: 'plain_text', text: run.name });
   assert.deepEqual(payload.blocks[2].fields, [
     { type: 'plain_text', text: 'Branch: main' },

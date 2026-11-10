@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import {
   kilocode_users,
   organizations,
@@ -26,14 +27,29 @@ export type SupportResolution = {
   access: SupportContext | null;
   decision: SupportDecision;
   grantId: string | null;
+  inheritedFromOrganizationId: string | null;
 };
 
 type GrantLookup = {
   id: string;
   actionClass: SupportAccessActionClass;
   expiresAt: string;
+  grantOrganizationId: string;
+  grantOrganizationName: string | null;
 };
 
+const targetOrganization = alias(organizations, 'target_organization');
+const grantOrganization = alias(organizations, 'grant_organization');
+const parentOrganization = alias(organizations, 'parent_organization');
+
+/**
+ * An active grant on the target organization, or on its live direct parent,
+ * admits the target. Target liveness, the parent link, parent liveness, and
+ * the grant are all read in one statement, so a detach or a soft delete that
+ * lands between checks cannot admit a child. The order prefers an exact
+ * action-class match, then a grant on the organization itself over an
+ * inherited one, then the longest remaining lifetime.
+ */
 async function findUsableGrant(params: {
   actorKiloUserId: string;
   organizationId: string;
@@ -44,47 +60,95 @@ async function findUsableGrant(params: {
       id: support_access_grants.id,
       actionClass: support_access_grants.action_class,
       expiresAt: support_access_grants.expires_at,
+      grantOrganizationId: support_access_grants.organization_id,
+      grantOrganizationName: grantOrganization.name,
     })
     .from(support_access_grants)
     .innerJoin(kilocode_users, eq(kilocode_users.id, support_access_grants.actor_kilo_user_id))
-    .innerJoin(organizations, eq(organizations.id, support_access_grants.organization_id))
+    .innerJoin(
+      targetOrganization,
+      and(eq(targetOrganization.id, params.organizationId), isNull(targetOrganization.deleted_at))
+    )
+    .innerJoin(
+      grantOrganization,
+      and(
+        eq(grantOrganization.id, support_access_grants.organization_id),
+        isNull(grantOrganization.deleted_at)
+      )
+    )
+    .leftJoin(
+      parentOrganization,
+      and(
+        eq(parentOrganization.id, targetOrganization.parent_organization_id),
+        isNull(parentOrganization.deleted_at)
+      )
+    )
     .where(
       and(
         eq(support_access_grants.actor_kilo_user_id, params.actorKiloUserId),
-        eq(support_access_grants.organization_id, params.organizationId),
         eq(support_access_grants.status, 'active'),
         sql`${support_access_grants.expires_at} > now()`,
         eq(kilocode_users.is_admin, true),
         isNull(kilocode_users.blocked_reason),
-        isNull(organizations.deleted_at)
+        or(
+          eq(grantOrganization.id, targetOrganization.id),
+          eq(grantOrganization.id, parentOrganization.id)
+        )
       )
     )
     .orderBy(
       sql`${support_access_grants.action_class} = ${params.requiredActionClass} DESC`,
+      sql`(${support_access_grants.organization_id} = ${params.organizationId}) DESC`,
       desc(support_access_grants.expires_at)
     )
     .limit(1);
 
   return row && row.expiresAt !== null
-    ? { id: row.id, actionClass: row.actionClass, expiresAt: row.expiresAt }
+    ? {
+        id: row.id,
+        actionClass: row.actionClass,
+        expiresAt: row.expiresAt,
+        grantOrganizationId: row.grantOrganizationId,
+        grantOrganizationName: row.grantOrganizationName,
+      }
     : null;
 }
 
 /**
  * Distinguishes an expired or revoked grant from "never requested" so the
- * caller can return a specific cause code, per the Failure UX rule.
+ * caller can return a specific cause code, per the Failure UX rule. A grant on
+ * the target's still-linked, live direct parent counts, so a lapsed inherited
+ * grant reports the same reason as a lapsed direct one; a deleted parent's
+ * lapsed grant does not.
  */
 export async function latestSupportGrantStatus(params: {
   actorKiloUserId: string;
   organizationId: string;
 }): Promise<'expired' | 'revoked' | null> {
+  const [target] = await db
+    .select({ parentOrganizationId: organizations.parent_organization_id })
+    .from(organizations)
+    .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  const organizationIds = [params.organizationId];
+  if (target?.parentOrganizationId) {
+    const [parent] = await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(
+        and(eq(organizations.id, target.parentOrganizationId), isNull(organizations.deleted_at))
+      )
+      .limit(1);
+    if (parent) organizationIds.push(target.parentOrganizationId);
+  }
+
   const [row] = await db
     .select({ status: support_access_grants.status })
     .from(support_access_grants)
     .where(
       and(
         eq(support_access_grants.actor_kilo_user_id, params.actorKiloUserId),
-        eq(support_access_grants.organization_id, params.organizationId),
+        inArray(support_access_grants.organization_id, organizationIds),
         inArray(support_access_grants.status, ['expired', 'revoked'])
       )
     )
@@ -107,10 +171,20 @@ export async function evaluateSupportAccess(params: {
   supportActionId: string | null;
 }): Promise<SupportResolution> {
   if (params.key === null) {
-    return { access: null, decision: 'deny_not_allowlisted', grantId: null };
+    return {
+      access: null,
+      decision: 'deny_not_allowlisted',
+      grantId: null,
+      inheritedFromOrganizationId: null,
+    };
   }
   if (isSupportNeverKey(params.key)) {
-    return { access: null, decision: 'deny_never_list', grantId: null };
+    return {
+      access: null,
+      decision: 'deny_never_list',
+      grantId: null,
+      inheritedFromOrganizationId: null,
+    };
   }
   const grant = await findUsableGrant({
     actorKiloUserId: params.actorKiloUserId,
@@ -118,24 +192,46 @@ export async function evaluateSupportAccess(params: {
     requiredActionClass: params.requiredActionClass,
   });
   if (!grant) {
-    return { access: null, decision: 'deny_no_grant', grantId: null };
+    return {
+      access: null,
+      decision: 'deny_no_grant',
+      grantId: null,
+      inheritedFromOrganizationId: null,
+    };
   }
 
+  const inheritedFromOrganizationId =
+    grant.grantOrganizationId === params.organizationId ? null : grant.grantOrganizationId;
   const entry = findSupportAllowEntry({
     surface: params.surface,
     key: params.key,
     actionClass: params.requiredActionClass,
   });
   if (!entry) {
-    return { access: null, decision: 'deny_not_allowlisted', grantId: grant.id };
+    return {
+      access: null,
+      decision: 'deny_not_allowlisted',
+      grantId: grant.id,
+      inheritedFromOrganizationId,
+    };
   }
   const grantSatisfies =
     params.requiredActionClass === 'support_read' || grant.actionClass === 'support_write';
   if (!grantSatisfies) {
-    return { access: null, decision: 'deny_action_class', grantId: grant.id };
+    return {
+      access: null,
+      decision: 'deny_action_class',
+      grantId: grant.id,
+      inheritedFromOrganizationId,
+    };
   }
   if (!supportEntrySatisfiesRoles(entry, params.roles)) {
-    return { access: null, decision: 'deny_action_class', grantId: grant.id };
+    return {
+      access: null,
+      decision: 'deny_action_class',
+      grantId: grant.id,
+      inheritedFromOrganizationId,
+    };
   }
 
   const inventory = findPrivilegedInventoryEntry({
@@ -153,9 +249,13 @@ export async function evaluateSupportAccess(params: {
       expiresAt: grant.expiresAt,
       supportActionId: params.supportActionId ?? params.key,
       inventoryId: inventory?.id ?? null,
+      inheritedFromOrganizationId,
+      inheritedFromOrganizationName:
+        inheritedFromOrganizationId === null ? null : grant.grantOrganizationName,
     },
     decision: 'support_grant',
     grantId: grant.id,
+    inheritedFromOrganizationId,
   };
 }
 
@@ -177,13 +277,17 @@ export async function organizationState(
 }
 
 /**
- * Usage evidence for an admitted write. Best-effort: an evidence insert must
- * never turn an otherwise authorized write into a failure.
+ * Usage evidence for an admitted write. The event's `organization_id` names
+ * the organization the grant belongs to (the live parent for an inherited
+ * grant), matching the grant it references; `targetOrganizationId` records the
+ * child organization that was actually written. Best-effort: an evidence
+ * insert must never turn an otherwise authorized write into a failure.
  */
 export async function recordSupportWriteUse(params: {
   grantId: string;
   actorKiloUserId: string;
-  organizationId: string;
+  grantOrganizationId: string;
+  targetOrganizationId: string;
   supportActionId: string;
 }): Promise<void> {
   try {
@@ -191,9 +295,12 @@ export async function recordSupportWriteUse(params: {
       grant_id: params.grantId,
       event_type: 'used_write',
       performed_by_kilo_user_id: params.actorKiloUserId,
-      organization_id: params.organizationId,
+      organization_id: params.grantOrganizationId,
       action_class: 'support_write',
-      metadata: { supportActionId: params.supportActionId },
+      metadata: {
+        supportActionId: params.supportActionId,
+        targetOrganizationId: params.targetOrganizationId,
+      },
     });
   } catch {
     warnWriteEvidenceFailure('Support write evidence could not be recorded; continuing');

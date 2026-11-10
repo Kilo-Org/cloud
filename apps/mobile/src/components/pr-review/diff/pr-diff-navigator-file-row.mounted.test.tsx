@@ -135,3 +135,27 @@ describe('NavigatorFileRow path under an RTL interface', () => {
     expect(basename?.props.children).toBe(`${LTR_ISOLATE_OPEN}README.md${LTR_ISOLATE_CLOSE}`);
   });
 });
+
+const ADDITIONS_RUN = `${LTR_ISOLATE_OPEN}+3${LTR_ISOLATE_CLOSE}`;
+const DELETIONS_RUN = `${LTR_ISOLATE_OPEN}-1${LTR_ISOLATE_CLOSE}`;
+
+describe('NavigatorFileRow diff stats under an RTL interface', () => {
+  it('keeps each signed count in its own isolated left-to-right run', () => {
+    mountRow('src/greeting.ts');
+    if (!renderer) {
+      throw new Error('the row did not render');
+    }
+    // Each count is its own run, so the sign must be isolated inside it: the
+    // RTL paragraph would otherwise move the neutral sign behind the number.
+    const hosts = renderer.root.findAll(
+      node => Object.is(node.type, 'Text') && typeof node.props.children === 'string'
+    );
+    const additions = hosts.find(node => node.props.children === ADDITIONS_RUN);
+    const deletions = hosts.find(node => node.props.children === DELETIONS_RUN);
+
+    expect(additions?.props.className).toContain('text-muted-foreground');
+    expect(additions?.props.className).toContain('text-xs');
+    expect(deletions?.props.className).toContain('text-muted-foreground');
+    expect(deletions?.props.className).toContain('text-xs');
+  });
+});

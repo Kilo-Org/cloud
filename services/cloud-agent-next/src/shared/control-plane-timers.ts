@@ -22,6 +22,8 @@ export type ControlPlaneTimers = {
   sandbox: {
     providerCreateMs: number;
     providerCreateRetryMs: number;
+    billingAdmissionMs: number;
+    billingAdmissionMinimumMs: number;
     wrapperFirstConnectMs: number;
     wrapperHelloMs: number;
     heartbeatMs: number;
@@ -33,6 +35,8 @@ export type ControlPlaneTimers = {
     providerLeaseMs: number;
     credentialGrantMs: number;
     credentialGrantReissueBelowMs: number;
+    /** Wait before the alarm retries a failed renewal while the grant is still valid. */
+    credentialGrantRenewalRetryMs: number;
     /** Bounds one member's backing renewal during scope-handle resolution. */
     scopeBackingTokenMs: number;
     providerStopAttemptMs: number;
@@ -115,6 +119,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     providerCreateRetryMs: PROVIDER_CREATE_RETRY_MS,
     wrapperFirstConnectMs: WRAPPER_FIRST_CONNECT_MS,
     wrapperHelloMs: WRAPPER_HELLO_MS,
+    billingAdmissionMs: MINUTE_MS,
+    billingAdmissionMinimumMs: 1_000,
     heartbeatMs: ms(45_000),
     reconnectMs: ms(90_000),
     routePreparationMs: ROUTE_PREPARATION_MS,
@@ -123,8 +129,11 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     // Bounds one Sandbox -> Session notification; real (not scaled) like the
     // other bounds on external work.
     sessionNotifyDeadlineMs: 2_000,
+    // Grants are renewed from the alarm and on `deliver` below the threshold, so
+    // their lease does not bound how long one native execution may run.
     credentialGrantMs: 4 * HOUR_MS,
     credentialGrantReissueBelowMs: HOUR_MS,
+    credentialGrantRenewalRetryMs: 5 * MINUTE_MS,
     // Bounds external token renewal, so it stays real and short enough for the
     // Session DO's total scope-resolution bound.
     scopeBackingTokenMs: 3_000,
@@ -151,7 +160,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     // Allow transient reclaim to clear while bounding a sustained memory stall.
     kiloMemoryHoldMs: ms(2 * MINUTE_MS),
     noProgressMs: ms(20 * MINUTE_MS),
-    turnHardCapMs: ms(120 * MINUTE_MS),
+    turnHardCapMs: ms(12 * HOUR_MS),
     reconnectBackoffMinMs: ms(1_000),
     reconnectBackoffMaxMs: ms(30_000),
   };

@@ -229,6 +229,21 @@
     "signInCodeField": "Koodii seensaa",
     "or": "ykn"
   },
+  "pendingLink": {
+    "description": "Herregni tokko duraanuu {{email}} fayyadama. {{provider}} dabaluuf mala seensaa isaa keessaa tokkoon seeni.",
+    "emailCode": "Koodii seensaa imeeliidhaan naaf ergi",
+    "continueInBrowser": "Biraawzarii keessatti itti fufi",
+    "startAgain": "Irra deebi'ii jalqabi",
+    "expired": "Gaaffiin {{provider}} dabaluu kun yeroon isaa darbeera.",
+    "noMethods": "Herregni kun mala seensaa biraa hin qabu, kanaaf {{provider}} dabaluun hin danda'amu.",
+    "linked": "{{provider}} herrega keetti dabalameera.",
+    "failedExpired": "Gaaffiin yeroon isaa waan darbeef {{provider}} hin dabalamne.",
+    "failedWrongAccount": "Herrega biraatti waan seenteef {{provider}} hin dabalamne.",
+    "failedAccountAlreadyLinked": "{{provider}} duraanuu herrega biraa waliin waan walqabateef hin dabalamne.",
+    "failedProviderAlreadyLinked": "Herregni kee duraanuu seensa {{provider}} biraa waan qabuuf {{provider}} hin dabalamne.",
+    "failedLinking": "{{provider}} herrega keetti dabaluun hin danda'amne.",
+    "notAdded": "Seentee jirta. {{provider}} herrega keetti hin dabalamne."
+  },
   "profile": {
     "codeReviewerSubtitle": "Sakatta'iinsa PR ofumaan raawwatamu",
     "securityAgentSubtitle": "Hanqinoota nageenyaa barbaadiitii sirreessi",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Haquu mirkaneessi",
     "credits": "Kiriiditii",
     "failedToLoadBalance": "Haftee fe'uu hin danda'amne. Deebi'anii yaaluuf tuqi.",
+    "balanceLoadFailed": "Haftee fe'uu hin danda'amne",
     "hideBalance": "Haftee dhoksi",
     "showBalance": "Haftee agarsiisi",
     "balanceHidden": "Hafteen dhokateera",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Herrega yaalii",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO dhaabbataa",
     "passkeysTitle": "Furtuu seenii",
     "passkeysSubtitle": "Jecha darbii malee seeni",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Gaaffiin walitti makuu kun jijjiirama faayilii hin qabu.",
     "fileList": {
       "openNavigator": "Tarree faayilootaa bani",
-      "filesViewed": "Faayiloota · {{total}} keessaa {{viewed}} ilaalaman",
       "listed": "(tarreeffame)",
       "layout": "Teessuma",
       "unified": "Walitti makame",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Gaaffiin kee fi faayiloonni ol fe'aman kan ergaa ergametti hin qabachiifamne ni haqamu.",
       "discardFailed": "Wixinee haquu hin danda'amne. Deebi'ii yaali.",
       "remoteHint": "Kompiitara kee irratti hojjechuuf, Kilo baniitii akka itti fufu hafi.",
-      "continueFrom": "{{title}} itti fufaa jira.",
+      "continueFrom": "“{{title}}” itti fufaa jira.",
       "importingSession": "Turtii galchaa jira",
       "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",
       "importFailed": "Turtii kana galchuu hin danda'amne.",
@@ -2560,7 +2577,21 @@
       "thought": "Yaada",
       "showDetails": "Ibsa agarsiisi",
       "pending": "Eegachaa jira…",
-      "running": "Hojjechaa jira…"
+      "running": "Hojjechaa jira…",
+      "field": {
+        "filePath": "Daandii faayilii",
+        "path": "Daandii",
+        "offset": "Lakkoofsa jalqabaa",
+        "limit": "Daangaa",
+        "pattern": "Fakkaataa",
+        "include": "Dabalata",
+        "patchText": "Barreeffama sirreeffamaa",
+        "query": "Gaaffii barbaacha",
+        "prompt": "Qajeelfama",
+        "header": "Mataduree",
+        "question": "Gaaffii",
+        "options": "Filannoo"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Qabiyyee agarsiisuu hin danda'amne."
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Moodeelli kun sadarkaa xiinxalaa ni deeggara"
     },
-    "creditsRequired": "Kiriiditiin ergaa kanaa erguuf gahaa miti. Kiriiditii dabaliitii irra deebi'ii yaali."
+    "creditsRequired": "Kiriiditiin ergaa kanaa erguuf gahaa miti."
   },
   "settingsTools": {
     "confirmTitle": "Jijjiirama kana mirkaneessuu?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Gabaasota saganteeffamaniif haalawwan dandeessifaman hin jiran",
     "sourceBlocker": "Taa'umsi xiyyeeffannoo barbaada",
     "sourceMetadata": "Meetadaataa taa'umsaa galmaa'e"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Bu'aa barbaachuu kana banuun hin danda'amne"
   }
 }

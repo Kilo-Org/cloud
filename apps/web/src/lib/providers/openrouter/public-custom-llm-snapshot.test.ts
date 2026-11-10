@@ -89,7 +89,7 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
     ['amazon-bedrock', 'Amazon Bedrock'],
     ['meituan', 'Meituan LongCat'],
     ['boundless', 'Boundless'],
-    ['particle', 'Particle'],
+    ['particle', 'Particle AI'],
     ['runinfra', 'RunInfra'],
     ['runware', 'Runware'],
   ])('normalizes the synthesized provider name for %s', (slug, name) => {

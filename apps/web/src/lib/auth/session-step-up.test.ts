@@ -131,7 +131,7 @@ describe('session step-up ceremony', () => {
     );
   });
 
-  it('mints a 15 minute session proof bound to the session hash', async () => {
+  it('mints a 30 minute session proof bound to the session hash', async () => {
     const user = await createAdmin({ web_session_pepper: 'session-pepper' });
     const authenticator = createTestAuthenticator();
     await insertCredential(user.id, authenticator);
@@ -156,8 +156,8 @@ describe('session step-up ceremony', () => {
     expect(proof.session_id_hash).toBe(hashWebSessionId(webSessionId));
     expect(proof.action_binding_hash).toBeNull();
     const ttlMinutes = (new Date(proof.expires_at).getTime() - Date.now()) / 60_000;
-    expect(ttlMinutes).toBeGreaterThan(14.9);
-    expect(ttlMinutes).toBeLessThan(15.1);
+    expect(ttlMinutes).toBeGreaterThan(29.9);
+    expect(ttlMinutes).toBeLessThan(30.1);
   });
 
   it('refuses a user-presence-only assertion', async () => {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import path from 'node:path';
 import { selectedRuntimeCli } from '../../../src/shared/runtime-distribution.js';
 import { fetchKiloServer, type KiloServer } from '../kilo-server-auth.js';
 import { createKilo2Harness } from './kilo2-harness.js';
@@ -58,6 +59,16 @@ export function kilo2RuntimeEnvironment(env: Record<string, string>): Record<str
     .record(z.string(), z.unknown())
     .parse(JSON.parse(env.KILO_CONFIG_CONTENT ?? '{}'));
   delete config.indexing;
+  // V2 does not discover legacy rules. Reuse the workspace's files as one
+  // configured source, leaving repository AGENTS.md discovery and V1 unchanged.
+  if (env.HOME) {
+    config.instructions = [
+      ...new Set([
+        ...z.array(z.string()).parse(config.instructions ?? []),
+        path.join(env.HOME, '.kilocode', 'rules', '*.md'),
+      ]),
+    ];
+  }
   const provider = z
     .object({
       kilo: z
@@ -85,6 +96,7 @@ export function kilo2RuntimeEnvironment(env: Record<string, string>): Record<str
   return {
     ...env,
     KILO_CONFIG_CONTENT: JSON.stringify(config),
+    OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
     ...(nativeGateway ? { KILO_AI_GATEWAY_URL: nativeGateway } : {}),
   };
 }

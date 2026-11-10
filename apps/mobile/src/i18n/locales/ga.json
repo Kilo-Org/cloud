@@ -229,6 +229,21 @@
     "signInCodeField": "Cód sínithe isteach",
     "or": "nó"
   },
+  "pendingLink": {
+    "description": "Tá {{email}} in úsáid ag cuntas cheana. Sínigh isteach le ceann dá mhodhanna chun {{provider}} a chur leis.",
+    "emailCode": "Seol cód sínithe isteach chugam i ríomhphost",
+    "continueInBrowser": "Lean ar aghaidh sa bhrabhsálaí",
+    "startAgain": "Tosaigh arís",
+    "expired": "Tá an t-iarratas seo chun {{provider}} a chur leis imithe in éag.",
+    "noMethods": "Níl aon mhodh sínithe isteach eile ag an gcuntas seo, mar sin ní féidir {{provider}} a chur leis.",
+    "linked": "Cuireadh {{provider}} le do chuntas.",
+    "failedExpired": "Níor cuireadh {{provider}} leis mar go ndeachaigh an t-iarratas in éag.",
+    "failedWrongAccount": "Níor cuireadh {{provider}} leis mar gur shínigh tú isteach i gcuntas eile.",
+    "failedAccountAlreadyLinked": "Níor cuireadh {{provider}} leis mar go bhfuil sé nasctha le cuntas eile cheana.",
+    "failedProviderAlreadyLinked": "Níor cuireadh {{provider}} leis mar go bhfuil síniú isteach {{provider}} eile ag do chuntas cheana.",
+    "failedLinking": "Níorbh fhéidir {{provider}} a chur le do chuntas.",
+    "notAdded": "Tá tú sínithe isteach. Níor cuireadh {{provider}} le do chuntas."
+  },
   "profile": {
     "codeReviewerSubtitle": "Athbhreithnithe PR uathoibríocha",
     "securityAgentSubtitle": "Aimsigh agus réitigh leochaileachtaí",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Deimhnigh scriosadh",
     "credits": "Creidmheasanna",
     "failedToLoadBalance": "Níorbh fhéidir an t-iarmhéid a lódáil. Tapáil chun triail eile a bhaint as.",
+    "balanceLoadFailed": "Níorbh fhéidir an t-iarmhéid a lódáil",
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Cuntas tástála",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO fiontair",
     "passkeysTitle": "Eochracha rochtana",
     "passkeysSubtitle": "Sínigh isteach gan phasfhocal",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Níl aon athrú ar chomhaid san iarratas tarraingthe seo.",
     "fileList": {
       "openNavigator": "Oscail an loingseoir comhad",
-      "filesViewed": "Comhaid · {{viewed}} de {{total}} feicthe",
       "listed": "(liostaithe)",
       "layout": "Leagan amach",
       "unified": "Aontaithe",
@@ -2534,7 +2551,7 @@
       "discardWithUploadsMessage": "Scriosfar do leid agus aon chomhad uaslódáilte nach bhfuil ceangailte le teachtaireacht sheolta.",
       "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil.",
       "remoteHint": "Chun rith ar do ríomhaire féin, tosaigh Kilo ansin agus fág ar siúl é.",
-      "continueFrom": "Táthar ag leanúint ar aghaidh le {{title}}.",
+      "continueFrom": "Táthar ag leanúint ar aghaidh le “{{title}}”.",
       "importingSession": "Ag iompórtáil an tseisiúin",
       "cliCannotContinue": "Ní féidir leis an CLI seo leanúint ar aghaidh le seisiún. Roghnaigh Cloud Agent nó CLI eile.",
       "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
@@ -2698,7 +2715,21 @@
       "thought": "Machnamh",
       "showDetails": "Taispeáin sonraí",
       "pending": "Ar feitheamh…",
-      "running": "Ar siúl…"
+      "running": "Ar siúl…",
+      "field": {
+        "filePath": "Conair comhaid",
+        "path": "Conair",
+        "offset": "Fritháireamh",
+        "limit": "Teorainn",
+        "pattern": "Patrún",
+        "include": "Cuimsiú",
+        "patchText": "Téacs paiste",
+        "query": "Fiosrú",
+        "prompt": "Leid",
+        "header": "Ceannteideal",
+        "question": "Ceist",
+        "options": "Roghanna"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Níorbh fhéidir an t-ábhar a thaispeáint."
@@ -3970,7 +4001,7 @@
     "reasoningEffort": {
       "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"
     },
-    "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh. Cuir creidmheasanna leis agus bain triail eile as."
+    "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh."
   },
   "settingsTools": {
     "confirmTitle": "An bhfuil tú cinnte faoin athrú seo?"
@@ -4441,5 +4472,8 @@
     "noEnabledContexts": "Níl aon chomhthéacsanna cumasaithe le haghaidh tuarascálacha sceidealaithe",
     "sourceBlocker": "Tá aird de dhíth ar an seisiún",
     "sourceMetadata": "Meiteashonraí seisiúin gafa"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Níorbh fhéidir an toradh cuardaigh seo a oscailt"
   }
 }

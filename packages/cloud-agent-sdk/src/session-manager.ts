@@ -3215,6 +3215,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       },
       onEvent: event => {
+        if (event.type === 'cloud.message.failed' && !open.resolvedFailures.has(event.messageId)) {
+          store.set(billingFailureAtom, event.billingFailure ?? null);
+        } else if (
+          event.type === 'cloud.message.queued' ||
+          event.type === 'cloud.message.sent' ||
+          event.type === 'cloud.message.completed'
+        ) {
+          store.set(billingFailureAtom, null);
+        }
         const session = getSession();
         const eventSessionId = chatEventSessionId(event);
         if (eventSessionId !== null) {
@@ -3324,20 +3333,26 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // is the visibility ('primary'|'subagent'|'all') and must not be used
           // as the picker's selected mode.
           const currentConfig = store.get(sessionConfigAtom);
+          if (!currentConfig) return;
+          const nextConfig = {
+            ...currentConfig,
+            mode: event.info.agent,
+            ...(canApplyMessageObservation &&
+            !(activeSessionType === 'cloud-agent' && store.get(cloudAgentModelOverrideAtom))
+              ? {
+                  model: event.info.modelID,
+                  providerID: event.info.providerID,
+                  variant: event.info.variant ?? null,
+                }
+              : {}),
+          };
           if (
-            currentConfig &&
-            (currentConfig.model !== event.info.modelID ||
-              currentConfig.providerID !== event.info.providerID ||
-              currentConfig.mode !== event.info.agent ||
-              currentConfig.variant !== (event.info.variant ?? null))
+            currentConfig.model !== nextConfig.model ||
+            currentConfig.providerID !== nextConfig.providerID ||
+            currentConfig.mode !== nextConfig.mode ||
+            currentConfig.variant !== nextConfig.variant
           ) {
-            store.set(sessionConfigAtom, {
-              ...currentConfig,
-              model: event.info.modelID,
-              providerID: event.info.providerID,
-              mode: event.info.agent,
-              variant: event.info.variant ?? null,
-            });
+            store.set(sessionConfigAtom, nextConfig);
           }
         }
       },
@@ -3553,12 +3568,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           : {}),
       };
     } else {
-      // Prefer the in-session cloud-agent override over the payload so a stale
-      // composer model cannot bypass the manager's single source of truth.
-      const cloudModel = cloudAgentModelOverride?.model ?? input.payload.model;
-      const cloudVariant = cloudAgentModelOverride
-        ? cloudAgentModelOverride.variant
-        : input.payload.variant;
+      const sessionConfigAtSend = store.get(sessionConfigAtom);
+      const payloadMode = input.payload.mode;
+      const runtimeAgent = payloadMode
+        ? sessionConfigAtSend?.runtimeAgents?.find(agent => agent.slug === payloadMode)
+        : undefined;
+      const pinnedModel = runtimeAgent?.model?.trim() || undefined;
+      const pinnedVariant = pinnedModel ? runtimeAgent?.variant?.trim() || undefined : undefined;
+      const cloudModel = pinnedModel ?? cloudAgentModelOverride?.model ?? input.payload.model;
+      const cloudVariant = pinnedModel
+        ? pinnedVariant
+        : cloudAgentModelOverride
+          ? cloudAgentModelOverride.variant
+          : input.payload.variant;
       transportPayload = {
         type: 'prompt',
         prompt: input.payload.prompt,

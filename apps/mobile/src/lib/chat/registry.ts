@@ -11,6 +11,7 @@ import {
   type PartDraft,
   type SessionHandle,
   ToolMissingError,
+  type Turn,
 } from '@kilocode/harness-sdk';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
@@ -20,6 +21,7 @@ import {
   change,
   CHAT_UNAVAILABLE_KEY,
   type ChatTarget,
+  type Displaced,
   forgetState,
   moveState,
   NOTHING,
@@ -39,12 +41,17 @@ import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
 import {
+  type Asked,
   askedIn,
   forgetAsked,
+  keptIn,
   migrateAsked,
-  moveAsked,
+  moveQuestions,
+  newKeptId,
   recordAskedFailure,
   rememberAsked,
+  rememberFirstQuestion,
+  replaceKept,
 } from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
 import {
@@ -95,9 +102,17 @@ type ChatContext = ManagedRuntime.ManagedRuntime.Services<ChatRuntime>;
  */
 type Waiting = Question & ChatTarget;
 
-/** What the screen draws of the line: the questions, without the models they go to. */
+/**
+ * What the screen draws of the line: the questions, without the models they go
+ * to. A question asked again keeps the record it came from, so its bubble stays
+ * the one already in the transcript rather than a second copy at the bottom.
+ */
 const questionsIn = (waiting: readonly Waiting[]): readonly Question[] =>
-  waiting.map(one => ({ text: one.text, images: one.images }));
+  waiting.map(one => ({
+    text: one.text,
+    images: one.images,
+    ...(one.from == null ? {} : { from: one.from }),
+  }));
 
 /** A chat that is open: the session behind it, and what it is doing. */
 type Chat = {
@@ -130,6 +145,16 @@ type Chat = {
 };
 
 const chats = new Map<string, Chat>();
+
+/**
+ * The kept questions a press is asking right now.
+ *
+ * Asking one is asynchronous before the slot holds it, and two presses in quick
+ * succession would otherwise queue the same question behind itself. It is the
+ * record's identifier rather than its words: two attempts can say the same
+ * thing, and only one of them was pressed.
+ */
+const askingKept = new Set<string>();
 
 /**
  * One operation at a time per chat: opening one, and letting one go.
@@ -458,6 +483,34 @@ async function openOrMissing<E>(
   throw failure instanceof Error ? failure : new Error(Cause.pretty(exit.cause).slice(0, 300));
 }
 
+/**
+ * Reads the two records of a chat's unanswered questions and folds the ones the
+ * conversation has already answered, writing that away.
+ *
+ * The kept list is written before the slot's record goes, the same order an
+ * answer clears them in: a refused write leaves both records, and the next open
+ * folds them again. Dropping the slot first would lose the only record that
+ * names the kept one.
+ */
+async function openRecords(sessionId: string, turns: readonly Turn[]) {
+  const [stored, written] = await Promise.all([askedIn(sessionId), keptIn(sessionId)]);
+  const folded = settledRecords(turns, stored, written);
+  if (folded.asked !== stored || folded.kept !== written) {
+    try {
+      if (folded.kept !== written) {
+        await replaceKept(sessionId, folded.kept);
+      }
+      if (folded.asked === null) {
+        await forgetAsked(sessionId);
+      }
+    } catch {
+      /* The records stay as they were; the open still draws them folded, and the
+         next open repairs them. */
+    }
+  }
+  return folded;
+}
+
 async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   /* The row is what says whose chat this is. It is read on the same handle the
      rest of the open reads, before the session, its servers or its history are
@@ -486,8 +539,11 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
     const current = await onto(place, sessionId, {
       tools: await chatToolNames(organizationIdOf(place.org), sessionId, storedModel ?? ''),
     });
+    const moved = chats.get(current);
+    const history =
+      moved === undefined ? [] : await runtime.runPromise(moved.handle.history).catch(() => []);
+    const { asked, kept } = await openRecords(current, history);
     const database = await open();
-    const asked = await askedIn(current);
     change(current, {
       model: modelOfSession(database, current) ?? '',
       effort: effortOfSession(database, current),
@@ -495,6 +551,11 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
       askedEffort: asked?.effort ?? null,
+      /* The slot's question names the kept record it asks again, when it is a
+         retry: that record is the bubble, so it stays in the transcript where
+         it was said and the slot draws no second one. */
+      askedFrom: asked?.from ?? null,
+      displaced: kept,
       status: 'idle',
       failed: null,
       failureKey: asked?.failureKey ?? null,
@@ -505,7 +566,10 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   const { handle, scope } = opened;
   try {
     const turns = await runtime.runPromise(handle.history);
-    const asked = await askedIn(sessionId);
+    /* A question asked again can leave either of its two records behind when a
+       write was refused; the stored turns say which of them the conversation has
+       already answered. */
+    const { asked, kept } = await openRecords(sessionId, turns);
     const database = await open();
     chats.set(sessionId, {
       handle,
@@ -526,6 +590,11 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       asked: asked?.text ?? null,
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
+      /* The slot's question names the kept record it asks again, when it is a
+         retry: that record is the bubble, so it stays in the transcript where
+         it was said and the slot draws no second one. */
+      askedFrom: asked?.from ?? null,
+      displaced: kept,
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
       failureKey: asked?.failureKey ?? null,
@@ -537,6 +606,71 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
        holds, so its scope is closed here or it leaks. */
     await runtime.runPromise(Scope.close(scope, Exit.void));
     throw error;
+  }
+}
+
+/**
+ * Keeps the question that has no answer in the transcript when a later one takes
+ * its slot: the words, the images, the model it was asked of, and how many turns
+ * came before it, so it is drawn where it was said rather than at the top.
+ *
+ * Its bubble carries the same failure footer and Copy to composer it had in the
+ * slot, and a Retry that asks it again.
+ */
+async function keepAsked(sessionId: string): Promise<void> {
+  const held = snapshotOf(sessionId);
+  /* A question that is still being answered has not failed yet: the slot holds
+     the attempt in progress, and only a question the chat has stopped working
+     on has a bubble to keep. */
+  if (held.asked === null || held.status !== 'idle') {
+    return;
+  }
+  const outcome: Displaced['outcome'] = held.failureKey === null ? 'stopped' : 'failed';
+  const askedFrom = held.askedFrom;
+  if (askedFrom !== null) {
+    /* It is already in the transcript, where it was said. This attempt is the
+       one its bubble stands for now, so only how it ended is written down. */
+    change(sessionId, {
+      displaced: held.displaced.map(one => (one.id === askedFrom ? { ...one, outcome } : one)),
+      asked: null,
+      askedImages: [],
+      askedModel: null,
+      askedEffort: null,
+      askedFrom: null,
+    });
+    try {
+      await replaceKept(sessionId, snapshotOf(sessionId).displaced);
+    } catch {
+      /* The bubble keeps the ending it had; a refused write costs a restart. */
+    }
+    return;
+  }
+  /* The bubble goes on screen first, so a refused write cannot take it away
+     from the reader. The identifier is made here rather than read from the
+     list: a question the list does not hold yet cannot take one another
+     question already has. */
+  const stored: Displaced = {
+    id: newKeptId(),
+    text: held.asked,
+    images: held.askedImages,
+    model: held.askedModel ?? held.model,
+    effort: held.askedEffort,
+    afterTurns: held.turns.length,
+    outcome,
+  };
+  change(sessionId, {
+    displaced: [...snapshotOf(sessionId).displaced, stored],
+    asked: null,
+    askedImages: [],
+    askedModel: null,
+    askedEffort: null,
+    askedFrom: null,
+  });
+  try {
+    await replaceKept(sessionId, snapshotOf(sessionId).displaced);
+  } catch {
+    /* The bubble is on screen with its Retry and its words are in this chat for
+       the session; a restart is what a refused write costs. */
   }
 }
 
@@ -569,7 +703,13 @@ export async function say(
          while it works. So a second question joins the line rather than racing
          the first, and it is on screen while it waits. It is held in memory
          only: an answer that is still arriving is not written down either. */
-      held.waiting.push({ text, images, model, effort });
+      held.waiting.push({
+        text,
+        images,
+        model,
+        effort,
+        ...(question.from === undefined ? {} : { from: question.from }),
+      });
       change(current, { waiting: questionsIn(held.waiting) });
       return;
     }
@@ -580,10 +720,34 @@ export async function say(
     if (held === undefined) {
       throw new Error('the chat is not open');
     }
+    /* A question with no answer keeps its place in the transcript. It is done
+       before the slot is written, so the words this send takes the place of are
+       already safe if the send itself fails. */
+    const before = snapshotOf(current);
+    await keepAsked(current);
+    /* Nothing said in it yet, so this question is the one the chat is named for
+       while no answer is stored. A question asked again after another one took
+       its place is not the first: the name is already written. */
+    if (before.turns.length === 0 && before.asked === null && before.displaced.length === 0) {
+      await rememberFirstQuestion(current, text);
+    }
     /* Remember the requested target before the move can fail. The live model
        stays unchanged until onto installs the session that actually moved. */
-    change(current, { asked: text, askedImages: images, askedModel: model, askedEffort: effort });
-    await rememberAsked(current, { text, model, effort, images });
+    change(current, {
+      asked: text,
+      askedImages: images,
+      askedModel: model,
+      askedEffort: effort,
+      askedFrom: question.from ?? null,
+    });
+    await rememberAsked(current, {
+      text,
+      model,
+      effort,
+      images,
+      ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
+      ...(question.from == null ? {} : { from: question.from }),
+    });
     current = await ontoForUse(current, { model, effort }, held);
     const chat = chats.get(current);
     if (chat === undefined) {
@@ -599,6 +763,7 @@ export async function say(
       askedImages: images,
       askedModel: model,
       askedEffort: effort,
+      askedFrom: question.from ?? null,
       failed: null,
       failureKey: null,
       record: { ...snapshotOf(current).record, updatedAt: at },
@@ -619,6 +784,7 @@ export async function say(
       askedImages: images,
       askedModel: model,
       askedEffort: effort,
+      askedFrom: question.from ?? null,
       failed: reason(error),
       failureKey,
     });
@@ -649,13 +815,58 @@ const reason = (error: unknown): string =>
 const openReason = (error: unknown): string =>
   error instanceof Error ? error.message : 'the chat could not be opened';
 
-/** Asks again what was asked and never answered. */
-export async function retryChat(sessionId: string): Promise<void> {
-  const { sessionId: current, asked, askedImages, askedModel, askedEffort } = snapshotOf(sessionId);
+/**
+ * Asks again what was asked and never answered: the question in the slot, or one
+ * an earlier failure kept in the transcript.
+ *
+ * A kept question stays where it was said and becomes the current attempt
+ * there, rather than moving under everything said since: the transcript reads in
+ * the order the questions were asked, oldest at the top, and one question is one
+ * bubble however often it is asked. Whatever the slot holds is kept in turn, so
+ * asking an older one cannot take a newer failure with it.
+ */
+export async function retryChat(sessionId: string, displaced?: Displaced): Promise<void> {
+  if (displaced !== undefined) {
+    const current = snapshotOf(sessionId).sessionId;
+    const held = snapshotOf(current);
+    /* It is already being asked, or waiting to be: a second press of the same
+       bubble asks nothing twice. */
+    if (
+      askingKept.has(displaced.id) ||
+      held.askedFrom === displaced.id ||
+      held.waiting.some(one => one.from === displaced.id) ||
+      !held.displaced.includes(displaced)
+    ) {
+      return;
+    }
+    askingKept.add(displaced.id);
+    try {
+      await say(
+        current,
+        { text: displaced.text, images: displaced.images, from: displaced.id },
+        { model: displaced.model, effort: displaced.effort }
+      );
+    } finally {
+      askingKept.delete(displaced.id);
+    }
+    return;
+  }
+  const {
+    sessionId: current,
+    asked,
+    askedImages,
+    askedModel,
+    askedEffort,
+    askedFrom,
+  } = snapshotOf(sessionId);
   if (asked !== null && askedModel !== null) {
+    /* The slot already holds it, so asking it again takes its place back rather
+       than leaving a second copy of itself in the transcript. A retry of a kept
+       question stays the retry of it, so its bubble stays where it was said. */
+    change(current, { asked: null, askedImages: [], askedModel: null, askedEffort: null });
     await say(
       current,
-      { text: asked, images: askedImages },
+      { text: asked, images: askedImages, ...(askedFrom === null ? {} : { from: askedFrom }) },
       { model: askedModel, effort: askedEffort }
     );
   } else {
@@ -790,6 +1001,109 @@ function why(cause: Cause.Cause<unknown>): string {
 }
 
 /**
+ * The kept questions left once the answer to one of them is a stored turn.
+ *
+ * The question that was answered leaves, and the ones said after it move down
+ * by the turns that exchange added: an answer stores the question's own turn and
+ * the answer's, so a question said after the one it answers has to stay under
+ * both of them rather than reading between them.
+ */
+function withoutAnswered(
+  kept: readonly Displaced[],
+  answeredFrom: string | null,
+  addedTurns: number
+): readonly Displaced[] {
+  if (answeredFrom === null) {
+    return kept;
+  }
+  const answeredIndex = kept.findIndex(one => one.id === answeredFrom);
+  const answered = kept[answeredIndex];
+  if (answered === undefined) {
+    return kept;
+  }
+  return kept.flatMap((one, index) => {
+    if (index === answeredIndex) {
+      return [];
+    }
+    return [
+      index > answeredIndex && one.afterTurns >= answered.afterTurns
+        ? { ...one, afterTurns: one.afterTurns + addedTurns }
+        : one,
+    ];
+  });
+}
+
+/**
+ * The kept questions and the slot record an open should draw, given what the
+ * store actually holds.
+ *
+ * A question asked again leaves two records while its answer is on its way: the
+ * slot's, and the kept one its bubble is drawn from. When the answer lands the
+ * kept record goes first and the slot's second, so a write that was refused — or
+ * a process that stopped between them — can leave either record behind. A stored
+ * turn with that question's words is what says the answer landed, so both of its
+ * records are stale and the open drops them rather than drawing a failed bubble
+ * beside the answer.
+ *
+ * The match is anchored where the question was asked: an answer is a question
+ * turn after the turns the conversation already held, and it is the newest one,
+ * because a retry is always the newest ask. That is what tells a repeat of the
+ * same words from the attempt that was answered earlier — and it is why a turn
+ * of tool results, which is stored as a user turn with no text, is not a
+ * question.
+ */
+function settledRecords(turns: readonly Turn[], asked: Asked | null, kept: readonly Displaced[]) {
+  const from = asked?.from;
+  if (asked == null || from == null) {
+    return { asked, kept };
+  }
+  const named = kept.find(one => one.id === from);
+  const anchor = Math.max(named?.afterTurns ?? 0, asked.after ?? 0);
+  const newest = newestQuestionTurn(turns);
+  const answered =
+    newest >= anchor && says(turns[newest], { text: asked.text, images: asked.images });
+  if (!answered) {
+    return { asked, kept };
+  }
+  return {
+    asked: null,
+    kept: named === undefined ? kept : kept.filter(one => one.id !== from),
+  };
+}
+
+/** Where the newest question the conversation holds sits, or -1 when it holds none. */
+function newestQuestionTurn(turns: readonly Turn[]): number {
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const turn = turns[index];
+    if (turn?.role === 'user' && asksSomething(turn)) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+/** Whether a user turn is a question rather than what the tools answered with. */
+function asksSomething(turn: Turn): boolean {
+  return turn.parts.some(part => part.kind === 'text' || part.kind === 'image');
+}
+
+/** Whether a stored turn is that question: the same words and the same pictures. */
+function says(turn: Turn | undefined, question: Question): boolean {
+  if (turn?.role !== 'user') {
+    return false;
+  }
+  const text = turn.parts.flatMap(part => (part.kind === 'text' ? [part.body] : [])).join('');
+  if (text !== question.text) {
+    return false;
+  }
+  const pictures = turn.parts.flatMap(part =>
+    part.kind === 'image' ? [`${part.media}:${part.body}`] : []
+  );
+  const asked = question.images.map(image => `${image.media}:${image.data}`);
+  return pictures.length === asked.length && pictures.every((one, index) => one === asked[index]);
+}
+
+/**
  * What is true once an answer has ended. A failure carries a reason for the log
  * and the key of the fixed copy the screen shows.
  *
@@ -809,17 +1123,48 @@ async function settle(
   const turns = await runtime.runPromise(chat.handle.history);
   await countCall(sessionId, chat, { total: await runtime.runPromise(chat.handle.usageByModel) });
   const failed = failure?.reason ?? null;
-  /* A question whose answer landed is forgotten; one whose answer failed keeps
-     the reason beside it, so a reopened chat still says why. */
-  await (failure === null ? forgetAsked(sessionId) : keepAskedFailure(sessionId, failure.key));
+  /* The kept question this attempt asked again, if it was one: an answer to it
+     is now a stored turn, so its kept bubble goes rather than standing beside
+     the answer as a failure that never happened. A failed attempt keeps it, and
+     that bubble is where the failure is shown. */
+  const held = snapshotOf(sessionId);
+  const answeredFrom = failed === null ? held.askedFrom : null;
+  const kept = withoutAnswered(
+    held.displaced,
+    answeredFrom,
+    Math.max(0, turns.length - held.turns.length)
+  );
+  if (failure !== null) {
+    /* The question keeps its place in the slot, so the reason it failed is
+       written beside it: a chat opened again then says why, instead of reading
+       as a message the person stopped. */
+    await keepAskedFailure(sessionId, failure.key);
+  } else if (kept !== held.displaced) {
+    /* The list is written before the slot's record goes: a refused write leaves
+       both records, and an open folds the pair into the one bubble it already
+       drew. Dropping the slot first would leave the answered question with no
+       way back, drawn beside the answer for good. */
+    try {
+      await replaceKept(sessionId, kept);
+      await forgetAsked(sessionId);
+    } catch {
+      /* The written list still counts the answered question, and the slot's
+         record still names it, so an open folds the two into the bubble it
+         drew. The next write of the list leaves one record behind. */
+    }
+  } else {
+    await forgetAsked(sessionId);
+  }
   chat.answering = undefined;
   change(sessionId, {
     turns,
     answering: [],
     status: 'idle',
-    asked: failed === null ? null : snapshotOf(sessionId).asked,
-    askedImages: failed === null ? [] : snapshotOf(sessionId).askedImages,
-    askedModel: failed === null ? null : snapshotOf(sessionId).askedModel,
+    asked: failed === null ? null : held.asked,
+    askedImages: failed === null ? [] : held.askedImages,
+    askedModel: failed === null ? null : held.askedModel,
+    askedFrom: failed === null ? null : held.askedFrom,
+    displaced: kept,
     failed,
     failureKey: failure?.key ?? null,
   });
@@ -885,7 +1230,11 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
   change(current, { waiting: questionsIn(chat.waiting) });
   await say(
     current,
-    { text: next.text, images: next.images },
+    {
+      text: next.text,
+      images: next.images,
+      ...(next.from === undefined ? {} : { from: next.from }),
+    },
     { model: next.model, effort: next.effort }
   );
 }
@@ -937,7 +1286,7 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   });
   const database = await open();
   moveChat(database, { from: sessionId, to: handle.id, at: Date.now() });
-  await moveAsked(sessionId, handle.id);
+  await moveQuestions(sessionId, handle.id);
   await moveMcpEnabled(sessionId, handle.id);
   await moveWebSearchEnabled(sessionId, handle.id);
   const turns = await runtime.runPromise(handle.history);

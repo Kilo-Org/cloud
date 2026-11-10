@@ -313,7 +313,6 @@ function byteLength(text: string): number {
 
 const blockingPiiSettings = {
   status: 'ready',
-  scan_tool_results: false,
   detectors: [{ detector: 'pii', action: 'block', pii_entities: ['secrets'] }],
 };
 
@@ -499,6 +498,7 @@ describe('guardEnkryptOutput', () => {
             decision: 'allowed',
             creditsCost: 2,
             addedLatencyMs: 0,
+            detectorsFired: ['pii'],
           }),
         ],
       ]);
@@ -847,7 +847,7 @@ describe('guardEnkryptOutput', () => {
       expect(client.status).toBe(400);
       expect(await client.json()).toMatchObject({
         error: {
-          message: expect.stringContaining('3,000,000 characters of model output'),
+          message: expect.stringContaining('250,000 characters of model output'),
           code: 'guardrail_blocked',
         },
       });
@@ -899,7 +899,7 @@ describe('guardEnkryptOutput', () => {
         false
       );
 
-      expect(scan.config).toEqual({ scanToolResults: false, status: 'invalid' });
+      expect(scan.config).toEqual({ status: 'invalid' });
       expect(cancel).toHaveBeenCalledTimes(1);
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(release).not.toHaveBeenCalled();
@@ -1069,6 +1069,7 @@ describe('guardEnkryptOutput', () => {
             decision: 'blocked',
             creditsCost: 2,
             addedLatencyMs: expect.any(Number),
+            detectorsFired: ['pii'],
           }),
         ],
       ]);
@@ -1126,7 +1127,6 @@ describe('guardEnkryptOutput', () => {
       expect(await capturedReport(captureReport)).toEqual({
         settings: {
           status: 'ready',
-          scan_tool_results: false,
           detectors: [
             { detector: 'pii', action: 'block', pii_entities: ['secrets'] },
             { detector: 'toxicity', action: 'log' },
@@ -1205,7 +1205,7 @@ describe('guardEnkryptOutput', () => {
 
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(await capturedReport(captureReport)).toEqual({
-        settings: { status: 'invalid', scan_tool_results: false, detectors: [] },
+        settings: { status: 'invalid', detectors: [] },
         held_back: false,
         held_bytes: null,
         held_ms: null,
@@ -1314,7 +1314,6 @@ describe('guardEnkryptOutput', () => {
       expect(await capturedReport(captureReport)).toEqual({
         settings: {
           status: 'ready',
-          scan_tool_results: false,
           detectors: [{ detector: 'pii', action: 'log', pii_entities: ['secrets'] }],
         },
         held_back: false,

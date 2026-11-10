@@ -22,6 +22,14 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
+import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
+import { announcePendingLinkOutcome, pendingLinkOutcome } from '@/lib/auth/pending-link';
+import {
+  readPendingLinkOffer,
+  recordPendingLinkOutcome,
+  setPendingLinkOffer,
+  takePendingLinkOutcome,
+} from '@/lib/auth/pending-link-state';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -45,6 +53,8 @@ export function LoginScreen() {
     error,
     verificationUrl,
     resumed,
+    pendingLink: pendingLinkResult,
+    expiredPendingLinkToken,
     start,
     cancel,
     openBrowser,
@@ -59,11 +69,31 @@ export function LoginScreen() {
     email: string;
     ssoRecovery: SsoRecoveryDraft | null;
   } | null>(null);
+  // Held in the module rather than in this screen: the screen unmounts while a
+  // browser sign-in is pending and right after the device approved one, and a
+  // remount must return to the same link instead of the plain landing.
+  const [pendingLink, setPendingLink] = useState<PendingLinkOffer | null>(readPendingLinkOffer);
+  const updatePendingLink = useCallback((offer: PendingLinkOffer | null) => {
+    setPendingLinkOffer(offer);
+    setPendingLink(offer);
+  }, []);
 
   // Set once this mount completes a sign-in: the unmount persistence then
   // stays off, because the signed-in session owns the screen and a typed
   // email from the abandoned attempt must not survive into the next login.
   const signedInRef = useRef(false);
+
+  // The outcome of the last link-resolution survives a remount the same way the
+  // offer does, so a mount that follows an activity restart still tells the
+  // person what happened — once, then the record is gone. Past the link's own
+  // deadline the notice would describe a link nobody can still resolve.
+  useEffect(() => {
+    const offer = readPendingLinkOffer();
+    const outcome = takePendingLinkOutcome();
+    if (!offer || Date.now() < offer.expiresAt) {
+      announcePendingLinkOutcome(outcome, offer);
+    }
+  }, []);
 
   const persistToken = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
@@ -74,9 +104,13 @@ export function LoginScreen() {
         // The message renders from the catalog at draw time, so a language
         // switch re-renders it in the new language.
         setPersistFailed(true);
+        return;
       }
+      announcePendingLinkOutcome(takePendingLinkOutcome(), pendingLink);
+      // The link is resolved: a later login must not restore it.
+      updatePendingLink(null);
     },
-    [signIn]
+    [pendingLink, signIn, updatePendingLink]
   );
 
   // Every provider's completed sign-in — device code, email code, Apple,
@@ -133,6 +167,15 @@ export function LoginScreen() {
       announcingToast.warning(t('login.sessionEnded'), { id: 'session-ended' });
     }
   }, [sessionEnded, t]);
+
+  // The approved code carries the outcome of the link it resolved. Record it here, before the
+  // effect below persists the token and announces it, so a mount that follows an activity
+  // restart can still reach it.
+  useEffect(() => {
+    if (status === 'approved' && pendingLink) {
+      recordPendingLinkOutcome(pendingLinkOutcome(pendingLinkResult));
+    }
+  }, [pendingLink, pendingLinkResult, status]);
 
   useEffect(() => {
     if (status === 'approved' && token) {
@@ -286,6 +329,14 @@ export function LoginScreen() {
               initialSsoRecovery={draft?.ssoRecovery ?? null}
               onBusyChange={setAuthFormBusy}
               onSignInStart={clearError}
+              pendingLink={pendingLink}
+              pendingLinkRefused={
+                pendingLink !== null && pendingLink.token === expiredPendingLinkToken
+              }
+              onPendingLink={updatePendingLink}
+              onClearPendingLink={() => {
+                updatePendingLink(null);
+              }}
             />
           )}
 

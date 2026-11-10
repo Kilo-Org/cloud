@@ -229,6 +229,21 @@
     "signInCodeField": "Kirish kodi",
     "or": "yoki"
   },
+  "pendingLink": {
+    "description": "{{email}} allaqachon bir hisob tomonidan ishlatilmoqda. {{provider}} qo'shish uchun uning usullaridan biri bilan kiring.",
+    "emailCode": "Kirish kodini elektron pochtamga yuborish",
+    "continueInBrowser": "Brauzerda davom etish",
+    "startAgain": "Qaytadan boshlash",
+    "expired": "{{provider}} qo'shish bo'yicha bu so'rovning muddati tugagan.",
+    "noMethods": "Bu hisobda boshqa kirish usuli yo'q, shuning uchun {{provider}} qo'shib bo'lmaydi.",
+    "linked": "{{provider}} hisobingizga qo'shildi.",
+    "failedExpired": "So'rov muddati tugagani uchun {{provider}} qo'shilmadi.",
+    "failedWrongAccount": "Boshqa hisobga kirganingiz uchun {{provider}} qo'shilmadi.",
+    "failedAccountAlreadyLinked": "{{provider}} allaqachon boshqa hisobga bog'langani uchun qo'shilmadi.",
+    "failedProviderAlreadyLinked": "Hisobingizda allaqachon boshqa {{provider}} orqali kirish mavjudligi uchun {{provider}} qo'shilmadi.",
+    "failedLinking": "{{provider}} hisobingizga qo'shib bo'lmadi.",
+    "notAdded": "Siz tizimga kirdingiz. {{provider}} hisobingizga qo'shilmadi."
+  },
   "profile": {
     "codeReviewerSubtitle": "PR tekshiruvlarini avtomatik bajarish",
     "securityAgentSubtitle": "Zaifliklarni topish va bartaraf etish",
@@ -248,6 +263,7 @@
     "confirmDeletion": "O'chirishni tasdiqlash",
     "credits": "Kreditlar",
     "failedToLoadBalance": "Balansni yuklab bo'lmadi. Qayta urinish uchun bosing.",
+    "balanceLoadFailed": "Balansni yuklab bo'lmadi",
     "hideBalance": "Balansni yashirish",
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Sinov hisobi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Korporativ SSO",
     "passkeysTitle": "Kirish kalitlari",
     "passkeysSubtitle": "Parolsiz kiring",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Bu PRda hech bir fayl o'zgarmagan.",
     "fileList": {
       "openNavigator": "Fayllar ro'yxatini ochish",
-      "filesViewed": "Fayllar · {{total}} tadan {{viewed}} tasi ko'rildi",
       "listed": "(ro'yxatda)",
       "layout": "Ko'rinish",
       "unified": "Birlashtirilgan",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "So'rovingiz va hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "remoteHint": "Kompyuteringizda ishga tushirish uchun Kilo dasturini o'sha kompyuterda ishga tushiring va uni yoniq holatda qoldiring.",
-      "continueFrom": "{{title}} sessiyasi davom ettirilmoqda.",
+      "continueFrom": "“{{title}}” sessiyasi davom ettirilmoqda.",
       "importingSession": "Sessiya import qilinmoqda",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent xizmatini yoki boshqa CLI dasturini tanlang.",
       "importFailed": "Bu sessiyani import qilib bo'lmadi.",
@@ -2560,7 +2577,21 @@
       "thought": "Fikr",
       "showDetails": "Tafsilotlarni ko'rsatish",
       "pending": "Kutilmoqda…",
-      "running": "Bajarilmoqda…"
+      "running": "Bajarilmoqda…",
+      "field": {
+        "filePath": "Fayl yo'li",
+        "path": "Yo'l",
+        "offset": "Boshlanish",
+        "limit": "Chegara",
+        "pattern": "Shablon",
+        "include": "Kiritish",
+        "patchText": "Yamaq matni",
+        "query": "So'rov",
+        "prompt": "Ko'rsatma",
+        "header": "Sarlavha",
+        "question": "Savol",
+        "options": "Variantlar"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Mazmunni ko'rsatib bo'lmadi."
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
     },
-    "creditsRequired": "Bu xabarni yuborish uchun kreditlar yetarli emas. Kreditlar qo'shing va qaytadan urinib ko'ring."
+    "creditsRequired": "Bu xabarni yuborish uchun kreditlar yetarli emas."
   },
   "settingsTools": {
     "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Rejalashtirilgan brifinglar uchun hech bir kontekst yoqilmagan",
     "sourceBlocker": "Seans e’tibor talab qiladi",
     "sourceMetadata": "Qayd etilgan seans metama’lumotlari"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Bu qidiruv natijasini ochib bo'lmadi"
   }
 }

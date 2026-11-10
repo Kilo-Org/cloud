@@ -1,11 +1,31 @@
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
+import * as z from 'zod';
 import { agent_briefing_snapshots } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { recordBriefingUsage } from './agent-briefing-usage';
+import {
+  briefingChargeAccountingSchema,
+  briefingChargeDeliverySchema,
+  recordBriefingUsage,
+} from './agent-briefing-usage';
 import type { UsageAccountingResult } from './ai-gateway/processUsage.types';
+
+/** Freeze the deployed parser so schema changes cannot silently discard charged attempts. */
+const previousAccountingReader = z.object({
+  baselineCostMicrodollars: z.number().nonnegative(),
+  generations: z.array(
+    z.object({
+      id: z.string(),
+      settlementToken: z.string().optional(),
+      usageId: z.uuid().nullable(),
+      deadlineAt: z.string().datetime().optional(),
+      deliveryAt: z.string().datetime().optional(),
+      delivery: briefingChargeDeliverySchema.optional(),
+    })
+  ),
+});
 
 async function fixture(organizationId?: string) {
   const user = await insertTestUser();
@@ -67,6 +87,12 @@ async function readReport(id: string) {
   return report;
 }
 
+function persistedEntries(summary: Record<string, unknown>, generationId: string) {
+  return briefingChargeAccountingSchema
+    .parse(summary.chargeAccounting)
+    .generations.filter(entry => entry.id === generationId);
+}
+
 function usage(status: UsageAccountingResult['status'] = 'recorded'): UsageAccountingResult {
   return { status, usageId: randomUUID(), createdAt: new Date().toISOString() };
 }
@@ -95,18 +121,98 @@ describe('recordBriefingUsage', () => {
           ),
         },
       };
-      expect(persisted).toEqual({ ...prepared.report, summary: expectedSummary });
+      expect(persisted).toEqual({
+        ...prepared.report,
+        next_charge_check_at: expect.any(String),
+        summary: expectedSummary,
+      });
+      expect(Date.parse(persisted.next_charge_check_at ?? '')).toBe(
+        Date.parse(
+          persistedEntries(persisted.summary, prepared.input.generationId)[0]?.deliveryAt ?? ''
+        )
+      );
     }
   );
 
-  it('retains the first accounting identity for repeated completion', async () => {
+  it('retains every charged attempt for the deployed accounting reader', async () => {
     const prepared = await fixture();
     const first = usage('queued');
+    const second = usage();
     await recordBriefingUsage({ ...prepared.input, usage: first });
+    await recordBriefingUsage({ ...prepared.input, usage: second });
     const persisted = await readReport(prepared.report.id);
+    const previous = previousAccountingReader.parse(persisted.summary.chargeAccounting);
+    expect(
+      previous.generations
+        .filter(entry => entry.id === prepared.input.generationId)
+        .map(entry => entry.usageId)
+    ).toEqual([first.usageId, second.usageId]);
+    expect(previous.generations.find(entry => entry.id === prepared.input.generationId)).toEqual({
+      id: prepared.input.generationId,
+      settlementToken: prepared.input.settlementToken,
+      usageId: first.usageId,
+      delivery: 'queued',
+      deliveryAt: expect.any(String),
+    });
+  });
+
+  it('stores every distinct receipt and ignores a duplicate receipt', async () => {
+    const prepared = await fixture();
+    const first = usage('queued');
+    const second = usage();
     await recordBriefingUsage({ ...prepared.input, usage: first });
-    await recordBriefingUsage({ ...prepared.input, usage: usage() });
-    expect(await readReport(prepared.report.id)).toEqual(persisted);
+    const afterFirst = await readReport(prepared.report.id);
+    await recordBriefingUsage({ ...prepared.input, usage: first });
+    expect(await readReport(prepared.report.id)).toEqual(afterFirst);
+    await recordBriefingUsage({ ...prepared.input, usage: second });
+    const afterSecond = await readReport(prepared.report.id);
+    expect(persistedEntries(afterSecond.summary, prepared.input.generationId)).toMatchObject([
+      {
+        settlementToken: prepared.input.settlementToken,
+        usageId: first.usageId,
+        delivery: 'queued',
+      },
+      {
+        settlementToken: prepared.input.settlementToken,
+        usageId: second.usageId,
+        delivery: 'committed',
+      },
+    ]);
+    expect(afterSecond.summary.chargeAccounting).toMatchObject({
+      generations: [
+        prepared.summary.chargeAccounting.generations[0],
+        expect.anything(),
+        expect.anything(),
+      ],
+    });
+    await recordBriefingUsage({ ...prepared.input, usage: second });
+    expect(await readReport(prepared.report.id)).toEqual(afterSecond);
+  });
+
+  it('re-arms reconciliation when a distinct receipt arrives after settlement', async () => {
+    const prepared = await fixture();
+    const first = usage();
+    await recordBriefingUsage({ ...prepared.input, usage: first });
+    const withFirst = await readReport(prepared.report.id);
+    await db
+      .update(agent_briefing_snapshots)
+      .set({
+        next_charge_check_at: null,
+        summary: { ...withFirst.summary, chargeStatus: 'settled' },
+      })
+      .where(eq(agent_briefing_snapshots.id, prepared.report.id));
+    const second = usage();
+    await recordBriefingUsage({ ...prepared.input, usage: second });
+    const rearmed = await readReport(prepared.report.id);
+    expect(rearmed.summary.chargeStatus).toBe('pending');
+    expect(Date.parse(rearmed.next_charge_check_at ?? '')).toBe(
+      Date.parse(
+        persistedEntries(rearmed.summary, prepared.input.generationId)[1]?.deliveryAt ?? ''
+      )
+    );
+    expect(
+      persistedEntries(rearmed.summary, prepared.input.generationId).map(entry => entry.usageId)
+    ).toEqual([first.usageId, second.usageId]);
   });
 
   it('serializes concurrent completion identities', async () => {
@@ -118,18 +224,16 @@ describe('recordBriefingUsage', () => {
       recordBriefingUsage({ ...prepared.input, usage: second }),
     ]);
     const persisted = await readReport(prepared.report.id);
-    const accounting = persisted.summary.chargeAccounting;
-    expect(accounting).toEqual({
-      ...prepared.summary.chargeAccounting,
+    const entries = persistedEntries(persisted.summary, prepared.input.generationId);
+    expect(entries.map(entry => entry.usageId).sort()).toEqual(
+      [first.usageId, second.usageId].sort()
+    );
+    expect(entries.every(entry => entry.delivery === 'committed')).toBe(true);
+    expect(persisted.summary.chargeAccounting).toMatchObject({
       generations: [
         prepared.summary.chargeAccounting.generations[0],
-        {
-          id: prepared.input.generationId,
-          settlementToken: prepared.input.settlementToken,
-          usageId: expect.stringMatching(`${first.usageId}|${second.usageId}`),
-          delivery: 'committed',
-          deliveryAt: expect.any(String),
-        },
+        expect.anything(),
+        expect.anything(),
       ],
     });
   });
@@ -211,6 +315,21 @@ describe('recordBriefingUsage', () => {
       {
         baselineCostMicrodollars: 0,
         generations: [{ id: prepared.input.generationId, usageId: null }],
+      },
+      {
+        baselineCostMicrodollars: 0,
+        generations: [
+          {
+            id: prepared.input.generationId,
+            settlementToken: prepared.input.settlementToken,
+            usageId: null,
+          },
+          {
+            id: prepared.input.generationId,
+            settlementToken: prepared.input.settlementToken,
+            usageId: null,
+          },
+        ],
       },
       {
         ...prepared.summary.chargeAccounting,

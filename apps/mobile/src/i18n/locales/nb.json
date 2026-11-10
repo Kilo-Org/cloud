@@ -229,6 +229,21 @@
     "signInCodeField": "Innloggingskode",
     "or": "eller"
   },
+  "pendingLink": {
+    "description": "En konto bruker allerede {{email}}. Logg inn med en av metodene for kontoen for å legge til {{provider}}.",
+    "emailCode": "Send meg en innloggingskode på e-post",
+    "continueInBrowser": "Fortsett i nettleseren",
+    "startAgain": "Start på nytt",
+    "expired": "Denne forespørselen om å legge til {{provider}} er utløpt.",
+    "noMethods": "Denne kontoen har ingen annen innloggingsmetode, så {{provider}} kan ikke legges til.",
+    "linked": "{{provider}} ble lagt til i kontoen din.",
+    "failedExpired": "{{provider}} ble ikke lagt til fordi forespørselen utløp.",
+    "failedWrongAccount": "{{provider}} ble ikke lagt til fordi du logget inn på en annen konto.",
+    "failedAccountAlreadyLinked": "{{provider}} ble ikke lagt til fordi den allerede er koblet til en annen konto.",
+    "failedProviderAlreadyLinked": "{{provider}} ble ikke lagt til fordi kontoen din allerede har en annen {{provider}}-innlogging.",
+    "failedLinking": "{{provider}} kunne ikke legges til i kontoen din.",
+    "notAdded": "Du er logget inn. {{provider}} ble ikke lagt til i kontoen din."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatiske PR-gjennomganger",
     "securityAgentSubtitle": "Finn og utbedre sårbarheter",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Bekreft sletting",
     "credits": "Kreditter",
     "failedToLoadBalance": "Kunne ikke laste inn saldoen. Trykk for å prøve igjen.",
+    "balanceLoadFailed": "Kunne ikke laste inn saldoen",
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO for bedrifter",
     "passkeysTitle": "Passnøkler",
     "passkeysSubtitle": "Logg inn uten passord",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Denne PR-en inneholder ingen filendringer.",
     "fileList": {
       "openNavigator": "Åpne filoversikten",
-      "filesViewed": "Filer · {{viewed}} av {{total}} gjennomgått",
       "listed": "(i listen)",
       "layout": "Oppsett",
       "unified": "Samlet",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Instruksjonen din og opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
       "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen.",
       "remoteHint": "For å kjøre økten på datamaskinen din, må du starte Kilo der og la den fortsette å kjøre.",
-      "continueFrom": "Fortsetter økten {{title}}.",
+      "continueFrom": "Fortsetter økten «{{title}}».",
       "importingSession": "Importerer økten",
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
       "importFailed": "Kunne ikke importere denne økten.",
@@ -2560,7 +2577,21 @@
       "thought": "Resonnement",
       "showDetails": "Vis detaljer",
       "pending": "Venter…",
-      "running": "Kjører…"
+      "running": "Kjører…",
+      "field": {
+        "filePath": "Filsti",
+        "path": "Sti",
+        "offset": "Forskyvning",
+        "limit": "Grense",
+        "pattern": "Mønster",
+        "include": "Inkludering",
+        "patchText": "Endringstekst",
+        "query": "Søk",
+        "prompt": "Instruks",
+        "header": "Overskrift",
+        "question": "Spørsmål",
+        "options": "Alternativer"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Kunne ikke vise innholdet."
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Denne modellen støtter resonneringsinnsats"
     },
-    "creditsRequired": "Ikke nok kreditter til å sende denne meldingen – fyll på kreditter og prøv igjen."
+    "creditsRequired": "Ikke nok kreditter til å sende denne meldingen."
   },
   "settingsTools": {
     "confirmTitle": "Bekrefte denne endringen?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Ingen kontekster er aktivert for planlagte briefer",
     "sourceBlocker": "Økten krever oppmerksomhet",
     "sourceMetadata": "Lagrede øktmetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kunne ikke åpne dette søkeresultatet"
   }
 }

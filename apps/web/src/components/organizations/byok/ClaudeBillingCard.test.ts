@@ -35,6 +35,7 @@ function status(state: ClaudeBillingStatus['state']): ClaudeBillingStatus {
     providerId: CLAUDE_BILLING_PROVIDER_ID,
     providerName: CLAUDE_BILLING_PROVIDER_NAME,
     canManage: true,
+    canSharePersonal: false,
   };
 }
 
@@ -48,6 +49,16 @@ describe('ClaudeBillingCardView', () => {
     expect(buttons({ status: status('not_connected'), onConnect: () => undefined })).toHaveLength(
       1
     );
+  });
+
+  it('offers the personal-link action for an unlinked organization scope', () => {
+    expect(
+      buttons({
+        status: { ...status('not_connected'), canSharePersonal: true },
+        scope: 'member',
+        onShare: () => undefined,
+      })
+    ).toHaveLength(1);
   });
 
   it('offers no linking action when the release gate omits it', () => {
@@ -70,5 +81,19 @@ describe('ClaudeBillingCardView', () => {
 
   it('hides linking and removal controls from read-only members', () => {
     expect(buttons({ status: { ...status('connected'), canManage: false } })).toHaveLength(0);
+  });
+
+  it.each([
+    ['personal', 'Linked billing with Claude Platform'],
+    ['member', 'Linked billing with Claude Platform'],
+    ['shared_services', 'Claude billing for shared services'],
+  ] as const)('names the %s connection it shows', (scope, title) => {
+    const html = renderToStaticMarkup(
+      React.createElement(ClaudeBillingCardView, {
+        status: status('not_connected'),
+        scope,
+      })
+    );
+    expect(html).toContain(title);
   });
 });

@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Masukkan alamat emailmu.",
     "or": "atau"
   },
+  "pendingLink": {
+    "description": "Sudah ada akun yang menggunakan {{email}}. Masuk dengan salah satu metodenya untuk menambahkan {{provider}}.",
+    "emailCode": "Kirimi saya kode masuk lewat email",
+    "continueInBrowser": "Lanjutkan di peramban",
+    "startAgain": "Mulai lagi",
+    "expired": "Permintaan untuk menambahkan {{provider}} ini sudah kedaluwarsa.",
+    "noMethods": "Akun ini tidak punya metode masuk lain, jadi {{provider}} tidak dapat ditambahkan.",
+    "linked": "{{provider}} telah ditambahkan ke akunmu.",
+    "failedExpired": "{{provider}} tidak ditambahkan karena permintaannya sudah kedaluwarsa.",
+    "failedWrongAccount": "{{provider}} tidak ditambahkan karena kamu masuk ke akun lain.",
+    "failedAccountAlreadyLinked": "{{provider}} tidak ditambahkan karena sudah ditautkan ke akun lain.",
+    "failedProviderAlreadyLinked": "{{provider}} tidak ditambahkan karena akunmu sudah memiliki metode masuk {{provider}} yang berbeda.",
+    "failedLinking": "{{provider}} tidak dapat ditambahkan ke akunmu.",
+    "notAdded": "Kamu sudah masuk. {{provider}} tidak ditambahkan ke akunmu."
+  },
   "profile": {
     "codeReviewerSubtitle": "Tinjauan PR otomatis",
     "securityAgentSubtitle": "Temukan dan perbaiki kerentanan",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Konfirmasi penghapusan",
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuat saldo. Ketuk untuk mencoba lagi.",
+    "balanceLoadFailed": "Gagal memuat saldo",
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Akun uji",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO perusahaan",
     "passkeysTitle": "Kunci sandi",
     "passkeysSubtitle": "Masuk tanpa kata sandi",
@@ -1869,7 +1887,7 @@
       "discardWithUploadsMessage": "Instruksimu dan unggahan yang belum dilampirkan ke pesan terkirim akan dihapus.",
       "discardFailed": "Tidak dapat membuang draf. Coba lagi.",
       "remoteHint": "Untuk menjalankan sesi di komputermu, mulailah Kilo di sana dan biarkan tetap berjalan.",
-      "continueFrom": "Melanjutkan sesi {{title}}.",
+      "continueFrom": "Melanjutkan sesi “{{title}}”.",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
       "importFailed": "Tidak dapat mengimpor sesi ini.",
@@ -2021,7 +2039,21 @@
       "thought": "Pemikiran",
       "showDetails": "Tampilkan detail",
       "pending": "Menunggu…",
-      "running": "Berjalan…"
+      "running": "Berjalan…",
+      "field": {
+        "filePath": "Jalur berkas",
+        "path": "Jalur",
+        "offset": "Offset",
+        "limit": "Batas",
+        "pattern": "Pola",
+        "include": "Sertakan",
+        "patchText": "Teks patch",
+        "query": "Kueri",
+        "prompt": "Arahan",
+        "header": "Judul",
+        "question": "Pertanyaan",
+        "options": "Pilihan"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Gagal menampilkan konten."
@@ -2891,7 +2923,6 @@
     },
     "fileList": {
       "filesList": "Daftar file",
-      "filesViewed": "File · {{viewed}} dari {{total}} sudah dilihat",
       "layout": "Tata letak",
       "listed": "(terdaftar)",
       "loadingFiles": "Memuat file",
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
     },
-    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini. Tambah kredit dan coba lagi."
+    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini."
   },
   "settingsTools": {
     "confirmTitle": "Konfirmasi perubahan ini?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Tidak ada konteks yang diaktifkan untuk laporan terjadwal",
     "sourceBlocker": "Sesi memerlukan perhatian",
     "sourceMetadata": "Metadata sesi yang direkam"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tidak dapat membuka hasil pencarian ini"
   }
 }

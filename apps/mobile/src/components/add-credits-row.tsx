@@ -3,6 +3,7 @@ import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openExternalUrl } from '@/lib/external-link';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,12 @@ type AddCreditsButtonProps = Readonly<{
  * inside another surface — the balance card puts it on the right — instead of
  * rendering the whole row.
  *
+ * The outline variant paints the elevated card surface in dark mode, which is
+ * the fill of the card this control sits on: the button then reads as a faint
+ * outline instead of the raised white control light mode shows. `--secondary-fill`
+ * is the palette's own step above that surface, so the dark fill stands off the
+ * card the way the light fill does.
+ *
  * It is always an in-app CTA and therefore always safe to show on iOS. The
  * external billing-page variant lives in `AddCreditsRow`, which owns the App
  * Store gate.
@@ -25,7 +32,12 @@ type AddCreditsButtonProps = Readonly<{
 export function AddCreditsButton({ onPress, className }: AddCreditsButtonProps) {
   const { t } = useTranslation();
   return (
-    <Button size="sm" variant="outline" className={className} onPress={onPress}>
+    <Button
+      size="sm"
+      variant="outline"
+      className={cn('dark:bg-secondary-fill', className, STATE_ACTION_CLASS)}
+      onPress={onPress}
+    >
       <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>
     </Button>
   );

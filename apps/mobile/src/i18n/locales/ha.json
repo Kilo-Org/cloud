@@ -229,6 +229,21 @@
     "signInCodeField": "Lambar shiga",
     "or": "ko"
   },
+  "pendingLink": {
+    "description": "Wani asusu yana amfani da {{email}} tuni. Shiga da ɗaya daga cikin hanyoyinsa domin ƙara {{provider}}.",
+    "emailCode": "Aiko mini lambar shiga ta imel",
+    "continueInBrowser": "Ci gaba a burauza",
+    "startAgain": "Sake farawa",
+    "expired": "Wannan buƙatar ƙara {{provider}} ta ƙare.",
+    "noMethods": "Wannan asusun ba shi da wata hanyar shiga, don haka ba za a iya ƙara {{provider}} ba.",
+    "linked": "An ƙara {{provider}} zuwa asusunka.",
+    "failedExpired": "Ba a ƙara {{provider}} ba saboda buƙatar ta ƙare.",
+    "failedWrongAccount": "Ba a ƙara {{provider}} ba saboda ka shiga wani asusu daban.",
+    "failedAccountAlreadyLinked": "Ba a ƙara {{provider}} ba saboda an riga an haɗa shi da wani asusu.",
+    "failedProviderAlreadyLinked": "Ba a ƙara {{provider}} ba saboda asusunka yana da wata shigar {{provider}} daban tuni.",
+    "failedLinking": "An kasa ƙara {{provider}} zuwa asusunka.",
+    "notAdded": "Ka shiga. Ba a ƙara {{provider}} zuwa asusunka ba."
+  },
   "profile": {
     "codeReviewerSubtitle": "Bitar PR ta atomatik",
     "securityAgentSubtitle": "Nemo raunin tsaro ka gyara su",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Tabbatar da sharewa",
     "credits": "Kuɗin amfani",
     "failedToLoadBalance": "An kasa loda ragowar kuɗi. Danna don sake gwadawa.",
+    "balanceLoadFailed": "An kasa loda ragowar kuɗi",
     "hideBalance": "Ɓoye ragowar kuɗi",
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Asusun gwaji",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO na kamfani",
     "passkeysTitle": "Maɓallan shiga",
     "passkeysSubtitle": "Shiga ba tare da kalmar sirri ba",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Babu canje-canje ga fayiloli a wannan buƙatar haɗawa.",
     "fileList": {
       "openNavigator": "Buɗe jerin fayiloli",
-      "filesViewed": "Fayiloli · An duba {{viewed}} cikin {{total}}",
       "listed": "(da aka jera)",
       "layout": "Tsari",
       "unified": "Haɗe",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Za a share umarnin aikinka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
       "discardFailed": "An kasa watsar da daftarin. Sake gwadawa.",
       "remoteHint": "Don gudanar da aiki a kwamfutarka, fara Kilo a can ka bar shi yana aiki.",
-      "continueFrom": "Ana ci gaba da {{title}}.",
+      "continueFrom": "Ana ci gaba da “{{title}}”.",
       "importingSession": "Ana shigo da zaman",
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
       "importFailed": "An kasa shigo da wannan zaman.",
@@ -2560,7 +2577,21 @@
       "thought": "Tunani",
       "showDetails": "Nuna cikakkun bayanai",
       "pending": "Yana jira…",
-      "running": "Yana gudana…"
+      "running": "Yana gudana…",
+      "field": {
+        "filePath": "Hanyar fayil",
+        "path": "Hanya",
+        "offset": "Matsayi",
+        "limit": "Iyaka",
+        "pattern": "Tsari",
+        "include": "Haɗawa",
+        "patchText": "Rubutun gyara",
+        "query": "Bincike",
+        "prompt": "Umarni",
+        "header": "Kanun",
+        "question": "Tambaya",
+        "options": "Zaɓuɓɓuka"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "An kasa nuna abubuwan da ke ciki."
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Wannan samfurin yana goyon bayan matakin tunani"
     },
-    "creditsRequired": "Kuɗin amfani bai isa don aika wannan saƙon ba. Ƙara kuɗin amfani ka sake gwadawa."
+    "creditsRequired": "Kuɗin amfani bai isa don aika wannan saƙon ba."
   },
   "settingsTools": {
     "confirmTitle": "A tabbatar da wannan canji?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Babu mahallin da aka kunna rahotannin da aka tsara a cikinsa",
     "sourceBlocker": "Zaman aiki yana buƙatar kulawa",
     "sourceMetadata": "Bayanan metadata na zaman aiki da aka adana"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ba a iya buɗe wannan sakamakon binciken ba"
   }
 }

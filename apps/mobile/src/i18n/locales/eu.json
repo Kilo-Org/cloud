@@ -229,6 +229,21 @@
     "signInCodeField": "Saioa hasteko kodea",
     "or": "edo"
   },
+  "pendingLink": {
+    "description": "Kontu batek {{email}} erabiltzen du dagoeneko. {{provider}} gehitzeko, hasi saioa kontu horren metodoetako batekin.",
+    "emailCode": "Bidali saioa hasteko kode bat posta elektronikoz",
+    "continueInBrowser": "Jarraitu nabigatzailean",
+    "startAgain": "Hasi berriro",
+    "expired": "{{provider}} gehitzeko eskaera hau iraungi egin da.",
+    "noMethods": "Kontu honek ez du saioa hasteko beste metodorik; beraz, ezin da {{provider}} gehitu.",
+    "linked": "{{provider}} zure kontuan gehitu da.",
+    "failedExpired": "Ez da {{provider}} gehitu, eskaera iraungi delako.",
+    "failedWrongAccount": "Ez da {{provider}} gehitu, beste kontu batean hasi duzulako saioa.",
+    "failedAccountAlreadyLinked": "Ez da {{provider}} gehitu, dagoeneko beste kontu bati lotuta dagoelako.",
+    "failedProviderAlreadyLinked": "Ez da {{provider}} gehitu, zure kontuak dagoeneko beste {{provider}} saio-hasiera bat duelako.",
+    "failedLinking": "Ezin izan da {{provider}} zure kontuan gehitu.",
+    "notAdded": "Saioa hasi duzu. Ez da {{provider}} zure kontuan gehitu."
+  },
   "profile": {
     "codeReviewerSubtitle": "PR-ak automatikoki berrikustea",
     "securityAgentSubtitle": "Aurkitu eta konpondu ahultasunak",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Berretsi ezabaketa",
     "credits": "Kredituak",
     "failedToLoadBalance": "Ezin izan da saldoa kargatu. Sakatu berriro saiatzeko.",
+    "balanceLoadFailed": "Ezin izan da saldoa kargatu",
     "hideBalance": "Ezkutatu saldoa",
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Probako kontua",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Enpresako SSO",
     "passkeysTitle": "Sarbide-gakoak",
     "passkeysSubtitle": "Hasi saioa pasahitzik gabe",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Bateratze-eskaera honek ez du fitxategi-aldaketarik.",
     "fileList": {
       "openNavigator": "Ireki fitxategi-nabigatzailea",
-      "filesViewed": "Fitxategiak · {{viewed}} / {{total}} ikusita",
       "listed": "(zerrendatuta)",
       "layout": "Antolamendua",
       "unified": "Bateratua",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Zure eskaera eta igotako fitxategietatik mezuei erantsi gabe geratu direnak ezabatuko dira.",
       "discardFailed": "Ezin izan da zirriborroa baztertu. Saiatu berriro.",
       "remoteHint": "Zure ordenagailuan exekutatzeko, abiarazi Kilo han eta utzi martxan.",
-      "continueFrom": "Saio honekin jarraitzen ari zara: {{title}}.",
+      "continueFrom": "Saio honekin jarraitzen ari zara: «{{title}}».",
       "importingSession": "Saioa inportatzen",
       "cliCannotContinue": "CLI honek ezin dio saio bati jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",
       "importFailed": "Ezin izan da saio hau inportatu.",
@@ -2560,7 +2577,21 @@
       "thought": "Pentsamendua",
       "showDetails": "Erakutsi xehetasunak",
       "pending": "Zain…",
-      "running": "Exekutatzen…"
+      "running": "Exekutatzen…",
+      "field": {
+        "filePath": "Fitxategiaren bidea",
+        "path": "Bidea",
+        "offset": "Desplazamendua",
+        "limit": "Muga",
+        "pattern": "Eredua",
+        "include": "Sartzea",
+        "patchText": "Adabaki-testua",
+        "query": "Kontsulta",
+        "prompt": "Argibidea",
+        "header": "Izenburua",
+        "question": "Galdera",
+        "options": "Aukerak"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Ezin izan da edukia bistaratu."
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
     },
-    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko. Gehitu kredituak eta saiatu berriro."
+    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko."
   },
   "settingsTools": {
     "confirmTitle": "Aldaketa hau berretsi?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Ez dago testuingururik gaituta programatutako txostenetarako",
     "sourceBlocker": "Saioak arreta behar du",
     "sourceMetadata": "Jasotako saioaren metadatuak"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ezin izan da bilaketa-emaitza hau ireki"
   }
 }

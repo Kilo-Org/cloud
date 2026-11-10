@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Введите адрес электронной почты.",
     "or": "или"
   },
+  "pendingLink": {
+    "description": "Адрес {{email}} уже используется другим аккаунтом. Войдите одним из его способов входа, чтобы добавить {{provider}}.",
+    "emailCode": "Отправить код входа на почту",
+    "continueInBrowser": "Продолжить в браузере",
+    "startAgain": "Начать заново",
+    "expired": "Срок действия запроса на добавление {{provider}} истёк.",
+    "noMethods": "У этого аккаунта нет других способов входа, поэтому добавить {{provider}} нельзя.",
+    "linked": "{{provider}} добавлен в ваш аккаунт.",
+    "failedExpired": "{{provider}} не добавлен: срок действия запроса истёк.",
+    "failedWrongAccount": "{{provider}} не добавлен: вы вошли в другой аккаунт.",
+    "failedAccountAlreadyLinked": "{{provider}} не добавлен: он уже привязан к другому аккаунту.",
+    "failedProviderAlreadyLinked": "{{provider}} не добавлен: в вашем аккаунте уже есть другой вход через {{provider}}.",
+    "failedLinking": "Не удалось добавить {{provider}} в ваш аккаунт.",
+    "notAdded": "Вход выполнен. {{provider}} не добавлен в ваш аккаунт."
+  },
   "profile": {
     "codeReviewerSubtitle": "Автоматические проверки PR",
     "securityAgentSubtitle": "Поиск и устранение уязвимостей",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Подтвердить удаление",
     "credits": "Кредиты",
     "failedToLoadBalance": "Не удалось загрузить баланс. Нажмите, чтобы повторить.",
+    "balanceLoadFailed": "Не удалось загрузить баланс",
     "hideBalance": "Скрыть баланс",
     "showBalance": "Показать баланс",
     "balanceHidden": "Баланс скрыт",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Тестовый аккаунт",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Корпоративный SSO",
     "passkeysTitle": "Ключи доступа",
     "passkeysSubtitle": "Войти без пароля",
@@ -2071,7 +2089,21 @@
       "thought": "Рассуждения",
       "showDetails": "Показать сведения",
       "pending": "Ожидание…",
-      "running": "Выполняется…"
+      "running": "Выполняется…",
+      "field": {
+        "filePath": "Путь файла",
+        "path": "Путь",
+        "offset": "Смещение",
+        "limit": "Ограничение",
+        "pattern": "Шаблон",
+        "include": "Фильтр",
+        "patchText": "Текст патча",
+        "query": "Запрос",
+        "prompt": "Инструкция",
+        "header": "Заголовок",
+        "question": "Вопрос",
+        "options": "Варианты"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не удалось отобразить содержимое."
@@ -2971,7 +3003,6 @@
     },
     "fileList": {
       "filesList": "Список файлов",
-      "filesViewed": "Файлы · просмотрено {{viewed}} из {{total}}",
       "layout": "Вид",
       "listed": "(в списке)",
       "loadingFiles": "Загрузка файлов",
@@ -3914,7 +3945,7 @@
     "reasoningEffort": {
       "modelFlag": "Эта модель поддерживает уровень рассуждений"
     },
-    "creditsRequired": "Недостаточно кредитов для отправки этого сообщения. Пополните баланс и повторите попытку."
+    "creditsRequired": "Недостаточно кредитов для отправки этого сообщения."
   },
   "settingsTools": {
     "confirmTitle": "Подтвердить это изменение?"
@@ -4375,5 +4406,8 @@
     "noEnabledContexts": "Нет контекстов с включёнными сводками по расписанию",
     "sourceBlocker": "Сессия требует внимания",
     "sourceMetadata": "Зафиксированные метаданные сессии"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Не удалось открыть результат поиска"
   }
 }

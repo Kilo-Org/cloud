@@ -229,6 +229,21 @@
     "signInCodeField": "د ننوتلو کوډ",
     "or": "یا"
   },
+  "pendingLink": {
+    "description": "یو حساب دمخه {{email}} کاروي. د {{provider}} د زیاتولو لپاره د هغه له یوې طریقې سره ننوځئ.",
+    "emailCode": "ما ته د ننوتلو کوډ په برېښنالیک کې راولېږئ",
+    "continueInBrowser": "په براوزر کې دوام ورکړئ",
+    "startAgain": "له سره پیل کړئ",
+    "expired": "د {{provider}} د زیاتولو دا غوښتنه پای ته رسېدلې ده.",
+    "noMethods": "دا حساب د ننوتلو بله طریقه نه لري، نو {{provider}} نشي زیاتېدای.",
+    "linked": "{{provider}} ستاسو حساب ته زیات شو.",
+    "failedExpired": "{{provider}} زیات نه شو ځکه چې غوښتنه پای ته ورسېده.",
+    "failedWrongAccount": "{{provider}} زیات نه شو ځکه چې تاسو بل حساب ته ننوتلي یاست.",
+    "failedAccountAlreadyLinked": "{{provider}} زیات نه شو ځکه چې دمخه له بل حساب سره تړل شوی دی.",
+    "failedProviderAlreadyLinked": "{{provider}} زیات نه شو ځکه چې ستاسو حساب دمخه د {{provider}} بل ننوتل لري.",
+    "failedLinking": "{{provider}} ستاسو حساب ته زیات نه شو.",
+    "notAdded": "تاسو ننوتلي یاست. {{provider}} ستاسو حساب ته زیات نه شو."
+  },
   "profile": {
     "codeReviewerSubtitle": "د PR اوتومات بیاکتنې",
     "securityAgentSubtitle": "زیانمنتیاوې ومومئ او حل کړئ",
@@ -248,6 +263,7 @@
     "confirmDeletion": "ړنګول تایید کړئ",
     "credits": "کریډیټ",
     "failedToLoadBalance": "بیلانس بار نه شو. د بیا هڅې لپاره ټک وکړئ.",
+    "balanceLoadFailed": "بیلانس بار نه شو",
     "hideBalance": "بیلانس پټ کړئ",
     "showBalance": "بیلانس ښکاره کړئ",
     "balanceHidden": "بیلانس پټ دی",
@@ -266,6 +282,8 @@
     "providerTestAccount": "د ازموینې حساب",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "سازماني SSO",
     "passkeysTitle": "د ننوتلو کیلي",
     "passkeysSubtitle": "پرته له پټنوم ننوځئ",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "په دې پل ریکویسټ کې هېڅ فایل نه دی بدل شوی.",
     "fileList": {
       "openNavigator": "د فایلونو نیویګیټر پرانیزئ",
-      "filesViewed": "فایلونه · له {{total}} څخه {{viewed}} لیدل شوي",
       "listed": "(په لړلیک کې)",
       "layout": "ترتیب",
       "unified": "یوځای",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "ستاسو پرامپټ او هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
       "discardFailed": "مسوده ړنګه نه شوه. بیا هڅه وکړئ.",
       "remoteHint": "په خپل کمپیوټر کې چلېدلو لپاره، هلته Kilo پیل کړئ او روان یې پرېږدئ.",
-      "continueFrom": "د {{title}} ناستې دوام روان دی.",
+      "continueFrom": "د «{{title}}» ناستې دوام روان دی.",
       "importingSession": "ناسته واردېږي",
       "cliCannotContinue": "دا CLI ناستې ته دوام نه شي ورکولی. Cloud Agent یا بل CLI غوره کړئ.",
       "importFailed": "دا ناسته وارده نه شوه.",
@@ -2560,7 +2577,21 @@
       "thought": "فکر",
       "showDetails": "جزیات وښیئ",
       "pending": "په تمه…",
-      "running": "روان…"
+      "running": "روان…",
+      "field": {
+        "filePath": "د فایل لار",
+        "path": "لار",
+        "offset": "افسیټ",
+        "limit": "حد",
+        "pattern": "نمونه",
+        "include": "شمول",
+        "patchText": "د پیچ متن",
+        "query": "لټون",
+        "prompt": "لارښوونه",
+        "header": "سرلیک",
+        "question": "پوښتنه",
+        "options": "اختیارونه"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "منځپانګه ونه ښودل شوه."
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "دا ماډل د فکر کچه ملاتړ کوي"
     },
-    "creditsRequired": "د دې پیغام د لېږلو لپاره کافي کریډیټ نشته. کریډیټ زیات کړئ او بیا هڅه وکړئ."
+    "creditsRequired": "د دې پیغام د لېږلو لپاره کافي کریډیټ نشته."
   },
   "settingsTools": {
     "confirmTitle": "دا بدلون تایید شي؟"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "د مهالویش شوو راپورونو لپاره هېڅ چوکاټ فعال نه دی",
     "sourceBlocker": "ناسته پاملرنې ته اړتیا لري",
     "sourceMetadata": "د ناستې ثبت شوې مېټاډاټا"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "دا د لټون پایله پرانیستل نه شو"
   }
 }

@@ -229,6 +229,21 @@
     "signInCodeField": "ਸਾਈਨ-ਇਨ ਕੋਡ",
     "or": "ਜਾਂ"
   },
+  "pendingLink": {
+    "description": "{{email}} ਪਹਿਲਾਂ ਹੀ ਇੱਕ ਖਾਤੇ ਵਿੱਚ ਵਰਤਿਆ ਜਾ ਰਿਹਾ ਹੈ। {{provider}} ਜੋੜਨ ਲਈ ਉਸ ਖਾਤੇ ਦੇ ਕਿਸੇ ਤਰੀਕੇ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ।",
+    "emailCode": "ਮੈਨੂੰ ਈਮੇਲ ਰਾਹੀਂ ਸਾਈਨ-ਇਨ ਕੋਡ ਭੇਜੋ",
+    "continueInBrowser": "ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਜਾਰੀ ਰੱਖੋ",
+    "startAgain": "ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਕਰੋ",
+    "expired": "{{provider}} ਜੋੜਨ ਦੀ ਇਹ ਬੇਨਤੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
+    "noMethods": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰਨ ਦਾ ਕੋਈ ਹੋਰ ਤਰੀਕਾ ਨਹੀਂ ਹੈ, ਇਸ ਲਈ {{provider}} ਨਹੀਂ ਜੋੜਿਆ ਜਾ ਸਕਦਾ।",
+    "linked": "{{provider}} ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚ ਜੋੜ ਦਿੱਤਾ ਗਿਆ।",
+    "failedExpired": "{{provider}} ਨਹੀਂ ਜੋੜਿਆ ਗਿਆ ਕਿਉਂਕਿ ਬੇਨਤੀ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ।",
+    "failedWrongAccount": "{{provider}} ਨਹੀਂ ਜੋੜਿਆ ਗਿਆ ਕਿਉਂਕਿ ਤੁਸੀਂ ਕਿਸੇ ਹੋਰ ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕੀਤਾ।",
+    "failedAccountAlreadyLinked": "{{provider}} ਨਹੀਂ ਜੋੜਿਆ ਗਿਆ ਕਿਉਂਕਿ ਇਹ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਹੋਰ ਖਾਤੇ ਨਾਲ ਲਿੰਕ ਹੈ।",
+    "failedProviderAlreadyLinked": "{{provider}} ਨਹੀਂ ਜੋੜਿਆ ਗਿਆ ਕਿਉਂਕਿ ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚ ਪਹਿਲਾਂ ਹੀ ਕੋਈ ਹੋਰ {{provider}} ਸਾਈਨ-ਇਨ ਹੈ।",
+    "failedLinking": "{{provider}} ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚ ਨਹੀਂ ਜੋੜਿਆ ਜਾ ਸਕਿਆ।",
+    "notAdded": "ਤੁਸੀਂ ਸਾਈਨ ਇਨ ਕਰ ਲਿਆ ਹੈ। {{provider}} ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚ ਨਹੀਂ ਜੋੜਿਆ ਗਿਆ।"
+  },
   "profile": {
     "codeReviewerSubtitle": "ਆਪਣੇ ਆਪ ਹੋਣ ਵਾਲੀਆਂ PR ਸਮੀਖਿਆਵਾਂ",
     "securityAgentSubtitle": "ਸੁਰੱਖਿਆ ਕਮਜ਼ੋਰੀਆਂ ਲੱਭੋ ਅਤੇ ਠੀਕ ਕਰੋ",
@@ -248,6 +263,7 @@
     "confirmDeletion": "ਮਿਟਾਉਣ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
     "credits": "ਕ੍ਰੈਡਿਟ",
     "failedToLoadBalance": "ਬੈਲੰਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ।",
+    "balanceLoadFailed": "ਬੈਲੰਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ",
     "hideBalance": "ਬੈਲੰਸ ਲੁਕਾਓ",
     "showBalance": "ਬੈਲੰਸ ਵਿਖਾਓ",
     "balanceHidden": "ਬੈਲੰਸ ਲੁਕਾਇਆ ਗਿਆ",
@@ -266,6 +282,8 @@
     "providerTestAccount": "ਟੈਸਟ ਖਾਤਾ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "ਐਂਟਰਪ੍ਰਾਈਜ਼ SSO",
     "passkeysTitle": "ਪਾਸਕੀ",
     "passkeysSubtitle": "ਪਾਸਵਰਡ ਤੋਂ ਬਿਨਾਂ ਸਾਈਨ ਇਨ ਕਰੋ",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ ਵਿੱਚ ਕਿਸੇ ਫਾਈਲ ਵਿੱਚ ਬਦਲਾਅ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।",
     "fileList": {
       "openNavigator": "ਫਾਈਲ ਨੈਵੀਗੇਟਰ ਖੋਲ੍ਹੋ",
-      "filesViewed": "ਫਾਈਲਾਂ · {{total}} ਵਿੱਚੋਂ {{viewed}} ਵੇਖੀਆਂ ਗਈਆਂ",
       "listed": "(ਸੂਚੀਬੱਧ)",
       "layout": "ਲੇਆਉਟ",
       "unified": "ਇਕੱਠੇ",
@@ -2414,7 +2431,7 @@
       "discardWithUploadsMessage": "ਤੁਹਾਡਾ ਪ੍ਰੌਂਪਟ ਅਤੇ ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਉਹ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ ਜੋ ਕਿਸੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹੇ ਨਾਲ ਅਟੈਚ ਨਹੀਂ ਹਨ।",
       "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "remoteHint": "ਆਪਣੇ ਕੰਪਿਊਟਰ 'ਤੇ ਚਲਾਉਣ ਲਈ, ਉੱਥੇ Kilo ਸ਼ੁਰੂ ਕਰੋ ਅਤੇ ਇਸਨੂੰ ਚੱਲਦਾ ਰਹਿਣ ਦਿਓ।",
-      "continueFrom": "{{title}} ਨੂੰ ਜਾਰੀ ਰੱਖਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
+      "continueFrom": "“{{title}}” ਨੂੰ ਜਾਰੀ ਰੱਖਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
       "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
       "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। Cloud Agent ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
       "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
@@ -2566,7 +2583,21 @@
       "thought": "ਸੋਚ",
       "showDetails": "ਵੇਰਵੇ ਦਿਖਾਓ",
       "pending": "ਉਡੀਕ ਵਿੱਚ…",
-      "running": "ਚੱਲ ਰਿਹਾ ਹੈ…"
+      "running": "ਚੱਲ ਰਿਹਾ ਹੈ…",
+      "field": {
+        "filePath": "ਫਾਈਲ ਮਾਰਗ",
+        "path": "ਮਾਰਗ",
+        "offset": "ਆਫਸੈੱਟ",
+        "limit": "ਸੀਮਾ",
+        "pattern": "ਪੈਟਰਨ",
+        "include": "ਸ਼ਾਮਲ",
+        "patchText": "ਪੈਚ ਲਿਖਤ",
+        "query": "ਕਿਊਰੀ",
+        "prompt": "ਨਿਰਦੇਸ਼",
+        "header": "ਸਿਰਲੇਖ",
+        "question": "ਸਵਾਲ",
+        "options": "ਵਿਕਲਪ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ਸਮੱਗਰੀ ਨਹੀਂ ਦਿਖਾਈ ਜਾ ਸਕੀ।"
@@ -3808,7 +3839,7 @@
     "reasoningEffort": {
       "modelFlag": "ਇਹ ਮਾਡਲ ਸੋਚਣ ਦੇ ਪੱਧਰ ਦਾ ਸਮਰਥਨ ਕਰਦਾ ਹੈ"
     },
-    "creditsRequired": "ਇਹ ਸੁਨੇਹਾ ਭੇਜਣ ਲਈ ਲੋੜੀਂਦੇ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ। ਕ੍ਰੈਡਿਟ ਜੋੜੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+    "creditsRequired": "ਇਹ ਸੁਨੇਹਾ ਭੇਜਣ ਲਈ ਲੋੜੀਂਦੇ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ।"
   },
   "settingsTools": {
     "confirmTitle": "ਇਹ ਬਦਲਾਅ ਪੁਸ਼ਟੀ ਕਰਨੀ?"
@@ -4249,5 +4280,8 @@
     "noEnabledContexts": "ਨਿਰਧਾਰਿਤ ਬ੍ਰੀਫਿੰਗਾਂ ਲਈ ਕੋਈ ਸੰਦਰਭ ਚਾਲੂ ਨਹੀਂ ਹੈ",
     "sourceBlocker": "ਸੈਸ਼ਨ ਵੱਲ ਧਿਆਨ ਦੇਣ ਦੀ ਲੋੜ ਹੈ",
     "sourceMetadata": "ਕੈਪਚਰ ਕੀਤਾ ਸੈਸ਼ਨ ਮੈਟਾਡੇਟਾ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ਇਹ ਖੋਜ ਨਤੀਜਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
   }
 }

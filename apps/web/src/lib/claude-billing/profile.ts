@@ -3,7 +3,9 @@ import { sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createClaudeUserProfile } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import {
-  getClaudeBillingConnection,
+  claudeBillingOwnerKey,
+  getClaudeBillingConnectionIncludingRemoved,
+  getGrantedClaudeBillingConnection,
   insertClaudeBillingProfile,
   type ClaudeBillingOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
@@ -18,15 +20,17 @@ export async function ensureClaudeBillingProfile(
   owner: ClaudeBillingOwner,
   createdBy: string
 ): Promise<string> {
-  const lockKey =
-    owner.kind === 'organization' ? `org:${owner.organizationId}` : `user:${owner.kiloUserId}`;
+  const lockKey = claudeBillingOwnerKey(owner);
 
   return await db.transaction(async tx => {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${`claude_billing_profile:${lockKey}`}))`
     );
-    const existing = await getClaudeBillingConnection(owner, tx);
-    if (existing) return existing.user_profile_id;
+    const active = await getGrantedClaudeBillingConnection(owner, tx);
+    if (active) return active.user_profile_id;
+
+    const previous = await getClaudeBillingConnectionIncludingRemoved(owner, tx);
+    if (previous) return previous.user_profile_id;
 
     const userProfileId = await createClaudeUserProfile();
     const row = await insertClaudeBillingProfile(owner, userProfileId, createdBy, tx);

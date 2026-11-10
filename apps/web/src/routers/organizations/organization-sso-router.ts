@@ -4,16 +4,24 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
+  organizationAccessRole,
   organizationMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_MANAGE_ROLES,
+  canManageOrganization,
+} from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import { GenerateLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import { OrganizationSSODomainSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  OrganizationSSODomainSchema,
+  type OrganizationSsoConfigView,
+  type OrganizationSsoStatusView,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -47,6 +55,50 @@ async function hasWorkOsConnections(organizationId: string) {
     organizationId,
   });
   return connections.data.length > 0;
+}
+
+/**
+ * Releases the SSO domain an organization records, under the same locks a claim takes: the
+ * organization row first, then the advisory lock for the recorded domain. `updateSsoDomain`
+ * and the directory capture take them in that order, so a release cannot interleave with a
+ * claim of the same domain and make it fail on a stale authority read.
+ *
+ * Returns the released domain, or null when the organization records none. A null release
+ * writes nothing, so the audit log records one entry per changed field.
+ */
+async function releaseSsoDomain(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  actor: { id: string; google_user_email: string; google_user_name: string }
+): Promise<string | null> {
+  const [locked] = await tx
+    .select({ ssoDomain: organizations.sso_domain })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .for('update');
+  if (!locked?.ssoDomain) {
+    return null;
+  }
+
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${locked.ssoDomain}, 0))`
+  );
+  await tx
+    .update(organizations)
+    .set({ sso_domain: null })
+    .where(eq(organizations.id, organizationId));
+
+  await createAuditLog({
+    action: 'organization.sso.remove_domain',
+    actor_email: actor.google_user_email,
+    actor_id: actor.id,
+    actor_name: actor.google_user_name,
+    message: `Cleared SSO domain ${locked.ssoDomain}`,
+    organization_id: organizationId,
+    tx,
+  });
+
+  return locked.ssoDomain;
 }
 
 export const organizationSsoRouter = createTRPCRouter({
@@ -100,26 +152,73 @@ export const organizationSsoRouter = createTRPCRouter({
     // Check if organization has SSO connections
     const hasConnection = await hasWorkOsConnections(result.id);
 
-    return {
-      ...result,
+    // The summary names the domain its verification state describes: the verified
+    // one when the organization holds one, otherwise the first configured domain.
+    const primaryDomain =
+      result.domains?.find(domain => domain.state === OrganizationDomainState.Verified) ??
+      result.domains?.[0];
+
+    const status: OrganizationSsoStatusView = {
       isDomainVerified,
       hasConnection,
+      domain: primaryDomain?.domain ?? null,
     };
+
+    // Every member reads the status above. The provider organization, its
+    // domains with their verification state, and the rest of the WorkOS object
+    // are configuration material, and only the roles that may change that
+    // configuration read them.
+    const role = organizationAccessRole(opts.ctx, opts.ctx.organizationAccess);
+    if (!canManageOrganization(role)) {
+      return { kind: 'status', ...status } satisfies OrganizationSsoConfigView;
+    }
+
+    return {
+      kind: 'configuration',
+      ...status,
+      workosOrganization: {
+        id: result.id,
+        name: result.name,
+        domains: (result.domains ?? []).map(domain => ({
+          domain: domain.domain,
+          state: domain.state,
+        })),
+      },
+    } satisfies OrganizationSsoConfigView;
   }),
   deleteConfig: adminProcedure.input(OrgIdSchema).mutation(async opts => {
     const { organizationId } = opts.input;
     await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
     const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
-    if (!workOSOrg) {
+    const organization = await getOrganizationById(organizationId);
+    if (!organization) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+    }
+    // A configuration is the WorkOS organization, the recorded domain, or both; the procedure
+    // removes whatever the organization holds.
+    const releasedDomain = organization.sso_domain;
+    if (!workOSOrg && !releasedDomain) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
     }
-    await workos.organizations.deleteOrganization(workOSOrg.id);
-    await recordAdminAction(opts.ctx, {
-      action: 'organization.sso.config.delete',
-      target: organizationActionTarget(organizationId),
-      message: 'Deleted WorkOS SSO organization',
-      metadata: { workosOrganizationId: workOSOrg.id },
+
+    // Remove the WorkOS organization before the recorded domain, and record the platform admin
+    // action together with that deletion. The released domain is recorded by the
+    // organization.sso.remove_domain entry below, which reads the value under the row lock.
+    if (workOSOrg) {
+      await workos.organizations.deleteOrganization(workOSOrg.id);
+      await recordAdminAction(opts.ctx, {
+        action: 'organization.sso.config.delete',
+        target: organizationActionTarget(organizationId),
+        message: 'Deleted WorkOS SSO organization',
+        metadata: { workosOrganizationId: workOSOrg.id },
+      });
+    }
+
+    // Release whatever domain the organization records, and audit it.
+    await db.transaction(async tx => {
+      await releaseSsoDomain(tx, organizationId, opts.ctx.user);
     });
+
     return successResult({ message: 'SSO configuration deleted successfully' });
   }),
   generateAdminPortalLink: adminProcedure.input(AdminPortalSchema).mutation(async opts => {
@@ -204,18 +303,8 @@ export const organizationSsoRouter = createTRPCRouter({
     const { organizationId } = opts.input;
     await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
 
-    await db
-      .update(organizations)
-      .set({ sso_domain: null })
-      .where(eq(organizations.id, organizationId));
-
-    await createAuditLog({
-      action: 'organization.sso.remove_domain',
-      actor_email: opts.ctx.user.google_user_email,
-      actor_id: opts.ctx.user.id,
-      actor_name: opts.ctx.user.google_user_name,
-      message: `Cleared SSO domain`,
-      organization_id: organizationId,
+    await db.transaction(async tx => {
+      await releaseSsoDomain(tx, organizationId, opts.ctx.user);
     });
 
     return successResult({ message: 'SSO domain cleared successfully' });

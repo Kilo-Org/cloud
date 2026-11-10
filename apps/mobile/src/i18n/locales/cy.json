@@ -229,6 +229,21 @@
     "signInCodeField": "Cod mewngofnodi",
     "or": "neu"
   },
+  "pendingLink": {
+    "description": "Mae cyfrif eisoes yn defnyddio {{email}}. Mewngofnodwch gydag un o'i ddulliau i ychwanegu {{provider}}.",
+    "emailCode": "Anfon cod mewngofnodi ataf drwy e-bost",
+    "continueInBrowser": "Parhau yn y porwr",
+    "startAgain": "Dechrau eto",
+    "expired": "Mae'r cais hwn i ychwanegu {{provider}} wedi dod i ben.",
+    "noMethods": "Does gan y cyfrif hwn ddim dull mewngofnodi arall, felly does dim modd ychwanegu {{provider}}.",
+    "linked": "Cafodd {{provider}} ei ychwanegu at eich cyfrif.",
+    "failedExpired": "Chafodd {{provider}} mo'i ychwanegu oherwydd bod y cais wedi dod i ben.",
+    "failedWrongAccount": "Chafodd {{provider}} mo'i ychwanegu oherwydd i chi fewngofnodi i gyfrif gwahanol.",
+    "failedAccountAlreadyLinked": "Chafodd {{provider}} mo'i ychwanegu oherwydd ei fod eisoes wedi'i gysylltu â chyfrif arall.",
+    "failedProviderAlreadyLinked": "Chafodd {{provider}} mo'i ychwanegu oherwydd bod gan eich cyfrif ddull mewngofnodi {{provider}} gwahanol yn barod.",
+    "failedLinking": "Doedd dim modd ychwanegu {{provider}} at eich cyfrif.",
+    "notAdded": "Rydych chi wedi mewngofnodi. Chafodd {{provider}} mo'i ychwanegu at eich cyfrif."
+  },
   "profile": {
     "codeReviewerSubtitle": "Adolygiadau PR awtomatig",
     "securityAgentSubtitle": "Darganfod a thrwsio gwendidau",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Cadarnhau dileu",
     "credits": "Credydau",
     "failedToLoadBalance": "Methu llwytho'r balans. Tapiwch i geisio eto.",
+    "balanceLoadFailed": "Methu llwytho'r balans",
     "hideBalance": "Cuddio'r balans",
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Cyfrif prawf",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO menter",
     "passkeysTitle": "Allweddi mynediad",
     "passkeysSubtitle": "Mewngofnodi heb gyfrinair",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Nid oes unrhyw ffeiliau wedi'u newid yn y cais tynnu hwn.",
     "fileList": {
       "openNavigator": "Agor y llywiwr ffeiliau",
-      "filesViewed": "Ffeiliau · {{viewed}} o {{total}} wedi'u gweld",
       "listed": "(wedi'u rhestru)",
       "layout": "Cynllun",
       "unified": "Cyfun",
@@ -2576,7 +2593,7 @@
       "discardWithUploadsMessage": "Bydd eich anogiad ac unrhyw ffeiliau a uwchlwythwyd ond sydd heb eu defnyddio yn cael eu dileu.",
       "discardFailed": "Methu dileu'r drafft. Ceisiwch eto.",
       "remoteHint": "I redeg ar eich cyfrifiadur, dechreuwch Kilo yno a gadewch iddo redeg.",
-      "continueFrom": "Yn parhau â {{title}}.",
+      "continueFrom": "Yn parhau â “{{title}}”.",
       "importingSession": "Yn mewnforio sesiwn",
       "cliCannotContinue": "Ni all y CLI hwn barhau â sesiwn. Dewiswch Cloud Agent neu CLI arall.",
       "importFailed": "Methu mewnforio'r sesiwn hon.",
@@ -2744,7 +2761,21 @@
       "thought": "Syniad",
       "showDetails": "Dangos manylion",
       "pending": "Yn aros…",
-      "running": "Yn rhedeg…"
+      "running": "Yn rhedeg…",
+      "field": {
+        "filePath": "Llwybr ffeil",
+        "path": "Llwybr",
+        "offset": "Dadleoliad",
+        "limit": "Terfyn",
+        "pattern": "Patrwm",
+        "include": "Cynnwys",
+        "patchText": "Testun clwt",
+        "query": "Ymholiad",
+        "prompt": "Anogiad",
+        "header": "Pennawd",
+        "question": "Cwestiwn",
+        "options": "Opsiynau"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Methu dangos y cynnwys."
@@ -4026,7 +4057,7 @@
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
     },
-    "creditsRequired": "Dim digon o gredydau i anfon y neges hon. Ychwanegwch gredydau a rhowch gynnig arall arni."
+    "creditsRequired": "Dim digon o gredydau i anfon y neges hon."
   },
   "settingsTools": {
     "confirmTitle": "Cadarnhau'r newid hwn?"
@@ -4507,5 +4538,8 @@
     "noEnabledContexts": "Dim cyd-destunau wedi'u galluogi ar gyfer briffiau a drefnwyd",
     "sourceBlocker": "Mae angen rhoi sylw i'r sesiwn",
     "sourceMetadata": "Metadata'r sesiwn a gipiwyd"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ni lwyddwyd i agor canlyniad chwilio hwn"
   }
 }

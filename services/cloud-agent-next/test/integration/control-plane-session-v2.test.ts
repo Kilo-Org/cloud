@@ -451,6 +451,10 @@ type PreparingRowData = {
   step?: string;
   stepId?: string;
   parentStepId?: string;
+  label?: string;
+  command?: string;
+  commandIndex?: number;
+  commandCount?: number;
   safeError?: string;
   attempt?: { id?: string; status?: string; triggerMessageId?: string };
   stepSnapshot?: { id?: string; key?: string; status?: string };
@@ -677,26 +681,116 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(await readAlarm(stub)).toBeNull();
   });
 
-  it('fails accepted and re-prepares queued messages on a lost route', async () => {
-    const { stub, peer } = await setup();
-    peer.prepareView = peer.view('ready');
-    await stub.send(promptPayload('m1'));
-    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+  it.each(['connection_lost', 'billing_blocked'] as const)(
+    'fails accepted and re-prepares queued messages on a %s lost route',
+    async reason => {
+      const { stub, peer } = await setup();
+      peer.prepareView = peer.view('ready');
+      await stub.send(promptPayload('m1'));
+      await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
 
-    peer.prepareView = peer.view('preparing');
-    await stub.onRoute({ state: 'preparing', attemptId: peer.attemptId });
-    await stub.send(promptPayload('m2'));
-    const preparesBefore = peer.prepareCalls.length;
+      peer.prepareView = peer.view('preparing');
+      await stub.onRoute({ state: 'preparing', attemptId: peer.attemptId });
+      await stub.send(promptPayload('m2'));
+      const preparesBefore = peer.prepareCalls.length;
 
-    const oldAttempt = peer.attemptId;
-    peer.status = async input => ({ sessionId: input.sessionId, view: { state: 'unknown' } });
-    peer.attemptId = crypto.randomUUID();
-    peer.prepareView = peer.view('preparing');
-    await stub.onRoute({ state: 'lost', attemptId: oldAttempt, reason: 'connection_lost' });
-    expect(await messageStatus(stub, 'm1')).toBe('failed');
-    expect(await messageStatus(stub, 'm2')).toBe('queued');
-    expect(peer.prepareCalls.length).toBeGreaterThan(preparesBefore);
-  });
+      const oldAttempt = peer.attemptId;
+      peer.status = async input => ({ sessionId: input.sessionId, view: { state: 'unknown' } });
+      peer.attemptId = crypto.randomUUID();
+      peer.prepareView = peer.view('preparing');
+      const billingFailure =
+        reason === 'billing_blocked'
+          ? {
+              code: 'INSUFFICIENT_CREDITS' as const,
+              payer: { type: 'user' as const, id: SESSION_OWNER_ID },
+              retryable: true,
+              remainingMicrodollars: 4_000_000,
+              minimumRequiredMicrodollars: 5_000_000,
+            }
+          : undefined;
+      await stub.onRoute({ state: 'lost', attemptId: oldAttempt, reason, billingFailure });
+      expect(await messageStatus(stub, 'm1')).toBe('failed');
+      expect(await messageStatus(stub, 'm2')).toBe('queued');
+      expect(peer.prepareCalls.length).toBeGreaterThan(preparesBefore);
+      const saved = await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        const [message] = await db
+          .select()
+          .from(controlPlaneMessages)
+          .where(eq(controlPlaneMessages.message_id, 'm1'));
+        return message;
+      });
+      expect(saved.reason).toBe(reason);
+      expect(
+        saved.billing_failure === null ? undefined : JSON.parse(saved.billing_failure)
+      ).toEqual(billingFailure);
+    }
+  );
+
+  it.each(['failed', 'lost'] as const)(
+    'persists and replays billing details from a %s route, then recovers',
+    async state => {
+      const { stub, peer } = await setup();
+      peer.prepareView = peer.view(state === 'lost' ? 'ready' : 'preparing');
+      await stub.send(promptPayload('billing-message'));
+      if (state === 'lost')
+        await waitFor(async () =>
+          expect(await messageStatus(stub, 'billing-message')).toBe('running')
+        );
+      const billingFailure = {
+        code: 'INSUFFICIENT_CREDITS' as const,
+        payer: { type: 'user' as const, id: SESSION_OWNER_ID },
+        retryable: true,
+        remainingMicrodollars: 4_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      };
+      if (state === 'failed')
+        peer.prepareView = {
+          state,
+          attemptId: peer.attemptId,
+          reason: 'billing_blocked',
+          billingFailure,
+        };
+      await stub.onRoute({
+        state,
+        attemptId: peer.attemptId,
+        reason: 'billing_blocked',
+        billingFailure,
+      });
+      expect(await messageStatus(stub, 'billing-message')).toBe('failed');
+      expect(await readMessageReason(stub, 'billing-message')).toBe('billing_blocked');
+      await evictAllDurableObjects();
+      await installPeer(stub, peer);
+      const saved = await runInDurableObject(stub, async (_instance, durableState) => {
+        const db = drizzle(durableState.storage, { logger: false });
+        const [message] = await db
+          .select()
+          .from(controlPlaneMessages)
+          .where(eq(controlPlaneMessages.message_id, 'billing-message'));
+        const terminal = await db
+          .select()
+          .from(events)
+          .where(eq(events.stream_event_type, 'cloud.message.failed'));
+        return { message, terminal };
+      });
+      expect(JSON.parse(saved.message.billing_failure ?? 'null')).toEqual(billingFailure);
+      expect(saved.terminal.map(event => JSON.parse(event.payload))).toContainEqual(
+        expect.objectContaining({
+          messageId: 'billing-message',
+          reason: 'billing_blocked',
+          billingFailure,
+        })
+      );
+
+      peer.attemptId = crypto.randomUUID();
+      peer.prepareView = peer.view('ready');
+      await stub.send(promptPayload('recovered-message'));
+      await waitFor(async () =>
+        expect(await messageStatus(stub, 'recovered-message')).toBe('running')
+      );
+      expect(await messageStatus(stub, 'billing-message')).toBe('failed');
+    }
+  );
 
   it('fails a queued message on the backstop and clears the alarm', async () => {
     const { stub, peer } = await setup();
@@ -1031,30 +1125,50 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
-  it('keeps the environment snapshot detail after the sandbox starts', async () => {
-    const { sessionId, stub, peer } = await setup();
-    peer.prepareView = peer.view('preparing');
-    await stub.send(promptPayload('m1'));
-    const detail = 'Starting from the environment snapshot (revision 2)';
-    await stub.onRoute({ state: 'preparing', step: 'sandbox_create', attemptId: peer.attemptId });
-    await stub.onRoute({
-      state: 'preparing',
+  it.each([
+    {
       step: 'environment_snapshot',
-      detail,
-      attemptId: peer.attemptId,
-    });
-    await stub.onRoute({ state: 'preparing', step: 'sandbox_start', attemptId: peer.attemptId });
+      key: 'environment_snapshot',
+      detail: 'Using environment snapshot',
+    },
+    { step: 'restore', key: 'workspace_restore', detail: 'Using workspace snapshot' },
+  ] as const)(
+    'keeps $key capture time in live progress and replay after sandbox startup',
+    async ({ step, key, detail }) => {
+      const { sessionId, stub, peer } = await setup();
+      peer.prepareView = peer.view('preparing');
+      await stub.send(promptPayload('m1'));
+      const snapshotCapturedAt = Date.parse('2026-10-24T21:32:19Z');
+      const live = await connectStream(sessionId);
+      await waitForStreamEvent(live, 'connected');
+      await drainStream(live);
+      await stub.onRoute({ state: 'preparing', step: 'sandbox_create', attemptId: peer.attemptId });
+      await stub.onRoute({
+        state: 'preparing',
+        step,
+        detail,
+        snapshotCapturedAt,
+        attemptId: peer.attemptId,
+      });
+      await stub.onRoute({ state: 'preparing', step: 'sandbox_start', attemptId: peer.attemptId });
+      expect(preparingRows(await drainStream(live))).toContainEqual(
+        expect.objectContaining({ action: 'step_progress', detail, snapshotCapturedAt })
+      );
+      live.close();
 
-    const stream = await connectStream(sessionId);
-    await waitForStreamEvent(stream, 'connected');
-    const replayed = preparingRows(await drainStream(stream));
-    expect(
-      replayed.find(
-        row => row.action === 'step_snapshot' && row.stepSnapshot?.key === 'environment_snapshot'
-      )?.stepSnapshot
-    ).toMatchObject({ status: 'completed', latestDetail: detail });
-    stream.close();
-  });
+      const stream = await connectStream(sessionId);
+      await waitForStreamEvent(stream, 'connected');
+      const replayed = preparingRows(await drainStream(stream));
+      expect(
+        replayed.find(row => row.action === 'step_snapshot' && row.stepSnapshot?.key === key)
+          ?.stepSnapshot
+      ).toMatchObject({ status: 'completed', latestDetail: detail, snapshotCapturedAt });
+      expect(
+        replayed.find(row => row.stepSnapshot?.key === 'sandbox_boot')?.stepSnapshot
+      ).not.toHaveProperty('snapshotCapturedAt');
+      stream.close();
+    }
+  );
 
   it('preserves ordered phase occurrences and original starts across retries in one attempt', async () => {
     const { sessionId, stub, peer } = await setup();
@@ -1368,6 +1482,180 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(commandRows[1]).toMatchObject({ step: 'setup_commands', output: 'npm install\n' });
     // The rendered preparing rows replace the raw wrapper events.
     expect(messages.some(message => message.streamEventType === 'kilocode')).toBe(false);
+    stream.close();
+  });
+
+  it('renders session setup and start phases with their kind and command text', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+    await stub.onEvents({
+      events: [
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 1,
+            commandCount: 1,
+            kind: 'session_setup',
+            commandText: 'pnpm install',
+          },
+        },
+        {
+          type: 'session.setup.finished',
+          properties: { command: 1, kind: 'session_setup', exitCode: 0 },
+        },
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 1,
+            commandCount: 2,
+            kind: 'start',
+            commandText: 'pnpm dev:start',
+          },
+        },
+        {
+          type: 'session.setup.finished',
+          properties: {
+            command: 1,
+            kind: 'start',
+            exitCode: 1,
+            safeError: 'Start command 1 failed',
+          },
+        },
+      ],
+    });
+
+    const messages = await drainStream(stream);
+    const rows = preparingRows(messages);
+    const setupStart = rows.find(
+      row =>
+        row.action === 'step_started' &&
+        row.step === 'session_setup_commands' &&
+        row.stepId?.endsWith('setup_command:0')
+    );
+    expect(setupStart).toMatchObject({
+      step: 'session_setup_commands',
+      stepId: 'phase:session_setup_commands:setup_command:0',
+      label: 'Session setup command 1 · `pnpm install`',
+      command: 'pnpm install',
+      commandIndex: 0,
+      commandCount: 1,
+    });
+    const startPhase = rows.find(
+      row =>
+        row.action === 'step_started' &&
+        row.step === 'start_commands' &&
+        row.stepId?.startsWith('phase:start_commands')
+    );
+    expect(startPhase).toMatchObject({ step: 'start_commands' });
+    const startCommand = rows.find(
+      row => row.step === 'start_commands' && row.stepId?.endsWith('setup_command:0')
+    );
+    expect(startCommand).toMatchObject({
+      action: 'step_started',
+      label: 'Start command 1 · `pnpm dev:start`',
+      command: 'pnpm dev:start',
+    });
+    expect(startCommand?.parentStepId).toMatch(/^phase:start_commands/);
+
+    const failed = rows.filter(row => row.action === 'step_failed');
+    expect(failed).toEqual([
+      expect.objectContaining({
+        step: 'start_commands',
+        stepId: 'phase:start_commands:setup_command:0',
+      }),
+    ]);
+    expect(messages.some(message => message.streamEventType === 'cloud.command.failed')).toBe(
+      false
+    );
+    stream.close();
+  });
+
+  it('records a timed-out start command once when the failure is redelivered', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+    const failureEvent = {
+      type: 'session.setup.finished',
+      properties: {
+        command: 2,
+        commandCount: 2,
+        kind: 'start',
+        exitCode: 124,
+        terminationReason: 'hard_timeout',
+        safeError: 'Start command 2 timed out',
+      },
+    };
+    await stub.onEvents({
+      events: [
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 2,
+            commandCount: 2,
+            kind: 'start',
+            commandText: 'pnpm dev:start',
+          },
+        },
+        failureEvent,
+        failureEvent,
+      ],
+    });
+
+    const messages = await drainStream(stream);
+    const failed = preparingRows(messages).filter(row => row.action === 'step_failed');
+    expect(failed).toHaveLength(1);
+    expect(failed[0]).toMatchObject({
+      step: 'start_commands',
+      safeError: 'Start command 2 timed out',
+    });
+    expect(
+      preparingRows(messages).find(row => row.action === 'step_started' && row.commandIndex === 1)
+    ).toMatchObject({ label: 'Start command 2 · `pnpm dev:start`', command: 'pnpm dev:start' });
+    expect(messages.some(message => message.streamEventType === 'cloud.command.failed')).toBe(
+      false
+    );
+    stream.close();
+  });
+
+  it.each([
+    { kind: 'build', phase: 'setup_commands' },
+    { kind: undefined, phase: 'setup_commands' },
+  ] as const)('records a $kind command under the $phase phase', async ({ kind, phase }) => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+    await stub.onEvents({
+      events: [
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 1,
+            commandCount: 1,
+            ...(kind === undefined ? {} : { kind }),
+          },
+        },
+        {
+          type: 'session.setup.finished',
+          properties: {
+            command: 1,
+            exitCode: 1,
+            ...(kind === undefined ? {} : { kind }),
+          },
+        },
+      ],
+    });
+    const messages = await drainStream(stream);
+    // The legacy path keeps the old phase key so old wrappers are unchanged.
+    expect(
+      preparingRows(messages).some(row => row.step === phase && row.action === 'step_started')
+    ).toBe(true);
     stream.close();
   });
 
@@ -2064,7 +2352,18 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         });
         for (const [key, value] of retained) await state.storage.put(key, value);
         expect(await state.storage.get('control_plane_generation')).toBe(2);
-        db.insert(allocationTable).values(allocation).run();
+        // Raw SQL: the pre-B allocation table predates `create_attempt`.
+        db.run(
+          sql`INSERT INTO allocation (id, state, allocation_id, connection_id, provider_ref, wrapper_id,
+                  last_frame_at, last_activity_at, create_deadline_at, first_connect_deadline_at,
+                  stop_attempt, stop_pending, stop_at, unconfirmed_provider_ref, provider_pin)
+              VALUES (${allocation.id}, ${allocation.state}, ${allocation.allocation_id},
+                  ${allocation.connection_id}, ${allocation.provider_ref}, ${allocation.wrapper_id},
+                  ${allocation.last_frame_at}, ${allocation.last_activity_at},
+                  ${allocation.create_deadline_at}, ${allocation.first_connect_deadline_at},
+                  ${allocation.stop_attempt}, ${allocation.stop_pending}, ${allocation.stop_at},
+                  ${allocation.unconfirmed_provider_ref}, ${allocation.provider_pin})`
+        );
         // Raw SQL: the pre-B routes table predates `repo_key`, which the schema now carries.
         db.run(
           sql`INSERT INTO routes (session_id, spec, grant, credential_source, state, attempt_id, attempt_deadline_at, reason, updated_at)
@@ -2664,6 +2963,110 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     expect(provider.createCalls).toBe(2);
     wrapper.close();
   });
+
+  it('fails the queued message when the create attempt budget is spent', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = isolatedSandboxId();
+    const provider = createFakeProvider();
+    provider.failure = new Error('provider unavailable');
+    const sandboxStub = sandboxes.getByName(sandboxId);
+    await runInDurableObject(sandboxStub, async instance => {
+      await instance.getAllocationState();
+      installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+      });
+    });
+    const sessionName = sessionDoName(SESSION_OWNER_ID, sessionId);
+    const sessionStub = sessions.getByName(sessionName);
+    await sessionStub.registerSession(registration(sandboxId, sessionId));
+    const reports: CloudAgentQueueReport[] = [];
+    const callbacks: CallbackJob[] = [];
+    await runInDurableObject(sessionStub, instance => {
+      instance.env.CLOUD_AGENT_REPORT_QUEUE = {
+        send: async (report: CloudAgentQueueReport) => {
+          reports.push(report);
+        },
+      } as never;
+      instance.env.CALLBACK_QUEUE = {
+        send: async (job: CallbackJob) => {
+          callbacks.push(job);
+        },
+      } as never;
+    });
+    const stream = await connectStream(sessionName);
+    const startedAt = Date.now();
+    await sessionStub.send(promptPayload('m1'));
+
+    // The retry runs and fails: two attempts, and the budget is spent long
+    // before the attempt deadline could expire.
+    await waitFor(async () => {
+      const allocation = await sandboxStub.getAllocationState();
+      expect(provider.createCalls).toBe(1);
+      expect(allocation.kind).toBe('creating');
+      // The pause the first failure persisted, not the first create deadline.
+      expect(allocation.createDeadlineAt).toBeLessThanOrEqual(
+        Date.now() + CONTROL_PLANE_TIMERS.sandbox.providerCreateRetryMs
+      );
+    });
+    await waitFor(async () => {
+      await runInDurableObject(sandboxStub, async (instance, state) => {
+        drizzle(state.storage)
+          .update(allocationTable)
+          .set({ create_deadline_at: Date.now() - 1 })
+          .where(eq(allocationTable.id, 'current'))
+          .run();
+        await instance.alarm();
+      });
+      expect(provider.createCalls).toBe(2);
+    });
+    await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('failed'));
+    expect(Date.now() - startedAt).toBeLessThan(
+      CONTROL_PLANE_TIMERS.sandbox.providerCreateRetryMs * 3
+    );
+    expect(await readMessageReason(sessionStub, 'm1')).toBe('sandbox_create_failed');
+    expect((await sandboxStub.status({ sessionId })).view).toMatchObject({
+      state: 'failed',
+      reason: 'sandbox_create_failed',
+    });
+    const failed = await waitForStreamEvent(stream, 'cloud.message.failed');
+    expect(failed.data).toMatchObject({
+      messageId: 'm1',
+      status: 'failed',
+      reason: 'sandbox_create_failed',
+      error: 'The sandbox could not be created',
+      accepted: false,
+    });
+    await runSessionAlarm(sessionStub);
+    expect(reports).toHaveLength(1);
+    expect(reports[0]?.run).toMatchObject({
+      status: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'sandbox_connect_failed',
+    });
+    expect(reports[0]?.run.diagnostic).toMatchObject({
+      errorMessageRedacted: 'Sandbox connection failed',
+    });
+    await waitFor(async () =>
+      expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
+    );
+    expect(provider.createCalls).toBe(2);
+    stream.close();
+    // A fresh client opens into the same error status rather than a retrying
+    // preparation: the failure survives the session's own reconnect.
+    const reopened = await connectStream(sessionName);
+    const connected = await waitForStreamEvent(reopened, 'connected');
+    expect(connected.data).toMatchObject({
+      cloudStatus: { type: 'error', message: 'sandbox_create_failed' },
+    });
+    reopened.close();
+  }, 20_000);
 
   it('completes a cold message and streams queued, sent, and completed', async () => {
     const sessionId = newSessionId();

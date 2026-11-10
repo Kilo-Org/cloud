@@ -229,6 +229,21 @@
     "signInCodeField": "Kod za prijavu",
     "or": "ili"
   },
+  "pendingLink": {
+    "description": "Nalog već koristi {{email}}. Prijavi se jednim od njegovih načina da dodaš {{provider}}.",
+    "emailCode": "Pošalji mi kod za prijavu e-poštom",
+    "continueInBrowser": "Nastavi u pregledaču",
+    "startAgain": "Počni ponovo",
+    "expired": "Ovaj zahtev za dodavanje {{provider}} je istekao.",
+    "noMethods": "Ovaj nalog nema drugi način prijave, pa {{provider}} ne može da se doda.",
+    "linked": "{{provider}} je dodat na tvoj nalog.",
+    "failedExpired": "{{provider}} nije dodat jer je zahtev istekao.",
+    "failedWrongAccount": "{{provider}} nije dodat jer si se prijavio na drugi nalog.",
+    "failedAccountAlreadyLinked": "{{provider}} nije dodat jer je već povezan sa drugim nalogom.",
+    "failedProviderAlreadyLinked": "{{provider}} nije dodat jer tvoj nalog već ima drugu {{provider}} prijavu.",
+    "failedLinking": "{{provider}} nije moguće dodati na tvoj nalog.",
+    "notAdded": "Prijavljen si. {{provider}} nije dodat na tvoj nalog."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatski pregledi PR-ova",
     "securityAgentSubtitle": "Pronađi i otkloni ranjivosti",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Potvrdi brisanje",
     "credits": "Krediti",
     "failedToLoadBalance": "Učitavanje salda nije uspelo. Dodirni za ponovni pokušaj.",
+    "balanceLoadFailed": "Učitavanje salda nije uspelo",
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Probni nalog",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Poslovni SSO",
     "passkeysTitle": "Pristupni ključevi",
     "passkeysSubtitle": "Prijavi se bez lozinke",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "U ovom zahtevu za spajanje nema izmena datoteka.",
     "fileList": {
       "openNavigator": "Otvori pregled datoteka",
-      "filesViewed": "Datoteke · pregledano {{viewed}} od {{total}}",
       "listed": "(navedeno)",
       "layout": "Raspored",
       "unified": "Objedinjeno",
@@ -2450,7 +2467,7 @@
       "discardWithUploadsMessage": "Tvoj upit i svi otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani.",
       "discardFailed": "Odbacivanje nacrta nije uspelo. Pokušaj ponovo.",
       "remoteHint": "Da pokreneš sesiju na svom računaru, pokreni Kilo tamo i ostavi ga da radi.",
-      "continueFrom": "Nastavlja se sesija {{title}}.",
+      "continueFrom": "Nastavlja se sesija „{{title}}“.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može da nastavi sesiju. Izaberi Cloud Agent ili drugi CLI.",
       "importFailed": "Uvoz ove sesije nije uspeo.",
@@ -2606,7 +2623,21 @@
       "thought": "Misao",
       "showDetails": "Prikaži detalje",
       "pending": "Na čekanju…",
-      "running": "Radi…"
+      "running": "Radi…",
+      "field": {
+        "filePath": "Putanja datoteke",
+        "path": "Putanja",
+        "offset": "Pomeraj",
+        "limit": "Ograničenje",
+        "pattern": "Obrazac",
+        "include": "Uključivanje",
+        "patchText": "Tekst zakrpe",
+        "query": "Upit",
+        "prompt": "Uputstvo",
+        "header": "Naslov",
+        "question": "Pitanje",
+        "options": "Opcije"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Prikaz sadržaja nije uspeo."
@@ -3858,7 +3889,7 @@
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava nivo razmišljanja"
     },
-    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke. Dodajte kredite i pokušajte ponovo."
+    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke."
   },
   "settingsTools": {
     "confirmTitle": "Potvrditi ovu promenu?"
@@ -4309,5 +4340,8 @@
     "noEnabledContexts": "Nijedan kontekst nije omogućen za zakazane izveštaje",
     "sourceBlocker": "Sesija zahteva pažnju",
     "sourceMetadata": "Zabeleženi metapodaci sesije"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
   }
 }

@@ -19,7 +19,7 @@ import {
 export type PreparationProgressRecorder = {
   readonly attemptId: string;
   /** Translate a legacy (step, message) progress callback into v2 events. */
-  onProgress(step: string, message: string): boolean;
+  onProgress(step: string, message: string, snapshotCapturedAt?: number): boolean;
   /**
    * Drive the attempt to a terminal state if it is still running. A no-op
    * when no preparation happened or the wrapper already finished the attempt.
@@ -37,7 +37,9 @@ export function createPreparationProgressRecorder(options: {
 }): PreparationProgressRecorder {
   const { attemptId, triggerMessageId, sessionId, eventQueries, broadcast } = options;
   const now = options.now ?? Date.now;
-  let activeStep: { id: string; key: PreparingStep; detail?: string } | undefined;
+  let activeStep:
+    | { id: string; key: PreparingStep; detail?: string; snapshotCapturedAt?: number }
+    | undefined;
 
   function emit(
     step: PreparingStep,
@@ -45,7 +47,7 @@ export function createPreparationProgressRecorder(options: {
     action:
       | { action: 'attempt_started' }
       | { action: 'step_started'; stepId: string; kind: 'phase'; label: string }
-      | { action: 'step_progress'; stepId: string; detail: string }
+      | { action: 'step_progress'; stepId: string; detail: string; snapshotCapturedAt?: number }
       | { action: 'step_completed'; stepId: string }
   ): void {
     // Revisions ride on the materialized snapshot so they stay monotonic no
@@ -72,11 +74,15 @@ export function createPreparationProgressRecorder(options: {
     if (materializePreparationEvent(eventQueries, stored, data)) broadcast(stored);
   }
 
-  function onProgress(step: string, message: string): boolean {
+  function onProgress(step: string, message: string, snapshotCapturedAt?: number): boolean {
     const existing = readPreparationAttempt(eventQueries, attemptId);
     if (existing?.status === 'completed' || existing?.status === 'failed') return false;
     const key = step as PreparingStep;
-    if (activeStep?.key === key && activeStep.detail === message) {
+    if (
+      activeStep?.key === key &&
+      activeStep.detail === message &&
+      (snapshotCapturedAt === undefined || activeStep.snapshotCapturedAt === snapshotCapturedAt)
+    ) {
       return existing?.status === 'running';
     }
     if (!existing) {
@@ -90,7 +96,12 @@ export function createPreparationProgressRecorder(options: {
       for (const running of steps) {
         if (running.kind !== 'phase' || running.status !== 'running') continue;
         if (running.key === key) {
-          activeStep = { id: running.id, key, detail: running.latestDetail };
+          activeStep = {
+            id: running.id,
+            key,
+            detail: running.latestDetail,
+            snapshotCapturedAt: running.snapshotCapturedAt,
+          };
         } else {
           emit(running.key, running.label, { action: 'step_completed', stepId: running.id });
         }
@@ -114,12 +125,21 @@ export function createPreparationProgressRecorder(options: {
         label: key.replaceAll('_', ' '),
       });
       activeStep = { id: stepId, key };
-    } else if (activeStep.detail === message) {
+    } else if (
+      activeStep.detail === message &&
+      (snapshotCapturedAt === undefined || activeStep.snapshotCapturedAt === snapshotCapturedAt)
+    ) {
       // A repeated report (a `prepare` reply and its notification) adds nothing.
       return existing?.status === 'running';
     }
-    emit(key, message, { action: 'step_progress', stepId: activeStep.id, detail: message });
+    emit(key, message, {
+      action: 'step_progress',
+      stepId: activeStep.id,
+      detail: message,
+      ...(snapshotCapturedAt === undefined ? {} : { snapshotCapturedAt }),
+    });
     activeStep.detail = message;
+    if (snapshotCapturedAt !== undefined) activeStep.snapshotCapturedAt = snapshotCapturedAt;
     return readPreparationAttempt(eventQueries, attemptId)?.status === 'running';
   }
 

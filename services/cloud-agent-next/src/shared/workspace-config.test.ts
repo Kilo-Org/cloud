@@ -12,6 +12,9 @@ const HEAVY: Partial<ControlPlaneRouteSpec> = {
   setupCommands: ['echo first'],
   environmentSetupCommandCount: 1,
   runtimeSkills: [{ name: 'review', rawMarkdown: '# Review' }],
+  runtimeInstructions: [
+    { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+  ],
   runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
   kiloCommands: [{ name: 'review', template: 'Review the change' }],
 };
@@ -40,6 +43,7 @@ describe('workspace config', () => {
     expect(attachment).not.toHaveProperty('setupCommands');
     expect(attachment).not.toHaveProperty('environmentSetupCommandCount');
     expect(attachment).not.toHaveProperty('runtimeSkills');
+    expect(attachment).not.toHaveProperty('runtimeInstructions');
     expect(attachment).not.toHaveProperty('runtimeAgents');
     expect(attachment).not.toHaveProperty('kiloCommands');
     expect(attachment).not.toHaveProperty('mcp');

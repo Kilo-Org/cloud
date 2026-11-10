@@ -25,7 +25,6 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 const organizationId = '00000000-0000-4000-8000-000000000002';
 
 const config = {
-  scanToolResults: true,
   status: 'ready',
   detectors: {
     injection_attack: { enabled: true, need_explanation: false },
@@ -185,7 +184,6 @@ describe('verdictCacheKeys', () => {
         },
       },
     ],
-    ['tool-result scope', { config: { ...config, scanToolResults: false } }],
   ])('shares no key across a different %s', (_name, overrides) => {
     const original = new Set(keysFor(conversation));
 
@@ -350,7 +348,6 @@ describe('scanRequestWithVerdictCache', () => {
         session_id: 'ses_retry',
         client_request_id: 'retry-request',
         api_kind: 'chat_completions',
-        scan_tool_results: true,
         ...result.report,
       });
     }
@@ -420,9 +417,10 @@ describe('scanRequestWithVerdictCache', () => {
   });
 
   it.each(['allow', 'block'] as const)(
-    'expires a cached %s after six hours without renewing it on hits',
+    'expires a cached %s after seven days without renewing it on hits',
     async action => {
       const startedAt = Date.now();
+      const expiresAt = startedAt + 7 * 24 * 60 * 60 * 1_000;
       const now = jest.spyOn(Date, 'now').mockReturnValue(startedAt);
       const store = memoryStore();
       const original = await scanRequestWithVerdictCache(
@@ -431,7 +429,7 @@ describe('scanRequestWithVerdictCache', () => {
       );
       if (!original.cacheEntry) throw new Error('expected a cacheable verdict');
       await rememberRequestVerdict(original.cacheEntry, store);
-      now.mockReturnValue(startedAt + ENKRYPT_VERDICT_CACHE_TTL_SECONDS * 1_000 - 1);
+      now.mockReturnValue(expiresAt - 1);
       const hitDependencies = deps(store);
 
       const hit = await scanRequestWithVerdictCache(makeRequest(conversation), hitDependencies);
@@ -440,7 +438,7 @@ describe('scanRequestWithVerdictCache', () => {
       expect(hit.cacheEntry).toBeNull();
       expect(hitDependencies.fetch).not.toHaveBeenCalled();
       expect(store.set).toHaveBeenCalledTimes(1);
-      now.mockReturnValue(startedAt + ENKRYPT_VERDICT_CACHE_TTL_SECONDS * 1_000);
+      now.mockReturnValue(expiresAt);
       const expiredDependencies = deps(store);
 
       const expired = await scanRequestWithVerdictCache(
@@ -493,7 +491,6 @@ describe('scanRequestWithVerdictCache', () => {
         },
       },
     ],
-    ['changed tool-result scope', { config: { ...config, scanToolResults: false } }],
     ['rewritten history', { segments: conversation.with(2, 'rewritten message') }],
   ])('does not reuse a cached block for %s', async (_name, overrides) => {
     const store = memoryStore();
@@ -526,36 +523,118 @@ describe('scanRequestWithVerdictCache', () => {
     expect(result.cacheEntry).toBeNull();
   });
 
-  it.each<[string, () => Response]>([
-    ['fails', () => new Response('unavailable', { status: 500 })],
-    ['reports a detector error', () => enkryptResponse({ pii: -1 })],
-  ])('returns no entry to cache when a log-only scan %s and allows', async (_name, respond) => {
+  describe('log-only scans', () => {
     const logOnlyConfig = {
-      scanToolResults: true,
       status: 'ready',
       detectors: { pii: { enabled: true, entities: ['secrets'] } },
       blockingDetectors: [],
     } satisfies EnkryptGuardrailRequest['config'];
 
-    const result = await scanRequestWithVerdictCache(
-      makeRequest(conversation, { config: logOnlyConfig }),
-      deps(memoryStore(), respond)
-    );
+    it.each<[string, () => Response]>([
+      ['detects', () => enkryptResponse({ pii: 1 })],
+      ['fails', () => new Response('unavailable', { status: 500 })],
+      ['is rate limited', () => new Response('slow down', { status: 429 })],
+      ['reports a detector error', () => enkryptResponse({ pii: -1 })],
+      ['returns an invalid response', () => new Response('{}', { status: 200 })],
+    ])('returns an allow entry for the final key when the scan %s', async (_name, respond) => {
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(conversation, { config: logOnlyConfig }),
+        deps(memoryStore(), respond)
+      );
 
-    expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.cacheEntry).toBeNull();
-  });
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(result.cacheEntry).toEqual({
+        key: keysFor(conversation, { config: logOnlyConfig }).at(-1),
+        verdict: 'allow',
+      });
+    });
 
-  it('returns no entry to cache when a log-only scan is too large to send', async () => {
-    const result = await scanRequestWithVerdictCache(
-      makeRequest(['a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1)], {
-        config: { ...config, blockingDetectors: [] },
-      }),
-      deps(memoryStore())
-    );
+    it('returns an allow entry when the request is too large to send', async () => {
+      const segments = ['a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1)];
+      const dependencies = deps(memoryStore());
 
-    expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.cacheEntry).toBeNull();
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(segments, { config: logOnlyConfig }),
+        dependencies
+      );
+
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(result.cacheEntry).toEqual({
+        key: keysFor(segments, { config: logOnlyConfig }).at(-1),
+        verdict: 'allow',
+      });
+    });
+
+    it('returns an allow entry without an API key', async () => {
+      const dependencies = deps(memoryStore());
+      dependencies.apiKey = undefined;
+
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(conversation, { config: logOnlyConfig }),
+        dependencies
+      );
+
+      expect(result.cacheEntry?.verdict).toBe('allow');
+    });
+
+    it('returns no entry to cache when the client disconnected', async () => {
+      const dependencies = deps(memoryStore());
+      dependencies.signal = AbortSignal.abort();
+
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(conversation, { config: logOnlyConfig }),
+        dependencies
+      );
+
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(result.cacheEntry).toBeNull();
+    });
+
+    it('scans only the new suffix after a failed scan', async () => {
+      const history = ['tool definitions', 'x'.repeat(10_000), `${'y'.repeat(4_000)}END`];
+      const store = memoryStore();
+      const failed = await scanRequestWithVerdictCache(
+        makeRequest(history, { config: logOnlyConfig }),
+        deps(store, () => enkryptResponse({ pii: -1 }))
+      );
+      if (!failed.cacheEntry) throw new Error('expected a cacheable allow');
+      await rememberRequestVerdict(failed.cacheEntry, store);
+      const dependencies = deps(store, () => enkryptResponse({ pii: 0 }));
+
+      await scanRequestWithVerdictCache(
+        makeRequest([...history, 'tool result', 'another question'], { config: logOnlyConfig }),
+        dependencies
+      );
+
+      expect(scannedTexts(dependencies)).toEqual([
+        `${'y'.repeat(ENKRYPT_SCAN_OVERLAP_CHARACTERS - 3)}END\n\ntool result\n\nanother question`,
+      ]);
+    });
+
+    it('does not let a blocking scan of the same detectors reuse its entries', async () => {
+      const store = memoryStore();
+      const failed = await scanRequestWithVerdictCache(
+        makeRequest(conversation, { config: logOnlyConfig }),
+        deps(store, () => new Response('unavailable', { status: 500 }))
+      );
+      if (!failed.cacheEntry) throw new Error('expected a cacheable allow');
+      await rememberRequestVerdict(failed.cacheEntry, store);
+      const blockingConfig = {
+        ...logOnlyConfig,
+        blockingDetectors: ['pii'],
+      } satisfies EnkryptGuardrailRequest['config'];
+      const dependencies = deps(store, () => enkryptResponse({ pii: 1 }));
+
+      const result = await scanRequestWithVerdictCache(
+        makeRequest(conversation, { config: blockingConfig }),
+        dependencies
+      );
+
+      expect(scannedTexts(dependencies)).toEqual([conversation.join('\n\n')]);
+      expect(result.verdict.action).toBe('block');
+    });
   });
 
   it.each(['missing API key', 'aborted request'])(
@@ -623,7 +702,7 @@ describe('scanRequestWithVerdictCache', () => {
     const store = memoryStore();
 
     const result = await scanRequestWithVerdictCache(
-      makeRequest(conversation, { config: { scanToolResults: true, status: 'invalid' } }),
+      makeRequest(conversation, { config: { status: 'invalid' } }),
       deps(store)
     );
 
@@ -632,13 +711,31 @@ describe('scanRequestWithVerdictCache', () => {
     expect(store.mget).not.toHaveBeenCalled();
   });
 
-  it('probes only the most recent prefixes', async () => {
-    const segments = Array.from({ length: MAX_PROBED_PREFIXES + 20 }, (_, index) => `m${index}`);
+  it('probes only the 1,024 most recent prefixes', async () => {
+    const segments = Array.from({ length: 1_024 + 20 }, (_, index) => `m${index}`);
     const store = memoryStore();
 
     await scanRequestWithVerdictCache(makeRequest(segments), deps(store));
 
     expect(store.mget.mock.calls).toEqual([[keysFor(segments).slice(20)]]);
+  });
+
+  it('reuses the oldest prefix within the 1,024-key window', async () => {
+    const segments = Array.from(
+      { length: 1_024 + 20 },
+      (_, index) => `m${index}: ${'x'.repeat(128)}`
+    );
+    const dependencies = deps(memoryStore([keysFor(segments)[20]]));
+
+    const result = await scanRequestWithVerdictCache(makeRequest(segments), dependencies);
+
+    expect(result.report).toEqual(
+      expect.objectContaining({ verdict_cache: 'hit', cached_segments: 21 })
+    );
+    const cachedCharacters = segments.slice(0, 21).join('\n\n').length;
+    expect(scannedTexts(dependencies)).toEqual([
+      segments.join('\n\n').slice(cachedCharacters - ENKRYPT_SCAN_OVERLAP_CHARACTERS),
+    ]);
   });
 
   it('scans in full when the only cached prefix is older than the probed prefixes', async () => {

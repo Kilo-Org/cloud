@@ -229,6 +229,21 @@
     "signInCodeField": "Sisselogimiskood",
     "or": "või"
   },
+  "pendingLink": {
+    "description": "Aadressi {{email}} kasutab juba üks konto. {{provider}} lisamiseks logi sisse mõne selle konto meetodiga.",
+    "emailCode": "Saada mulle sisselogimiskood e-postiga",
+    "continueInBrowser": "Jätka brauseris",
+    "startAgain": "Alusta uuesti",
+    "expired": "See {{provider}} lisamise taotlus on aegunud.",
+    "noMethods": "Sellel kontol pole muud sisselogimismeetodit, seega ei saa {{provider}} lisada.",
+    "linked": "{{provider}} lisati sinu kontole.",
+    "failedExpired": "{{provider}} jäi lisamata, sest taotlus aegus.",
+    "failedWrongAccount": "{{provider}} jäi lisamata, sest logisid sisse teise kontoga.",
+    "failedAccountAlreadyLinked": "{{provider}} jäi lisamata, sest see on juba seotud teise kontoga.",
+    "failedProviderAlreadyLinked": "{{provider}} jäi lisamata, sest sinu kontol on juba teine {{provider}} sisselogimine.",
+    "failedLinking": "{{provider}} ei õnnestunud sinu kontole lisada.",
+    "notAdded": "Oled sisse logitud. {{provider}} jäi sinu kontole lisamata."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automaatsed PR-ülevaatused",
     "securityAgentSubtitle": "Leia ja kõrvalda turvanõrkused",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Kinnita kustutamine",
     "credits": "Krediit",
     "failedToLoadBalance": "Saldo laadimine ebaõnnestus. Uuesti proovimiseks puuduta.",
+    "balanceLoadFailed": "Saldo laadimine ebaõnnestus",
     "hideBalance": "Peida saldo",
     "showBalance": "Näita saldot",
     "balanceHidden": "Saldo on peidetud",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Testikonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Ettevõtte SSO",
     "passkeysTitle": "Pääsuvõtmed",
     "passkeysSubtitle": "Logi sisse ilma paroolita",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "See tõmbetaotlus ei sisalda failimuudatusi.",
     "fileList": {
       "openNavigator": "Ava failinavigaator",
-      "filesViewed": "Failid · {{viewed}}/{{total}} vaadatud",
       "listed": "(loetletud)",
       "layout": "Paigutus",
       "unified": "Ühisvaade",
@@ -2560,7 +2577,21 @@
       "thought": "Mõttekäik",
       "showDetails": "Kuva üksikasjad",
       "pending": "Ootel…",
-      "running": "Käimas…"
+      "running": "Käimas…",
+      "field": {
+        "filePath": "Faili tee",
+        "path": "Tee",
+        "offset": "Nihe",
+        "limit": "Ülempiir",
+        "pattern": "Muster",
+        "include": "Kaasatavad failid",
+        "patchText": "Paranduse tekst",
+        "query": "Päring",
+        "prompt": "Viip",
+        "header": "Pealkiri",
+        "question": "Küsimus",
+        "options": "Valikud"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Sisu kuvamine ebaõnnestus."
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
     },
-    "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks. Lisa krediiti ja proovi uuesti."
+    "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks."
   },
   "settingsTools": {
     "confirmTitle": "Kas kinnitada see muudatus?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Ajastatud ülevaated pole üheski kontekstis lubatud",
     "sourceBlocker": "Seanss vajab tähelepanu",
     "sourceMetadata": "Salvestatud seansi metaandmed"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Otsingutulemust ei õnnestunud avada"
   }
 }

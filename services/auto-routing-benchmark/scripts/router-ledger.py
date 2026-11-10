@@ -18,9 +18,14 @@ SCHEMA = "router-campaign-ledger-v2"
 # Programme policy ceiling for cumulative new inference. Historical totals are
 # never constants: they derive from the immutable imported rows (origin snapshot).
 MAX_CUMULATIVE_NEW_USD = Decimal("100")
-PROSPECTIVE_SCHEMA = "router-prospective-allowance-v1"
-AMENDMENT_SCHEMA = "router-prospective-amendment-v1"
-FINANCING_SCHEMA = "router-financing-manifest-v1"
+PILOT_CAP_USD = Decimal("60")
+RUN_CAP_USD = Decimal("60")
+PROSPECTIVE_SCHEMA = "router-capped-exploration-allowance-v1"
+AMENDMENT_SCHEMA = "router-capped-exploration-amendment-v1"
+FINANCING_SCHEMA = "router-cost-forecast-v1"
+# Stored v4 financing manifests stay readable for audit. They never authorize current-version dispatch.
+LEGACY_FINANCING_SCHEMA = "router-financing-manifest-v1"
+MANIFEST_VERSION = 6
 
 
 def grant_tables(db):
@@ -123,7 +128,7 @@ def authorize(path, approval_path):
     content = Path(approval_path).read_bytes()
     approval = json.loads(content)
     expected = {"schema", "authorized", "action", "grant_id", "campaign_id", "inventory_sha256", "committed_upper_baseline_usd", "additional_cap_usd", "total_cap_usd", "candidate_slots", "historical_unknown_policy", "accepted_proposal", "user_response"}
-    if not isinstance(approval, dict) or set(approval) != expected or approval["schema"] != PROSPECTIVE_SCHEMA or approval["authorized"] is not True or approval["action"] != "authorize-prospective-router-study":
+    if not isinstance(approval, dict) or set(approval) != expected or approval["schema"] != PROSPECTIVE_SCHEMA or approval["authorized"] is not True or approval["action"] != "authorize-capped-exploration-router-study":
         raise ValueError("Exact parent prospective authorization required")
     if not isinstance(approval["grant_id"], str) or not approval["grant_id"] or any(not isinstance(approval[key], str) or not approval[key].strip() for key in ("accepted_proposal", "user_response")):
         raise ValueError("Grant identity and verbatim accepted proposal/user response required")
@@ -177,7 +182,7 @@ def amend_authorization(path, amendment_path):
     content = Path(amendment_path).read_bytes()
     amendment = json.loads(content)
     expected = {"schema", "authorized", "action", "amendment_id", "grant_id", "prior_approval_sha256", "cumulative_additional_cap_usd", "candidate_slots", "accepted_proposal", "user_response"}
-    if not isinstance(amendment, dict) or set(amendment) != expected or amendment["schema"] != AMENDMENT_SCHEMA or amendment["authorized"] is not True or amendment["action"] != "amend-prospective-router-study-authorization":
+    if not isinstance(amendment, dict) or set(amendment) != expected or amendment["schema"] != AMENDMENT_SCHEMA or amendment["authorized"] is not True or amendment["action"] != "amend-capped-exploration-router-study-authorization":
         raise ValueError("Exact prospective authorization amendment required")
     if not isinstance(amendment["amendment_id"], str) or not amendment["amendment_id"] or not isinstance(amendment["grant_id"], str) or not amendment["grant_id"] or any(not isinstance(amendment[key], str) or not amendment[key].strip() for key in ("accepted_proposal", "user_response")):
         raise ValueError("Amendment identity and verbatim accepted proposal/user response required")
@@ -437,7 +442,7 @@ def register(db, manifest, candidates):
     existing = {row[0] for row in db.execute("SELECT fingerprint FROM campaign_candidates")}
     grant = prospective_grant(db)
     if grant is not None:
-        if manifest.get("version") != 4 or manifest.get("spec", {}).get("prospective_grant_id") != grant["grant_id"] or len(candidates) != 2 or {item.get("router") for item in candidates} != {"efficient", "frontier"}:
+        if manifest.get("version") != MANIFEST_VERSION or manifest.get("spec", {}).get("prospective_grant_id") != grant["grant_id"] or len(candidates) != 2 or {item.get("router") for item in candidates} != {"efficient", "frontier"}:
             raise ValueError("Prospective manifest requires exactly one grant-bound candidate per mode")
         registered = dict(db.execute("SELECT router,fingerprint FROM campaign_prospective_candidates WHERE grant_id=?", (grant["grant_id"],)))
         for fingerprint, identity in new.items():
@@ -453,37 +458,42 @@ def register(db, manifest, candidates):
     return {"campaign_id": values["campaign_id"], "candidate_fingerprints": sorted(new), "registered_before": state["registered"]}
 
 
-def plan_liability(db, pending=None):
-    """Whole-plan liability under the current authorization.
+def register_manifest(db, manifest):
+    """Register a v6 manifest only. The live router arm is not a candidate.
 
-    settled+held requests + remaining envelopes of active admissions +
-    envelopes of every unattempted financed mandatory row, across all
-    financed plans. A run already admitted is never counted twice: while
-    active only its admission envelope remainder counts; after terminality
-    only its actual held requests count (unused envelope is released).
-    `pending`=(run, amount) adds a hypothetical next reservation to held.
+    No campaign_candidates or campaign_prospective_candidates row is
+    written, so the router arm counts toward neither CANDIDATE_CAP nor a
+    grant's per-mode candidate slot.
     """
-    requests = rows(db)
-    held_by_run = {}
-    for row in requests:
-        held_by_run[row["run"]] = held_by_run.get(row["run"], Decimal(0)) + held(row)
+    values = metadata(db)
+    grant = prospective_grant(db)
+    if grant is None or manifest.get("version") != MANIFEST_VERSION or manifest.get("spec", {}).get("prospective_grant_id") != grant["grant_id"]:
+        raise ValueError("Manifest registration requires the current prospective grant manifest")
+    manifest_hash = digest(manifest)
+    db.execute("INSERT INTO campaign_manifests VALUES (?,?,?)", (manifest_hash, manifest["out_root"], json.dumps(manifest, sort_keys=True)))
+    return {"campaign_id": values["campaign_id"], "manifest_sha256": manifest_hash, "candidate_fingerprints": []}
+
+
+def plan_liability(db, pending=None):
+    """Incurred liability under capped exploration.
+
+    Only settled plus held requests count, plus one hypothetical next
+    reservation in `pending`=(run, amount). Forecasts and unused future
+    envelopes are not incurred commitments. Each forecast is reported by
+    its own identity, never as a blend of historical plans.
+    """
+    settled_held = sum((held(row) for row in rows(db)), Decimal(0))
     if pending is not None:
-        run, amount = pending
-        held_by_run[run] = held_by_run.get(run, Decimal(0)) + money(amount)
-    settled_held = sum(held_by_run.values(), Decimal(0))
-    admissions = {run: money(maximum) for run, maximum in db.execute("SELECT run,maximum_usd FROM campaign_admissions")} if _table(db, "campaign_admissions") else {}
-    active = {row[0] for row in db.execute("SELECT run FROM router_runs WHERE state='active'")} if _table(db, "router_runs") else set()
-    active_remaining = sum((max(Decimal(0), admissions[run] - held_by_run.get(run, Decimal(0))) for run in active if run in admissions), Decimal(0))
-    unattempted = Decimal(0)
-    financed_runs = {}
-    if _table(db, "campaign_financing_rows"):
-        for run, envelope in db.execute("SELECT run,envelope_usd FROM campaign_financing_rows"):
-            financed_runs[run] = max(financed_runs.get(run, Decimal(0)), money(envelope))
-        unattempted = sum((envelope for run, envelope in financed_runs.items() if run not in admissions), Decimal(0))
-    return {"settled_plus_held_usd": settled_held, "active_envelope_remaining_usd": active_remaining, "unattempted_financed_envelope_usd": unattempted, "total_liability_usd": settled_held + active_remaining + unattempted, "financed_runs": financed_runs, "admitted_runs": set(admissions)}
+        settled_held += money(pending[1])
+    return {"settled_plus_held_usd": settled_held, "total_liability_usd": settled_held}
 
 
 def check_financing_fits(db, pending=None):
+    """True when incurred commitments plus `pending` fit the effective ceiling.
+
+    Forecast size never decides fit. A request must fit the incurred
+    allowance independently of the complete plan's cost forecast.
+    """
     authorization = effective_authorization(db)
     if authorization is None:
         raise ValueError("Paid dispatch requires a prospective authorization")
@@ -496,10 +506,10 @@ def _registered_plan(db, financing):
     """Load the registered manifest and its frozen execution plan, hash-checked."""
     manifest_sha = financing.get("manifest_sha256")
     if not isinstance(manifest_sha, str):
-        raise ValueError("Financing must bind a registered campaign manifest")
+        raise ValueError("Cost forecast must bind a registered campaign manifest")
     record = db.execute("SELECT out_root,manifest_json FROM campaign_manifests WHERE sha256=?", (manifest_sha,)).fetchone()
     if record is None:
-        raise ValueError("Financing must bind a registered campaign manifest")
+        raise ValueError("Cost forecast must bind a registered campaign manifest")
     out_root, manifest_json = record
     manifest = json.loads(manifest_json)
     if digest(manifest) != manifest_sha or not isinstance(manifest, dict):
@@ -509,7 +519,7 @@ def _registered_plan(db, financing):
     plan_sha = financing.get("execution_plan_sha256")
     approval = manifest.get("approval") if isinstance(manifest.get("approval"), dict) else {}
     if not isinstance(plan_sha, str) or approval.get("execution_plan_sha256") != plan_sha:
-        raise ValueError("Financing execution plan hash must equal the registered manifest approval hash")
+        raise ValueError("Cost forecast execution plan hash must equal the registered manifest approval hash")
     try:
         plan = json.loads((Path(out_root) / "execution-plan.json").read_text())
     except (OSError, ValueError) as error:
@@ -535,61 +545,71 @@ def _validate_financing_rows(financing, manifest, expected):
     supplied = []
     for row in rows:
         if not isinstance(row, dict):
-            raise ValueError("Financing rows must be objects")
+            raise ValueError("Cost forecast rows must be objects")
         identity = tuple(row.get(key) for key in ("run", "phase", "arm_id", "router"))
         if any(not isinstance(value, str) or not value for value in identity):
-            raise ValueError("Financing rows must name each mandatory run, phase, arm and mode")
+            raise ValueError("Cost forecast rows must name each mandatory run, phase, arm and mode")
         supplied.append(identity)
     if supplied != expected:
-        raise ValueError("Financing rows must exactly cover every frozen plan run in plan order, with matching phase, arm and mode")
+        raise ValueError("Cost forecast rows must exactly cover every frozen plan run in plan order, with matching phase, arm and mode")
+    if financing.get("forecast_only") is not True:
+        raise ValueError("Cost forecast must state that it carries no full-plan funding guarantee")
     resources = financing.get("resources") if isinstance(financing.get("resources"), dict) else {}
     if not isinstance(resources.get("run_cost_limit_usd"), str):
-        raise ValueError("Financing must bind the unchanged per-run resource cap")
+        raise ValueError("Cost forecast must bind the unchanged per-run resource cap")
     resource_cap = money(resources["run_cost_limit_usd"])
+    if resource_cap <= 0 or resource_cap > RUN_CAP_USD:
+        raise ValueError("Cost forecast per-run resource cap must stay within the per-run ceiling")
     spec = manifest.get("spec") if isinstance(manifest.get("spec"), dict) else {}
     spec_resources = spec.get("resources") if isinstance(spec.get("resources"), dict) else {}
     if "run_cost_limit_usd" in spec_resources and money(spec_resources["run_cost_limit_usd"]) != resource_cap:
-        raise ValueError("Financing resource cap differs from the frozen manifest resource cap")
+        raise ValueError("Cost forecast resource cap differs from the frozen manifest resource cap")
     total, pilot_total = Decimal(0), Decimal(0)
     for row in rows:
         envelope, proved, cap = money(row.get("envelope_usd")), money(row.get("proved_envelope_usd")), money(row.get("resource_cap_usd"))
         if cap != resource_cap or envelope != min(proved, cap):
-            raise ValueError("Each financing envelope must equal min(proved bound, unchanged resource cap)")
+            raise ValueError("Each forecast envelope must equal min(proved bound, unchanged resource cap)")
         total += envelope
         if row["phase"] == "pilot":
             pilot_total += envelope
     if money(financing.get("total_envelope_usd")) != total:
-        raise ValueError("Financing total must equal the sum of every mandatory row envelope")
-    if not isinstance(financing.get("pilot_cap_usd"), str) or not isinstance(financing.get("pilot_envelope_usd"), str) or money(financing["pilot_envelope_usd"]) != pilot_total or pilot_total > money(financing["pilot_cap_usd"]):
-        raise ValueError("Financing pilot envelopes must sum exactly and stay within the frozen pilot cap")
+        raise ValueError("Forecast total must equal the sum of every mandatory row envelope")
+    if not isinstance(financing.get("pilot_cap_usd"), str) or not isinstance(financing.get("pilot_envelope_usd"), str) or money(financing["pilot_envelope_usd"]) != pilot_total or money(financing["pilot_cap_usd"]) <= 0 or money(financing["pilot_cap_usd"]) > PILOT_CAP_USD:
+        raise ValueError("Forecast pilot envelopes must sum exactly under a frozen pilot cap within the pilot ceiling")
     if "pilot_cap_usd" in spec and money(spec["pilot_cap_usd"]) != money(financing["pilot_cap_usd"]):
-        raise ValueError("Financing pilot cap differs from the frozen manifest pilot cap")
+        raise ValueError("Forecast pilot cap differs from the frozen manifest pilot cap")
     return total
 
 
 def register_financing(db, financing):
-    """Register one hash-bound whole-plan financing manifest. Caller holds BEGIN IMMEDIATE."""
+    """Register one hash-bound whole-plan cost forecast. Caller holds BEGIN IMMEDIATE.
+
+    The forecast must price every mandatory row. Its total and its pilot
+    total may exceed the cumulative allowance and the pilot cap. Dispatch
+    stops at the caps instead, and a stopped plan is inconclusive.
+    """
     financing_tables(db)
     if not isinstance(financing, dict) or financing.get("schema") != FINANCING_SCHEMA or not isinstance(financing.get("rows"), list) or not financing["rows"]:
-        raise ValueError("Exact whole-plan financing manifest required")
+        raise ValueError("Exact whole-plan cost forecast required")
     manifest_sha = financing.get("manifest_sha256")
     manifest, _plan, expected = _registered_plan(db, financing)
+    if manifest.get("version") != MANIFEST_VERSION:
+        raise ValueError("Cost forecast requires a version6 manifest; old manifests are audit-only")
     authorization = effective_authorization(db, financing.get("authorization", {}).get("grant_id") if isinstance(financing.get("authorization"), dict) else None)
     if authorization is None or financing["authorization"] != authorization_summary(authorization):
-        raise ValueError("Financing must bind the current effective authorization and origin snapshot")
-    _validate_financing_rows(financing, manifest, expected)
+        raise ValueError("Cost forecast must bind the current effective authorization and origin snapshot")
+    forecast_total = _validate_financing_rows(financing, manifest, expected)
     plan_sha = digest(financing)
     existing = db.execute("SELECT financing_json FROM campaign_financing_plans WHERE sha256=?", (plan_sha,)).fetchone()
     if existing is not None:
         if json.loads(existing[0]) != financing:
-            raise ValueError("Financing plan hash collision")
+            raise ValueError("Cost forecast hash collision")
     else:
         db.execute("INSERT INTO campaign_financing_plans VALUES (?,?,?,?,?)", (plan_sha, manifest_sha, authorization["effective_approval_sha256"], json.dumps(financing, sort_keys=True), time.time()))
         db.executemany("INSERT INTO campaign_financing_rows VALUES (?,?,?,?)", ((plan_sha, row["run"], row["phase"], str(money(row["envelope_usd"]))) for row in financing["rows"]))
     fits = check_financing_fits(db)
-    if not fits["fits"]:
-        raise ValueError("Whole-plan financing exceeds the effective authorization ceiling: " + json.dumps(fits, sort_keys=True))
-    return {"financing_sha256": plan_sha, **fits}
+    allowance = max(Decimal(0), money(authorization["effective_ceiling_usd"]) - money(authorization["origin_commitments_usd"]))
+    return {"financing_sha256": plan_sha, **fits, "forecast_total_usd": str(forecast_total), "forecast_exceeds_allowance": forecast_total > allowance, "forecast_pilot_usd": financing["pilot_envelope_usd"], "funding_guarantee": "none; capped exploration may stop inconclusive"}
 
 
 def _revalidate_financing(db, financing_sha, financing, manifest_sha, authorization_sha):
@@ -600,8 +620,10 @@ def _revalidate_financing(db, financing_sha, financing, manifest_sha, authorizat
     amendment after registration makes earlier financing stale here, even
     though the immutable financing record itself is preserved for audit.
     """
+    if financing.get("schema") != FINANCING_SCHEMA or financing.get("forecast_only") is not True:
+        raise ValueError("Stored financing evidence is audit-only; register a version6 cost forecast before dispatch")
     if financing.get("manifest_sha256") != manifest_sha:
-        raise ValueError("Registered financing manifest binding changed")
+        raise ValueError("Registered cost forecast manifest binding changed")
     stored_rows = {}
     for run, phase, envelope in db.execute("SELECT run,phase,envelope_usd FROM campaign_financing_rows WHERE plan_sha256=?", (financing_sha,)):
         if run in stored_rows:
@@ -613,7 +635,7 @@ def _revalidate_financing(db, financing_sha, financing, manifest_sha, authorizat
     grant_id = financing.get("authorization", {}).get("grant_id") if isinstance(financing.get("authorization"), dict) else None
     current = effective_authorization(db, grant_id)
     if current is None or financing.get("authorization") != authorization_summary(current) or authorization_sha != current["effective_approval_sha256"]:
-        raise ValueError("Registered financing authorization is stale; re-finance under the current effective authorization")
+        raise ValueError("Registered cost forecast authorization is stale; register a new forecast under the current effective authorization")
     return financing
 
 
@@ -640,7 +662,7 @@ def require_current_financing(db, financing_sha):
     """Like financing_for, but a missing plan is also an admission failure."""
     financing = financing_for(db, financing_sha)
     if financing is None:
-        raise ValueError("Paid dispatch requires a registered whole-plan financing manifest")
+        raise ValueError("Paid dispatch requires a registered whole-plan cost forecast")
     return financing
 
 
@@ -653,6 +675,15 @@ def audit(path):
         grant = prospective_grant(db)
         authorization = effective_authorization(db)
         liability = None if authorization is None else check_financing_fits(db)
+        forecasts = []
+        if _table(db, "campaign_financing_plans"):
+            for sha, financing_json in db.execute("SELECT sha256,financing_json FROM campaign_financing_plans ORDER BY created,sha256"):
+                stored = json.loads(financing_json)
+                try:
+                    executable = financing_for(db, sha) is not None
+                except ValueError:
+                    executable = False
+                forecasts.append({"sha256": sha, "schema": stored.get("schema"), "hash_matches": digest(stored) == sha, "total_envelope_usd": stored.get("total_envelope_usd"), "executable_for_current_version": executable})
         source_hashes = {name: sha for name, sha in db.execute("SELECT path,sha256 FROM campaign_sources")}
         attributed = dict(db.execute("SELECT id,kind FROM router_requests"))
         receipt_locations = [{"request_id": request_id, "source": source, "original_path": original, "evidence_path": evidence, "sha256": sha} for request_id, source, original, evidence, sha in db.execute("SELECT * FROM campaign_receipt_locations ORDER BY source,request_id")]
@@ -666,7 +697,7 @@ def audit(path):
         legacy_ceiling = money(authorization["legacy_total_cap_usd"])
         effective_remaining = max(Decimal(0), min(cumulative - new_upper, legacy_ceiling - upper))
         accounting = {"historical_origin_commitments_usd": str(origin), "new_settled_plus_held_usd": str(new_upper), "cumulative_authorized_new_usd": str(cumulative), "unused_authorization_usd": str(effective_remaining), "effective_campaign_ceiling_usd": authorization["effective_ceiling_usd"], "legacy_total_cap_usd": authorization["legacy_total_cap_usd"], "whole_plan_liability": liability}
-    return {"schema": SCHEMA, "campaign_id": values["campaign_id"], "inventory_sha256": values["inventory_sha256"], "settled_actual_usd": str(settled), "settled_plus_held_usd": str(upper), "unsettled_upper_usd": str(upper - settled), "requests": len(requests), "unattributed_request_ids": [row["id"] for row in requests if row["id"] not in attributed], "receipt_locations_count": len(receipt_locations), "receipt_locations_sha256": digest(receipt_locations), "candidates": candidates, "admission_block": block, "source_sha256": source_hashes, "historical_evidence_can_establish_pass": False, "prospective_grant": None if grant is None else {key: value for key, value in grant.items() if key != "historical_rows"}, "effective_authorization": None if authorization is None else authorization_summary(authorization), "authorization_accounting": accounting}
+    return {"schema": SCHEMA, "campaign_id": values["campaign_id"], "inventory_sha256": values["inventory_sha256"], "settled_actual_usd": str(settled), "settled_plus_held_usd": str(upper), "unsettled_upper_usd": str(upper - settled), "requests": len(requests), "unattributed_request_ids": [row["id"] for row in requests if row["id"] not in attributed], "receipt_locations_count": len(receipt_locations), "receipt_locations_sha256": digest(receipt_locations), "candidates": candidates, "admission_block": block, "source_sha256": source_hashes, "historical_evidence_can_establish_pass": False, "capped_exploration": {"cumulative_new_ceiling_usd": str(MAX_CUMULATIVE_NEW_USD), "pilot_ceiling_usd": str(PILOT_CAP_USD), "run_ceiling_usd": str(RUN_CAP_USD), "liability_basis": "settled plus held incurred commitments only; forecast envelopes and unattempted rows excluded", "funding_guarantee": "none; capped exploration may stop inconclusive"}, "cost_forecasts": forecasts, "prospective_grant": None if grant is None else {key: value for key, value in grant.items() if key != "historical_rows"}, "effective_authorization": None if authorization is None else authorization_summary(authorization), "authorization_accounting": accounting}
 
 
 def main():

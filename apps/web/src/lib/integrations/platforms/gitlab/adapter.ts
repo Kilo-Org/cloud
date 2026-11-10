@@ -469,6 +469,12 @@ export type GitLabProject = {
   archived: boolean;
   marked_for_deletion_on?: string | null;
   marked_for_deletion_at?: string | null;
+  /**
+   * Access the requesting credential holds on the project, as reported by the
+   * instance. The value is provider input with no shape guarantee, so a caller
+   * that reads it validates it before use.
+   */
+  permissions?: unknown;
 };
 
 function isActiveGitLabProject(project: GitLabProject): boolean {
@@ -722,6 +728,53 @@ export async function fetchGitLabBranches(
     logExceptInTest('GitLab branches fetched', { projectId, count: branches.length });
 
     return branches;
+  } finally {
+    budget.dispose();
+  }
+}
+
+/**
+ * The exact remote head of one branch. Unlike the listing, this is a single
+ * point read: a missing branch is `null`, never a default-branch success.
+ */
+export async function fetchGitLabBranchHead(
+  accessToken: string,
+  projectId: string | number,
+  branch: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<{ sha: string } | null> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+  const budget = new GitLabListingBudget('branch head');
+  try {
+    const response = await fetchGitLab(
+      buildGitLabUrl(
+        instanceUrl,
+        `/api/v4/projects/${encodedProjectId}/repository/branches/${encodeURIComponent(branch)}`
+      ),
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+      budget
+    );
+
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      const bodyExcerpt = providerErrorExcerpt(await response.text());
+      logExceptInTest('GitLab branch head fetch failed:', {
+        status: response.status,
+        bodyExcerpt,
+      });
+      throw new GitLabBranchesFetchError(
+        response.status,
+        `GitLab branch head fetch failed: ${response.status}`
+      );
+    }
+
+    const data = (await response.json()) as { commit?: { id?: string } };
+    return typeof data.commit?.id === 'string' ? { sha: data.commit.id } : null;
   } finally {
     budget.dispose();
   }
@@ -1853,6 +1906,19 @@ export async function addReactionToMR(
   });
 }
 
+/**
+ * A non-ok HTTP response from the GitLab single-project read. The status is the
+ * only provider detail a caller can act on; the response body is never
+ * included, so a message built from this error cannot leak a token or a
+ * project path.
+ */
+export class GitLabProjectFetchError extends Error {
+  constructor(readonly status: number) {
+    super(`GitLab project fetch failed: ${status}`);
+    this.name = 'GitLabProjectFetchError';
+  }
+}
+
 export async function getGitLabProject(
   accessToken: string,
   projectPath: string,
@@ -1872,7 +1938,7 @@ export async function getGitLabProject(
   if (!response.ok) {
     const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab project fetch failed:', { status: response.status, bodyExcerpt });
-    throw new Error(`GitLab project fetch failed: ${response.status}`);
+    throw new GitLabProjectFetchError(response.status);
   }
 
   return (await response.json()) as GitLabProject;
@@ -2429,13 +2495,17 @@ export async function rotateProjectAccessToken(
  * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
  * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
+ * `signal` carries a caller's deadline, so a settlement that has spent its
+ * budget does not keep one revocation open for the per-request timeout.
+ *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#revoke-a-project-access-token
  */
 export async function revokeProjectAccessToken(
   accessToken: string,
   projectId: string | number,
   tokenId: number,
-  instanceUrl: string = DEFAULT_GITLAB_URL
+  instanceUrl: string = DEFAULT_GITLAB_URL,
+  signal?: AbortSignal
 ): Promise<void> {
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
@@ -2447,6 +2517,7 @@ export async function revokeProjectAccessToken(
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      ...(signal === undefined ? {} : { signal }),
     }
   );
 

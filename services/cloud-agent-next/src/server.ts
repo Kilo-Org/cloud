@@ -58,12 +58,14 @@ import {
 import {
   logRuntimeProxyRequestFailed,
   readUpstreamFailureEvidence,
+  runtimeProxyRequestShape,
 } from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopeIngestRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
+  runtimeProxyAttestationAudience,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
 import { readBoundedBody } from './utils/read-bounded-body.js';
@@ -76,7 +78,6 @@ import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
-  type RuntimeProxyAttestationAudience,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { TRPCError } from '@trpc/server';
 import {
@@ -552,10 +553,29 @@ async function forwardRuntimeCredentialProxy(
   path: string
 ): Promise<Response> {
   if (!claims || !isControlSession(claims.sessionId)) return c.text('Unauthorized', 401);
+  const correlation = { sessionId: claims.sessionId, kiloSessionId: claims.kiloSessionId };
+  const requestShape = (organizationId: string | undefined) =>
+    runtimeProxyRequestShape({
+      route,
+      method: c.req.method,
+      path,
+      organizationId,
+      kiloSessionId: claims.kiloSessionId,
+    });
+  // One diagnostic per refused request: the path, method or body has no allowlist entry.
+  const rejectRoute = (organizationId: string | undefined): Response => {
+    logRuntimeProxyRequestFailed({
+      upstreamAttempted: false,
+      rejectionStage: 'route',
+      request: requestShape(organizationId),
+      ...correlation,
+    });
+    return c.text('Not found', 404);
+  };
   let bodyText: string | undefined;
   if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
-    if (bodyText === undefined) return c.text('Not found', 404);
+    if (bodyText === undefined) return rejectRoute(undefined);
   }
   let credential: {
     token: string;
@@ -596,7 +616,7 @@ async function forwardRuntimeCredentialProxy(
       contentType: c.req.header('content-type'),
       bodyText,
     });
-    if (adopted === null) return c.text('Not found', 404);
+    if (adopted === null) return rejectRoute(credential.organizationId);
     upstream = adopted.upstream;
     if (adopted.kind === 'scoped') {
       const v2Headers = encodeCloudAgentSessionScopeV2ViewHeaders(scopeView);
@@ -630,11 +650,10 @@ async function forwardRuntimeCredentialProxy(
         bodyText
       );
   }
-  if (!upstream) return c.text('Not found', 404);
+  if (!upstream) return rejectRoute(credential.organizationId);
   try {
     // The route allowlist is resolved above before a proof is issued.
-    const audience: RuntimeProxyAttestationAudience =
-      route === 'backend' ? 'kilo-api' : route === 'ingest' ? 'session-ingest' : 'kilo-gateway';
+    const audience = runtimeProxyAttestationAudience(route, path);
     const proof = await issueRuntimeProxyAttestation({
       secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
         if (!value) throw new Error('Authentication unavailable');
@@ -669,8 +688,8 @@ async function forwardRuntimeCredentialProxy(
         upstreamAttempted: true,
         upstreamStatus: response.status,
         evidence: await readUpstreamFailureEvidence(response),
-        sessionId: claims.sessionId,
-        kiloSessionId: claims.kiloSessionId,
+        request: requestShape(credential.organizationId),
+        ...correlation,
       });
     }
     return sanitizeRuntimeProxyResponse(response);

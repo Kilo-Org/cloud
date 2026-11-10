@@ -2,7 +2,9 @@ import {
   environmentReferenceSchema,
   type SessionEnvironmentReference,
 } from '../../environment-build/reference.js';
+import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
 import { eq } from 'drizzle-orm';
+import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import type { drizzle } from 'drizzle-orm/durable-sqlite';
 import {
   controlPlaneCredentialSourceSchema,
@@ -66,12 +68,14 @@ export type RouteRecord = {
   attemptId: string;
   attemptDeadlineAt: number;
   reason: ControlPlaneFailureReason | null;
+  billingFailure?: CustomerBillingFailure;
 };
 
 /** One preparation step and an optional live detail line within it. */
 export type RoutePreparationProgress = {
   step: ControlPlanePreparationStep;
   detail?: string;
+  snapshotCapturedAt?: number;
 };
 
 /** The grant outcome for a route attempt: a re-projected spec plus the grant. */
@@ -140,6 +144,9 @@ export function routeFromRow(db: RouteDatabase, row: RouteRow): RouteRecord {
     attemptId: row.attempt_id,
     attemptDeadlineAt: row.attempt_deadline_at ?? 0,
     reason: row.reason === null ? null : controlPlaneFailureReasonSchema.parse(row.reason),
+    ...(row.billing_failure == null
+      ? {}
+      : { billingFailure: readCustomerBillingFailure(row.billing_failure) }),
   };
 }
 
@@ -155,6 +162,8 @@ function routeToRow(route: RouteRecord): typeof routesTable.$inferInsert {
     attempt_id: route.attemptId,
     attempt_deadline_at: route.attemptDeadlineAt,
     reason: route.reason,
+    billing_failure:
+      route.billingFailure === undefined ? null : JSON.stringify(route.billingFailure),
     updated_at: Date.now(),
   };
 }
@@ -202,6 +211,7 @@ export function routeView(
       state: 'failed',
       attemptId: route.attemptId,
       reason: route.reason ?? 'preparation_timeout',
+      ...(route.billingFailure === undefined ? {} : { billingFailure: route.billingFailure }),
     };
   }
   return { state: 'preparing', attemptId: route.attemptId, ...sandboxProgress };
@@ -292,7 +302,9 @@ export async function failRoute(
   attemptId: string,
   reason: ControlPlaneFailureReason,
   stage = 'route',
-  diagnostic?: GrantDiagnosticSnapshot
+  diagnostic?: GrantDiagnosticSnapshot,
+  subtype?: ControlPlaneWorkspaceFailureSubtype,
+  billingFailure?: CustomerBillingFailure
 ): Promise<RouteRecord> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   const route: RouteRecord = {
@@ -305,6 +317,7 @@ export async function failRoute(
     attemptId,
     attemptDeadlineAt: 0,
     reason,
+    ...(billingFailure === undefined ? {} : { billingFailure }),
   };
   writeRoute(ctx.db, route);
   logControlDiagnostic('route_failed', {
@@ -312,9 +325,16 @@ export async function failRoute(
     attemptId,
     reason,
     stage,
+    subtype,
     ...(diagnostic === undefined ? {} : pickGrantDiagnosticFields(diagnostic)),
   });
-  await ctx.notify(spec.sessionId, { state: 'failed', attemptId, reason });
+  await ctx.notify(spec.sessionId, {
+    state: 'failed',
+    attemptId,
+    reason,
+    ...(subtype === undefined ? {} : { subtype }),
+    ...(billingFailure === undefined ? {} : { billingFailure }),
+  });
   return route;
 }
 
@@ -339,11 +359,13 @@ export async function failCurrentAttempt(
   sessionId: string,
   attemptId: string,
   reason: ControlPlaneFailureReason,
-  stage = 'attempt'
+  stage = 'attempt',
+  subtype?: ControlPlaneWorkspaceFailureSubtype,
+  billingFailure?: CustomerBillingFailure
 ): Promise<void> {
   const route = await readRoute(ctx.db, sessionId);
   if (!isCurrentPreparingAttempt(route, attemptId)) return;
-  await failRoute(ctx, route.spec, attemptId, reason, stage);
+  await failRoute(ctx, route.spec, attemptId, reason, stage, undefined, subtype, billingFailure);
 }
 
 /**
@@ -508,12 +530,18 @@ export async function notifyReadyRoutes(ctx: RouteContext): Promise<void> {
 /** Stop the sandbox: every ready route loses its session and is removed. */
 export async function dropReadyRoutes(
   ctx: RouteContext,
-  reason: ControlPlaneFailureReason
+  reason: ControlPlaneFailureReason,
+  billingFailure?: CustomerBillingFailure
 ): Promise<void> {
   for (const route of await listRoutes(ctx.db)) {
     if (route.state !== 'ready') continue;
     await deleteRoute(ctx.db, ctx.acceptedHandles, route.sessionId);
-    await ctx.notify(route.sessionId, { state: 'lost', attemptId: route.attemptId, reason });
+    await ctx.notify(route.sessionId, {
+      state: 'lost',
+      attemptId: route.attemptId,
+      reason,
+      ...(billingFailure === undefined ? {} : { billingFailure }),
+    });
   }
 }
 

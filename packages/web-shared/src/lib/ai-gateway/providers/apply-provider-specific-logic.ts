@@ -20,6 +20,7 @@ import {
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
+import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import {
   isGatewayUserByokProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -156,15 +157,22 @@ function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest)
 }
 
 /**
- * Claude goes to Anthropic directly only for non-trial enterprise
- * organizations; everyone else is served by the other Claude providers.
+ * Claude goes to Anthropic and OpenAI models go to Amazon Bedrock only for
+ * non-trial enterprise organizations; everyone else is served by the other
+ * providers of the model.
  */
 export function getIgnoredProviders(
   requestedModel: string,
-  isAnthropicProviderAllowed: boolean
+  isNonTrialEnterprise: boolean
 ): string[] {
-  if (!isAnthropicProviderAllowed && isClaudeModel(requestedModel)) {
+  if (isNonTrialEnterprise) {
+    return [];
+  }
+  if (isClaudeModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.anthropic];
+  }
+  if (isOpenAiModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock']];
   }
   return [];
 }
@@ -186,13 +194,13 @@ export function applyPreferredProvider(
     | OpenRouterChatCompletionRequest
     | GatewayResponsesRequest
     | GatewayMessagesRequest,
-  isAnthropicProviderAllowed: boolean
+  isNonTrialEnterprise: boolean
 ) {
   const preferredProviderOrder = resolvePreferredProviderOrder(
     preferredProviderOrderConfig,
     requestedModel
   );
-  const ignoredProviders = getIgnoredProviders(requestedModel, isAnthropicProviderAllowed);
+  const ignoredProviders = getIgnoredProviders(requestedModel, isNonTrialEnterprise);
   if (preferredProviderOrder.length === 0 && ignoredProviders.length === 0) {
     return;
   }

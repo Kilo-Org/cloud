@@ -229,6 +229,21 @@
     "signInCodeField": "Kirjautumiskoodi",
     "or": "tai"
   },
+  "pendingLink": {
+    "description": "Sähköpostiosoite {{email}} on jo käytössä toisella tilillä. Lisää {{provider}} kirjautumalla jollakin sen kirjautumistavoista.",
+    "emailCode": "Lähetä minulle kirjautumiskoodi sähköpostiin",
+    "continueInBrowser": "Jatka selaimessa",
+    "startAgain": "Aloita alusta",
+    "expired": "Tämä pyyntö lisätä {{provider}} on vanhentunut.",
+    "noMethods": "Tällä tilillä ei ole muuta kirjautumistapaa, joten {{provider}}-palvelua ei voi lisätä.",
+    "linked": "{{provider}} lisättiin tiliisi.",
+    "failedExpired": "{{provider}}-palvelua ei lisätty, koska pyyntö vanheni.",
+    "failedWrongAccount": "{{provider}}-palvelua ei lisätty, koska kirjauduit eri tilille.",
+    "failedAccountAlreadyLinked": "{{provider}}-palvelua ei lisätty, koska se on jo yhdistetty toiseen tiliin.",
+    "failedProviderAlreadyLinked": "{{provider}}-palvelua ei lisätty, koska tililläsi on jo toinen {{provider}}-kirjautuminen.",
+    "failedLinking": "{{provider}}-palvelua ei voitu lisätä tiliisi.",
+    "notAdded": "Olet kirjautunut sisään. {{provider}}-palvelua ei lisätty tiliisi."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automaattiset PR-katselmoinnit",
     "securityAgentSubtitle": "Etsi ja korjaa haavoittuvuuksia",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Vahvista poisto",
     "credits": "Krediitit",
     "failedToLoadBalance": "Saldoa ei voitu ladata. Yritä uudelleen napauttamalla.",
+    "balanceLoadFailed": "Saldoa ei voitu ladata",
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Testitili",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Yrityksen SSO",
     "passkeysTitle": "Pääsyavaimet",
     "passkeysSubtitle": "Kirjaudu ilman salasanaa",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Tässä muutospyynnössä ei ole tiedostomuutoksia.",
     "fileList": {
       "openNavigator": "Avaa tiedostoselain",
-      "filesViewed": "Tiedostot · {{viewed}}/{{total}} katsottu",
       "listed": "(luettelossa)",
       "layout": "Asettelu",
       "unified": "Yhdistetty",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Kehotteesi ja palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
       "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
       "remoteHint": "Käynnistä Kilo tietokoneellasi ja jätä se käyntiin.",
-      "continueFrom": "Jatketaan istuntoa: {{title}}.",
+      "continueFrom": "Jatketaan istuntoa: ”{{title}}”.",
       "importingSession": "Tuodaan istuntoa",
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
       "importFailed": "Tätä istuntoa ei voitu tuoda.",
@@ -2560,7 +2577,21 @@
       "thought": "Päättely",
       "showDetails": "Näytä tiedot",
       "pending": "Odotetaan…",
-      "running": "Käynnissä…"
+      "running": "Käynnissä…",
+      "field": {
+        "filePath": "Tiedostopolku",
+        "path": "Polku",
+        "offset": "Siirtymä",
+        "limit": "Yläraja",
+        "pattern": "Kuvio",
+        "include": "Sisällytettävät",
+        "patchText": "Korjausteksti",
+        "query": "Hakukysely",
+        "prompt": "Kehote",
+        "header": "Otsikko",
+        "question": "Kysymys",
+        "options": "Vaihtoehdot"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Sisällön näyttäminen epäonnistui."
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
     },
-    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen – lisää krediittejä ja yritä uudelleen."
+    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen."
   },
   "settingsTools": {
     "confirmTitle": "Vahvistetaanko tämä muutos?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Ajastetut katsaukset eivät ole käytössä missään kontekstissa",
     "sourceBlocker": "Istunto vaatii huomiota",
     "sourceMetadata": "Tallennetut istunnon metatiedot"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"
   }
 }

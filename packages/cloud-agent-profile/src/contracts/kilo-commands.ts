@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { overLimitMessage } from './limit-copy';
 
 export const MAX_PROFILE_KILO_COMMANDS = 50;
 export const MAX_KILO_COMMAND_NAME_LENGTH = 50;
@@ -46,7 +47,7 @@ export const kiloCommandCreateInputSchema = z.object({
     .min(1)
     .max(
       MAX_KILO_COMMAND_TEMPLATE_LENGTH,
-      `Command template exceeds ${MAX_KILO_COMMAND_TEMPLATE_LENGTH} bytes`
+      overLimitMessage('Command template', MAX_KILO_COMMAND_TEMPLATE_LENGTH)
     ),
   agent: z.string().optional(),
   model: z.string().optional(),
@@ -61,7 +62,7 @@ export const kiloCommandUpdateInputSchema = z.object({
     .min(1)
     .max(
       MAX_KILO_COMMAND_TEMPLATE_LENGTH,
-      `Command template exceeds ${MAX_KILO_COMMAND_TEMPLATE_LENGTH} bytes`
+      overLimitMessage('Command template', MAX_KILO_COMMAND_TEMPLATE_LENGTH)
     )
     .optional(),
   agent: z.string().nullable().optional(),

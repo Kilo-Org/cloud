@@ -24,7 +24,7 @@ export const ENKRYPT_VERDICT_CACHE_ENABLED = true;
  */
 const VERDICT_CACHE_VERSION = 2;
 
-export const ENKRYPT_VERDICT_CACHE_TTL_SECONDS = 6 * 60 * 60;
+export const ENKRYPT_VERDICT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 /**
  * Already-scanned text sent ahead of the uncached suffix, so content split across the boundary is
@@ -36,7 +36,7 @@ export const ENKRYPT_SCAN_OVERLAP_CHARACTERS = 2_000;
  * Bounds the lookup. Cached prefixes are earlier requests of the same conversation, which end near
  * the end of the current one.
  */
-export const MAX_PROBED_PREFIXES = 128;
+export const MAX_PROBED_PREFIXES = 1_024;
 
 const cachedBlockVerdictSchema = z
   .object({
@@ -77,7 +77,6 @@ function configHash(config: ReadyConfig): Buffer {
       JSON.stringify({
         detectors: config.detectors,
         blockingDetectors: [...config.blockingDetectors].sort(),
-        scanToolResults: config.scanToolResults,
       })
     )
     .digest();
@@ -167,9 +166,22 @@ function overlapStart(text: string, cachedCharacters: number): number {
 }
 
 /**
+ * A log-only scan gates nothing, so its result is cached even when it fails, unless the client
+ * disconnected. Otherwise a failure that recurs, such as a timeout, a detector error, or a request
+ * too large to scan, would rescan, log, and possibly be charged for a growing suffix on every later
+ * request of the conversation.
+ */
+function isCacheableAllow({ verdict, report, usageRecords }: EnkryptGuardrailScanResult): boolean {
+  if (verdict.action !== 'allow') return false;
+  if (report.scan === 'log_only') return report.decision !== 'client_aborted';
+  return usageRecords.at(-1)?.decision === 'allowed';
+}
+
+/**
  * Scans only the part of the request that no earlier allowed request with the same scope covered,
  * plus an overlap. A cached block rejects requests retaining that prefix. A cache failure scans
- * the request in full, so it never lets unscanned content through.
+ * the request in full, so it never lets unscanned content through. A failed blocking scan is never
+ * cached; see `isCacheableAllow` for log-only scans.
  */
 export async function scanRequestWithVerdictCache(
   { segments, ...request }: EnkryptGuardrailRequest,
@@ -223,7 +235,6 @@ export async function scanRequestWithVerdictCache(
       session_id: request.sessionId,
       client_request_id: request.clientRequestId,
       api_kind: request.apiKind,
-      scan_tool_results: config.scanToolResults,
       ...report,
     });
     return {
@@ -243,7 +254,7 @@ export async function scanRequestWithVerdictCache(
   );
   let cacheEntry: EnkryptVerdictCacheEntry | null = null;
   if (!fullyCached && key) {
-    if (result.verdict.action === 'allow' && finalDecision === 'allowed') {
+    if (isCacheableAllow(result)) {
       cacheEntry = { key, verdict: 'allow' };
     } else if (
       result.verdict.action === 'block' &&

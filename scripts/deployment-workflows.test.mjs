@@ -375,17 +375,80 @@ test('production EU preparation, rollback and historical source use the selected
   }
 });
 
-test('production and staging schedule independently on main every 20 minutes', () => {
+test('both deploys start from a successful main CI run and keep an hourly catch-up poll', () => {
   for (const [name, deployment] of [
     ['production', production],
     ['staging', staging],
   ]) {
     assert.equal(deployment.on.push, undefined, `${name} must not deploy on every merge`);
-    assert.deepEqual(deployment.on.schedule, [{ cron: '7,27,47 * * * *' }]);
+    assert.deepEqual(deployment.on.workflow_run, {
+      workflows: [ci.name],
+      types: ['completed'],
+      branches: ['main'],
+    });
+    assert.deepEqual(deployment.on.schedule, [{ cron: '7 * * * *' }]);
     assert.ok(Object.hasOwn(deployment.on, 'workflow_dispatch'));
     assert.equal(deployment.concurrency['cancel-in-progress'], false);
     assert.equal(deployment.jobs['check-changes'].with.workflow_file, `deploy-${name}.yml`);
+    // One runner reservation per run: the admission guard lives on the job that
+    // does the candidate lookup, so no guard-only job reserves a runner first.
     assert.equal(deployment.jobs['check-changes'].needs, undefined);
+    assert.equal(
+      Object.hasOwn(deployment.jobs, 'admit'),
+      false,
+      `${name} must not reserve a runner to evaluate the guard`
+    );
+    const admitted = (eventName, conclusion, repository = 'Kilo-Org/cloud') =>
+      runInNewContext(deployment.jobs['check-changes'].if, {
+        github: {
+          repository,
+          event_name: eventName,
+          event: { workflow_run: { conclusion } },
+        },
+      });
+    assert.equal(admitted('workflow_run', 'success'), true);
+    for (const conclusion of ['failure', 'cancelled', 'skipped', 'neutral', 'timed_out', null]) {
+      assert.equal(admitted('workflow_run', conclusion), false, `${name} must skip ${conclusion}`);
+    }
+    assert.equal(admitted('schedule', null), true);
+    assert.equal(admitted('workflow_dispatch', null), true);
+    for (const eventName of ['workflow_run', 'schedule', 'workflow_dispatch']) {
+      assert.equal(
+        admitted(eventName, 'success', 'fork/cloud'),
+        false,
+        `${name} must skip a fork's ${eventName}`
+      );
+    }
+    // Every deploy job reaches the guarded job through `needs`, so a skipped
+    // admission skips the whole chain exactly as the separate job did.
+    const reachesCheckChanges = id => {
+      const seen = new Set([id]);
+      const pending = [deployment.jobs[id]];
+      while (pending.length > 0) {
+        for (const dependency of [pending.pop().needs ?? []].flat()) {
+          if (dependency === 'check-changes') return true;
+          if (seen.has(dependency)) continue;
+          seen.add(dependency);
+          pending.push(deployment.jobs[dependency]);
+        }
+      }
+      return false;
+    };
+    assert.deepEqual(
+      Object.entries(deployment.jobs)
+        .filter(([, job]) => job.needs === undefined)
+        .map(([id]) => id),
+      ['check-changes'],
+      `${name} must admit the trigger in the job that starts the candidate lookup`
+    );
+    for (const id of Object.keys(deployment.jobs).filter(id => id !== 'check-changes')) {
+      assert.ok(reachesCheckChanges(id), `${id} must run only after the guarded lookup`);
+    }
+    assert.doesNotMatch(
+      JSON.stringify(deployment.jobs),
+      /workflow_run\.head_sha/,
+      `${name} must not deploy a SHA taken from the event payload`
+    );
   }
   assert.notEqual(production.concurrency.group, staging.concurrency.group);
 });
@@ -431,6 +494,48 @@ test('successful main CI selects the tested deployment SHA', () => {
   for (const job of ['db-gate', 'deploy-app', 'deploy-workers']) {
     assert.match(staging.jobs[job].if, /should_deploy == 'true'/);
     assert.ok([staging.jobs[job].needs].flat().includes('check-changes'));
+  }
+});
+
+test('web promotion waits for a completed or deliberately skipped gateway rollout', () => {
+  const job = production.jobs['promote-app'];
+  const condition = (job.if ?? 'success()')
+    .replace(/^\$\{\{|\}\}$/g, '')
+    .replace(/needs\.([\w-]+)\.result/g, 'needs["$1"].result');
+  const expression = /\b(always|cancelled|failure|success)\(/.test(condition)
+    ? condition
+    : `success() && (${condition})`;
+  for (const [stage, promotion, app, database, cancelled, expected] of [
+    ['success', 'success', 'success', 'success', false, true],
+    ['skipped', 'skipped', 'success', 'success', false, true],
+    ['success', 'failure', 'success', 'success', false, false],
+    ['failure', 'skipped', 'success', 'success', false, false],
+    ['cancelled', 'skipped', 'success', 'success', false, false],
+    ['success', 'cancelled', 'success', 'success', false, false],
+    ['success', 'skipped', 'success', 'success', false, false],
+    ['skipped', 'success', 'success', 'success', false, false],
+    ['skipped', 'skipped', 'failure', 'success', false, false],
+    ['success', 'success', 'success', 'failure', false, false],
+    ['skipped', 'skipped', 'success', 'skipped', false, false],
+    ['success', 'success', 'success', 'success', true, false],
+  ]) {
+    const results = {
+      'stage-app': app,
+      'db-gate': database,
+      'stage-ai-gateway': stage,
+      'promote-ai-gateway': promotion,
+    };
+    const needs = Object.fromEntries(job.needs.map(name => [name, { result: results[name] }]));
+    assert.equal(
+      runInNewContext(expression, {
+        needs,
+        github: { repository: 'Kilo-Org/cloud' },
+        cancelled: () => cancelled,
+        success: () => Object.values(needs).every(dependency => dependency.result === 'success'),
+      }),
+      expected,
+      JSON.stringify({ stage, promotion, app, database, cancelled })
+    );
   }
 });
 
@@ -588,20 +693,26 @@ test('every Worker deploy job installs only the Worker closure and the root proj
 
 test('staging and production Worker changes use independent deployment baselines', () => {
   assert.equal(workers.concurrency.group, 'deploy-workers-${{ inputs.target_environment }}');
-  assert.equal(
-    production.jobs['deploy-workers'].with.base_sha,
-    '${{ needs.check-changes.outputs.base_sha }}'
-  );
-  assert.equal(
-    staging.jobs['deploy-workers'].with.base_sha,
-    '${{ needs.check-changes.outputs.base_sha }}'
-  );
+  for (const [deployment, environment] of [
+    [production, 'production'],
+    [staging, 'staging'],
+  ]) {
+    const job = deployment.jobs['detect-workers'];
+    assert.equal(job.with.base_sha, '${{ needs.check-changes.outputs.base_sha }}');
+    assert.equal(job.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
+    if (environment === 'staging') {
+      assert.equal(job.with.target_environment, 'staging');
+    }
+  }
   assert.equal(staging.jobs['deploy-workers'].with.target_environment, 'staging');
   assert.equal(
     staging.jobs['deploy-workers'].with.source_sha,
     '${{ needs.check-changes.outputs.target_sha }}'
   );
-  assert.match(workers.jobs['detect-changes'].if, /inputs.base_sha != ''/);
+  // Detection runs in the call that carries the baseline and no matrix, so a
+  // deploy call never repeats the diff work.
+  assert.match(workers.jobs['detect-changes'].if, /inputs\.base_sha != ''/);
+  assert.match(workers.jobs['detect-changes'].if, /inputs\.worker_matrix == ''/);
   const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
   assert.match(detect.run, /has_named_environment "\$dir\/wrangler\.jsonc"/);
   assert.equal(
@@ -638,6 +749,122 @@ test('staging and production Worker changes use independent deployment baselines
       '${{ needs.check-changes.outputs.target_sha }}'
     );
   }
+});
+
+test('Worker detection runs beside the staging chain and still gates the Worker deploy', () => {
+  // Detection reads only the SHAs check-changes publishes, so neither workflow
+  // waits for a Vercel staging deploy or a promotion before it starts.
+  for (const [name, deployment, stagingDependencies] of [
+    [
+      'production',
+      production,
+      ['stage-app', 'stage-ai-gateway', 'promote-app', 'promote-ai-gateway'],
+    ],
+    ['staging', staging, ['deploy-app', 'deploy-ai-gateway']],
+  ]) {
+    const job = deployment.jobs['detect-workers'];
+    assert.equal(job.needs, 'check-changes', `${name} detection starts from the lookup`);
+    assert.equal(job.uses, './.github/workflows/deploy-workers.yml');
+    assert.match(job.if, /should_deploy == 'true'/);
+    // The detection call names a baseline and no matrix, so it cannot deploy.
+    assert.equal(job.with.base_sha, '${{ needs.check-changes.outputs.base_sha }}');
+    assert.equal(job.with.worker_matrix, undefined);
+    for (const dependency of stagingDependencies) {
+      assert.equal(
+        [job.needs].flat().includes(dependency),
+        false,
+        `${name} detection must not wait for ${dependency}`
+      );
+      assert.ok(
+        [deployment.jobs['deploy-workers'].needs].flat().includes(dependency),
+        `${name} Worker deploy keeps waiting for ${dependency}`
+      );
+    }
+    const deploy = deployment.jobs['deploy-workers'];
+    assert.ok([deploy.needs].flat().includes('detect-workers'), `${name} deploy needs the matrix`);
+    assert.equal(deploy.with.worker_matrix, '${{ needs.detect-workers.outputs.matrix }}');
+    assert.equal(
+      deploy.with.deploy_cloud_agent_after_session_ingest,
+      '${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-ingest }}'
+    );
+    assert.equal(deploy.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
+    assert.equal(deploy.with.base_sha, undefined, `${name} deploy call must not run detection`);
+  }
+  for (const dependency of ['db-gate', 'deploy-app', 'deploy-ai-gateway']) {
+    assert.ok([staging.jobs['deploy-workers'].needs].flat().includes(dependency));
+  }
+
+  // The production deploy keeps every gate it had and adds the detection result:
+  // a failed or skipped detection skips the called workflow instead of running it
+  // with an empty matrix, which would deploy nothing and report success.
+  const deploy = production.jobs['deploy-workers'];
+  const condition = deploy.if
+    .replace(/^\$\{\{|\}\}$/g, '')
+    .replace(/needs\.([\w-]+)\.outputs/g, 'needs["$1"].outputs')
+    .replace(/needs\.([\w-]+)\.result/g, 'needs["$1"].result');
+  const deployRuns = results => {
+    const needs = Object.fromEntries(
+      deploy.needs.map(name => [
+        name,
+        {
+          result: results[name] ?? 'success',
+          outputs: { should_deploy: results.should_deploy ?? 'true' },
+        },
+      ])
+    );
+    return runInNewContext(condition, {
+      needs,
+      github: { repository: 'Kilo-Org/cloud' },
+      cancelled: () => false,
+      contains: (list, item) => Array.isArray(list) && list.includes(item),
+      fromJSON: JSON.parse,
+    });
+  };
+  assert.equal(deployRuns({}), true, 'a healthy run deploys the detected workers');
+  for (const dependency of deploy.needs.filter(name => name !== 'check-changes')) {
+    assert.equal(
+      deployRuns({ [dependency]: 'failure' }),
+      false,
+      `a failed ${dependency} must block the Worker deploy`
+    );
+  }
+  for (const dependency of ['db-gate', 'detect-workers']) {
+    assert.equal(
+      deployRuns({ [dependency]: 'skipped' }),
+      false,
+      `a skipped ${dependency} must block the Worker deploy`
+    );
+  }
+  // A failed lookup skips detection, and a skipped detection skips the deploy.
+  assert.equal(deployRuns({ 'check-changes': 'failure', 'detect-workers': 'skipped' }), false);
+  assert.equal(deployRuns({ should_deploy: 'false' }), false);
+
+  // The detection call publishes the matrix, and the deploy call reads it from
+  // its inputs, so the deploy jobs never wait for a job in their own run.
+  assert.equal(
+    workers.on.workflow_call.outputs.matrix.value,
+    '${{ jobs.detect-changes.outputs.matrix }}'
+  );
+  assert.equal(
+    workers.on.workflow_call.outputs['deploy-cloud-agent-after-session-ingest'].value,
+    '${{ jobs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest }}'
+  );
+  const changed = workers.jobs['deploy-changed'];
+  assert.equal(changed.needs, undefined);
+  assert.equal(changed.strategy.matrix.worker, '${{ fromJson(inputs.worker_matrix) }}');
+  assert.match(changed.if, /inputs\.worker_matrix != '\[\]'/);
+  assert.match(changed.if, /inputs\.worker_matrix != ''/);
+  const missing = workers.jobs['missing-selection'];
+  assert.equal(
+    missing.if,
+    "inputs.worker == '' && inputs.worker_matrix == '' && inputs.base_sha == ''"
+  );
+  assert.match(missing.steps[0].run, /exit 1/);
+  assert.equal(
+    workers.on.workflow_call.inputs.worker_matrix.default,
+    '',
+    'a deploy call must supply the matrix explicitly'
+  );
 });
 
 test('deployment gate only deploys changes since the last complete run', () => {
@@ -898,19 +1125,28 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
     detect.outputs['deploy-cloud-agent-after-session-ingest'],
     '${{ steps.set-matrix.outputs.deploy-cloud-agent-after-session-ingest }}'
   );
+  // The deploy call reads the flag from the detection call's output.
+  assert.equal(
+    workers.on.workflow_call.outputs['deploy-cloud-agent-after-session-ingest'].value,
+    '${{ jobs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest }}'
+  );
+  assert.equal(
+    workers.on.workflow_call.outputs.matrix.value,
+    '${{ jobs.detect-changes.outputs.matrix }}'
+  );
 
   const ingest = workers.jobs['deploy-session-ingest'];
-  assert.equal(ingest.needs, 'detect-changes');
+  assert.equal(ingest.needs, undefined);
   assert.equal(
     ingest.if,
-    "needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'"
+    "github.repository == 'Kilo-Org/cloud' && inputs.deploy_cloud_agent_after_session_ingest == 'true'"
   );
   assert.equal(ingest.environment, '${{ inputs.target_environment }}');
   assert.equal(ingest['timeout-minutes'], 25);
 
   const ordered = workers.jobs['deploy-cloud-agent-after-session-ingest'];
-  assert.deepEqual([ordered.needs].flat(), ['detect-changes', 'deploy-session-ingest']);
-  assert.match(ordered.if, /deploy-cloud-agent-after-session-ingest == 'true'/);
+  assert.deepEqual([ordered.needs].flat(), ['deploy-session-ingest']);
+  assert.match(ordered.if, /deploy_cloud_agent_after_session_ingest == 'true'/);
   assert.match(ordered.if, /needs\.deploy-session-ingest\.result == 'success'/);
   assert.equal(ordered.environment, '${{ inputs.target_environment }}');
 

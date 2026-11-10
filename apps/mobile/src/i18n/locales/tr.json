@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Lütfen e-posta adresini gir.",
     "or": "veya"
   },
+  "pendingLink": {
+    "description": "{{email}} adresini zaten bir hesap kullanıyor. {{provider}} eklemek için bu hesabın yöntemlerinden biriyle oturum aç.",
+    "emailCode": "Bana e-postayla oturum açma kodu gönder",
+    "continueInBrowser": "Tarayıcıda devam et",
+    "startAgain": "Baştan başla",
+    "expired": "{{provider}} ekleme isteğinin süresi doldu.",
+    "noMethods": "Bu hesabın başka bir oturum açma yöntemi olmadığından {{provider}} eklenemiyor.",
+    "linked": "{{provider}} hesabına eklendi.",
+    "failedExpired": "İsteğin süresi dolduğu için {{provider}} eklenmedi.",
+    "failedWrongAccount": "Farklı bir hesapta oturum açtığın için {{provider}} eklenmedi.",
+    "failedAccountAlreadyLinked": "{{provider}} zaten başka bir hesaba bağlı olduğu için eklenmedi.",
+    "failedProviderAlreadyLinked": "Hesabında zaten farklı bir {{provider}} oturum açma yöntemi olduğu için {{provider}} eklenmedi.",
+    "failedLinking": "{{provider}} hesabına eklenemedi.",
+    "notAdded": "Oturum açtın. {{provider}} hesabına eklenmedi."
+  },
   "profile": {
     "codeReviewerSubtitle": "Otomatik PR incelemeleri",
     "securityAgentSubtitle": "Güvenlik açıklarını bul ve gider",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Silmeyi onayla",
     "credits": "Krediler",
     "failedToLoadBalance": "Bakiye yüklenemedi. Tekrar denemek için dokun.",
+    "balanceLoadFailed": "Bakiye yüklenemedi",
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Test hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Kurumsal SSO",
     "passkeysTitle": "Geçiş anahtarları",
     "passkeysSubtitle": "Parolasız oturum açın",
@@ -1869,7 +1887,7 @@
       "discardWithUploadsMessage": "İstemin ve henüz bir mesaja eklenmemiş tüm yüklemeler silinecek.",
       "discardFailed": "Taslak silinemedi. Tekrar dene.",
       "remoteHint": "Bilgisayarında çalıştırmak için Kilo'yu orada başlat ve çalışır halde bırak.",
-      "continueFrom": "{{title}} oturumuna devam ediliyor.",
+      "continueFrom": "“{{title}}” oturumuna devam ediliyor.",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
       "importFailed": "Bu oturum içe aktarılamadı.",
@@ -2021,7 +2039,21 @@
       "thought": "Düşünce",
       "showDetails": "Ayrıntıları göster",
       "pending": "Bekliyor…",
-      "running": "Çalışıyor…"
+      "running": "Çalışıyor…",
+      "field": {
+        "filePath": "Dosya yolu",
+        "path": "Yol",
+        "offset": "Başlangıç",
+        "limit": "Sınır",
+        "pattern": "Desen",
+        "include": "Dosya filtresi",
+        "patchText": "Yama metni",
+        "query": "Sorgu",
+        "prompt": "İstem",
+        "header": "Başlık",
+        "question": "Soru",
+        "options": "Seçenekler"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "İçerik görüntülenemedi."
@@ -2891,7 +2923,6 @@
     },
     "fileList": {
       "filesList": "Dosya listesi",
-      "filesViewed": "Dosyalar · {{viewed}}/{{total}} görüntülendi",
       "layout": "Düzen",
       "listed": "(listelenen)",
       "loadingFiles": "Dosyalar yükleniyor",
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Bu model düşünme düzeyini destekler"
     },
-    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok. Kredi ekle ve tekrar dene."
+    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok."
   },
   "settingsTools": {
     "confirmTitle": "Bu değişiklik onaylansın mı?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Planlanmış raporlar için etkinleştirilmiş bağlam yok",
     "sourceBlocker": "Oturumla ilgilenilmesi gerekiyor",
     "sourceMetadata": "Kaydedilen oturum meta verileri"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Bu arama sonucu açılamadı"
   }
 }

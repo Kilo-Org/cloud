@@ -1,40 +1,49 @@
-"""Native text-only tariff bounds and the final outbound request contract.
+"""Text-only tariff bounds at the dearest public provider price.
 
-Primary sources (read 2026-11-07):
-- Endpoint/pricing schema: https://openrouter.ai/docs/api/api-reference/endpoints/list-all-endpoints-for-a-model.md
-- Provider selection and max_price: https://openrouter.ai/docs/guides/routing/provider-selection.md
-- Service tiers: https://openrouter.ai/docs/guides/features/service-tiers.md
-- Prompt caching: https://openrouter.ai/docs/guides/best-practices/prompt-caching.md
-- Reasoning tokens: https://openrouter.ai/docs/guides/best-practices/reasoning-tokens.md
-
-Finite-bound assumptions are stated in `endpoint_quote` and recorded per
-endpoint in the returned evidence. Anything outside the documented schema,
-or without a documented finite quantity bound, is a quote failure
-(TariffError), never an endpoint outage.
+The Kilo catalog price is not a bound: the gateway can route to a provider
+whose public price is far above it. A quote therefore takes per-component
+maxima over the Kilo catalog pricing and every public OpenRouter endpoint
+price for the model, including every schedule override tier, with positive
+discounts undone because a discount can expire. The bound is an input rate
+over a byte-based input ceiling plus 2048, an output rate over the frozen
+max_tokens, and the per-request fee, summed across components. Spending
+control is the local ledger only; no per-request cap is sent. Anything
+outside the documented pricing schema, missing endpoint evidence, or a
+quantity without a finite bound is a quote failure (TariffError), never a
+model outage.
 """
 
 import copy
-from decimal import Decimal, InvalidOperation, localcontext
+from decimal import Decimal, InvalidOperation, ROUND_CEILING
 import hashlib
 import json
 import math
 import re
-from typing import Annotated, Any
+from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
 
-FINANCIAL_QUOTE_POLICY = "text-only-component-closure-max-v2"
-
-# Plugin ids verified in primary docs (plugins guide and per-plugin pages,
-# read 2026-11-07). Account-policy evidence names any others; every id it
-# lists is disabled by name as well, so this floor need not be exhaustive.
-DOCUMENTED_PLUGIN_IDS = ("web", "file-parser", "response-healing", "alignment")
-ENDPOINT_UNAVAILABLE = "No current active endpoint meets public reasoning/context/output constraints"
+FINANCIAL_QUOTE_POLICY = "kilo-gateway-dearest-public-max-v2"
+MODEL_UNAVAILABLE = "No Kilo catalog model meets frozen text/context/output constraints"
+GATEWAY_INPUT_FUDGE_TOKENS = 2048
+KNOWN_TIERS = {None, "flex", "priority", "ultrafast"}
+CLASSIFIER_QUOTE_POLICY = "public-endpoint-classifier-max-v1"
+# The largest classifier request (buildClassifierRequest in
+# packages/auto-routing-contracts, every prefix at its length cap with 4-byte
+# code points) serializes to 27,061 UTF-8 bytes, and one token never exceeds
+# one byte. 32,768 input tokens bounds one question attempt with margin.
+# One billed classification runs per gateway request, with at most two HTTP
+# attempts. Billing may be per question, and the request has six questions,
+# so the bound prices every question on every attempt. The classifier
+# request sends no max_tokens, so its output price must be exactly zero.
+CLASSIFIER_INPUT_TOKENS_PER_QUESTION_ATTEMPT = 32768
+CLASSIFIER_QUESTIONS_PER_CLASSIFICATION = 6
+CLASSIFIER_MAX_ATTEMPTS_PER_CLASSIFICATION = 2
 
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 SELECTOR_KEYS = {"min_prompt_tokens", "utc_days", "utc_start", "utc_end"}
 
-# Documented component units from the endpoint Pricing schema.
+# Documented component units from the catalog Pricing schema.
 COMPONENT_UNITS = {
     "prompt": "usd_per_input_token",
     "input_cache_read": "usd_per_input_token",
@@ -54,7 +63,7 @@ COMPONENT_UNITS = {
 INPUT_COMPONENTS = ("prompt", "input_cache_read", "input_cache_write", "input_cache_write_1h")
 OUTPUT_COMPONENTS = ("completion", "internal_reasoning")
 # Quantities the frozen text-only request itself proves are zero: no media or
-# audio input parts, no tools/plugins/search in the final payload.
+# audio input parts and no tools or search in the final payload.
 ZERO_QUANTITY_COMPONENTS = ("audio", "image", "image_token", "input_audio_cache", "web_search")
 # Output modalities are not fully request-controlled. A nonzero rate blocks
 # unless frozen quantity evidence proves a zero quantity for the candidate.
@@ -63,12 +72,9 @@ PRICE_KEYS = frozenset(COMPONENT_UNITS)
 # PricingOverride carries only this documented subset of price keys.
 OVERRIDE_PRICE_KEYS = frozenset({"prompt", "completion", "input_cache_read", "input_cache_write", "input_cache_write_1h", "audio", "input_audio_cache"})
 
-TIER_ALIASES = {"fast": "priority", "standard": "default", "turbo": "priority", "highspeed": "priority", "prime": "priority"}
-KNOWN_TIERS = {None, "flex", "priority", "ultrafast"}
-
 
 class TariffError(RuntimeError, ValueError):
-    """A quote/admission failure. Never an endpoint-availability record."""
+    """A quote/admission failure. Never a model-availability record."""
 
 
 def _decimal(value, what):
@@ -159,11 +165,6 @@ class Endpoint(BaseModel):
     supports_implicit_caching: bool | None = None
 
 
-def _schema_error(error, what):
-    locations = sorted({".".join(str(part) for part in item.get("loc", ())) for item in error.errors()})
-    return TariffError(f"Invalid {what} schema at: {', '.join(locations)}")
-
-
 def parse_endpoint(raw):
     if not isinstance(raw, dict):
         raise TariffError("Endpoint evidence must be an object")
@@ -178,6 +179,11 @@ def parse_endpoint(raw):
     if endpoint.max_prompt_tokens is not None and endpoint.max_prompt_tokens <= 0:
         raise TariffError("Endpoint max_prompt_tokens must be positive")
     return endpoint
+
+
+def _schema_error(error, what):
+    locations = sorted({".".join(str(part) for part in item.get("loc", ())) for item in error.errors()})
+    return TariffError(f"Invalid {what} schema at: {', '.join(locations)}")
 
 
 def _unknown_zero_keys(raw, known):
@@ -199,7 +205,7 @@ def _unknown_zero_keys(raw, known):
 def parse_pricing(raw, require_positive=True):
     """Strict pricing parse. Raw values are preserved by the caller verbatim."""
     if not isinstance(raw, dict):
-        raise TariffError("Endpoint pricing evidence must be an object")
+        raise TariffError("Catalog pricing evidence must be an object")
     unknown_zero = _unknown_zero_keys(raw, PRICE_KEYS | {"discount", "overrides"})
     cleaned = {key: value for key, value in raw.items() if key not in unknown_zero}
     overrides = cleaned.get("overrides") or []
@@ -215,12 +221,12 @@ def parse_pricing(raw, require_positive=True):
     try:
         pricing = Pricing.model_validate(cleaned)
     except ValidationError as error:
-        raise _schema_error(error, "endpoint pricing") from error
+        raise _schema_error(error, "catalog pricing") from error
     if pricing.prompt <= 0 or (require_positive and pricing.completion <= 0):
         raise TariffError("Require explicit positive prompt and completion token pricing")
     discount = _decimal(pricing.discount, "pricing discount") if pricing.discount is not None else Decimal(0)
-    if discount > 1:
-        raise TariffError("Pricing discount above one would imply negative prices")
+    if discount >= 1:
+        raise TariffError("Pricing discount of one or above cannot be undone to a finite undiscounted price")
     for override in pricing.overrides or []:
         validate_selectors(override)
     return pricing, sorted(set(unknown_zero))
@@ -296,9 +302,11 @@ def resolved_rates(pricing, prompt_tokens, utc_weekday=None, utc_hhmm=None):
 
 
 def discount_factor(pricing):
-    """Positive discounts are forgone; a negative discount is a markup and counts."""
+    """Undo the discount: a positive discount can expire, a negative one is a markup."""
     discount = _decimal(pricing.discount, "pricing discount") if pricing.discount is not None else Decimal(0)
-    return (1 - discount) if discount < 0 else Decimal(1)
+    if discount >= 1:
+        raise TariffError("Pricing discount of one or above cannot be undone to a finite undiscounted price")
+    return (1 - discount) if discount < 0 else Decimal(1) / (1 - discount)
 
 
 def component_maxima(pricing):
@@ -325,7 +333,7 @@ def component_maxima(pricing):
 
 EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
 REASONING_KEYS = {"enabled", "effort", "max_tokens", "exclude"}
-VERBOSITY_VALUES = {"low", "medium", "high", "max"}
+VERBOSITY_VALUES = {"low", "medium", "high", "xhigh", "max"}
 
 
 def validate_reasoning(value, what="reasoning"):
@@ -383,9 +391,8 @@ def _candidate(cfg):
     return model, effort
 
 
-def _text_only_architecture(cfg):
+def _text_only_architecture(architecture):
     """Raw candidate-bound model architecture proving text-only output, or None."""
-    architecture = cfg.get("model_architecture")
     if not isinstance(architecture, dict):
         return None
     if architecture.get("output_modalities") == ["text"]:
@@ -393,256 +400,216 @@ def _text_only_architecture(cfg):
     return None
 
 
-def input_bound(endpoint):
-    """Endpoint-declared financial input ceiling. Never an estimator output."""
-    if endpoint.max_prompt_tokens is not None:
-        return endpoint.max_prompt_tokens, "endpoint.max_prompt_tokens capacity"
-    return endpoint.context_length, "endpoint.context_length capacity (max_prompt_tokens unknown; input shares the documented context window)"
+ORGANIZATION_ID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 
-def output_bound(endpoint, cfg):
-    """Documented finite financial ceiling for completion/reasoning tokens.
-
-    Only endpoint-declared capacities count. cfg overrides and reasoning
-    request controls are not accepted as universal billing ceilings, and a
-    missing max_completion_tokens is unknown evidence resolved through the
-    documented shared context window, never an outage by itself.
-    """
-    if "financial_output_token_bound" in cfg:
-        raise TariffError("Unchecked cfg financial_output_token_bound overrides are not accepted; finance from endpoint-declared capacity")
-    candidates = []
-    if endpoint.max_completion_tokens is not None:
-        candidates.append((endpoint.max_completion_tokens, "endpoint.max_completion_tokens capacity"))
-    candidates.append((endpoint.context_length, "endpoint.context_length capacity (input and output share the documented context window)"))
-    bound, source = min(candidates)
-    return bound, source
+def validate_organization_id(value):
+    """Canonical UUID organization id, or fail closed. Never a secret."""
+    if not isinstance(value, str) or not ORGANIZATION_ID_RE.fullmatch(value):
+        raise TariffError("A frozen canonical Kilo organization UUID is required")
+    return value.lower()
 
 
-def endpoint_upstream_bound(endpoint, maxima, cfg):
-    """Complete one-attempt upstream bound for one endpoint, with evidence."""
-    in_bound, in_source = input_bound(endpoint)
-    out_bound, out_source = output_bound(endpoint, cfg)
-    # reasoning.max_tokens is a request control for some providers; it does
-    # not prove a universal hidden-output billing ceiling, so it never
-    # tightens the financial reasoning quantity.
-    reasoning_bound = out_bound
-    quantities = {"prompt": in_bound, "input_cache_read": in_bound, "input_cache_write": in_bound, "input_cache_write_1h": in_bound, "completion": out_bound, "internal_reasoning": reasoning_bound, "request": 1}
-    architecture = _text_only_architecture(cfg)
-    components, total = {}, Decimal(0)
+def ceil_microdollars(value):
+    """Round a USD bound up to whole microdollars."""
+    return _decimal(value, "USD bound").quantize(Decimal("0.000001"), rounding=ROUND_CEILING)
+
+
+def _rates(maxima):
+    input_rate = sum((maxima.get(key, Decimal(0)) for key in INPUT_COMPONENTS), Decimal(0))
+    output_rate = sum((maxima.get(key, Decimal(0)) for key in OUTPUT_COMPONENTS), Decimal(0))
+    return input_rate, output_rate, maxima.get("request", Decimal(0))
+
+
+def _bound(maxima, input_quantity, output_quantity, allowance):
+    input_rate, output_rate, request_rate = _rates(maxima)
+    solver = input_rate * input_quantity + output_rate * output_quantity + request_rate
+    return solver, ceil_microdollars(solver + allowance)
+
+
+def _components(maxima, input_quantity, output_quantity, architecture):
+    quantities = {key: input_quantity for key in INPUT_COMPONENTS}
+    quantities.update({key: output_quantity for key in OUTPUT_COMPONENTS})
+    quantities["request"] = 1
+    components = {}
     for key, unit in COMPONENT_UNITS.items():
         component_rate = maxima.get(key)
         if component_rate is None:
             continue
         if key in ZERO_QUANTITY_COMPONENTS:
-            quantity, treatment = 0, "quantity is zero under the frozen text-only final payload with documented plugins explicitly disabled; raw rate preserved"
+            quantity, treatment = 0, "quantity is zero under the frozen text-only final payload; raw rate preserved"
         elif key in OUTPUT_MODALITY_COMPONENTS:
             if component_rate > 0 and architecture is None:
                 raise TariffError(f"No finite quantity bound can be proved for tariff component: {key}; validated candidate-bound text-only architecture evidence is required")
             quantity, treatment = 0, ("zero quantity: candidate-bound raw model architecture declares output_modalities == ['text']" if component_rate > 0 else "zero rate")
         else:
-            quantity, treatment = quantities[key], "endpoint-declared bounded quantity; additive across components"
-        charge = component_rate * quantity
-        total += charge
-        components[key] = {"unit": unit, "max_rate_per_unit": str(component_rate), "quantity_bound": quantity, "max_charge_usd": str(charge), "treatment": treatment}
-    detail = {"components": components, "output_token_bound": out_bound, "output_token_bound_source": out_source, "reasoning_token_bound": reasoning_bound, "input_token_bound": in_bound, "input_token_bound_source": in_source}
-    if architecture is not None and any(maxima.get(key, Decimal(0)) > 0 for key in OUTPUT_MODALITY_COMPONENTS):
-        detail["model_architecture"] = architecture
-        detail["model_architecture_sha256"] = digest(architecture)
-    return total, detail
+            quantity, treatment = quantities[key], "frozen bounded quantity; additive across components"
+        components[key] = {"unit": unit, "max_rate_per_unit": str(component_rate), "quantity_bound": quantity, "max_charge_usd": str(component_rate * quantity), "treatment": treatment}
+    return components
 
 
-def normalize_tier(value):
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise TariffError("Routing context service tier must be a string")
-    tier = TIER_ALIASES.get(value, value)
-    if tier not in {"default", "flex", "priority", "ultrafast"}:
-        raise TariffError("Routing context carries an unknown service tier")
-    return tier
-
-
-def admissible_tiers(cfg, explicit_tags, endpoints_by_tag):
-    """Tiers that could serve the final request, plus explicit uncertainty notes."""
-    context = cfg.get("routing_context")
-    explicit = {endpoints_by_tag[tag].service_tier for tag in explicit_tags if tag in endpoints_by_tag}
-    if not isinstance(context, dict) or "workspace_default_service_tier" not in context:
-        return set(KNOWN_TIERS), ["workspace default service tier is not in frozen evidence; every documented tier is financed"]
-    default = normalize_tier(context.get("workspace_default_service_tier"))
-    if default is None:
-        # No workspace default and no request tier: standard endpoints, plus
-        # open-weight priority endpoints that join default routing. Public
-        # endpoint data does not prove open/closed weight, so priority stays.
-        tiers = {None, "priority"} | explicit
-        notes = ["no workspace default tier; priority endpoints are financed because open-weight priority endpoints can join default routing and weight openness is not in public endpoint evidence"]
-    elif default == "default":
-        tiers, notes = {None} | explicit, ["workspace default pins the standard tier; explicitly selected tier endpoints remain financed"]
-    elif default == "flex":
-        tiers, notes = {None, "flex"} | explicit, ["workspace default tier is flex with standard fallback"]
-    elif default == "priority":
-        tiers, notes = {None, "priority"} | explicit, ["workspace default tier is priority with standard fallback"]
-    else:
-        tiers, notes = {None, "priority", "ultrafast"} | explicit, ["workspace default tier is ultrafast with priority and standard fallback"]
-    allowed = context.get("workspace_allowed_tiers")
-    if allowed is not None:
-        if not isinstance(allowed, list):
-            raise TariffError("Routing context allowed tiers must be a list")
-        normalized = {normalize_tier(item) for item in allowed}
-        tiers &= {None if item == "default" else item for item in normalized} | {None}
-        notes.append("workspace allowed-tier restriction applied from frozen evidence; the default tier is always allowed")
-    return tiers, notes
-
-
-def routing_number(per_token):
-    """USD/token -> USD/million for prompt/completion caps only, exact or fail."""
-    normalized = rate(per_token, "routing tariff rate")
-    with localcontext() as context:
-        context.prec = max(28, len(normalized.as_tuple().digits) + 6)
-        exact = normalized * 1000000
-    numeric = float(exact)
-    if not math.isfinite(numeric) or Decimal(json.dumps(numeric)) != exact:
-        raise TariffError("Routing tariff cannot serialize exactly without changing the witness rate")
-    return numeric
-
-
-def _eligible(endpoint, cfg):
-    if endpoint.status != 0 or not {"reasoning", "max_tokens"}.issubset(endpoint.supported_parameters):
-        return False
-    if endpoint.context_length < cfg["max_input_tokens"] + cfg["max_output_tokens"]:
-        return False
-    # max_completion_tokens=None is unknown evidence, not unavailability:
-    # the documented shared context window already proves the requested
-    # output fits when the context check above passes.
-    if endpoint.max_completion_tokens is not None and endpoint.max_completion_tokens < cfg["max_output_tokens"]:
-        return False
-    if endpoint.max_prompt_tokens is not None and endpoint.max_prompt_tokens < cfg["max_input_tokens"]:
-        return False
-    return True
-
-
-def endpoint_quote(endpoints, cfg):
-    """Complete text-only financial quote for one candidate. See module docstring."""
-    if not isinstance(endpoints, list):
-        raise TariffError("Endpoint evidence must be a list")
-    for key in ("max_input_tokens", "max_output_tokens"):
-        if type(cfg.get(key)) is not int or cfg[key] <= 0:
-            raise TariffError(f"Quote requires a positive frozen {key}")
-    if "byok_fee_ceiling_fraction" not in cfg:
-        raise TariffError("Quote requires the explicit approved BYOK fee allowance")
-    fee = rate(cfg["byok_fee_ceiling_fraction"], "BYOK fee fraction")
-    model, effort = _candidate(cfg)
-    resolved = resolve_variant(cfg.get("variant_catalog"), model, effort) if effort is not None else {}
-    parsed = [(raw, parse_endpoint(raw)) for raw in endpoints]
-    by_tag = {endpoint.tag: endpoint for _, endpoint in parsed}
-    if len(by_tag) != len(parsed):
-        raise TariffError("Duplicate endpoint tags in quote evidence")
-    eligible = [(raw, endpoint) for raw, endpoint in parsed if _eligible(endpoint, cfg)]
-    if not eligible:
-        raise RuntimeError(ENDPOINT_UNAVAILABLE)
-    priced = {}
-    for raw, endpoint in eligible:
-        pricing, unknown_zero = parse_pricing(raw.get("pricing"))
-        priced[endpoint.tag] = (pricing, component_maxima(pricing), unknown_zero)
-    witness_raw, witness = min(eligible, key=lambda item: (rate(item[0]["pricing"]["prompt"], "witness prompt rate"), rate(item[0]["pricing"]["completion"], "witness completion rate"), item[1].tag))
-    route_prompt = rate(witness_raw["pricing"]["prompt"], "witness prompt rate")
-    route_completion = rate(witness_raw["pricing"]["completion"], "witness completion rate")
-    routing_cap = {"prompt": routing_number(route_prompt), "completion": routing_number(route_completion)}
-    selected = sorted(endpoint.tag for raw, endpoint in eligible if rate(raw["pricing"]["prompt"], "base prompt rate") <= route_prompt and rate(raw["pricing"]["completion"], "base completion rate") <= route_completion)
-    tiers, tier_notes = admissible_tiers(cfg, selected, by_tag)
-    if "account_policy" in cfg:
-        validate_account_policy(cfg)
-    evidence, financial = [], []
-    for raw, endpoint in parsed:
-        selector_match = any(endpoint.tag == tag or endpoint.tag.startswith(tag + "/") for tag in selected)
-        in_closure = endpoint.status == 0 and selector_match and endpoint.service_tier in tiers
-        record = {"tag": endpoint.tag, "status": endpoint.status, "service_tier": endpoint.service_tier, "context_length": endpoint.context_length, "max_completion_tokens": endpoint.max_completion_tokens, "max_prompt_tokens": endpoint.max_prompt_tokens, "supported_parameters": list(endpoint.supported_parameters), "supports_implicit_caching": endpoint.supports_implicit_caching, "pricing_raw": raw.get("pricing"), "in_witness_set": endpoint.tag in selected, "in_financial_closure": in_closure}
-        if in_closure:
-            if endpoint.tag not in priced:
-                pricing, unknown_zero = parse_pricing(raw.get("pricing"))
-                priced[endpoint.tag] = (pricing, component_maxima(pricing), unknown_zero)
-            pricing, maxima, unknown_zero = priced[endpoint.tag]
-            bound, detail = endpoint_upstream_bound(endpoint, maxima, cfg)
-            record.update({"unknown_zero_components": unknown_zero, "discount_raw": pricing.discount, "discount_factor_applied": str(discount_factor(pricing)), "schedules": [validate_selectors(item) for item in pricing.overrides or []], "component_maxima": {key: str(value) for key, value in sorted(maxima.items())}, "upstream_bound_usd": str(bound), **detail})
-            financial.append((endpoint, maxima, bound, detail))
-        evidence.append(record)
-    if not financial:
-        raise TariffError("No selector-matching active endpoint can be financed under the frozen routing context")
-    upstream = max(bound for _, _, bound, _ in financial)
-    # Component maxima stay correlated per endpoint in endpoint_evidence.
-    # There is deliberately no cross-endpoint maxima table to recombine.
-    output_financial = max(detail["output_token_bound"] for _, _, _, detail in financial)
-    reasoning_financial = max(detail["reasoning_token_bound"] for _, _, _, detail in financial)
-    input_financial = max(detail["input_token_bound"] for _, _, _, detail in financial)
+def _quote_dict(model, effort, resolved, maxima, cfg, allowance, extra):
+    input_quantity = cfg["max_input_tokens"] + GATEWAY_INPUT_FUDGE_TOKENS
+    output_quantity = cfg["max_output_tokens"]
+    solver, attempt = _bound(maxima, input_quantity, output_quantity, allowance)
     return {
         "policy": FINANCIAL_QUOTE_POLICY,
         "candidate": {"model": model, "effort": effort},
         "resolved_variant": resolved,
-        "upstream_bound_usd": str(upstream),
-        "attempt_bound_usd": str(upstream * (1 + fee)),
-        "fee_fraction": str(fee),
-        "financial_components_note": "per-endpoint only; see endpoint_evidence[].component_maxima and components",
-        "plugin_policy": {"documented_plugin_ids": list(DOCUMENTED_PLUGIN_IDS), "request_level_disables_required": True, "account_policy_evidence_required_at_dispatch": True, "note": "plugins: [] inherits account defaults and never proves zero plugin charges"},
-        "quantities": {"input_tokens": input_financial, "input_token_bound_source": "endpoint-declared max_prompt_tokens or context_length capacity per endpoint; never a token estimate", "requested_max_tokens": cfg["max_output_tokens"], "output_tokens_financial": output_financial, "reasoning_tokens_financial": reasoning_financial, "requests": 1},
-        "routing_prompt_per_token": str(route_prompt),
-        "routing_completion_per_token": str(route_completion),
-        "routing_max_price": routing_cap,
-        "routing_witness": {"tag": witness.tag, "prompt_per_token": str(route_prompt), "completion_per_token": str(route_completion), "selection": "lowest current full-context-compatible base prompt, then ITS completion, then tag"},
-        "eligible_endpoint_tags": selected,
-        "financial_endpoint_tags": sorted(endpoint.tag for endpoint, _, _, _ in financial),
-        "endpoint_evidence": evidence,
-        "endpoints_sha256": digest(endpoints),
-        "public_constraints": {"input_bound": cfg["max_input_tokens"], "max_tokens": cfg["max_output_tokens"], "required_parameters": ["reasoning", "max_tokens"], "status": 0},
-        "selector_closure": "provider.only witness tags plus every active regional/tier descendant that could be admitted; raw base prices never exclude a selector-matching endpoint from financial coverage",
-        "routing_uncertainty": tier_notes + ["max_price evaluation under discounts/overrides is not fully documented; selector-matching endpoints are financed regardless of raw base prices", "public endpoint data does not prove account privacy, BYOK or workspace eligibility"],
-        "privacy_eligibility": "Unproven by endpoint metadata; data_collection=deny and require_parameters remain mandatory at dispatch",
+        "solver_bound_usd": str(solver),
+        "classifier_allowance_usd": str(allowance),
+        "attempt_bound_usd": str(attempt),
+        "component_maxima": {key: str(value) for key, value in sorted(maxima.items())},
+        "quantities": {"input_quantity": input_quantity, "max_input_tokens": cfg["max_input_tokens"], "output_tokens": output_quantity, "requested_max_tokens": cfg["max_output_tokens"], "requests": 1},
+        **extra,
     }
 
 
-def _record_upstream(record):
-    maxima = {key: rate(value, "financial component maximum") for key, value in record["component_maxima"].items()}
-    upstream = maxima.get("request", Decimal(0))
-    upstream += record["input_token_bound"] * sum((maxima.get(key, Decimal(0)) for key in INPUT_COMPONENTS), Decimal(0))
-    upstream += record["output_token_bound"] * maxima.get("completion", Decimal(0))
-    upstream += record["reasoning_token_bound"] * maxima.get("internal_reasoning", Decimal(0))
-    return upstream
+def _allowance(value):
+    allowance = _decimal(value, "classifier allowance") if value is not None else Decimal(0)
+    if allowance < 0:
+        raise TariffError("Classifier allowance must be nonnegative")
+    return allowance
 
 
-def attempt_reservation(quote, estimated_input_tokens=None):
-    """Complete upstream+fee reservation, recomputed per endpoint then maximized.
+def _endpoint_maxima(endpoints, require_positive=True):
+    """Per-component maxima over every public endpoint price, overrides included."""
+    if not isinstance(endpoints, list) or not endpoints:
+        raise TariffError("Public endpoint price evidence is required; the catalog price alone is not a bound")
+    parsed = [(raw, parse_endpoint(raw)) for raw in endpoints]
+    if len({endpoint.tag for _, endpoint in parsed}) != len(parsed):
+        raise TariffError("Duplicate endpoint tags in quote evidence")
+    maxima, evidence = {}, []
+    for raw, endpoint in parsed:
+        pricing, unknown_zero = parse_pricing(raw.get("pricing"), require_positive=require_positive)
+        endpoint_maxima = component_maxima(pricing)
+        for key, value in endpoint_maxima.items():
+            maxima[key] = max(maxima.get(key, Decimal(0)), value)
+        evidence.append({"tag": endpoint.tag, "status": endpoint.status, "service_tier": endpoint.service_tier, "context_length": endpoint.context_length, "max_completion_tokens": endpoint.max_completion_tokens, "max_prompt_tokens": endpoint.max_prompt_tokens, "supported_parameters": list(endpoint.supported_parameters), "pricing_raw": raw.get("pricing"), "unknown_zero_components": unknown_zero, "discount_factor_applied": str(discount_factor(pricing)), "component_maxima": {key: str(value) for key, value in sorted(endpoint_maxima.items())}})
+    return maxima, evidence
 
-    Component correlations stay inside each endpoint. An estimated input
-    count is recorded for diagnostics only and can never shrink the
-    financial input quantity, which is endpoint-declared capacity.
+
+def catalog_quote(entry, cfg, classifier_allowance_usd=None, endpoints=None):
+    """Complete text-only quote at the dearest public price for one model.
+
+    Required cfg keys: max_input_tokens, max_output_tokens, candidate
+    {model, effort}, and variant_catalog (loaded dict) for variant= labels.
+    The entry is one raw Kilo catalog model object and endpoints is the raw
+    public endpoint list for the same model; both are preserved by hash.
     """
-    if not isinstance(quote, dict) or quote.get("policy") != FINANCIAL_QUOTE_POLICY:
-        raise TariffError("A complete current financial quote is required before dispatch")
-    if estimated_input_tokens is not None and (type(estimated_input_tokens) is not int or estimated_input_tokens < 0):
-        raise TariffError("Estimated input tokens must be a nonnegative integer when supplied")
-    records = [record for record in quote.get("endpoint_evidence") or [] if isinstance(record, dict) and record.get("in_financial_closure")]
-    if not records or any("component_maxima" not in record or "input_token_bound" not in record or "output_token_bound" not in record or "reasoning_token_bound" not in record for record in records):
-        raise TariffError("Quote lacks per-endpoint financial evidence for reservation recomputation")
-    per_endpoint = [(record["tag"], _record_upstream(record)) for record in records]
-    tag, upstream = max(per_endpoint, key=lambda item: item[1])
-    if upstream != rate(quote.get("upstream_bound_usd"), "quote upstream bound"):
-        raise TariffError("Recomputed per-endpoint reservation does not reproduce the quoted upstream bound")
-    fee = rate(quote["fee_fraction"], "quote fee fraction")
-    bound = upstream * (1 + fee)
-    if bound != rate(quote.get("attempt_bound_usd"), "quote attempt bound"):
-        raise TariffError("Recomputed reservation does not reproduce the quoted attempt bound")
-    quantities = quote["quantities"]
-    return {"upstream_usd": upstream, "fee_usd": bound - upstream, "bound_usd": bound, "financial_input_tokens": quantities["input_tokens"], "estimated_input_tokens": estimated_input_tokens, "max_endpoint_tag": tag, "output_tokens_financial": quantities["output_tokens_financial"], "reasoning_tokens_financial": quantities["reasoning_tokens_financial"]}
+    if not isinstance(entry, dict):
+        raise TariffError("Catalog model evidence must be an object")
+    for key in ("max_input_tokens", "max_output_tokens"):
+        if type(cfg.get(key)) is not int or cfg[key] <= 0:
+            raise TariffError(f"Quote requires a positive frozen {key}")
+    model, effort = _candidate(cfg)
+    if entry.get("id") != model:
+        raise TariffError("Catalog quote model identity mismatch")
+    context = entry.get("context_length")
+    if type(context) is not int or context <= 0:
+        raise TariffError("Catalog model requires a positive context_length")
+    if context < cfg["max_input_tokens"] + cfg["max_output_tokens"]:
+        raise RuntimeError(MODEL_UNAVAILABLE)
+    supported = entry.get("supported_parameters")
+    if not isinstance(supported, list) or not all(isinstance(item, str) for item in supported):
+        raise TariffError("Catalog model lacks supported_parameters evidence")
+    if not {"reasoning", "max_tokens"}.issubset(supported):
+        raise RuntimeError(MODEL_UNAVAILABLE)
+    resolved = resolve_variant(cfg.get("variant_catalog"), model, effort) if effort is not None else {}
+    pricing, unknown_zero = parse_pricing(entry.get("pricing"))
+    maxima = component_maxima(pricing)
+    endpoint_maxima, endpoint_evidence = _endpoint_maxima(endpoints)
+    for key, value in endpoint_maxima.items():
+        maxima[key] = max(maxima.get(key, Decimal(0)), value)
+    architecture = _text_only_architecture(entry.get("architecture"))
+    components = _components(maxima, cfg["max_input_tokens"] + GATEWAY_INPUT_FUDGE_TOKENS, cfg["max_output_tokens"], architecture)
+    extra = {"components": components, "pricing_raw": entry.get("pricing"), "unknown_zero_components": unknown_zero, "context_length": context, "supported_parameters": list(supported), "catalog_entry_sha256": digest(entry), "endpoint_evidence": endpoint_evidence, "endpoints_sha256": digest(endpoints)}
+    if architecture is not None and any(maxima.get(key, Decimal(0)) > 0 for key in OUTPUT_MODALITY_COMPONENTS):
+        extra["model_architecture"] = architecture
+        extra["model_architecture_sha256"] = digest(architecture)
+    return _quote_dict(model, effort, resolved, maxima, cfg, _allowance(classifier_allowance_usd), extra)
+
+
+def worst_case_quote(quotes, model, effort, cfg, classifier_allowance_usd=None):
+    """Router-arm quote: per-component maximum over every pool quote, plus allowance."""
+    if not quotes:
+        raise TariffError("Router quote requires at least one quoted pool model")
+    maxima = {}
+    for quote in quotes:
+        validate_quote({"financial_quote": quote})
+        for key, value in quote["component_maxima"].items():
+            maxima[key] = max(maxima.get(key, Decimal(0)), rate(value, "pool component maximum"))
+    quantities = {tuple(sorted(quote["quantities"].items())) for quote in quotes}
+    if len(quantities) != 1:
+        raise TariffError("Pool quotes do not share one frozen quantity contract")
+    resolved = resolve_variant(cfg.get("variant_catalog"), model, effort) if effort is not None else {}
+    extra = {"pool_quote_sha256": sorted(digest(quote) for quote in quotes), "pool_models": sorted({quote["candidate"]["model"] for quote in quotes})}
+    return _quote_dict(model, effort, resolved, maxima, cfg, _allowance(classifier_allowance_usd), extra)
+
+
+def classifier_endpoint_quote(model, endpoints):
+    """Classifier price from public endpoints only; the Kilo catalog does not list it.
+
+    The classifier request sends no max_tokens, so a priced output cannot
+    be bounded: every endpoint output price must be exactly zero.
+    """
+    if not isinstance(model, str) or not MODEL_RE.fullmatch(model):
+        raise TariffError("Classifier quote requires an exact model id")
+    maxima, evidence = _endpoint_maxima(endpoints, require_positive=False)
+    for record in evidence:
+        for key in OUTPUT_COMPONENTS:
+            if rate(record["component_maxima"].get(key, "0"), "classifier output rate") != 0:
+                raise TariffError(f"Classifier endpoint {record['tag']} prices {key} output; the classifier request sends no max_tokens, so the quote fails")
+    quote = {"policy": CLASSIFIER_QUOTE_POLICY, "model": model, "component_maxima": {key: str(value) for key, value in sorted(maxima.items())}, "endpoint_evidence": evidence, "endpoints_sha256": digest(endpoints)}
+    return {**quote, "bound_usd": str(classifier_allowance_bound(quote))}
+
+
+def classifier_allowance_bound(quote):
+    """Bound: dearest input rate x 32768 x 6 questions x 2 attempts, plus request fees."""
+    if not isinstance(quote, dict) or not isinstance(quote.get("component_maxima"), dict):
+        raise TariffError("Classifier quote lacks component maxima")
+    maxima = {key: rate(value, "classifier component maximum") for key, value in quote["component_maxima"].items()}
+    input_rate, output_rate, request_rate = _rates(maxima)
+    if output_rate != 0:
+        raise TariffError("Classifier output price must be exactly zero; the classifier request sends no max_tokens")
+    per_question_attempt = input_rate * CLASSIFIER_INPUT_TOKENS_PER_QUESTION_ATTEMPT + request_rate
+    return ceil_microdollars(per_question_attempt * CLASSIFIER_QUESTIONS_PER_CLASSIFICATION * CLASSIFIER_MAX_ATTEMPTS_PER_CLASSIFICATION)
+
+
+def attempt_reservation(quote, estimated_input_tokens=None, request_bytes=None):
+    """Per-request reservation from the actual byte-based input bound.
+
+    The input quantity is the larger of the caller's conservative input
+    bound and the exact request byte length, plus a 2048 fudge. The bound
+    is rounded up to whole microdollars for exact ledger accounting.
+    """
+    validate_quote({"financial_quote": quote})
+    for value, what in ((estimated_input_tokens, "estimated input tokens"), (request_bytes, "request bytes")):
+        if value is not None and (type(value) is not int or value < 0):
+            raise TariffError(f"{what} must be a nonnegative integer when supplied")
+    quantity = max(estimated_input_tokens or 0, request_bytes or 0) + GATEWAY_INPUT_FUDGE_TOKENS
+    maxima = {key: rate(value, "financial component maximum") for key, value in quote["component_maxima"].items()}
+    allowance = rate(quote["classifier_allowance_usd"], "classifier allowance")
+    solver, bound = _bound(maxima, quantity, quote["quantities"]["output_tokens"], allowance)
+    return {"bound_usd": bound, "solver_usd": solver, "classifier_allowance_usd": allowance, "input_quantity": quantity, "estimated_input_tokens": estimated_input_tokens, "request_bytes": request_bytes, "output_tokens": quote["quantities"]["output_tokens"]}
 
 
 def validate_quote(candidate):
     quote = candidate.get("financial_quote") if isinstance(candidate, dict) else None
     if not isinstance(quote, dict) or quote.get("policy") != FINANCIAL_QUOTE_POLICY:
-        raise TariffError("A complete current financial quote is required; token-only bounds are not a full charge")
-    upstream, attempt = rate(quote.get("upstream_bound_usd"), "quote upstream bound"), rate(quote.get("attempt_bound_usd"), "quote attempt bound")
-    fee = rate(quote.get("fee_fraction"), "quote fee fraction")
-    if attempt != upstream * (1 + fee):
-        raise TariffError("Quote attempt bound is not upstream plus the approved fee fraction")
-    if not quote.get("eligible_endpoint_tags") or not quote.get("financial_endpoint_tags") or not quote.get("endpoint_evidence"):
-        raise TariffError("Quote lacks endpoint closure evidence")
+        raise TariffError("A complete current Kilo catalog quote is required; token-only bounds are not a full charge")
+    maxima_raw = quote.get("component_maxima")
+    quantities = quote.get("quantities") if isinstance(quote.get("quantities"), dict) else {}
+    if not isinstance(maxima_raw, dict) or not maxima_raw or type(quantities.get("input_quantity")) is not int or type(quantities.get("output_tokens")) is not int:
+        raise TariffError("Quote lacks component maxima or frozen quantities")
+    maxima = {key: rate(value, "financial component maximum") for key, value in maxima_raw.items()}
+    allowance = rate(quote.get("classifier_allowance_usd"), "classifier allowance")
+    solver, attempt = _bound(maxima, quantities["input_quantity"], quantities["output_tokens"], allowance)
+    if rate(quote.get("solver_bound_usd"), "quote solver bound") != solver or rate(quote.get("attempt_bound_usd"), "quote attempt bound") != attempt:
+        raise TariffError("Quote bounds do not reproduce from its component maxima and allowance")
+    quoted = quote.get("candidate") if isinstance(quote.get("candidate"), dict) else {}
+    if not isinstance(quoted.get("model"), str) or not quoted["model"]:
+        raise TariffError("Quote lacks its candidate model identity")
     return quote
 
 
@@ -654,54 +621,12 @@ class RequestContractError(ValueError):
     """Final outbound payload rejection. Messages never carry prompt content."""
 
 
-def validate_account_policy(cfg):
-    """Frozen account-plugin evidence, normalized. Raises when unresolved.
-
-    cfg["account_policy"] must be the parent's frozen export summary:
-    {"source": str, "captured_at": epoch seconds, "raw_sha256": hex str,
-     "default_plugins": [{"id": str, "enabled": bool,
-                          "prevent_overrides": bool}, ...]}.
-    Public metadata never proves this state; the parent binds the raw
-    export by hash. An enabled enforced ("Prevent overrides") plugin can
-    never be disabled at request level and blocks dispatch outright.
-    """
-    policy = cfg.get("account_policy")
-    if not isinstance(policy, dict) or set(policy) != {"source", "captured_at", "raw_sha256", "default_plugins"}:
-        raise TariffError("Frozen account policy evidence is required before paid dispatch; plugin defaults are unresolved")
-    if not isinstance(policy["source"], str) or not policy["source"].strip() or not isinstance(policy["raw_sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", policy["raw_sha256"]):
-        raise TariffError("Account policy evidence must name its source and bind the raw export hash")
-    captured = policy["captured_at"]
-    if isinstance(captured, bool) or not isinstance(captured, (int, float)) or not math.isfinite(captured) or captured <= 0:
-        raise TariffError("Account policy evidence must carry a finite capture time")
-    defaults = policy["default_plugins"]
-    if not isinstance(defaults, list):
-        raise TariffError("Account policy default_plugins must be a list")
-    normalized, seen = [], set()
-    for item in defaults:
-        if not isinstance(item, dict) or set(item) != {"id", "enabled", "prevent_overrides"} or not isinstance(item["id"], str) or not item["id"] or not isinstance(item["enabled"], bool) or not isinstance(item["prevent_overrides"], bool) or item["id"] in seen:
-            raise TariffError("Account policy default plugin entries are malformed")
-        seen.add(item["id"])
-        if item["enabled"] and item["prevent_overrides"]:
-            raise TariffError(f"Account plugin is enforced and cannot be disabled per request: {item['id']}")
-        normalized.append(dict(item))
-    return {"source": policy["source"], "captured_at": captured, "raw_sha256": policy["raw_sha256"], "default_plugins": normalized}
-
-
-def disabled_plugins(policy):
-    """Request-level disables for every documented or account-named plugin."""
-    ids = list(DOCUMENTED_PLUGIN_IDS)
-    for item in policy["default_plugins"]:
-        if item["id"] not in ids:
-            ids.append(item["id"])
-    return [{"id": plugin_id, "enabled": False} for plugin_id in ids]
-
-
 def _contract_core(contract):
-    return {key: contract.get(key) for key in ("model", "variant_label", "resolved_variant", "max_tokens", "provider", "plugins", "financial_quote_sha256")}
+    return {key: contract.get(key) for key in ("model", "variant_label", "resolved_variant", "max_tokens", "kilo_organization_id", "financial_quote_sha256")}
 
 
 def request_contract(candidate, cfg, quote_fetched_at=None, quote_max_age_seconds=7200):
-    """The immutable approved contract one paid request must match exactly."""
+    """The immutable approved contract one gateway request must match exactly."""
     quote = validate_quote(candidate)
     model, effort = candidate.get("model"), candidate.get("effort")
     quoted = quote.get("candidate") if isinstance(quote.get("candidate"), dict) else {}
@@ -714,19 +639,12 @@ def request_contract(candidate, cfg, quote_fetched_at=None, quote_max_age_second
         raise TariffError("Resolved variant no longer matches the quoted variant")
     if type(quote_max_age_seconds) is not int or quote_max_age_seconds <= 0:
         raise TariffError("Quote maximum age must be a positive integer")
-    policy_max_age = cfg.get("account_policy_max_age_seconds", 7200)
-    if type(policy_max_age) is not int or policy_max_age <= 0:
-        raise TariffError("Account policy maximum age must be a positive integer")
-    policy = validate_account_policy(cfg)
     contract = {
         "model": model,
         "variant_label": effort,
         "resolved_variant": copy.deepcopy(resolved),
         "max_tokens": cfg["max_output_tokens"],
-        "provider": {"only": list(quote["eligible_endpoint_tags"]), "max_price": dict(quote["routing_max_price"]), "allow_fallbacks": False, "require_parameters": True, "data_collection": "deny"},
-        "plugins": disabled_plugins(policy),
-        "account_policy": policy,
-        "account_policy_max_age_seconds": policy_max_age,
+        "kilo_organization_id": validate_organization_id(cfg.get("kilo_organization_id")),
         "financial_quote_sha256": digest(quote),
         "quote_fetched_at": quote_fetched_at,
         "quote_max_age_seconds": quote_max_age_seconds,
@@ -735,22 +653,20 @@ def request_contract(candidate, cfg, quote_fetched_at=None, quote_max_age_second
     return contract
 
 
-def _finite_number(value):
-    return (type(value) is int and not isinstance(value, bool)) or (type(value) is float and math.isfinite(value))
-
-
 def validate_final_payload(payload, contract):
     """Validate the post-variant payload and return the exact bytes to send.
 
     Runs on the actual outbound representation. Callers must post the
-    returned immutable bytes and never mutate the payload afterwards.
+    returned immutable bytes and never mutate the payload afterwards. The
+    gateway deletes client `usage` and may replace `provider`, so neither is
+    sent; plugins and tools are absent, not disabled by name.
     """
     if not isinstance(contract, dict) or not isinstance(payload, dict):
         raise RequestContractError("Final request requires an approved contract and payload object")
     if contract.get("contract_sha256") != digest(_contract_core(contract)):
         raise RequestContractError("Approved contract was mutated after construction")
     resolved = contract.get("resolved_variant") or {}
-    expected = {"model", "messages", "max_tokens", "usage", "stream", "plugins", "provider"}
+    expected = {"model", "messages", "max_tokens", "stream"}
     if "reasoning" in resolved:
         expected.add("reasoning")
     if "verbosity" in resolved:
@@ -759,7 +675,7 @@ def validate_final_payload(payload, contract):
         raise RequestContractError("Final request top-level fields differ from the approved contract")
     model = payload["model"]
     if not isinstance(model, str) or model != contract.get("model") or not MODEL_RE.fullmatch(model) or ":" in model or "@" in model:
-        raise RequestContractError("Final request model is not the concrete quoted model")
+        raise RequestContractError("Final request model is not the quoted model")
     messages = payload["messages"]
     if not isinstance(messages, list) or not messages:
         raise RequestContractError("Final request messages must be a nonempty list")
@@ -776,17 +692,8 @@ def validate_final_payload(payload, contract):
             raise RequestContractError("Final request reasoning differs from the frozen variant")
     if "verbosity" in resolved and payload["verbosity"] != resolved["verbosity"]:
         raise RequestContractError("Final request verbosity differs from the frozen variant")
-    if payload["stream"] is not False or payload["usage"] != {"include": True}:
-        raise RequestContractError("Final request stream or usage differs from the approved contract")
-    plugins = payload["plugins"]
-    if not isinstance(plugins, list) or plugins != contract.get("plugins") or any(not isinstance(item, dict) or set(item) != {"id", "enabled"} or item.get("enabled") is not False for item in plugins):
-        raise RequestContractError("Final request plugins are not the exact approved request-level disables")
-    provider = payload["provider"]
-    if not isinstance(provider, dict) or provider != contract.get("provider"):
-        raise RequestContractError("Final request provider controls differ from the approved contract")
-    max_price = provider.get("max_price") or {}
-    if set(max_price) != {"prompt", "completion"} or any(not _finite_number(value) or value < 0 for value in max_price.values()):
-        raise RequestContractError("Final request provider caps are not the exact paired witness caps")
+    if payload["stream"] is not False:
+        raise RequestContractError("Final request stream differs from the approved contract")
     try:
         raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True, allow_nan=False).encode()
     except (TypeError, ValueError) as error:
@@ -798,7 +705,3 @@ def validate_final_payload(payload, contract):
 
 def request_bytes_sha256(raw):
     return hashlib.sha256(raw).hexdigest()
-
-
-
-

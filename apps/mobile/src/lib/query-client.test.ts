@@ -350,6 +350,7 @@ describe('accepted active-session outcomes', () => {
       await client.query({ queryKey: QUERY_KEY, queryFn: () => emptyResult });
       expect(getActiveSessionsQueryMetadata(query)).toEqual({
         acceptedRevision: 1,
+        acceptedSessionIds: new Set(),
         terminalError: null,
       });
       unsubscribe();

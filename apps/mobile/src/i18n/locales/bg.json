@@ -229,6 +229,21 @@
     "signInCodeField": "Код за влизане",
     "or": "или"
   },
+  "pendingLink": {
+    "description": "Вече има акаунт с {{email}}. Влез с някой от неговите методи, за да добавиш {{provider}}.",
+    "emailCode": "Изпрати ми код за влизане по имейл",
+    "continueInBrowser": "Продължи в браузъра",
+    "startAgain": "Започни отначало",
+    "expired": "Тази заявка за добавяне на {{provider}} е изтекла.",
+    "noMethods": "Този акаунт няма друг метод за влизане, затова {{provider}} не може да бъде добавен.",
+    "linked": "{{provider}} беше добавен към акаунта ти.",
+    "failedExpired": "{{provider}} не беше добавен, защото заявката изтече.",
+    "failedWrongAccount": "{{provider}} не беше добавен, защото влезе в друг акаунт.",
+    "failedAccountAlreadyLinked": "{{provider}} не беше добавен, защото вече е свързан с друг акаунт.",
+    "failedProviderAlreadyLinked": "{{provider}} не беше добавен, защото акаунтът ти вече има друго влизане с {{provider}}.",
+    "failedLinking": "{{provider}} не можа да бъде добавен към акаунта ти.",
+    "notAdded": "Влязъл си. {{provider}} не беше добавен към акаунта ти."
+  },
   "profile": {
     "codeReviewerSubtitle": "Автоматични прегледи на PR",
     "securityAgentSubtitle": "Откривай и отстранявай уязвимости",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Потвърди изтриването",
     "credits": "Кредити",
     "failedToLoadBalance": "Не успяхме да заредим наличността. Докосни, за да опиташ отново.",
+    "balanceLoadFailed": "Не успяхме да заредим наличността",
     "hideBalance": "Скрий наличността",
     "showBalance": "Покажи наличността",
     "balanceHidden": "Наличността е скрита",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Тестов акаунт",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Корпоративно SSO",
     "passkeysTitle": "Ключове за достъп",
     "passkeysSubtitle": "Влезте без парола",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "В тази заявка за обединяване няма промени по файловете.",
     "fileList": {
       "openNavigator": "Отвори навигатора за файлове",
-      "filesViewed": "Файлове · прегледани {{viewed}} от {{total}}",
       "listed": "(в списъка)",
       "layout": "Оформление",
       "unified": "Обединено",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Подканата ти и всички качени файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити.",
       "discardFailed": "Не успяхме да изтрием черновата. Опитай отново.",
       "remoteHint": "За да се изпълни на компютъра ти, стартирай Kilo там и го остави да работи.",
-      "continueFrom": "Продължаваш сесията {{title}}.",
+      "continueFrom": "Продължаваш сесията „{{title}}“.",
       "importingSession": "Импортиране на сесията",
       "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
       "importFailed": "Тази сесия не можа да бъде импортирана.",
@@ -2560,7 +2577,21 @@
       "thought": "Разсъждения",
       "showDetails": "Покажи подробностите",
       "pending": "В изчакване…",
-      "running": "В изпълнение…"
+      "running": "В изпълнение…",
+      "field": {
+        "filePath": "Файлов път",
+        "path": "Път",
+        "offset": "Отместване",
+        "limit": "Ограничение",
+        "pattern": "Шаблон",
+        "include": "Включване",
+        "patchText": "Корекционен текст",
+        "query": "Заявка",
+        "prompt": "Инструкция",
+        "header": "Заглавие",
+        "question": "Въпрос",
+        "options": "Опции"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не успяхме да покажем съдържанието."
@@ -3802,7 +3833,7 @@
     "reasoningEffort": {
       "modelFlag": "Този модел поддържа усилие за разсъждение"
     },
-    "creditsRequired": "Нямате достатъчно кредити, за да изпратите това съобщение. Добавете кредити и опитайте отново."
+    "creditsRequired": "Нямате достатъчно кредити, за да изпратите това съобщение."
   },
   "settingsTools": {
     "confirmTitle": "Да се потвърди ли тази промяна?"
@@ -4243,5 +4274,8 @@
     "noEnabledContexts": "Няма включени контексти за планирани брифинги",
     "sourceBlocker": "Сесията изисква внимание",
     "sourceMetadata": "Запазени метаданни за сесията"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Не можахме да отворим този резултат от търсенето"
   }
 }

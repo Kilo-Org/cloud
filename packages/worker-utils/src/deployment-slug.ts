@@ -604,11 +604,11 @@ function cryptoRandomInt(max: number): number {
   return value % max;
 }
 
-function pickRandom<T>(list: readonly T[]): T {
-  const index = cryptoRandomInt(list.length);
+function pickWord<T>(list: readonly T[], chooseInt: (max: number) => number): T {
+  const index = chooseInt(list.length);
   const value = list[index];
   if (value === undefined) {
-    throw new Error(`pickRandom: index ${index} out of bounds for list of length ${list.length}`);
+    throw new Error(`pickWord: index ${index} out of bounds for list of length ${list.length}`);
   }
   return value;
 }
@@ -623,8 +623,11 @@ function generateEphemeralSuffix(): string {
   return Array.from(values, value => BASE32_ALPHABET.charAt(value & 31)).join('');
 }
 
-function generatePronounceableSlug(suffix: string): string {
-  return `${pickRandom(adjectives)}-${pickRandom(nouns)}-${suffix}`;
+function generatePronounceableSlug(
+  suffix: string,
+  chooseInt: (max: number) => number = cryptoRandomInt
+): string {
+  return `${pickWord(adjectives, chooseInt)}-${pickWord(nouns, chooseInt)}-${suffix}`;
 }
 
 function sanitizePrefix(raw: string): string {
@@ -646,11 +649,27 @@ function sanitizePrefix(raw: string): string {
   return prefix;
 }
 
-export function generateBranchSlug(): string {
-  const suffix = cryptoRandomInt(36 ** BRANCH_SUFFIX_LENGTH)
+function branchSlug(chooseInt: (max: number) => number): string {
+  const suffix = chooseInt(36 ** BRANCH_SUFFIX_LENGTH)
     .toString(36)
     .padStart(BRANCH_SUFFIX_LENGTH, '0');
-  return generatePronounceableSlug(suffix);
+  return generatePronounceableSlug(suffix, chooseInt);
+}
+
+export function generateBranchSlug(): string {
+  return branchSlug(cryptoRandomInt);
+}
+
+/** Stable branch slug for a workspace whose registration may be retried. */
+export async function generateBranchSlugFromSeed(seed: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed));
+  const values = new DataView(digest);
+  let offset = 0;
+  return branchSlug(max => {
+    const value = values.getUint32(offset);
+    offset += Uint32Array.BYTES_PER_ELEMENT;
+    return value % max;
+  });
 }
 
 /** Generate a pronounceable slug with a high-entropy suffix for public ephemeral deployments. */

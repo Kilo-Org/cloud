@@ -37,7 +37,7 @@
  * Usage: node tools/i18n/check-plurals.mjs [--source-only]
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative as relativePath } from 'node:path';
+import { join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { lineIndex, parseProblems, parseSourceFile, walk } from '../lib/ast.mjs';
@@ -263,7 +263,12 @@ function auditTree(rootDir) {
   for (const file of sourceFiles(rootDir, isTestArtifact)) {
     const text = readFileSync(file, 'utf8');
     const { program, errors } = parseSourceFile(file, text);
-    const path = relativePath(ROOT, file).split('\\').join('/');
+    // The app's sources read the way every other diagnostic names them; a
+    // fixture tree outside the repository reads from its own root.
+    const fromRepo = relativePath(ROOT, file);
+    const path = (fromRepo.startsWith('..') ? relativePath(rootDir, file) : fromRepo)
+      .split(sep)
+      .join('/');
     problems.push(...parseProblems(path, errors, lineIndex(text)));
     walk(program, node => {
       const call = countedCall(node, text);

@@ -52,6 +52,7 @@ import {
   type CreateSessionForCloudAgentResult,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
+import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-slug';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   createRuntimeAuthorization,
@@ -266,6 +267,7 @@ export function executionTurnSubmissionFromAcceptedTurn(
 }
 
 type NewSessionAllocation = SessionRegistrationResult & {
+  generatedBranch: string;
   credentialContainment: CredentialContainment;
   rollbackCliSession: () => Promise<void>;
   runtimeAuthorization?: { token: string; seal: string };
@@ -595,6 +597,7 @@ function ownershipRequestForCreate(
     sandboxId: SandboxId;
     sandboxProvider: SessionRegistrationResult['sandboxProvider'];
     worktreeId?: CloudAgentWorktreeId;
+    generatedBranch: string;
   }
 ): CreateSessionForCloudAgentParams {
   const worktreeId = allocation.worktreeId;
@@ -606,6 +609,7 @@ function ownershipRequestForCreate(
     createdOnPlatform: input.options?.createdOnPlatform ?? 'cloud-agent',
     title: input.ownershipTitle ?? `New session - ${new Date().toISOString()}`,
     gitUrl: deriveCanonicalRepositoryUrl(input.repository),
+    gitBranch: input.repository.branch ?? allocation.generatedBranch,
     ...stackedOwnershipFields(input),
     profileId: input.profile?.resolvedProfileId,
     // Always present (undefined when there is no clone), matching the previous
@@ -1009,6 +1013,7 @@ async function allocateNewSession(
   const worktreeId = ledger?.worktreeEnabled
     ? cloudAgentWorktreeIdSchema.parse(`worktree_${cloudAgentSessionId.slice('workspace_'.length)}`)
     : undefined;
+  const generatedBranch = `kilo/${await generateBranchSlugFromSeed(worktreeId ?? cloudAgentSessionId)}`;
   const runtimeAuthorization = await issueSessionRuntimeAuthorization(
     input,
     ctx,
@@ -1164,6 +1169,7 @@ async function allocateNewSession(
         kiloSessionId,
         sandboxId,
         sandboxProvider,
+        generatedBranch,
         ...(worktreeId ? { worktreeId } : {}),
       })
     );
@@ -1246,6 +1252,7 @@ async function allocateNewSession(
     cloudAgentSessionId,
     kiloSessionId,
     sandboxId,
+    generatedBranch,
     ...(sandboxKind ? { sandboxKind } : {}),
     sandboxProvider,
     ...(worktreeId ? { worktreeId } : {}),
@@ -1284,12 +1291,12 @@ async function allocateNewSession(
  * fingerprint already proved unchanged. A prompt-less create recorded no
  * `initialMessageId` and rebuilds no initial turn.
  */
-function rebuildRecordedSessionAllocation(
+async function rebuildRecordedSessionAllocation(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
   row: OperationLedgerRow,
   options?: { billingOrigin?: string }
-): NewSessionAllocation {
+): Promise<NewSessionAllocation> {
   const canonical = row.canonical_result ?? {};
   const cloudAgentSessionId = canonical.cloudAgentSessionId;
   assertStoredControlPlaneSessionId(cloudAgentSessionId);
@@ -1389,10 +1396,12 @@ function rebuildRecordedSessionAllocation(
     throw creationInProgressError();
   }
   const normalizedBinding = parsedBinding.data;
+  const generatedBranch = `kilo/${await generateBranchSlugFromSeed(worktreeId ?? cloudAgentSessionId)}`;
 
   return {
     cloudAgentSessionId,
     kiloSessionId,
+    generatedBranch,
     sandboxId: sandboxId as SandboxId,
     ...(sandboxKind ? { sandboxKind } : {}),
     sandboxProvider: recordedProvider.data,
@@ -1428,6 +1437,7 @@ function buildSessionRegistrationCommand(
   options?: { billingOrigin?: string }
 ) {
   return {
+    generatedBranch: allocation.generatedBranch,
     allowSubagentSessions:
       allowsSubagentSessions(input) &&
       isPolicyBearingAuthToken(ctx.authToken) &&
@@ -2600,7 +2610,7 @@ async function resumeCloneCreate(
   }
   assertStoredControlPlaneSessionId(ids.cloudAgentSessionId);
 
-  const allocation = rebuildRecordedSessionAllocation(input, ctx, row, options);
+  const allocation = await rebuildRecordedSessionAllocation(input, ctx, row, options);
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, 'takeover');
 
   let ingestResult: CreateSessionForCloudAgentResult | undefined;
@@ -2869,7 +2879,7 @@ async function reconcileLedgerCreate(
   }
 
   const worktreeAllocation = worktreeEnabledForCreate(input, ctx, row)
-    ? rebuildRecordedSessionAllocation(input, ctx, row, options)
+    ? await rebuildRecordedSessionAllocation(input, ctx, row, options)
     : undefined;
 
   // (b) Ownership row lookup by kiloSessionId.

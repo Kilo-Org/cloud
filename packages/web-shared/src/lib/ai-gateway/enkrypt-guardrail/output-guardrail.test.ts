@@ -848,7 +848,7 @@ describe('guardEnkryptOutput', () => {
       expect(client.status).toBe(400);
       expect(await client.json()).toMatchObject({
         error: {
-          message: expect.stringContaining('3,000,000 characters of model output'),
+          message: expect.stringContaining('250,000 characters of model output'),
           code: 'guardrail_blocked',
         },
       });

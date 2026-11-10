@@ -172,7 +172,7 @@ describe('startEnkryptInputGuardrail', () => {
     }
   );
 
-  it('starts the request scan with a 30-second timeout', async () => {
+  it('starts the request scan with a 5-second timeout', async () => {
     mockedScanRequest.mockResolvedValue({
       verdict: { action: 'allow' },
       report: scanReport,
@@ -184,7 +184,7 @@ describe('startEnkryptInputGuardrail', () => {
 
     expect(mockedScanRequest).toHaveBeenCalledWith(
       expect.objectContaining({ text: 'system prompt\n\ntool output' }),
-      expect.objectContaining({ timeoutMs: 30_000, signal })
+      expect.objectContaining({ timeoutMs: 5_000, signal })
     );
   });
 
@@ -382,11 +382,11 @@ describe('startEnkryptInputGuardrail', () => {
     expect(mockedScanRequest.mock.calls).toEqual([
       [
         scanOf({ ...request, config: scan.config }),
-        expect.objectContaining({ timeoutMs: 30_000, signal }),
+        expect.objectContaining({ timeoutMs: 5_000, signal }),
       ],
       [
         scanOf({ ...request, config: logOnlyScan.config }),
-        expect.objectContaining({ timeoutMs: 30_000, signal }),
+        expect.objectContaining({ timeoutMs: 5_000, signal }),
       ],
     ]);
 

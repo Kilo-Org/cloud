@@ -870,6 +870,26 @@ test('kilo-app CI installs the closure the declaration action needs', () => {
   }
 });
 
+// Both harness SDK producers run the same action and no other step that reads
+// a workspace, so both install the same closure. The package has no workspace
+// dependency; the root project supplies the `tsgo` binary the action's key
+// script runs, so it stays in the filter.
+const harnessProducerInstall =
+  "pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo";
+
+test('both harness SDK producers install the harness SDK closure', () => {
+  for (const file of ['kilo-app-ci.yml', 'mobile-native-build.yml']) {
+    const install = workflows[file].jobs[harnessProducer].steps.find(
+      step => step.name === 'Install dependencies'
+    );
+    assert.equal(
+      install.run,
+      harnessProducerInstall,
+      `${file}'s ${harnessProducer} installs the harness SDK closure, not the whole workspace`
+    );
+  }
+});
+
 // mobile-native-build needs the same producer for the same reason: both
 // platform jobs start together after the gate, so running the action in each
 // made a cache miss compile the declaration program twice and race both jobs to
@@ -1603,9 +1623,9 @@ const appClosureInstall =
   "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
 
 test('the kilo-app CI consumers install the app closure', () => {
-  // The producer jobs keep their own wider (or whole-workspace) closures, and
-  // `mobile-typecheck` keeps the whole workspace until its measured saving
-  // clears the bar; every other install in this workflow is the app's.
+  // The producer jobs install their own build closure, and `mobile-typecheck`
+  // keeps the whole workspace until its measured saving clears the bar; every
+  // other install in this workflow is the app's.
   const consumerJobs = Object.entries(kiloAppJobs)
     .filter(
       ([name, job]) =>

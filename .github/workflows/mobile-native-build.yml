@@ -122,8 +122,13 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the harness SDK's dependency closure and the root project are
+      # installed, as in the kilo-app CI producer above. The composite action
+      # below builds `@kilocode/harness-sdk` alone, and that package has no
+      # workspace dependency. Widen the filter when a step here imports a
+      # workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo
 
       - name: Restore or build the harness SDK
         uses: ./.github/actions/harness-sdk-build

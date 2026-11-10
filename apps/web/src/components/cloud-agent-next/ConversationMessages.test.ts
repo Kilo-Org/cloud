@@ -841,6 +841,17 @@ describe('ConversationMessages', () => {
       {
         isStreaming: true,
         dynamicMessages: [
+          {
+            info: {
+              id: 'user-2',
+              role: 'user',
+              sessionID: 'ses-1',
+              time: { created: 4 },
+              agent: 'code',
+              model: { providerID: 'test', modelID: 'test' },
+            },
+            parts: [],
+          },
           assistantMessage(
             'assistant-3',
             [reasoningPart('active-reasoning', { time: { start: 5 } })],
@@ -856,7 +867,8 @@ describe('ConversationMessages', () => {
       expect.stringContaining('Thinking'),
     ]);
     expect(html.match(/data-message-role="assistant"/g)).toHaveLength(2);
-    expect(html.match(/<time\b/g)).toHaveLength(1);
+    // The completed answer's timestamp and the later prompt's timestamp.
+    expect(html.match(/<time\b/g)).toHaveLength(2);
     expect(html.indexOf('Message timestamp')).toBeGreaterThan(
       html.indexOf('The previous turn is complete.')
     );

@@ -66,7 +66,6 @@ export type WorkspaceSnapshotSelectionReason =
   | 'runtime_mismatch'
   | 'expired'
   | 'image_unavailable'
-  | 'image_mismatch'
   | 'selected';
 export type WorkspaceSnapshotSelection =
   | { kind: 'selected'; descriptor: WorkspaceSnapshotDescriptor }
@@ -244,9 +243,7 @@ export function selectWorkspaceSnapshotResult(
             ? 'expired'
             : baseImage === null
               ? 'image_unavailable'
-              : descriptor.baseImage !== baseImage
-                ? 'image_mismatch'
-                : 'selected';
+              : 'selected';
   logControlDiagnostic('workspace_snapshot_selection', {
     sandboxId: identity.sandboxId,
     workspaceId: identity.workspaceId,

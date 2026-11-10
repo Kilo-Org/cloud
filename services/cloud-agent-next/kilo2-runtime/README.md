@@ -9,6 +9,12 @@ From this Cloud service directory, prepare the local image configuration:
 node scripts/prepare-kilo2-local.mjs
 ```
 
+To verify the Cloud Agent runtime pin (`0.0.0-v2-77`) rather than a moving channel:
+
+```sh
+node scripts/prepare-kilo2-local.mjs 0.0.0-v2-77
+```
+
 Pass an npm dist-tag to select another published v2 channel, for example
 `node scripts/prepare-kilo2-local.mjs kilo-v2`.
 
@@ -33,6 +39,10 @@ The driver uses this worktree's ports and the funded local test account. It uses
 `kilo/fake-deterministic` through the local gateway. It records the runtime version,
 wrapper hash, history reads, tools, questions, Stop recovery, native process
 replacement, and sandbox replacement under `dev/logs/`.
+It rejects a runtime version that differs from the Cloud Agent pin. Set
+`E2E_USER_EMAIL` to a funded local user's email. The default checkout is the public
+`octocat/Hello-World` repository; `E2E_GIT_URL` overrides it, or use
+`E2E_GITHUB_REPO` for a token-backed checkout with a GitHub-enabled account.
 
 The sandbox replacement step also restarts this worktree's local Worker. This
 clears stopped container references in the local Containers emulator. The Worker

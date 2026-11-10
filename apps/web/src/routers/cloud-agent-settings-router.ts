@@ -5,6 +5,8 @@ import {
   ORGANIZATION_MANAGE_ROLES,
   canManageOrganization,
 } from '@kilocode/app-shared/organizations';
+import { cloud_agent_user_settings } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
@@ -31,6 +33,7 @@ import {
   getSavedAllocationReason,
   loadSandboxCapabilities,
 } from '@/lib/cloud-agent-next/sandbox-allocation-offers';
+import { DEFAULT_WORKSPACE_ORDER, workspaceOrderSchema } from '@/lib/cloud-agent/workspace-folders';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
 const RepositoryPlatformSchema = z.enum(['github', 'gitlab']);
@@ -59,6 +62,8 @@ const CloudAgentSettingsSchema = z.object({
     gitlab: sandboxSelectionCapabilitiesSchema,
   }),
 });
+
+const WorkspaceOrderSchema = z.object({ workspaceOrder: workspaceOrderSchema });
 
 function ownerFromInput(organizationId: string | undefined, userId: string): ProfileOwner {
   return organizationId
@@ -258,6 +263,29 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const agents = await setBuiltinAgentSettings(db, ctx.user.id, input.agents);
       return { success: true, agents };
+    }),
+
+  getWorkspaceOrder: baseProcedure.output(WorkspaceOrderSchema).query(async ({ ctx }) => {
+    const [settings] = await db
+      .select({ workspaceOrder: cloud_agent_user_settings.workspace_order })
+      .from(cloud_agent_user_settings)
+      .where(eq(cloud_agent_user_settings.kilo_user_id, ctx.user.id))
+      .limit(1);
+    return { workspaceOrder: settings?.workspaceOrder ?? DEFAULT_WORKSPACE_ORDER };
+  }),
+
+  setWorkspaceOrder: baseProcedure
+    .input(WorkspaceOrderSchema)
+    .output(WorkspaceOrderSchema)
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .insert(cloud_agent_user_settings)
+        .values({ kilo_user_id: ctx.user.id, workspace_order: input.workspaceOrder })
+        .onConflictDoUpdate({
+          target: cloud_agent_user_settings.kilo_user_id,
+          set: { workspace_order: input.workspaceOrder },
+        });
+      return { workspaceOrder: input.workspaceOrder };
     }),
 
   removeRepositorySettings: baseProcedure

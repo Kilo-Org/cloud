@@ -27,6 +27,7 @@ import { ChatHeader } from './ChatHeader';
 import { ParentSessionLink } from './ParentSessionLink';
 import { worktreeParentQueryOptions } from './worktree-parent-query';
 import { sessionResumeHref } from '@/lib/cloud-agent/session-resume-target';
+import { useChatStackInfo } from './useChatStackInfo';
 import {
   getWorkspaceControlSession,
   getWorktreeBranch,
@@ -67,7 +68,8 @@ import { getCurrentTodos } from './current-todos';
 import { useCloudThreadScroll } from './assistant-ui/use-cloud-thread-scroll';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
-import { SessionStatusIndicator } from './SessionStatusIndicator';
+import { SessionErrorNotice } from './SessionErrorNotice';
+import { readableSessionError } from './session-error-copy';
 import { isNoOpCompletedPreparationAttempt } from './preparation-summary';
 import { PreparationDrawer } from './PreparationDrawer';
 import { WorkspaceSnapshotRecovery } from './WorkspaceSnapshotRecovery';
@@ -1394,6 +1396,15 @@ export default function CloudChatPage({
       ? { sessionId: sessionIdFromParams, message: statusIndicator.message }
       : null;
 
+  const sessionErrorMessage =
+    transcriptPhase !== 'opening' && !billingFailure && statusIndicator?.type === 'error'
+      ? readableSessionError(statusIndicator.message)
+      : null;
+  const failedPreparationAttemptId =
+    cloudStatus?.type === 'error'
+      ? (preparationAttempts.filter(attempt => attempt.status === 'failed').at(-1)?.id ?? null)
+      : null;
+
   const chatOpening = transcriptPhase === 'opening' || (isLoading && transcriptPhase !== 'local');
 
   // The worktree's sandbox stays reachable through its control chat while a chat loads.
@@ -1433,6 +1444,28 @@ export default function CloudChatPage({
   );
 
   // Feedback context carries the session the server resolved for this route.
+  const headerRepository = workspaceControlSession?.repository ?? sessionConfig?.repository ?? '';
+  const headerBranch = workspaceControlSession
+    ? (workspaceControlSession.branch ?? undefined)
+    : fetchedSessionData?.isPreparingAsync &&
+        cloudStatus?.type !== 'ready' &&
+        !preparationAttempts.some(attempt => attempt.status === 'completed')
+      ? undefined
+      : (sessionBranch ?? undefined);
+  const headerGitUrl = workspaceControlSession ? undefined : fetchedSessionData?.gitUrl;
+  const [stackRefreshToken, setStackRefreshToken] = useState(0);
+  const chatStackInfo = useChatStackInfo({
+    enabled: Boolean(selectedWorktreeId),
+    userId: currentUserId,
+    currentWorktreeId: selectedWorktreeId,
+    cloudAgentSessionId: workspaceCloudSessionId ?? '',
+    organizationId,
+    repository: headerRepository,
+    branch: headerBranch,
+    gitUrl: fetchedSessionData?.gitUrl,
+    refreshToken: stackRefreshToken,
+    openSession,
+  });
   const sessionActions = (
     <ChatHeader
       currentUserId={currentUserId}
@@ -1449,17 +1482,9 @@ export default function CloudChatPage({
           : workspaceControlSession?.sessionId
       }
       organizationId={organizationId}
-      repository={workspaceControlSession?.repository ?? sessionConfig?.repository ?? ''}
-      branch={
-        workspaceControlSession
-          ? (workspaceControlSession.branch ?? undefined)
-          : fetchedSessionData?.isPreparingAsync &&
-              cloudStatus?.type !== 'ready' &&
-              !preparationAttempts.some(attempt => attempt.status === 'completed')
-            ? undefined
-            : (sessionBranch ?? undefined)
-      }
-      gitUrl={workspaceControlSession ? undefined : fetchedSessionData?.gitUrl}
+      repository={headerRepository}
+      branch={headerBranch}
+      gitUrl={headerGitUrl}
       model={workspaceControlSession?.model ?? displayModel}
       modelDisplayName={workspaceControlSession ? undefined : modelDisplayName}
       getSessionCostBreakdown={
@@ -1490,6 +1515,9 @@ export default function CloudChatPage({
         Boolean(workspaceControlSession) ||
         (!isReadOnly && Boolean(fetchedSessionData?.cloudAgentSessionId))
       }
+      stack={chatStackInfo}
+      onSendStackInstruction={handleSendMessage}
+      onStackOperationCompleted={() => setStackRefreshToken(token => token + 1)}
       sandboxStatusEligible={isSandboxStatusEligible({
         currentUserId,
         sessionId: workspaceCloudSessionId,
@@ -1844,6 +1872,60 @@ export default function CloudChatPage({
                               <div className="px-[max(1rem,calc(50%_-_27rem))]">
                                 <CurrentTaskList todos={currentTodos} />
                               </div>
+                              {sessionErrorMessage !== null && (
+                                <div className="-mb-2 px-[max(1rem,calc(50%_-_27rem))]">
+                                  <SessionErrorNotice
+                                    message={sessionErrorMessage}
+                                    hint={
+                                      workspaceSnapshotRecoveryState !== null
+                                        ? 'Start fresh to discard the snapshot, or send your message again to retry.'
+                                        : environmentBuildRecoveryId !== null
+                                          ? 'Send your message again once the environment snapshot is ready.'
+                                          : undefined
+                                    }
+                                    actions={
+                                      environmentBuildRecoveryId !== null ||
+                                      workspaceSnapshotRecoveryState !== null ||
+                                      failedPreparationAttemptId !== null ? (
+                                        <>
+                                          {environmentBuildRecoveryId !== null && (
+                                            <EnvironmentBuildRecovery
+                                              environmentId={environmentBuildRecoveryId}
+                                              organizationId={organizationId}
+                                            />
+                                          )}
+                                          {workspaceSnapshotRecoveryState !== null && (
+                                            <WorkspaceSnapshotRecovery
+                                              capturedAt={workspaceSnapshotRecoveryState.capturedAt}
+                                              isRemoving={removeWorkspaceSnapshot.isPending}
+                                              onRemove={async () => {
+                                                await removeWorkspaceSnapshot.mutateAsync();
+                                                toast.success(
+                                                  'Workspace snapshot removed. Your next start will use the environment snapshot or base image.'
+                                                );
+                                              }}
+                                            />
+                                          )}
+                                          {failedPreparationAttemptId !== null && (
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() =>
+                                                handleOpenPreparationDetails(
+                                                  failedPreparationAttemptId
+                                                )
+                                              }
+                                            >
+                                              View details
+                                            </Button>
+                                          )}
+                                        </>
+                                      ) : undefined
+                                    }
+                                  />
+                                </div>
+                              )}
                               <CloudComposer
                                 inputRef={composerInputRef}
                                 onSend={handleSendMessage}
@@ -1908,34 +1990,6 @@ export default function CloudChatPage({
                                   },
                                 }}
                               />
-                              {transcriptPhase !== 'opening' &&
-                                !billingFailure &&
-                                statusIndicator?.type === 'error' && (
-                                  <div
-                                    className="px-[max(1rem,calc(50%_-_27rem))] pb-2"
-                                    role="alert"
-                                  >
-                                    <SessionStatusIndicator indicator={statusIndicator} />
-                                    {environmentBuildRecoveryId !== null && (
-                                      <EnvironmentBuildRecovery
-                                        environmentId={environmentBuildRecoveryId}
-                                        organizationId={organizationId}
-                                      />
-                                    )}
-                                    {workspaceSnapshotRecoveryState !== null && (
-                                      <WorkspaceSnapshotRecovery
-                                        capturedAt={workspaceSnapshotRecoveryState.capturedAt}
-                                        isRemoving={removeWorkspaceSnapshot.isPending}
-                                        onRemove={async () => {
-                                          await removeWorkspaceSnapshot.mutateAsync();
-                                          toast.success(
-                                            'Workspace snapshot removed. Your next start will use the environment snapshot or base image.'
-                                          );
-                                        }}
-                                      />
-                                    )}
-                                  </div>
-                                )}
                               <ComposerContextLine
                                 userId={currentUserId}
                                 reserve={Boolean(sessionIdFromParams)}

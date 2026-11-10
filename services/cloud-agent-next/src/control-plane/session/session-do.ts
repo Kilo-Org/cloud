@@ -129,6 +129,24 @@ import {
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
 } from '../../shared/control-plane-protocol.js';
+import {
+  worktreeBranchOperationResultSchema,
+  type ControlPlaneWorktreeGitInput,
+  type WorktreeBranchOperationResult,
+} from '../../shared/worktree-git-operations.js';
+import {
+  matchesExpectedWorktree,
+  nextRepositoryBase,
+  withRepositoryBase,
+  type AdoptWorktreeBaseRequest,
+  type AdoptWorktreeBaseResponse,
+  type WorktreeBranchOperationInput,
+  type WorktreeBranchOperationResponse,
+} from '../../session/worktree-branch-operation.js';
+
+/** Bounded wake for a branch operation: idle sandboxes prepare async. */
+const WORKTREE_GIT_PREPARE_TIMEOUT_MS = 90_000;
+const WORKTREE_GIT_PREPARE_POLL_MS = 500;
 import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
 import type {
@@ -520,6 +538,8 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   } | null>;
   /** B10: forwards one worktree-change request to the wrapper. */
   worktreeCapture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;
+  /** Forwards one Sync/Restack branch operation to the wrapper. */
+  worktreeGit(input: ControlPlaneWorktreeGitInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one terminal request to the wrapper. */
   terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one allowlisted native read to the live wrapper. */
@@ -860,6 +880,272 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       };
     }
     return peer.worktreeCapture(input);
+  }
+
+  /**
+   * Runs a Sync or Restack against the worktree's own sandbox.
+   *
+   * The target is derived from this session only: callers cannot name a sandbox
+   * or directory. An idle sandbox is woken through the existing preparation
+   * path (no synthetic turn); preparation is bounded so the caller learns
+   * rather than waiting for the provider. The wrapper owns the active-turn and
+   * directory locks and answers `refused`, so the DO never forces a rewrite
+   * over a running turn.
+   */
+  async syncWorktreeBranch(
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    return this.runWorktreeBranchOperation('sync', input);
+  }
+
+  async restackWorktreeBranch(
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    return this.runWorktreeBranchOperation('restack', input);
+  }
+
+  private async runWorktreeBranchOperation(
+    operation: 'sync' | 'restack',
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    await this.initialized;
+    const metadata = this.metadata;
+    const registration = this.registration;
+    const worktreeId = metadata?.workspace?.worktreeId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const directory = registration?.spec.directory;
+    if (
+      metadata === null ||
+      registration === null ||
+      worktreeId === undefined ||
+      kiloSessionId === undefined ||
+      directory === undefined ||
+      metadata.identity.createdOnPlatform !== 'cloud-agent-web' ||
+      metadata.workspace?.sandboxKind === 'shared' ||
+      metadata.workspace?.sandboxRoute !== undefined
+    ) {
+      return {
+        ok: false,
+        code: 'not_a_worktree_session',
+        message: 'Sync and Restack run only in a browser workspace session with its own sandbox',
+        retryable: false,
+      };
+    }
+
+    const baseBranch = input.baseBranch ?? metadata.repository?.baseBranch;
+    const upstreamSha = input.upstreamSha ?? metadata.repository?.baseSha;
+
+    const ready = await this.ensureReadyForBranchOperation();
+    if (!ready.ok) {
+      return { ok: false, code: 'sandbox_not_ready', message: ready.message, retryable: true };
+    }
+
+    const sandboxId = metadata.workspace?.sandboxId;
+    if (sandboxId === undefined) {
+      return {
+        ok: false,
+        code: 'sandbox_not_ready',
+        message: 'Sandbox is not available',
+        retryable: true,
+      };
+    }
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return {
+        ok: false,
+        code: 'sandbox_not_ready',
+        message: 'Sandbox is not available',
+        retryable: true,
+      };
+    }
+    let result: ControlPlaneControlResult;
+    try {
+      result = await peer.worktreeGit({
+        session: {
+          sessionId: this.sessionId,
+          kiloSessionId,
+          directory,
+        },
+        payload: {
+          operation,
+          ...(baseBranch === undefined ? {} : { baseBranch }),
+          ...(upstreamSha === undefined ? {} : { upstreamSha }),
+        },
+      });
+    } catch (error) {
+      // The wrapper may have completed a lease push before the reply was lost.
+      // Surface the ambiguity; the Worker must not retry this mutation.
+      return {
+        ok: false,
+        code: 'operation_outcome_unknown',
+        message: error instanceof Error ? error.message : 'Worktree operation outcome is unknown',
+        retryable: false,
+      };
+    }
+    if (!result.ok) {
+      return {
+        ok: false,
+        code:
+          result.error.code === 'operation_outcome_unknown'
+            ? 'operation_outcome_unknown'
+            : 'operation_failed',
+        message: result.error.message,
+        retryable: result.error.retryable,
+      };
+    }
+    const parsed = worktreeBranchOperationResultSchema.safeParse(result.result);
+    if (!parsed.success) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Worktree branch operation returned an invalid result');
+      return {
+        ok: false,
+        code: 'invalid_result',
+        message: 'The sandbox returned an invalid branch operation result',
+        retryable: false,
+      };
+    }
+    const outcome = parsed.data;
+    if (
+      (outcome.status === 'changed' || outcome.status === 'unchanged') &&
+      !(operation === 'restack' && outcome.operation === 'sync')
+    ) {
+      await this.persistWorktreeBranchOperation(outcome);
+    }
+    return { ok: true, result: outcome };
+  }
+
+  private async persistWorktreeBranchOperation(
+    outcome: Extract<WorktreeBranchOperationResult, { status: 'changed' | 'unchanged' }>
+  ): Promise<void> {
+    const metadata = this.metadata;
+    if (metadata?.repository === undefined) return;
+    const nextBase = nextRepositoryBase({
+      current: {
+        ...(metadata.repository.baseBranch === undefined
+          ? {}
+          : { baseBranch: metadata.repository.baseBranch }),
+        ...(metadata.repository.baseSha === undefined
+          ? {}
+          : { baseSha: metadata.repository.baseSha }),
+      },
+      result: { baseBranch: outcome.baseBranch, baseSha: outcome.baseSha },
+    });
+    await this.persistAdoptedBase(nextBase, outcome.branch);
+  }
+
+  /**
+   * Internal metadata-only adoption for a sibling session that shares the
+   * worktree. It never wakes the sandbox or creates a turn: the next capture
+   * reads the updated grouped metadata, so a sibling cannot overwrite the
+   * shared Changes snapshot with its old base.
+   */
+  async adoptWorktreeBase(input: AdoptWorktreeBaseRequest): Promise<AdoptWorktreeBaseResponse> {
+    await this.initialized;
+    if (!matchesExpectedWorktree(this.metadata, input.expectedWorktreeId)) {
+      return {
+        ok: false,
+        code: 'worktree_mismatch',
+        message: 'This session does not belong to the expected worktree',
+      };
+    }
+    const persisted = await this.persistAdoptedBase({
+      baseBranch: input.baseBranch,
+      baseSha: input.baseSha,
+    });
+    return persisted
+      ? { ok: true }
+      : {
+          ok: false,
+          code: 'invalid_metadata',
+          message: 'Adopted base did not produce valid session metadata',
+        };
+  }
+
+  /**
+   * Writes a base + effective prompt + route spec through the queue. Callers
+   * have already resolved the effective values; a null result keeps the
+   * current value upstream in `nextRepositoryBase`.
+   */
+  private async persistAdoptedBase(
+    nextBase: { baseBranch?: string; baseSha?: string },
+    fallbackBranch?: string
+  ): Promise<boolean> {
+    const metadata = this.metadata;
+    if (metadata?.repository === undefined) return false;
+    const next = withRepositoryBase(metadata, nextBase, fallbackBranch);
+    const validated = CurrentSessionMetadataSchema.safeParse(next);
+    if (!validated.success) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Worktree base adoption produced invalid session metadata');
+      return false;
+    }
+    await this.enqueue(async () => {
+      await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(validated.data));
+      this.metadata = validated.data;
+      if (this.registration !== null) {
+        const spec = {
+          ...this.registration.spec,
+          ...(validated.data.repository?.baseBranch === undefined
+            ? {}
+            : { baseBranch: validated.data.repository.baseBranch }),
+          ...(validated.data.repository?.baseSha === undefined
+            ? {}
+            : { baseSha: validated.data.repository.baseSha }),
+        };
+        const registration = { ...this.registration, spec };
+        await this.ctx.storage.put(REGISTRATION_KEY, registration);
+        this.registration = registration;
+      }
+    });
+    return true;
+  }
+
+  /** Wakes an idle sandbox through the ordinary preparation path. */
+  private async ensureReadyForBranchOperation(): Promise<
+    { ok: true } | { ok: false; message: string }
+  > {
+    const prepared = await this.prepareSandbox();
+    if (prepared !== null) {
+      await this.applyView(prepared, this.transportPass());
+      if (prepared.state === 'ready') return { ok: true };
+      if (prepared.state === 'failed') return { ok: false, message: prepared.reason };
+    }
+    const deadline = Date.now() + WORKTREE_GIT_PREPARE_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      if (this.route.state === 'ready') return { ok: true };
+      const failed = this.branchOperationRouteFailure();
+      if (failed !== undefined) return { ok: false, message: failed };
+      const peer = this.sandboxPeer();
+      if (peer !== null) {
+        try {
+          const status = await peer.status({ sessionId: this.sessionId });
+          if (status.view.state !== 'preparing') {
+            await this.applyView(status.view, this.transportPass());
+          }
+        } catch {
+          // A transient Sandbox RPC failure is retried within the bound.
+        }
+        if (this.routeIsReady()) return { ok: true };
+        const afterPoll = this.branchOperationRouteFailure();
+        if (afterPoll !== undefined) return { ok: false, message: afterPoll };
+      }
+      await new Promise(resolve => setTimeout(resolve, WORKTREE_GIT_PREPARE_POLL_MS));
+    }
+    return {
+      ok: false,
+      message: 'Sandbox preparation did not finish within 90 seconds',
+    };
+  }
+
+  private branchOperationRouteFailure(): string | undefined {
+    const route = this.route;
+    return route.state === 'failed' ? route.reason : undefined;
+  }
+
+  private routeIsReady(): boolean {
+    return this.route.state === 'ready';
   }
 
   private async initializeStorage(): Promise<void> {

@@ -1,3 +1,4 @@
+import { assertContainerAccountAvailable } from '../../container-account-admission.js';
 import {
   parseRuntimeHarness,
   RUNTIME_HARNESS_HEADER,
@@ -70,10 +71,7 @@ import {
   workspaceMcpAnchorSessionId,
   type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
-import {
-  assertContainerCapacity,
-  getContainerCapacityFailureReason,
-} from '../../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../../container-concurrency.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -224,6 +222,7 @@ import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   CONTROL_PLANE_PROTOCOL_VERSION,
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
+  CONTROL_PLANE_WORKTREE_GIT_TIMEOUT_MS,
   controlPlaneAnswerPayloadSchema,
   controlPlaneDeliverPayloadSchema,
   controlPlaneKiloRequestInputSchema,
@@ -260,6 +259,10 @@ import {
   type ControlPlaneWorkspaceFailureSubtype,
   type WorkspaceConfig,
 } from '../../shared/control-plane-protocol.js';
+import {
+  controlPlaneWorktreeGitInputSchema,
+  type ControlPlaneWorktreeGitInput,
+} from '../../shared/worktree-git-operations.js';
 import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
@@ -456,6 +459,7 @@ const wrapperSocketAttachmentSchema = z.object({
   workspaceSnapshots: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
   installsSkillsSh: z.literal(true).optional(),
+  worktreeGit: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   runtimeHarness: z.enum(RUNTIME_HARNESSES).optional(),
@@ -584,8 +588,6 @@ function workspaceSnapshotFailureDetail(
       return `The workspace snapshot belongs to another workspace. ${since}`;
     case 'runtime_mismatch':
       return `The workspace snapshot was captured with a different runtime. ${since}`;
-    case 'image_mismatch':
-      return `The workspace snapshot was captured from a different sandbox image. ${since}`;
     case 'image_unavailable':
       return `The sandbox image for the workspace snapshot could not be resolved. Send a message to retry. ${since}`;
     case 'unsupported':
@@ -1090,7 +1092,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         projection = undefined;
       }
       const context = projection?.context;
-      const enforcementRequested = pin.billing?.enforcementRequested === true;
+      const enforcementRequested = pin.billing !== null;
       return {
         payer: context?.subject ?? pin.billing?.subject ?? null,
         actor: context?.actor ?? pin.billing?.actor ?? null,
@@ -1701,6 +1703,42 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Session DO -> Sandbox DO. Forwards one Sync/Restack request to the wrapper
+   * and returns its shared `worktreeBranchOperationResult`. The reply budget is
+   * the longer git-operation bound (fetch + rebase + push), not the 30s
+   * capture bound: these operations force-push with a lease, so a premature
+   * timeout would report failure for work that then completes.
+   */
+  async worktreeGit(input: ControlPlaneWorktreeGitInput): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneWorktreeGitInputSchema.parse(input);
+    const handoff = await this.enqueue(() => this.beginWorktreeGit(parsed));
+    return 'error' in handoff ? handoff.error : handoff.promise;
+  }
+
+  private async beginWorktreeGit(
+    input: ControlPlaneWorktreeGitInput
+  ): Promise<ControlRequestHandoff> {
+    const requestId = crypto.randomUUID();
+    const frame: ControlPlaneWrapperFrame = {
+      type: 'worktree.git',
+      requestId,
+      session: input.session,
+      payload: input.payload,
+    };
+    // A lost reply after a lease push leaves the outcome unknown, so a timeout must not invite a retry.
+    return this.beginWrapperControlRequest(
+      frame,
+      CONTROL_PLANE_WORKTREE_GIT_TIMEOUT_MS,
+      controlRequestFailure(
+        'operation_outcome_unknown',
+        'The sandbox did not answer the branch operation in time; it may have completed',
+        false
+      )
+    );
+  }
+
+  /**
    * Session DO -> Sandbox DO (spec §10). Forwards exactly one terminal
    * create/resize/close/connect request to the wrapper and returns its result.
    * Like worktree captures, only the bind/pending/write happen under the serial
@@ -1831,19 +1869,34 @@ export class SandboxControlV2 extends DurableObject<Env> {
    */
   private async beginWrapperControlRequest(
     frame: Extract<ControlPlaneWrapperFrame, { requestId: string }>,
-    timeoutMs: number = this.controlRequestTimeoutMs
+    timeoutMs: number = this.controlRequestTimeoutMs,
+    timeoutFailure?: ControlPlaneControlResult
   ): Promise<ControlRequestHandoff> {
     const state = await this.readAllocation();
     const socket = this.boundWrapperSocket(state);
     if (socket === null) {
       return { error: controlRequestFailure('not_ready', WRAPPER_NOT_CONNECTED, true) };
     }
+    if (frame.type === 'worktree.git' && this.readAttachment(socket)?.worktreeGit !== true) {
+      return {
+        error: controlRequestFailure(
+          'wrapper_upgrade_required',
+          'This sandbox must restart with an updated runtime before using Sync or Restack.',
+          false
+        ),
+      };
+    }
     if (this.pendingControlRequests.size >= MAX_PENDING_CONTROL_REQUESTS) {
       return {
         error: controlRequestFailure('busy', 'Too many outstanding control requests', true),
       };
     }
-    const promise = this.registerPendingControlRequest(frame.requestId, socket, timeoutMs);
+    const promise = this.registerPendingControlRequest(
+      frame.requestId,
+      socket,
+      timeoutMs,
+      timeoutFailure
+    );
     if (!this.trySendFrame(socket, frame)) {
       this.settlePendingControlRequest(
         frame.requestId,
@@ -1857,12 +1910,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private registerPendingControlRequest(
     requestId: string,
     socket: WebSocket,
-    timeoutMs: number = this.controlRequestTimeoutMs
+    timeoutMs: number = this.controlRequestTimeoutMs,
+    timeoutFailure = controlRequestFailure('not_ready', WRAPPER_REQUEST_TIMED_OUT, true)
   ): Promise<ControlPlaneControlResult> {
     return new Promise<ControlPlaneControlResult>(resolve => {
       const timer = setTimeout(() => {
         this.pendingControlRequests.delete(requestId);
-        resolve(controlRequestFailure('not_ready', WRAPPER_REQUEST_TIMED_OUT, true));
+        resolve(timeoutFailure);
       }, timeoutMs);
       this.pendingControlRequests.set(requestId, { socket, resolve, timer });
     });
@@ -4911,15 +4965,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
                 'Runtime preflight timed out'
               );
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
-        if (pin.billing) {
-          await assertContainerCapacity(this.env, {
-            subject: pin.billing.subject,
-            actor: pin.billing.actor,
-            instanceId: pin.billing.sandboxId,
-            checkpoint: 'control-plane-create',
-            billingOrigin: pin.billing.metadata?.origin,
-          });
-        }
+        if (pin.billing) await assertContainerAccountAvailable(this.env, pin.billing);
 
         // Preflight failures must not pin a harness or mark this sandbox as legacy v1.
         await this.ctx.storage.put({
@@ -5298,9 +5344,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
         detail: 'Using workspace snapshot',
         snapshotCapturedAt: descriptor.capturedAt,
       });
+      // A tail restores the captured disk, not an image, so a later base image
+      // does not block it; the provider receives the current image identity.
       return {
         snapshotId: descriptor.snapshotId,
-        baseImage: descriptor.baseImage,
+        baseImage,
         capturedAt: descriptor.capturedAt,
       };
     });
@@ -6074,6 +6122,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
         ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
         ...(frame.startCommands ? { startCommands: true } : {}),
+        ...(frame.worktreeGit ? { worktreeGit: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
         ...runtimeHarnessField(attachment?.runtimeHarness),
       });

@@ -165,6 +165,56 @@ repository.
     every session that user starts including organization sessions, and MUST
     NOT be settable by a session request.
 
+### Stacked Worktrees
+
+1. The user MAY create a stacked workspace from an existing worktree's sidebar
+   or chat-header menu. The composer MUST identify the parent branch, keep its
+   repository locked, and allow removing the stack target to start normally.
+2. A stacked worktree MUST have its own branch and sandbox. Its first checkout
+   MUST start at the remote parent commit resolved when the workspace was
+   prepared. Sibling chats MUST retain the same stack and base.
+3. A parent outside the user's personal or organization scope, a different
+   repository, or a parent being deleted MUST NOT be accepted. An unpushed base
+   MUST fail before creating the workspace with a specific reason. A base
+   rewritten during startup MUST fail with a retryable base-changed reason.
+4. The Changes panel MUST compare a layer with its base branch, not with its own
+   branch. When the base no longer exists, it MUST compare with the repository's
+   default branch and identify that fallback.
+5. A worktree MUST rewrite or push only its own branch. Auto-commit MUST NOT
+   force-push. A remote history change MUST retain local commits and offer Sync.
+6. Sync and Restack MUST require a user action and MUST refuse while any chat in
+   the worktree is running or the working tree has uncommitted changes. Restack
+   MUST use a force-with-lease pinned to the expected remote head. Waking an idle
+   sandbox MUST be visible as operation progress.
+7. Restack stack MUST visit layers bottom-up, in their own sandboxes, and stop
+   on the first refusal or conflict. A conflicting rebase MUST be aborted before
+   the agent receives the exact operation, command, files, and expected result
+   as a resolving turn. No unrelated branch may be rewritten.
+8. Deleting a parent worktree MUST preserve its branch and its children's base
+   branches. The confirmation MUST warn when stacked children exist. Children
+   MUST remain usable after the parent worktree is deleted.
+9. A stack MUST appear as one sidebar unit with an individually navigable row
+   and PR state for each layer. A collapsed stack MUST summarize its layer count
+   and most urgent status.
+10. Sidebar layout preferences MUST belong to the individual user in the
+    selected scope, including within organizations. All members MAY change their
+    own workspace order and smart folders. Single sessions MUST remain sorted
+    by actual activity, and PR verification or other metadata writes MUST NOT
+    move them or workspaces in activity order.
+11. A Cloud Agent permitted to launch child sessions MUST be able to orchestrate
+    stacked workspaces through its scoped launch tool when the user requests a
+    PR stack. Every new launch MUST use a fresh UUID `operationKey` and create a
+    registered workspace. The response MUST return its `worktreeId`, including
+    on an identical retry. The orchestrator MAY launch worker A independently,
+    then launch B with `stackOnWorktreeId` set to A's returned ID after A pushes.
+    The stack parent MAY be another owned worktree in the same personal or
+    organization scope. Completion callbacks MUST target the launching
+    orchestrator independently of the stack parent. The server MUST resolve the
+    parent repository, branch, and pushed commit with the UI ownership checks.
+    The agent MUST NOT select the resolved commit, override its lineage, or
+    combine stacking with `upstreamBranch`. Each layer MUST receive its PR base
+    instruction and may push only its own branch.
+
 ### Preparation
 
 1. While the environment is created or rebuilt, the user MUST see live
@@ -206,13 +256,13 @@ repository.
    Private workspace tail snapshots MUST follow the separate workspace snapshot
    rules below and MUST NOT be published as environment snapshots.
 2. A session whose repository environment has build commands MUST start from
-   that environment's published snapshot when the owner, repository, sandbox
-   image and runtime match and the snapshot revision is not newer than the
+   that environment's published snapshot when the owner, repository and
+   runtime match and the snapshot revision is not newer than the
    session's configuration revision. For a multi-repository environment, the
    environment, owner and the same list of repositories MUST match instead of
-   one repository. A snapshot from the previous image MAY remain eligible for
-   at most 24 hours after capture while a replacement build runs; the runtime
-   ABI MUST still match. A missing, building, failed or backed-off environment
+   one repository. A snapshot from an earlier sandbox image MUST remain
+   eligible while a replacement build runs, until its eligible lifetime ends;
+   the runtime ABI MUST still match. A missing, building, failed or backed-off environment
    or an unavailable lookup MUST fail with a specific reason and a way to open
    the environment build, never start from the base image. When no environment
    snapshot can serve the start at all -- a sandbox provider that cannot restore
@@ -272,9 +322,9 @@ repository.
    resource teardown. Restored disks MUST NOT restore deleted-session authorization or
    recreate a deleted workspace.
 8. When a private workspace snapshot exists, cold startup MUST use it as the only source.
-   Selection MUST validate ownership, enrollment, provider, startup mode, the exact base
-   image and the 30-day lifetime from durable Sandbox DO metadata. A compatible downloaded
-   runtime release MAY update the restored disk.
+   Selection MUST validate ownership, enrollment, provider, startup mode, image class and
+   the 30-day lifetime from durable Sandbox DO metadata. A later base image MUST NOT block
+   the restore. A compatible downloaded runtime release MAY update the restored disk.
 9. Only a confirmed provider restore MAY supply frame-only workspace provenance.
    Every authorized sibling, including later joins, MUST receive it.
    Registration MUST reject supplied restore provenance. Older peers use ordinary recovery.

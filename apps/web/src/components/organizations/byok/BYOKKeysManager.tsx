@@ -51,77 +51,21 @@ import {
   VertexCredentialsSchema,
   isExperimentalByokProviderId,
   isGatewayUserByokProviderId,
-  type GatewayUserByokProviderId,
-  type VercelUserByokInferenceProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
 import { BYOKRoutingPreview } from '@/components/organizations/byok/BYOKRoutingPreview';
+import {
+  BYOK_PROVIDERS,
+  DIRECT_BYOK_PROVIDERS_LIST,
+  getByokProviderDisplayName,
+} from '@/lib/byok/provider-names';
 import { cn } from '@/lib/utils';
 import * as z from 'zod';
 
-// Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
-// clause forces new entries here whenever a provider is added to
-// VercelUserByokInferenceProviderIdSchema. The `openai` entry names the pasted
-// API key: the personal BYOK page also renders the "Sign in with ChatGPT"
-// connection card, so a bare 'OpenAI' there and here would be two different
-// things with one name.
-export const VERCEL_BYOK_PROVIDER_NAMES = {
-  anthropic: 'Anthropic',
-  azure: 'Azure Foundry',
-  bedrock: 'AWS Bedrock',
-  cohere: 'Cohere',
-  deepseek: 'DeepSeek',
-  openai: 'OpenAI API key',
-  inception: 'Inception',
-  fireworks: 'Fireworks',
-  gmicloud: 'GMI Cloud',
-  google: 'Google AI Studio',
-  minimax: 'MiniMax',
-  mistral: 'Mistral AI',
-  moonshotai: 'Moonshot AI',
-  nebius: 'Nebius Token Factory',
-  novita: 'Novita AI',
-  perplexity: 'Perplexity',
-  vertex: 'Google Vertex AI',
-  xai: 'SpaceXSI',
-  xiaomi: 'Xiaomi (pay as you go)',
-  zai: 'Z.ai (pay as you go)',
-} satisfies Record<VercelUserByokInferenceProviderId, string>;
-
-const VERCEL_BYOK_PROVIDERS = [
-  ...Object.entries(VERCEL_BYOK_PROVIDER_NAMES).map(([id, name]) => ({ id, name })),
-  { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Legacy Codestral-only key' },
-];
-
-const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).map(([id, name]) => ({
-  id,
-  name,
-}));
-
-const GATEWAY_BYOK_PROVIDER_NAMES = {
-  'vercel-ai-gateway': 'Vercel AI Gateway',
-  openrouter: 'OpenRouter',
-} satisfies Record<GatewayUserByokProviderId, string>;
-
-const GATEWAY_BYOK_PROVIDERS_LIST = Object.entries(GATEWAY_BYOK_PROVIDER_NAMES).map(
-  ([id, name]) => ({ id, name })
-);
-
-const BYOK_PROVIDERS = [
-  ...DIRECT_BYOK_PROVIDERS_LIST,
-  ...VERCEL_BYOK_PROVIDERS,
-  ...GATEWAY_BYOK_PROVIDERS_LIST,
-].toSorted((a, b) => a.name.localeCompare(b.name));
 const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
   provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
 );
-
-function getProviderDisplayName(providerId: string) {
-  const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
-  return provider?.name || providerId;
-}
 
 type StructuredCredentialKind = 'azure' | 'bedrock' | 'vertex';
 
@@ -602,7 +546,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     key: { id: string; provider_id: string },
     serve_catalog_models: boolean
   ) => {
-    const providerName = getProviderDisplayName(key.provider_id);
+    const providerName = getByokProviderDisplayName(key.provider_id);
     const prefix = `${key.provider_id}/`;
     const confirmed = await confirm(
       serve_catalog_models
@@ -635,7 +579,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     const reordered = keyIds.with(index, swappedId).with(target, movedId);
     const movedKey = keys?.find(key => key.id === movedId);
     setReorderAnnouncement(
-      `${apiKeyObjectLabel(getProviderDisplayName(movedKey?.provider_id ?? ''))} moved to priority ${target + 1} of ${keyIds.length}.`
+      `${apiKeyObjectLabel(getByokProviderDisplayName(movedKey?.provider_id ?? ''))} moved to priority ${target + 1} of ${keyIds.length}.`
     );
     setPendingFocus({ keyId: movedId, index: target, direction });
     reorderMutation.mutate(
@@ -806,7 +750,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             <td role="cell" className="col-span-2 @2xl:table-cell @2xl:p-4">
                               <KeyPriorityControls
                                 keyId={key.id}
-                                providerName={getProviderDisplayName(key.provider_id)}
+                                providerName={getByokProviderDisplayName(key.provider_id)}
                                 position={index + 1}
                                 count={listedKeyIds.length}
                                 saving={reorderMutation.isPending}
@@ -822,12 +766,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             )}
                           >
                             <div className="break-words">
-                              {getProviderDisplayName(key.provider_id)}
+                              {getByokProviderDisplayName(key.provider_id)}
                             </div>
                             {isManaged ? (
                               <p className="text-muted-foreground mt-1 text-xs">
                                 {getCodingPlanManagedKeyLabel(
-                                  getProviderDisplayName(key.provider_id)
+                                  getByokProviderDisplayName(key.provider_id)
                                 )}
                               </p>
                             ) : null}
@@ -838,7 +782,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                 provider loses every catalog mapping. */}
                             {key.supports_catalog_mode || key.serve_catalog_models ? (
                               <CatalogModeSetting
-                                providerName={getProviderDisplayName(key.provider_id)}
+                                providerName={getByokProviderDisplayName(key.provider_id)}
                                 enabled={key.serve_catalog_models}
                                 canChange={key.can_change_catalog_mode}
                                 isOrganizationKey={!!organizationId}
@@ -867,7 +811,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                     handleToggleEnabled(key.id, isEnabled)
                                   }
                                   disabled={setEnabledMutation.isPending}
-                                  aria-label={`Toggle ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                  aria-label={`Toggle ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
                                 />
                               ) : null}
                               <span
@@ -890,7 +834,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                 }
                                 disabled={testMutation.isPending}
                                 title="Test API key"
-                                aria-label={`Test ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                aria-label={`Test ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
                               >
                                 <FlaskConical className="size-4" />
                               </Button>
@@ -901,7 +845,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                     size="sm"
                                     onClick={() => handleEdit(key.id)}
                                     disabled={updateMutation.isPending}
-                                    aria-label={`Update ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                    aria-label={`Update ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
                                   >
                                     <Edit className="size-4" />
                                   </Button>
@@ -909,10 +853,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                     variant="secondary"
                                     size="sm"
                                     onClick={() =>
-                                      handleDelete(key.id, getProviderDisplayName(key.provider_id))
+                                      handleDelete(
+                                        key.id,
+                                        getByokProviderDisplayName(key.provider_id)
+                                      )
                                     }
                                     disabled={deleteMutation.isPending}
-                                    aria-label={`Delete ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                    aria-label={`Delete ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
                                   >
                                     <Trash2 className="size-4" />
                                   </Button>
@@ -1347,7 +1294,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       {listedKeys && listedKeys.length > 0 ? (
         <BYOKRoutingPreview
           organizationId={organizationId}
-          getProviderName={getProviderDisplayName}
+          getProviderName={getByokProviderDisplayName}
         />
       ) : null}
     </div>

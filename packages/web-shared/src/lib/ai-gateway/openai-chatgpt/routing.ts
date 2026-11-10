@@ -299,6 +299,7 @@ export function buildOpenAiChatGptProvider(
 
   return {
     type: 'openai-chatgpt',
+    inferenceProviderId: 'openai-chatgpt',
     ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},

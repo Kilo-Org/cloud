@@ -375,7 +375,7 @@ describe('environmentSnapshotDecision', () => {
     });
   });
 
-  it('uses the current image identity for a previous-image snapshot inside the rollout window', () => {
+  it('uses the current image identity for an earlier-image snapshot', () => {
     const resolution: SnapshotResolution = {
       ...RESOLVED,
       snapshot: {
@@ -391,7 +391,7 @@ describe('environmentSnapshotDecision', () => {
       baseImage: 'registry.example/app:2',
     });
     expect(environmentStartDetail(REFERENCE, { kind: 'resolved', resolution })).toContain(
-      'built for an earlier image; using it during the rollout window'
+      'built for an earlier image; using it while the replacement builds'
     );
   });
 

@@ -26,7 +26,8 @@ export type ContainerUsageClientOptions = {
 };
 
 export type ClientUsageContext = Omit<UsageContext, 'service'>;
-export type ClientRecordStartInput = ClientUsageContext & { startEpochMs: number };
+export type ClientRecordStartInput = ClientUsageContext &
+  Pick<RecordStartInput, 'startEpochMs' | 'enforceCapacity'>;
 export type ClientRecordHeartbeatInput = Omit<
   RecordHeartbeatInput,
   'service' | 'idempotencyKey' | 'context'

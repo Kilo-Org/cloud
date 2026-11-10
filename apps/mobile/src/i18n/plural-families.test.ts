@@ -173,7 +173,9 @@ describe('plural families', () => {
       join(root, 'src', 'fixture.ts'),
       [
         `t(\`fixture.nestedTemplate\`, { count: 1, label: \`\${x}\` });`,
-        `t('fixture.computedKey', { [key]: 3 });`,
+        // A computed key named like an option is an expression, not an option:
+        // the object has no plain `count` key, so the call is not counted.
+        `t('fixture.computedKey', { [count]: 3 });`,
       ].join('\n')
     );
     try {

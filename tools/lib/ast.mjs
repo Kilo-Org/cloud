@@ -28,32 +28,41 @@ export function parseSourceFile(relative, text) {
 }
 
 /**
- * Every node below `node`, in source order, each visited before its children.
+ * Every node below `node`, each visited before its children. Children are
+ * visited in source order, so a rule that reports what it finds reports it top
+ * to bottom: the tree groups them by field (a template's chunks before its
+ * interpolations), which is not the order they are written in.
+ *
  * Node positions (`start`, `end`) and the node kind (`type`) stay on the node;
  * everything else that is an object is a child, so a rule never has to know
  * the shape of the node it is looking through.
  */
 export function walk(node, visit) {
-  if (Array.isArray(node)) {
-    for (const child of node) {
-      walk(child, visit);
-    }
-    return;
-  }
   if (node === null || typeof node !== 'object') {
     return;
   }
   if (typeof node.type === 'string') {
     visit(node);
   }
+  const children = [];
   for (const key of Object.keys(node)) {
     if (key === 'type' || key === 'start' || key === 'end') {
       continue;
     }
     const value = node[key];
-    if (value !== null && typeof value === 'object') {
-      walk(value, visit);
+    if (Array.isArray(value)) {
+      for (const child of value) {
+        if (child !== null && typeof child === 'object') {
+          children.push(child);
+        }
+      }
+    } else if (value !== null && typeof value === 'object') {
+      children.push(value);
     }
+  }
+  children.sort((left, right) => (left.start ?? 0) - (right.start ?? 0));
+  for (const child of children) {
+    walk(child, visit);
   }
 }
 

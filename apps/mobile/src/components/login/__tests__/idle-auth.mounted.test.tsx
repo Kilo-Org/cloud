@@ -111,7 +111,7 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
 vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
-vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound' }));
+vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Mail: 'Mail' }));
 
 vi.mock('expo-web-browser', () => ({
   openBrowserAsync: vi.fn(),

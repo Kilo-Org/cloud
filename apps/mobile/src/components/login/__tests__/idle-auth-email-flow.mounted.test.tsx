@@ -110,7 +110,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
 vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
-vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound' }));
+vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Mail: 'Mail' }));
 
 // The idle screen reads the foreground ink for the Apple mark; the real hook
 // pulls expo-router, which the mounted project cannot load.

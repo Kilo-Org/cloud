@@ -2,8 +2,15 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { ProviderButtons } from '@/components/login/provider-buttons';
+import {
+  PROVIDER_GLYPH_SLOT_CLASS,
+  PROVIDER_ROW_CLASS,
+  ProviderButtons,
+} from '@/components/login/provider-buttons';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
+import { Mail } from '@/components/ui/icons';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { Text } from '@/components/ui/text';
 import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 import {
@@ -65,6 +72,7 @@ export function PendingLinkAuth({
   onStartAgain: () => void;
 }>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const expired = useExpired(offer.expiresAt) || refused;
   const view = resolvePendingLinkView({ offer, options, expired, failure });
   const disabled = busy !== undefined || browserStarting;
@@ -114,12 +122,24 @@ export function PendingLinkAuth({
         <Button
           variant="outline"
           size="lg"
+          // Same anatomy as the provider rows: the mark is out of flow at the
+          // leading edge, so the label centers on the button's own width and
+          // the row keeps the shared 44pt floor.
+          className={PROVIDER_ROW_CLASS}
           disabled={disabled}
-          loading={busy === 'otp-send'}
           onPress={onEmailCode}
           accessibilityLabel={t('pendingLink.emailCode')}
         >
-          <Text className="text-[17px] font-medium">{t('pendingLink.emailCode')}</Text>
+          <View className={PROVIDER_GLYPH_SLOT_CLASS}>
+            {busy === 'otp-send' ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              <Mail size={18} color={colors.foreground} />
+            )}
+          </View>
+          <Text className="flex-1 text-center text-[17px] font-medium">
+            {t('pendingLink.emailCode')}
+          </Text>
         </Button>
       )}
       {options.browser && (

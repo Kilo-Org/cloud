@@ -32,7 +32,7 @@ export const PROVIDER_GLYPH_SLOT_CLASS =
 // where the mark ends, so the centered label can never run under the mark
 // however long the translation is, and the equal start and end insets keep it
 // centered on the button.
-const PROVIDER_ROW_CLASS =
+export const PROVIDER_ROW_CLASS =
   'relative min-h-[44px] w-full flex-row justify-center rounded-[8px] px-[34px] py-2.5';
 
 /** The Apple, Google and passkey rows, shared by the sign-in landing and the pending-link screen. */

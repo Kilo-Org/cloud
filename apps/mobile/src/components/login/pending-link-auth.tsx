@@ -127,6 +127,12 @@ export function PendingLinkAuth({
           // the row keeps the shared 44pt floor.
           className={PROVIDER_ROW_CLASS}
           disabled={disabled}
+          // The mark replaces nothing here: the label stays visible and the
+          // slot shows the spinner, the same busy treatment as the provider
+          // rows above. The explicit state is what tells assistive technology
+          // the control is working, since this row does not use the button's
+          // `loading` layout.
+          accessibilityState={{ busy: busy === 'otp-send' }}
           onPress={onEmailCode}
           accessibilityLabel={t('pendingLink.emailCode')}
         >

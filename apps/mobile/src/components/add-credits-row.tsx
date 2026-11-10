@@ -3,6 +3,7 @@ import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openExternalUrl } from '@/lib/external-link';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
@@ -34,7 +35,7 @@ export function AddCreditsButton({ onPress, className }: AddCreditsButtonProps) 
     <Button
       size="sm"
       variant="outline"
-      className={cn('dark:bg-secondary-fill', className)}
+      className={cn('dark:bg-secondary-fill', STATE_ACTION_CLASS, className)}
       onPress={onPress}
     >
       <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>

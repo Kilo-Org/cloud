@@ -57,6 +57,11 @@ describe('AddCreditsRow mounted layout', () => {
     expect(String(root.findByType(BUTTON).props.className).split(' ')).toContain('w-full');
   });
 
+  it('gives the button the shared state-surface target', () => {
+    const root = renderRow();
+    expect(String(root.findByType(BUTTON).props.className).split(' ')).toContain('min-h-[48px]');
+  });
+
   it('keeps the button at its natural width at phone widths', () => {
     const root = renderRow();
     expect(containerClasses(root)).toEqual(

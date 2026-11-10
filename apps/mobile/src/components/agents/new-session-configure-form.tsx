@@ -478,6 +478,11 @@ export function NewSessionConfigureForm({
   return (
     <View
       ref={containerRef}
+      // The whole form, once it renders. The prepared design-gate comparison
+      // needs one node that both revisions expose and that is on screen only
+      // when this screen, not the splash or a picker, is what the device
+      // shows; the root wrapper is that node on every entry point.
+      testID="new-session-form"
       className="flex-1"
       style={sideInsetStyle}
       onLayout={handleContainerLayout}

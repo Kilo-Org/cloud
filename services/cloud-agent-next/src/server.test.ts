@@ -2066,6 +2066,49 @@ describe('server /internal/streams/close', () => {
     expect((await responsePromise).status).toBe(204);
   });
 
+  it('holds the ninth close until the first wave of eight finishes', async () => {
+    const env = createEnv();
+    const heldCloses = Array.from({ length: 8 }, () => Promise.withResolvers<number>());
+    const closeOrgStreams = vi.fn();
+    for (const held of heldCloses) closeOrgStreams.mockReturnValueOnce(held.promise);
+    closeOrgStreams.mockResolvedValue(1);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () =>
+            Array.from({ length: 9 }, (_, index) => ({
+              cloudAgentSessionId: `workspace_0000000${index}-0000-0000-0000-00000000000${index}`,
+            }))
+          ),
+        })),
+      })),
+    });
+
+    const responsePromise = fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    // The first eight closes never settle, so the request holds its wave and
+    // the ninth session waits for it.
+    await vi.waitFor(() => expect(closeOrgStreams).toHaveBeenCalledTimes(8));
+    expect(closeOrgStreams).toHaveBeenCalledTimes(8);
+    for (const held of heldCloses) held.resolve(1);
+
+    expect((await responsePromise).status).toBe(204);
+    expect(closeOrgStreams).toHaveBeenCalledTimes(9);
+  });
+
   it('skips rows that do not name a control session', async () => {
     const env = createEnv();
     const closeOrgStreams = vi.fn().mockResolvedValue(0);

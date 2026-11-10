@@ -40,23 +40,26 @@ export async function backfillEmailDomainBatch(): Promise<BackfillBatchResult> {
 
     if (rows.length === 0) break;
 
-    const updates = rows
-      .map(row => ({
-        id: row.id,
-        email_domain: extractEmailDomain(row.google_user_email),
-      }))
-      .filter((u): u is { id: string; email_domain: string } => u.email_domain !== null);
+    const updates = rows.flatMap(row => {
+      const email_domain = extractEmailDomain(row.google_user_email);
+      return email_domain === null
+        ? []
+        : [{ id: row.id, google_user_email: row.google_user_email, email_domain }];
+    });
 
     if (updates.length === 0) break;
 
+    // Matching the email that was read skips rows a soft delete anonymized after the select.
     await db.execute(sql`
       UPDATE ${kilocode_users}
       SET email_domain = domain_updates.email_domain
       FROM (VALUES ${sql.join(
-        updates.map(u => sql`(${u.id}, ${u.email_domain})`),
+        updates.map(u => sql`(${u.id}, ${u.google_user_email}, ${u.email_domain})`),
         sql`, `
-      )}) AS domain_updates(id, email_domain)
+      )}) AS domain_updates(id, google_user_email, email_domain)
       WHERE ${kilocode_users.id} = domain_updates.id
+        AND ${kilocode_users.google_user_email} = domain_updates.google_user_email
+        AND ${emailDomainBackfillCandidates}
     `);
 
     totalProcessed += updates.length;

@@ -217,11 +217,21 @@ describe('EnkryptUsageWriteResponseSchema', () => {
     expect(EnkryptUsageWriteResponseSchema.parse({ status })).toStrictEqual({ status });
   });
 
+  test.each(['recorded', 'duplicate'])('accepts %s with an echoed usage id', status => {
+    const body = { status, usageId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' };
+    expect(EnkryptUsageWriteResponseSchema.parse(body)).toStrictEqual(body);
+  });
+
   test.each([
     ['an unknown status', { status: 'not_recorded' }],
     ['a missing status', {}],
-    ['an echoed usage id', { status: 'recorded', usageId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' }],
+    ['a non-UUID usage id', { status: 'recorded', usageId: 'usage-1' }],
+    ['a null usage id', { status: 'recorded', usageId: null }],
     ['an extra key', { status: 'duplicate', result: null }],
+    [
+      'an extra key beside an echoed usage id',
+      { status: 'recorded', usageId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301', result: null },
+    ],
   ])('rejects %s', (_label, body) => {
     expect(EnkryptUsageWriteResponseSchema.safeParse(body).success).toBe(false);
   });

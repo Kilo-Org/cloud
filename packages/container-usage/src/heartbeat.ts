@@ -1,13 +1,13 @@
 import type { Container } from '@cloudflare/containers';
 import type {
-  nonRetryableSkuAdmissionCodes,
+  nonRetryableAdmissionCodes,
   BudgetVerdict,
   HeartbeatAck,
   RecordAck,
 } from './contracts';
 import {
   ContainerUsageContractError,
-  isNonRetryableSkuAdmissionError,
+  isNonRetryableAdmissionError,
   type ContainerUsageClient,
 } from './client';
 import {
@@ -28,7 +28,7 @@ export const DEFAULT_STOPPED_STATE_ABANDON_SECONDS = 60 * 60;
 type BillingContainer = Pick<Container, 'deleteSchedules' | 'getState' | 'schedule'>;
 
 export type BillingGenerationCloseCause = {
-  nonRetryableSkuAdmissionCode: (typeof nonRetryableSkuAdmissionCodes)[number];
+  nonRetryableSkuAdmissionCode: (typeof nonRetryableAdmissionCodes)[number];
 };
 
 export type BillingHeartbeatDependencies = {
@@ -52,7 +52,8 @@ export type BillingHeartbeatDependencies = {
   ) => void | Promise<void>;
   enforceBudgetStop: (
     budget: BudgetVerdict,
-    expected: { generation: string; startEpochMs: number }
+    expected: { generation: string; startEpochMs: number },
+    failureCode?: 'BILLING_UNAVAILABLE'
   ) => Promise<void>;
   onBudgetWarning?: (budget: BudgetVerdict) => Promise<void> | void;
 };
@@ -197,7 +198,7 @@ export function installBillingHeartbeat(
       rethrowAfterReschedule: boolean;
     }
   ): Promise<void> => {
-    if (isNonRetryableSkuAdmissionError(error)) {
+    if (isNonRetryableAdmissionError(error)) {
       const abandoned = await abandonIfCurrent(context, {
         nonRetryableSkuAdmissionCode: error.code,
       });
@@ -444,7 +445,8 @@ export function installBillingHeartbeat(
           {
             generation: context.generation,
             startEpochMs: context.startEpochMs,
-          }
+          },
+          'BILLING_UNAVAILABLE'
         );
         if (!dependencies.deferBudgetStopFinalSettlement) {
           await recordStopForGeneration({ reason: 'runtime_signal' }, context.generation);

@@ -167,6 +167,9 @@ type StartOptions = {
   configuration?: SandboxProviderConfiguration;
   meter?: ContainerUsageRpcMethods;
   preparingRoute?: string;
+  preparingRouteDeadlineAt?: number;
+  admissionError?: string;
+  billingAdmissionMs?: number;
   egressMode?: EgressMode;
   egressAllowlist?: string[];
   egressAudit?: boolean;
@@ -189,6 +192,9 @@ async function startAllocation(
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
+      ...(options.billingAdmissionMs === undefined
+        ? {}
+        : { sandboxTimers: () => ({ ...TIMERS, billingAdmissionMs: options.billingAdmissionMs }) }),
       ...(options.meter === undefined
         ? {}
         : {
@@ -205,7 +211,7 @@ async function startAllocation(
   if (options.preparingRoute !== undefined) {
     await insertPreparingRoute(stub, {
       sessionId: options.preparingRoute,
-      attemptDeadlineAt: Date.now() + MINUTE,
+      attemptDeadlineAt: options.preparingRouteDeadlineAt ?? Date.now() + MINUTE,
     });
   }
   await stub.ensureAllocation({
@@ -721,6 +727,384 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(provider.createCalls).toBe(1);
   });
 
+  it.each([
+    [containerLimitError(), 'container_limit_reached'],
+    [new ContainerCapacityUnavailableError(), 'billing_unavailable'],
+  ] as const)(
+    'fails capacity denial from the sandbox start without retrying creation: %s',
+    async (failure, reason) => {
+      const provider = createFakeProvider({ gateLaunch: true });
+      const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+      await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+      await releaseGate(stub, () =>
+        provider.launchGates[0](new Error(`remote: ${failure.message}`))
+      );
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+          state: 'failed',
+          reason,
+        })
+      );
+      await waitFor(async () => expect((await readState(stub)).kind).not.toBe('creating'));
+      expect(provider.createCalls).toBe(1);
+    }
+  );
+
+  it('does not reopen native admission after an alarm fails a retry during preflight', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      throw new ProviderCreationError('meter_unavailable');
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    await waitFor(async () => {
+      await runInDurableObject(stub, instance => {
+        expect((instance as unknown as { createInFlight: boolean }).createInFlight).toBe(false);
+      });
+    });
+    let releasePreflight: () => void = () => {};
+    let enteredPreflight = false;
+    const preflight = new Promise<void>(resolve => {
+      releasePreflight = resolve;
+    });
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        wrapperLaunchEnv: async () => {
+          enteredPreflight = true;
+          await preflight;
+          return {};
+        },
+      });
+    });
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(enteredPreflight).toBe(true));
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sessionPeerFor: () => ({
+          notify: async () => {
+            releasePreflight();
+            // Permit the off-queue create continuation to run during notification.
+            for (let i = 0; i < 10; i++) await Promise.resolve();
+          },
+        }),
+      });
+    });
+    try {
+      await runInDurableObject(stub, async (_instance, state) => {
+        const saved = await state.storage.get<{ attemptId: string }>(
+          'native_billing_admission_deadline'
+        );
+        await state.storage.put('native_billing_admission_deadline', {
+          ...saved,
+          deadlineAt: Date.now() - 1,
+        });
+      });
+      await runAlarm(stub);
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+      });
+    } finally {
+      await releaseGate(stub, releasePreflight);
+    }
+    await waitFor(async () => {
+      await runInDurableObject(stub, instance => {
+        expect((instance as unknown as { createInFlight: boolean }).createInFlight).toBe(false);
+      });
+    });
+    expect(provider.createCalls).toBe(1);
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('skips native admission when its deadline has no useful time left', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 500,
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+      })
+    );
+    expect(provider.createCalls).toBe(0);
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('bounds stopping retries without reporting a billing admission failure', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      throw new ProviderCreationError('stopping');
+    };
+    const startedAt = Date.now();
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 1_500,
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    await waitFor(async () => {
+      expect(
+        await runInDurableObject(stub, (_instance, state) =>
+          state.storage.get('native_billing_admission_deadline')
+        )
+      ).toBeUndefined();
+    });
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, startedAt + 1_600 - Date.now())));
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+      state: 'failed',
+      reason: 'sandbox_create_failed',
+    });
+    expect((await stub.status({ sessionId: 'waiting' })).view).not.toHaveProperty('billingFailure');
+  });
+
+  it('reconstructs the stored in-flight admission deadline without extending it', async () => {
+    const provider = createFakeProvider();
+    let rejectCreate: (error: Error) => void = () => {};
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      return new Promise((_resolve, reject) => {
+        rejectCreate = reject;
+      });
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 30_000,
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    const deadline = await runInDurableObject(stub, async (_instance, state) => {
+      const saved = await state.storage.get<{ attemptId: string; deadlineAt: number }>(
+        'native_billing_admission_deadline'
+      );
+      expect(saved).toBeDefined();
+      expect(await state.storage.getAlarm()).toBe(saved?.deadlineAt);
+      const allocation = drizzle(state.storage).select().from(allocationTable).get();
+      return { saved, allocation };
+    });
+    // Eviction waits for waitUntil tasks in this harness. Restore the captured
+    // durable in-flight state after draining the task, then reconstruct it.
+    await runInDurableObject(stub, () => {
+      rejectCreate(new ProviderCreationError('meter_unavailable'));
+    });
+    await waitFor(async () => {
+      await runInDurableObject(stub, instance => {
+        expect((instance as unknown as { createInFlight: boolean }).createInFlight).toBe(false);
+      });
+    });
+    await runInDurableObject(stub, async (_instance, state) => {
+      if (!deadline.allocation) throw new Error('Missing allocation snapshot');
+      drizzle(state.storage).update(allocationTable).set(deadline.allocation).run();
+    });
+    await evictDurableObject(stub);
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      expect(await state.storage.getAlarm()).toBe(deadline.saved?.deadlineAt);
+      await state.storage.put('native_billing_admission_deadline', {
+        ...deadline.saved,
+        deadlineAt: Date.now() - 1,
+      });
+    });
+    await runAlarm(stub);
+    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+      state: 'failed',
+      reason: 'billing_unavailable',
+    });
+    expect(provider.createCalls).toBe(1);
+  });
+
+  it('retries a transient native meter outage within the original preparation attempt', async () => {
+    const provider = createFakeProvider();
+    const create = provider.adapter.create;
+    provider.adapter.create = async intent => {
+      if (provider.createCalls === 0) {
+        provider.createCalls += 1;
+        throw new ProviderCreationError('meter_unavailable');
+      }
+      return create(intent);
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      preparingRouteDeadlineAt: Date.now() + TIMERS.routePreparationMs,
+    });
+    await waitFor(async () => {
+      const state = await readState(stub);
+      expect(provider.createCalls).toBe(1);
+      expect(state.createDeadlineAt).toBeLessThan(Date.now() + TIMERS.providerCreateMs);
+    });
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    expect(provider.createCalls).toBe(2);
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+  });
+
+  it('reports billing unavailable when immediate meter failures exhaust native create retries', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      throw new ProviderCreationError('meter_unavailable');
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billing: {
+        sandboxId: SANDBOX_ID,
+        subject: { type: 'user', id: 'owner-1' },
+        actor: { type: 'user', id: 'owner-1' },
+        sessionId: 'waiting',
+        metadata: { origin: 'cloud-agent' },
+      },
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    const deadline = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.get<{ deadlineAt: number }>('native_billing_admission_deadline')
+    );
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+        billingFailure: {
+          code: 'BILLING_UNAVAILABLE',
+          payer: { type: 'user', id: 'owner-1' },
+          retryable: true,
+        },
+      })
+    );
+    expect(provider.createCalls).toBe(2);
+    expect(provider.launchEnvs).toHaveLength(0);
+    expect(Date.now()).toBeLessThan(deadline?.deadlineAt ?? 0);
+  });
+
+  it('bounds a hanging native admission and permits a fresh preparation after recovery', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async intent => {
+      provider.createCalls += 1;
+      provider.createInputs.push(intent);
+      return new Promise(() => {});
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 1_500,
+      billing: {
+        sandboxId: SANDBOX_ID,
+        subject: { type: 'user', id: 'owner-1' },
+        actor: { type: 'user', id: 'owner-1' },
+        sessionId: 'waiting',
+        metadata: { origin: 'cloud-agent' },
+      },
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+        billingFailure: {
+          code: 'BILLING_UNAVAILABLE',
+          payer: { type: 'user', id: 'owner-1' },
+          retryable: true,
+        },
+      })
+    );
+    expect(provider.launchEnvs).toHaveLength(0);
+
+    provider.adapter.create = async intent => ({ providerRef: `mem_${intent.intentId}` });
+    await insertPreparingRoute(stub, {
+      sessionId: 'recovered',
+      attemptDeadlineAt: Date.now() + TIMERS.routePreparationMs,
+    });
+    await stub.ensureAllocation({
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+  });
+
+  it('keeps the first native admission deadline when a later retry hangs', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      if (provider.createCalls === 1) throw new ProviderCreationError('meter_unavailable');
+      return new Promise(() => {});
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 2_000,
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    const deadline = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.get<{ deadlineAt: number }>('native_billing_admission_deadline')
+    );
+    expect(deadline).toBeDefined();
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+      })
+    );
+    expect(provider.createCalls).toBe(2);
+    expect(Date.now()).toBeLessThan((deadline?.deadlineAt ?? 0) + 1_000);
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('gives healthy admission a fresh budget after a nonbilling startup retry', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const create = provider.adapter.create;
+    provider.adapter.create = async intent => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+      return create(intent);
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      preparingRouteDeadlineAt: Date.now() + TIMERS.routePreparationMs - 90_000,
+    });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await releaseGate(stub, () => provider.launchGates[0](new Error('Transient startup failure')));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('creating'));
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get('native_billing_admission_deadline')
+      )
+    ).toBeUndefined();
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.launchGates).toHaveLength(2));
+    expect(provider.createCalls).toBe(2);
+    await releaseGate(stub, () => provider.launchGates[1]());
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+  });
+
   it('ignores a permanent late launch rejection after hello has acquired the allocation', async () => {
     const provider = createFakeProvider({ gateLaunch: true });
     const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
@@ -742,6 +1126,55 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
     expect((await stub.status({ sessionId: 'sibling' })).view.state).toBe('ready');
     expect(provider.stopCalls).toEqual([]);
+    wrapper.close();
+  });
+
+  it('routes a fenced native billing stop through the allocation owner with recovery details', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+    });
+    const updates: unknown[] = [];
+    await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put('control_plane_owner', 'owner-1');
+      Object.assign(instance, {
+        sessionPeerFor: () => ({
+          onRoute: async (update: unknown) => {
+            updates.push(update);
+          },
+        }),
+      });
+    });
+    await awaitStarting(provider, stub);
+    const { wrapper } = await connectAndHello(provider, stub);
+    wrapper.send({ type: 'session.ready', sessionId: 'waiting' });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('ready')
+    );
+    const billingFailure = {
+      code: 'INSUFFICIENT_CREDITS' as const,
+      payer: { type: 'user' as const, id: 'owner-1' },
+      retryable: true,
+      remainingMicrodollars: 4_000_000,
+      minimumRequiredMicrodollars: 5_000_000,
+    };
+    await stub.requestBillingStop({ allocationRef: 'stale-ref', billingFailure });
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+
+    await stub.requestBillingStop({ allocationRef: provider.refs[0], billingFailure });
+    await waitFor(() =>
+      expect(updates).toContainEqual({
+        state: 'lost',
+        attemptId: expect.any(String),
+        reason: 'billing_blocked',
+        billingFailure,
+      })
+    );
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+    expect((await readState(stub)).kind).not.toBe('connected');
     wrapper.close();
   });
 

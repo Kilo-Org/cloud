@@ -3,6 +3,7 @@ import {
   workspaceSnapshotIdentity,
   type WorkspaceSnapshotIdentity,
 } from '../sandbox/workspace-snapshot.js';
+import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -37,6 +38,7 @@ import { asc, eq, gt } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
+import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import { resolveSecret } from '../../auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
@@ -619,6 +621,9 @@ function rowToMessage(row: SessionMessageRow): SessionMessage {
     acceptedAt: row.accepted_at,
     settledAt: row.settled_at,
     reason: row.reason,
+    ...(row.billing_failure == null
+      ? {}
+      : { billingFailure: readCustomerBillingFailure(row.billing_failure) }),
     ...(container === undefined ? {} : { container }),
   };
 }
@@ -632,6 +637,8 @@ function messageToRow(message: SessionMessage): SessionMessageRow {
     accepted_at: message.acceptedAt,
     settled_at: message.settledAt,
     reason: message.reason,
+    billing_failure:
+      message.billingFailure === undefined ? null : JSON.stringify(message.billingFailure),
     container: message.container === undefined ? null : JSON.stringify(message.container),
   };
 }
@@ -2256,7 +2263,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.settleMessages(
           this.messages.filter(m => m.state === 'accepted').map(m => m.messageId),
           'failed',
-          parsed.reason
+          parsed.reason,
+          undefined,
+          'coordinator',
+          parsed.billingFailure
         );
         await this.applyView({ state: 'unknown' });
         await this.armAlarm();
@@ -3389,7 +3399,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           openMessages(this.messages).map(message => message.messageId),
           'failed',
           route.reason,
-          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype }
+          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype },
+          'coordinator',
+          route.billingFailure
         );
         return;
     }
@@ -3567,7 +3579,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           .filter(message => message.state === 'accepted')
           .map(message => message.messageId),
         'failed',
-        ownerHint.reason
+        ownerHint.reason,
+        undefined,
+        'coordinator',
+        ownerHint.billingFailure
       );
     }
     if (ownerHint && view.state !== 'unknown' && view.attemptId !== this.currentAttemptId()) {
@@ -3825,10 +3840,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     status: Extract<SessionMessageState, 'completed' | 'failed' | 'cancelled'>,
     reason: string | undefined,
     facts?: ControlPlaneReportFacts,
-    source: ControlPlaneMessageSource = 'coordinator'
+    source: ControlPlaneMessageSource = 'coordinator',
+    billingFailure?: CustomerBillingFailure
   ): Promise<void> {
     await this.applySettlement(
-      settleMessages(this.messages, messageIds, status, reason, Date.now()),
+      settleMessages(this.messages, messageIds, status, reason, Date.now(), billingFailure),
       facts,
       source
     );
@@ -3990,6 +4006,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               status: 'failed',
               delivery: accepted ? 'sent' : 'queued',
               accepted,
+              ...(message.billingFailure === undefined
+                ? {}
+                : { billingFailure: message.billingFailure }),
               ...(message.reason === null
                 ? {}
                 : { reason: message.reason, error: messageFailureText(message.reason) }),
@@ -4150,6 +4169,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             status: 'failed',
             delivery: message.acceptedAt === null ? 'queued' : 'sent',
             accepted: message.acceptedAt !== null,
+            ...(message.billingFailure === undefined
+              ? {}
+              : { billingFailure: message.billingFailure }),
             ...(message.reason === null
               ? { error: 'The message failed' }
               : { reason: message.reason, error: messageFailureText(message.reason) }),

@@ -541,6 +541,8 @@ export class SessionSyncDO extends DurableObject<Env> {
         principal.tenant.type
       );
       if (!admitted.ok) return admitted;
+      const missing = this.missingSession();
+      if (missing) return missing;
       // Hash before the transaction: checks and writes below run synchronously.
       const digest = await phase(
         this.env,
@@ -549,8 +551,6 @@ export class SessionSyncDO extends DurableObject<Env> {
         () => sha256Hex(body),
         principal.tenant.type
       );
-      const missing = this.missingSession();
-      if (missing) return missing;
       const applied = await this.leased(principal, sessionID, 'applyBatch', () => {
         // Queued writes never retain parsed trees across tenant RPC I/O.
         const validationStarted = work ? performance.now() : 0;

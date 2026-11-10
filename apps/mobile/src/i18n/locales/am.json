@@ -2414,7 +2414,7 @@
       "discardWithUploadsMessage": "ጥያቄዎና ከተላኩ መልእክቶች ጋር ያልተያያዙ የተሰቀሉ ፋይሎች ይሰረዛሉ።",
       "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "remoteHint": "በኮምፒውተርዎ ላይ ለማስኬድ በዚያ ላይ Kilo ይጀምሩ እና እየሰራ እንዲቀጥል ይተዉ።",
-      "continueFrom": "{{title}} እየቀጠለ ነው።",
+      "continueFrom": "«{{title}}» እየቀጠለ ነው።",
       "importingSession": "ክፍለ ጊዜውን በማስመጣት ላይ",
       "cliCannotContinue": "ይህ CLI ክፍለ ጊዜን መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
       "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።",

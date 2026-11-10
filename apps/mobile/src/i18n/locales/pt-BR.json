@@ -1864,7 +1864,7 @@
       "discardWithUploadsMessage": "Seu prompt e os arquivos enviados ainda não vinculados a uma mensagem serão excluídos.",
       "discardFailed": "Não foi possível descartar o rascunho. Tente novamente.",
       "remoteHint": "Para executar no seu computador, inicie o Kilo nele e mantenha-o em execução.",
-      "continueFrom": "Continuando a sessão {{title}}.",
+      "continueFrom": "Continuando a sessão “{{title}}”.",
       "importingSession": "Importando sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
       "importFailed": "Não foi possível importar esta sessão.",

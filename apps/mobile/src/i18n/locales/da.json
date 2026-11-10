@@ -2408,7 +2408,7 @@
       "discardWithUploadsMessage": "Din forespørgsel og eventuelle uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
       "discardFailed": "Kunne ikke kassere kladden. Prøv igen.",
       "remoteHint": "For at køre på din computer skal du starte Kilo der og lade den køre videre.",
-      "continueFrom": "Sessionen {{title}} fortsættes.",
+      "continueFrom": "Sessionen “{{title}}” fortsættes.",
       "importingSession": "Importerer session",
       "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
       "importFailed": "Kunne ikke importere denne session.",

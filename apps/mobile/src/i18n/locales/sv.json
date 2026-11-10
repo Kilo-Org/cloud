@@ -2408,7 +2408,7 @@
       "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
       "discardFailed": "Det gick inte att ta bort utkastet. Försök igen.",
       "remoteHint": "För att köra på din dator startar du Kilo där och låter det köras.",
-      "continueFrom": "Sessionen {{title}} fortsätter.",
+      "continueFrom": "Sessionen ”{{title}}” fortsätter.",
       "importingSession": "Importerar sessionen",
       "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
       "importFailed": "Det gick inte att importera den här sessionen.",

@@ -2414,7 +2414,7 @@
       "discardWithUploadsMessage": "Isicelo sakho namafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe kuzosuswa.",
       "discardFailed": "Asikwazanga ukulahla okusalungiswa. Sicela uzame futhi.",
       "remoteHint": "Ukuze isebenze kukhompyutha yakho, qalisa i-Kilo lapho bese uyigcina isebenza.",
-      "continueFrom": "Kuqhutshekwa neseshini ethi {{title}}.",
+      "continueFrom": "Kuqhutshekwa neseshini ethi “{{title}}”.",
       "importingSession": "Iseshini iyangeniswa",
       "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka neseshini. Khetha i-Cloud Agent noma enye i-CLI.",
       "importFailed": "Asikwazanga ukungenisa le seshini.",

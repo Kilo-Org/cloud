@@ -1870,7 +1870,7 @@
       "discardWithUploadsMessage": "프롬프트와 보낸 메시지에 첨부되지 않은 모든 업로드 파일이 삭제됩니다.",
       "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
       "remoteHint": "컴퓨터에서 실행하려면 그 컴퓨터에서 Kilo를 시작하고 계속 실행해 두세요.",
-      "continueFrom": "{{title}} 세션을 이어서 진행합니다.",
+      "continueFrom": "“{{title}}” 세션을 이어서 진행합니다.",
       "importingSession": "세션 가져오는 중",
       "cliCannotContinue": "이 CLI에서는 세션을 이어서 진행할 수 없습니다. Cloud Agent 또는 다른 CLI를 선택하세요.",
       "importFailed": "이 세션을 가져올 수 없습니다.",

@@ -2408,7 +2408,7 @@
       "discardWithUploadsMessage": "A ga-ehichapụ ihe ị dere na faịlụ ọ bụla ebugotere nke a na-ejikọtaghị na ozi ezigara.",
       "discardFailed": "Enweghị ike ịtụfu ozi a na-ede. Biko nwaa ọzọ.",
       "remoteHint": "Iji rụọ ọrụ na kọmputa gị, malite Kilo n'ebe ahụ ma hapụ ka ọ na-aga n'ihu na-arụ ọrụ.",
-      "continueFrom": "A na-aga n'ihu na {{title}}.",
+      "continueFrom": "A na-aga n'ihu na “{{title}}”.",
       "importingSession": "Na-ebubata nnọkọ",
       "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
       "importFailed": "Enweghị ike ibubata nnọkọ a.",

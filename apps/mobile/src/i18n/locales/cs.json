@@ -2492,7 +2492,7 @@
       "discardWithUploadsMessage": "Vaše zadání a všechny nahrané soubory nepřipojené k odeslaným zprávám se smažou.",
       "discardFailed": "Koncept se nepodařilo zahodit. Zkuste to znovu.",
       "remoteHint": "Pokud chcete relaci spustit na svém počítači, spusťte tam Kilo a nechte jej spuštěné.",
-      "continueFrom": "Pokračujete v relaci {{title}}.",
+      "continueFrom": "Pokračujete v relaci „{{title}}“.",
       "importingSession": "Import relace",
       "cliCannotContinue": "Toto CLI nepodporuje pokračování v relaci. Vyberte službu Cloud Agent nebo jiné CLI.",
       "importFailed": "Tuto relaci se nepodařilo importovat.",

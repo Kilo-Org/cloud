@@ -1891,7 +1891,7 @@
       "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardFailed": "לא ניתן היה למחוק את הטיוטה. נסה שוב.",
       "remoteHint": "כדי להריץ במחשב שלך, הפעל את Kilo שם והשאר אותו פעיל.",
-      "continueFrom": "ממשיך את הסשן {{title}}.",
+      "continueFrom": "ממשיך את הסשן ”{{title}}”.",
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
       "importFailed": "לא ניתן היה לייבא את הסשן הזה.",

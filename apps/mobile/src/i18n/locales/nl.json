@@ -1870,7 +1870,7 @@
       "discardWithUploadsMessage": "Je prompt en alle uploads die nog niet zijn gebruikt, worden verwijderd.",
       "discardFailed": "Het concept kon niet worden verwijderd. Probeer het opnieuw.",
       "remoteHint": "Om op je computer uit te voeren, start je Kilo daar en laat je het draaien.",
-      "continueFrom": "Je gaat verder met {{title}}.",
+      "continueFrom": "Je gaat verder met ‘{{title}}’.",
       "importingSession": "Sessie importeren…",
       "cliCannotContinue": "Deze CLI kan geen sessie voortzetten. Kies Cloud Agent of een andere CLI.",
       "importFailed": "Deze sessie kon niet worden geïmporteerd.",

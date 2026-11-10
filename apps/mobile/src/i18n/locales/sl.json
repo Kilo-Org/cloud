@@ -2492,7 +2492,7 @@
       "discardWithUploadsMessage": "Tvoj poziv in vse naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisani.",
       "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova.",
       "remoteHint": "Za zagon na tvojem računalniku tam zaženi Kilo in ga pusti zagnanega.",
-      "continueFrom": "Nadaljuje se seja {{title}}.",
+      "continueFrom": "Nadaljuje se seja „{{title}}“.",
       "importingSession": "Uvažanje seje",
       "cliCannotContinue": "Ta CLI ne podpira nadaljevanja seje. Izberi Cloud Agent ali drug CLI.",
       "importFailed": "Te seje ni bilo mogoče uvoziti.",

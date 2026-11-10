@@ -1891,7 +1891,7 @@
       "discardWithUploadsMessage": "Se eliminarán tus instrucciones y los archivos subidos que no estén adjuntos a mensajes enviados.",
       "discardFailed": "No se pudo descartar el borrador. Inténtalo de nuevo.",
       "remoteHint": "Para ejecutarlo en tu ordenador, inicia Kilo allí y déjalo en marcha.",
-      "continueFrom": "Se está continuando la sesión {{title}}.",
+      "continueFrom": "Se está continuando la sesión “{{title}}”.",
       "importingSession": "Importando sesión",
       "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",
       "importFailed": "No se pudo importar esta sesión.",

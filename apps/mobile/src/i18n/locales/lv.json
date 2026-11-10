@@ -2450,7 +2450,7 @@
       "discardWithUploadsMessage": "Tava uzvedne un augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
       "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
       "remoteHint": "Lai sesija darbotos tavā datorā, palaid Kilo tajā un atstāj to darbojamies.",
-      "continueFrom": "Tiek turpināta sesija: {{title}}.",
+      "continueFrom": "Tiek turpināta sesija: “{{title}}”.",
       "importingSession": "Importē sesiju…",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlies Cloud Agent vai citu CLI.",
       "importFailed": "Neizdevās importēt šo sesiju.",

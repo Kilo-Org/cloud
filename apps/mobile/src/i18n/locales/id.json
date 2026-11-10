@@ -1870,7 +1870,7 @@
       "discardWithUploadsMessage": "Instruksimu dan unggahan yang belum dilampirkan ke pesan terkirim akan dihapus.",
       "discardFailed": "Tidak dapat membuang draf. Coba lagi.",
       "remoteHint": "Untuk menjalankan sesi di komputermu, mulailah Kilo di sana dan biarkan tetap berjalan.",
-      "continueFrom": "Melanjutkan sesi {{title}}.",
+      "continueFrom": "Melanjutkan sesi “{{title}}”.",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
       "importFailed": "Tidak dapat mengimpor sesi ini.",

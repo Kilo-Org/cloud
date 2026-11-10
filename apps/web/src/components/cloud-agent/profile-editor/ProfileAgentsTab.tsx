@@ -25,7 +25,14 @@ import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { cn } from '@/lib/utils';
 import { useProfileMutations, type ProfileAgent } from '@/hooks/useCloudAgentProfiles';
 import { isRedundantAgentSlug } from '@kilocode/app-shared/agent-profile';
-import type { AgentConfig, PermissionRule } from '@kilocode/db/schema-types';
+import type { AgentConfig } from '@kilocode/db/schema-types';
+import {
+  PERMISSION_TOOLS,
+  mergePermissions,
+  readDisabledTools,
+  readWholeToolAction,
+  type PermissionTool,
+} from './agent-permissions';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
 const BUILTIN_SLUGS = new Set([
@@ -38,29 +45,6 @@ const BUILTIN_SLUGS = new Set([
   'architect',
   'custom',
 ]);
-
-/**
- * Tools the UI exposes as disableable per agent. Cloud sessions run in a
- * sandbox where every tool is allowed by default; the only customization we
- * surface is "turn this tool off for this agent", which emits `deny` for the
- * tool. The CLI's richer permission shapes (per-pattern maps, ask, etc.) are
- * preserved on save but not editable here.
- */
-const PERMISSION_TOOLS = [
-  'read',
-  'edit',
-  'bash',
-  'glob',
-  'grep',
-  'list',
-  'task',
-  'skill',
-  'webfetch',
-  'websearch',
-  'codesearch',
-  'mcp',
-] as const;
-type PermissionTool = (typeof PERMISSION_TOOLS)[number];
 
 type Props = {
   profileId: string;
@@ -223,19 +207,9 @@ type FormState = {
   temperature: string;
   topP: string;
   steps: string;
-  /** Tools the user wants turned off for this agent. Everything else is allowed. */
+  /** Tools the user wants turned off for this agent. Every other stored rule is kept. */
   disabledTools: Set<PermissionTool>;
 };
-
-function readDisabledTools(permission: AgentConfig['permission'] | undefined): Set<PermissionTool> {
-  const out = new Set<PermissionTool>();
-  if (!permission || typeof permission !== 'object') return out;
-  const map = permission as Record<string, PermissionRule>;
-  for (const tool of PERMISSION_TOOLS) {
-    if (map[tool] === 'deny') out.add(tool);
-  }
-  return out;
-}
 
 function buildInitialState(agent: ProfileAgent | undefined): FormState {
   const c = agent?.config ?? {};
@@ -252,28 +226,6 @@ function buildInitialState(agent: ProfileAgent | undefined): FormState {
     steps: c.steps !== undefined ? String(c.steps) : '',
     disabledTools: readDisabledTools(c.permission),
   };
-}
-
-/**
- * Apply UI disable toggles onto the existing permission map, preserving any
- * non-string (per-pattern) rules and any unrelated tool keys a user may have
- * imported. Toggling a tool off writes `deny`; toggling it back on clears a
- * simple string rule but leaves per-pattern maps alone.
- */
-function mergePermissions(
-  existing: AgentConfig['permission'] | undefined,
-  disabledTools: Set<PermissionTool>
-): AgentConfig['permission'] | undefined {
-  const base: Record<string, PermissionRule> =
-    existing && typeof existing === 'object' ? { ...existing } : {};
-  for (const tool of PERMISSION_TOOLS) {
-    if (disabledTools.has(tool)) {
-      base[tool] = 'deny';
-    } else if (typeof base[tool] === 'string') {
-      delete base[tool];
-    }
-  }
-  return Object.keys(base).length > 0 ? base : undefined;
 }
 
 function FieldHint({ hint }: { hint: string }) {
@@ -348,6 +300,9 @@ function AgentForm({
   );
   const availableVariants =
     (state.model && modelOptions.find(m => m.id === state.model)?.variants) || [];
+  // A stored single-rule permission applies to every tool at once, so the
+  // per-tool switches below cannot express a change to it.
+  const wholeToolAction = readWholeToolAction(agent?.config.permission);
 
   const handleSave = async () => {
     const trimmedSlug = state.slug.trim();
@@ -652,7 +607,13 @@ function AgentForm({
             </div>
 
             <div className="grid gap-2">
-              <FieldLabel hint="Every tool is allowed by default. Uncheck a tool to deny it for this agent only.">
+              <FieldLabel
+                hint={
+                  wholeToolAction
+                    ? 'This agent stores one rule for every tool at once, so the switches below are read-only.'
+                    : 'Every tool is allowed by default. Uncheck a tool to deny it for this agent only. Other stored rules stay as they are.'
+                }
+              >
                 Tools
               </FieldLabel>
               <div className="bg-background/60 grid grid-cols-2 gap-2 rounded-md border p-3 sm:grid-cols-3">
@@ -661,10 +622,16 @@ function AgentForm({
                   return (
                     <label
                       key={tool}
-                      className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm transition-colors"
+                      className={cn(
+                        'flex items-center gap-2 rounded px-1.5 py-1 text-sm transition-colors',
+                        wholeToolAction
+                          ? 'cursor-not-allowed opacity-60'
+                          : 'hover:bg-muted/50 cursor-pointer'
+                      )}
                     >
                       <Checkbox
                         checked={enabled}
+                        disabled={wholeToolAction !== undefined}
                         onCheckedChange={checked => {
                           const next = new Set(state.disabledTools);
                           if (checked) next.delete(tool);

@@ -251,7 +251,11 @@ test('every Chromium install skips apt and restores the browser cache first', ()
   }
   assert.deepEqual(
     installs,
-    ['ci.yml:mobile-diagram-host', 'extension-ci.yml:e2e-chrome', 'setup-smoke.yml:setup-smoke'],
+    [
+      'ci.yml:mobile-diagram-host',
+      'extension-ci.yml:e2e-chrome-shard',
+      'setup-smoke.yml:setup-smoke',
+    ],
     'every Chromium install in a live workflow is covered'
   );
 });

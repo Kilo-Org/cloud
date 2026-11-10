@@ -51,6 +51,10 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
  * customer, a credential, or a settings change produces the same failure and
  * bills a second run. A cause added later stays out of this set until someone
  * decides it is transient.
+ *
+ * `repository_clone_failed` covers the clone and checkout timeouts, rate limits
+ * and network faults that one attempt can hit; `repository_auth_failed` needs a
+ * credential or permission change, so it stays out.
  */
 const AUTOMATIC_RETRY_TERMINAL_REASON_LIST = [
   'timeout',
@@ -65,6 +69,7 @@ const AUTOMATIC_RETRY_TERMINAL_REASON_LIST = [
   'workspace_capacity',
   'workspace_setup_failed',
   'runtime_startup_failed',
+  'repository_clone_failed',
   'wrapper_failed',
   'delivery_failed',
   'session_import_failed',

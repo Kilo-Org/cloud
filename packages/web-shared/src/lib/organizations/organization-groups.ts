@@ -9,7 +9,7 @@ import {
   type Organization,
   type OrganizationGroup,
 } from '@kilocode/db/schema';
-import { MAX_ORGANIZATION_GROUPS } from '@kilocode/db/schema-types';
+import { MAX_ORGANIZATION_GROUPS, OrganizationSettingsSchema } from '@kilocode/db/schema-types';
 import {
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
@@ -22,7 +22,6 @@ import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
-import { mutateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   enkryptInputGuardrailGroupId,
   resolveEnkryptInputGuardrail,
@@ -713,25 +712,30 @@ async function releaseEnkryptInputGuardrailGroup(
   organizationId: string,
   groupId: string
 ) {
-  await mutateOrganizationSettings(
-    organizationId,
-    ({ settings }) => {
-      const inputGuardrail = settings.enkrypt?.input_guardrail;
-      if (!inputGuardrail || enkryptInputGuardrailGroupId(settings) !== groupId) return settings;
-      if (resolveEnkryptInputGuardrail(organizationId, settings) !== null) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message:
-            'Input guardrails are limited to this group. Choose another group on the AI Guardrails page first.',
-        });
-      }
-      return {
+  const [organization] = await tx
+    .select({ settings: organizations.settings })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .for('update');
+  const settings = organization?.settings;
+  const inputGuardrail = settings?.enkrypt?.input_guardrail;
+  if (!inputGuardrail || enkryptInputGuardrailGroupId(settings) !== groupId) return;
+  if (resolveEnkryptInputGuardrail(organizationId, settings) !== null) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message:
+        'Input guardrails are limited to this group. Choose another group on the AI Guardrails page first.',
+    });
+  }
+  await tx
+    .update(organizations)
+    .set({
+      settings: OrganizationSettingsSchema.parse({
         ...settings,
         enkrypt: { ...settings.enkrypt, input_guardrail: { ...inputGuardrail, group_id: null } },
-      };
-    },
-    tx
-  );
+      }),
+    })
+    .where(eq(organizations.id, organizationId));
 }
 
 export async function deleteOrganizationGroup(params: {

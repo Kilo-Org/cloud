@@ -1,0 +1,12 @@
+{
+  "name": "pages",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "stage": "node scripts/stage.mjs",
+    "typecheck": "node --check scripts/stage.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "catalog:"
+  }
+}

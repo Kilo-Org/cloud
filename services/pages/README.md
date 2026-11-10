@@ -1,18 +1,107 @@
 # Pages
 
 Pages is a service for shared documents that people and agents edit together.
-Its source lives in `nteract/nteract` for now. This folder records how the dev
-deployment on this Cloudflare account was made, so it can be diagnosed or
-repeated.
+Its source lives in `nteract/nteract`, directory `apps/pages`, for now. This
+folder holds what this repository decides about a deployment: which commit is
+built, which Worker and resources it runs on, and how it is deployed. It also
+records the dev deployment, so it can be diagnosed or repeated.
 
-There is no `wrangler.jsonc` here on purpose. The deploy workflow publishes
-every `services/<name>/wrangler.jsonc` to production on merge, and Pages is not
-ready for that. The dev Worker is deployed by hand from a profile.
+| File | Holds |
+|---|---|
+| `source.json` | The source repository and the full id of the commit that is built |
+| `profiles/dev.json` | The dev Worker's name, account, hostname, D1 databases, R2 bucket and plain variables |
+| `scripts/stage.mjs` | Fetches the pinned commit, builds it, and writes a package Wrangler deploys as it is |
+| `package.json` | Wrangler, from this repository's lockfile |
+
+There is no `wrangler.jsonc` here on purpose. `deploy-workers.yml` finds
+Workers by that file and publishes each one to production, and Pages is not
+ready for that. The Wrangler configuration is generated from the profile into
+the package, as `wrangler.json`.
+
+## Deploy
+
+Run the **Deploy Pages** workflow (`.github/workflows/deploy-pages.yml`) from
+the Actions tab. It only runs by hand. It takes a profile and a `deploy` box.
+With the box unticked, the run builds the package, uploads it as an artifact
+and stops after `wrangler deploy --dry-run`. With it ticked, the run also
+deploys, then checks that `/health` reports the build id it built.
+
+The workflow has two jobs, so that another repository's install and build
+scripts never run in a job that holds the Cloudflare token:
+
+1. `build` runs `scripts/stage.mjs`. It fetches the commit named in
+   `source.json` and, in `apps/pages`, runs `npm ci`, `npm run setup`,
+   `npm run build:upstream`, `npm run build` and
+   `scripts/cloudflare-stage.mjs` with the profile. `npm run setup` also
+   fetches `automerge/automerge-repo` at a commit the Pages source pins. This
+   job holds no secret.
+2. `deploy` installs Wrangler from this repository's lockfile and runs
+   `wrangler deploy --config PACKAGE/wrangler.json` with
+   `CLOUDFLARE_API_TOKEN`, the repository secret the other Workers deploy
+   with.
+
+To deploy a newer Pages, change `commit` in `source.json` in a pull request,
+merge it, then run the workflow. The build id is a hash of the Pages source,
+so one commit always reports one id.
+
+The same steps by hand, from this folder, with Node 22 or newer. Only the
+last command needs `wrangler login` or `CLOUDFLARE_API_TOKEN`:
+
+```sh
+pnpm install --filter '{.}...'
+pnpm run stage dev NEW_DIRECTORY
+pnpm exec wrangler deploy --dry-run --config NEW_DIRECTORY/wrangler.json
+pnpm exec wrangler deploy --config NEW_DIRECTORY/wrangler.json
+```
+
+`NEW_DIRECTORY` must not exist yet. The stage step prints the Worker name, the
+commit and the build id.
+
+A second deployment needs its two D1 databases and its R2 bucket created
+first, then a profile here beside `dev.json`, and its name added to the
+workflow's `profile` options.
+
+## Secrets
+
+No secret is in this repository, in a profile or in the package. The
+packaging script refuses a profile variable whose name reads like one.
+
+| Name | Where it is set | Use |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | Repository secret, read by the `deploy` job only | Publishes the Worker |
+| `NOTEBOOK_CLOUD_APP_SESSION_KEYS` | Worker secret on `pages-dev` | Session keyring |
+| `PAGES_KILO_EXCHANGE_SECRET` | Worker secret on `pages-dev` | Sign-in handoff with the web app |
+| `PAGES_DEV_AUTH_SECRET` | The web app's Vercel environment | The same value as `PAGES_KILO_EXCHANGE_SECRET` |
+
+`wrangler deploy` keeps the secrets already on the Worker, so the workflow
+never reads or writes them. Set or rotate one with
+`wrangler secret put NAME --name pages-dev`.
+
+## Roll back
+
+```sh
+pnpm exec wrangler rollback --name pages-dev
+```
+
+This puts the previous version back at once, with no build. Then revert the
+`source.json` change, so the pin names what is running. To go back further,
+set `commit` to the older commit and run the workflow.
+
+A rollback changes code only:
+
+- Durable Object, D1 and R2 data stay as the newer version left them. A
+  release that changes stored data cannot be undone this way. The dev
+  deployment's data is disposable: empty it and deploy again.
+- Cloudflare refuses a rollback to a version from before a Durable Object
+  migration.
+- A version runs with the secret values it was deployed with. Before a
+  rollback across a secret rotation, read "Session key rotation" in nteract's
+  `apps/pages/DEPLOYMENT.md`.
 
 ## Dev deployment
 
-| | |
-| --- | --- |
+|  |  |
+|---|---|
 | Worker | `pages-dev` |
 | Address | `https://pages-dev.kiloapps.io` |
 | First deployed | 2026-11-10, from `nteract/nteract` at `3c22117f7`, version `e11cd161-d009-4619-8cdb-b8464a0a17a1` |
@@ -102,20 +191,6 @@ that approved them.
 `/llms.txt` and `/connect` describe these routes and nothing else. They are
 written by the Worker for a deployment with `PAGES_KILO_APP_URL` set.
 
-## Deploy again
-
-From a clean checkout of `nteract/nteract`, in `apps/pages`. The tree must
-have no untracked files when it is built, or the stage step refuses the build:
-
-```sh
-npm run build
-node scripts/cloudflare-stage.mjs NEW_EMPTY_DIR services/pages/profiles/dev.json
-node_modules/.bin/wrangler deploy --config NEW_EMPTY_DIR/wrangler.json
-```
-
-`wrangler deploy` keeps the secret that is already set. To roll back, use
-`wrangler rollback --name pages-dev`.
-
 ## The session keyring
 
 The keyring was generated on the deploying machine and uploaded with
@@ -176,6 +251,11 @@ On 2026-11-10, at `dc13616ff`:
 
 ## Not checked yet
 
+- A run of the Deploy Pages workflow. Every deploy so far was made by hand. The
+  package `scripts/stage.mjs` builds from `dc13616ff` has the build id the
+  dev Worker reports, and passes `wrangler deploy --dry-run` with this
+  repository's Wrangler. Whether `CLOUDFLARE_API_TOKEN` may deploy this Worker
+  with its D1, R2 and custom domain is not known until the first run.
 - A second browser failing to finish a sign-in link the first one started.
 - A session ending at 8 hours.
 - Sharing a Page between two Kilo accounts. Invitations match a verified

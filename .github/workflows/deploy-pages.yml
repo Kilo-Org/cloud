@@ -1,0 +1,153 @@
+name: Deploy Pages
+
+# Manual-only: run from the Actions tab. Pages is outside the scheduled
+# pipeline because services/pages has no wrangler.jsonc, which is how
+# deploy-workers.yml discovers Workers.
+#
+# Pages source is in another repository. services/pages/source.json pins the
+# commit, and services/pages/profiles/<profile>.json names the Worker and its
+# resources. The work is split so that the other repository's install and build
+# scripts never run beside the Cloudflare token:
+#
+# * `build` fetches the pinned commit, builds it and uploads the package. It
+#   holds no secret.
+# * `deploy` installs only this repository's lockfile, checks the package with
+#   a dry run, and publishes it when `deploy` is ticked.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Profile in services/pages/profiles'
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+      deploy:
+        description: 'Deploy to Cloudflare. Unticked, the run stops after the dry run'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-pages-${{ inputs.profile }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Guard: this workflow_dispatch is reachable from a fork. Only the canonical
+    # repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    name: Build Pages package (${{ inputs.profile }})
+    outputs:
+      build-id: ${{ steps.stage.outputs.build_id }}
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          # The steps below run another repository's scripts. Leave no token in
+          # the checkout for them to read.
+          persist-credentials: false
+
+      # The Node release the Pages repository builds and tests with (`.nvmrc`
+      # at the pinned commit), not this repository's.
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '22'
+
+      - name: Build and stage the pinned source
+        id: stage
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          node services/pages/scripts/stage.mjs "$PROFILE" "$RUNNER_TEMP/pages-package" > "$RUNNER_TEMP/receipt.json"
+          cat "$RUNNER_TEMP/receipt.json"
+          echo "build_id=$(jq -r '.build_id' "$RUNNER_TEMP/receipt.json")" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Pages package"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            jq -r '"| Worker | `\(.worker)` |", "| Source | `\(.repository)` at `\(.commit)` |", "| Build id | `\(.build_id)` |"' "$RUNNER_TEMP/receipt.json"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pages-package-${{ inputs.profile }}
+          path: ${{ runner.temp }}/pages-package
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    needs: build
+    # Guard: the deploy step uses repo secrets. Only the canonical repo may run
+    # it.
+    if: github.repository == 'Kilo-Org/cloud'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    name: ${{ inputs.deploy && 'Deploy' || 'Dry run' }} Pages (${{ inputs.profile }})
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        working-directory: services/pages
+        # Only this workspace's closure plus the root project: Wrangler, from
+        # this repository's lockfile.
+        run: pnpm install --frozen-lockfile --filter '{.}...' --filter kilocode-monorepo
+
+      - name: Download package
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: pages-package-${{ inputs.profile }}
+          path: ${{ runner.temp }}/pages-package
+
+      # Reads the package the way a deploy does and stops before any request to
+      # Cloudflare. It needs no token.
+      - name: Dry run
+        working-directory: services/pages
+        run: pnpm exec wrangler deploy --dry-run --config "$RUNNER_TEMP/pages-package/wrangler.json"
+
+      - name: Deploy to Cloudflare Workers
+        if: inputs.deploy
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/pages
+          command: deploy --config ${{ runner.temp }}/pages-package/wrangler.json
+
+      # `/health` reports the build id of the version that answers. A new
+      # version can take a few seconds to reach every location.
+      - name: Check the deployed build
+        if: inputs.deploy
+        env:
+          BUILD_ID: ${{ needs.build.outputs.build-id }}
+        run: |
+          origin=$(jq -r '.vars.NOTEBOOK_CLOUD_PUBLIC_ORIGIN' "$RUNNER_TEMP/pages-package/wrangler.json")
+          for attempt in 1 2 3 4 5 6; do
+            serving=$(curl -fsS --max-time 10 "$origin/health" | jq -r '.build' || true)
+            if [ "$serving" = "$BUILD_ID" ]; then
+              echo "$origin serves build $BUILD_ID" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "Attempt $attempt: $origin serves build '${serving:-none}', expected $BUILD_ID"
+            sleep 10
+          done
+          echo "::error::$origin does not serve build $BUILD_ID. See the rollback note in services/pages/README.md."
+          exit 1

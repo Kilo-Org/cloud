@@ -3,6 +3,7 @@ import { cookies, headers } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import type { TurnstileJwtPayload } from '@/lib/user/next-auth-options';
+import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 /**
@@ -48,22 +49,11 @@ export async function verifyTurnstileJWT(
 
   // Validate IP address matches
   const headersList = await headers();
-  const forwardedFor = headersList.get('x-forwarded-for');
-
-  if (!forwardedFor) {
-    warnInSentry('SECURITY: Missing x-forwarded-for header during JWT verification');
-    return {
-      success: false,
-      response: NextResponse.json({ error: 'Security verification failed' }, { status: 401 }),
-    };
-  }
-
-  // Extract first IP from comma-separated list (client IP, ignoring proxy IPs)
-  const currentIP = forwardedFor.split(',')[0]?.trim();
+  const currentIP = getTrustedSignupClientIp(headersList);
 
   if (!currentIP || verifiedToken.ip !== currentIP) {
     warnInSentry(
-      `SECURITY: IP mismatch - JWT: ${verifiedToken.ip}, Current: ${currentIP || 'null'}`
+      `SECURITY: IP mismatch - JWT: ${verifiedToken.ip}, Current: ${currentIP ?? 'unresolved'}`
     );
     return {
       success: false,

@@ -130,6 +130,9 @@ export {
 
 export type { SkillsShSource } from './skills-sh';
 
+// Size-limit copy shared by the profile and runtime contracts
+export { LIMIT_UNIT, overLimitMessage, overTotalMessage } from './contracts/limit-copy';
+
 // Agent CRUD + session helpers
 export {
   MAX_PROFILE_AGENTS,

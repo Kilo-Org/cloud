@@ -31,6 +31,7 @@ const SESSION: StoredSession = {
   total_cost_microdollars: null,
   created_at: ROW,
   updated_at: ROW,
+  last_activity_at: null,
   version: 0,
   associatedPr: null,
 };

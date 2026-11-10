@@ -58,7 +58,7 @@ const NOT_SCANNED_REASON_LABELS: Record<
   held_output_too_large: 'Held-back response too large',
 };
 
-function detectorLabel(detector: EnkryptDetectorId): string {
+export function detectorLabel(detector: EnkryptDetectorId): string {
   return DETECTOR_DETAILS[detector].label;
 }
 
@@ -214,7 +214,7 @@ export function EnkryptReportSection({ report }: { report: EnkryptGuardrailRepor
   return (
     <GuardrailReportBody
       title="Enkrypt input guardrail"
-      description="How the organization's Enkrypt guardrail scanned this request. Prompt text is never stored."
+      description="How the organization's Enkrypt guardrail scanned this request."
       verdict={report.verdict}
       unavailableReason={report.unavailable_reason}
       addedLatencyMs={report.added_latency_ms}
@@ -235,7 +235,7 @@ export function EnkryptOutputReportSection({ report }: { report: EnkryptOutputGu
   return (
     <GuardrailReportBody
       title="Enkrypt output guardrail"
-      description="How the organization's Enkrypt guardrail scanned the response. Response text is never stored."
+      description="How the organization's Enkrypt guardrail scanned the response."
       verdict={report.verdict}
       unavailableReason={report.unavailable_reason}
       addedLatencyMs={report.added_latency_ms}

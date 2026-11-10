@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useDebouncedValue } from '@/components/organizations/guardrails/mcp-and-skills/use-debounced-value';
 import { OrganizationPageHeader } from '@/components/organizations/OrganizationPageHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -12,13 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -39,8 +31,9 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import { ABSENT_CELL } from './detail-primitives';
 import { formatCount, formatMicrodollarsAsUsd, formatRequestTime } from './format';
-import { EnkryptUsageTab } from './EnkryptUsageTab';
+import { EnkryptUsageTab, parseEnkryptFilters } from './EnkryptUsageTab';
 import { RequestLogDetailsSheet, userLabel, type RequestLogRow } from './RequestLogDetailsSheet';
+import { StartTimeFilter, UserFilter, parseStartParam } from './RequestLogFilters';
 
 const COLUMNS = [
   { label: 'Time' },
@@ -53,7 +46,6 @@ const COLUMNS = [
   { label: 'BYOK' },
 ] as const;
 
-const ALL_USERS = '__all__';
 const MODEL_PREFIX_DEBOUNCE_MS = 300;
 
 function RequestLogTableRow({
@@ -127,105 +119,6 @@ type RequestFilters = {
 
 type FilterParamUpdate = Partial<Record<'start' | 'user' | 'model', string | null>>;
 
-function parseStartParam(value: string | null): string | null {
-  if (!value) return null;
-  const time = Date.parse(value);
-  return Number.isNaN(time) ? null : new Date(time).toISOString();
-}
-
-function toDateTimeLocalValue(time: number): string {
-  const date = new Date(time);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function StartTimeFilter({
-  startTime,
-  rollingTime,
-  error,
-  onChange,
-}: {
-  startTime: string | null;
-  rollingTime: number;
-  error: string | null;
-  onChange: (startTime: string | null) => void;
-}) {
-  const handleChange = (value: string) => {
-    const time = value ? new Date(value).getTime() : Number.NaN;
-    onChange(Number.isNaN(time) || time >= Date.now() ? null : new Date(time).toISOString());
-  };
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor="request-logs-start">Start time</Label>
-      <div className="flex items-center gap-2">
-        <Input
-          id="request-logs-start"
-          type="datetime-local"
-          value={toDateTimeLocalValue(startTime ? Date.parse(startTime) : rollingTime)}
-          aria-invalid={error !== null}
-          aria-describedby={error ? 'request-logs-start-error' : undefined}
-          className="w-56 cursor-pointer tabular-nums [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-          onClick={event => event.currentTarget.showPicker?.()}
-          onChange={event => handleChange(event.target.value)}
-        />
-        {startTime && (
-          <Button variant="ghost" size="sm" onClick={() => onChange(null)}>
-            Now
-          </Button>
-        )}
-      </div>
-      {error && (
-        <p id="request-logs-start-error" className="text-destructive text-xs">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function UserFilter({
-  organizationId,
-  userId,
-  onChange,
-}: {
-  organizationId: string;
-  userId: string | null;
-  onChange: (userId: string | null) => void;
-}) {
-  const membersQuery = useOrganizationWithMembers(organizationId);
-  const users = (membersQuery.data?.members ?? [])
-    .flatMap(member =>
-      member.status === 'active' ? [{ id: member.id, label: member.name || member.email }] : []
-    )
-    .sort((a, b) => a.label.localeCompare(b.label));
-  if (userId && !users.some(user => user.id === userId)) {
-    users.push({ id: userId, label: userId });
-  }
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor="request-logs-user">User</Label>
-      <Select
-        value={userId ?? ALL_USERS}
-        onValueChange={value => onChange(value === ALL_USERS ? null : value)}
-      >
-        <SelectTrigger id="request-logs-user" className="w-56">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_USERS}>All users</SelectItem>
-          {users.map(user => (
-            <SelectItem key={user.id} value={user.id}>
-              {user.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
 function ModelPrefixFilter({
   modelPrefix,
   onChange,
@@ -294,12 +187,14 @@ function RequestsTab({
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-start gap-3">
           <StartTimeFilter
+            id="request-logs-start"
             startTime={filters.startTime}
             rollingTime={logsQuery.dataUpdatedAt || mountedAt}
             error={startTimeError}
             onChange={startTime => onFiltersChange({ start: startTime })}
           />
           <UserFilter
+            id="request-logs-user"
             organizationId={organizationId}
             userId={filters.userId}
             onChange={userId => onFiltersChange({ user: userId })}
@@ -445,7 +340,11 @@ export function RequestLogsPage({ organizationId }: { organizationId: string }) 
           />
         </TabsContent>
         <TabsContent value="enkrypt">
-          <EnkryptUsageTab organizationId={organizationId} />
+          <EnkryptUsageTab
+            organizationId={organizationId}
+            filters={parseEnkryptFilters(searchParams)}
+            onFiltersChange={replaceParams}
+          />
         </TabsContent>
       </Tabs>
     </div>

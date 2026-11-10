@@ -26290,6 +26290,39 @@
     ],
     "searchBlob": "organizations.requestLogs.getDetails Get full details for one organization request log entry, including model, provider, status code, finish reason, streaming, session, editor, mode, and region. organizations requestlogs getdetails organizationid usageid organizationId usageId"
   },
+  "organizations.requestLogs.getEnkryptRequestDetails": {
+    "path": "organizations.requestLogs.getEnkryptRequestDetails",
+    "kind": "query",
+    "summary": "Get one organization request's Enkrypt guardrail calls (decision, fired detectors, guardrail, charge, added latency), its inference model, provider, and cost when recorded, and its routing details, including requests the guardrail blocked before inference.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId",
+        "requestId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "requestlogs",
+      "getenkryptrequestdetails",
+      "organizationid",
+      "requestid"
+    ],
+    "searchBlob": "organizations.requestLogs.getEnkryptRequestDetails Get one organization request's Enkrypt guardrail calls (decision, fired detectors, guardrail, charge, added latency), its inference model, provider, and cost when recorded, and its routing details, including requests the guardrail blocked before inference. organizations requestlogs getenkryptrequestdetails organizationid requestid organizationId requestId"
+  },
   "organizations.requestLogs.isAvailable": {
     "path": "organizations.requestLogs.isAvailable",
     "kind": "query",
@@ -26362,7 +26395,7 @@
   "organizations.requestLogs.listEnkryptUsage": {
     "path": "organizations.requestLogs.listEnkryptUsage",
     "kind": "query",
-    "summary": "Shows recent Enkrypt guardrail request logs for an organization, including per-call decisions (allowed, blocked, error), guardrail type, charged amount, added latency, and the user and session involved, plus summary totals and averages.",
+    "summary": "List an organization's recent Enkrypt guardrail calls, newest first, with user, model, API, guardrail, decision (allowed, flagged, blocked, error), fired detectors, charged amount, added latency, session, and request ID. Filter by start time, user, decision, and guardrail.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -26371,6 +26404,32 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "flagged",
+            "blocked",
+            "error"
+          ]
+        },
+        "guardrail": {
+          "type": "string",
+          "enum": [
+            "input",
+            "output"
+          ]
         }
       },
       "required": [
@@ -26381,9 +26440,13 @@
       "organizations",
       "requestlogs",
       "listenkryptusage",
-      "organizationid"
+      "organizationid",
+      "starttime",
+      "userid",
+      "outcome",
+      "guardrail"
     ],
-    "searchBlob": "organizations.requestLogs.listEnkryptUsage Shows recent Enkrypt guardrail request logs for an organization, including per-call decisions (allowed, blocked, error), guardrail type, charged amount, added latency, and the user and session involved, plus summary totals and averages. organizations requestlogs listenkryptusage organizationid organizationId"
+    "searchBlob": "organizations.requestLogs.listEnkryptUsage List an organization's recent Enkrypt guardrail calls, newest first, with user, model, API, guardrail, decision (allowed, flagged, blocked, error), fired detectors, charged amount, added latency, session, and request ID. Filter by start time, user, decision, and guardrail. organizations requestlogs listenkryptusage organizationid starttime userid outcome guardrail organizationId startTime userId outcome guardrail"
   },
   "organizations.reviewAgent.createManualReviewJob": {
     "path": "organizations.reviewAgent.createManualReviewJob",

@@ -14,8 +14,12 @@ const workspace = (name, dir, dependencies = {}) => ({ name, dir, manifest: { de
 const items = [
   workspace('@kilocode/db', 'packages/db'),
   workspace('@kilocode/trpc', 'packages/trpc', { '@kilocode/db': 'workspace:*' }),
+  workspace('@kilocode/harness-sdk', 'packages/harness-sdk'),
   workspace('web', 'apps/web', { '@kilocode/db': 'workspace:*' }),
-  workspace('kilo-app', 'apps/mobile', { '@kilocode/trpc': 'workspace:*' }),
+  workspace('kilo-app', 'apps/mobile', {
+    '@kilocode/trpc': 'workspace:*',
+    '@kilocode/harness-sdk': 'workspace:*',
+  }),
   workspace('agent', 'services/agent'),
   workspace('agent-wrapper', 'services/agent/wrapper'),
   workspace('leaf', 'services/leaf'),
@@ -102,11 +106,8 @@ test('an unattributable or global change selects everything', () => {
     'unknown/file.ts',
     '.github/workflows/ci.yml',
     'scripts/affected-workspaces.mjs',
-    '.github/actions/trpc-declarations/action.yml',
-    '.github/actions/harness-sdk-build/action.yml',
+    'scripts/changed-dependencies.mjs',
     '.github/actions/ttsc-plugin-cache/action.yml',
-    'scripts/trpc-declaration-key.mjs',
-    'scripts/harness-sdk-build-key.mjs',
     'scripts/ttsc-plugin-key.mjs',
     'scripts/build-key-inputs.mjs',
   ]) {
@@ -116,6 +117,51 @@ test('an unattributable or global change selects everything', () => {
     assert.deepEqual(result.full_checks, ['lint', 'typecheck'], file);
   }
   assert.equal(select(['<no base revision>']).full, true);
+});
+
+test('a single-package build action selects its package and that package readers', () => {
+  for (const file of [
+    '.github/actions/trpc-declarations/action.yml',
+    'scripts/trpc-declaration-key.mjs',
+  ]) {
+    assert.deepEqual(select([file]), {
+      full: false,
+      reasons: [],
+      full_checks: [],
+      dirs: ['apps/mobile', 'packages/trpc'],
+      packages: ['@kilocode/trpc', 'kilo-app'],
+      ...noTests,
+    });
+  }
+  for (const file of [
+    '.github/actions/harness-sdk-build/action.yml',
+    '.github/actions/harness-sdk-build/step.sh',
+    'scripts/harness-sdk-build-key.mjs',
+  ]) {
+    assert.deepEqual(select([file]).dirs, ['apps/mobile', 'packages/harness-sdk'], file);
+  }
+  // The trpc rows run only on a full check, so the key change starts no
+  // typecheck row; the rest lint group still covers every workspace it lints.
+  assert.deepEqual(selectGroups(select(['scripts/trpc-declaration-key.mjs'])), {
+    typecheck_groups: [],
+    lint_groups: ['rest'],
+  });
+});
+
+test('an action no table attributes stays global', () => {
+  for (const file of [
+    '.github/actions/pnpm-store/action.yml',
+    '.github/actions/pnpm-store/cleanup/cleanup.cjs',
+    '.github/actions/brand-new-action/action.yml',
+  ]) {
+    assert.equal(select([file]).full, true, file);
+  }
+  // A global path in the same diff keeps the whole selection full.
+  assert.equal(
+    select(['.github/actions/trpc-declarations/action.yml', '.github/actions/pnpm-store/action.yml'])
+      .full,
+    true
+  );
 });
 
 test('a check script change runs only that check everywhere', () => {

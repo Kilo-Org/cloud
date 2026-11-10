@@ -6,6 +6,11 @@ import { settleTabSwitchInput } from '@/lib/tab-switch-input-gate';
 
 export const unstable_settings = {
   initialRouteName: 'index',
+  // This stack carries `TabStackErrorBoundary`, whose fallback keeps the tab's
+  // own header and refetches this tab's reads. Opt out of the authenticated
+  // stack's screen boundary, which would otherwise catch a tab screen's throw
+  // first and take that recovery over.
+  screenErrorBoundary: null,
 };
 
 /**
@@ -36,6 +41,10 @@ export default function AgentsLayout() {
       queryPrefixes={AGENTS_STACK_QUERY_PREFIXES}
     >
       <Stack
+        // A blurred tab keeps its state but stops its effects, timers and
+        // queries. The tabs navigator cannot: its screens are groups, and the
+        // router wraps only route nodes.
+        activityEnabled={1}
         screenLayout={appSceneLayout}
         screenOptions={{ headerShown: false }}
         // A push or a pop moves a screen that is still the touch target until

@@ -23,6 +23,8 @@ const STEP_LABEL_KEYS = {
   branch: 'agentChat.preparation.stepBranch',
   devcontainer_setup: 'agentChat.preparation.stepDevcontainerSetup',
   setup_commands: 'agentChat.preparation.detailRunningSetupCommands',
+  session_setup_commands: 'agentChat.preparation.detailRunningSetupCommands',
+  start_commands: 'agentChat.computeStatus.runningCommands',
   workspace_restore: 'agentChat.preparation.stepWorkspaceRestore',
   workspace_backup: 'agentChat.preparation.stepWorkspaceBackup',
   sandbox_provision: 'agentChat.preparation.stepSandboxProvision',
@@ -49,6 +51,9 @@ const MESSAGE_KEYS = {
   'Updating repository': 'agentChat.preparation.detailUpdatingRepository',
   'Checking out branch': 'agentChat.preparation.detailCheckingOutBranch',
   'Running setup commands': 'agentChat.preparation.detailRunningSetupCommands',
+  'Running build commands': 'agentChat.preparation.detailRunningSetupCommands',
+  'Running session setup': 'agentChat.preparation.detailRunningSetupCommands',
+  'Running start commands': 'agentChat.computeStatus.runningCommands',
   'Saving repository for faster starts': 'agentChat.preparation.detailSavingRepository',
   'Starting Kilo runtime': 'agentChat.preparation.detailStartingKiloRuntime',
   'Starting Kilo': 'agentChat.preparation.stepKiloServer',
@@ -113,10 +118,26 @@ const RESTORE_REPORT_PATTERN =
   /^Session restore incomplete: (\d+) of (\d+) files were not restored \(([^)]*)\)\.?(?: Missing: (.*))?$/u;
 const RESTORE_MORE_PATTERN = /^(.*) and (\d+) more$/u;
 const CLONE_RETRY_PATTERN = /^Retrying clone \(attempt (\d+) of (\d+)\)$/u;
-const SETUP_COMMAND_FAILED_PATTERN = /^Setup command (\d+) failed$/u;
-const SETUP_COMMAND_TIMED_OUT_PATTERN = /^Setup command (\d+) timed out$/u;
+/** Every command kind reuses the setup-command copy until the catalogs gain kind-specific sentences. */
+const SETUP_COMMAND_FAILED_PATTERN = /^(?:Setup|Build|Session setup|Start) command (\d+) failed$/u;
+const SETUP_COMMAND_TIMED_OUT_PATTERN =
+  /^(?:Setup|Build|Session setup|Start) command (\d+) timed out$/u;
 const COLD_RESTORE_PATTERN = /^Cold restore, snapshot applied, (\d+)\/(\d+) files restored$/u;
 const GIT_PROGRESS_PATTERN = /(\d{1,3})%$/u;
+
+/**
+ * The sentence stops the catalogs actually spell a two-sentence failure with:
+ * the Latin marks, which only break before whitespace, and the stops of the
+ * Indic, Arabic-script, Armenian, Ethiopic, Myanmar, Khmer and CJK catalogs,
+ * which stand on their own.
+ */
+const SENTENCE_STOPS = '।॥۔؟։።፧။។៕。．！？';
+const SENTENCE_BREAK_PATTERN = new RegExp(
+  `^([\\s\\S]*?(?:[.!?](?=\\s)|[${SENTENCE_STOPS}]))\\s*([\\s\\S]+)$`,
+  'u'
+);
+/** Thai writes no full stop, so a Thai sentence meets the next one at a space. */
+const THAI_BREAK_PATTERN = /^([\s\S]*?[\u0E00-\u0E7F])\s+([\s\S]+)$/u;
 
 /**
  * Looks up a possibly-unknown key in a literal dictionary without widening its
@@ -159,6 +180,27 @@ export function preparationDetailText(detail: string, t: TFunction): string {
  */
 export function preparationErrorText(error: string, t: TFunction): string {
   return resolvePreparationText(error, t) ?? t('agentChat.preparation.preparationFailed');
+}
+
+/** A failure's one-line headline, and the sentence that continues it. */
+type FailureHeadline = {
+  title: string;
+  detail?: string;
+};
+
+/**
+ * A localized failure cut after its first sentence: the first sentence is what
+ * failed, the second what to do about it. A group with no failed stage titles
+ * itself with the first, because that is the only thing that tells two
+ * stage-less failures apart, and keeps the rest in the body. A one-sentence
+ * cause yields no body text.
+ */
+export function splitFailureSentence(text: string): FailureHeadline {
+  const sentence = SENTENCE_BREAK_PATTERN.exec(text) ?? THAI_BREAK_PATTERN.exec(text);
+  if (sentence === null) {
+    return { title: text };
+  }
+  return { title: sentence[1] ?? text, detail: sentence[2] };
 }
 
 function resolvePreparationText(raw: string, t: TFunction): string | undefined {
@@ -214,8 +256,9 @@ function resolvePreparationText(raw: string, t: TFunction): string | undefined {
 }
 
 /**
- * The wrapper's named report for a restore that left files behind, which also
- * titles the group: counts, why each file was skipped, and the paths.
+ * The wrapper's named report for a restore that left files behind: how many
+ * files were skipped, why, and the paths. The group header carries only the
+ * status, so this sentence reads as the report's body rather than a title.
  */
 function resolveRestoreReport(raw: string, t: TFunction): string | undefined {
   const match = RESTORE_REPORT_PATTERN.exec(raw);
@@ -229,7 +272,7 @@ function resolveRestoreReport(raw: string, t: TFunction): string | undefined {
       return key === undefined ? t('agentChat.preparation.detailReasonUnknown') : t(key);
     })
     .join(', ');
-  const summary = t('agentChat.preparation.detailRestoreIncompleteReport', {
+  const summary = t('agentChat.preparation.detailRestoreIncompleteFiles', {
     skipped: localizedNumber(match[1] ?? ''),
     total: localizedNumber(match[2] ?? ''),
     reasons,

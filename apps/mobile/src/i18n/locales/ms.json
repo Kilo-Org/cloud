@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo kawalan jauh natif",
+    "sessionsEmpty": "Belum ada sesi natif",
+    "hosts": "Hos dalam talian",
+    "hostsEmpty": "Tiada hos dalam talian",
+    "directory": "Direktori kerja",
+    "createSession": "Cipta sesi natif",
+    "queueIfOffline": "Masukkan gesaan dalam baris gilir jika hos di luar talian",
+    "prompt": "Gesaan atau /command",
+    "localClear": "Kosongkan paparan setempat",
+    "abort": "Hentikan giliran",
+    "failed": "Tindakan kawalan jauh natif gagal",
+    "creationUnknown": "Hasil penciptaan tidak diketahui. Muat semula sesi sebelum mencuba semula.",
+    "commandFailed": "Arahan pelaksana gagal",
+    "invalidReply": "Balasan pelaksana tidak sah",
+    "unsafeCommand": "Gunakan /compact, /new, /skill, /models, /agents atau /clear (setempat sahaja).",
+    "status": "Sambungan: {{connection}} · Pelaksana: {{runner}}",
+    "presenceStatus": "Hos: {{connection}}",
+    "commandStatus": "Penghantaran arahan: {{status}}",
+    "delivered": "Dihantar",
+    "expired": "Tamat tempoh"
+  },
   "common": {
     "cancel": "Batal",
     "done": "Selesai",
@@ -110,6 +132,7 @@
     "newSession": "Sesi baharu",
     "noModelsAvailable": "Tiada model tersedia",
     "notFound": "Tidak ditemui.",
+    "online": "Dalam talian",
     "open": "Buka {{name}}",
     "openPullRequest": "Buka PR",
     "completed": "Selesai",
@@ -186,6 +209,7 @@
     "resendCode": "Hantar semula kod",
     "termsPrefix": "Dengan meneruskan, anda bersetuju dengan ",
     "terms": "Terma",
+    "termsInSentence": "Terma",
     "termsConnector": " dan ",
     "termsSuffix": ".",
     "moreSignInOptions": "Pilihan log masuk lain",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Sahkan pemadaman",
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuatkan baki. Ketik untuk mencuba semula.",
+    "balanceLoadFailed": "Gagal memuatkan baki",
     "hideBalance": "Sembunyikan baki",
     "showBalance": "Tunjukkan baki",
     "balanceHidden": "Baki disembunyikan",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Tiada perubahan pada fail dalam permintaan tarik ini.",
     "fileList": {
       "openNavigator": "Buka penavigasi fail",
-      "filesViewed": "Fail · {{viewed}} daripada {{total}} sudah dilihat",
       "listed": "(disenaraikan)",
       "layout": "Susun atur",
       "unified": "Bersepadu",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "Tidak dapat menyemak sambungan GitHub.",
-      "checkFailedMessage": "Status log masuk hanya tersedia selepas data ini dimuatkan.",
+      "checkFailedMessage": "Tidak dapat menghubungi GitHub. Semak sambungan anda dan cuba lagi.",
       "checkFailedTitleGitLab": "Tidak dapat menyemak sambungan GitLab.",
       "checkFailedTitleBitbucket": "Tidak dapat menyemak sambungan Bitbucket.",
-      "providerCheckFailedMessage": "Status sambungan tidak tersedia sehingga ia dimuatkan.",
+      "providerCheckFailedMessage": "Tidak dapat menghubungi penyedia. Semak sambungan anda dan cuba lagi.",
       "reconnectTitle": "Sambung semula ke GitHub",
       "reconnectTitleGitLab": "Sambung semula ke GitLab",
       "reconnectTitleBitbucket": "Sambung semula ke Bitbucket",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Benarkan akses kamera dalam tetapan untuk mengambil foto."
+    },
+    "botStatus": {
+      "offline": "Luar talian"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Tindakan ini tidak dapat disiapkan. Sila cuba lagi.",
       "actionBlocked": "Tindakan ini tidak dapat disiapkan. Masalah ini perlu diselesaikan terlebih dahulu.",
       "syncNoRepositories": "Tiada repositori dalam skop segerak. Pilih repositori yang dipantau oleh Ejen Keselamatan, kemudian segerakkan semula.",
+      "syncNoRepositoriesNoManage": "Tiada repositori dalam skop segerak. Pemilik organisasi, pentadbir atau pengurus pengebilan mesti menyambungkan repositori sebelum ia boleh disegerakkan.",
       "syncIntegrationInactive": "Sambungan GitHub untuk Ejen Keselamatan tidak aktif. Sambung semula Apl GitHub Kilo, kemudian segerakkan semula.",
       "syncMissingPermission": "Apl GitHub Kilo tidak dapat membaca makluman kerentanan. Berikan kebenaran itu dalam GitHub, kemudian segerakkan semula.",
       "configConflict": "Tetapan Ejen Keselamatan diubah di tempat lain. Semak tetapan terkini dan simpan semula."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "Hantar mesej di bawah untuk bermula.",
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
+      "emptyReadOnlyTitle": "Tiada mesej dalam sesi ini",
       "renameAccessibility": "Namakan semula sesi: {{title}}",
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Pilih repositori untuk bermula.",
       "enterPromptToStart": "Tambahkan prompt untuk bermula.",
       "enterPromptOrFileToStart": "Tambahkan prompt atau fail untuk bermula.",
-      "connectProviderToStart": "Sambungkan penyedia untuk bermula.",
+      "connectProviderToStart": "Repositori datang daripada akaun GitHub, GitLab atau Bitbucket yang disambungkan.",
       "promptPlaceholder": "Apa yang ingin anda usahakan?",
       "couldNotLoadModels": "Tidak dapat memuatkan model.",
       "prefillRepoAndModelUnavailable": "Repositori dan model sesi asal tidak lagi tersedia. Pilih repositori dan model lain di bawah.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "Respons dihentikan.",
       "assistantContextOverflow": "Perbualan terlalu panjang untuk model.",
       "assistantProviderError": "Penyedia mengembalikan ralat.",
+      "assistantProviderRefused": "Penyedia menolak permintaan ini dan ia tidak boleh dicuba semula.",
+      "assistantCreditsRefusal": "Kredit tidak mencukupi untuk menjalankan Cloud Agent.",
       "assistantOutputLimit": "Respons mencapai had output model.",
       "assistantStructuredOutput": "Respons tidak sepadan dengan format yang diperlukan.",
       "assistantFailed": "Respons gagal."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Menyediakan persekitaran",
       "preparationComplete": "Penyediaan selesai",
       "preparationFailed": "Penyediaan gagal",
+      "preparationStageFailed": "{{stage}} gagal",
       "setupCommand": "Arahan penyediaan {{index}}",
       "setupCommandOf": "Arahan penyediaan {{index}} daripada {{displayCount}}",
       "stepWorkspaceSetup": "Penyediaan ruang kerja",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "Arahan penyediaan {{index}} tamat masa",
       "detailColdRestore": "Pemulihan sejuk, snapshot digunakan, {{applied}} daripada {{total}} fail dipulihkan",
       "detailProgressPercent": "{{percent}}% selesai",
-      "detailRestoreIncompleteReport": "Pemulihan sesi tidak lengkap: {{skipped}} daripada {{total}} fail tidak dipulihkan ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} daripada {{total}} fail tidak dipulihkan ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Hilang: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} dan {{omitted}} lagi",
       "detailReasonPatchFailed": "patch tidak berjaya digunakan",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Saiz tetingkap konteks tidak tersedia",
-      "tapToViewDetails": "Ketik untuk melihat butiran konteks.",
-      "costSuffix": ", kos {{cost}}",
-      "tokensWindowUnavailable": "Konteks menggunakan {{used}} token, saiz tetingkap tidak tersedia",
-      "tokensUsage": "Konteks menggunakan {{used}} daripada {{window}} token, {{percentage}} digunakan",
+      "tapToViewDetails": " Ketik untuk melihat butiran konteks.",
+      "costClause": ", kos {{cost}}",
+      "loadingCostSpoken": "kos {{cost}}.",
+      "tokensWindowUnavailable": "Konteks menggunakan {{used}} token, saiz tetingkap tidak tersedia{{costClause}}.",
+      "tokensUsage": "Konteks menggunakan {{used}} daripada {{window}} token, {{percentage}} digunakan{{costClause}}.",
       "title": "Penggunaan konteks",
       "used": "Digunakan",
       "provider": "Penyedia",
       "totalCost": "Jumlah kos",
       "usageReflectsLatest": "Penggunaan ini berdasarkan respons pembantu terkini yang telah selesai dijana.",
-      "usageUnavailable": "Penggunaan konteks tidak tersedia",
+      "usageUnavailable": "Penggunaan konteks tidak tersedia{{costClause}}.",
       "tokenUsage": "Penggunaan token",
       "cacheRate": "Kadar cache",
       "modelsCount": "Model ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Tambah kredit",
-    "description": "Tambah kredit untuk terus menggunakan perkhidmatan.",
     "billingPage": "halaman pengebilan"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Carian web",
       "thinking": "Sedang berfikir"
     },
-    "planOf": "daripada",
+    "planProgress": "{{done}} daripada {{total}}",
     "filesChanged": "fail diubah",
-    "finishedIn": "Selesai dalam",
+    "finishedIn": "Selesai dalam {{duration}}",
     "noActivityFor": "Tiada aktiviti selama",
     "prOpened": "Permintaan tarik dibuka",
     "permissionWants": "Ingin menjalankan",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Model ini menyokong tahap pemikiran"
     },
-    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini. Tambah kredit dan cuba lagi."
+    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini."
   },
   "settingsTools": {
     "confirmTitle": "Sahkan perubahan ini?"
@@ -3340,8 +3372,8 @@
     "saved": "Tetapan amaran perbelanjaan disimpan",
     "loadError": "Tidak dapat memuatkan amaran perbelanjaan.",
     "saveError": "Tidak dapat menyimpan amaran perbelanjaan.",
-    "empty": "Amaran perbelanjaan dimatikan. Hidupkannya untuk memberitahu kenalan pengebilan skop ini.",
-    "noSpend": "Belum ada perbelanjaan direkodkan",
+    "sendAlerts": "Hantar amaran",
+    "noSpend": "Belum ada perbelanjaan",
     "spend24h": "Perbelanjaan dalam 24 jam terakhir",
     "multiplierError": "Masukkan pengganda 1 atau lebih",
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus amaran perbelanjaan.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Tiada konteks didayakan untuk laporan berjadual",
     "sourceBlocker": "Sesi memerlukan perhatian",
     "sourceMetadata": "Metadata sesi yang dirakam"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
   }
 }

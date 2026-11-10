@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo ta' kontroll remot nattiv",
+    "sessionsEmpty": "Għad m'hemmx sessjonijiet nattivi",
+    "hosts": "Hosts online",
+    "hostsEmpty": "M'hemmx hosts online",
+    "directory": "Direttorju tax-xogħol",
+    "createSession": "Oħloq sessjoni nattiva",
+    "queueIfOffline": "Poġġi l-prompt fil-kju jekk il-host ikun offline",
+    "prompt": "Prompt jew /command",
+    "localClear": "Naddaf il-veduta lokali",
+    "abort": "Waqqaf id-dawra",
+    "failed": "L-azzjoni remota nattiva falliet",
+    "creationUnknown": "Ir-riżultat tal-ħolqien mhux magħruf. Aġġorna s-sessjonijiet qabel terġa' tipprova.",
+    "commandFailed": "Il-kmand tal-proċess CLI falla",
+    "invalidReply": "Tweġiba invalida mill-proċess CLI",
+    "unsafeCommand": "Uża /compact, /new, /skill, /models, /agents jew /clear (lokalment biss).",
+    "status": "Konnessjoni: {{connection}} · Proċess CLI: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Twassil tal-kmand: {{status}}",
+    "delivered": "Imwassal",
+    "expired": "Skada"
+  },
   "common": {
     "cancel": "Ikkanċella",
     "done": "Lest",
@@ -110,6 +132,7 @@
     "newSession": "Sessjoni ġdida",
     "noModelsAvailable": "L-ebda mudell disponibbli",
     "notFound": "Ma nstabx.",
+    "online": "Onlajn",
     "open": "Iftaħ {{name}}",
     "openPullRequest": "Ftuħ tal-PR",
     "completed": "Lest",
@@ -186,6 +209,7 @@
     "resendCode": "Erġa' ibgħat il-kodiċi",
     "termsPrefix": "Billi tkompli, taċċetta d-dokumenti tagħna: ",
     "terms": "Termini",
+    "termsInSentence": "Termini",
     "termsConnector": " u ",
     "termsSuffix": ".",
     "moreSignInOptions": "Aktar għażliet ta' dħul",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Ikkonferma t-tħassir",
     "credits": "Krediti",
     "failedToLoadBalance": "Ma setax jitgħabba l-bilanċ. Tektek biex terġa' tipprova.",
+    "balanceLoadFailed": "Ma setax jitgħabba l-bilanċ",
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Din it-talba għall-għaqda ma fiha l-ebda bidla fil-fajls.",
     "fileList": {
       "openNavigator": "Iftaħ in-navigatur tal-fajls",
-      "filesViewed": "Fajls · rajt {{viewed}} minn {{total}}",
       "listed": "(imniżżla)",
       "layout": "Tqassim",
       "unified": "Magħqud",
@@ -717,10 +741,10 @@
     },
     "connect": {
       "checkFailedTitle": "Ma setgħetx tiġi ċċekkjata l-konnessjoni ma' GitHub.",
-      "checkFailedMessage": "L-istatus tad-dħul mhux disponibbli sakemm jitgħabba dan il-kontenut.",
+      "checkFailedMessage": "Ma setax jintlaħaq GitHub. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
       "checkFailedTitleGitLab": "Ma setgħetx tiġi ċċekkjata l-konnessjoni ma' GitLab.",
       "checkFailedTitleBitbucket": "Ma setgħetx tiġi ċċekkjata l-konnessjoni ma' Bitbucket.",
-      "providerCheckFailedMessage": "L-istat tal-konnessjoni mhux disponibbli sakemm jitgħabba.",
+      "providerCheckFailedMessage": "Ma setax jintlaħaq il-fornitur. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
       "reconnectTitle": "Erġa' kkonnetta GitHub",
       "reconnectTitleGitLab": "Erġa' kkonnetta GitLab",
       "reconnectTitleBitbucket": "Erġa' kkonnetta Bitbucket",
@@ -1010,6 +1034,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Ħalli l-app taċċessa l-kamera fl-issettjar biex tieħu ritratt."
+    },
+    "botStatus": {
+      "offline": "Offlajn"
     }
   },
   "codeReviewer": {
@@ -1722,6 +1749,7 @@
       "actionFailed": "Ma stajniex nikkompletaw din l-azzjoni. Jekk jogħġbok erġa' pprova.",
       "actionBlocked": "Ma stajniex nikkompletaw din l-azzjoni. Il-problema trid titfixxa qabel ma tista' terġa' tipprova.",
       "syncNoRepositories": "M'hemm l-ebda repożitorju fl-ambitu tas-sinkronizzazzjoni. Agħżel ir-repożitorji li jimmonitorja l-Aġent tas-sigurtà, imbagħad erġa' sinkronizza.",
+      "syncNoRepositoriesNoManage": "M'hemm l-ebda repożitorju fl-ambitu tas-sinkronizzazzjoni. Sid tal-organizzazzjoni, amministratur jew maniġer tal-ħlasijiet irid jgħaqqad ir-repożitorji qabel ma tkun tista' ssir is-sinkronizzazzjoni.",
       "syncIntegrationInactive": "Il-konnessjoni ma' GitHub għall-Aġent tas-sigurtà mhijiex attiva. Erġa' qabbad il-Kilo GitHub App, imbagħad erġa' sinkronizza.",
       "syncMissingPermission": "L-app ta' Kilo fuq GitHub ma tistax taqra l-vulnerability alerts. Agħti dik il-permess f'GitHub, imbagħad erġa' sinkronizza.",
       "configConflict": "L-issettjar tal-aġent tas-sigurtà nbidlu x'imkien ieħor. Erġa' eżamina l-issettjar l-aktar riċenti u ssejvja mill-ġdid."
@@ -1921,6 +1949,7 @@
       "emptyDescription": "Ibgħat messaġġ hawn taħt biex tibda.",
       "scrollToBottom": "Skrollja sal-qiegħ",
       "emptyTitle": "L-ebda messaġġ s'issa",
+      "emptyReadOnlyTitle": "L-ebda messaġġ f'din is-sessjoni",
       "renameAccessibility": "Ibdel l-isem tas-sessjoni: {{title}}",
       "cloningSession": "Qed tiġi kklonjata s-sessjoni",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
@@ -2020,7 +2049,7 @@
       "selectRepositoryToStart": "Agħżel repożitorju biex tibda.",
       "enterPromptToStart": "Żid prompt biex tibda.",
       "enterPromptOrFileToStart": "Żid prompt jew fajl biex tibda.",
-      "connectProviderToStart": "Ikkonnettja fornitur biex tibda.",
+      "connectProviderToStart": "Ir-repożitorji jiġu minn kont imqabbad GitHub, GitLab jew Bitbucket.",
       "promptPlaceholder": "Fuq xiex tixtieq taħdem?",
       "couldNotLoadModels": "Ma setgħux jitgħabbew il-mudelli.",
       "prefillRepoAndModelUnavailable": "Ir-repożitorju u l-mudell tas-sessjoni oriġinali m'għadhomx disponibbli. Agħżel oħrajn hawn taħt.",
@@ -2214,6 +2243,8 @@
       "assistantStopped": "It-tweġiba twaqqfet.",
       "assistantContextOverflow": "Il-konversazzjoni hija twila wisq għall-mudell.",
       "assistantProviderError": "Il-fornitur rritorna żball.",
+      "assistantProviderRefused": "Il-fornitur ċaħad din it-talba u ma tistax terġa' tiġi pruvata.",
+      "assistantCreditsRefusal": "M'għandekx biżżejjed krediti biex tħaddem Cloud Agent.",
       "assistantOutputLimit": "It-tweġiba laħqet il-limitu ta' output tal-mudell.",
       "assistantStructuredOutput": "It-tweġiba ma kinitx konformi mal-format meħtieġ.",
       "assistantFailed": "It-tweġiba falliet."
@@ -2246,6 +2277,7 @@
       "preparingEnvironment": "Qed jitħejja l-ambjent",
       "preparationComplete": "It-tħejjija tlestiet",
       "preparationFailed": "It-tħejjija falliet",
+      "preparationStageFailed": "Falliment ta' {{stage}}",
       "setupCommand": "Kmand tat-tħejjija {{index}}",
       "setupCommandOf": "Kmand tat-tħejjija {{index}} minn {{displayCount}}",
       "stepWorkspaceSetup": "Tħejjija tal-workspace",
@@ -2284,7 +2316,7 @@
       "detailSetupCommandTimedOut": "Il-kmand tat-tħejjija {{index}} skada ż-żmien",
       "detailColdRestore": "Irkupru kiesaħ, snapshot applikat, fajls rkuprati: {{applied}} minn {{total}}",
       "detailProgressPercent": "{{percent}}% komplut",
-      "detailRestoreIncompleteReport": "Irkupru tas-sessjoni mhux komplut, fajls mhumiex rkuprati: {{skipped}} minn {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Fajls mhumiex rkuprati: {{skipped}} minn {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Nieqes: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} u {{omitted}} oħrajn",
       "detailReasonPatchFailed": "il-patch ma applikatx",
@@ -2545,16 +2577,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Id-daqs tat-tieqa tal-kuntest mhux disponibbli",
-      "tapToViewDetails": "Tektek biex tara d-dettalji tal-kuntest.",
-      "costSuffix": ", spiża {{cost}}",
-      "tokensWindowUnavailable": "Kuntest: {{used}} unitajiet tat-test, daqs tat-tieqa mhux disponibbli",
-      "tokensUsage": "Kuntest: {{used}} minn {{window}} unitajiet tat-test, {{percentage}} użat",
+      "tapToViewDetails": " Tektek biex tara d-dettalji tal-kuntest.",
+      "costClause": ", spiża {{cost}}",
+      "loadingCostSpoken": "spiża ta' {{cost}}.",
+      "tokensWindowUnavailable": "Kuntest: {{used}} unitajiet tat-test, daqs tat-tieqa mhux disponibbli{{costClause}}.",
+      "tokensUsage": "Kuntest: {{used}} minn {{window}} unitajiet tat-test, {{percentage}} użat{{costClause}}.",
       "title": "Użu tal-kuntest",
       "used": "Użat",
       "provider": "Fornitur",
       "totalCost": "Spiża totali",
       "usageReflectsLatest": "L-użu jirrifletti l-aħħar tweġiba tal-assistent li tlestiet.",
-      "usageUnavailable": "Użu tal-kontest mhux disponibbli",
+      "usageUnavailable": "Użu tal-kontest mhux disponibbli{{costClause}}.",
       "tokenUsage": "Użu tal-unitajiet tat-test",
       "cacheRate": "Rata tal-memorja temporanja",
       "modelsCount": "Mudelli ({{displayCount}})",
@@ -2644,7 +2677,6 @@
   },
   "addCredits": {
     "cta": "Żid krediti",
-    "description": "Żid krediti biex tkun tista' tkompli tuża s-servizz.",
     "billingPage": "paġna tal-ħlasijiet"
   },
   "deviceSessions": {
@@ -3152,9 +3184,9 @@
       "searching": "Fittxija fuq il-web",
       "thinking": "Qed jaħseb"
     },
-    "planOf": "minn",
+    "planProgress": "{{done}} minn {{total}}",
     "filesChanged": "fajls mibdula",
-    "finishedIn": "Lest fi",
+    "finishedIn": "Spiċċa fi {{duration}}",
     "noActivityFor": "L-ebda attività għal",
     "prOpened": "Pull request miftuħa",
     "permissionWants": "Jixtieq iħaddem",
@@ -3465,7 +3497,7 @@
     "reasoningEffort": {
       "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
     },
-    "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ. Żid krediti u erġa' pprova."
+    "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ."
   },
   "settingsTools": {
     "confirmTitle": "Tikkonferma din il-bidla?"
@@ -3499,8 +3531,8 @@
     "saved": "Is-settings tat-twissijiet tal-infiq ġew salvati",
     "loadError": "It-twissijiet tal-infiq ma setgħux jitgħabbew.",
     "saveError": "It-twissijiet tal-infiq ma setgħux jiġu salvati.",
-    "empty": "It-twissijiet tal-infiq huma mitfija. Xegħelhom biex tavża lill-kuntatti tal-ħlasijiet ta' dan il-kamp.",
-    "noSpend": "Għadu ma ġie rreġistrat l-ebda infiq",
+    "sendAlerts": "Ibgħat it-twissijiet",
+    "noSpend": "Għadu l-ebda infiq",
     "spend24h": "Infiq fl-aħħar 24 siegħa",
     "multiplierError": "Daħħal multiplikatur ta' 1 jew aktar",
     "permissionDenied": "M'għandekx permess biex timmaniġġja t-twissijiet tal-infiq.",
@@ -3936,5 +3968,8 @@
     "noEnabledContexts": "L-ebda kuntest mixgħul għall-briefings skedati",
     "sourceBlocker": "Is-sessjoni teħtieġ attenzjoni",
     "sourceMetadata": "Metadata maqbuda tas-sessjoni"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
   }
 }

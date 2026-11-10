@@ -12,7 +12,6 @@ import {
   type ControlPlaneRouteSpec,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions } from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
@@ -32,6 +31,18 @@ const API_URL = 'https://github.com/acme/api.git';
 const WEB_URL = 'https://github.com/acme/web.git';
 const FOREIGN: WorkspaceStamp = { allocationId: 'alloc-builder', commit: 'built' };
 
+function openHarness(record?: (input: { restoreFiles: boolean; roots?: unknown }) => void): never {
+  return {
+    open: async (input: { restoreFiles: boolean; roots?: unknown }) => {
+      record?.({
+        restoreFiles: input.restoreFiles,
+        ...(input.roots === undefined ? {} : { roots: input.roots }),
+      });
+      return true;
+    },
+  } as never;
+}
+
 function rootSpec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneRouteSpec {
   return {
     sessionId: 'ses_00000000000000000000000000',
@@ -43,6 +54,7 @@ function rootSpec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneR
     branch: 'kilo/generated',
     branchMode: 'working',
     setupCommands: ['npm install'],
+    environmentSetupCommandCount: 1,
     roots: [
       {
         directory: API,
@@ -110,7 +122,9 @@ function rootsHarness(
   const restoreOptions_: Array<Record<string, unknown>> = [];
   const runtime: PrepareRuntimePort = {
     ensure: async () =>
-      ({ serverUrl: 'http://127.0.0.1:1', ensureSession: async () => undefined }) as never,
+      openHarness(input => {
+        restoreOptions_.push(input);
+      }),
     installCredentials: async () => undefined,
     isUnavailable: () => false,
     getLiveClient: () => undefined,
@@ -169,15 +183,6 @@ function rootsHarness(
       setups.push({ command, directory });
       return { stdout: '', stderr: '', exitCode: 0 };
     },
-    restore: (async (
-      _id: string,
-      _directory: string,
-      _file: undefined,
-      restoreOptions: unknown
-    ) => {
-      restoreOptions_.push(restoreOptions as Record<string, unknown>);
-      return { ok: false, code: 404, error: 'not found', step: 'download' };
-    }) as never,
     ...(options.recoverWorktree
       ? {
           recoverWorktree: ((directory: string, recovery: { files: Array<{ path: string }> }) =>
@@ -187,8 +192,6 @@ function rootsHarness(
             )) as never,
         }
       : {}),
-    seedRegistration: async () => undefined,
-    sessionExists: async () => !options.recoverWorktree,
     sleep: async () => undefined,
   });
   const callsAt = (cwd: string, command: string) =>
@@ -228,7 +231,7 @@ const GITLAB_ALIAS = `kcp1.${Buffer.from('sandbox-1').toString('base64url')}.git
 const MANAGED_GITHUB_OPTION = 'http.https://github.com/.proactiveAuth=basic';
 
 describe('preparing a route with several git roots', () => {
-  it('clones every root with its own url and branch, sets up once at the cwd, and stamps each root', async () => {
+  it('clones every root with its own url and branch, skips environment build commands, and stamps each root', async () => {
     const harness = rootsHarness();
     const spec = rootSpec();
 
@@ -252,7 +255,11 @@ describe('preparing a route with several git roots', () => {
       'feature/web',
       'origin/feature/web',
     ]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    expect(harness.setups).toEqual([]);
+    expect(progressDetails(harness.frames, 'clone')).toEqual([
+      'acme/api: Cloning repository',
+      'acme/web: Cloning repository',
+    ]);
     expect([...harness.stamps]).toEqual([
       [API, { allocationId: 'alloc-current', commit: 'commit-api' }],
       [WEB, { allocationId: 'alloc-current', commit: 'commit-web' }],
@@ -282,7 +289,7 @@ describe('preparing a route with several git roots', () => {
     expect(second.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'same' });
   });
 
-  it('prepares again, setup included, when one root has no matching stamp', async () => {
+  it('prepares again when one root has no matching stamp', async () => {
     const harness = rootsHarness({
       repos: [API, WEB],
       stamps: { [API]: { allocationId: 'alloc-current', commit: 'c' } },
@@ -294,7 +301,7 @@ describe('preparing a route with several git roots', () => {
     expect(harness.clones()).toEqual([]);
     expect(harness.callsAt(API, 'checkout')).toEqual([]);
     expect(harness.callsAt(WEB, 'checkout')).not.toEqual([]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    expect(harness.setups).toEqual([]);
     expect(harness.stamps.get(WEB)).toEqual({
       allocationId: 'alloc-current',
       commit: 'commit-web',
@@ -424,7 +431,24 @@ describe('preparing a route with several git roots', () => {
     }
     expect(harness.clones()).toEqual([]);
     expect([...harness.repos]).toEqual([API, WEB]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    expect(harness.setups).toEqual([]);
+    expect(harness.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'adopted' });
+  });
+
+  it('runs inline setup once at the cwd after adopting all environment roots', async () => {
+    const harness = rootsHarness({
+      repos: [API, WEB],
+      stamps: { [API]: FOREIGN, [WEB]: FOREIGN },
+    });
+
+    await harness.manager.prepare(
+      rootSpec({ setupCommands: ['npm install', 'inline extra'], startCommands: ['serve'] })
+    );
+
+    expect(harness.setups).toEqual([
+      { command: 'inline extra', directory: CWD },
+      { command: 'serve', directory: CWD },
+    ]);
     expect(harness.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'adopted' });
   });
 
@@ -567,8 +591,8 @@ describe('preparing a route with several git roots', () => {
 
     expect(failure(harness.frames)).toMatchObject({ step: 'checkout' });
     const lastCheckout = progressDetails(harness.frames, 'checkout').at(-1);
-    expect(lastCheckout).toContain('acme/web');
-    expect(progressDetails(harness.frames, 'checkout')).toContain('acme/api');
+    expect(lastCheckout).toContain('acme/web: Checking out branch');
+    expect(progressDetails(harness.frames, 'checkout')).toContain('acme/api: Checking out branch');
     expect(harness.setups).toEqual([]);
 
     const { roots: _roots, ...legacy } = rootSpec();
@@ -585,7 +609,10 @@ describe('preparing a route with several git roots', () => {
 
     await harness.manager.prepare(rootSpec());
 
-    expect(progressDetails(harness.frames, 'restore')).toEqual(['acme/api', 'acme/web']);
+    expect(progressDetails(harness.frames, 'restore')).toEqual([
+      'acme/api: Updating repository',
+      'acme/web: Updating repository',
+    ]);
   });
 
   it('does not clone a finished root again when a retry follows a failed clone of another', async () => {
@@ -608,7 +635,7 @@ describe('preparing a route with several git roots', () => {
     await retry.manager.prepare(rootSpec());
 
     expect(retry.clones()).toEqual([{ url: WEB_URL, directory: WEB }]);
-    expect(retry.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    expect(retry.setups).toEqual([]);
     expect([...retry.stamps.keys()]).toEqual([API, WEB]);
     expect(retry.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'cloned' });
   });
@@ -626,7 +653,7 @@ describe('preparing a route with one git root', () => {
     await harness.manager.prepare(spec);
 
     expect(harness.clones()).toEqual([{ url: API_URL, directory: '/workspace/app' }]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: '/workspace/app' }]);
+    expect(harness.setups).toEqual([]);
     expect([...harness.stamps.keys()]).toEqual(['/workspace/app']);
   });
 
@@ -648,8 +675,12 @@ describe('preparing a route with one git root', () => {
     await harness.manager.prepare(spec);
 
     expect(harness.clones()).toEqual([{ url: API_URL, directory: API }]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: API }]);
+    expect(harness.setups).toEqual([]);
     expect([...harness.stamps.keys()]).toEqual([API]);
+    // The route names one repository, so its name adds nothing to the phase
+    // progress: the step's own message names the work.
+    expect(progressDetails(harness.frames, 'clone')).toEqual([null]);
+    expect(progressDetails(harness.frames, 'checkout')).toEqual([null]);
   });
 });
 
@@ -691,11 +722,7 @@ describe('preparing real repositories in two roots', () => {
       timers: CONTROL_PLANE_TIMERS,
       emit,
       runtimes: {
-        ensure: async () =>
-          ({
-            serverUrl: 'http://127.0.0.1:1',
-            ensureSession: async () => undefined,
-          }) as unknown as WrapperKiloClient,
+        ensure: async () => openHarness(),
         installCredentials: async () => undefined,
         isUnavailable: () => false,
         getLiveClient: () => undefined,
@@ -705,8 +732,6 @@ describe('preparing real repositories in two roots', () => {
       inheritedEnv: process.env,
       homeRoots: { directory: path.join(base, 'home'), legacy: path.join(base, 'legacy') },
       allocationId: 'alloc-current',
-      seedRegistration: async () => undefined,
-      sessionExists: async () => true,
       sleep: async () => undefined,
     });
   }
@@ -724,6 +749,7 @@ describe('preparing real repositories in two roots', () => {
         directory: cwd,
         git: { url: apiUrl, platform: 'github' },
         setupCommands: [`pwd >> '${marker}'`],
+        environmentSetupCommandCount: 0,
         roots: [
           {
             directory: apiDir,

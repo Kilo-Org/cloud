@@ -17,6 +17,7 @@ const routerState = vi.hoisted(() => ({ back: vi.fn() }));
 vi.mock('expo-router', () => ({ useRouter: () => routerState }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
   View: 'View',
   Pressable: 'Pressable',
   Text: 'Text',

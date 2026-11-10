@@ -59,8 +59,8 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
     );
 
     expect(models.map(entry => entry.provider)).toEqual([
-      { slug: 'acme', name: 'ACME', training: true, retainsPrompts: true },
-      { slug: 'together', name: 'TOGETHER', training: true, retainsPrompts: true },
+      { slug: 'acme', name: 'Acme', training: true, retainsPrompts: true },
+      { slug: 'together', name: 'Together AI', training: true, retainsPrompts: true },
     ]);
     expect(models[0].model).toEqual({
       slug: 'acme/model-free',
@@ -79,6 +79,37 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
         data_policy: { training: true, retainsPrompts: true },
       },
     });
+  });
+
+  test.each([
+    ['future-provider', 'Future Provider'],
+    ['future_provider', 'Future Provider'],
+    ['future--__provider', 'Future Provider'],
+    ['deepinfra', 'DeepInfra'],
+    ['amazon-bedrock', 'Amazon Bedrock'],
+    ['meituan', 'Meituan LongCat'],
+    ['boundless', 'Boundless'],
+    ['particle', 'Particle AI'],
+    ['runinfra', 'RunInfra'],
+    ['runware', 'Runware'],
+  ])('normalizes the synthesized provider name for %s', (slug, name) => {
+    const models = buildPublicCustomLlmSnapshotModels(
+      [
+        {
+          ...publicCustomLlm,
+          definition: {
+            ...publicCustomLlm.definition,
+            public: { inference_providers: [slug], description: 'A free Acme model' },
+          },
+        },
+      ],
+      new Set(),
+      '2026-10-08T00:00:00.000Z'
+    );
+
+    expect(models.map(entry => entry.provider)).toEqual([
+      { slug, name, training: true, retainsPrompts: true },
+    ]);
   });
 
   test('prices a public custom LLM from its first pricing tier and keeps the data policy', () => {
@@ -137,8 +168,8 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
     );
 
     expect(models.map(entry => entry.provider)).toEqual([
-      { slug: 'acme', name: 'ACME', training: false, retainsPrompts: true },
-      { slug: 'together', name: 'TOGETHER', training: false, retainsPrompts: true },
+      { slug: 'acme', name: 'Acme', training: false, retainsPrompts: true },
+      { slug: 'together', name: 'Together AI', training: false, retainsPrompts: true },
     ]);
     expect(models[0].model.endpoint).toMatchObject({
       data_policy: { training: false, retainsPrompts: true },

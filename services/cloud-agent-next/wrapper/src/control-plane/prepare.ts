@@ -1,3 +1,4 @@
+import type { HistoryPageRequest } from './history-requests.js';
 import { runSetupScript } from '../setup-script.js';
 import {
   createRuntimeProfileMaterializer,
@@ -7,19 +8,21 @@ import {
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
+  CONTROL_PLANE_COMMAND_FAILURES_MAX,
   CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH,
   type AttachmentSpec,
+  type ControlPlaneCommandFailure,
   type ControlPlanePreparationStep,
   type ControlPlaneRouteSpec,
   type ControlPlaneSessionCredentialsPayload,
+  type ControlPlaneSetupCommandKind,
   type ControlPlaneWorkspaceOutcome,
   type ControlPlaneWrapperFrame,
   type WorkspaceConfig,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
-import { fetchKiloServer } from '../kilo-server-auth.js';
+import type { Harness } from './harness.js';
 import {
   git,
   runProcess,
@@ -49,7 +52,6 @@ import {
 } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import type { RestoreRoots } from '../restore-roots.js';
-import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
 import { restoreWorktreeRecovery } from './worktree-recovery.js';
 import type { ControlWorkload } from '../control/workload-cgroup.js';
@@ -88,10 +90,7 @@ const STEP_RETRY_ATTEMPTS = 2;
  * effort: it must terminate and never block the route release, so the walk is
  * capped by depth, node count and a shared deadline, with one retry per step.
  */
-const RELEASE_CLEANUP_MAX_DEPTH = 8;
-const RELEASE_CLEANUP_MAX_NODES = 64;
 const RELEASE_CLEANUP_DEADLINE_MS = 10_000;
-const RELEASE_CLEANUP_ATTEMPTS = 2;
 
 export type PrepareRuntimePort = {
   ensure(input: {
@@ -99,7 +98,7 @@ export type PrepareRuntimePort = {
     directory: string;
     env: Record<string, string>;
     workload?: ControlWorkload;
-  }): Promise<WrapperKiloClient>;
+  }): Promise<Harness>;
   installCredentials(
     key: string,
     env: Record<string, string>,
@@ -111,7 +110,7 @@ export type PrepareRuntimePort = {
    * The runtime's client only while it is live; undefined during a restart, when
    * unavailable, or after shutdown. Never throws.
    */
-  getLiveClient(key: string): WrapperKiloClient | undefined;
+  getLiveClient(key: string): Harness | undefined;
   remove(key: string): void;
   release(key: string): void;
 };
@@ -119,11 +118,14 @@ export type PrepareRuntimePort = {
 export type PrepareDeps = {
   timers: ControlPlaneTimers;
   emit: (frame: ControlPlaneWrapperFrame) => void;
+  /** Reads one page of a session's Cloud history over the control connection. */
+  readHistoryPage?: (request: HistoryPageRequest) => Promise<unknown>;
   runtimes: PrepareRuntimePort;
   /** This wrapper's allocation; a workspace stamped by another one came from a snapshot. */
   allocationId: string;
   log?: (message: string) => void;
   onNativeDiagnostic?: ControlDiagnosticReporter;
+  onPreparedRoute?: (spec: ControlPlaneRouteSpec) => void;
   runGit?: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
   runSetup?: (
     command: string,
@@ -135,16 +137,8 @@ export type PrepareDeps = {
   runSkillInstall?: typeof runProcess;
   /** Starts the default setup command, e.g. inside the setup cgroup. */
   spawnSetup?: ProcessSpawn;
-  restore?: typeof restoreSession;
   recoverWorktree?: typeof restoreWorktreeRecovery;
-  seedRegistration?: typeof seedSessionIngestRegistration;
   configureGitAuthor?: typeof configureWorkspaceGitAuthor;
-  sessionExists?: (
-    client: WrapperKiloClient,
-    kiloSessionId: string,
-    directory: string,
-    signal: AbortSignal
-  ) => Promise<boolean>;
   mkdir?: (directory: string) => Promise<void>;
   hasGit?: (directory: string) => Promise<boolean>;
   readStamp?: (directory: string) => Promise<WorkspaceStamp | null>;
@@ -228,24 +222,6 @@ async function defaultHasGit(directory: string): Promise<boolean> {
   }
 }
 
-async function defaultSessionExists(
-  client: WrapperKiloClient,
-  kiloSessionId: string,
-  directory: string,
-  signal: AbortSignal
-): Promise<boolean> {
-  const url = new URL(`/session/${encodeURIComponent(kiloSessionId)}`, client.serverUrl);
-  url.searchParams.set('directory', directory);
-  const response = await fetchKiloServer(client.server, url, { signal });
-  if (response.status === 404) return false;
-  if (!response.ok) throw new Error('Kilo session probe failed');
-  const data: unknown = await response.json();
-  if (typeof data !== 'object' || data === null || !('id' in data) || data.id !== kiloSessionId) {
-    throw new Error('Kilo session probe returned an invalid session');
-  }
-  return true;
-}
-
 /** Keep existing allocations on their original runtime and HOME identities. */
 export function runtimeKey(spec: ControlPlaneRouteSpec): string {
   return workspaceConfigRuntimeKey(spec);
@@ -255,111 +231,10 @@ function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): bo
   return error instanceof Error && error.message === `${step} timed out`;
 }
 
-type ReleaseCleanupResult = {
-  ok: boolean;
-  sessions: number;
-  failures: number;
-  elapsedMs: number;
-};
-
 type InflightCleanup = {
   promise: Promise<void>;
   controller: AbortController;
 };
-
-/**
- * Best-effort abort of a released route's Kilo session tree. Walks children from
- * the root with a visited set and shared depth/node/deadline bounds; each step
- * retries once. It must terminate on a cyclic or unbounded tree, never throw,
- * and never block the route release that called it. `externalSignal` lets a
- * re-prepare stop the walk before it can abort the new session under the same
- * kiloSessionId.
- */
-async function cleanupKiloSessionTree(
-  client: WrapperKiloClient,
-  directory: string,
-  rootSessionId: string,
-  deadlineMs: number,
-  externalSignal: AbortSignal
-): Promise<ReleaseCleanupResult> {
-  const startedAt = Date.now();
-  const controller = new AbortController();
-  const signal = controller.signal;
-  const onExternalAbort = (): void => controller.abort();
-  externalSignal.addEventListener('abort', onExternalAbort, { once: true });
-  if (externalSignal.aborted) controller.abort();
-  const timer = setTimeout(() => controller.abort(), deadlineMs);
-  const abortedError = new Error('release cleanup deadline exceeded');
-  const deadline = new Promise<never>((_, reject) => {
-    signal.addEventListener('abort', () => reject(abortedError), { once: true });
-  });
-  void deadline.catch(() => undefined);
-  const visited = new Set<string>();
-  const queue: Array<{ id: string; depth: number }> = [{ id: rootSessionId, depth: 0 }];
-  let sessions = 0;
-  let failures = 0;
-
-  const attempt = async (operation: () => Promise<void>): Promise<boolean> => {
-    for (let attemptNumber = 1; attemptNumber <= RELEASE_CLEANUP_ATTEMPTS; attemptNumber += 1) {
-      if (signal.aborted) return false;
-      try {
-        await Promise.race([operation(), deadline]);
-        return true;
-      } catch {
-        if (attemptNumber === RELEASE_CLEANUP_ATTEMPTS) return false;
-      }
-    }
-    return false;
-  };
-
-  try {
-    while (queue.length > 0 && sessions < RELEASE_CLEANUP_MAX_NODES && !signal.aborted) {
-      const next = queue.shift();
-      if (next === undefined) break;
-      if (visited.has(next.id)) continue;
-      visited.add(next.id);
-      sessions += 1;
-      if (
-        !(await attempt(async () => {
-          await client.abortSessionForCleanup({ sessionId: next.id, directory, signal });
-        }))
-      ) {
-        failures += 1;
-      }
-      if (
-        !(await attempt(async () => {
-          await client.stopSessionProcesses({ sessionId: next.id, directory, signal });
-        }))
-      ) {
-        failures += 1;
-      }
-      if (next.depth >= RELEASE_CLEANUP_MAX_DEPTH) continue;
-      let children: Array<{ id: string; directory: string }> = [];
-      if (
-        !(await attempt(async () => {
-          children = await client.children({ sessionId: next.id, directory, signal });
-        }))
-      ) {
-        failures += 1;
-        continue;
-      }
-      for (const child of children) {
-        if (child.directory !== directory) continue;
-        if (!visited.has(child.id)) queue.push({ id: child.id, depth: next.depth + 1 });
-      }
-    }
-
-    return {
-      ok: failures === 0 && !signal.aborted,
-      sessions,
-      failures,
-      elapsedMs: Date.now() - startedAt,
-    };
-  } finally {
-    clearTimeout(timer);
-    externalSignal.removeEventListener('abort', onExternalAbort);
-  }
-}
 
 export function createPreparationManager(deps: PrepareDeps): PreparationManager {
   const timers = deps.timers.wrapper;
@@ -413,10 +288,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         hardTimeoutMs: SETUP_COMMAND_HARD_TIMEOUT_MS,
         ...(onOutput ? { onOutput } : {}),
       }));
-  const restore = deps.restore ?? restoreSession;
-  const seedRegistration = deps.seedRegistration ?? seedSessionIngestRegistration;
   const configureGitAuthor = deps.configureGitAuthor ?? configureWorkspaceGitAuthor;
-  const sessionExists = deps.sessionExists ?? defaultSessionExists;
   const sleep = deps.sleep ?? defaultSleep;
   const homeRoots = deps.homeRoots ?? defaultHomeRoots();
   const prepared = new Map<string, PreparedRoute>();
@@ -569,7 +441,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       env,
       redact,
       signal,
-      onProgress: detail => emitProgress(spec.sessionId, 'clone', rootProgressDetail(root, detail)),
+      onProgress: detail =>
+        emitProgress(
+          spec.sessionId,
+          'clone',
+          rootProgressDetail(root, detail, 'Cloning repository')
+        ),
     });
     if (!spec.git) return;
     onCheckout();
@@ -588,7 +465,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     startRef?: string
   ): Promise<void> {
     const { spec, directory } = root;
-    emitProgress(spec.sessionId, 'checkout', rootProgressDetail(root, undefined));
+    emitProgress(
+      spec.sessionId,
+      'checkout',
+      rootProgressDetail(root, undefined, 'Checking out branch')
+    );
     const gitRoute: GitRouteClass = spec.git?.token ? 'managed' : 'direct';
     const runBranchGit = (args: string[], options?: ProcessOptions): Promise<ExecResult> =>
       runGit([...managedGitHubPreparationGitArgs(spec, args[0]), ...args], {
@@ -680,7 +561,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           emitProgress(
             spec.sessionId,
             'checkout',
-            rootProgressDetail(root, `Checking out branch... ${progressText}`)
+            rootProgressDetail(
+              root,
+              `Checking out branch... ${progressText}`,
+              'Checking out branch'
+            )
           )
         ),
       });
@@ -720,7 +605,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     }
     await restoreBudget.spend(remainingMs =>
       withinStep('restore', remainingMs, async signal => {
-        emitProgress(spec.sessionId, 'restore', rootProgressDetail(root, undefined));
+        emitProgress(
+          spec.sessionId,
+          'restore',
+          rootProgressDetail(root, undefined, 'Updating repository')
+        );
         const startRef = await refreshAdoptedRepository({
           remoteUrl: credentialFreeGitUrl(git.url),
           route: git.token ? 'managed' : 'direct',
@@ -762,10 +651,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
    * root has a stamp from this allocation needs nothing, a root with one from
    * another allocation is a restored environment snapshot to adopt, and anything
    * else is cloned. An adopt failure fails the preparation; it never clears the
-   * root to clone over the snapshot. Setup runs once, at the route directory,
-   * after every root is in place. It always runs after a clone or an adopt, with
-   * this session's admitted configuration. Each root is stamped, never the route
-   * directory. A session never captures.
+   * root to clone over the snapshot. Environment build commands run only in an
+   * environment build, so every start skips them. Session setup and start
+   * commands run once, at the route directory, after every root is in place;
+   * their failures are reported non-fatally. A workspace tail snapshot restore
+   * runs no commands at all. Repository stamps stay per root. Registered
+   * workspace identity is stamped after runtime preparation succeeds.
    */
   async function prepareWorkspace(
     spec: ControlPlaneRouteSpec,
@@ -779,21 +670,31 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   ): Promise<{
     outcome: ControlPlaneWorkspaceOutcome;
     deferredStamps: Array<{ directory: string; commit: string; workspacePrepared?: false }> | null;
+    /** Non-fatal session setup/start failures, reported on `session.ready`. */
+    commandFailures: ControlPlaneCommandFailure[];
   }> {
     const workspaceStartedAt = Date.now();
     let sessionInspection: WorkspaceInspection | undefined;
     let sessionStamp: WorkspaceStamp | null = null;
-    if (spec.sessionSnapshot !== undefined) {
+    if (spec.workspaceSnapshot !== undefined) {
       setStep('restore');
       const inspected = await inspectWorkspace(spec.directory);
       sessionInspection = inspected.inspection;
       sessionStamp = inspected.stamp;
-      const sourceAllocationId = spec.sessionSnapshot.sourceAllocationId;
+      const sourceAllocationId = spec.workspaceSnapshot.sourceAllocationId;
       if (
         sessionStamp === null ||
+        sessionStamp.workspaceId !== spec.workspaceSnapshot.workspaceId ||
+        sessionStamp.directory !== spec.directory ||
+        spec.workspaceSnapshot.directory !== spec.directory ||
+        spec.kilo?.scopeId !== spec.workspaceSnapshot.workspaceId ||
         (sessionStamp.allocationId !== sourceAllocationId &&
           sessionStamp.allocationId !== deps.allocationId) ||
-        (spec.git !== undefined && !(await hasGit(spec.directory))) ||
+        (
+          await Promise.all(
+            roots.filter(root => root.spec.git !== undefined).map(root => hasGit(root.directory))
+          )
+        ).some(present => !present) ||
         !(await fs.stat(spec.directory).then(
           stat => stat.isDirectory(),
           () => false
@@ -801,7 +702,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       ) {
         throw new WrapperBootstrapError({
           code: 'WORKSPACE_SETUP_FAILED',
-          message: 'Session snapshot workspace provenance does not match the prepared session',
+          message: 'Workspace snapshot provenance does not match the prepared workspace',
           retryable: false,
         });
       }
@@ -831,28 +732,30 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         });
       }
     }
-    // A session disk snapshot is restored as a whole: it keeps the refs, index
-    // and dirty files it was captured with and never re-clones or adopts a root.
-    // It is eligible only for the isolated workspace, whose one root is the route
-    // directory itself, so its stamp is read and written there.
-    if (spec.sessionSnapshot !== undefined) {
+    // A workspace tail restores every root without checkout or environment adoption.
+    // The workspace stamp binds the route directory; repository stamps remain per root.
+    if (spec.workspaceSnapshot !== undefined) {
       log(
         `control-plane workspace inspect session=${spec.sessionId} inspection=${sessionInspection} elapsedMs=${Date.now() - workspaceStartedAt}`
       );
       if (sessionInspection === 'same' || sessionStamp?.allocationId === deps.allocationId)
-        return { outcome: 'same', deferredStamps: null };
-      emitProgress(spec.sessionId, 'restore', 'Restoring session disk snapshot');
-      if (spec.git) {
-        await withinStep('restore', timers.restoreMs, signal =>
-          configureGitAuthor(
-            spec.directory,
+        return { outcome: 'same', deferredStamps: null, commandFailures: [] };
+      emitProgress(spec.sessionId, 'restore', 'Using workspace snapshot');
+      await withinStep('restore', timers.restoreMs, async signal => {
+        for (const root of roots) {
+          if (!root.spec.git) continue;
+          await configureGitAuthor(
+            root.directory,
             (args, options) =>
-              runGit(args, { ...options, cwd: spec.directory, env, inheritEnv: false }),
-            spec.git?.author,
+              runGit(args, { ...options, cwd: root.directory, env, inheritEnv: false }),
+            root.spec.git.author,
             signal
-          )
-        );
-      }
+          );
+        }
+      });
+      // A workspace snapshot restores files and no processes. Nothing setup or
+      // start produced is running, and the agent can start what it needs, so no
+      // command runs on this path.
       return {
         outcome: 'adopted',
         deferredStamps: [
@@ -862,6 +765,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             ...(sessionStamp?.workspacePrepared === false ? { workspacePrepared: false } : {}),
           },
         ],
+        commandFailures: [],
       };
     }
     const inspectStartedAt = Date.now();
@@ -889,10 +793,40 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(
       `control-plane workspace inspect session=${spec.sessionId} inspection=${reconciled.inspections.join(',')} elapsedMs=${Date.now() - inspectStartedAt}`
     );
-    if (reconciled.kind === 'same') return { outcome: 'same', deferredStamps: null };
+    if (reconciled.kind === 'same')
+      return { outcome: 'same', deferredStamps: null, commandFailures: [] };
     const { adopted, cloning } = reconciled;
     setStep('setup');
-    await runSetupCommands(spec, spec.directory, env, redact, new AbortController().signal);
+    const fromEnvironmentSnapshot = reconciled.inspections.every(
+      inspection => inspection === 'foreign'
+    );
+    // The leading commands belong to the environment's build and run only there.
+    // This applies to a fresh start too, not only an adopted snapshot.
+    const skippedSetupCommands = spec.environmentSetupCommandCount ?? 0;
+    const setupCommands = (spec.setupCommands ?? []).slice(skippedSetupCommands);
+    const startCommands = spec.startCommands ?? [];
+    log(
+      `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} environmentBuildCommands=${skippedSetupCommands} sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
+    );
+    if (skippedSetupCommands > 0) {
+      emitProgress(
+        spec.sessionId,
+        'setup',
+        fromEnvironmentSnapshot
+          ? 'Setup already ran in the environment snapshot'
+          : 'Environment build commands run in the environment build'
+      );
+    }
+    const commandFailures: ControlPlaneCommandFailure[] = [];
+    await runPreparationCommands(
+      spec,
+      setupCommands,
+      'session_setup',
+      env,
+      redact,
+      commandFailures
+    );
+    await runPreparationCommands(spec, startCommands, 'start', env, redact, commandFailures);
     // The callback reports whether the recovery steps actually applied. A clone
     // with no `.git` yet, or a surviving workspace, never runs it.
     const recoveryApplied =
@@ -908,7 +842,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       log(
         `control-plane workspace stamp deferred session=${spec.sessionId} elapsedMs=${Date.now() - workspaceStartedAt}`
       );
-      return { outcome: adopted ? 'adopted' : 'cloned', deferredStamps: stamps };
+      return {
+        outcome: adopted ? 'adopted' : 'cloned',
+        deferredStamps: stamps,
+        commandFailures: commandFailures.slice(0, CONTROL_PLANE_COMMAND_FAILURES_MAX),
+      };
     }
     for (const stamp of stamps) {
       await writeStamp(stamp.directory, { allocationId: deps.allocationId, commit: stamp.commit });
@@ -916,69 +854,75 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(
       `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
     );
-    return { outcome: adopted ? 'adopted' : 'cloned', deferredStamps: null };
+    return {
+      outcome: adopted ? 'adopted' : 'cloned',
+      deferredStamps: null,
+      commandFailures: commandFailures.slice(0, CONTROL_PLANE_COMMAND_FAILURES_MAX),
+    };
   }
 
-  async function runSetupCommands(
+  /**
+   * Run one command list at the route directory. Session setup and start
+   * commands are non-fatal: failures are collected for `session.ready` and the
+   * next command still runs.
+   */
+  async function runPreparationCommands(
     spec: ControlPlaneRouteSpec,
-    directory: string,
+    commands: readonly string[],
+    kind: ControlPlaneSetupCommandKind,
     env: Record<string, string>,
     redact: (text: string) => string,
-    signal: AbortSignal
+    failures: ControlPlaneCommandFailure[]
   ): Promise<void> {
-    const commands = spec.setupCommands ?? [];
     if (commands.length === 0) return;
-    emitProgress(spec.sessionId, 'setup');
+    // The setup events create the kind-specific preparation phase; a generic
+    // `setup` progress line would leave an empty phase before them.
     // The Session renders the setup events as per-command preparation steps.
-    await repository.runSetupCommands({
-      commands,
-      directory,
+    const reported = await repository.runSetupCommands({
+      commands: [...commands],
+      kind,
+      directory: spec.directory,
       env,
       redact,
-      signal,
+      signal: new AbortController().signal,
+      continueOnFailure: true,
       onEvent: event =>
         deps.emit({ type: 'session.events', sessionId: spec.sessionId, events: [event] }),
-      logContext: `sessionId=${spec.sessionId} kiloSessionId=${spec.kiloSessionId} attemptId=${spec.attemptId}`,
+      logContext: `sessionId=${spec.sessionId} kiloSessionId=${spec.kiloSessionId} attemptId=${spec.attemptId} kind=${kind}`,
     });
+    failures.push(...reported);
   }
 
   async function resolveKiloSession(
     spec: ControlPlaneRouteSpec,
     directory: string,
     env: Record<string, string>,
-    client: WrapperKiloClient,
+    client: Harness,
     signal: AbortSignal,
     restoreFiles: boolean,
     restoreRoots: RestoreRoots | undefined
   ): Promise<void> {
-    await seedRegistration(spec.kiloSessionId, env, signal);
-    if (await sessionExists(client, spec.kiloSessionId, directory, signal)) return;
-    emitProgress(spec.sessionId, 'kilo_session', 'Loading session history');
-    const restored = await restore(spec.kiloSessionId, directory, undefined, {
+    const readHistoryPage = deps.readHistoryPage;
+    await client.open({
+      sessionId: spec.kiloSessionId,
+      ...(readHistoryPage
+        ? {
+            readHistoryPage: (cursor: string | undefined) =>
+              readHistoryPage({
+                sessionId: spec.sessionId,
+                kiloSessionId: spec.kiloSessionId,
+                cursor,
+                signal,
+              }),
+          }
+        : {}),
+      directory,
       env,
       signal,
       restoreFiles,
       ...(restoreRoots === undefined ? {} : { roots: restoreRoots }),
+      onRestore: () => emitProgress(spec.sessionId, 'kilo_session', 'Loading session history'),
     });
-    if (restored.ok) {
-      if (restored.diffs.skipped > 0) {
-        await reportRestoreIncomplete({
-          diffs: restored.diffs,
-          identity: `kiloSessionId=${spec.kiloSessionId}`,
-          log,
-        }).catch(() => undefined);
-      }
-      return;
-    }
-    if (restored.code !== 404 && !restored.emptySnapshot) {
-      throw new WrapperBootstrapError({
-        code: 'WORKSPACE_SETUP_FAILED',
-        subtype: restored.subtype ?? 'kilo_import_failed',
-        message: restored.error,
-        retryable: true,
-      });
-    }
-    await client.ensureSession(spec.kiloSessionId, directory, signal);
   }
 
   async function withRuntimeStartRetry<T>(
@@ -1066,13 +1010,13 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       controller: new AbortController(),
       promise: Promise.resolve(),
     };
-    entry.promise = cleanupKiloSessionTree(
-      client,
-      input.spec.directory,
-      input.spec.kiloSessionId,
-      releaseCleanupDeadlineMs,
-      entry.controller.signal
-    )
+    entry.promise = client
+      .release({
+        directory: input.spec.directory,
+        sessionId: input.spec.kiloSessionId,
+        deadlineMs: releaseCleanupDeadlineMs,
+        signal: entry.controller.signal,
+      })
       .then(result => {
         if (!result.ok) {
           log(
@@ -1191,13 +1135,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         spec.secretEnvKeys ?? []
       );
       const needsWorkspace =
-        spec.sessionSnapshot !== undefined ||
+        spec.workspaceSnapshot !== undefined ||
         Boolean(spec.git) ||
-        (spec.setupCommands?.length ?? 0) > 0;
+        (spec.setupCommands?.length ?? 0) > 0 ||
+        (spec.startCommands?.length ?? 0) > 0;
       // M3: clone/checkout/setup mutate a shared worktree. Serialize per
       // directory and inspect the stamp inside the lock, so a waiting session
       // sees the finished workspace and skips the work.
       let workspace: ControlPlaneWorkspaceOutcome | undefined;
+      let workspaceCommandFailures: ControlPlaneCommandFailure[] = [];
       let replacementWorkspace = false;
       let localRecoveryApplied = false;
       let deferredRuntimeStarted = false;
@@ -1216,7 +1162,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // of truth. `spec.continuation` is the server-only marker for that case;
       // transcript import still runs for the message history.
       const restoreFilesFor = (): boolean =>
-        spec.sessionSnapshot === undefined &&
+        spec.workspaceSnapshot === undefined &&
         spec.continuation !== true &&
         !(replacementWorkspace && localRecoveryApplied) &&
         !(recovery !== undefined && workspace === 'same');
@@ -1331,6 +1277,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           }
         );
         workspace = preparedWorkspace.outcome;
+        workspaceCommandFailures = preparedWorkspace.commandFailures;
         if (spec.git) {
           for (const root of roots) {
             const origin = await normalizeOriginCredential({
@@ -1371,11 +1318,27 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           if (await readStamp(directory)) return;
           await writeStamp(directory, {
             allocationId: deps.allocationId,
+            ...(spec.kilo?.scopeId.startsWith('worktree_')
+              ? { workspaceId: spec.kilo.scopeId, directory }
+              : {}),
             commit: '',
             workspacePrepared: false,
           });
         });
       }
+      if (spec.kilo?.scopeId.startsWith('worktree_')) {
+        await withWorkspaceLock(directory, async () => {
+          const stamp = await readStamp(directory);
+          await writeStamp(directory, {
+            allocationId: deps.allocationId,
+            commit: await headCommit(directory, builtEnv),
+            workspaceId: spec.kilo?.scopeId,
+            directory,
+            ...(stamp?.workspacePrepared === false ? { workspacePrepared: false } : {}),
+          });
+        });
+      }
+      if (owner.released) return;
       prepared.set(sessionId, {
         key,
         spec,
@@ -1414,8 +1377,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         }
       }
       if (owner.released) return;
+      deps.onPreparedRoute?.(spec);
       emitSessionReadyNative(sessionId);
-      deps.emit({ type: 'session.ready', sessionId, ...(workspace ? { workspace } : {}) });
+      deps.emit({
+        type: 'session.ready',
+        sessionId,
+        ...(workspace ? { workspace } : {}),
+        ...(workspaceCommandFailures.length > 0
+          ? { commandFailures: workspaceCommandFailures }
+          : {}),
+      });
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
     } catch (error) {
       if (owner.released) return;
@@ -1556,6 +1527,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               }
             }
             if (!owner.released) {
+              deps.onPreparedRoute?.(route.spec);
               emitSessionReadyNative(spec.sessionId);
               deps.emit({ type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' });
             }

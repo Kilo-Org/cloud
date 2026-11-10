@@ -431,6 +431,194 @@ describe('ConversationMessages', () => {
     expect(html).toContain('data-message-id="assistant-first"');
   });
 
+  it('groups tools and reasoning between visible messages when collapse tools is enabled', () => {
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          textPart('intro', 'I will check the implementation.'),
+          reasoningPart('reasoning-1'),
+          toolPart('bash-1'),
+          textPart('empty', '  '),
+          toolPart('hidden', 'todoread'),
+        ]),
+        assistantMessage('assistant-2', [
+          toolPart('bash-2'),
+          textPart('progress', 'The checks passed.'),
+          toolPart('bash-3'),
+          textPart('answer', 'The implementation is ready.'),
+        ]),
+      ],
+      { collapseTools: true }
+    );
+
+    expect(buttons(html)).toEqual([
+      expect.stringContaining('2 tool calls · reasoning'),
+      expect.stringContaining('1 tool call'),
+    ]);
+    for (const button of buttons(html)) {
+      expect(button).toContain('aria-expanded="false"');
+      expect(button).toContain('aria-controls=');
+    }
+    expect(html).not.toContain('pnpm test');
+    expect(html).not.toContain('Reasoning details');
+    expect(html.indexOf('I will check')).toBeLessThan(html.indexOf('2 tool calls'));
+    expect(html.indexOf('2 tool calls')).toBeLessThan(html.indexOf('The checks passed.'));
+    expect(html.indexOf('The checks passed.')).toBeLessThan(html.indexOf('1 tool call'));
+    expect(html.indexOf('1 tool call')).toBeLessThan(html.indexOf('The implementation is ready.'));
+    expect(html).toContain('data-message-id="assistant-2"');
+  });
+
+  it.each([false, true])('shows running group status only while streaming=%s', isStreaming => {
+    const html = renderConversation(
+      [
+        assistantMessage(
+          'assistant-1',
+          [
+            toolPart('completed'),
+            toolPart('running', 'bash', {
+              status: 'running',
+              input: { command: 'pnpm lint' },
+              time: { start: 3 },
+            }),
+          ],
+          { time: { created: 1 } }
+        ),
+      ],
+      { collapseTools: true, isStreaming }
+    );
+
+    expect(buttons(html)).toEqual([
+      expect.stringContaining(
+        isStreaming ? 'Working · 2 tool calls' : 'Worked for 1s · 2 tool calls'
+      ),
+    ]);
+    if (isStreaming) expect(html).toContain('animate-spin');
+    else expect(html).not.toContain('animate-spin');
+    if (isStreaming) expect(buttons(html)[0]).toContain('bash: pnpm lint');
+    else expect(html).not.toContain('pnpm lint');
+    expect(html).not.toContain('Output for');
+  });
+
+  it.each([
+    {
+      tool: 'read',
+      input: { filePath: '/workspace/app/src/index.ts' },
+      activity: 'read: src/index.ts',
+    },
+    { tool: 'grep', input: { pattern: 'render.*Tool' }, activity: 'grep: render.*Tool' },
+    { tool: 'glob', input: { pattern: '**/*.tsx' }, activity: 'glob: **/*.tsx' },
+    { tool: 'websearch', input: { query: 'tool grouping' }, activity: 'websearch: tool grouping' },
+    {
+      tool: 'bash',
+      input: { command: 'pnpm test\n  --runInBand' },
+      activity: 'bash: pnpm test --runInBand',
+    },
+    {
+      tool: 'mcp',
+      input: { server_name: 'github', tool_name: 'search', arguments: { query: 'tool grouping' } },
+      activity: 'github/search: tool grouping',
+    },
+    { tool: 'custom_tool', input: {}, activity: 'custom_tool' },
+    {
+      tool: 'custom_tool',
+      input: { command: {}, pattern: '  ', description: 'Preparing tools' },
+      activity: 'custom_tool: Preparing tools',
+    },
+  ])('previews pending $tool activity without expanding the group', ({ tool, input, activity }) => {
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('pending', tool, { status: 'pending', input, raw: '' }),
+        ]),
+      ],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)).toEqual([expect.stringContaining(activity)]);
+    expect(buttons(html)[0]).toContain('aria-expanded="false"');
+    expect(html).toContain(`title="${activity}"`);
+    expect(html).toContain('truncate');
+    expect(html).toContain('Working · 1 tool call');
+  });
+
+  it('shows only the latest active tool even when a later parallel tool has completed', () => {
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('earlier', 'read', {
+            status: 'running',
+            input: { filePath: '/workspace/app/src/earlier.ts' },
+            time: { start: 1 },
+          }),
+          toolPart('running', 'read', {
+            status: 'running',
+            input: { filePath: '/workspace/app/src/current.ts' },
+            time: { start: 3 },
+          }),
+          toolPart('completed'),
+        ]),
+      ],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)[0]).toContain('read: src/current.ts');
+    expect(html).not.toContain('src/earlier.ts');
+    expect(html).not.toContain('pnpm test');
+  });
+
+  it('bounds activity previews for long commands, including their accessible text', () => {
+    const command = 'x'.repeat(500);
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('pending', 'bash', { status: 'pending', input: { command }, raw: '' }),
+        ]),
+      ],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)[0]).toContain(`bash: ${'x'.repeat(197)}...`);
+    expect(html).not.toContain('x'.repeat(198));
+  });
+
+  it('shows thinking without exposing reasoning text in a collapsed group', () => {
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [reasoningPart('active', { time: { start: 1 } })])],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)[0]).toContain('Thinking');
+    expect(html).not.toContain('Reasoning details');
+  });
+
+  it('keeps failed tools, assistant errors, and snapshot progress visible with tools collapsed', () => {
+    const html = renderConversation(
+      [
+        assistantMessage(
+          'assistant-1',
+          [
+            { ...textPart('snapshot', 'Initializing snapshot'), synthetic: true },
+            toolPart('completed'),
+            toolPart('failed', 'bash', {
+              status: 'error',
+              input: { command: 'pnpm test' },
+              error: 'Verification failed',
+              time: { start: 3, end: 4 },
+            }),
+          ],
+          { error: { name: 'UnknownError', data: { message: 'Model unavailable' } } }
+        ),
+      ],
+      { collapseTools: true }
+    );
+
+    expect(html).toContain('Initializing snapshot');
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Verification failed');
+    expect(html).toContain('Model unavailable');
+    expect(buttons(html)).toEqual([expect.stringContaining('1 tool call')]);
+  });
+
   it('dispatches the new tool cards as independent rows without a group disclosure', () => {
     const parts = [
       { tool: 'background_process', input: { action: 'start', command: 'pnpm dev' } },
@@ -732,7 +920,7 @@ describe('ConversationMessages', () => {
     }
   );
 
-  it('keeps live questions, suggestion actions, and child-session controls visible', () => {
+  it.each([false, true])('keeps live actions visible with collapse tools=%s', collapseTools => {
     const atoms: Pick<
       SessionManager['atoms'],
       'activeQuestion' | 'isStreaming' | 'activeSuggestion'
@@ -810,6 +998,7 @@ describe('ConversationMessages', () => {
         ]),
       ],
       {
+        collapseTools,
         isStreaming: true,
         onOpenChildSession: jest.fn(),
         getChildMessages: sessionId => (sessionId === childSessionId ? childMessages : []),
@@ -838,11 +1027,12 @@ describe('ConversationMessages', () => {
     expect(html).not.toContain('Reasoning details for child-reasoning');
     expect(html).toContain('href="https://example.com/report.txt"');
     expect(html).toContain('report.txt');
-    expect(html).toContain('Review the results');
-    expect(disclosures).toEqual([
-      expect.stringContaining('Thought'),
-      expect.stringContaining('Shell'),
-    ]);
+    if (!collapseTools) expect(html).toContain('Review the results');
+    expect(disclosures).toEqual(
+      collapseTools
+        ? [expect.stringContaining('1 tool call · reasoning'), expect.stringContaining('1 subtask')]
+        : [expect.stringContaining('Thought'), expect.stringContaining('Shell')]
+    );
     for (const disclosure of disclosures) {
       expect(disclosure).toContain('aria-expanded="false"');
     }
@@ -1381,6 +1571,236 @@ describe('ConversationMessages memoization', () => {
   function parsesOf(text: string): number {
     return markdownRenders().filter(rendered => rendered === text).length;
   }
+
+  it('updates collapsed activity as tools and reasoning finish without reopening the group', () => {
+    const props = baseProps({ collapseTools: true, isStreaming: true });
+    function renderParts(parts: Part[], isStreaming = true) {
+      renderConversationMessages({
+        ...props,
+        isStreaming,
+        dynamicMessages: [assistantMessage('assistant-1', parts, { time: { created: 1 } })],
+      });
+    }
+    renderParts([
+      toolPart('read', 'read', {
+        status: 'running',
+        input: { filePath: '/workspace/app/src/index.ts' },
+        time: { start: 1 },
+      }),
+    ]);
+    const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+    expect(group?.textContent).toContain('read: src/index.ts');
+
+    const completed = toolPart('read', 'read', {
+      status: 'completed',
+      input: { filePath: '/workspace/app/src/index.ts' },
+      output: 'Hidden file contents',
+      title: 'Read file',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    });
+    renderParts([
+      completed,
+      toolPart('grep', 'grep', {
+        status: 'running',
+        input: { pattern: 'getToolActivity' },
+        time: { start: 3 },
+      }),
+    ]);
+    expect(group?.textContent).toContain('grep: getToolActivity');
+    expect(group?.textContent).not.toContain('read:');
+    expect(container.textContent).not.toContain('Hidden file contents');
+
+    renderParts([completed, reasoningPart('thinking', { time: { start: 4 } })]);
+    expect(group?.textContent).toContain('Thinking');
+    expect(group?.textContent).not.toContain('grep:');
+
+    renderParts([completed, reasoningPart('thinking')], false);
+    expect(container.contains(group)).toBe(true);
+    expect(group?.getAttribute('aria-expanded')).toBe('false');
+    expect(group?.textContent).toContain('Worked for');
+    expect(group?.textContent).not.toContain('Thinking');
+    expect(group?.querySelector('[title]')).toBeNull();
+  });
+
+  it('expands grouped parts at their projected indices and preserves expansion while streaming', () => {
+    const props = baseProps({
+      collapseTools: true,
+      isStreaming: true,
+      staticMessages: [
+        assistantMessage(
+          'assistant-1',
+          [
+            toolPart('hidden', 'todoread'),
+            textPart('empty', ''),
+            reasoningPart('reasoning-1'),
+            toolPart('bash-1', 'bash', {
+              status: 'running',
+              input: { command: 'pnpm test -- bash-1' },
+              time: { start: 1 },
+            }),
+          ],
+          { time: { created: 1 } }
+        ),
+      ],
+    });
+    renderConversationMessages(props);
+    expect(container.textContent).toContain('Working');
+    expect(container.textContent).toContain('1 tool call');
+    expect(container.textContent).toContain('bash: pnpm test -- bash-1');
+    expect(container.querySelector('[data-tool-card]')).toBeNull();
+    const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+    expect(group).not.toBeNull();
+    act(() => group?.click());
+    expect(container.textContent).toContain('Thought');
+    expect(container.textContent).toContain('pnpm test -- bash-1');
+    expect(container.textContent).not.toContain('Output for');
+
+    renderConversationMessages({
+      ...props,
+      dynamicMessages: [
+        assistantMessage(
+          'assistant-2',
+          [
+            toolPart('bash-2', 'bash', {
+              status: 'running',
+              input: { command: 'pnpm test -- bash-2' },
+              time: { start: 3 },
+            }),
+          ],
+          { time: { created: 3 } }
+        ),
+      ],
+    });
+    expect(container.textContent).toContain('Working');
+    expect(container.textContent).toContain('2 tool calls');
+    expect(container.textContent).toContain('pnpm test -- bash-2');
+    expect(group?.textContent).toContain('bash: pnpm test -- bash-2');
+    expect(group?.getAttribute('aria-expanded')).toBe('true');
+
+    renderConversationMessages({ ...props, isStreaming: false });
+    expect(group?.textContent).not.toContain('bash:');
+    expect(group?.textContent).not.toContain('Working');
+    expect(group?.getAttribute('aria-expanded')).toBe('true');
+
+    renderConversationMessages({ ...props, collapseTools: false });
+    expect(container.textContent).not.toContain('1 tool call');
+    expect(container.textContent).toContain('pnpm test -- bash-1');
+  });
+
+  it.each(['reasoning', 'todowrite'] as const)(
+    'preserves group and tool expansion when leading %s becomes visible while streaming',
+    type => {
+      const hidden =
+        type === 'reasoning'
+          ? reasoningPart('leading', { text: '', time: { start: 1 } })
+          : toolPart('leading', 'todowrite', {
+              status: 'running',
+              input: { todos: [] },
+              time: { start: 1 },
+            });
+      const visible =
+        type === 'reasoning'
+          ? reasoningPart('leading', { time: { start: 1 } })
+          : toolPart('leading', 'todowrite', {
+              status: 'completed',
+              input: { todos: [] },
+              output: '',
+              title: 'Todos',
+              metadata: {},
+              time: { start: 1, end: 2 },
+            });
+      const parts = [textPart('intro', 'Inspecting the code'), hidden, toolPart('bash-1')];
+      const props = baseProps({
+        collapseTools: true,
+        isStreaming: true,
+        dynamicMessages: [assistantMessage('assistant-1', parts, { time: { created: 1 } })],
+      });
+      renderConversationMessages(props);
+      const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+      expect(group).not.toBeNull();
+      act(() => group?.click());
+      const tool = container.querySelector<HTMLButtonElement>('[data-tool-card] button');
+      expect(tool).not.toBeNull();
+      act(() => tool?.click());
+      expect(container.textContent).toContain('Output for bash-1');
+
+      renderConversationMessages({
+        ...props,
+        dynamicMessages: [
+          assistantMessage('assistant-1', [parts[0], visible, parts[2]], {
+            time: { created: 1 },
+          }),
+        ],
+      });
+      expect(container.contains(group)).toBe(true);
+      expect(group?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.contains(tool)).toBe(true);
+      expect(tool?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.textContent).toContain('Output for bash-1');
+      expect(container.textContent).toContain(type === 'reasoning' ? 'Thinking' : 'Todos');
+      expect(container.textContent).toContain(type === 'reasoning' ? 'Working' : '2 tool calls');
+    }
+  );
+
+  it('preserves group and nested tool expansion when a leading tool errors while streaming', () => {
+    const intro = textPart('intro', 'Inspecting the code');
+    const running = toolPart('bash-1', 'bash', {
+      status: 'running',
+      input: { command: 'pnpm test' },
+      time: { start: 1 },
+    });
+    const completed = toolPart('bash-2');
+    const props = baseProps({
+      collapseTools: true,
+      isStreaming: true,
+      dynamicMessages: [
+        assistantMessage('assistant-1', [intro, running, completed], { time: { created: 1 } }),
+      ],
+    });
+    renderConversationMessages(props);
+    const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+    expect(group?.textContent).toContain('Working');
+    act(() => group?.click());
+    const tool = container.querySelectorAll<HTMLButtonElement>('[data-tool-card] button')[1];
+    expect(tool).toBeDefined();
+    act(() => tool?.click());
+    expect(container.textContent).toContain('Output for bash-2');
+
+    renderConversationMessages({
+      ...props,
+      dynamicMessages: [
+        assistantMessage(
+          'assistant-1',
+          [
+            intro,
+            {
+              ...running,
+              state: {
+                ...running.state,
+                status: 'error',
+                error: 'Command failed',
+                time: { start: 1, end: 2 },
+              },
+            },
+            completed,
+          ],
+          { time: { created: 1 } }
+        ),
+      ],
+    });
+
+    expect(container.contains(group)).toBe(true);
+    expect(group?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.contains(tool)).toBe(true);
+    expect(tool?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('Output for bash-2');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Command failed');
+
+    act(() => group?.click());
+    expect(container.textContent).not.toContain('Output for bash-2');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Command failed');
+  });
 
   it('does not re-render the active list when only getChildMessages changes', () => {
     const message = assistantMessage('assistant-1', [textPart('text-1', 'Answer one')]);

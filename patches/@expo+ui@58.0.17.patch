@@ -1,5 +1,5 @@
 diff --git a/android/build.gradle b/android/build.gradle
-index 451dea211d69e0b38f56af577fa31e3babf42312..aa70efbe9c41e845d50d57d01591e4f78373ae84 100644
+index 451dea2..aa70efb 100644
 --- a/android/build.gradle
 +++ b/android/build.gradle
 @@ -48,6 +48,10 @@ dependencies {
@@ -14,7 +14,7 @@ index 451dea211d69e0b38f56af577fa31e3babf42312..aa70efbe9c41e845d50d57d01591e4f7
    // Testing
    testImplementation 'junit:junit:4.13.2'
 diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
-index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..6b64322285fce13a0f5d77610be924a887e9957a 100644
+index 9ca0932..6b64322 100644
 --- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 +++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 @@ -5,9 +5,12 @@ package expo.modules.ui
@@ -207,7 +207,7 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..6b64322285fce13a0f5d77610be924a8
  
    LaunchedEffect(Unit) {
 diff --git a/build/community/bottom-sheet/BottomSheet.android.js b/build/community/bottom-sheet/BottomSheet.android.js
-index d39d9de891d83a7bf10f74e66d4a55bd38b63a22..3bc614f261d2b987aec00001598e56ff7b943432 100644
+index d39d9de..3bc614f 100644
 --- a/build/community/bottom-sheet/BottomSheet.android.js
 +++ b/build/community/bottom-sheet/BottomSheet.android.js
 @@ -37,7 +37,7 @@ function findNearestSnapPointIndex(snapPoints, position) {
@@ -320,7 +320,7 @@ index d39d9de891d83a7bf10f74e66d4a55bd38b63a22..3bc614f261d2b987aec00001598e56ff
                      properties: {
                          shouldDismissOnBackPress: enablePanDownToClose,
 diff --git a/build/community/bottom-sheet/BottomSheet.ios.js b/build/community/bottom-sheet/BottomSheet.ios.js
-index 5ab7afffe56b6e91764c0beb083d629207f38753..9ab11ce9e2161de7b870848ded7170414c7736c9 100644
+index 5ab7aff..428fe72 100644
 --- a/build/community/bottom-sheet/BottomSheet.ios.js
 +++ b/build/community/bottom-sheet/BottomSheet.ios.js
 @@ -71,7 +71,7 @@ function findNearestDetentIndex(detents, position) {
@@ -328,11 +328,34 @@ index 5ab7afffe56b6e91764c0beb083d629207f38753..9ab11ce9e2161de7b870848ded717041
   * @remarks Uses SwiftUI's `.sheet()` presentation (modal overlay).
   */ export function BottomSheet(props) {
 -    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
-+    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
++    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onBackdropTap, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
      const { width } = useWindowDimensions();
      const [isPresented, setIsPresented] = useState(indexProp >= 0);
      const [currentIndex, setCurrentIndex] = useState(Math.max(indexProp, 0));
-@@ -192,7 +192,7 @@ function findNearestDetentIndex(detents, position) {
+@@ -86,6 +86,10 @@ function findNearestDetentIndex(detents, position) {
+     onCloseRef.current = onClose;
+     const onDismissRef = useRef(onDismiss);
+     onDismissRef.current = onDismiss;
++    // Repo-local: the native sheet reports a backdrop tap instead of dismissing,
++    // so the caller answers it through this ref without a new effect per render.
++    const onBackdropTapRef = useRef(onBackdropTap);
++    onBackdropTapRef.current = onBackdropTap;
+     const detents = useMemo(()=>{
+         if (!snapPointsProp || snapPointsProp.length === 0) return [
+             'medium',
+@@ -129,6 +133,11 @@ function findNearestDetentIndex(detents, position) {
+             setIsPresented(false);
+         }
+     }, []);
++    // Repo-local: the sheet keeps itself presented on a backdrop tap, because the
++    // decision belongs to the caller (a form may refuse it and ask first).
++    const handleBackdropTap = useCallback(()=>{
++        onBackdropTapRef.current?.();
++    }, []);
+     const handleDetentChange = useCallback((detent)=>{
+         const newIndex = findDetentIndex(detents, detent);
+         if (newIndex >= 0 && newIndex !== currentIndexRef.current) {
+@@ -192,7 +201,7 @@ function findNearestDetentIndex(detents, position) {
                  })
              ],
              presentationDragIndicator(handleComponent === null ? 'hidden' : 'visible'),
@@ -341,7 +364,7 @@ index 5ab7afffe56b6e91764c0beb083d629207f38753..9ab11ce9e2161de7b870848ded717041
              ...bg ? [
                  presentationBackground(bg)
              ] : []
-@@ -204,6 +204,7 @@ function findNearestDetentIndex(detents, position) {
+@@ -204,6 +213,7 @@ function findNearestDetentIndex(detents, position) {
          handleDetentChange,
          handleComponent,
          enablePanDownToClose,
@@ -349,11 +372,24 @@ index 5ab7afffe56b6e91764c0beb083d629207f38753..9ab11ce9e2161de7b870848ded717041
          backgroundStyle
      ]);
      return /*#__PURE__*/ _jsx(BottomSheetInternalContext.Provider, {
+@@ -220,6 +230,12 @@ function findNearestDetentIndex(detents, position) {
+                     isPresented: isPresented,
+                     onIsPresentedChange: handlePresentedChange,
+                     onDismiss: fireCloseCallbacks,
++                    // Repo-local: SwiftUI draws the dimmed area around the sheet and
++                    // never dismisses on a tap there. The sheet reports the tap and the
++                    // caller decides, which keeps the gesture off exactly when
++                    // `dismissGestures` is off.
++                    dismissOnBackdropTap: dismissGestures,
++                    onBackdropTap: handleBackdropTap,
+                     fitToContents: fitToContents,
+                     children: /*#__PURE__*/ _jsx(Group, {
+                         modifiers: modifiers,
 diff --git a/build/community/bottom-sheet/types.d.ts b/build/community/bottom-sheet/types.d.ts
-index cf72b27f4304b6772a844acd0eb144796c03b5c0..fb408e55eaff591d07d428677986380d967727aa 100644
+index cf72b27..8f15786 100644
 --- a/build/community/bottom-sheet/types.d.ts
 +++ b/build/community/bottom-sheet/types.d.ts
-@@ -169,6 +169,26 @@ export interface BottomSheetProps {
+@@ -169,6 +169,38 @@ export interface BottomSheetProps {
       * On Android, this also controls back button and scrim tap dismiss.
       */
      enablePanDownToClose?: boolean;
@@ -370,6 +406,18 @@ index cf72b27f4304b6772a844acd0eb144796c03b5c0..fb408e55eaff591d07d428677986380d
 +     */
 +    onRequestDismiss?: () => boolean;
 +    /**
++     * Called when a tap lands on the dimmed area outside a presented sheet. The
++     * sheet stays presented: this reports the tap, so the caller decides whether
++     * it dismisses. Repo-local.
++     *
++     * @remarks The platform sheet draws that dimmed area through its presentation
++     * and never dismisses on a tap there, on either platform. Android turns the
++     * scrim tap into `onRequestDismiss` and dismisses itself; iOS reports it here
++     * because the dimmed area belongs to the presentation, which the app's view
++     * tree cannot see. Reported only while `dismissGestures` is on.
++     */
++    onBackdropTap?: () => void;
++    /**
 +     * BCP-47 tag of the app's UI language. On Android the sheet paints platform
 +     * strings of its own — the scrim's dismiss label, the drag handle, the pane
 +     * title — and Material3 otherwise resolves them against the device locale, so
@@ -381,7 +429,7 @@ index cf72b27f4304b6772a844acd0eb144796c03b5c0..fb408e55eaff591d07d428677986380d
       * Whether the sheet should automatically size to fit its content.
       * @default true
 diff --git a/build/jetpack-compose/ModalBottomSheet/index.d.ts b/build/jetpack-compose/ModalBottomSheet/index.d.ts
-index 6d3806c8213034310a304287da1e609453d30243..a99ddcd3e17a3f806d37f7e40a19ddcf2448a85c 100644
+index 6d3806c..a99ddcd 100644
 --- a/build/jetpack-compose/ModalBottomSheet/index.d.ts
 +++ b/build/jetpack-compose/ModalBottomSheet/index.d.ts
 @@ -78,6 +78,13 @@ export interface ModalBottomSheetProps {
@@ -398,8 +446,30 @@ index 6d3806c8213034310a304287da1e609453d30243..a99ddcd3e17a3f806d37f7e40a19ddcf
      /**
       * Properties for the modal window behavior.
       */
+diff --git a/build/swift-ui/BottomSheet/index.d.ts b/build/swift-ui/BottomSheet/index.d.ts
+index cc62286..eb4f0c2 100644
+--- a/build/swift-ui/BottomSheet/index.d.ts
++++ b/build/swift-ui/BottomSheet/index.d.ts
+@@ -29,6 +29,17 @@ export interface BottomSheetProps extends CommonViewModifierProps {
+      * @default false
+      */
+     fitToContents?: boolean;
++    /**
++     * Repo-local: whether a tap on the dimmed area outside the sheet reports
++     * `onBackdropTap`. The native sheet never dismisses on that tap itself.
++     * @default false
++     */
++    dismissOnBackdropTap?: boolean;
++    /**
++     * Repo-local: a tap on the dimmed area outside the sheet. The sheet stays
++     * presented; the caller decides whether the tap dismisses it.
++     */
++    onBackdropTap?: () => void;
+ }
+ /**
+  * `BottomSheet` presents content from the bottom of the screen.
 diff --git a/build/swift-ui/Text/index.d.ts b/build/swift-ui/Text/index.d.ts
-index 2a5e57bc85660a666fc95f42b5a284ba16ebaf53..121d743b4fdb52213a08fbd2b1b75a3d2e103445 100644
+index 2a5e57b..121d743 100644
 --- a/build/swift-ui/Text/index.d.ts
 +++ b/build/swift-ui/Text/index.d.ts
 @@ -1,9 +1,19 @@
@@ -424,8 +494,253 @@ index 2a5e57bc85660a666fc95f42b5a284ba16ebaf53..121d743b4fdb52213a08fbd2b1b75a3d
  export interface TextProps extends CommonViewModifierProps {
      /**
       * Text content or nested Text components.
+diff --git a/ios/BottomSheetView.swift b/ios/BottomSheetView.swift
+index 29b1a3a..740268c 100644
+--- a/ios/BottomSheetView.swift
++++ b/ios/BottomSheetView.swift
+@@ -6,8 +6,15 @@ import ExpoModulesCore
+ final class BottomSheetProps: UIBaseViewProps {
+   @Field var isPresented: Bool = false
+   @Field var fitToContents: Bool = false
++  /// Repo-local: whether a tap on the dimmed area outside the sheet reports
++  /// `onBackdropTap`. The platform never dismisses a sheet on that tap, so the
++  /// sheet reports it and the app decides.
++  @Field var dismissOnBackdropTap: Bool = false
+   var onIsPresentedChange = EventDispatcher()
+   var onDismiss = EventDispatcher()
++  /// Repo-local: a tap on the dimmed area outside the presented sheet. The sheet
++  /// stays presented: a form may refuse the dismissal and ask first.
++  var onBackdropTap = EventDispatcher()
+ }
+ 
+ struct SizePreferenceKey: PreferenceKey {
+@@ -58,6 +65,210 @@ private struct BottomSheetSizeReader<Content: View>: View {
+   }
+ }
+ 
++/// Repo-local: reports a tap on the dimmed area a presented sheet shows around
++/// itself.
++///
++/// The platform draws that area through the presentation, and it never dismisses
++/// the sheet on a tap there: the area belongs to the presentation, not to the
++/// app's view tree, so nothing on the React Native side sees the tap either. This
++/// view sits inside the presented content. It installs one tap recognizer on the
++/// presentation's own container, accepts only taps that land outside the sheet's
++/// own frame, and reports them. The sheet stays presented, because the caller
++/// owns the decision (a form may ask before it discards a draft).
++private struct BackdropTapReporter: UIViewRepresentable {
++  let enabled: Bool
++  let onTap: () -> Void
++
++  func makeCoordinator() -> Coordinator {
++    Coordinator()
++  }
++
++  func makeUIView(context: Context) -> ReportingView {
++    let view = ReportingView()
++    view.reporter = context.coordinator
++    return view
++  }
++
++  func updateUIView(_ uiView: ReportingView, context: Context) {
++    context.coordinator.enabled = enabled
++    context.coordinator.onTap = onTap
++    context.coordinator.contentView = uiView
++    context.coordinator.refresh()
++  }
++
++  static func dismantleUIView(_ uiView: ReportingView, coordinator: Coordinator) {
++    coordinator.remove()
++  }
++
++  final class ReportingView: UIView {
++    weak var reporter: Coordinator?
++
++    override func didMoveToWindow() {
++      super.didMoveToWindow()
++      reporter?.refresh()
++    }
++  }
++
++  /// Where the tap landed, as far as this sheet can tell.
++  private enum SheetRegion {
++    /// The content has no frame yet, so nothing can be decided.
++    case unknown
++    /// Another presentation was opened above this sheet; the dimmed area they
++    /// share belongs to the sheet on top.
++    case covered
++    case frame(CGRect)
++  }
++
++  final class Coordinator: NSObject, UIGestureRecognizerDelegate {
++    var enabled = false
++    var onTap: () -> Void = {}
++    weak var contentView: UIView?
++    private var recognizer: UITapGestureRecognizer?
++    /// The recognizer sits on this sheet's own presentation container, so a
++    /// presentation opened above this sheet cannot hand it a tap: that container
++    /// is not a descendant of this one. Without a presentation there is no dimmed
++    /// area to own, and the reporter stays off.
++    private weak var container: UIView?
++    /// Schedules the install while the presentation is still building its views.
++    private var retryGeneration = 0
++    private var retryCount = 0
++    /// Clearance above the hosted content for the grabber the sheet draws there:
++    /// a tap on the grabber is still a tap on the sheet.
++    private let grabberClearance: CGFloat = 20
++    /// How many install retries the presentation gets before the reporter gives
++    /// up on it; the sheet needs that long to build its container view from its
++    /// commit. At 50 ms per retry this covers ~1.5 s of opening.
++    private static let retryLimit = 30
++
++    /// Installs the recognizer once the sheet's own container exists, and takes
++    /// it away when the sheet no longer needs one (turned off, or dismissed).
++    func refresh() {
++      retryGeneration &+= 1
++      retryCount = 0
++      install()
++    }
++
++    func remove() {
++      if let recognizer, let view = recognizer.view {
++        view.removeGestureRecognizer(recognizer)
++      }
++      recognizer = nil
++      container = nil
++    }
++
++    private func install() {
++      guard enabled, let contentView = contentView, let window = contentView.window else {
++        remove()
++        return
++      }
++      if let presentation = self.presentation(from: contentView) {
++        self.container = presentation.controller.containerView
++      }
++      guard let target = container, target.window === window else {
++        // The container is built after its content commits; retry inside the
++        // opening window instead of leaving the sheet's dimmed area without a
++        // reporter for its whole stay.
++        guard retryCount < Self.retryLimit else {
++          return
++        }
++        retryCount += 1
++        let generation = retryGeneration
++        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
++          guard let self, self.retryGeneration == generation, self.recognizer == nil else {
++            return
++          }
++          self.install()
++        }
++        return
++      }
++      if recognizer?.view === target {
++        return
++      }
++      remove()
++      let recognizer = UITapGestureRecognizer(target: self, action: #selector(handleTap))
++      recognizer.delegate = self
++      // The sheet's own controls must still receive a touch this recognizer
++      // declines: cancelling would swallow a press that is not a dismissal.
++      recognizer.cancelsTouchesInView = false
++      target.addGestureRecognizer(recognizer)
++      self.recognizer = recognizer
++    }
++
++    func gestureRecognizer(
++      _ gestureRecognizer: UIGestureRecognizer,
++      shouldReceive touch: UITouch
++    ) -> Bool {
++      guard enabled, let contentView = contentView, let view = gestureRecognizer.view,
++            view.window != nil else {
++        return false
++      }
++      switch sheetRegion(from: contentView, in: view) {
++      case .unknown, .covered:
++        return false
++      case .frame(let sheet):
++        return !sheet.contains(touch.location(in: view))
++      }
++    }
++
++    /// The sheet's own area in the recognizer's view. The presentation's
++    /// presented view is exact; the hosted content, widened by the grabber,
++    /// answers when the presentation does not expose one.
++    private func sheetRegion(from contentView: UIView, in view: UIView) -> SheetRegion {
++      let contentFrame = contentView.convert(contentView.bounds, to: view)
++      guard !contentFrame.isEmpty else {
++        return .unknown
++      }
++      let fallback = contentFrame.insetBy(dx: -grabberClearance, dy: -grabberClearance)
++      guard let (presentation, controller) = self.presentation(from: contentView) else {
++        return .unknown
++      }
++      if controller.presentedViewController != nil {
++        return .covered
++      }
++      guard let presented = presentation.presentedView, presented.window === view.window else {
++        return .frame(fallback)
++      }
++      return .frame(presented.convert(presented.bounds, to: view))
++    }
++
++    /// The presentation this content belongs to, when it belongs to one.
++    private func presentation(
++      from view: UIView
++    ) -> (controller: UIPresentationController, presented: UIViewController)? {
++      var responder: UIResponder? = view
++      var depth = 0
++      while let next = responder?.next, depth < 32 {
++        if let controller = next as? UIViewController {
++          return presentation(from: controller)
++        }
++        responder = next
++        depth += 1
++      }
++      return nil
++    }
++
++    private func presentation(
++      from controller: UIViewController
++    ) -> (controller: UIPresentationController, presented: UIViewController)? {
++      var candidate: UIViewController? = controller
++      var depth = 0
++      while let current = candidate, depth < 16 {
++        if let presentation = current.presentationController,
++           presentation.presentedViewController === current {
++          return (presentation, current)
++        }
++        candidate = current.parent ?? current.presentingViewController
++        depth += 1
++      }
++      return nil
++    }
++
++    @objc private func handleTap() {
++      onTap()
++    }
++  }
++}
++
+ struct BottomSheetView: ExpoSwiftUI.View {
+   @ObservedObject var props: BottomSheetProps
+   @State private var isPresented: Bool = false
+@@ -108,6 +319,13 @@ struct BottomSheetView: ExpoSwiftUI.View {
+         props.onDismiss()
+       }) {
+         sheetContent
++          // Repo-local: the sheet draws the dimmed area through the presentation
++          // and never dismisses on a tap there, so it reports the tap instead.
++          .background(
++            BackdropTapReporter(enabled: props.dismissOnBackdropTap) {
++              props.onBackdropTap()
++            }
++          )
+       }
+       .onChange(of: isPresented, perform: { newIsPresented in
+         if props.isPresented == newIsPresented {
 diff --git a/ios/TextView.swift b/ios/TextView.swift
-index 7dfe0a9dc9fafb625067dbb29f80d82f767d63e1..a56405cb660d045d2ad30c6815cad0337b05607b 100644
+index 7dfe0a9..a56405c 100644
 --- a/ios/TextView.swift
 +++ b/ios/TextView.swift
 @@ -5,11 +5,12 @@ import ExpoModulesCore
@@ -459,7 +774,7 @@ index 7dfe0a9dc9fafb625067dbb29f80d82f767d63e1..a56405cb660d045d2ad30c6815cad033
        text = Text(date, style: props.dateStyle?.toSwiftUI() ?? .date)
      } else {
 diff --git a/src/community/bottom-sheet/BottomSheet.android.tsx b/src/community/bottom-sheet/BottomSheet.android.tsx
-index 419edefacdca8b98e318dc924c66575171e35124..b9643168830022aec3f61b2bb9a129793da1109b 100644
+index 419edef..b964316 100644
 --- a/src/community/bottom-sheet/BottomSheet.android.tsx
 +++ b/src/community/bottom-sheet/BottomSheet.android.tsx
 @@ -61,6 +61,15 @@ export function BottomSheet(props: BottomSheetProps) {
@@ -582,20 +897,45 @@ index 419edefacdca8b98e318dc924c66575171e35124..b9643168830022aec3f61b2bb9a12979
              properties={{
                shouldDismissOnBackPress: enablePanDownToClose,
 diff --git a/src/community/bottom-sheet/BottomSheet.ios.tsx b/src/community/bottom-sheet/BottomSheet.ios.tsx
-index d0eb811efbd9e87dc1b71be1fe6fc3288afd990a..0d4b403a109691f81958c6e6d55a4115495e43dd 100644
+index d0eb811..3916ebf 100644
 --- a/src/community/bottom-sheet/BottomSheet.ios.tsx
 +++ b/src/community/bottom-sheet/BottomSheet.ios.tsx
-@@ -89,6 +89,9 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -89,6 +89,10 @@ export function BottomSheet(props: BottomSheetProps) {
      onClose,
      onDismiss,
      enablePanDownToClose = false,
 +    // Repo-local: the drag/backdrop gesture can stay off while `enablePanDownToClose`
 +    // keeps the dismissal paths a platform can separate (Android back and scrim).
 +    dismissGestures = enablePanDownToClose,
++    onBackdropTap,
      enableDynamicSizing = true,
      handleComponent,
      backgroundStyle,
-@@ -209,7 +212,7 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -110,6 +114,10 @@ export function BottomSheet(props: BottomSheetProps) {
+   onCloseRef.current = onClose;
+   const onDismissRef = useRef(onDismiss);
+   onDismissRef.current = onDismiss;
++  // Repo-local: the native sheet reports a backdrop tap instead of dismissing,
++  // so the caller answers it through this ref without a new effect per render.
++  const onBackdropTapRef = useRef(onBackdropTap);
++  onBackdropTapRef.current = onBackdropTap;
+ 
+   const detents = useMemo<PresentationDetent[]>(() => {
+     if (!snapPointsProp || snapPointsProp.length === 0) return ['medium', 'large'];
+@@ -147,6 +155,12 @@ export function BottomSheet(props: BottomSheetProps) {
+     }
+   }, []);
+ 
++  // Repo-local: the sheet keeps itself presented on a backdrop tap, because the
++  // decision belongs to the caller (a form may refuse it and ask first).
++  const handleBackdropTap = useCallback(() => {
++    onBackdropTapRef.current?.();
++  }, []);
++
+   const handleDetentChange = useCallback(
+     (detent: PresentationDetent) => {
+       const newIndex = findDetentIndex(detents, detent);
+@@ -209,7 +223,7 @@ export function BottomSheet(props: BottomSheetProps) {
              }),
            ]),
        presentationDragIndicator(handleComponent === null ? 'hidden' : 'visible'),
@@ -604,7 +944,7 @@ index d0eb811efbd9e87dc1b71be1fe6fc3288afd990a..0d4b403a109691f81958c6e6d55a4115
        ...(bg ? [presentationBackground(bg)] : []),
      ];
    }, [
-@@ -219,6 +222,7 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -219,6 +233,7 @@ export function BottomSheet(props: BottomSheetProps) {
      handleDetentChange,
      handleComponent,
      enablePanDownToClose,
@@ -612,11 +952,24 @@ index d0eb811efbd9e87dc1b71be1fe6fc3288afd990a..0d4b403a109691f81958c6e6d55a4115
      backgroundStyle,
    ]);
  
+@@ -230,6 +245,12 @@ export function BottomSheet(props: BottomSheetProps) {
+             isPresented={isPresented}
+             onIsPresentedChange={handlePresentedChange}
+             onDismiss={fireCloseCallbacks}
++            // Repo-local: SwiftUI draws the dimmed area around the sheet and
++            // never dismisses on a tap there. The sheet reports the tap and the
++            // caller decides, which keeps the gesture off exactly when
++            // `dismissGestures` is off.
++            dismissOnBackdropTap={dismissGestures}
++            onBackdropTap={handleBackdropTap}
+             fitToContents={fitToContents}>
+             <Group modifiers={modifiers}>
+               <RNHostView matchContents={fitToContents ? { vertical: true } : false}>
 diff --git a/src/community/bottom-sheet/types.ts b/src/community/bottom-sheet/types.ts
-index 51326fbfdeb9642f52e6fe244093cc697fa585f7..cddd01b10241bc0d6e676123a0e463ac15028ba4 100644
+index 51326fb..657577f 100644
 --- a/src/community/bottom-sheet/types.ts
 +++ b/src/community/bottom-sheet/types.ts
-@@ -191,6 +191,40 @@ export interface BottomSheetProps {
+@@ -191,6 +191,53 @@ export interface BottomSheetProps {
     */
    enablePanDownToClose?: boolean;
  
@@ -646,6 +999,19 @@ index 51326fbfdeb9642f52e6fe244093cc697fa585f7..cddd01b10241bc0d6e676123a0e463ac
 +  onRequestDismiss?: () => boolean;
 +
 +  /**
++   * Called when a tap lands on the dimmed area outside a presented sheet. The
++   * sheet stays presented: this reports the tap, so the caller decides whether
++   * it dismisses. Repo-local.
++   *
++   * @remarks The platform sheet draws that dimmed area through its presentation
++   * and never dismisses on a tap there, on either platform. Android turns the
++   * scrim tap into `onRequestDismiss` and dismisses itself; iOS reports it here
++   * because the dimmed area belongs to the presentation, which the app's view
++   * tree cannot see. Reported only while `dismissGestures` is on.
++   */
++  onBackdropTap?: () => void;
++
++  /**
 +   * BCP-47 tag of the app's UI language. On Android the sheet paints platform
 +   * strings of its own — the scrim's dismiss label, the drag handle, the pane
 +   * title — and Material3 otherwise resolves them against the device locale, so
@@ -658,7 +1024,7 @@ index 51326fbfdeb9642f52e6fe244093cc697fa585f7..cddd01b10241bc0d6e676123a0e463ac
     * Whether the sheet should automatically size to fit its content.
     * @default true
 diff --git a/src/jetpack-compose/ModalBottomSheet/index.tsx b/src/jetpack-compose/ModalBottomSheet/index.tsx
-index c3225b1d9c7c0636d366203e2b23f536fec9e54e..829bcd50dbe832b99e3d8c80f2017b62222b35eb 100644
+index c3225b1..829bcd5 100644
 --- a/src/jetpack-compose/ModalBottomSheet/index.tsx
 +++ b/src/jetpack-compose/ModalBottomSheet/index.tsx
 @@ -92,6 +92,13 @@ export interface ModalBottomSheetProps {
@@ -675,8 +1041,30 @@ index c3225b1d9c7c0636d366203e2b23f536fec9e54e..829bcd50dbe832b99e3d8c80f2017b62
    /**
     * Properties for the modal window behavior.
     */
+diff --git a/src/swift-ui/BottomSheet/index.tsx b/src/swift-ui/BottomSheet/index.tsx
+index c6327bb..7e9e653 100644
+--- a/src/swift-ui/BottomSheet/index.tsx
++++ b/src/swift-ui/BottomSheet/index.tsx
+@@ -36,6 +36,17 @@ export interface BottomSheetProps extends CommonViewModifierProps {
+    * @default false
+    */
+   fitToContents?: boolean;
++  /**
++   * Repo-local: whether a tap on the dimmed area outside the sheet reports
++   * `onBackdropTap`. The native sheet never dismisses on that tap itself.
++   * @default false
++   */
++  dismissOnBackdropTap?: boolean;
++  /**
++   * Repo-local: a tap on the dimmed area outside the sheet. The sheet stays
++   * presented; the caller decides whether the tap dismisses it.
++   */
++  onBackdropTap?: () => void;
+ }
+ 
+ type NativeBottomSheetProps = Omit<
 diff --git a/src/swift-ui/Text/index.tsx b/src/swift-ui/Text/index.tsx
-index 2351ee84db1984243d4b65ed4a52dec843a74906..e9c590fe23f939699c1f513e15f917f6bda70fad 100644
+index 2351ee8..e9c590f 100644
 --- a/src/swift-ui/Text/index.tsx
 +++ b/src/swift-ui/Text/index.tsx
 @@ -5,9 +5,19 @@ import { createViewModifierEventListener } from '../modifiers/utils';
@@ -701,3 +1089,192 @@ index 2351ee84db1984243d4b65ed4a52dec843a74906..e9c590fe23f939699c1f513e15f917f6
  
  export interface TextProps extends CommonViewModifierProps {
    /**
+diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
+--- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
++++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
+@@ -9,8 +9,12 @@
+ import android.content.res.Resources
+ import android.graphics.Color
+ import android.view.KeyEvent
++import android.view.View
+ import android.view.inputmethod.InputMethodManager
+ import androidx.activity.compose.BackHandler
++import androidx.core.view.WindowCompat
++import androidx.compose.foundation.layout.WindowInsetsSides
++import androidx.compose.foundation.layout.only
+ import androidx.compose.material3.BottomSheetDefaults
+ import androidx.compose.material3.ExperimentalMaterial3Api
+ import androidx.compose.material3.MaterialTheme
+@@ -67,6 +71,16 @@
+    * density, theme) stays the activity's.
+    */
+   val locale: String? = null,
++  /**
++   * Repo-local: when true the caller's content clears the top system bar itself. The surface then
++   * pads that inset inside its own tree, so the dialog window's decoration must not fit the
++   * system bars: without it a content-sized sheet first covered the status bar, and the window
++   * shrank by the status bar once its insets arrived, moving the whole content — a full-window
++   * sheet's header included — after it had appeared. Material3 pads what reads as zero in that
++   * window (its insets were consumed by the decoration), so this pair drops the top reserve; the
++   * bottom inset stays with the sheet, whose insets it measures reliably.
++   */
++  val contentOwnsTopInset: Boolean = false,
+   val properties: ModalBottomSheetPropertiesRecord = ModalBottomSheetPropertiesRecord(),
+   val modifiers: ModifierList = emptyList()
+ ) : ComposeProps
+@@ -78,6 +92,16 @@
+ private fun Activity.isAcceptingText(): Boolean {
+   val inputMethodManager = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+   return inputMethodManager?.isAcceptingText == true
++}
++
++/**
++ * Repo-local, for `contentOwnsTopInset` callers: stop the sheet's own dialog window from also
++ * fitting the system bars. See the prop's documentation — the two together keep the sheet's box
++ * at the size its first painted frame already has.
++ */
++private fun stopDecorFittingSystemBars(sheet: View) {
++  val window = (sheet.parent as? DialogWindowProvider)?.window ?: return
++  WindowCompat.setDecorFitsSystemWindows(window, false)
+ }
+ 
+ /**
+@@ -220,6 +244,11 @@
+       contentColor = resolvedContentColor,
+       scrimColor = resolvedScrimColor,
+       sheetGesturesEnabled = props.sheetGesturesEnabled,
++      contentWindowInsets = {
++        val sheetInsets = BottomSheetDefaults.modalWindowInsets
++        // Repo-local: see the `contentOwnsTopInset` field above.
++        if (props.contentOwnsTopInset) sheetInsets.only(WindowInsetsSides.Bottom) else sheetInsets
++      },
+       dragHandle = when {
+         dragHandleSlotView != null -> {
+           { with(UIComposableScope()) { with(dragHandleSlotView) { Content() } } }
+@@ -239,6 +268,14 @@
+       ),
+       modifier = ModifierRegistry.applyModifiers(props.modifiers, appContext, composableScope, globalEventDispatcher)
+     ) {
++      // LocalView here is the dialog's own view, so its parent is the DialogWindowProvider that
++      // owns the sheet's window: see `stopDecorFittingSystemBars`.
++      val sheetView = LocalView.current
++      DisposableEffect(props.contentOwnsTopInset, sheetView) {
++        if (props.contentOwnsTopInset) stopDecorFittingSystemBars(sheetView)
++        // The window keeps this for as long as it exists, so nothing undoes it here.
++        onDispose { }
++      }
+       // Registered inside the dialog, so it runs before the wrapper's fallback.
+       if (props.properties.shouldDismissOnBackPress) {
+         BackHandler { onDismissRequest() }
+diff --git a/src/community/bottom-sheet/BottomSheet.android.tsx b/src/community/bottom-sheet/BottomSheet.android.tsx
+--- a/src/community/bottom-sheet/BottomSheet.android.tsx
++++ b/src/community/bottom-sheet/BottomSheet.android.tsx
+@@ -70,6 +70,9 @@
+     // strings (scrim label, drag handle, pane title) do not fall back to the
+     // device's language.
+     locale,
++    // Repo-local: the caller clears the status bar itself, so the dialog window
++    // must not also fit it — see the Kotlin prop's comment.
++    contentOwnsTopInset,
+     enableDynamicSizing = true,
+     handleComponent,
+     backgroundStyle,
+@@ -215,6 +218,7 @@
+             showDragHandle={handleComponent !== null}
+             sheetGesturesEnabled={dismissGestures}
+             locale={locale}
++            contentOwnsTopInset={contentOwnsTopInset}
+             containerColor={containerColor}
+             properties={{
+               shouldDismissOnBackPress: enablePanDownToClose,
+diff --git a/build/community/bottom-sheet/BottomSheet.android.js b/build/community/bottom-sheet/BottomSheet.android.js
+--- a/build/community/bottom-sheet/BottomSheet.android.js
++++ b/build/community/bottom-sheet/BottomSheet.android.js
+@@ -37,7 +37,7 @@
+  * @remarks Supports two snap states: partially expanded (~50%) and fully expanded.
+  * `snapToIndex(0)` maps to partial, `snapToIndex(lastIndex)` maps to expanded.
+  */ export function BottomSheet(props) {
+-    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onRequestDismiss, locale, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
++    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onRequestDismiss, locale, contentOwnsTopInset, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
+     const { width } = useWindowDimensions();
+     const hasMultipleSnapPoints = snapPointsProp != null && snapPointsProp.length > 1;
+     const fitToContents = enableDynamicSizing && (!snapPointsProp || snapPointsProp.length === 0);
+@@ -184,6 +184,7 @@
+                     showDragHandle: handleComponent !== null,
+                     sheetGesturesEnabled: dismissGestures,
+                     locale: locale,
++                    contentOwnsTopInset: contentOwnsTopInset,
+                     containerColor: containerColor,
+                     properties: {
+                         shouldDismissOnBackPress: enablePanDownToClose,
+diff --git a/src/community/bottom-sheet/types.ts b/src/community/bottom-sheet/types.ts
+--- a/src/community/bottom-sheet/types.ts
++++ b/src/community/bottom-sheet/types.ts
+@@ -237,6 +237,15 @@
+    * language. Repo-local; ignored where the platform sheet has no such strings.
+    */
+   locale?: string;
++
++  /**
++   * Repo-local, Android: when true the caller's content clears the status bar
++   * itself, so the sheet's dialog window stops fitting that inset. The window
++   * applies the inset only once its insets arrive, a frame or two after the
++   * sheet presented, and the sheet then shrank by the status bar's height,
++   * moving its whole content after it had already appeared.
++   */
++  contentOwnsTopInset?: boolean;
+ 
+   /**
+    * Whether the sheet should automatically size to fit its content.
+diff --git a/build/community/bottom-sheet/types.d.ts b/build/community/bottom-sheet/types.d.ts
+--- a/build/community/bottom-sheet/types.d.ts
++++ b/build/community/bottom-sheet/types.d.ts
+@@ -201,6 +201,8 @@
+      * language. Repo-local; ignored where the platform sheet has no such strings.
+      */
+     locale?: string;
++
++    contentOwnsTopInset?: boolean;
+     /**
+      * Whether the sheet should automatically size to fit its content.
+      * @default true
+diff --git a/src/jetpack-compose/ModalBottomSheet/index.tsx b/src/jetpack-compose/ModalBottomSheet/index.tsx
+--- a/src/jetpack-compose/ModalBottomSheet/index.tsx
++++ b/src/jetpack-compose/ModalBottomSheet/index.tsx
+@@ -100,6 +100,13 @@
+    */
+   locale?: string;
+   /**
++   * Repo-local: when true the caller's content clears the status bar itself, so
++   * the dialog window stops fitting it — the window applies that inset only once
++   * its insets arrive, which shrinks a sheet after it had first measured.
++   * @platform android
++   */
++  contentOwnsTopInset?: boolean;
++  /**
+    * Properties for the modal window behavior.
+    */
+   properties?: ModalBottomSheetProperties;
+diff --git a/build/jetpack-compose/ModalBottomSheet/index.d.ts b/build/jetpack-compose/ModalBottomSheet/index.d.ts
+--- a/build/jetpack-compose/ModalBottomSheet/index.d.ts
++++ b/build/jetpack-compose/ModalBottomSheet/index.d.ts
+@@ -85,6 +85,8 @@
+      * @platform android
+      */
+     locale?: string;
++
++    contentOwnsTopInset?: boolean;
+     /**
+      * Properties for the modal window behavior.
+      */
+diff --git a/build/jetpack-compose/ModalBottomSheet/index.js b/build/jetpack-compose/ModalBottomSheet/index.js
+--- a/build/jetpack-compose/ModalBottomSheet/index.js
++++ b/build/jetpack-compose/ModalBottomSheet/index.js
+@@ -12,6 +12,7 @@
+         ...restProps,
+         skipPartiallyExpanded: props.skipPartiallyExpanded ?? false,
+         initialFullyExpanded: props.initialFullyExpanded ?? false,
++        contentOwnsTopInset: props.contentOwnsTopInset ?? false,
+         onDismissRequest: ()=>{
+             onDismissRequest?.();
+         }

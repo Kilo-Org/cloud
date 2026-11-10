@@ -169,7 +169,8 @@ const request = JSON.parse(process.argv[1] ?? '{}');
 
 // __EXCLUSIVE_LAYOUT__
 
-const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo']);
+const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo', 'kilo2', '.kilo2']);
+const kilo2Servers = new Set();
 
 // Each kilo serve has its own Basic credential in its environment. It stays in
 // this script and never goes into the JSON result.
@@ -240,6 +241,8 @@ function kiloListeners() {
     try {
       const argv = fs.readFileSync('/proc/' + processId + '/cmdline', 'utf8').split('\0');
       if (!isKiloServeArgv(argv)) continue;
+      if (argv.some((arg, index) => ['kilo2', '.kilo2'].includes(path.basename(arg)) && argv[index + 1] === 'serve'))
+        kilo2Servers.add(serverUrl);
       const cwd = fs.readlinkSync('/proc/' + processId + '/cwd');
       const directory = fs.realpathSync(cwd);
       if (!path.isAbsolute(cwd) || cwd !== directory) continue;
@@ -268,7 +271,7 @@ function sameListener(left, right) {
 }
 
 async function getRoot(serverUrl, kiloSessionId, directory = request.directory) {
-  const endpoint = new URL('/session/' + encodeURIComponent(kiloSessionId), serverUrl);
+  const endpoint = new URL((kilo2Servers.has(serverUrl) ? '/api' : '') + '/session/' + encodeURIComponent(kiloSessionId), serverUrl);
   endpoint.searchParams.set('directory', directory);
   const response = await fetch(endpoint, {
     headers: kiloHeaders(serverUrl),
@@ -276,7 +279,10 @@ async function getRoot(serverUrl, kiloSessionId, directory = request.directory) 
     redirect: 'error',
   });
   if (!response.ok) return null;
-  const root = await response.json();
+  const decoded = await response.json();
+  const root = kilo2Servers.has(serverUrl) && decoded.data
+    ? { ...decoded.data, directory: decoded.data.location?.directory }
+    : decoded;
   if (
     typeof root !== 'object' ||
     root === null ||

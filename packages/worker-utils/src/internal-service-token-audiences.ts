@@ -1,7 +1,5 @@
 export const KILO_API_AUDIENCE = 'kilo-api';
 export const KILO_GATEWAY_AUDIENCE = 'kilo-gateway';
-export const GASTOWN_AUDIENCE = 'gastown';
-export const WASTELAND_AUDIENCE = 'wasteland';
 export const KILO_CHAT_AUDIENCE = 'kilo-chat';
 export const EVENT_SERVICE_AUDIENCE = 'event-service';
 export const NOTIFICATIONS_AUDIENCE = 'notifications';

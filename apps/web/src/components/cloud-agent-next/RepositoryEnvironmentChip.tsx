@@ -11,7 +11,7 @@ import {
 } from '@/hooks/useCloudAgentEnvironments';
 import { useCloudAgentSettingsCanManage } from '@/hooks/useCloudAgentSettings';
 import { EnvironmentDialog } from './EnvironmentDialog';
-import { memberMatchesRepository } from './environment-display';
+import { additionalEnvironmentMembers } from './environment-display';
 
 const chipClassName =
   'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/50 bg-muted/30 px-2 py-1 text-xs text-muted-foreground';
@@ -93,6 +93,7 @@ export function RepositoryEnvironmentChip({
             <ul className="max-h-72 overflow-y-auto">
               {environments.map(candidate => {
                 const members = environmentMembers(candidate);
+                const additionalMembers = additionalEnvironmentMembers(candidate, repository);
                 return (
                   <li key={candidate.id}>
                     <button
@@ -120,19 +121,12 @@ export function RepositoryEnvironmentChip({
                             {members.length} {members.length === 1 ? 'repo' : 'repos'}
                           </span>
                         </span>
-                        <span className="mt-1 block space-y-1 border-l pl-2">
-                          {members.map(member => {
-                            const isSelectedRepository = memberMatchesRepository(
-                              member,
-                              repository
-                            );
-                            return (
+                        {additionalMembers.length > 0 && (
+                          <span className="mt-1 block space-y-1 border-l pl-2">
+                            {additionalMembers.map(member => (
                               <span
                                 key={`${member.platform}:${member.repoFullName}`}
-                                className={cn(
-                                  'flex items-center gap-2',
-                                  !isSelectedRepository && 'text-muted-foreground'
-                                )}
+                                className="text-muted-foreground flex items-center gap-2"
                               >
                                 <span
                                   className="min-w-0 flex-1 truncate"
@@ -140,15 +134,10 @@ export function RepositoryEnvironmentChip({
                                 >
                                   {member.repoFullName}
                                 </span>
-                                {isSelectedRepository && (
-                                  <span className="text-muted-foreground shrink-0 text-[9px]">
-                                    Selected repository
-                                  </span>
-                                )}
                               </span>
-                            );
-                          })}
-                        </span>
+                            ))}
+                          </span>
+                        )}
                       </span>
                     </button>
                   </li>

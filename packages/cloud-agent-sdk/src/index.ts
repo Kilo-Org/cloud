@@ -1,3 +1,34 @@
+export { NativeSyncClient, NativeSyncError } from './native-sync';
+export type {
+  NativeSyncOptions,
+  NativeEvent,
+  NativeSessionSummary,
+  NativePresenceState,
+  NativeSessionState,
+  NativePresenceConnection,
+  NativeSessionConnection,
+  NativeInstanceReply,
+  NativeSocket,
+  NativeSocketConstructor,
+} from './native-sync';
+export { listNativeModels } from './native-sync-discovery';
+export type { NativeDiscoveredModel } from './native-sync-discovery';
+export { projectNativeSnapshot } from './native-sync-snapshot';
+export type {
+  NativeEntity,
+  NativeAssetReader,
+  NativeSnapshot,
+  NativeSnapshotMessage,
+  NativeSnapshotProjection,
+  NativeSnapshotSession,
+} from './native-sync-snapshot';
+export { readNativeConversation } from './native-conversation-source';
+export type {
+  NativeConversation,
+  NativePendingRequests,
+  NativePendingQuestion,
+} from './native-conversation-source';
+
 export { isStreamError, isValidCloudAgentEvent } from './schemas';
 export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
 
@@ -41,7 +72,7 @@ export type {
 } from './session';
 
 export { normalize, normalizeCliEvent, isChatEvent, projectSessionGoal } from './normalizer';
-export type { NormalizedEvent, ChatEvent, ServiceEvent } from './normalizer';
+export type { NormalizedEvent, ChatEvent, ChatEventVersion, ServiceEvent } from './normalizer';
 
 export { reduce } from './reducer';
 
@@ -176,6 +207,8 @@ export type {
   SessionGoalStatus,
   KiloSessionId,
   CloudAgentSessionId,
+  CloudSessionMetadata,
+  CloudSessionSnapshotPage,
   ResolvedSession,
   SessionSnapshot,
   SessionSnapshotPage,
@@ -205,3 +238,7 @@ export type {
 // `New session - <ISO>` placeholder that no display surface should show as
 // the session's title.
 export { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
+
+export { createConversationSourceReader } from './conversation-source';
+export type { ConversationSource } from './conversation-source';
+export type { CloudSessionMessagesWirePage } from './schemas';

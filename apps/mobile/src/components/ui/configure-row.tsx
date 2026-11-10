@@ -6,7 +6,14 @@ import { type ReactNode } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { type RowHue, rowTint, type Tint, toneColor, type ToneKey } from '@/lib/agent-color';
+import {
+  NEUTRAL_TINT,
+  type RowHue,
+  rowTint,
+  type Tint,
+  toneColor,
+  type ToneKey,
+} from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
@@ -19,27 +26,6 @@ import { cn } from '@/lib/utils';
  * the same presentation.
  */
 const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
-
-/**
- * Every row without a semantic tone renders this one neutral tile. A settings
- * list is not a list of agents: hashing each title into the agent hue ramp
- * gave a single list (Language / Trusted hosts / Device sessions) three
- * different accent tints. The neutral tile matches the sibling settings rows
- * (PreferenceRow, notifications CategoryRow), which use the un-tinted
- * secondary-foreground icon.
- *
- * It is shaped as a `Tint` so the shared `IconTile` renders it: the tile
- * classes are the same neutral pair the row used inline, and the icon keeps
- * the secondary-foreground stroke.
- */
-const NEUTRAL_TINT = {
-  hueClass: 'bg-hair-soft',
-  hueTextClass: 'text-secondary-foreground',
-  hueBorderClass: 'border-border',
-  tileBgClass: 'bg-hair-soft',
-  tileBorderClass: 'border-border',
-  hueThemeKey: 'secondaryForeground',
-} as const satisfies Tint;
 
 type ConfigureRowProps = {
   icon: LucideIcon;
@@ -114,9 +100,10 @@ export function ConfigureRow({
   // title the row's full width.
   const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE || isNarrowLayout(width);
   // A semantic tone outranks the curated destination hue, and a row carrying
-  // neither keeps the neutral tile that the settings surfaces outside the
-  // Profile screen still render (preferences-screen, account-settings-screen).
-  // A title never hashes into an agent hue here.
+  // neither keeps the shared neutral tile. A settings list is not a list of
+  // agents: hashing each title into the agent hue ramp gave one list (Language
+  // / Trusted hosts / Device sessions) three different accents, and a title
+  // never picks a hue here.
   let tint: Tint = NEUTRAL_TINT;
   if (tone) {
     tint = toneColor(tone);
@@ -136,8 +123,10 @@ export function ConfigureRow({
   // out of reach of a user who cannot act on it. The muted ink keeps 4.53:1
   // dark and 4.62:1 light, and the icon leaves the tint's hue for the same
   // ink (4.05:1 on the tile). The tile's own low-alpha fill and border stay,
-  // and the chevron, the pressed feedback and `accessibilityState` are what
-  // still say "unavailable".
+  // and the chevron, the pressed feedback and the row Pressable's
+  // `accessibilityState` are what still say "unavailable". The inner layout
+  // View owns no role, so it declares no interactive state of its own: a
+  // state on it would announce disablement from a node a reader never reaches.
   const iconTint: Tint = disabled ? { ...tint, hueThemeKey: 'mutedForeground' } : tint;
 
   const iconTile = <IconTile icon={Icon} tint={iconTint} />;
@@ -167,7 +156,6 @@ export function ConfigureRow({
 
   const inner = (
     <View
-      accessibilityState={{ disabled: Boolean(disabled) }}
       className={cn(
         stack ? 'gap-2 py-3' : 'flex-row items-center gap-3 py-3',
         !last && 'border-b-[0.5px] border-hair-soft',

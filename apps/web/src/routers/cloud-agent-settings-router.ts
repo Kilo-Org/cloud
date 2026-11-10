@@ -12,11 +12,14 @@ import {
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  BuiltinAgentSettingsInputSchema,
   canonicalRepoFullName,
   clearContextSandboxAllocation,
+  getBuiltinAgentSettings,
   getSandboxAllocationSettings,
   listBindings,
   removeRepositorySettings,
+  setBuiltinAgentSettings,
   setContextSandboxAllocation,
   setRepositorySettings,
   type ProfileOwner,
@@ -46,6 +49,7 @@ const CloudAgentSettingsSchema = z.object({
   canManage: z.boolean(),
   contextAllocation: z.string().nullable(),
   contextUnavailableReason: z.string().optional(),
+  builtinAgents: BuiltinAgentSettingsInputSchema,
   repositories: z.array(RepositorySettingsRowSchema),
   capabilities: sandboxSelectionCapabilitiesSchema,
   // Repository-scoped capability views so a GitLab row never offers a
@@ -85,10 +89,11 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       const canManage = role ? canManageOrganization(role) : true;
       const owner = ownerFromInput(organizationId, ctx.user.id);
 
-      const [capabilities, settings, bindings] = await Promise.all([
+      const [capabilities, settings, bindings, builtinAgents] = await Promise.all([
         loadSandboxCapabilities(ctx.user, ctx.headersList, organizationId),
         getSandboxAllocationSettings(db, owner),
         listBindings(db, owner),
+        getBuiltinAgentSettings(db, ctx.user.id),
       ]);
 
       const rows = new Map<string, z.infer<typeof RepositorySettingsRowSchema>>();
@@ -164,6 +169,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         canManage,
         contextAllocation: settings.contextAllocation,
         ...(contextReason ? { contextUnavailableReason: contextReason } : {}),
+        builtinAgents,
         repositories,
         capabilities,
         capabilitiesByPlatform: {
@@ -244,6 +250,14 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         allocation: input.allocation ?? null,
       });
       return { success: true };
+    }),
+
+  setBuiltinAgents: baseProcedure
+    .input(z.object({ agents: BuiltinAgentSettingsInputSchema }))
+    .output(z.object({ success: z.boolean(), agents: BuiltinAgentSettingsInputSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const agents = await setBuiltinAgentSettings(db, ctx.user.id, input.agents);
+      return { success: true, agents };
     }),
 
   removeRepositorySettings: baseProcedure

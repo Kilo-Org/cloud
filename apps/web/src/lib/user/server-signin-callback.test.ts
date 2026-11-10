@@ -35,10 +35,15 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async () => ({ id: 'cus_test' })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
+jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
+  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
+}));
 
 import jwt from 'jsonwebtoken';
+import { encode, type JWT } from 'next-auth/jwt';
 import { authOptions } from '@/lib/user/next-auth-options';
-import { createOrUpdateUser, linkAccountToExistingUser } from '@/lib/user';
+import { createOrUpdateUser, getUserAuthProviders, linkAccountToExistingUser } from '@/lib/user';
+import type * as UserModule from '@/lib/user';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
@@ -46,6 +51,10 @@ import {
   getOrganizationById,
   getUserOrgMemberships,
 } from '@kilocode/web-shared/lib/organizations/organizations';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
+import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockLinkAccountToExistingUser = jest.mocked(linkAccountToExistingUser);
@@ -65,6 +74,17 @@ function setValidTurnstileCookie() {
     value: jwt.sign({ guid: randomUUID(), ip: '203.0.113.7' }, NEXTAUTH_SECRET, {
       algorithm: 'HS256',
       expiresIn: '5m',
+    }),
+  });
+}
+
+/** Signs in the request as `userId` with a real NextAuth session cookie. */
+async function setSessionCookie(userId: string, claims: Partial<JWT> = {}) {
+  cookieStore.set('next-auth.session-token', {
+    name: 'next-auth.session-token',
+    value: await encode({
+      secret: NEXTAUTH_SECRET,
+      token: { kiloUserId: userId, sub: randomUUID(), ...claims },
     }),
   });
 }
@@ -239,6 +259,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       success: true,
       user: { id: 'existing-user', blocked_reason: null },
     } as never);
+    await setSessionCookie('existing-user');
 
     const result = await signIn({
       user: { id: 'x', email: 'sso-link@example.com', name: 'SSO Link', image: '' },
@@ -259,6 +280,87 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 
+  it('requires the web session to name the same user as the pending link', async () => {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+    } as never);
+    await setSessionCookie('other-user');
+
+    const result = await signIn({
+      user: { id: 'x', email: 'mismatch-link@example.com', name: 'Mismatch', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+      },
+      profile: { sub: 'openai-mismatch-sub', email: 'mismatch-link@example.com' },
+    } as never);
+
+    // The refusal is the linking failure the person reads on the page the link
+    // started from, and no user is settled and no provider is attached.
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('requires a web session to complete a pending link', async () => {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+    } as never);
+
+    const result = await signIn({
+      user: { id: 'x', email: 'anonymous-link@example.com', name: 'Anonymous', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+      },
+      profile: { sub: 'openai-anonymous-sub', email: 'anonymous-link@example.com' },
+    } as never);
+
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('sends a refused organization connect back to its BYOK card', async () => {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+      organizationId: SHARED_SERVICES_ORGANIZATION_ID,
+      chatGptScope: 'shared_services',
+    } as never);
+    await setSessionCookie('other-user');
+
+    const result = await signIn({
+      user: { id: 'x', email: 'org-mismatch@example.com', name: 'Org Mismatch', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+      },
+      profile: { sub: 'openai-org-mismatch-sub', email: 'org-mismatch@example.com' },
+    } as never);
+
+    // The organization's BYOK card reads `openai_error`, so a refused
+    // organization connect returns there, like the shared-services re-check.
+    expect(result).toBe(
+      `/organizations/${SHARED_SERVICES_ORGANIZATION_ID}/byok?openai_error=LINKING-FAILED`
+    );
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+  });
+
   it('carries the linking session organization onto the profile for an OpenAI connection', async () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: 'existing-user',
@@ -269,6 +371,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       success: true,
       user: { id: 'existing-user', blocked_reason: null },
     } as never);
+    await setSessionCookie('existing-user');
 
     const profile: Record<string, unknown> = {
       sub: 'openai-org-sub',
@@ -307,6 +410,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       success: true,
       user: { id: 'existing-user', blocked_reason: null },
     } as never);
+    await setSessionCookie('existing-user');
 
     return signIn({
       user: { id: 'x', email: 'shared-services@example.com', name: 'Shared', image: '' },
@@ -359,5 +463,295 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     } as never);
 
     await expect(openAiSharedServicesSignIn()).resolves.toBe(true);
+  });
+});
+
+describe('authOptions.callbacks.signIn for Claude', () => {
+  const claudeSignIn = (profile: Record<string, unknown>) =>
+    signIn({
+      user: { id: 'x', email: 'claude-cb@example.com', name: 'Claude CB', image: '' },
+      account: { provider: 'claude', providerAccountId: 'pairwise-sub', type: 'oauth' },
+      profile: { sub: 'pairwise-sub', email: 'claude-cb@example.com', ...profile },
+    } as never);
+
+  beforeEach(() => {
+    cookieStore.clear();
+    mockCreateOrUpdateUser.mockReset().mockResolvedValue({
+      success: true,
+      user: { id: 'settled-user', blocked_reason: null } as never,
+      isNew: false,
+    });
+    mockLinkAccountToExistingUser.mockReset();
+    mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
+    jest.mocked(isClaudePlatformOAuthEnabled).mockClear().mockResolvedValue(true);
+    mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
+      status: 'not_required',
+      domain: 'example.com',
+    });
+  });
+
+  it('refuses a Claude sign-in before settlement while it is not launched', async () => {
+    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValueOnce(false);
+    setValidTurnstileCookie();
+
+    const result = await claudeSignIn({});
+
+    expect(result).toEqual(expect.stringContaining('error=UNKNOWN-ERROR'));
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('settles an issuer-qualified Claude account from a token without email_verified', async () => {
+    setValidTurnstileCookie();
+    await expect(claudeSignIn({})).resolves.toBe(true);
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('claude-cb@example.com');
+    expect(mockCreateOrUpdateUser.mock.calls[0]?.[0]).toMatchObject({
+      provider: 'claude',
+      provider_account_id: `${CLAUDE_OIDC_ISSUER}#pairwise-sub`,
+      hosted_domain: '@@claude@@',
+    });
+    // Without a verified-email claim the sign-in must not attach to an account
+    // that already owns this email.
+    expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(false);
+  });
+
+  it('lets a verified-email claim auto-link, like every other provider', async () => {
+    setValidTurnstileCookie();
+    await expect(claudeSignIn({ email_verified: true })).resolves.toBe(true);
+    expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(true);
+  });
+
+  it('reports rejected claim names without identity or credential values', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await claudeSignIn({
+        access_token: 'private-access-value',
+        id_token: 'private-id-value',
+        private_claim: 'private-claim-value',
+        email: undefined,
+      });
+      expect(warn.mock.calls[0]?.[1]).toMatchObject({
+        reason: 'invalid_profile_claims',
+        rejectedClaims: ['email'],
+      });
+      const diagnostic = JSON.stringify(warn.mock.calls);
+      for (const value of [
+        'claude-cb@example.com',
+        'pairwise-sub',
+        'private-access-value',
+        'private-id-value',
+        'private-claim-value',
+        'private_claim',
+      ]) {
+        expect(diagnostic).not.toContain(value);
+      }
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it.each([
+    { email: undefined },
+    { email: null },
+    { email: 'not-an-email' },
+    { email: 'different@kilocode.ai' },
+    { email_verified: false },
+  ])(
+    'refuses a missing, unverified, or mismatched Claude email before flag evaluation: %s',
+    async profile => {
+      setValidTurnstileCookie();
+      await expect(claudeSignIn(profile)).resolves.toEqual(
+        expect.stringContaining('error=UNKNOWN-ERROR')
+      );
+      expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe('Claude explicit linking persistence', () => {
+  beforeEach(() => {
+    cookieStore.clear();
+    mockCreateOrUpdateUser.mockReset();
+    mockLinkAccountToExistingUser
+      .mockReset()
+      .mockImplementation(
+        jest.requireActual<typeof UserModule>('@/lib/user').linkAccountToExistingUser
+      );
+    mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
+    jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
+    mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: SHARED_SERVICES_ORGANIZATION_ID,
+    });
+  });
+
+  async function prepareLink(subject = `explicit-${randomUUID()}`) {
+    const owner = await insertTestUser({
+      google_user_email: `authenticated-link-${randomUUID()}@example.com`,
+      web_session_pepper: randomUUID(),
+    });
+    async function start() {
+      await setSessionCookie(owner.id, {
+        authProvider: 'workos',
+        webSessionPepper: owner.web_session_pepper,
+        ssoSourceOrganizationId: SHARED_SERVICES_ORGANIZATION_ID,
+      });
+      mockGetAccountLinkingSession.mockResolvedValueOnce({
+        existingUserId: owner.id,
+        targetProvider: 'claude',
+        createdAt: Date.now(),
+      });
+    }
+    await start();
+    return {
+      owner,
+      start,
+      complete: () =>
+        signIn({
+          user: { id: subject, email: 'external-link@example.net', name: 'External' },
+          account: { provider: 'claude', providerAccountId: subject, type: 'oauth' },
+          profile: { sub: subject, email: 'external-link@example.net' },
+        }),
+      providers: async () =>
+        (await getUserAuthProviders(owner.id)).filter(provider => provider.provider === 'claude'),
+      subject,
+    };
+  }
+
+  it('attaches a claim-omitting subject to the authenticated SSO owner', async () => {
+    const link = await prepareLink();
+    jest
+      .mocked(isClaudePlatformOAuthEnabled)
+      .mockImplementation(async email => email === link.owner.google_user_email);
+
+    await expect(link.complete()).resolves.toBe('/connected-accounts?linked=claude');
+    expect(await link.providers()).toEqual([
+      expect.objectContaining({
+        kilo_user_id: link.owner.id,
+        provider_account_id: `${CLAUDE_OIDC_ISSUER}#${link.subject}`,
+      }),
+    ]);
+    expect((await findUserById(link.owner.id))?.google_user_email).toBe(
+      link.owner.google_user_email
+    );
+  });
+
+  it.each(['absent', 'revoked', 'different'])(
+    'refuses attachment with an %s initiating session',
+    async sessionState => {
+      const link = await prepareLink();
+      if (sessionState === 'absent') {
+        cookieStore.clear();
+      } else {
+        const sessionUser = sessionState === 'different' ? await insertTestUser() : link.owner;
+        await setSessionCookie(sessionUser.id, {
+          webSessionPepper:
+            sessionState === 'revoked' ? randomUUID() : sessionUser.web_session_pepper,
+        });
+      }
+      await expect(link.complete()).resolves.toEqual(
+        expect.stringContaining('error=LINKING-FAILED')
+      );
+      expect(await link.providers()).toEqual([]);
+    }
+  );
+
+  it('refuses attachment when the initiating account loses release eligibility', async () => {
+    const link = await prepareLink();
+    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
+    await expect(link.complete()).resolves.toEqual(expect.stringContaining('error=LINKING-FAILED'));
+    expect(await link.providers()).toEqual([]);
+  });
+
+  it.each(['absent', 'different'])(
+    'treats an %s link intent as a plain sign-in that cannot attach the subject',
+    async intentState => {
+      const link = await prepareLink();
+      // The sign-in email already belongs to another Kilo account, so a plain
+      // sign-in for it must be refused instead of attaching the Claude subject.
+      const email = `external-${randomUUID()}@example.net`;
+      await insertTestUser({ google_user_email: email });
+      setValidTurnstileCookie();
+      mockResolveSsoAuthorityForDomain.mockResolvedValue({
+        status: 'not_required',
+        domain: 'example.net',
+      });
+      mockGetAccountLinkingSession
+        .mockReset()
+        .mockResolvedValue(
+          intentState === 'different'
+            ? { existingUserId: link.owner.id, targetProvider: 'google', createdAt: Date.now() }
+            : null
+        );
+      // Settlement finds the existing account that owns this email and another
+      // provider's subject.
+      mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'DIFFERENT-OAUTH' });
+      const result = await signIn({
+        user: { id: link.subject, email, name: 'External' },
+        account: { provider: 'claude', providerAccountId: link.subject, type: 'oauth' },
+        profile: { sub: link.subject, email },
+      } as never);
+      expect(result).toEqual(expect.stringContaining('error=DIFFERENT-OAUTH'));
+      // A plain sign-in reaches settlement for its own email without the
+      // auto-link step, so it cannot attach the subject to another account.
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(1);
+      expect(mockCreateOrUpdateUser.mock.calls[0]?.[0]).toMatchObject({
+        google_user_email: email,
+        provider_account_id: `${CLAUDE_OIDC_ISSUER}#${link.subject}`,
+      });
+      expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(false);
+      expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+      expect(await link.providers()).toEqual([]);
+    }
+  );
+
+  it('does not move a subject already attached to another account', async () => {
+    const original = await prepareLink();
+    await original.complete();
+    const attempted = await prepareLink(original.subject);
+    await expect(attempted.complete()).resolves.toEqual(
+      expect.stringContaining('error=ACCOUNT-ALREADY-LINKED')
+    );
+    expect(await attempted.providers()).toEqual([]);
+    expect(await original.providers()).toEqual([
+      expect.objectContaining({ kilo_user_id: original.owner.id }),
+    ]);
+  });
+
+  it('does not replace an existing Claude subject', async () => {
+    const original = await prepareLink();
+    await original.complete();
+    const attempted = await prepareLink();
+    mockGetAccountLinkingSession.mockReset().mockResolvedValueOnce({
+      existingUserId: original.owner.id,
+      targetProvider: 'claude',
+      createdAt: Date.now(),
+    });
+    await original.start();
+    await expect(attempted.complete()).resolves.toEqual(
+      expect.stringContaining('error=PROVIDER-ALREADY-LINKED')
+    );
+    expect(await original.providers()).toEqual([
+      expect.objectContaining({
+        provider_account_id: `${CLAUDE_OIDC_ISSUER}#${original.subject}`,
+      }),
+    ]);
+    expect(await attempted.providers()).toEqual([]);
+  });
+
+  it('permits a new link attempt for the same owner and subject', async () => {
+    const link = await prepareLink();
+    await link.complete();
+    await link.start();
+    await expect(link.complete()).resolves.toBe('/connected-accounts?linked=claude');
+    expect(await link.providers()).toEqual([
+      expect.objectContaining({
+        kilo_user_id: link.owner.id,
+        provider_account_id: `${CLAUDE_OIDC_ISSUER}#${link.subject}`,
+      }),
+    ]);
   });
 });

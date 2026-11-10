@@ -238,7 +238,7 @@ async function startConnectedSandbox(): Promise<{
   kiloSessionId: string;
   worktreeId: string;
 }> {
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(newSessionId());
   const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
   const sessionId = newSessionId();
@@ -432,7 +432,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
   });
 
   it('shortcuts only a stopped allocation with no unconfirmed provider ref', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
     const worktree = worktreeId();
@@ -601,7 +601,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
   });
 
   it('cleans a connected shared sandbox when the deleted worktree has no route', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
     const worktreeA = worktreeId();
@@ -770,7 +770,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
   });
 
   it('rejects a foreign sandbox location', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
 

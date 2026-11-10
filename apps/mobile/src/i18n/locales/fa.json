@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "دموی دسترسی از راه دور نیتیو",
+    "sessionsEmpty": "هنوز نشست نیتیو وجود ندارد",
+    "hosts": "میزبان‌های آنلاین",
+    "hostsEmpty": "میزبان آنلاینی وجود ندارد",
+    "directory": "پوشهٔ کاری",
+    "createSession": "ایجاد نشست نیتیو",
+    "queueIfOffline": "قرار دادن پرامپت در صف اگر میزبان آفلاین است",
+    "prompt": "پرامپت یا /command",
+    "localClear": "پاک کردن نمای محلی",
+    "abort": "لغو نوبت",
+    "failed": "عملیات دسترسی از راه دور نیتیو ناموفق بود",
+    "creationUnknown": "نتیجهٔ ایجاد نشست نامشخص است. پیش از تلاش دوباره، نشست‌ها را بازخوانی کنید.",
+    "commandFailed": "فرمان اجراگر ناموفق بود",
+    "invalidReply": "پاسخ اجراگر نامعتبر است",
+    "unsafeCommand": "از /compact، /new، /skill، /models، /agents یا /clear (فقط محلی) استفاده کنید.",
+    "status": "اتصال: {{connection}} · اجراگر: {{runner}}",
+    "presenceStatus": "میزبان‌ها: {{connection}}",
+    "commandStatus": "تحویل فرمان: {{status}}",
+    "delivered": "تحویل داده شد",
+    "expired": "منقضی شد"
+  },
   "common": {
     "cancel": "لغو",
     "done": "تمام",
@@ -110,6 +132,7 @@
     "newSession": "نشست جدید",
     "noModelsAvailable": "مدلی در دسترس نیست",
     "notFound": "پیدا نشد.",
+    "online": "آنلاین",
     "open": "باز کردن {{name}}",
     "openPullRequest": "پول ریکوئست باز",
     "completed": "تکمیل‌شده",
@@ -186,6 +209,7 @@
     "resendCode": "ارسال مجدد کد",
     "termsPrefix": "با ادامه، موافقت خود را با این موارد اعلام می‌کنید: ",
     "terms": "شرایط",
+    "termsInSentence": "شرایط",
     "termsConnector": " و ",
     "termsSuffix": ".",
     "moreSignInOptions": "گزینه‌های بیشتر برای ورود",
@@ -222,6 +246,7 @@
     "confirmDeletion": "تأیید حذف",
     "credits": "اعتبار",
     "failedToLoadBalance": "بارگذاری موجودی ممکن نشد. برای تلاش مجدد ضربه بزنید.",
+    "balanceLoadFailed": "بارگذاری موجودی ممکن نشد",
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "در این درخواست ادغام هیچ فایلی تغییر نکرده است.",
     "fileList": {
       "openNavigator": "باز کردن فهرست فایل‌ها",
-      "filesViewed": "فایل‌ها · {{viewed}} از {{total}} مشاهده‌شده",
       "listed": "(فهرست‌شده)",
       "layout": "چیدمان",
       "unified": "یکپارچه",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "بررسی اتصال به GitHub ممکن نشد.",
-      "checkFailedMessage": "وضعیت ورود تا بارگذاری این بخش در دسترس نیست.",
+      "checkFailedMessage": "اتصال به GitHub برقرار نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
       "checkFailedTitleGitLab": "بررسی اتصال به GitLab ممکن نشد.",
       "checkFailedTitleBitbucket": "بررسی اتصال به Bitbucket ممکن نشد.",
-      "providerCheckFailedMessage": "وضعیت اتصال تا بارگذاری در دسترس نیست.",
+      "providerCheckFailedMessage": "اتصال به ارائه‌دهنده برقرار نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
       "reconnectTitle": "اتصال مجدد به GitHub",
       "reconnectTitleGitLab": "اتصال مجدد به GitLab",
       "reconnectTitleBitbucket": "اتصال مجدد به Bitbucket",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "برای گرفتن عکس، دسترسی به دوربین را در تنظیمات فعال کنید."
+    },
+    "botStatus": {
+      "offline": "آفلاین"
     }
   },
   "codeReviewer": {
@@ -1623,6 +1650,7 @@
       "actionFailed": "امکان انجام این عملیات وجود نداشت. لطفاً دوباره تلاش کنید.",
       "actionBlocked": "امکان انجام این عملیات وجود نداشت. مشکل باید ابتدا برطرف شود تا بتوانید دوباره تلاش کنید.",
       "syncNoRepositories": "هیچ مخزنی در محدوده همگام‌سازی نیست. مخازنی را که عامل امنیتی پایش می‌کند انتخاب کنید، سپس دوباره همگام‌سازی کنید.",
+      "syncNoRepositoriesNoManage": "هیچ مخزنی در محدوده همگام‌سازی نیست. مالک سازمان، مدیر یا مدیر صورتحساب باید مخازن را متصل کند تا همگام‌سازی انجام شود.",
       "syncIntegrationInactive": "اتصال GitHub برای عامل امنیتی فعال نیست. برنامه Kilo در GitHub را دوباره متصل کنید، سپس دوباره همگام‌سازی کنید.",
       "syncMissingPermission": "برنامه Kilo در GitHub نمی‌تواند هشدارهای آسیب‌پذیری را بخواند. آن مجوز را در GitHub اعطا کنید، سپس دوباره همگام‌سازی کنید.",
       "configConflict": "تنظیمات عامل امنیتی جای دیگری تغییر کرده است. آخرین تنظیمات را بررسی و دوباره ذخیره کنید."
@@ -1810,6 +1838,7 @@
       "emptyDescription": "برای شروع، در کادر زیر پیامی بفرستید.",
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
+      "emptyReadOnlyTitle": "پیامی در این نشست وجود ندارد",
       "renameAccessibility": "تغییر نام نشست: {{title}}",
       "cloningSession": "در حال کپی کردن نشست",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد.",
@@ -1909,7 +1938,7 @@
       "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
       "enterPromptToStart": "برای شروع یک پرامپت اضافه کنید.",
       "enterPromptOrFileToStart": "برای شروع یک پرامپت یا فایل اضافه کنید.",
-      "connectProviderToStart": "برای شروع یک ارائه‌دهنده را متصل کنید.",
+      "connectProviderToStart": "مخزن‌ها از یک حساب GitHub، GitLab یا Bitbucket که اتصالش برقرار است می‌آیند.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",
       "prefillRepoAndModelUnavailable": "مخزن و مدل نشست اصلی دیگر در دسترس نیستند. از گزینه‌های زیر مخزن و مدل دیگری انتخاب کنید.",
@@ -2091,6 +2120,8 @@
       "assistantStopped": "پاسخ متوقف شد.",
       "assistantContextOverflow": "گفت‌وگو برای این مدل بیش از حد طولانی است.",
       "assistantProviderError": "ارائه‌دهنده خطا برگرداند.",
+      "assistantProviderRefused": "ارائه‌دهنده این درخواست را رد کرد و تلاش دوباره ممکن نیست.",
+      "assistantCreditsRefusal": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد.",
       "assistantOutputLimit": "پاسخ به محدودیت خروجی مدل رسید.",
       "assistantStructuredOutput": "پاسخ با قالب مورد نیاز مطابقت نداشت.",
       "assistantFailed": "تولید پاسخ ناموفق بود."
@@ -2123,6 +2154,7 @@
       "preparingEnvironment": "در حال آماده‌سازی محیط",
       "preparationComplete": "آماده‌سازی کامل شد",
       "preparationFailed": "آماده‌سازی ناموفق بود",
+      "preparationStageFailed": "{{stage}} ناموفق بود",
       "setupCommand": "دستور راه‌اندازی {{index}}",
       "setupCommandOf": "دستور راه‌اندازی {{index}} از {{displayCount}}",
       "stepWorkspaceSetup": "راه‌اندازی فضای کار",
@@ -2161,7 +2193,7 @@
       "detailSetupCommandTimedOut": "مهلت دستور راه‌اندازی {{index}} به پایان رسید",
       "detailColdRestore": "بازیابی سرد، اسنپ‌شات اعمال شد، فایل‌های بازیابی‌شده: {{applied}} از {{total}}",
       "detailProgressPercent": "{{percent}}٪ کامل شد",
-      "detailRestoreIncompleteReport": "بازیابی نشست ناقص بود، فایل‌های بازیابی‌نشده: {{skipped}} از {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "فایل‌های بازیابی‌نشده: {{skipped}} از {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "موارد حذف‌شده: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} و {{omitted}} مورد دیگر",
       "detailReasonPatchFailed": "وصله اعمال نشد",
@@ -2410,16 +2442,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "اندازه پنجره زمینه در دسترس نیست",
-      "tapToViewDetails": "برای مشاهدهٔ جزئیات زمینه، بزنید.",
-      "costSuffix": "، هزینه {{cost}}",
-      "tokensWindowUnavailable": "زمینه: {{used}} توکن، اندازهٔ پنجره در دسترس نیست",
-      "tokensUsage": "زمینه: {{used}} از {{window}} توکن، {{percentage}} استفاده‌شده",
+      "tapToViewDetails": " برای مشاهدهٔ جزئیات زمینه، بزنید.",
+      "costClause": "، هزینه {{cost}}",
+      "loadingCostSpoken": "هزینه {{cost}}.",
+      "tokensWindowUnavailable": "زمینه: {{used}} توکن، اندازهٔ پنجره در دسترس نیست{{costClause}}.",
+      "tokensUsage": "زمینه: {{used}} از {{window}} توکن، {{percentage}} استفاده‌شده{{costClause}}.",
       "title": "میزان استفاده از زمینه",
       "used": "استفاده‌شده",
       "provider": "ارائه‌دهنده",
       "totalCost": "هزینه کل",
       "usageReflectsLatest": "میزان استفاده بر اساس آخرین پاسخ تکمیل‌شدهٔ دستیار است.",
-      "usageUnavailable": "میزان استفاده از زمینه در دسترس نیست",
+      "usageUnavailable": "میزان استفاده از زمینه در دسترس نیست{{costClause}}.",
       "tokenUsage": "مصرف توکن",
       "cacheRate": "نرخ استفاده از کش",
       "modelsCount": "مدل‌ها ({{displayCount}})",
@@ -2500,7 +2533,6 @@
   },
   "addCredits": {
     "cta": "افزودن اعتبار",
-    "description": "برای ادامه استفاده، اعتبار اضافه کنید.",
     "billingPage": "صفحه صورتحساب"
   },
   "deviceSessions": {
@@ -3002,9 +3034,9 @@
       "searching": "جستجوی وب",
       "thinking": "در حال تفکر"
     },
-    "planOf": "از",
+    "planProgress": "{{done}} از {{total}}",
     "filesChanged": "فایل‌های تغییریافته",
-    "finishedIn": "تمام‌شده در",
+    "finishedIn": "تمام‌شده در {{duration}}",
     "noActivityFor": "بدون فعالیت برای",
     "prOpened": "پول ریکوئست باز شد",
     "permissionWants": "می‌خواهد اجرا کند",
@@ -3312,7 +3344,7 @@
     "reasoningEffort": {
       "modelFlag": "این مدل از میزان تفکر پشتیبانی می‌کند"
     },
-    "creditsRequired": "اعتبار کافی برای ارسال این پیام وجود ندارد. اعتبار اضافه کنید و دوباره امتحان کنید."
+    "creditsRequired": "اعتبار کافی برای ارسال این پیام وجود ندارد."
   },
   "settingsTools": {
     "confirmTitle": "این تغییر تأیید شود؟"
@@ -3346,8 +3378,8 @@
     "saved": "تنظیمات هشدار هزینه ذخیره شد",
     "loadError": "هشدارهای هزینه بارگذاری نشد.",
     "saveError": "هشدارهای هزینه ذخیره نشد.",
-    "empty": "هشدارهای هزینه خاموش است. برای هشدار دادن به مخاطبان صورتحساب این حوزه آن‌ها را روشن کن.",
-    "noSpend": "هنوز هیچ هزینه‌ای ثبت نشده است",
+    "sendAlerts": "فرستادن هشدارها",
+    "noSpend": "هنوز هیچ هزینه‌ای",
     "spend24h": "هزینه در ۲۴ ساعت گذشته",
     "multiplierError": "ضریبی برابر ۱ یا بیشتر وارد کن",
     "permissionDenied": "شما اجازهٔ مدیریت هشدارهای هزینه را ندارید.",
@@ -3753,5 +3785,8 @@
     "noEnabledContexts": "هیچ بخشی برای گزارش‌های زمان‌بندی‌شده فعال نیست",
     "sourceBlocker": "جلسه به توجه نیاز دارد",
     "sourceMetadata": "فراداده‌های ثبت‌شدهٔ جلسه"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"
   }
 }

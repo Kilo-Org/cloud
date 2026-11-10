@@ -127,6 +127,10 @@ export function controlPlaneRouteSpecFromAttachPayload(
     ...(git ? { git } : {}),
     ...(env ? { env } : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands } : {}),
+    ...(payload.startCommands ? { startCommands: payload.startCommands } : {}),
+    ...(payload.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: payload.environmentSetupCommandCount }),
     ...(runtimeIsolation ? { runtimeIsolation } : {}),
     // The Sandbox DO replaces this with its own route attempt id; the field is
     // only a protocol placeholder until an attempt starts.
@@ -219,12 +223,7 @@ export function buildControlPlaneSessionRegistration(
   ) {
     throw new Error('Sandbox selection kind does not match session metadata');
   }
-  const containment =
-    sandboxSelection.containment ??
-    getWorktreeCredentialContainment(runtimeConfiguration?.containmentEnabled ?? true);
-  if (sandboxProvider === 'vercel' && !containment.kilocode && !containment.github) {
-    throw new Error('Vercel requires credential containment');
-  }
+  const containment = getWorktreeCredentialContainment();
   if (!hasModernRuntimeAuthorization(metadata)) {
     throw new SessionCredentialUpgradeRequiredError();
   }
@@ -253,6 +252,11 @@ export function buildControlPlaneSessionRegistration(
     ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
     ...(!readOnlyBitbucketReview && profile.runtimeAgents?.length
       ? { runtimeAgents: profile.runtimeAgents }
+      : {}),
+    ...(!readOnlyBitbucketReview &&
+    profile.builtinAgents &&
+    Object.keys(profile.builtinAgents).length > 0
+      ? { builtinAgents: profile.builtinAgents }
       : {}),
     ...(!readOnlyBitbucketReview && profile.kiloCommands?.length
       ? { kiloCommands: profile.kiloCommands }

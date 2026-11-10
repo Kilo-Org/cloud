@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Predstavitev izvornega oddaljenega upravljanja",
+    "sessionsEmpty": "Ni še izvornih sej",
+    "hosts": "Povezani gostitelji",
+    "hostsEmpty": "Ni povezanih gostiteljev",
+    "directory": "Delovni imenik",
+    "createSession": "Ustvari izvorno sejo",
+    "queueIfOffline": "Dodaj poziv v čakalno vrsto, če gostitelj ni povezan",
+    "prompt": "Poziv ali /command",
+    "localClear": "Počisti lokalni prikaz",
+    "abort": "Prekini potezo",
+    "failed": "Izvorno oddaljeno dejanje ni uspelo",
+    "creationUnknown": "Izid ustvarjanja ni znan. Pred ponovnim poskusom osveži seje.",
+    "commandFailed": "Ukaz izvajalnika ni uspel",
+    "invalidReply": "Neveljaven odgovor izvajalnika",
+    "unsafeCommand": "Uporabi /compact, /new, /skill, /models, /agents ali /clear (samo lokalno).",
+    "status": "Povezava: {{connection}} · Izvajalnik: {{runner}}",
+    "presenceStatus": "Gostitelji: {{connection}}",
+    "commandStatus": "Dostava ukaza: {{status}}",
+    "delivered": "Dostavljeno",
+    "expired": "Poteklo"
+  },
   "common": {
     "cancel": "Prekliči",
     "done": "Končano",
@@ -110,6 +132,7 @@
     "newSession": "Nova seja",
     "noModelsAvailable": "Ni razpoložljivih modelov",
     "notFound": "Vsebine ni mogoče najti.",
+    "online": "Na spletu",
     "open": "Odpri {{name}}",
     "openPullRequest": "Odprta zahteva za združitev",
     "completed": "Dokončano",
@@ -186,6 +209,7 @@
     "resendCode": "Znova pošlji kodo",
     "termsPrefix": "Z nadaljevanjem sprejemaš naslednja dokumenta: ",
     "terms": "Pogoji",
+    "termsInSentence": "Pogoji",
     "termsConnector": " in ",
     "termsSuffix": ".",
     "moreSignInOptions": "Več možnosti prijave",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Potrdi izbris",
     "credits": "Krediti",
     "failedToLoadBalance": "Stanja ni bilo mogoče naložiti. Tapni za ponovni poskus.",
+    "balanceLoadFailed": "Stanja ni bilo mogoče naložiti",
     "hideBalance": "Skrij stanje",
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Ta zahtevek za združitev ne vsebuje sprememb datotek.",
     "fileList": {
       "openNavigator": "Odpri seznam datotek",
-      "filesViewed": "Datoteke · ogledano: {{viewed}} od {{total}}",
       "listed": "(na seznamu)",
       "layout": "Postavitev",
       "unified": "Združeno",
@@ -702,10 +726,10 @@
     },
     "connect": {
       "checkFailedTitle": "Povezave z GitHubom ni bilo mogoče preveriti.",
-      "checkFailedMessage": "Stanje prijave bo na voljo šele po končanem nalaganju.",
+      "checkFailedMessage": "Ni bilo mogoče vzpostaviti povezave z GitHubom. Preveri povezavo in poskusi znova.",
       "checkFailedTitleGitLab": "Povezave z GitLabom ni bilo mogoče preveriti.",
       "checkFailedTitleBitbucket": "Povezave z Bitbucketom ni bilo mogoče preveriti.",
-      "providerCheckFailedMessage": "Stanje povezave bo na voljo po končanem nalaganju.",
+      "providerCheckFailedMessage": "Ni bilo mogoče vzpostaviti povezave s ponudnikom. Preveri povezavo in poskusi znova.",
       "reconnectTitle": "Ponovna povezava z GitHubom",
       "reconnectTitleGitLab": "Ponovna povezava z GitLabom",
       "reconnectTitleBitbucket": "Ponovna povezava z Bitbucketom",
@@ -989,6 +1013,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Za fotografiranje v nastavitvah dovoli dostop do kamere."
+    },
+    "botStatus": {
+      "offline": "Brez povezave"
     }
   },
   "codeReviewer": {
@@ -1687,6 +1714,7 @@
       "actionFailed": "Tega dejanja ni bilo mogoče dokončati. Poskusi znova.",
       "actionBlocked": "Tega dejanja ni bilo mogoče dokončati. Težavo je treba najprej odpraviti.",
       "syncNoRepositories": "V obsegu sinhronizacije ni nobenega repozitorija. Izberite repozitorije, ki jih Varnostni agent spremlja, in znova sinhronizirajte.",
+      "syncNoRepositoriesNoManage": "V obsegu sinhronizacije ni nobenega repozitorija. Lastnik organizacije, skrbnik ali skrbnik obračunavanja mora povezati repozitorije, preden je mogoče sinhronizirati.",
       "syncIntegrationInactive": "Povezava z GitHub za Varnostnega agenta ni aktivna. Znova povežite Kilo GitHub App in nato znova sinhronizirajte.",
       "syncMissingPermission": "Kilo GitHub App ne more brati opozoril o ranljivostih. V GitHubu dodeli to dovoljenje in znova sinhroniziraj.",
       "configConflict": "Nastavitve varnostnega agenta so bile spremenjene drugje. Preglej najnovejše nastavitve in znova shrani."
@@ -1882,6 +1910,7 @@
       "emptyDescription": "Za začetek pošlji sporočilo v spodnjem polju.",
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Še ni sporočil",
+      "emptyReadOnlyTitle": "V tej seji ni sporočil",
       "renameAccessibility": "Preimenuj sejo: {{title}}",
       "cloningSession": "Kloniranje seje",
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
@@ -1981,7 +2010,7 @@
       "selectRepositoryToStart": "Izberi skladišče za začetek.",
       "enterPromptToStart": "Dodaj poziv za začetek.",
       "enterPromptOrFileToStart": "Dodaj poziv ali datoteko za začetek.",
-      "connectProviderToStart": "Poveži ponudnika za začetek.",
+      "connectProviderToStart": "Skladišča prihajajo iz povezanega računa GitHub, GitLab ali Bitbucket.",
       "promptPlaceholder": "Česa se želiš lotiti?",
       "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
       "prefillRepoAndModelUnavailable": "Skladišče in model prvotne seje nista več na voljo. Izberi ju spodaj.",
@@ -2171,6 +2200,8 @@
       "assistantStopped": "Ustvarjanje odgovora je bilo ustavljeno.",
       "assistantContextOverflow": "Pogovor je predolg za model.",
       "assistantProviderError": "Ponudnik je vrnil napako.",
+      "assistantProviderRefused": "Ponudnik je zavrnil to zahtevo in poskusa ni mogoče ponoviti.",
+      "assistantCreditsRefusal": "Za zagon storitve Cloud Agent ni dovolj kreditov.",
       "assistantOutputLimit": "Odgovor je dosegel omejitev izhoda modela.",
       "assistantStructuredOutput": "Odgovor ni ustrezal zahtevanemu formatu.",
       "assistantFailed": "Odgovora ni bilo mogoče ustvariti."
@@ -2203,6 +2234,7 @@
       "preparingEnvironment": "Priprava okolja",
       "preparationComplete": "Priprava končana",
       "preparationFailed": "Priprava ni uspela",
+      "preparationStageFailed": "{{stage}}: neuspeh",
       "setupCommand": "Ukaz za pripravo {{index}}",
       "setupCommandOf": "Ukaz za pripravo {{index}} od {{displayCount}}",
       "stepWorkspaceSetup": "Nastavitev delovnega prostora",
@@ -2241,7 +2273,7 @@
       "detailSetupCommandTimedOut": "Čas ukaza za pripravo {{index}} je potekel",
       "detailColdRestore": "Hladna obnovitev, posnetek uveljavljen, obnovljene datoteke: {{applied}} od {{total}}",
       "detailProgressPercent": "{{percent}}% dokončano",
-      "detailRestoreIncompleteReport": "Obnovitev seje ni dokončana – datoteke niso obnovljene: {{skipped}} od {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Datoteke niso obnovljene: {{skipped}} od {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Manjka: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} in še {{omitted}}",
       "detailReasonPatchFailed": "popravek se ni uveljavil",
@@ -2498,16 +2530,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Velikost kontekstnega okna ni na voljo",
-      "tapToViewDetails": "Tapni za prikaz podrobnosti konteksta.",
-      "costSuffix": ", strošek {{cost}}",
-      "tokensWindowUnavailable": "Žetoni v kontekstu: {{used}}, velikost okna ni na voljo",
-      "tokensUsage": "Žetoni v kontekstu: {{used}} od {{window}}, poraba: {{percentage}}",
+      "tapToViewDetails": " Tapni za prikaz podrobnosti konteksta.",
+      "costClause": ", strošek {{cost}}",
+      "loadingCostSpoken": "strošek {{cost}}.",
+      "tokensWindowUnavailable": "Žetoni v kontekstu: {{used}}, velikost okna ni na voljo{{costClause}}.",
+      "tokensUsage": "Žetoni v kontekstu: {{used}} od {{window}}, poraba: {{percentage}}{{costClause}}.",
       "title": "Poraba konteksta",
       "used": "Uporabljeno",
       "provider": "Ponudnik",
       "totalCost": "Skupni strošek",
       "usageReflectsLatest": "Prikazana poraba velja za zadnji dokončani odgovor asistenta.",
-      "usageUnavailable": "Uporaba konteksta ni na voljo",
+      "usageUnavailable": "Uporaba konteksta ni na voljo{{costClause}}.",
       "tokenUsage": "Poraba žetonov",
       "cacheRate": "Delež iz predpomnilnika",
       "modelsCount": "Modeli ({{displayCount}})",
@@ -2594,7 +2627,6 @@
   },
   "addCredits": {
     "cta": "Dodaj kredite",
-    "description": "Dodaj kredite za nadaljnjo uporabo.",
     "billingPage": "stran za obračunavanje"
   },
   "deviceSessions": {
@@ -3100,9 +3132,9 @@
       "searching": "Spletno iskanje",
       "thinking": "Premišljevanje"
     },
-    "planOf": "od",
+    "planProgress": "{{done}} od {{total}}",
     "filesChanged": "spremenjenih datotek",
-    "finishedIn": "Dokončano v",
+    "finishedIn": "Dokončano v {{duration}}",
     "noActivityFor": "Ni dejavnosti že",
     "prOpened": "Pull request odprt",
     "permissionWants": "Želi zagnati",
@@ -3412,7 +3444,7 @@
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"
     },
-    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila. Dodaj kredite in poskusi znova."
+    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila."
   },
   "settingsTools": {
     "confirmTitle": "Potrdim to spremembo?"
@@ -3446,8 +3478,8 @@
     "saved": "Nastavitve opozoril o porabi so shranjene",
     "loadError": "Opozoril o porabi ni bilo mogoče naložiti.",
     "saveError": "Opozoril o porabi ni bilo mogoče shraniti.",
-    "empty": "Opozorila o porabi so izklopljena. Vklopi jih, da opozoriš obračunske stike tega obsega.",
-    "noSpend": "Poraba še ni zabeležena",
+    "sendAlerts": "Pošlji opozorila",
+    "noSpend": "Ni še porabe",
     "spend24h": "Poraba v zadnjih 24 urah",
     "multiplierError": "Vnesi množitelj 1 ali večji",
     "permissionDenied": "Nimaš dovoljenja za upravljanje opozoril o porabi.",
@@ -3873,5 +3905,8 @@
     "noEnabledContexts": "Za načrtovana poročila ni omogočen noben kontekst",
     "sourceBlocker": "Seja zahteva pozornost",
     "sourceMetadata": "Zajeti metapodatki seje"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ni bilo mogoče odpreti tega rezultata iskanja"
   }
 }

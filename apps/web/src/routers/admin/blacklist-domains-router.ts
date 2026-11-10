@@ -7,18 +7,28 @@ import {
   getBlockedSignupTlds,
   normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import { BlacklistDomainsConfigSchema } from '@kilocode/worker-utils/account-access';
+import {
+  BlacklistDomainsConfigSchema,
+  MAX_BLACKLIST_DOMAINS,
+} from '@kilocode/worker-utils/account-access';
 import {
   BLACKLIST_DOMAINS_REDIS_KEY,
   BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
 } from '@kilocode/web-shared/lib/redis-keys';
 import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { kilocode_users } from '@kilocode/db/schema';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { blacklisted_domains, kilocode_users } from '@kilocode/db/schema';
+import { TRPCError } from '@trpc/server';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';
+import { createHash } from 'node:crypto';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
+import {
+  BLACKLIST_STATS_ROW_LIMIT,
+  computeBlacklistStats,
+  countUsersByEmailHost,
+} from '@/lib/abuse/blacklist-domain-stats';
 
 const SuspiciousDomainsInputSchema = z
   .object({
@@ -26,87 +36,109 @@ const SuspiciousDomainsInputSchema = z
   })
   .optional();
 
-// The admin table renders one row per entry. An imported blocklist can hold
-// tens of thousands of entries, so the procedure returns only the domains that
-// actually caught users, ordered by count.
-const STATS_ROW_LIMIT = 200;
+// Admin saves must round-trip the entire snapshot, not the access readers' capped prefix.
+const AdminBlacklistDomainsConfigSchema = BlacklistDomainsConfigSchema.extend({
+  domains: z.array(z.string()),
+});
+const AdminBlacklistDomainsInputSchema = BlacklistDomainsInputSchema.extend({
+  domains: z.array(z.string().min(1).trim()),
+  expected_version: z.string().length(64),
+});
 
-async function readConfigOrThrow(): Promise<BlacklistDomainsConfig> {
+async function readConfigOrThrow() {
   const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
-  if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
-  return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
-}
-
-async function readConfig(): Promise<BlacklistDomainsConfig> {
-  try {
-    return await readConfigOrThrow();
-  } catch {
-    return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
-  }
+  return {
+    config:
+      raw === null
+        ? DEFAULT_BLACKLIST_DOMAINS_CONFIG
+        : AdminBlacklistDomainsConfigSchema.parse(JSON.parse(raw)),
+    version: createHash('sha256')
+      .update(raw ?? '')
+      .digest('hex'),
+  };
 }
 
 export const adminBlacklistDomainsRouter = createTRPCRouter({
   get: adminProcedure.query(async () => {
-    const config = await readConfig();
+    const { config, version } = await readConfigOrThrow();
     return {
       ...config,
+      version,
       // The editor always shows an editable list: the stored one, or the
       // effective fallback (env or built-in) when the stored config predates
       // the field.
       blocked_signup_tlds: config.blocked_signup_tlds ?? (await getBlockedSignupTlds()),
+      dropped_domains: Math.max(0, config.domains.length - MAX_BLACKLIST_DOMAINS),
     };
   }),
 
-  set: adminProcedure.input(BlacklistDomainsInputSchema).mutation(async ({ input, ctx }) => {
-    // Deduplicate and normalize domains
+  set: adminProcedure.input(AdminBlacklistDomainsInputSchema).mutation(async ({ input, ctx }) => {
     const normalizedDomains = [
       ...new Set(input.domains.map(d => d.toLowerCase().trim()).filter(Boolean)),
     ];
 
-    // Diff against the list the admin started from so only newly added domains
-    // trigger a backfill. A failed read must not look like an empty list: that
-    // would turn a one-domain save into a backfill of every listed domain. Skip
-    // the automatic run in that case and let the manual backfill handle it.
-    let previous: BlacklistDomainsConfig | null = null;
+    let saved;
     try {
-      previous = await readConfigOrThrow();
+      saved = await db.transaction(async tx => {
+        // Serialize both stores, including the previous-config read, across admin saves.
+        await tx.execute(sql`SET LOCAL lock_timeout = '10s'`);
+        await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+        await tx.execute(sql`LOCK TABLE ${blacklisted_domains} IN EXCLUSIVE MODE`);
+        const { config: previous, version } = await readConfigOrThrow();
+        if (version !== input.expected_version) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Blacklist changed. Reload the complete list before saving.',
+          });
+        }
+        const previousDomains = new Set(previous.domains.map(d => d.toLowerCase().trim()));
+        const addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
+        const blockedSignupTlds =
+          input.blocked_tlds === undefined
+            ? (previous.blocked_signup_tlds ?? (await getBlockedSignupTlds()))
+            : normalizeSignupTlds(input.blocked_tlds);
+
+        const updatedAt = new Date().toISOString();
+        const config: BlacklistDomainsConfig = {
+          domains: normalizedDomains,
+          blocked_signup_tlds: blockedSignupTlds,
+          updated_at: updatedAt,
+          updated_by: ctx.user.id,
+          updated_by_email: ctx.user.google_user_email,
+        };
+        const deadline = Date.now() + 120_000;
+        await tx.delete(blacklisted_domains);
+        for (let offset = 0; offset < normalizedDomains.length; offset += 1000) {
+          if (Date.now() > deadline) throw new Error('Blacklist synchronization timed out');
+          await tx
+            .insert(blacklisted_domains)
+            .values(normalizedDomains.slice(offset, offset + 1000).map(domain => ({ domain })));
+        }
+        // Stage SQL first so failed batches leave Redis protection and the additions diff intact.
+        // Redis and the commit cannot be atomic; never roll back Redis after an ambiguous failure.
+        await redisClient.mset({
+          [BLACKLIST_DOMAINS_REDIS_KEY]: JSON.stringify(config),
+          [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: updatedAt,
+        });
+        return { config, addedDomains };
+      });
     } catch (error) {
-      captureException(error, { tags: { source: 'blacklist_domains_previous_config_read' } });
+      if (error instanceof TRPCError && error.code === 'CONFLICT') throw error;
+      captureException(error, { tags: { source: 'blacklist_domains_dual_write' } });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message:
+          'Blacklist save failed. Redis may already be updated. Reload and retry to synchronize Postgres, then run the account backfill.',
+        cause: error,
+      });
     }
-    const previousDomains = new Set((previous?.domains ?? []).map(d => d.toLowerCase().trim()));
-    const addedDomains = previous
-      ? normalizedDomains.filter(domain => !previousDomains.has(domain))
-      : null;
-
-    // An omitted field keeps the stored list so a stale admin tab cannot
-    // silently disable TLD blocking. A failed previous read falls back to the
-    // cached effective list rather than overwriting with the built-in default.
-    // A TLD never triggers a backfill: it only gates new signups.
-    const blockedSignupTlds =
-      input.blocked_tlds === undefined
-        ? (previous?.blocked_signup_tlds ?? (await getBlockedSignupTlds()))
-        : normalizeSignupTlds(input.blocked_tlds);
-
-    const updatedAt = new Date().toISOString();
-    const config: BlacklistDomainsConfig = {
-      domains: normalizedDomains,
-      blocked_signup_tlds: blockedSignupTlds,
-      updated_at: updatedAt,
-      updated_by: ctx.user.id,
-      updated_by_email: ctx.user.google_user_email,
-    };
-    // Readers download the list only when the updated_at key changes, so both
-    // keys must change together.
-    await redisClient.mset({
-      [BLACKLIST_DOMAINS_REDIS_KEY]: JSON.stringify(config),
-      [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: updatedAt,
-    });
+    const { config, addedDomains } = saved;
 
     // The list is already live for auth checks at this point, so a backfill
     // failure must not fail the save. Report it and point the admin at the
     // manual backfill instead.
-    const backfill = { blocked: 0, remaining: false, failed: addedDomains === null };
-    if (addedDomains && addedDomains.length > 0) {
+    const backfill = { blocked: 0, remaining: false, failed: false };
+    if (addedDomains.length > 0) {
       try {
         const result = await backfillBlockBlacklistedDomainsBatch({
           actorId: ctx.user.id,
@@ -126,18 +158,10 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
   stats: adminProcedure.query(async () => {
     const domains = await getBlacklistedDomains();
 
-    // One grouped query against the indexed email_domain column rather than
-    // an N+1 LIKE scan of google_user_email per blacklist entry.
-    const emailDomainCounts = await db
-      .select({
-        email_domain: kilocode_users.email_domain,
-        count: count(),
-      })
-      .from(kilocode_users)
-      .where(isNotNull(kilocode_users.email_domain))
-      .groupBy(kilocode_users.email_domain);
+    // Read-only admin report: the grouped aggregate stays off the primary pool.
+    const emailHostCounts = await countUsersByEmailHost(readDb);
 
-    return computeBlacklistStats(domains, emailDomainCounts, STATS_ROW_LIMIT);
+    return computeBlacklistStats(domains, emailHostCounts, BLACKLIST_STATS_ROW_LIMIT);
   }),
 
   suspicious: adminProcedure.input(SuspiciousDomainsInputSchema).query(async ({ input }) => {
@@ -191,57 +215,4 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
 export function isDomainOnBlacklist(domain: string, normalizedBlacklist: string[]): boolean {
   const lower = domain.toLowerCase();
   return normalizedBlacklist.some(entry => lower === entry || lower.endsWith('.' + entry));
-}
-
-export type EmailDomainCount = { email_domain: string | null; count: number };
-
-export type BlacklistStats = {
-  domains: { domain: string; blockedCount: number }[];
-  totalDomains: number;
-  totalBlockedUsers: number;
-};
-
-/**
- * Aggregates per-email_domain counts into per-blacklist-entry blocked counts.
- *
- * Walks each email_domain once and credits every blacklist entry that is one of
- * its label-boundary suffixes. The entry-major alternative (test every entry
- * against every group) is quadratic and does not survive a large imported list.
- *
- * `limit` caps the returned rows after sorting; `totalDomains` and
- * `totalBlockedUsers` still describe the whole list so the caller can say what
- * it is not showing.
- */
-export function computeBlacklistStats(
-  blacklistedDomains: string[],
-  emailDomainCounts: readonly EmailDomainCount[],
-  limit?: number
-): BlacklistStats {
-  const lookup = new Set(blacklistedDomains.map(domain => domain.toLowerCase()));
-  const counts = new Map<string, number>();
-
-  for (const row of emailDomainCounts) {
-    if (row.email_domain === null) continue;
-
-    const labels = row.email_domain.toLowerCase().split('.');
-    for (let i = 0; i < labels.length; i++) {
-      const candidate = labels.slice(i).join('.');
-      if (!lookup.has(candidate)) continue;
-
-      counts.set(candidate, (counts.get(candidate) ?? 0) + row.count);
-    }
-  }
-
-  const domainCounts = blacklistedDomains.map(domain => ({
-    domain,
-    blockedCount: counts.get(domain.toLowerCase()) ?? 0,
-  }));
-
-  domainCounts.sort((a, b) => b.blockedCount - a.blockedCount);
-
-  return {
-    domains: limit === undefined ? domainCounts : domainCounts.slice(0, limit),
-    totalDomains: blacklistedDomains.length,
-    totalBlockedUsers: domainCounts.reduce((sum, d) => sum + d.blockedCount, 0),
-  };
 }

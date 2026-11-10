@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Natiivi etädemo",
+    "sessionsEmpty": "Ei vielä natiiveja istuntoja",
+    "hosts": "Verkossa olevat isännät",
+    "hostsEmpty": "Ei verkossa olevia isäntiä",
+    "directory": "Työhakemisto",
+    "createSession": "Luo natiivi istunto",
+    "queueIfOffline": "Lisää kehote jonoon, jos isäntä ei ole verkossa",
+    "prompt": "Kehote tai /command",
+    "localClear": "Tyhjennä paikallinen näkymä",
+    "abort": "Keskeytä vuoro",
+    "failed": "Natiivi etätoiminto epäonnistui",
+    "creationUnknown": "Luonnin lopputulos on tuntematon. Päivitä istunnot ennen kuin yrität uudelleen.",
+    "commandFailed": "Suorittajan komento epäonnistui",
+    "invalidReply": "Virheellinen vastaus suorittajalta",
+    "unsafeCommand": "Käytä komentoa /compact, /new, /skill, /models, /agents tai /clear (vain paikallisesti).",
+    "status": "Yhteys: {{connection}} · Suorittaja: {{runner}}",
+    "presenceStatus": "Isännät: {{connection}}",
+    "commandStatus": "Komennon toimitus: {{status}}",
+    "delivered": "Toimitettu",
+    "expired": "Vanhentunut"
+  },
   "common": {
     "cancel": "Peruuta",
     "done": "Valmis",
@@ -110,6 +132,7 @@
     "newSession": "Uusi istunto",
     "noModelsAvailable": "Ei malleja saatavilla",
     "notFound": "Kohdetta ei löytynyt",
+    "online": "Verkossa",
     "open": "Avaa {{name}}",
     "openPullRequest": "Avaa muutospyyntö",
     "completed": "Valmis",
@@ -186,6 +209,7 @@
     "resendCode": "Lähetä koodi uudelleen",
     "termsPrefix": "Jatkamalla hyväksyt ",
     "terms": "Käyttöehdot",
+    "termsInSentence": "Käyttöehdot",
     "termsConnector": " ja ",
     "termsSuffix": ".",
     "moreSignInOptions": "Lisää kirjautumisvaihtoehtoja",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Vahvista poisto",
     "credits": "Krediitit",
     "failedToLoadBalance": "Saldoa ei voitu ladata. Yritä uudelleen napauttamalla.",
+    "balanceLoadFailed": "Saldoa ei voitu ladata",
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Tässä muutospyynnössä ei ole tiedostomuutoksia.",
     "fileList": {
       "openNavigator": "Avaa tiedostoselain",
-      "filesViewed": "Tiedostot · {{viewed}}/{{total}} katsottu",
       "listed": "(luettelossa)",
       "layout": "Asettelu",
       "unified": "Yhdistetty",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub-yhteyttä ei voitu tarkistaa",
-      "checkFailedMessage": "Kirjautumisen tila ei ole saatavilla, ennen kuin lataus valmistuu.",
+      "checkFailedMessage": "GitHubiin ei saatu yhteyttä. Tarkista yhteys ja yritä uudelleen.",
       "checkFailedTitleGitLab": "GitLab-yhteyttä ei voitu tarkistaa",
       "checkFailedTitleBitbucket": "Bitbucket-yhteyttä ei voitu tarkistaa",
-      "providerCheckFailedMessage": "Yhteyden tila näkyy vasta latauksen valmistuttua.",
+      "providerCheckFailedMessage": "Palveluntarjoajaan ei saatu yhteyttä. Tarkista yhteys ja yritä uudelleen.",
       "reconnectTitle": "Yhdistä GitHub uudelleen",
       "reconnectTitleGitLab": "Yhdistä GitLab uudelleen",
       "reconnectTitleBitbucket": "Yhdistä Bitbucket uudelleen",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Salli kameran käyttö asetuksissa, jotta voit ottaa kuvan."
+    },
+    "botStatus": {
+      "offline": "Ei yhteyttä"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen.",
       "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin.",
       "syncNoRepositories": "Synkronointilaajuudessa ei ole yhtään repositoriota. Valitse repositoriot, joita Tietoturva-agentti valvoo, ja synkronoi sitten uudelleen.",
+      "syncNoRepositoriesNoManage": "Synkronointilaajuudessa ei ole yhtään repositoriota. Organisaation omistajan, ylläpitäjän tai laskutusvastaavan on yhdistettävä repositoriot, ennen kuin synkronointi voi tapahtua.",
       "syncIntegrationInactive": "Tietoturva-agentin GitHub-yhteys ei ole aktiivinen. Yhdistä Kilo GitHub App uudelleen ja synkronoi sitten uudelleen.",
       "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen.",
       "configConflict": "Tietoturva-agentin asetuksia muutettiin muualla. Tarkista uusimmat asetukset ja tallenna uudelleen."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "Aloita lähettämällä viesti alla olevasta kentästä.",
       "scrollToBottom": "Vieritä alareunaan",
       "emptyTitle": "Ei vielä viestejä",
+      "emptyReadOnlyTitle": "Tässä istunnossa ei ole viestejä",
       "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
       "cloningSession": "Kloonataan istuntoa",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Valitse koodivarasto aloittaaksesi.",
       "enterPromptToStart": "Lisää kehote aloittaaksesi.",
       "enterPromptOrFileToStart": "Lisää kehote tai tiedosto aloittaaksesi.",
-      "connectProviderToStart": "Yhdistä palveluntarjoaja aloittaaksesi.",
+      "connectProviderToStart": "Koodivarastot tulevat yhdistetystä GitHub-, GitLab- tai Bitbucket-tilistä.",
       "promptPlaceholder": "Mitä haluaisit tehdä?",
       "couldNotLoadModels": "Malleja ei voitu ladata.",
       "prefillRepoAndModelUnavailable": "Alkuperäisen istunnon koodivarasto ja malli eivät ole enää käytettävissä. Valitse uudet alta.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "Vastauksen tuottaminen keskeytettiin.",
       "assistantContextOverflow": "Keskustelu on liian pitkä mallille.",
       "assistantProviderError": "Palveluntarjoaja palautti virheen.",
+      "assistantProviderRefused": "Palveluntarjoaja hylkäsi tämän pyynnön, eikä sitä voi yrittää uudelleen.",
+      "assistantCreditsRefusal": "Krediitit eivät riitä Cloud Agentin käyttämiseen.",
       "assistantOutputLimit": "Vastaus saavutti mallin tulostusrajan.",
       "assistantStructuredOutput": "Vastaus ei vastannut vaadittua muotoa.",
       "assistantFailed": "Vastauksen tuottaminen epäonnistui."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Valmistellaan ympäristöä",
       "preparationComplete": "Valmistelu valmis",
       "preparationFailed": "Valmistelu epäonnistui",
+      "preparationStageFailed": "{{stage}}: epäonnistui",
       "setupCommand": "Valmistelukomento {{index}}",
       "setupCommandOf": "Valmistelukomento {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "Työtilan valmistelu",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "Valmistelukomento {{index}} aikakatkesi",
       "detailColdRestore": "Kylmä palautus, tilannevedos otettu käyttöön, palautetut tiedostot: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}} % valmis",
-      "detailRestoreIncompleteReport": "Istunnon palautus vaillinainen, palauttamatta jääneet tiedostot: {{skipped}} / {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Palauttamatta jääneet tiedostot: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Puuttuvat: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ja {{omitted}} lisää",
       "detailReasonPatchFailed": "muutosta ei voitu soveltaa",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Konteksti-ikkunan koko ei ole saatavilla",
-      "tapToViewDetails": "Näytä kontekstin tiedot napauttamalla.",
-      "costSuffix": ", kustannus {{cost}}",
-      "tokensWindowUnavailable": "Kontekstissa {{used}} tokenia, konteksti-ikkunan koko ei ole saatavilla",
-      "tokensUsage": "Kontekstissa {{used}} tokenia {{window}} tokenista, {{percentage}} käytetty",
+      "tapToViewDetails": " Näytä kontekstin tiedot napauttamalla.",
+      "costClause": ", kustannus {{cost}}",
+      "loadingCostSpoken": "kustannus {{cost}}.",
+      "tokensWindowUnavailable": "Kontekstissa {{used}} tokenia, konteksti-ikkunan koko ei ole saatavilla{{costClause}}.",
+      "tokensUsage": "Kontekstissa {{used}} tokenia {{window}} tokenista, {{percentage}} käytetty{{costClause}}.",
       "title": "Kontekstin käyttö",
       "used": "Käytetty",
       "provider": "Palveluntarjoaja",
       "totalCost": "Kokonaiskustannukset",
       "usageReflectsLatest": "Käyttötiedot perustuvat viimeisimpään valmiiseen avustajan vastaukseen.",
-      "usageUnavailable": "Kontekstin käyttö ei ole saatavilla",
+      "usageUnavailable": "Kontekstin käyttö ei ole saatavilla{{costClause}}.",
       "tokenUsage": "Tokenien käyttö",
       "cacheRate": "Välimuistin osuus",
       "modelsCount": "Mallit ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Lisää krediittejä",
-    "description": "Lisää krediittejä, jotta voit jatkaa käyttöä.",
     "billingPage": "laskutussivu"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Verkkohaku",
       "thinking": "Pohdinta"
     },
-    "planOf": "/",
+    "planProgress": "{{done}}/{{total}}",
     "filesChanged": "tiedostoa muutettu",
-    "finishedIn": "Kesti",
+    "finishedIn": "Kesti {{duration}}",
     "noActivityFor": "Ei toimintaa",
     "prOpened": "Pull request avattu",
     "permissionWants": "Haluaa suorittaa",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
     },
-    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen – lisää krediittejä ja yritä uudelleen."
+    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen."
   },
   "settingsTools": {
     "confirmTitle": "Vahvistetaanko tämä muutos?"
@@ -3340,8 +3372,8 @@
     "saved": "Kulutusvaroitusten asetukset tallennettu",
     "loadError": "Kulutusvaroituksia ei voitu ladata.",
     "saveError": "Kulutusvaroituksia ei voitu tallentaa.",
-    "empty": "Kulutusvaroitukset ovat pois päältä. Ota ne käyttöön, jotta voit varoittaa tämän alueen laskutusyhteyshenkilöitä.",
-    "noSpend": "Kulutusta ei ole vielä kirjattu",
+    "sendAlerts": "Lähetä varoituksia",
+    "noSpend": "Ei vielä kulutusta",
     "spend24h": "Kulutus viimeisten 24 tunnin aikana",
     "multiplierError": "Anna kerroin, joka on 1 tai suurempi",
     "permissionDenied": "Sinulla ei ole oikeutta hallita kulutusvaroituksia.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Ajastetut katsaukset eivät ole käytössä missään kontekstissa",
     "sourceBlocker": "Istunto vaatii huomiota",
     "sourceMetadata": "Tallennetut istunnon metatiedot"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"
   }
 }

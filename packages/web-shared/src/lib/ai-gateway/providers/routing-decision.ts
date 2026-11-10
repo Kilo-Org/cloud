@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import { EnkryptGuardrailReportSchema } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import {
+  EnkryptGuardrailReportSchema,
+  EnkryptOutputGuardrailReportSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import {
   UserByokProviderIdSchema,
   type UserByokProviderId,
@@ -108,6 +111,17 @@ const RoutingDecisionStepSchema = z.union([
     outcome: z.literal('deferred'),
     reason: z.literal('catalog-key-serves'),
   }),
+  z.object({ step: z.literal('claude-billing'), outcome: z.literal('selected') }),
+  z.object({
+    step: z.literal('claude-billing'),
+    outcome: z.literal('rejected'),
+    reason: z.literal('unavailable'),
+  }),
+  z.object({
+    step: z.literal('claude-billing'),
+    outcome: z.literal('skipped'),
+    reason: z.literal('unavailable'),
+  }),
   z.object({
     step: z.literal('byok-key'),
     outcome: z.literal('selected'),
@@ -142,6 +156,7 @@ const SelectedRouteSchema = z.enum([
   'custom-llm',
   'direct-byok-model',
   'chatgpt',
+  'claude-billing',
   ...ByokCandidateRouteSchema.options,
   'unsupported-api-kind',
   'kilo',
@@ -155,6 +170,7 @@ const PayerSchema = z.enum([
   'custom-llm-credential',
   'owner-byok-key',
   'chatgpt-subscription',
+  'customer-claude-organization',
   'kilo',
 ]);
 
@@ -170,7 +186,12 @@ const RoutingDecisionResultSchema = z.discriminatedUnion('kind', [
     is_free: z.boolean(),
   }),
   z.object({
-    kind: z.enum(['chatgpt-reconnect', 'custom-llm-unavailable', 'direct-byok-catalog-only']),
+    kind: z.enum([
+      'chatgpt-reconnect',
+      'claude-billing-unavailable',
+      'custom-llm-unavailable',
+      'direct-byok-catalog-only',
+    ]),
   }),
 ]);
 
@@ -200,6 +221,8 @@ export const KiloRoutingDecisionRecordSchema = ProviderRoutingDecisionSchema.ext
     .optional(),
   /** The organization's Enkrypt input guardrail, when it applied to the request. */
   enkrypt: EnkryptGuardrailReportSchema.optional(),
+  /** The organization's Enkrypt output guardrail, when it applied to the response. */
+  enkrypt_output: EnkryptOutputGuardrailReportSchema.optional(),
 });
 
 export type KiloRoutingDecisionRecord = z.infer<typeof KiloRoutingDecisionRecordSchema>;
@@ -232,6 +255,8 @@ function payerOf(route: SelectedRoute): Payer {
       return 'custom-llm-credential';
     case 'chatgpt':
       return 'chatgpt-subscription';
+    case 'claude-billing':
+      return 'customer-claude-organization';
     case 'kilo':
       return 'kilo';
     case 'direct-byok-model':

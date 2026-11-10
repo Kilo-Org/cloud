@@ -24,6 +24,7 @@ import {
   ChevronRight,
   UsersRound,
   Network,
+  ScrollText,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -37,6 +38,7 @@ import SidebarUserFooter from './SidebarUserFooter';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
+import { useRequestLogsAvailable } from '@/hooks/useRequestLogsAvailable';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
@@ -55,8 +57,6 @@ export default function OrganizationAppSidebar({
 
   // Feature flags
   const isChatGptSignInEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
-  const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
-  const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
   const currentOrg = organizationData;
@@ -96,6 +96,8 @@ export default function OrganizationAppSidebar({
 
   const hasOwnerLevelAccess = canManageOrganizationBilling(currentRole);
 
+  const showRequestLogs = useRequestLogsAvailable(organizationId, hasOwnerLevelAccess);
+
   // Dashboard group
   const dashboardItems: Array<{
     title: string;
@@ -122,6 +124,15 @@ export default function OrganizationAppSidebar({
       icon: ChartColumnIncreasing,
       url: `/organizations/${organizationId}/usage-details?view=ai-usage`,
     },
+    ...(showRequestLogs
+      ? [
+          {
+            title: 'Request Logs',
+            icon: ScrollText,
+            url: `/organizations/${organizationId}/request-logs`,
+          },
+        ]
+      : []),
     ...(hasOwnerLevelAccess && currentOrg?.parent_organization_id === null
       ? [
           {
@@ -189,15 +200,6 @@ export default function OrganizationAppSidebar({
       icon: Webhook,
       url: `/organizations/${organizationId}/cloud/triggers`,
     },
-    ...((isGastownEnabled || isDevelopment) && currentRole !== 'billing_manager'
-      ? [
-          {
-            title: 'Gas Town',
-            icon: Bot,
-            url: `/organizations/${organizationId}/gastown`,
-          },
-        ]
-      : []),
     {
       title: 'Code Reviewer',
       icon: Bot,

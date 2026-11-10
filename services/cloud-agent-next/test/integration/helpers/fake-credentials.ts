@@ -12,11 +12,9 @@ export const FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN =
  * namespace-shaped stand-in that only implements `idFromName` is used.
  */
 export type FakeCredentialBroker = {
-  kiloIssued: () => number;
   githubIssued: () => number;
   /** The repository each GitHub capability was issued for, by capability. */
   githubCapabilityRepositories: () => ReadonlyMap<string, string>;
-  issueKiloSessionCapability: () => Promise<{ success: true; capability: string }>;
   issueGitHubSessionCapability: (params?: { githubRepo?: string }) => Promise<{
     success: true;
     capability: string;
@@ -30,17 +28,11 @@ export type FakeCredentialBroker = {
 export function createFakeCredentialBroker(
   appType: 'standard' | 'lite' = 'standard'
 ): FakeCredentialBroker {
-  let kiloIssued = 0;
   let githubIssued = 0;
   const repositories = new Map<string, string>();
   return {
-    kiloIssued: () => kiloIssued,
     githubIssued: () => githubIssued,
     githubCapabilityRepositories: () => repositories,
-    async issueKiloSessionCapability() {
-      kiloIssued += 1;
-      return { success: true as const, capability: `kka1.${kiloIssued}` };
-    },
     async issueGitHubSessionCapability(params) {
       githubIssued += 1;
       const capability = `kgh2.${githubIssued}`;
@@ -79,9 +71,6 @@ export function installFakeCredentialEnv(
   Object.assign(target as object, {
     GIT_TOKEN_SERVICE: broker,
     SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-    // The fake harness asserts contained grants unless a test opts out; the
-    // local `.dev.vars` value must not decide what a test means.
-    CREDENTIAL_CONTAINMENT_ENABLED: 'true',
     WORKER_URL: 'https://worker.example.com',
     ...extra,
   });

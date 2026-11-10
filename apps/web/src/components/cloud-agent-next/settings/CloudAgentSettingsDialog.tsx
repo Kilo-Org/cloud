@@ -16,16 +16,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProfilesManager } from '@/components/cloud-agent/profile-editor/ProfilesManager';
 import { useCloudAgentSettings } from '@/hooks/useCloudAgentSettings';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { BuiltinAgentsSection } from './BuiltinAgentsSection';
 import { DefaultSandboxSection } from './DefaultSandboxSection';
 import { EnvironmentsSection } from './EnvironmentsSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
+import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
+
+export type SettingsSection = 'general' | 'profiles' | 'environments' | 'compute';
 
 type CloudAgentSettingsDialogProps = {
   organizationId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialSection?: 'general' | 'profiles' | 'environments' | 'compute';
+  initialSection?: SettingsSection;
+  onSectionChange?: (section: SettingsSection) => void;
   onProfileSelect?: (profileId: string) => void;
   openToNewProfile?: boolean;
   initialSelectedProfileId?: string | null;
@@ -61,11 +66,17 @@ export function CloudAgentSettingsDialog({
 function CloudAgentSettings({
   organizationId,
   initialSection = 'general',
+  onSectionChange,
   onProfileSelect,
   openToNewProfile,
   initialSelectedProfileId,
 }: Omit<CloudAgentSettingsDialogProps, 'open' | 'onOpenChange'>) {
   const [section, setSection] = useState(initialSection);
+  const [environmentsVisited, setEnvironmentsVisited] = useState(initialSection === 'environments');
+  const changeSection = (next: SettingsSection) => {
+    setSection(next);
+    onSectionChange?.(next);
+  };
   const isMobile = useIsMobile();
   const settingsQuery = useCloudAgentSettings({ organizationId });
   const settings = settingsQuery.data;
@@ -76,14 +87,16 @@ function CloudAgentSettings({
   return (
     <>
       <DialogHeader className="gap-0 space-y-0 border-b px-6 py-4 text-left">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 pr-6">
           <DialogTitle>Cloud Agent settings</DialogTitle>
-          <Badge variant="secondary">{organizationId ? 'Organization' : 'Personal'}</Badge>
+          <Badge variant="secondary">
+            {organizationId ? 'Organization workspace' : 'Personal workspace'}
+          </Badge>
         </div>
-        {settings && !settings.canManage ? (
+        {organizationId && settings && !settings.canManage ? (
           <DialogDescription className="mt-1 flex items-center gap-1.5">
             <Lock className="size-3.5 shrink-0" aria-hidden />
-            View only. Organization owners and admins can change these settings.
+            Organization settings are view only. Your personal preferences remain editable.
           </DialogDescription>
         ) : (
           <DialogDescription className="sr-only">
@@ -100,15 +113,17 @@ function CloudAgentSettings({
             value === 'profiles' ||
             value === 'environments' ||
             (value === 'compute' && settings?.canManage)
-          )
-            setSection(value);
+          ) {
+            if (value === 'environments') setEnvironmentsVisited(true);
+            changeSection(value);
+          }
         }}
         orientation={isMobile ? 'horizontal' : 'vertical'}
         className="flex min-h-0 flex-1 flex-col md:flex-row"
       >
         <TabsList
           aria-label="Settings sections"
-          className="h-auto shrink-0 justify-start gap-1 rounded-none border-b bg-transparent p-3 md:w-44 md:flex-col md:justify-start md:border-r md:border-b-0"
+          className="h-auto min-w-0 shrink-0 justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-3 md:w-44 md:flex-col md:justify-start md:overflow-visible md:border-r md:border-b-0"
         >
           <TabsTrigger
             value="general"
@@ -148,26 +163,67 @@ function CloudAgentSettings({
         >
           <div className="flex flex-col gap-8">
             {settings ? (
-              <>
+              <section aria-labelledby="session-defaults-heading" className="flex flex-col gap-6">
+                <div className="flex flex-col gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 id="session-defaults-heading" className="text-base font-medium">
+                      {organizationId ? 'Organization settings' : 'Session defaults'}
+                    </h3>
+                    {organizationId && <Badge variant="secondary">All members</Badge>}
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    {organizationId
+                      ? 'Applies to new sessions for everyone in this organization. Only owners and admins can make changes.'
+                      : 'Applies to new sessions in your personal workspace.'}
+                  </p>
+                </div>
                 <DefaultSandboxSection organizationId={organizationId} settings={settings} />
                 <RepositoryOverridesSection
                   organizationId={organizationId}
                   settings={settings}
-                  onManageProfiles={() => setSection('profiles')}
+                  onManageProfiles={() => changeSection('profiles')}
                 />
-              </>
+              </section>
             ) : settingsQuery.isError ? (
               <LoadError onRetry={() => void settingsQuery.refetch()} />
             ) : (
               <LoadingSkeleton />
             )}
+            <section
+              aria-labelledby="personal-preferences-heading"
+              className="flex flex-col gap-6 border-t pt-6"
+            >
+              <div className="flex flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 id="personal-preferences-heading" className="text-base font-medium">
+                    Personal preferences
+                  </h3>
+                  <Badge variant="secondary">Only you</Badge>
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  Applies to you across personal and organization chats. Does not change settings
+                  for other members.
+                </p>
+              </div>
+              <TranscriptPreferencesSection />
+              {settings && (
+                <BuiltinAgentsSection organizationId={organizationId} settings={settings} />
+              )}
+            </section>
           </div>
         </TabsContent>
         <TabsContent
           value="environments"
-          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+          forceMount
+          className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col data-[state=inactive]:hidden"
         >
-          <EnvironmentsSection organizationId={organizationId} canManage={canManage} />
+          {environmentsVisited && (
+            <EnvironmentsSection
+              organizationId={organizationId}
+              canManage={canManage}
+              active={activeSection === 'environments'}
+            />
+          )}
         </TabsContent>
         <TabsContent
           value="profiles"

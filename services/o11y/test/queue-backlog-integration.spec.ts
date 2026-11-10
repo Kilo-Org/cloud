@@ -72,9 +72,6 @@ describe('evaluateAlerts infrastructure isolation', () => {
             },
           });
         }
-        if (url.includes('/analytics_engine/sql')) {
-          throw new Error('Gastown Analytics Engine unavailable');
-        }
         if (url === 'https://hooks.slack.com/page') {
           slackMessages.push(JSON.parse(String(init?.body)));
           return new Response(null, { status: 200 });
@@ -94,16 +91,13 @@ describe('evaluateAlerts infrastructure isolation', () => {
       } as Env;
 
       await expect(evaluateAlerts(env)).rejects.toThrow(
-        `Alert evaluation failed with ${nativeUnavailable ? 4 : 3} error(s)`
+        `Alert evaluation failed with ${nativeUnavailable ? 3 : 2} error(s)`
       );
 
       expect(
         fetchFn.mock.calls.some(([input]) =>
           String(input).includes('/containers/dash/applications')
         )
-      ).toBe(true);
-      expect(
-        fetchFn.mock.calls.some(([input]) => String(input).includes('/analytics_engine/sql'))
       ).toBe(true);
       expect(slackMessages).toHaveLength(nativeUnavailable ? 1 : 2);
       expect(JSON.stringify(slackMessages)).toContain('Queue Backlog Alert');

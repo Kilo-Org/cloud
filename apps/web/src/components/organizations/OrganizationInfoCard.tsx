@@ -38,6 +38,7 @@ import {
 import BuyOrganizationCreditsDialog from '@/components/payment/BuyOrganizationCreditsDialog';
 import { SeatsRequirementDialog } from '@/app/admin/components/OrganizationAdmin/SeatsRequirementDialog';
 import { PlanDialog } from '@/app/admin/components/OrganizationAdmin/PlanDialog';
+import { AdminViewOrganizationButton } from '@/app/admin/support-access/AdminViewOrganizationButton';
 import { TrialEndDateDialog } from '@/app/admin/components/OrganizationAdmin/TrialEndDateDialog';
 import { OssSponsorshipDialog } from '@/app/admin/components/OrganizationAdmin/OssSponsorshipDialog';
 import { Badge } from '@/components/ui/badge';
@@ -165,9 +166,6 @@ function Inner(props: InnerProps) {
     deleted_at,
     auto_top_up_enabled,
   } = info;
-  // The member variant omits the Stripe customer id, so read it only on the
-  // admin-and-above variant. The field is rendered only in the admin dashboard.
-  const stripe_customer_id = info.callerRole === 'member' ? null : info.stripe_customer_id;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
@@ -486,31 +484,13 @@ function Inner(props: InnerProps) {
               <label className="text-muted-foreground text-sm font-medium">Quick Actions</label>
               <div className="mt-1">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/organizations/${id}`} target="_blank">
+                  <AdminViewOrganizationButton organizationId={id} organizationName={name}>
                     <ExternalLink className="mr-2 h-4 w-4" />
                     View Organization Page
-                  </Link>
+                  </AdminViewOrganizationButton>
                 </Button>
               </div>
             </div>
-            {stripe_customer_id && (
-              <div>
-                <label className="text-muted-foreground text-sm font-medium">
-                  Stripe Customer ID
-                </label>
-                <p className="font-mono text-sm">
-                  {stripe_customer_id}
-                  <a
-                    href={`https://dashboard.stripe.com/${process.env.NODE_ENV === 'development' ? 'test/' : ''}customers/${stripe_customer_id}`}
-                    target="_blank"
-                    className="ml-1 inline-flex items-center rounded-full bg-purple-900 px-2 py-1 text-xs font-medium text-purple-200 transition-colors hover:bg-purple-800"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    View in Stripe
-                  </a>
-                </p>
-              </div>
-            )}
             <div>
               <label className="text-muted-foreground text-sm font-medium">Seats Required</label>
               <div className="mt-1 flex items-center gap-2">

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Native အဝေးထိန်း သရုပ်ပြ",
+    "sessionsEmpty": "Native ဆက်ရှင်များ မရှိသေးပါ",
+    "hosts": "အွန်လိုင်းရှိ ဟို့စ်များ",
+    "hostsEmpty": "အွန်လိုင်းရှိ ဟို့စ်များ မရှိပါ",
+    "directory": "အလုပ်လုပ်မည့် ဖိုင်တွဲ",
+    "createSession": "Native ဆက်ရှင် ဖန်တီးပါ",
+    "queueIfOffline": "ဟို့စ် အော့ဖ်လိုင်းဖြစ်နေလျှင် ညွှန်ကြားချက်ကို တန်းစီထားပါ",
+    "prompt": "ညွှန်ကြားချက် သို့မဟုတ် /command",
+    "localClear": "ဤစက်ပေါ်ရှိ မြင်ကွင်းကို ရှင်းပါ",
+    "abort": "အလှည့်ကို ရပ်ဆိုင်းပါ",
+    "failed": "Native အဝေးထိန်း လုပ်ဆောင်ချက် မအောင်မြင်ပါ",
+    "creationUnknown": "ဖန်တီးမှု ရလဒ်ကို မသိရပါ။ ထပ်မကြိုးစားမီ ဆက်ရှင်များကို ပြန်ရယူပါ။",
+    "commandFailed": "Runner အမိန့် မအောင်မြင်ပါ",
+    "invalidReply": "မမှန်ကန်သော Runner တုံ့ပြန်ချက်",
+    "unsafeCommand": "/compact၊ /new၊ /skill၊ /models၊ /agents သို့မဟုတ် /clear (ဤစက်ပေါ်တွင်သာ) ကို သုံးပါ။",
+    "status": "ချိတ်ဆက်မှု: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "ဟို့စ်များ: {{connection}}",
+    "commandStatus": "အမိန့် ပေးပို့မှု: {{status}}",
+    "delivered": "ပေးပို့ပြီး",
+    "expired": "သက်တမ်းကုန်ပြီ"
+  },
   "common": {
     "cancel": "ပယ်ဖျက်ပါ",
     "done": "ပြီးပါပြီ",
@@ -110,6 +132,7 @@
     "newSession": "ဆက်ရှင်အသစ်",
     "noModelsAvailable": "အသုံးပြုနိုင်သော မော်ဒယ် မရှိပါ",
     "notFound": "မတွေ့ရပါ။",
+    "online": "အွန်လိုင်း",
     "open": "{{name}} ကို ဖွင့်ပါ",
     "openPullRequest": "PR ဖွင့်",
     "completed": "ပြီးစီးပြီ",
@@ -186,6 +209,7 @@
     "resendCode": "ကုဒ် ပြန်ပို့ရန်",
     "termsPrefix": "ဆက်လုပ်ခြင်းဖြင့် သင်သည် ကျွန်ုပ်တို့၏",
     "terms": "စည်းကမ်းချက်များ",
+    "termsInSentence": "စည်းကမ်းချက်များ",
     "termsConnector": "နှင့်",
     "termsSuffix": "ကို သဘောတူလက်ခံပါသည်။",
     "moreSignInOptions": "အကောင့်ဝင်ရန် အခြားနည်းလမ်းများ",
@@ -222,6 +246,7 @@
     "confirmDeletion": "ဖျက်ခြင်းကို အတည်ပြုပါ",
     "credits": "ခရက်ဒစ်များ",
     "failedToLoadBalance": "လက်ကျန်ကို ရယူ၍မရပါ။ ထပ်ကြိုးစားရန် နှိပ်ပါ။",
+    "balanceLoadFailed": "လက်ကျန်ကို ရယူ၍မရပါ",
     "hideBalance": "လက်ကျန် ဖျောက်ရန်",
     "showBalance": "လက်ကျန် ပြရန်",
     "balanceHidden": "လက်ကျန် ဖျောက်ထားသည်",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "ဒီ PR တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။",
     "fileList": {
       "openNavigator": "ဖိုင်လမ်းညွှန်ကို ဖွင့်ပါ",
-      "filesViewed": "ဖိုင်များ · {{total}} ခုအနက် {{viewed}} ခု ကြည့်ပြီး",
       "listed": "(စာရင်းပါဖိုင်များ)",
       "layout": "အပြင်အဆင်",
       "unified": "တစ်စုတည်း",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
-      "checkFailedMessage": "အချက်အလက် ရယူပြီးမှသာ အကောင့်ဝင်ထားခြင်း ရှိမရှိ သိနိုင်ပါမည်။",
+      "checkFailedMessage": "GitHub သို့ ချိတ်ဆက်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
       "checkFailedTitleGitLab": "GitLab ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
       "checkFailedTitleBitbucket": "Bitbucket ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
-      "providerCheckFailedMessage": "၎င်းတိုင် လိုက်ဒ်မဖြစ်မီ ချိတ်ဆက်မှုအခြေအနေ မရရှိနိုင်ပါ။",
+      "providerCheckFailedMessage": "ဝန်ဆောင်မှုပေးသူထံ ချိတ်ဆက်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
       "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectTitleGitLab": "GitLab ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectTitleBitbucket": "Bitbucket ပြန်ချိတ်ဆက်ခြင်း",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "ဓာတ်ပုံရိုက်ရန် ဆက်တင်များတွင် ကင်မရာ အသုံးပြုခွင့် ပေးပါ။"
+    },
+    "botStatus": {
+      "offline": "အော့ဖ်လိုင်း"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "ဤလုပ်ဆောင်မှုကို ပြီးမြောက်အောင် မလုပ်နိုင်ပါ။ ထပ်ကြိုးစားပါ။",
       "actionBlocked": "ဤလုပ်ဆောင်မှုကို ပြီးမြောက်အောင် မလုပ်နိုင်ပါ။ ပြန်လုပ်နိုင်ရန် ပြဿနာကို အရင်ဖြေရှင်းရမည်။",
       "syncNoRepositories": "ထပ်တူပြုမှုနယ်ပယ်အတွင်း repository များ မရှိပါ။ «လုံခြုံရေးအေးဂျင့်» စောင့်ကြည့်သည့် repository များကို ရွေးချယ်ပြီး ထပ်မံထပ်တူပြုပါ။",
+      "syncNoRepositoriesNoManage": "ထပ်တူပြုမှုနယ်ပယ်အတွင်း repository များ မရှိပါ။ ထပ်တူပြုနိုင်ရန် အဖွဲ့အစည်း ပိုင်ရှင်၊ စီမံခန့်ခွဲသူ သို့မဟုတ် ငွေတောင်းခံမှုမန်နေဂျာက repository များကို ချိတ်ဆက်ရမည်။",
       "syncIntegrationInactive": "«လုံခြုံရေးအေးဂျင့်» အတွက် GitHub ချိတ်ဆက်မှုသည် အသက်ဝင်မနေပါ။ Kilo GitHub App ကို ပြန်လည်ချိတ်ဆက်ပြီးနောက် ထပ်မံစင့်ခ်လုပ်ပါ။",
       "syncMissingPermission": "Kilo GitHub App သည် vulnerability alerts များကို ဖတ်၍မရပါ။ GitHub တွင် ထို ခွင့်ပြုချက်ကို ပေးပြီးမှ ထပ်မံ sync လုပ်ပါ။",
       "configConflict": "လုံခြုံရေးအေးဂျင့်၏ ဆက်တင်များကို အခြားနေရာတွင် ပြောင်းထားသည်။ နောက်ဆုံးဆက်တင်များကို စစ်ဆေးပြီး ထပ်မံသိမ်းပါ။"
@@ -1804,6 +1832,7 @@
       "emptyDescription": "စတင်ရန် အောက်တွင် မက်ဆေ့ခ်ျတစ်ခု ပို့ပါ။",
       "scrollToBottom": "အောက်ခြေသို့ ဆွဲချပါ",
       "emptyTitle": "မက်ဆေ့ခ်ျ မရှိသေးပါ",
+      "emptyReadOnlyTitle": "ဤစက်ရှင်တွင် မက်ဆေ့ခ်ျ မရှိပါ",
       "renameAccessibility": "{{title}} စက်ရှင်ကို အမည်ပြောင်းပါ",
       "cloningSession": "စက်ရှင်ကို မိတ္တူပွားနေသည်",
       "couldNotLoadThisSession": "ဤစက်ရှင်ကို ဖွင့်၍မရပါ။",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "စတင်ရန် ကုဒ်သိုလှောင်ခန်းတစ်ခုကို ရွေးပါ။",
       "enterPromptToStart": "စတင်ရန် ညွှန်ကြားချက်တစ်ခု ထည့်ပါ။",
       "enterPromptOrFileToStart": "စတင်ရန် ညွှန်ကြားချက် သို့မဟုတ် ဖိုင်တစ်ခု ထည့်ပါ။",
-      "connectProviderToStart": "စတင်ရန် ဝန်ဆောင်မှုပေးသူတစ်ဦးကို ချိတ်ဆက်ပါ။",
+      "connectProviderToStart": "ကုဒ်သိုလှောင်ခန်းများသည် ချိတ်ဆက်ထားသော GitHub၊ GitLab သို့မဟုတ် Bitbucket အကောင့်မှ လာပါသည်။",
       "promptPlaceholder": "ဘာလုပ်ချင်ပါသလဲ။",
       "couldNotLoadModels": "မော်ဒယ်များကို ရယူ၍မရပါ။",
       "prefillRepoAndModelUnavailable": "မူရင်းစက်ရှင်၏ ကုဒ်သိုလှောင်ခန်းနှင့် မော်ဒယ်ကို အသုံးပြု၍မရတော့ပါ။ အောက်တွင် အသစ်ရွေးပါ။",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "တုံ့ပြန်မှုကို ရပ်တန့်လိုက်ပါသည်။",
       "assistantContextOverflow": "စကားဝိုင်းသည် မော်ဒယ်က လက်ခံနိုင်သည့် အရှည်ထက် ကျော်လွန်နေပါသည်။",
       "assistantProviderError": "ဝန်ဆောင်မှုပေးသူက အမှားတစ်ခု ပြန်လည်ပေးပို့ခဲ့ပါသည်။",
+      "assistantProviderRefused": "ဝန်ဆောင်မှုပေးသူက ဤတောင်းဆိုမှုကို ငြင်းပယ်ခဲ့ပြီး ပြန်လည်ကြိုးစားနိုင်ခြင်း မရှိတော့ပါ။",
+      "assistantCreditsRefusal": "Cloud Agent ကို လုပ်ဆောင်ရန် ခရက်ဒစ်မလုံလောက်ပါ။",
       "assistantOutputLimit": "တုံ့ပြန်မှုက မော်ဒယ်၏ အထွက်ပမာဏ ကန့်သတ်ချက်သို့ ရောက်ရှိသွားပါသည်။",
       "assistantStructuredOutput": "တုံ့ပြန်မှုသည် လိုအပ်သော ပုံစံနှင့် မကိုက်ညီပါ။",
       "assistantFailed": "တုံ့ပြန်မှု မအောင်မြင်ခဲ့ပါ။"
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ပြင်ဆင်နေသည်",
       "preparationComplete": "ပြင်ဆင်ပြီး",
       "preparationFailed": "ပြင်ဆင်မှု မအောင်မြင်ခဲ့ပါ",
+      "preparationStageFailed": "{{stage}} မအောင်မြင်ခဲ့ပါ",
       "setupCommand": "ပြင်ဆင်သတ်မှတ်ရေးအမိန့် {{index}}",
       "setupCommandOf": "ပြင်ဆင်သတ်မှတ်ရေးအမိန့် {{displayCount}} ခုအနက် {{index}}",
       "stepWorkspaceSetup": "ဝါ့ခ်စပေ့စ် ပြင်ဆင်သတ်မှတ်ခြင်း",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "ပြင်ဆင်သတ်မှတ်ရေးအမိန့် {{index}} အချိန်ကျော်လွန်ခဲ့သည်",
       "detailColdRestore": "ကိုးလ် ဆယ်တင်မှု၊ ဆနပ်ရှော့ အသုံးချပြီးပါပြီ၊ ဖိုင် {{total}} ခုအနက် {{applied}} ခု ပြန်လည်ဆယ်တင်ပြီးပါသည်",
       "detailProgressPercent": "{{percent}}% ပြီးမြောက်ပါပြီ",
-      "detailRestoreIncompleteReport": "ဆက်ရှင် ပြန်လည်ဆယ်တင်မှု မပြီးမြောက်သေးပါ: ဖိုင် {{total}} ခုအနက် {{skipped}} ခုကို ပြန်လည်ဆယ်တင်ခြင်း မပြုလုပ်နိုင်ခဲ့ပါ ({{reasons}})။",
+      "detailRestoreIncompleteFiles": "ဖိုင် {{total}} ခုအနက် {{skipped}} ခုကို ပြန်လည်ဆယ်တင်ခြင်း မပြုလုပ်နိုင်ခဲ့ပါ ({{reasons}})။",
       "detailRestoreIncompleteMissing": "ပျောက်ဆုံးနေသည်: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} နှင့် အခြား {{omitted}} ခု",
       "detailReasonPatchFailed": "ပက်ချ် အသုံးမချနိုင်ခဲ့ပါ",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "နောက်ခံအချက်အလက် လက်ခံနိုင်သည့်ပမာဏ မရရှိနိုင်ပါ",
-      "tapToViewDetails": "နောက်ခံအချက်အလက်အသေးစိတ်ကို ကြည့်ရန် နှိပ်ပါ။",
-      "costSuffix": "၊ ကုန်ကျစရိတ် {{cost}}",
-      "tokensWindowUnavailable": "နောက်ခံအချက်အလက် တိုကင် {{used}} ခု၊ လက်ခံနိုင်သည့်ပမာဏ မရရှိနိုင်ပါ",
-      "tokensUsage": "နောက်ခံအချက်အလက် တိုကင် {{window}} ခုအနက် {{used}} ခု၊ {{percentage}} အသုံးပြုထားသည်",
+      "tapToViewDetails": " နောက်ခံအချက်အလက်အသေးစိတ်ကို ကြည့်ရန် နှိပ်ပါ။",
+      "costClause": "၊ ကုန်ကျစရိတ် {{cost}}",
+      "loadingCostSpoken": "ကုန်ကျစရိတ် {{cost}}။",
+      "tokensWindowUnavailable": "နောက်ခံအချက်အလက် တိုကင် {{used}} ခု၊ လက်ခံနိုင်သည့်ပမာဏ မရရှိနိုင်ပါ{{costClause}}။",
+      "tokensUsage": "နောက်ခံအချက်အလက် တိုကင် {{window}} ခုအနက် {{used}} ခု၊ {{percentage}} အသုံးပြုထားသည်{{costClause}}။",
       "title": "နောက်ခံအချက်အလက် အသုံးပြုမှု",
       "used": "အသုံးပြုထားသည်",
       "provider": "ဝန်ဆောင်မှုပေးသူ",
       "totalCost": "စုစုပေါင်း ကုန်ကျစရိတ်",
       "usageReflectsLatest": "အသုံးပြုမှုပမာဏသည် လက်ထောက်၏ နောက်ဆုံးရေးပြီးသော တုံ့ပြန်ချက်အပေါ် အခြေခံပါသည်။",
-      "usageUnavailable": "အကြောင်းအရာအသုံးပြုမှု မရနိုင်ပါ",
+      "usageUnavailable": "အကြောင်းအရာအသုံးပြုမှု မရနိုင်ပါ{{costClause}}။",
       "tokenUsage": "တိုကင်အသုံးပြုမှု",
       "cacheRate": "ယာယီမှတ်ဉာဏ် အသုံးပြုနှုန်း",
       "modelsCount": "မော်ဒယ်များ ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "ခရက်ဒစ်ဖြည့်ပါ",
-    "description": "ဆက်လက်အသုံးပြုနိုင်ရန် ခရက်ဒစ်ဖြည့်ပါ။",
     "billingPage": "ငွေပေးချေမှု စာမျက်နှာ"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "ဝဘ်ရှာဖွေခြင်း",
       "thinking": "သေချာစဉ်းစားနေသည်"
     },
-    "planOf": "အနက်",
+    "planProgress": "{{total}} အနက် {{done}}",
     "filesChanged": "ပြောင်းလဲသည့်ဖိုင်များ",
-    "finishedIn": "ပြီးဆုံးချိန်",
+    "finishedIn": "{{duration}} အတွင်း ပြီးဆုံးပြီ",
     "noActivityFor": "အတွက် လှုပ်ရှားမှုမရှိပါ",
     "prOpened": "Pull request ဖွင့်ပြီးပါပြီ",
     "permissionWants": "လုပ်ဆောင်လိုသည်",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "ဤမော်ဒယ်သည် စဉ်းစားမှုအဆင့်ကို ပံ့ပိုးသည်"
     },
-    "creditsRequired": "ဤမက်ဆေ့ချ်ကို ပေးပို့ရန် ခရက်ဒစ် မလုံလောက်သဖြင့် ခရက်ဒစ်ဖြည့်ပြီး ထပ်ကြိုးစားပါ။"
+    "creditsRequired": "ဤမက်ဆေ့ချ်ကို ပေးပို့ရန် ခရက်ဒစ် မလုံလောက်ပါ။"
   },
   "settingsTools": {
     "confirmTitle": "ဤပြောင်းလဲမှုကို အတည်ပြုမလား?"
@@ -3340,8 +3372,8 @@
     "saved": "အသုံးစရိတ် သတိပေးချက် ဆက်တင်များ သိမ်းဆည်းပြီးပါပြီ",
     "loadError": "အသုံးစရိတ် သတိပေးချက်များကို ဖွင့်၍မရပါ။",
     "saveError": "အသုံးစရိတ် သတိပေးချက်များကို သိမ်း၍မရပါ။",
-    "empty": "အသုံးစရိတ် သတိပေးချက်များ ပိတ်ထားသည်။ ဤနယ်ပယ်၏ ငွေတောင်းခံမှု အဆက်အသွယ်များကို သတိပေးရန် ၎င်းတို့ကို ဖွင့်ပါ။",
-    "noSpend": "အသုံးစရိတ် မှတ်တမ်းတင်ထားခြင်း မရှိသေးပါ",
+    "sendAlerts": "အသုံးစရိတ် သတိပေးချက်များ ပို့ပါ",
+    "noSpend": "မှတ်တမ်း မရှိသေးပါ",
     "spend24h": "လွန်ခဲ့သော 24 နာရီအတွင်း အသုံးစရိတ်",
     "multiplierError": "1 သို့မဟုတ် ထိုထက်ကြီးသော အမြှောက်ကို ထည့်ပါ",
     "permissionDenied": "အသုံးစရိတ် သတိပေးချက်များကို စီမံရန် သင့်တွင် ခွင့်ပြုချက် မရှိပါ။",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "အချိန်စီစဉ်ထားသော အစီရင်ခံစာများအတွက် ဖွင့်ထားသော context မရှိပါ",
     "sourceBlocker": "ဆက်ရှင်ကို အာရုံစိုက်ရန် လိုအပ်သည်",
     "sourceMetadata": "မှတ်တမ်းတင်ထားသော ဆက်ရှင် မက်တာဒေတာ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ဤ ရှာဖွေမှုရလဒ်ကို ဖွင့်၍မရပါ"
   }
 }

@@ -6,10 +6,15 @@ import {
   firstGrapheme,
   foldDecimalDigits,
   formatCalendarDate,
+  formatClockTime,
+  formatDate,
+  formatDuration,
+  formatDurationIncludingZero,
   formatFileSize,
   formatList,
   formatMoney,
   formatNumber,
+  formatPrefixedUsd,
   normalizeLocalizedNumber,
   parseLocalizedNumber,
 } from './format';
@@ -26,6 +31,24 @@ describe('formatMoney', () => {
     expect(de).not.toBe(en);
   });
 
+  it("leads the prefixed amount with the symbol and the locale's own sign", () => {
+    expect(
+      formatPrefixedUsd(1234.5, 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ).toBe('$1,234.50');
+    expect(formatPrefixedUsd(1234.5, 'en-US')).toBe('$1,234.5');
+    expect(
+      formatPrefixedUsd(-5, 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ).toBe('-$5.00');
+    // Several languages write a different minus glyph; the sign is the
+    // formatter's own part, not ASCII.
+    expect(formatPrefixedUsd(-5, 'sv')[0]).toBe('\u2212');
+    // A right-to-left language keeps the digits of its own formatter and no
+    // separating space between the symbol and the number.
+    const ar = formatPrefixedUsd(0, 'ar');
+    expect(ar.startsWith('$')).toBe(true);
+    expect(ar).not.toContain('\u00A0');
+  });
+
   it('uses Portugal rules for Portuguese and Brazil rules for Brazilian Portuguese', () => {
     expect(formatMoney(1234.5, 'pt')).toMatch(/^1234,50[\s\u00A0\u202F]+\$$/);
     expect(formatMoney(1234.5, 'pt-BR')).toMatch(/^\$[\s\u00A0\u202F]*1\.234,50$/);
@@ -33,10 +56,31 @@ describe('formatMoney', () => {
 });
 
 describe('localized format helpers', () => {
+  it('keeps the padded hour of a twenty-four-hour locale', () => {
+    const twoForty = new Date(2026, 0, 1, 2, 40);
+    expect(formatDate(twoForty, 'yo', { hour: 'numeric', minute: '2-digit' })).toBe('02:40');
+    expect(formatClockTime(twoForty, 'yo')).toBe('02:40');
+  });
+
+  it('leaves an unpadded clock untouched', () => {
+    const twoForty = new Date(2026, 0, 1, 2, 40);
+    expect(formatClockTime(twoForty, 'en')).toBe(
+      formatDate(twoForty, 'en', { hour: 'numeric', minute: '2-digit' })
+    );
+  });
+
   it('formats a list and preserves one grapheme', () => {
     expect(formatList(['A', 'B'], 'de')).toBe('A und B');
     expect(formatFileSize(1024, 'de')).toContain('1 kB');
     expect(firstGrapheme('👨‍👩‍👧‍👦 family', 'en')).toBe('👨‍👩‍👧‍👦');
+  });
+
+  it('pluralizes a whole-byte size in the active language', () => {
+    expect(formatFileSize(1, 'en')).toBe('1 byte');
+    expect(formatFileSize(564, 'en')).toBe('564 bytes');
+    expect(formatFileSize(1023, 'en')).toBe('1,023 bytes');
+    // A count that reaches the kilobyte unit keeps the abbreviated form.
+    expect(formatFileSize(1024, 'en')).toBe('1 kB');
   });
 
   it('parses localized numbers and rejects other input', () => {
@@ -99,6 +143,24 @@ describe('localized format helpers', () => {
 
   it('formats a calendar date without a time-zone shift', () => {
     expect(formatCalendarDate('2026-08-03', 'en-US')).toBe('8/3/2026');
+  });
+});
+
+describe('formatDurationIncludingZero', () => {
+  it('writes the zero duration that formatDuration drops', () => {
+    expect(formatDuration(0, 'en')).toBe('');
+    expect(formatDurationIncludingZero(0, 'en')).toBe('0 sec');
+  });
+
+  it('keeps the plain duration once a second has elapsed', () => {
+    expect(formatDurationIncludingZero(1, 'en')).toBe('1 sec');
+    expect(formatDurationIncludingZero(59, 'en')).toBe('59 sec');
+    expect(formatDurationIncludingZero(60, 'en')).toBe('1 min');
+    expect(formatDurationIncludingZero(3725, 'en')).toBe('1 hr, 2 min, 5 sec');
+  });
+
+  it.each(SUPPORTED_LANGUAGES)('names the zero in its own digits in %s', tag => {
+    expect(formatDurationIncludingZero(0, tag)).toContain(formatNumber(0, tag));
   });
 });
 

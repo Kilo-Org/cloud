@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "نیٹو ریموٹ ڈیمو",
+    "sessionsEmpty": "ابھی کوئی نیٹو سیشن نہیں ہے",
+    "hosts": "آن لائن ہوسٹس",
+    "hostsEmpty": "کوئی ہوسٹ آن لائن نہیں ہے",
+    "directory": "ورکنگ ڈائریکٹری",
+    "createSession": "نیٹو سیشن بنائیں",
+    "queueIfOffline": "ہوسٹ آف لائن ہو تو پرامپٹ قطار میں رکھیں",
+    "prompt": "پرامپٹ یا /command",
+    "localClear": "مقامی منظر صاف کریں",
+    "abort": "ٹرن منسوخ کریں",
+    "failed": "نیٹو ریموٹ کارروائی ناکام ہو گئی",
+    "creationUnknown": "سیشن بننے کا نتیجہ نامعلوم ہے۔ دوبارہ کوشش سے پہلے سیشن تازہ کریں۔",
+    "commandFailed": "رنر کی کمانڈ ناکام ہو گئی",
+    "invalidReply": "رنر کا جواب درست نہیں ہے",
+    "unsafeCommand": "/compact، /new، /skill، /models، /agents یا /clear (صرف مقامی طور پر) استعمال کریں۔",
+    "status": "رابطہ: {{connection}} · رنر: {{runner}}",
+    "presenceStatus": "ہوسٹس: {{connection}}",
+    "commandStatus": "کمانڈ کی ترسیل: {{status}}",
+    "delivered": "پہنچا دیا گیا",
+    "expired": "میعاد ختم ہو گئی"
+  },
   "common": {
     "cancel": "منسوخ کریں",
     "done": "ہو گیا",
@@ -110,6 +132,7 @@
     "newSession": "نیا سیشن",
     "noModelsAvailable": "کوئی ماڈل دستیاب نہیں",
     "notFound": "نہیں ملا۔",
+    "online": "آن لائن",
     "open": "{{name}} کھولیں",
     "openPullRequest": "پل ریکویسٹ کھولیں",
     "completed": "مکمل",
@@ -186,6 +209,7 @@
     "resendCode": "کوڈ دوبارہ بھیجیں",
     "termsPrefix": "آگے بڑھنے سے آپ ہماری درج ذیل پالیسیوں سے اتفاق کرتے ہیں: ",
     "terms": "شرائط",
+    "termsInSentence": "شرائط",
     "termsConnector": " اور ",
     "termsSuffix": "۔",
     "moreSignInOptions": "سائن ان کے مزید اختیارات",
@@ -222,6 +246,7 @@
     "confirmDeletion": "حذف کرنے کی تصدیق کریں",
     "credits": "کریڈٹس",
     "failedToLoadBalance": "بیلنس لوڈ نہیں ہو سکا۔ دوبارہ کوشش کرنے کے لیے ٹیپ کریں۔",
+    "balanceLoadFailed": "بیلنس لوڈ نہیں ہو سکا",
     "hideBalance": "بیلنس چھپائیں",
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "اس پل ریکویسٹ میں کسی فائل میں تبدیلی نہیں کی گئی۔",
     "fileList": {
       "openNavigator": "فائل نیویگیٹر کھولیں",
-      "filesViewed": "فائلیں · {{total}} میں سے {{viewed}} دیکھی گئیں",
       "listed": "(فہرست میں)",
       "layout": "ترتیب",
       "unified": "یکجا",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub کنکشن چیک نہیں ہو سکا۔",
-      "checkFailedMessage": "جب تک یہ لوڈ نہیں ہوتا، سائن ان کی حالت دستیاب نہیں ہوگی۔",
+      "checkFailedMessage": "GitHub تک رسائی نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
       "checkFailedTitleGitLab": "GitLab کنکشن چیک نہیں ہو سکا۔",
       "checkFailedTitleBitbucket": "Bitbucket کنکشن چیک نہیں ہو سکا۔",
-      "providerCheckFailedMessage": "لوڈ ہونے تک کنکشن کی حالت دستیاب نہیں۔",
+      "providerCheckFailedMessage": "پرووائیڈر تک رسائی نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
       "reconnectTitle": "GitHub سے دوبارہ رابطہ",
       "reconnectTitleGitLab": "GitLab سے دوبارہ رابطہ",
       "reconnectTitleBitbucket": "Bitbucket سے دوبارہ رابطہ",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "تصویر لینے کے لیے ترتیبات میں کیمرے تک رسائی کی اجازت دیں۔"
+    },
+    "botStatus": {
+      "offline": "آف لائن"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "یہ کارروائی مکمل نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔",
       "actionBlocked": "یہ کارروائی مکمل نہیں ہو سکی۔ دوبارہ کوشش کرنے سے پہلے اس مسئلے کو حل کرنا ضروری ہے۔",
       "syncNoRepositories": "کوئی بھی ریپوزٹری سنک کے دائرہ کار میں نہیں ہے۔ وہ ریپوزٹریز منتخب کریں جن کی «سیکیورٹی ایجنٹ» نگرانی کرتا ہے، پھر دوبارہ سنک کریں۔",
+      "syncNoRepositoriesNoManage": "کوئی بھی ریپوزٹری سنک کے دائرہ کار میں نہیں ہے۔ سنک ہونے سے پہلے تنظیم کے مالک، منتظم یا بلنگ مینیجر کو ریپوزٹریز منسلک کرنی ہوں گی۔",
       "syncIntegrationInactive": "سیکیورٹی ایجنٹ کے لیے GitHub کنکشن فعال نہیں ہے۔ Kilo GitHub App کو دوبارہ جوڑیں، پھر دوبارہ سنک کریں۔",
       "syncMissingPermission": "Kilo GitHub App vulnerability alerts نہیں پڑھ سکتی۔ GitHub میں یہ اجازت دیں، پھر دوبارہ سنک کریں۔",
       "configConflict": "سیکیورٹی ایجنٹ کی ترتیبات کہیں اور تبدیل ہو گئی ہیں۔ تازہ ترین ترتیبات کا جائزہ لیں اور دوبارہ محفوظ کریں۔"
@@ -1804,6 +1832,7 @@
       "emptyDescription": "شروع کرنے کے لیے نیچے پیغام بھیجیں۔",
       "scrollToBottom": "آخر تک اسکرول کریں",
       "emptyTitle": "ابھی کوئی پیغام نہیں",
+      "emptyReadOnlyTitle": "اس سیشن میں کوئی پیغام نہیں",
       "renameAccessibility": "سیشن کا نام تبدیل کریں: {{title}}",
       "cloningSession": "سیشن کی نقل بن رہی ہے",
       "couldNotLoadThisSession": "یہ سیشن لوڈ نہیں ہو سکا۔",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "شروع کرنے کے لیے ایک ریپوزٹری منتخب کریں۔",
       "enterPromptToStart": "شروع کرنے کے لیے ایک پرومپٹ شامل کریں۔",
       "enterPromptOrFileToStart": "شروع کرنے کے لیے ایک پرومپٹ یا فائل شامل کریں۔",
-      "connectProviderToStart": "شروع کرنے کے لیے ایک فراہم کنندہ منسلک کریں۔",
+      "connectProviderToStart": "ریپوزٹریاں منسلک GitHub، GitLab یا Bitbucket اکاؤنٹ سے آتی ہیں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
       "prefillRepoAndModelUnavailable": "اصل سیشن کی ریپوزٹری اور ماڈل اب دستیاب نہیں ہیں۔ نیچے سے نئی ریپوزٹری اور ماڈل منتخب کریں۔",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "جواب روک دیا گیا۔",
       "assistantContextOverflow": "گفتگو ماڈل کے لیے بہت طویل ہے۔",
       "assistantProviderError": "فراہم کنندہ نے ایک خرابی واپس کی۔",
+      "assistantProviderRefused": "فراہم کنندہ نے یہ درخواست مسترد کر دی اور اس پر دوبارہ کوشش نہیں کی جا سکتی۔",
+      "assistantCreditsRefusal": "Cloud Agent چلانے کے لیے کافی کریڈٹس نہیں ہیں۔",
       "assistantOutputLimit": "جواب ماڈل کی آؤٹ پٹ حد تک پہنچ گیا۔",
       "assistantStructuredOutput": "جواب مطلوبہ فارمیٹ سے مطابقت نہیں رکھتا۔",
       "assistantFailed": "جواب تیار نہیں ہو سکا۔"
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "ماحول تیار کیا جا رہا ہے",
       "preparationComplete": "تیاری مکمل",
       "preparationFailed": "تیاری ناکام",
+      "preparationStageFailed": "ناکام: {{stage}}",
       "setupCommand": "سیٹ اپ کمانڈ {{index}}",
       "setupCommandOf": "سیٹ اپ کی کمانڈ {{index}}، کل {{displayCount}}",
       "stepWorkspaceSetup": "ورک اسپیس سیٹ اپ",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "سیٹ اپ کمانڈ {{index}} کا وقت ختم ہو گیا",
       "detailColdRestore": "کول بحالی، اسنیپ شاٹ لاگو، بحال شدہ فائلیں: {{total}} میں سے {{applied}}",
       "detailProgressPercent": "{{percent}}% مکمل",
-      "detailRestoreIncompleteReport": "سیشن بحالی نامکمل، غیر بحال شدہ فائلیں: {{total}} میں سے {{skipped}} ({{reasons}})۔",
+      "detailRestoreIncompleteFiles": "غیر بحال شدہ فائلیں: {{total}} میں سے {{skipped}} ({{reasons}})۔",
       "detailRestoreIncompleteMissing": "غیر موجود: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} اور {{omitted}} مزید",
       "detailReasonPatchFailed": "پیچ لاگو نہیں ہو سکا",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "سیاق و سباق کی گنجائش دستیاب نہیں",
-      "tapToViewDetails": "سیاق و سباق کی تفصیلات دیکھنے کے لیے ٹیپ کریں۔",
-      "costSuffix": "، لاگت {{cost}}",
-      "tokensWindowUnavailable": "سیاق و سباق: {{used}} ٹوکن، گنجائش دستیاب نہیں",
-      "tokensUsage": "سیاق و سباق: {{window}} میں سے {{used}} ٹوکن، {{percentage}} استعمال شدہ",
+      "tapToViewDetails": " سیاق و سباق کی تفصیلات دیکھنے کے لیے ٹیپ کریں۔",
+      "costClause": "، لاگت {{cost}}",
+      "loadingCostSpoken": "لاگت {{cost}}۔",
+      "tokensWindowUnavailable": "سیاق و سباق: {{used}} ٹوکن، گنجائش دستیاب نہیں{{costClause}}۔",
+      "tokensUsage": "سیاق و سباق: {{window}} میں سے {{used}} ٹوکن، {{percentage}} استعمال شدہ{{costClause}}۔",
       "title": "سیاق و سباق کا استعمال",
       "used": "استعمال شدہ",
       "provider": "فراہم کنندہ",
       "totalCost": "کل لاگت",
       "usageReflectsLatest": "استعمال کے یہ اعداد معاون کے آخری مکمل جواب کے مطابق ہیں۔",
-      "usageUnavailable": "سیاق کا استعمال دستیاب نہیں ہے",
+      "usageUnavailable": "سیاق کا استعمال دستیاب نہیں ہے{{costClause}}۔",
       "tokenUsage": "ٹوکن کا استعمال",
       "cacheRate": "کیش کی شرح",
       "modelsCount": "ماڈلز ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "کریڈٹس شامل کریں",
-    "description": "استعمال جاری رکھنے کے لیے کریڈٹس شامل کریں۔",
     "billingPage": "بلنگ کا صفحہ"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "ویب تلاش",
       "thinking": "غور کر رہا ہے"
     },
-    "planOf": "میں سے",
+    "planProgress": "{{total}} میں سے {{done}}",
     "filesChanged": "فائلیں تبدیل ہوئیں",
-    "finishedIn": "مکمل ہونے میں",
+    "finishedIn": "{{duration}} میں مکمل",
     "noActivityFor": "کوئی سرگرمی نہیں",
     "prOpened": "پل ریکویسٹ کھول دی گئی",
     "permissionWants": "چلانا چاہتا ہے",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
     },
-    "creditsRequired": "اس پیغام کو بھیجنے کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔"
+    "creditsRequired": "اس پیغام کو بھیجنے کے لیے کافی کریڈٹس نہیں ہیں۔"
   },
   "settingsTools": {
     "confirmTitle": "اس تبدیلی کی تصدیق کریں؟"
@@ -3340,8 +3372,8 @@
     "saved": "اخراجات کی تنبیہ کی ترتیبات محفوظ ہو گئیں",
     "loadError": "اخراجات کی تنبیہات لوڈ نہیں ہو سکیں۔",
     "saveError": "اخراجات کی تنبیہات محفوظ نہیں ہو سکیں۔",
-    "empty": "اخراجات کی تنبیہات بند ہیں۔ اس دائرے کے بلنگ رابطوں کو آگاہ کرنے کے لیے انہیں آن کریں۔",
-    "noSpend": "ابھی تک کوئی خرچ درج نہیں ہوا",
+    "sendAlerts": "تنبیہیں بھیجیں",
+    "noSpend": "کوئی خرچ نہیں",
     "spend24h": "گزشتہ 24 گھنٹوں کا خرچ",
     "multiplierError": "1 یا اس سے زیادہ کا ضرب درج کریں",
     "permissionDenied": "آپ کو اخراجات کی تنبیہات کا انتظام کرنے کی اجازت نہیں ہے۔",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "شیڈول شدہ بریفنگز کے لیے کوئی سیاق فعال نہیں ہے",
     "sourceBlocker": "سیشن کو توجہ درکار ہے",
     "sourceMetadata": "محفوظ کردہ سیشن میٹا ڈیٹا"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "یہ تلاش کا نتیجہ کھولا نہیں جا سکا"
   }
 }

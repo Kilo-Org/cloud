@@ -16,6 +16,7 @@ const {
   createCliSessionMock,
   deleteCliSessionMock,
   mergeProfileConfigurationMock,
+  getBuiltinAgentSettingsMock,
   organizationMembershipLimitMock,
   assertKiloModelAvailableMock,
   getSandboxAllocationCandidatesMock,
@@ -26,6 +27,7 @@ const {
   createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
   deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
   mergeProfileConfigurationMock: vi.fn(),
+  getBuiltinAgentSettingsMock: vi.fn().mockResolvedValue({}),
   organizationMembershipLimitMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
   getSandboxAllocationCandidatesMock: vi.fn(),
@@ -38,6 +40,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
     getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
@@ -132,7 +135,6 @@ function createInternalApiContext(options: {
   internalApiSecret?: string | null;
   requestInternalApiKey?: string | null;
   skipBalanceCheck?: boolean;
-  credentialContainmentEnabled?: string;
   doStub?: ReturnType<typeof createMockDOStub>;
   getTokenForRepo?: ReturnType<typeof vi.fn>;
   getBitbucketToken?: ReturnType<typeof vi.fn>;
@@ -210,10 +212,6 @@ function createInternalApiContext(options: {
       HYPERDRIVE: {
         connectionString: 'postgres://profile-test',
       } as TRPCContext['env']['HYPERDRIVE'],
-      CREDENTIAL_CONTAINMENT_ENABLED: options.credentialContainmentEnabled,
-      CODE_REVIEW_CONTAINERS_ORG_IDS: '*',
-      CLOUDFLARE_CONTAINERS_ORG_IDS:
-        options.credentialContainmentEnabled === 'false' ? '*' : undefined,
     },
   } as TRPCContext;
 }
@@ -254,6 +252,7 @@ describe('sandbox selection Worker API', () => {
     selectControlPlaneSandboxMock.mockReset();
     organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership' }]);
     mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     getSandboxAllocationCandidatesMock.mockResolvedValue({});
   });
@@ -300,7 +299,10 @@ describe('sandbox selection Worker API', () => {
       result.options
         .filter(option => option.unavailableReason === undefined)
         .map(option => option.allocation)
-    ).toEqual([getSandboxAllocationRequest('cloudflare-containers-standard-3')]);
+    ).toEqual([
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+      getSandboxAllocationRequest('cloudflare-containers-standard-4'),
+    ]);
   });
 
   it.each(allocationInputs)(
@@ -362,7 +364,6 @@ describe('sandbox selection Worker API', () => {
       });
       const ctx = createInternalApiContext({});
       ctx.env.SANDBOX_SELECTION_IDS = orgId;
-      ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = orgId;
       const result = await appRouter.createCaller(ctx).getSandboxSelectionOptions(input);
       expect(result.effectiveDestination).toEqual(
         getSandboxAllocationRequest('cloudflare-containers-standard-4')
@@ -478,7 +479,6 @@ describe('sandbox selection Worker API', () => {
     async kilocodeOrganizationId => {
       const ctx = createInternalApiContext({});
       ctx.env.SANDBOX_SELECTION_IDS = '*';
-      ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '*';
       const caller = appRouter.createCaller(ctx);
       const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId });
       expect(normal.defaultDestination).toEqual(
@@ -527,7 +527,6 @@ describe('sandbox selection Worker API', () => {
     const doStub = createMockDOStub();
     const ctx = createInternalApiContext({ doStub, requestInternalApiKey: null });
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
-    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = orgId;
     generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
     await appRouter.createCaller(ctx).start({
       ...startInput,
@@ -1162,11 +1161,9 @@ describe('prepareSession endpoint', () => {
   });
 
   it('rejects the retired shared allocation before allocation or registration', async () => {
-    const overrideStore = { get: vi.fn().mockResolvedValue('shared-slot-v1'), put: vi.fn() };
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     context.env.SANDBOX_SELECTION_IDS = '*';
-    Object.assign(context.env, { SHARED_SANDBOX_OVERRIDES: overrideStore });
     const caller = appRouter.createCaller(context);
 
     await expect(
@@ -1181,7 +1178,6 @@ describe('prepareSession endpoint', () => {
       message: expect.stringContaining('has been retired'),
     });
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(overrideStore.get).not.toHaveBeenCalled();
   });
 
   it('does not let public createdOnPlatform select the Code Review sandbox class', async () => {
@@ -1232,11 +1228,9 @@ describe('prepareSession endpoint', () => {
     expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
   });
 
-  it('enables containment when the global flag is true', async () => {
+  it('enables mandatory containment', async () => {
     const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(
-      createInternalApiContext({ doStub, credentialContainmentEnabled: 'true' })
-    );
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
     await caller.prepareSession({
       prompt: 'Test containment',
@@ -1274,16 +1268,15 @@ describe('prepareSession endpoint', () => {
     [`sbx-${'b'.repeat(48)}`, 'cloudflare-single', undefined],
     [`sbx-${'c'.repeat(48)}`, undefined, 'code-review'],
   ] as const)(
-    'persists the generated %s identity unchanged with containment disabled',
+    'persists the generated %s identity unchanged with mandatory containment',
     async (sandboxId, sandboxAllocation, createdOnPlatform) => {
       selectControlPlaneSandboxMock.mockResolvedValueOnce({
         sandboxKind: createdOnPlatform === 'code-review' ? 'code-review' : 'isolated',
         sandboxId,
-        provider:
-          sandboxAllocation === 'cloudflare-single' ? 'cloudflare-containers' : 'cloudflare',
+        provider: createdOnPlatform === 'code-review' ? 'cloudflare' : 'cloudflare-containers',
       });
       const doStub = createMockDOStub();
-      const ctx = createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' });
+      const ctx = createInternalApiContext({ doStub });
       ctx.env.SANDBOX_SELECTION_IDS = '*';
       await appRouter.createCaller(ctx).prepareSession({
         prompt: 'Create a non-contained session',
@@ -1300,17 +1293,15 @@ describe('prepareSession endpoint', () => {
             workspace: expect.objectContaining({
               sandboxId,
               sandboxProvider:
-                sandboxAllocation === 'cloudflare-single' ? 'cloudflare-containers' : 'cloudflare',
-              ...(sandboxAllocation === 'cloudflare-single'
+                createdOnPlatform === 'code-review' ? 'cloudflare' : 'cloudflare-containers',
+              ...(sandboxAllocation
                 ? { sandboxAllocation: 'cloudflare-containers-standard-3' }
-                : sandboxAllocation
-                  ? { sandboxAllocation }
-                  : {}),
+                : {}),
               credentialContainment: {
-                github: false,
+                github: true,
                 gitlab: false,
                 bitbucket: false,
-                kilocode: false,
+                kilocode: true,
               },
             }),
           }),
@@ -1318,35 +1309,6 @@ describe('prepareSession endpoint', () => {
       );
     }
   );
-
-  it('disables all containment when the global flag is false', async () => {
-    const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(
-      createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' })
-    );
-
-    await caller.prepareSession({
-      prompt: 'Test containment disabled',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'Kilo-Org/kg',
-    });
-
-    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
-      expect.objectContaining({
-        metadata: expect.objectContaining({
-          workspace: expect.objectContaining({
-            credentialContainment: {
-              github: false,
-              gitlab: false,
-              bitbucket: false,
-              kilocode: false,
-            },
-          }),
-        }),
-      })
-    );
-  });
 
   it('enables containment for standard GitLab sessions', async () => {
     const doStub = createMockDOStub();
@@ -1832,37 +1794,32 @@ describe('start endpoint', () => {
       repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
     },
     { type: 'git', url: 'https://git.example.com/acme/repo.git' },
-  ] as const)(
-    'disables all containment for $type grouped starts when the global flag is false',
-    async repository => {
-      const doStub = createMockDOStub();
-      const caller = appRouter.createCaller(
-        createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' })
-      );
+  ] as const)('requires containment for $type grouped starts', async repository => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
-      await caller.start({
-        message: { prompt: 'Test containment disabled' },
-        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
-        repository,
-        options: { kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' },
-      });
+    await caller.start({
+      message: { prompt: 'Test containment disabled' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository,
+      options: { kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' },
+    });
 
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({
-            workspace: expect.objectContaining({
-              credentialContainment: {
-                github: false,
-                gitlab: false,
-                bitbucket: false,
-                kilocode: false,
-              },
-            }),
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            credentialContainment: {
+              github: repository.type === 'github',
+              gitlab: repository.type === 'gitlab',
+              bitbucket: repository.type === 'bitbucket',
+              kilocode: true,
+            },
           }),
-        })
-      );
-    }
-  );
+        }),
+      })
+    );
+  });
 
   it.each(['cloud-agent-web', 'slack'])(
     'resolves implicit profiles for approved grouped %s start',
@@ -2185,8 +2142,6 @@ describe('start endpoint', () => {
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     Object.assign(context.env, {
-      PER_SESSION_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-      VERCEL_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       VERCEL_TOKEN: 'private-vercel-token',
       VERCEL_TEAM_ID: 'team-id',
       VERCEL_PROJECT_ID: 'project-id',
@@ -2210,7 +2165,6 @@ describe('start endpoint', () => {
         sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
         orgId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
         env: expect.objectContaining({
-          VERCEL_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
           VERCEL_TOKEN: 'private-vercel-token',
           VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot-id',
           VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'runtime-build-id',

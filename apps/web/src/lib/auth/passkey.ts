@@ -14,6 +14,7 @@ import {
 } from '@simplewebauthn/server';
 import { decodeClientDataJSON, isoBase64URL } from '@simplewebauthn/server/helpers';
 import {
+  kilocode_users,
   passkey_challenges,
   passkey_credentials,
   passkey_sign_in_tickets,
@@ -24,7 +25,8 @@ import {
 
 import assetLinks from '../../../public/.well-known/assetlinks.json';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 
 /**
  * WebAuthn ceremonies for passkey registration and sign-in.
@@ -85,6 +87,16 @@ function getRelyingParty(): { rpId: string; expectedOrigins: string[] } {
     expectedOrigins.push(fingerprintToAndroidOrigin(ANDROID_DEBUG_CERT_FINGERPRINT));
   }
   return { rpId: url.hostname, expectedOrigins };
+}
+
+/**
+ * The web-only relying party used by privileged MFA step-up. The native app
+ * must never complete a step-up: accepting an `android:apk-key-hash` origin
+ * there would let a mobile client borrow a browser session's proof.
+ */
+export function getWebRelyingParty(): { rpId: string; expectedOrigin: string } {
+  const url = new URL(NEXTAUTH_URL);
+  return { rpId: url.hostname, expectedOrigin: url.origin };
 }
 
 const rpName = 'Kilo Code';
@@ -254,11 +266,19 @@ export async function createRegistrationOptions(
  * attestation that does not verify (including one signed for another origin or
  * rpId, both of which the library checks against this configuration), and
  * refuses a credential id that is already bound to a user.
+ *
+ * `sessionPepper` is the pepper of the browser session that started this
+ * request. The credential is inserted while the user row is locked, and only if
+ * that session is still current. Account recovery rotates the pepper on the
+ * same row before it deletes passkeys. It therefore either commits first, and
+ * this registration is refused, or waits for this insert and then deletes the
+ * new credential.
  */
 export async function verifyRegistration(
   kiloUserId: string,
   challengeId: string,
-  response: RegistrationResponseJSON
+  response: RegistrationResponseJSON,
+  sessionPepper: string | null | undefined
 ): Promise<PasskeyCredential> {
   const { rpId, expectedOrigins } = getRelyingParty();
 
@@ -299,34 +319,45 @@ export async function verifyRegistration(
 
   const { credential, credentialDeviceType, credentialBackedUp, aaguid } = registrationInfo;
 
-  const [bound] = await db
-    .select({ kilo_user_id: passkey_credentials.kilo_user_id })
-    .from(passkey_credentials)
-    .where(eq(passkey_credentials.credential_id, credential.id))
-    .limit(1);
-  if (bound) {
-    // A credential id is unique per user and is never re-bound.
-    throw new PasskeyVerificationError('VERIFICATION_FAILED');
-  }
+  return db.transaction(async tx => {
+    const [owner] = await tx
+      .select({ web_session_pepper: kilocode_users.web_session_pepper })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, kiloUserId))
+      .for('update');
+    if (!owner || !isWebSessionCurrent(sessionPepper, owner)) {
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    }
 
-  const [inserted] = await db
-    .insert(passkey_credentials)
-    .values({
-      kilo_user_id: kiloUserId,
-      credential_id: credential.id,
-      public_key: isoBase64URL.fromBuffer(credential.publicKey),
-      sign_count: credential.counter,
-      transports: credential.transports ?? null,
-      device_type: credentialDeviceType,
-      backed_up: credentialBackedUp,
-      aaguid,
-    })
-    .returning();
+    const [bound] = await tx
+      .select({ kilo_user_id: passkey_credentials.kilo_user_id })
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.credential_id, credential.id))
+      .limit(1);
+    if (bound) {
+      // A credential id is unique per user and is never re-bound.
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    }
 
-  if (!inserted) {
-    throw new PasskeyVerificationError('VERIFICATION_FAILED');
-  }
-  return inserted;
+    const [inserted] = await tx
+      .insert(passkey_credentials)
+      .values({
+        kilo_user_id: kiloUserId,
+        credential_id: credential.id,
+        public_key: isoBase64URL.fromBuffer(credential.publicKey),
+        sign_count: credential.counter,
+        transports: credential.transports ?? null,
+        device_type: credentialDeviceType,
+        backed_up: credentialBackedUp,
+        aaguid,
+      })
+      .returning();
+
+    if (!inserted) {
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    }
+    return inserted;
+  });
 }
 
 /**
@@ -354,6 +385,30 @@ export async function createAuthenticationOptions(): Promise<AuthenticationOptio
   });
 
   return { challengeId, options };
+}
+
+/**
+ * Advance a credential's signature counter as a compare-and-set against the
+ * value that was just verified. A concurrent assertion read the same counter
+ * and reaches this write with a stale expectation, so it updates no row.
+ */
+export async function advancePasskeyCounter(
+  credential: Pick<PasskeyCredential, 'id' | 'sign_count'>,
+  newCounter: number,
+  fromDb: typeof db | DrizzleTransaction = db
+): Promise<boolean> {
+  const advanced = await fromDb
+    .update(passkey_credentials)
+    .set({ sign_count: newCounter, last_used_at: sql`NOW()` })
+    .where(
+      and(
+        eq(passkey_credentials.id, credential.id),
+        eq(passkey_credentials.sign_count, credential.sign_count)
+      )
+    )
+    .returning({ id: passkey_credentials.id });
+
+  return advanced.length === 1;
 }
 
 /**
@@ -430,25 +485,22 @@ export async function verifyAuthentication(
   }
 
   // Advance the counter as a compare-and-set against the value that was
-  // verified. A concurrent assertion for the same credential read the same
-  // counter and reaches this write with a stale expectation, so it updates no
-  // row: only the assertion that won the row is allowed to mint a ticket.
-  const advanced = await db
-    .update(passkey_credentials)
-    .set({ sign_count: newCounter, last_used_at: sql`NOW()` })
-    .where(
-      and(
-        eq(passkey_credentials.id, credential.id),
-        eq(passkey_credentials.sign_count, credential.sign_count)
-      )
-    )
-    .returning({ id: passkey_credentials.id });
-
-  if (advanced.length !== 1) {
-    throw new PasskeyVerificationError('VERIFICATION_FAILED');
-  }
-
-  const ticket = await createSignInTicket(credential.kilo_user_id);
+  // verified, and mint the ticket in the same transaction. A concurrent
+  // assertion for the same credential read the same counter and reaches this
+  // write with a stale expectation, so it updates no row: only the assertion
+  // that won the row is allowed to mint a ticket.
+  //
+  // The update also holds the credential's row lock until the ticket commits.
+  // Account recovery and account deletion delete the credential and then the
+  // user's tickets, so they either commit first, and this update matches no
+  // row, or wait for this commit and then delete the ticket minted here.
+  // Neither can leave a ticket that outlives the removed credential.
+  const ticket = await db.transaction(async tx => {
+    if (!(await advancePasskeyCounter(credential, newCounter, tx))) {
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    }
+    return createSignInTicket(credential.kilo_user_id, tx);
+  });
   return { ticket };
 }
 
@@ -458,11 +510,14 @@ export async function verifyAuthentication(
  * that a WebAuthn assertion verified, and the sign-in provider exchanges it for
  * a session.
  */
-export async function createSignInTicket(kiloUserId: string): Promise<string> {
+export async function createSignInTicket(
+  kiloUserId: string,
+  fromDb: typeof db | DrizzleTransaction = db
+): Promise<string> {
   const ticket = randomBytes(32).toString('hex');
   const ticket_hash = createHash('sha256').update(ticket).digest('hex');
 
-  await db.insert(passkey_sign_in_tickets).values({
+  await fromDb.insert(passkey_sign_in_tickets).values({
     ticket_hash,
     kilo_user_id: kiloUserId,
     expires_at: new Date(Date.now() + SIGN_IN_TICKET_TTL_MS).toISOString(),

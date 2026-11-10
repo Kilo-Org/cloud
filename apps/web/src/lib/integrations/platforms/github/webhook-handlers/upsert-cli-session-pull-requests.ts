@@ -10,6 +10,10 @@ import {
   pullRequestUrlMatchesRepo,
 } from '@/lib/integrations/platforms/github/pr-link-identity';
 import type { PullRequestPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
+import {
+  createEmptyPrObservations,
+  prMergeabilitySchema,
+} from '@/lib/integrations/platforms/github/pr-observations';
 
 /**
  * Identity of the GitHub installation that delivered a webhook. The cache
@@ -271,6 +275,24 @@ export async function upsertCliSessionPullRequestsFromWebhook(
     }
 
     const state = derivePrState(pull_request, action);
+    const mergeability = prMergeabilitySchema.safeParse({
+      headSha: pull_request.head.sha,
+      baseSha: pull_request.base.sha,
+      baseRef: pull_request.base.ref,
+      mergeable: pull_request.mergeable ?? null,
+      state: pull_request.mergeable_state ?? null,
+      observedAt: new Date().toISOString(),
+    });
+    const observations = {
+      ...createEmptyPrObservations(),
+      ...(mergeability.success ? { mergeability: mergeability.data } : {}),
+    };
+    const observationsSet = mergeability.success
+      ? sql`jsonb_set(
+          coalesce(${github_branch_pull_requests.pr_observations}, ${JSON.stringify(createEmptyPrObservations())}::jsonb),
+          '{mergeability}', ${JSON.stringify(mergeability.data)}::jsonb
+        )`
+      : sql`${github_branch_pull_requests.pr_observations} - 'mergeability'`;
 
     // Defense-in-depth against out-of-order webhook deliveries.
     //
@@ -341,6 +363,7 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         pr_state: state,
         pr_title: pull_request.title,
         pr_head_sha: pull_request.head.sha,
+        pr_observations: observations,
         pr_review_decision: null,
         review_decision_pending: true,
         review_decision_fetching_at: null,
@@ -355,6 +378,7 @@ export async function upsertCliSessionPullRequestsFromWebhook(
           pr_state: prStateSet,
           pr_title: sql`excluded.pr_title`,
           pr_head_sha: sql`excluded.pr_head_sha`,
+          pr_observations: observationsSet,
           review_decision_pending: reviewDecisionPendingSet,
           pr_last_synced_at: sql`now()`,
           updated_at: sql`now()`,

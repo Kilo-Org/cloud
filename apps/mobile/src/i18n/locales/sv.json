@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo av native-fjärrstyrning",
+    "sessionsEmpty": "Inga native-sessioner ännu",
+    "hosts": "Anslutna värdar",
+    "hostsEmpty": "Inga anslutna värdar",
+    "directory": "Arbetskatalog",
+    "createSession": "Skapa native-session",
+    "queueIfOffline": "Köa prompten om värden är offline",
+    "prompt": "Prompt eller /command",
+    "localClear": "Rensa lokal vy",
+    "abort": "Avbryt tur",
+    "failed": "Fjärråtgärden via native-protokollet misslyckades",
+    "creationUnknown": "Oklart om sessionen skapades. Uppdatera sessionerna innan du försöker igen.",
+    "commandFailed": "Kommandot till CLI-processen misslyckades",
+    "invalidReply": "Ogiltigt svar från CLI-processen",
+    "unsafeCommand": "Använd /compact, /new, /skill, /models, /agents eller /clear (endast lokalt).",
+    "status": "Anslutning: {{connection}} · CLI-process: {{runner}}",
+    "presenceStatus": "Värdar: {{connection}}",
+    "commandStatus": "Kommandoleverans: {{status}}",
+    "delivered": "Levererat",
+    "expired": "Utgånget"
+  },
   "common": {
     "cancel": "Avbryt",
     "done": "Klar",
@@ -110,6 +132,7 @@
     "newSession": "Ny session",
     "noModelsAvailable": "Inga modeller tillgängliga",
     "notFound": "Hittades inte",
+    "online": "Uppkopplad",
     "open": "Öppna {{name}}",
     "openPullRequest": "Öppna PR",
     "completed": "Slutförd",
@@ -186,6 +209,7 @@
     "resendCode": "Skicka koden igen",
     "termsPrefix": "Genom att fortsätta godkänner du våra ",
     "terms": "Villkor",
+    "termsInSentence": "Villkor",
     "termsConnector": " och ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fler inloggningsalternativ",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Bekräfta borttagning",
     "credits": "Krediter",
     "failedToLoadBalance": "Kunde inte läsa in saldot. Tryck för att försöka igen.",
+    "balanceLoadFailed": "Kunde inte läsa in saldot",
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Den här PR:en innehåller inga filändringar.",
     "fileList": {
       "openNavigator": "Öppna filnavigeringen",
-      "filesViewed": "Filer · {{viewed}} av {{total}} visade",
       "listed": "(listade)",
       "layout": "Visningsläge",
       "unified": "Enhetlig",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "Kunde inte kontrollera GitHub-anslutningen.",
-      "checkFailedMessage": "Inloggningsstatusen kan inte visas förrän inläsningen är klar.",
+      "checkFailedMessage": "Det gick inte att nå GitHub. Kontrollera anslutningen och försök igen.",
       "checkFailedTitleGitLab": "Kunde inte kontrollera GitLab-anslutningen.",
       "checkFailedTitleBitbucket": "Kunde inte kontrollera Bitbucket-anslutningen.",
-      "providerCheckFailedMessage": "Anslutningsstatusen kan inte visas förrän inläsningen är klar.",
+      "providerCheckFailedMessage": "Det gick inte att nå leverantören. Kontrollera anslutningen och försök igen.",
       "reconnectTitle": "Anslut GitHub igen",
       "reconnectTitleGitLab": "Anslut GitLab igen",
       "reconnectTitleBitbucket": "Anslut Bitbucket igen",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Tillåt åtkomst till kameran i Inställningar för att ta en bild."
+    },
+    "botStatus": {
+      "offline": "Frånkopplad"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Det gick inte att slutföra den här åtgärden. Försök igen.",
       "actionBlocked": "Det gick inte att slutföra den här åtgärden. Problemet måste åtgärdas innan du kan försöka igen.",
       "syncNoRepositories": "Inga kodarkiv finns i synkroniseringsomfånget. Välj de kodarkiv som Säkerhetsagenten övervakar och synkronisera igen.",
+      "syncNoRepositoriesNoManage": "Inga kodarkiv finns i synkroniseringsomfånget. En organisationsägare, administratör eller faktureringsansvarig måste ansluta kodarkiv innan synkronisering kan köras.",
       "syncIntegrationInactive": "GitHub-anslutningen för Säkerhetsagenten är inte aktiv. Återanslut Kilos GitHub-app och synkronisera igen.",
       "syncMissingPermission": "Kilos GitHub-app kan inte läsa sårbarhetsaviseringar. Bevilja behörigheten i GitHub och synkronisera igen.",
       "configConflict": "Säkerhetsagentens inställningar ändrades någon annanstans. Granska de senaste inställningarna och spara igen."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "Skicka ett meddelande nedan för att komma igång.",
       "scrollToBottom": "Rulla längst ned",
       "emptyTitle": "Inga meddelanden ännu",
+      "emptyReadOnlyTitle": "Inga meddelanden i den här sessionen",
       "renameAccessibility": "Byt namn på sessionen: {{title}}",
       "cloningSession": "Klonar sessionen",
       "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Välj ett kodarkiv för att starta.",
       "enterPromptToStart": "Lägg till en uppmaning för att starta.",
       "enterPromptOrFileToStart": "Lägg till en uppmaning eller en fil för att starta.",
-      "connectProviderToStart": "Anslut en leverantör för att starta.",
+      "connectProviderToStart": "Kodarkiv kommer från ett anslutet GitHub-, GitLab- eller Bitbucket-konto.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
       "prefillRepoAndModelUnavailable": "Den ursprungliga sessionens kodarkiv och modell är inte längre tillgängliga. Välj ett nytt kodarkiv och en ny modell nedan.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "Svaret avbröts.",
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
       "assistantProviderError": "Leverantören returnerade ett fel.",
+      "assistantProviderRefused": "Leverantören avvisade begäran och den kan inte göras om.",
+      "assistantCreditsRefusal": "Du har inte tillräckligt med krediter för att köra Cloud Agent.",
       "assistantOutputLimit": "Svaret nådde modellens utdata-gräns.",
       "assistantStructuredOutput": "Svaret matchade inte det begärda formatet.",
       "assistantFailed": "Det gick inte att generera svaret."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Förbereder miljön",
       "preparationComplete": "Förberedelserna är klara",
       "preparationFailed": "Förberedelserna misslyckades",
+      "preparationStageFailed": "Misslyckades: {{stage}}",
       "setupCommand": "Konfigurationskommando {{index}}",
       "setupCommandOf": "Konfigurationskommando {{index}} av {{displayCount}}",
       "stepWorkspaceSetup": "Konfigurerar arbetsyta",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "Konfigurationskommando {{index}} fick timeout",
       "detailColdRestore": "Kall återställning, ögonblicksbild tillämpades, filer återställda: {{applied}} av {{total}}",
       "detailProgressPercent": "{{percent}} % klart",
-      "detailRestoreIncompleteReport": "Sessionsåterställning ofullständig, filer återställdes inte: {{skipped}} av {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Filer återställdes inte: {{skipped}} av {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Saknas: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} och {{omitted}} till",
       "detailReasonPatchFailed": "patchen kunde inte tillämpas",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Kontextfönstrets storlek är inte tillgänglig",
-      "tapToViewDetails": "Tryck för att visa kontextdetaljer.",
-      "costSuffix": ", kostnad {{cost}}",
-      "tokensWindowUnavailable": "Kontext: {{used}} token, fönstrets storlek är inte tillgänglig",
-      "tokensUsage": "Kontext: {{used}} av {{window}} token, {{percentage}} använt",
+      "tapToViewDetails": " Tryck för att visa kontextdetaljer.",
+      "costClause": ", kostnad {{cost}}",
+      "loadingCostSpoken": "kostnad {{cost}}.",
+      "tokensWindowUnavailable": "Kontext: {{used}} token, fönstrets storlek är inte tillgänglig{{costClause}}.",
+      "tokensUsage": "Kontext: {{used}} av {{window}} token, {{percentage}} använt{{costClause}}.",
       "title": "Kontextanvändning",
       "used": "Använt",
       "provider": "Leverantör",
       "totalCost": "Total kostnad",
       "usageReflectsLatest": "Användningen avser det senaste färdiga svaret från assistenten.",
-      "usageUnavailable": "Kontextanvändning är inte tillgänglig",
+      "usageUnavailable": "Kontextanvändning är inte tillgänglig{{costClause}}.",
       "tokenUsage": "Tokenanvändning",
       "cacheRate": "Andel från cache",
       "modelsCount": "Modeller ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Fyll på krediter",
-    "description": "Fyll på krediter för att fortsätta använda tjänsten.",
     "billingPage": "faktureringssidan"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Webbsökning",
       "thinking": "Tänker igenom"
     },
-    "planOf": "av",
+    "planProgress": "{{done}} av {{total}}",
     "filesChanged": "filer ändrade",
-    "finishedIn": "Klart på",
+    "finishedIn": "Klart på {{duration}}",
     "noActivityFor": "Ingen aktivitet i",
     "prOpened": "Pull request öppnad",
     "permissionWants": "Vill köra",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"
     },
-    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet. Fyll på krediter och försök igen."
+    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet."
   },
   "settingsTools": {
     "confirmTitle": "Bekräfta denna ändring?"
@@ -3340,8 +3372,8 @@
     "saved": "Inställningarna för utgiftsvarningar har sparats",
     "loadError": "Utgiftsvarningarna kunde inte läsas in.",
     "saveError": "Utgiftsvarningarna kunde inte sparas.",
-    "empty": "Utgiftsvarningar är av. Slå på dem för att varna detta områdes faktureringskontakter.",
-    "noSpend": "Ingen utgift registrerad ännu",
+    "sendAlerts": "Skicka varningar",
+    "noSpend": "Inga utgifter ännu",
     "spend24h": "Utgifter de senaste 24 timmarna",
     "multiplierError": "Ange en multiplikator på 1 eller mer",
     "permissionDenied": "Du har inte behörighet att hantera utgiftsvarningar.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Inga kontexter är aktiverade för schemalagda rapporter",
     "sourceBlocker": "Sessionen behöver uppmärksamhet",
     "sourceMetadata": "Insamlad sessionsmetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kunde inte öppna det här sökresultatet"
   }
 }

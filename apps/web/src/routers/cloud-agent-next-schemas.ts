@@ -2,8 +2,13 @@ import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script'
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
-import { ParentSessionCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
+import { ParentCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
 import { CloudAgentSafeFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  cloudSessionMetadataSchema,
+  cloudSessionMessagesPageInputSchema,
+  cloudSessionMessagesPageWireSchema,
+} from '@kilocode/cloud-agent-sdk/schemas';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
 import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
@@ -33,6 +38,11 @@ export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
   SANDBOX_STATUS_DETAIL_MESSAGES,
 } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+export {
+  ListPreviewServicesOutputSchema as baseListPreviewServicesNextOutputSchema,
+  type ListPreviewServicesOutput,
+  type PreviewService,
+} from '../../../../services/cloud-agent-next/src/shared/preview-services';
 export { GetEgressAuditResponseSchema as baseGetEgressAuditNextOutputSchema } from '@kilocode/worker-utils/egress-audit';
 export type {
   SandboxLifecycleStatus,
@@ -335,6 +345,13 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('command'),
     command: z.string().min(1),
     arguments: z.string().max(CLOUD_AGENT_PROMPT_MAX_LENGTH).default(''),
+    mode: agentModeSendMessageSchema.optional(),
+    model: z.string().min(1).optional(),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
   }),
 ]);
 
@@ -383,7 +400,7 @@ const requestedEnvironmentSchema = z
  * initial turn fields.
  */
 const PrepareSessionSharedFields = {
-  callbackTarget: ParentSessionCallbackTargetSchema.optional(),
+  callbackTarget: ParentCallbackTargetSchema.optional(),
   // Repository source (mutually exclusive - must provide exactly one)
   githubRepo: z
     .string()
@@ -696,6 +713,8 @@ export const baseGetEgressAuditNextSchema = GetEgressAuditInputSchema.extend({
   cloudAgentSessionId: z.string().regex(SESSION_ID_RE, 'Invalid session ID format'),
   limit: z.number().int().min(1).max(100).default(50),
 }).strict();
+export const baseGetSessionMessagesPageNextSchema = cloudSessionMessagesPageInputSchema;
+export const baseGetSessionMessagesPageNextOutputSchema = cloudSessionMessagesPageWireSchema;
 
 export const baseGetSandboxStatusNextSchema = z
   .object({
@@ -798,6 +817,12 @@ export const baseCloseTerminalNextOutputSchema = z.object({
 
 const previewSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 
+export const baseListPreviewServicesNextSchema = z
+  .object({
+    cloudAgentSessionId: previewSessionIdSchema,
+  })
+  .strict();
+
 export const baseCreatePreviewNextSchema = z.object({
   cloudAgentSessionId: previewSessionIdSchema,
   port: z.number().int().min(PREVIEW_PORT_MIN).max(PREVIEW_PORT_MAX),
@@ -812,8 +837,6 @@ export const baseCreatePreviewNextOutputSchema = z.object({
 
 export const basePreviewOptionsNextSchema = z.object({
   cloudAgentSessionId: previewSessionIdSchema,
-  /** The route's organization; the Worker uses it only to decide whether to show preview. */
-  organizationId: z.uuid().optional(),
 });
 
 /** The Worker's answer: its preview hostname with a `{port}` placeholder. */
@@ -849,11 +872,18 @@ export const baseGetSessionNextOutputSchema = z.object({
   userId: z.string(),
   orgId: z.string().optional(),
   sandboxId: z.string().optional(),
+  environmentId: z.string().uuid().optional(),
+  title: cloudSessionMetadataSchema.shape.title,
+  associatedPr: cloudSessionMetadataSchema.shape.associatedPr,
+  totalCostMicrodollars: cloudSessionMetadataSchema.shape.totalCostMicrodollars,
+  createdOnPlatform: cloudSessionMetadataSchema.shape.createdOnPlatform,
+  profileId: cloudSessionMetadataSchema.shape.profileId,
 
   // Worktree ownership (present only for worktree sessions)
   worktreeId: z.string().nullable().optional(),
   parentSessionId: z.string().nullable().optional(),
   cloudAgentSessionScopeId: z.string().nullable().optional(),
+  parentCloudAgentSessionId: z.string().optional(),
 
   // Repository info (no tokens)
   githubRepo: z.string().optional(),

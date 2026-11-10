@@ -62,8 +62,15 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # The hash steps run tsx over the local dev/local scripts and let
+      # @expo/fingerprint read the Expo config from apps/mobile, so they need the
+      # root project and the mobile app, not the whole workspace. Everything
+      # downstream waits behind this job, so a filtered install here releases it
+      # sooner.
+      # The hash must stay identical to the one a build job recomputes after its
+      # recursive install, or the artifact name matches no build.
+      - name: Install root and mobile dependencies
+        run: pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts
 
       - name: Compute hashes and gate the build
         id: decide
@@ -79,8 +86,61 @@ jobs:
           echo "android_hash=$android_hash" >> "$GITHUB_OUTPUT"
           pnpm exec tsx dev/local/mobile-native-gate.ts "$ios_hash" "$android_hash"
 
-  ios:
+  # One harness SDK build per run. Both platform jobs need
+  # packages/harness-sdk/dist and start together after the gate, so running the
+  # action in each made a dist cache miss pay the typia compile twice and raced
+  # both jobs to save the one key, because actions/cache saves at the end of a
+  # job: the loser only logged "Unable to reserve cache". Here the action runs
+  # once and both builds download the tree it produced. The dist is a TypeScript
+  # emit, so the Linux build serves the macOS job.
+  #
+  # The job runs only when a platform job will. The gate already clears a
+  # platform whose artifact another run published, so a run with both cleared
+  # must not pay an install and a build for nobody.
+  prepare-harness-sdk:
     needs: gate
+    if: needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      # No lfs: the harness SDK build reads the root install and its own
+      # sources, and this matches the job in kilo-app CI and ci.yml that saves
+      # the dist cache key this job restores.
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      # The shared store keeps installs warm when a pull request changes the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
+
+      # A directory path makes the directory the artifact root, so a consumer
+      # that unpacks into packages/harness-sdk/dist gets the tree the build
+      # wrote, with no extra path segment.
+      - name: Upload the harness SDK build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
+          retention-days: 1
+          if-no-files-found: error
+
+  ios:
+    needs: [gate, prepare-harness-sdk]
     if: needs.gate.outputs.need_ios == 'true'
     runs-on: macos-26
     timeout-minutes: 90
@@ -130,9 +190,12 @@ jobs:
         if: steps.published.outputs.published != 'true'
         uses: ./.github/actions/trpc-declarations
 
-      - name: Restore or build the harness SDK
+      - name: Download the harness SDK build
         if: steps.published.outputs.published != 'true'
-        uses: ./.github/actions/harness-sdk-build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
 
       # A consumer computes the hash on macOS; the gate computed it on
       # Linux. A mismatch would publish an artifact nobody can ever find,
@@ -195,7 +258,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    needs: gate
+    needs: [gate, prepare-harness-sdk]
     if: needs.gate.outputs.need_android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -244,13 +307,35 @@ jobs:
         if: steps.published.outputs.published != 'true'
         uses: ./.github/actions/trpc-declarations
 
-      - name: Restore or build the harness SDK
+      - name: Download the harness SDK build
         if: steps.published.outputs.published != 'true'
-        uses: ./.github/actions/harness-sdk-build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
 
       - name: Expo prebuild
         if: steps.published.outputs.published != 'true'
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform android
+
+      # The prebuild rewrites apps/mobile/android inside this run, so the key
+      # hashes the inputs that pin the generated Gradle toolchain — the app
+      # manifest and the lockfile, which also records the patch hashes —
+      # instead of a generated wrapper file that does not exist yet. A warm
+      # user home is reused without a daemon. Any dependency change rotates the
+      # key, so a miss restores the newest earlier user home from the prefix
+      # and Gradle fetches only the modules that changed; the Build step stays
+      # the gate.
+      - name: Cache the Gradle user home
+        if: steps.published.outputs.published != 'true'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-${{ runner.arch }}-gradle-${{ hashFiles('apps/mobile/package.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-gradle-
 
       - name: Build
         if: steps.published.outputs.published != 'true'

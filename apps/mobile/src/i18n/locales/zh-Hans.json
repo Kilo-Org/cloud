@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "原生远程演示",
+    "sessionsEmpty": "暂无原生会话",
+    "hosts": "在线主机",
+    "hostsEmpty": "暂无在线主机",
+    "directory": "工作目录",
+    "createSession": "新建原生会话",
+    "queueIfOffline": "主机离线时将提示词加入队列",
+    "prompt": "提示词或 /command",
+    "localClear": "清空本地视图",
+    "abort": "中止当前轮次",
+    "failed": "原生远程操作失败",
+    "creationUnknown": "创建结果未知。请刷新会话列表后再重试。",
+    "commandFailed": "执行器命令失败",
+    "invalidReply": "执行器响应无效",
+    "unsafeCommand": "请使用 /compact、/new、/skill、/models、/agents 或 /clear（仅清空本地视图）。",
+    "status": "连接：{{connection}} · 执行器：{{runner}}",
+    "presenceStatus": "主机：{{connection}}",
+    "commandStatus": "命令送达状态：{{status}}",
+    "delivered": "已送达",
+    "expired": "已过期"
+  },
   "common": {
     "cancel": "取消",
     "done": "完成",
@@ -110,6 +132,7 @@
     "newSession": "新建会话",
     "noModelsAvailable": "暂无可用模型",
     "notFound": "未找到此内容",
+    "online": "在线",
     "open": "打开 {{name}}",
     "openPullRequest": "打开拉取请求",
     "completed": "已完成",
@@ -186,6 +209,7 @@
     "resendCode": "重新发送验证码",
     "termsPrefix": "继续即表示你同意我们的",
     "terms": "条款",
+    "termsInSentence": "条款",
     "termsConnector": "和",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登录方式",
@@ -222,6 +246,7 @@
     "confirmDeletion": "确认删除",
     "credits": "额度",
     "failedToLoadBalance": "加载余额失败。点击重试。",
+    "balanceLoadFailed": "加载余额失败",
     "hideBalance": "隐藏余额",
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
@@ -408,6 +433,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "请在设置中开启相机权限，以便拍照。"
+    },
+    "botStatus": {
+      "offline": "离线"
     }
   },
   "codeReviewer": {
@@ -1078,6 +1106,7 @@
       "actionFailed": "无法完成此操作。请重试。",
       "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。",
       "syncNoRepositories": "同步范围内没有仓库。请选择安全智能体要监控的仓库，然后再次同步。",
+      "syncNoRepositoriesNoManage": "同步范围内没有仓库。组织所有者、管理员或账单管理员必须先连接仓库，然后才能同步。",
       "syncIntegrationInactive": "安全智能体的 GitHub 连接未激活。请重新连接 Kilo GitHub App，然后再次同步。",
       "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。",
       "configConflict": "安全智能体的设置已在其他地方更改。请查看最新设置并重新保存。"
@@ -1265,6 +1294,7 @@
       "emptyDescription": "在下方发送消息，开始对话。",
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
+      "emptyReadOnlyTitle": "此会话中无消息",
       "renameAccessibility": "重命名会话：{{title}}",
       "cloningSession": "正在克隆会话",
       "couldNotLoadThisSession": "无法加载此会话",
@@ -1364,7 +1394,7 @@
       "selectRepositoryToStart": "选择仓库以开始。",
       "enterPromptToStart": "添加提示词以开始。",
       "enterPromptOrFileToStart": "添加提示词或文件以开始。",
-      "connectProviderToStart": "连接代码托管平台以开始。",
+      "connectProviderToStart": "仓库来自已连接的 GitHub、GitLab 或 Bitbucket 账户。",
       "promptPlaceholder": "你想完成什么任务？",
       "couldNotLoadModels": "无法加载模型。",
       "prefillRepoAndModelUnavailable": "原会话的仓库和模型已不可用。请在下方重新选择。",
@@ -1546,6 +1576,8 @@
       "assistantStopped": "已停止生成回复。",
       "assistantContextOverflow": "对话长度已超出模型的处理范围。",
       "assistantProviderError": "提供商返回了错误。",
+      "assistantProviderRefused": "提供商拒绝了该请求，且无法重试。",
+      "assistantCreditsRefusal": "额度不足，无法运行 Cloud Agent。",
       "assistantOutputLimit": "回复已达到模型的输出上限。",
       "assistantStructuredOutput": "回复与所需格式不匹配。",
       "assistantFailed": "生成回复失败。"
@@ -1578,6 +1610,7 @@
       "preparingEnvironment": "正在准备环境",
       "preparationComplete": "准备完成",
       "preparationFailed": "准备失败",
+      "preparationStageFailed": "{{stage}}时失败",
       "setupCommand": "初始化命令 {{index}}",
       "setupCommandOf": "初始化命令 {{index}}/{{displayCount}}",
       "stepWorkspaceSetup": "工作区设置",
@@ -1616,7 +1649,7 @@
       "detailSetupCommandTimedOut": "初始化命令 {{index}} 超时",
       "detailColdRestore": "冷恢复，已应用快照，{{total}} 个文件中已恢复 {{applied}} 个",
       "detailProgressPercent": "{{percent}}% 完成",
-      "detailRestoreIncompleteReport": "会话恢复不完整：{{total}} 个文件中有 {{skipped}} 个未恢复（{{reasons}}）。",
+      "detailRestoreIncompleteFiles": "{{total}} 个文件中有 {{skipped}} 个未恢复（{{reasons}}）。",
       "detailRestoreIncompleteMissing": "缺失：{{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} 以及另外 {{omitted}} 个",
       "detailReasonPatchFailed": "补丁未能应用",
@@ -1866,15 +1899,16 @@
     "contextUsage": {
       "windowUnavailable": "无法获取上下文窗口大小",
       "tapToViewDetails": "点击查看上下文详情。",
-      "costSuffix": "，费用 {{cost}}",
-      "tokensWindowUnavailable": "上下文已用 {{used}} 个词元，无法获取窗口大小",
-      "tokensUsage": "上下文已用 {{used}} 个词元，共可用 {{window}} 个，占 {{percentage}}",
+      "costClause": "，费用 {{cost}}",
+      "loadingCostSpoken": "费用 {{cost}}。",
+      "tokensWindowUnavailable": "上下文已用 {{used}} 个词元，无法获取窗口大小{{costClause}}。",
+      "tokensUsage": "上下文已用 {{used}} 个词元，共可用 {{window}} 个，占 {{percentage}}{{costClause}}。",
       "title": "上下文使用情况",
       "used": "已使用",
       "provider": "提供商",
       "totalCost": "总费用",
       "usageReflectsLatest": "此处显示的是助手最近一次完成回复时的用量。",
-      "usageUnavailable": "上下文用量不可用",
+      "usageUnavailable": "上下文用量不可用{{costClause}}。",
       "tokenUsage": "词元用量",
       "cacheRate": "缓存命中率",
       "modelsCount": "模型（{{displayCount}}）",
@@ -1955,7 +1989,6 @@
   },
   "addCredits": {
     "cta": "充值额度",
-    "description": "充值额度后即可继续使用。",
     "billingPage": "账单页面"
   },
   "deviceSessions": {
@@ -2248,10 +2281,10 @@
     },
     "connect": {
       "checkFailedTitle": "无法检查 GitHub 连接",
-      "checkFailedMessage": "加载完成前，无法确认登录状态。",
+      "checkFailedMessage": "无法连接 GitHub。请检查网络连接后重试。",
       "checkFailedTitleGitLab": "无法检查 GitLab 连接",
       "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接",
-      "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
+      "providerCheckFailedMessage": "无法连接服务提供商。请检查网络连接后重试。",
       "reconnectTitle": "重新连接 GitHub",
       "reconnectTitleGitLab": "重新连接 GitLab",
       "reconnectTitleBitbucket": "重新连接 Bitbucket",
@@ -2395,7 +2428,6 @@
     },
     "fileList": {
       "filesList": "文件列表",
-      "filesViewed": "文件 · 已查看 {{viewed}}/{{total}}",
       "layout": "布局",
       "listed": "（已列出）",
       "loadingFiles": "正在加载文件",
@@ -2996,9 +3028,9 @@
       "searching": "网页搜索",
       "thinking": "正在思考"
     },
-    "planOf": "/",
+    "planProgress": "{{done}}/{{total}}",
     "filesChanged": "个文件已更改",
-    "finishedIn": "耗时",
+    "finishedIn": "耗时 {{duration}}",
     "noActivityFor": "无活动已持续",
     "prOpened": "拉取请求已打开",
     "permissionWants": "想要运行",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "此模型支持思考强度"
     },
-    "creditsRequired": "额度不足，无法发送此消息。请充值额度后重试。"
+    "creditsRequired": "额度不足，无法发送此消息。"
   },
   "settingsTools": {
     "confirmTitle": "确认此更改？"
@@ -3340,8 +3372,8 @@
     "saved": "支出提醒设置已保存",
     "loadError": "无法加载支出提醒。",
     "saveError": "无法保存支出提醒。",
-    "empty": "支出提醒已关闭。开启后会通知此范围的账单联系人。",
-    "noSpend": "尚无支出记录",
+    "sendAlerts": "发送支出提醒",
+    "noSpend": "暂无支出",
     "spend24h": "过去 24 小时的支出",
     "multiplierError": "请输入 1 或更大的倍数",
     "permissionDenied": "你没有管理支出提醒的权限。",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "未为定时简报启用任何上下文",
     "sourceBlocker": "会话需要关注",
     "sourceMetadata": "已采集的会话元数据"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "无法打开此搜索结果"
   }
 }

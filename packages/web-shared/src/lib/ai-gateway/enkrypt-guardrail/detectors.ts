@@ -1,15 +1,21 @@
 import {
   ENKRYPT_DETECTOR_IDS,
+  ENKRYPT_OUTPUT_DETECTOR_IDS,
   ENKRYPT_PII_ENTITIES,
   type EnkryptDetectorId,
   type EnkryptInputDetectors,
+  type EnkryptInputDetectorsSchema,
+  type EnkryptOutputDetectorId,
+  type EnkryptOutputDetectors,
   type EnkryptPiiEntity,
   type EnkryptPolicyRule,
 } from '@kilocode/db/schema-types';
+import type * as z from 'zod';
 
 /**
  * Enkrypt's detector types. Block-type detectors answer with a block message; revise-type
- * detectors answer with rewritten input text, so whether they block is the organization's choice.
+ * detectors answer with rewritten input text. Either way the gateway decides from the verdict
+ * whether a detection blocks.
  */
 export const ENKRYPT_DETECTOR_TYPES = {
   injection_attack: 'block',
@@ -22,21 +28,6 @@ export const ENKRYPT_DETECTOR_TYPES = {
   keyword_detector: 'revise',
   bias: 'revise',
 } as const satisfies Record<EnkryptDetectorId, 'block' | 'revise'>;
-
-export const ENKRYPT_BLOCK_DETECTOR_IDS = [
-  'injection_attack',
-  'topic_detector',
-  'policy_violation',
-  'toxicity',
-  'nsfw',
-  'sponge_attack',
-] as const satisfies readonly EnkryptDetectorId[];
-
-export const ENKRYPT_REVISE_DETECTOR_IDS = [
-  'pii',
-  'keyword_detector',
-  'bias',
-] as const satisfies readonly EnkryptDetectorId[];
 
 /** Enkrypt reports two detectors in `summary` under names that differ from their request keys. */
 export const ENKRYPT_SUMMARY_DETECTORS: Record<string, EnkryptDetectorId> = {
@@ -51,14 +42,23 @@ export const ENKRYPT_SUMMARY_DETECTORS: Record<string, EnkryptDetectorId> = {
   bias: 'bias',
 };
 
-/** Kilo Default: injection detection blocks; secrets detection is logged, as Enkrypt intends. */
+/**
+ * Kilo Default: prompt injection blocks. Detectors without input controls stay off; see
+ * `enforcedEnkryptInputDetectors`.
+ */
 export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors {
   return {
-    injection_attack: { enabled: true },
-    pii: { enabled: true, action: 'log', entities: ['secrets'] },
+    injection_attack: { enabled: true, action: 'block' },
+    pii: { enabled: false, action: 'log', entities: ['secrets'] },
     keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
     topic_detector: { enabled: false, topic: [] },
-    policy_violation: { enabled: false, format: 'rules', policy_text: '', rules: [] },
+    policy_violation: {
+      enabled: false,
+      action: 'block',
+      format: 'rules',
+      policy_text: '',
+      rules: [],
+    },
     toxicity: { enabled: false },
     nsfw: { enabled: false },
     bias: { enabled: false, action: 'log' },
@@ -66,16 +66,115 @@ export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors 
   };
 }
 
+/** The input detectors admins can configure, in the order the page shows them. */
+export const ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS = [
+  'injection_attack',
+  'policy_violation',
+] as const satisfies readonly EnkryptDetectorId[];
+
+/**
+ * The input detectors the gateway enforces: the configurable ones as saved and Kilo Default, which
+ * turns them off, for every other one, whatever was saved for it. A detector without input controls
+ * therefore never runs.
+ */
+export function enforcedEnkryptInputDetectors(
+  detectors: EnkryptInputDetectors
+): EnkryptInputDetectors {
+  return {
+    ...createKiloDefaultEnkryptInputDetectors(),
+    injection_attack: detectors.injection_attack,
+    policy_violation: detectors.policy_violation,
+  };
+}
+
+function withActionOnlyForLogging<Detector extends { enabled: boolean; action: 'log' | 'block' }>({
+  action,
+  ...detector
+}: Detector) {
+  return detector.enabled && action === 'log' ? { ...detector, action } : detector;
+}
+
+/**
+ * The input detectors as saved. A configurable detector is saved with `action` only while it is set
+ * to Log only, because versions from before the choice reject the key and then fail every scanned
+ * request. A missing `action` reads as block, so a detector turned off resumes at Block.
+ */
+export function storableEnkryptInputDetectors(
+  detectors: EnkryptInputDetectors
+): z.input<typeof EnkryptInputDetectorsSchema> {
+  return {
+    ...detectors,
+    injection_attack: withActionOnlyForLogging(detectors.injection_attack),
+    policy_violation: withActionOnlyForLogging(detectors.policy_violation),
+  };
+}
+
 export function enabledEnkryptDetectorIds(detectors: EnkryptInputDetectors): EnkryptDetectorId[] {
   return ENKRYPT_DETECTOR_IDS.filter(id => detectors[id].enabled);
 }
 
-/** Enabled detectors whose detection blocks the request. */
+/** Enabled configurable detectors whose detection blocks the request. */
 export function blockingEnkryptDetectorIds(detectors: EnkryptInputDetectors): EnkryptDetectorId[] {
-  return enabledEnkryptDetectorIds(detectors).filter(id => {
+  return ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.filter(id => {
     const detector = detectors[id];
-    return 'action' in detector ? detector.action === 'block' : true;
+    return detector.enabled && detector.action === 'block';
   });
+}
+
+/** Output scanning has no Kilo Default, so every output detector starts off. */
+export function createEmptyEnkryptOutputDetectors(): EnkryptOutputDetectors {
+  return {
+    pii: { enabled: false, action: 'block', entities: ['secrets'] },
+    keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
+    topic_detector: { enabled: false, action: 'block', topic: [] },
+    policy_violation: {
+      enabled: false,
+      action: 'block',
+      format: 'rules',
+      policy_text: '',
+      rules: [],
+    },
+    toxicity: { enabled: false, action: 'block' },
+    nsfw: { enabled: false, action: 'block' },
+    bias: { enabled: false, action: 'block' },
+  };
+}
+
+export function enabledEnkryptOutputDetectorIds(
+  detectors: EnkryptOutputDetectors
+): EnkryptOutputDetectorId[] {
+  return ENKRYPT_OUTPUT_DETECTOR_IDS.filter(id => detectors[id].enabled);
+}
+
+/** Enabled output detectors whose detection blocks the response. */
+export function blockingEnkryptOutputDetectorIds(
+  detectors: EnkryptOutputDetectors
+): EnkryptOutputDetectorId[] {
+  return enabledEnkryptOutputDetectorIds(detectors).filter(id => detectors[id].action === 'block');
+}
+
+/** Enkrypt scans a response with the same detector settings as a request. */
+export function enkryptOutputDetectorsAsInputDetectors(
+  detectors: EnkryptOutputDetectors
+): EnkryptInputDetectors {
+  const { topic_detector, policy_violation } = detectors;
+  return {
+    injection_attack: { enabled: false, action: 'block' },
+    pii: detectors.pii,
+    keyword_detector: detectors.keyword_detector,
+    topic_detector: { enabled: topic_detector.enabled, topic: topic_detector.topic },
+    policy_violation: {
+      enabled: policy_violation.enabled,
+      action: policy_violation.action,
+      format: policy_violation.format,
+      policy_text: policy_violation.policy_text,
+      rules: policy_violation.rules,
+    },
+    toxicity: { enabled: detectors.toxicity.enabled },
+    nsfw: { enabled: detectors.nsfw.enabled },
+    bias: detectors.bias,
+    sponge_attack: { enabled: false },
+  };
 }
 
 type EnabledToggle = { enabled: true };

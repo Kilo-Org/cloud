@@ -279,7 +279,7 @@ async function setup(
 async function connectAndHello(
   provider: FakeProvider,
   wrapperId = 'wr_1',
-  options: { workspaceConfiguration?: boolean } = {}
+  options: { workspaceConfiguration?: boolean; runtimeHarness?: string } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const launchEnv = provider.launchEnvs[0];
@@ -352,6 +352,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
         allocationId,
         instanceId: allocationId,
         startSource: startSource === 'repository' ? 'snapshot' : 'image',
+        runtimeHarness: 'kilo',
       };
       await waitFor(() =>
         expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
@@ -371,6 +372,51 @@ describe('SandboxControlV2 routes and forwarding', () => {
         await stub.deliver({ sessionId: SESSION, allocationId, messages: [promptPayload('m1')] })
       ).toBe('sent');
       expect(await wrapper.next()).toMatchObject({ type: 'session.prompt' });
+      wrapper.close();
+    }
+  );
+
+  // This preinstalled sandbox stores `kilo`. A local v2 image reports `kilo2` and wins;
+  // without a valid report, the run keeps the stored harness.
+  it.each([
+    ['kilo2', { runtimeHarness: 'kilo2' }],
+    ['kilo', { runtimeHarness: 'kilo' }],
+    ['unknown', { runtimeHarness: 'kilo' }],
+    [undefined, { runtimeHarness: 'kilo' }],
+  ] as const)(
+    'records the wrapper runtime harness header %s in the run container',
+    async (header, expected) => {
+      const provider = createFakeProvider();
+      provider.adapter.describeRuntime = ref => ({
+        provider: 'cloudflare-containers',
+        sandboxId: SANDBOX_ID,
+        instanceId: ref.slice('mem_'.length),
+      });
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION));
+      const { wrapper, allocationId } = await connectAndHello(
+        provider,
+        'wr_1',
+        header === undefined ? {} : { runtimeHarness: header }
+      );
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      const container = {
+        provider: 'cloudflare-containers',
+        sandboxId: SANDBOX_ID,
+        allocationId,
+        instanceId: allocationId,
+        startSource: 'image',
+        ...expected,
+      };
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+          expect.objectContaining({ state: 'ready', container })
+        )
+      );
+      expect((await stub.status({ sessionId: SESSION })).view).toEqual(
+        expect.objectContaining({ container })
+      );
       wrapper.close();
     }
   );
@@ -1163,6 +1209,44 @@ describe('SandboxControlV2 routes and forwarding', () => {
       expect(provider.createCalls).toBe(2);
     });
     await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+  });
+
+  it('fails the preparing route once the create attempt budget is spent', async () => {
+    const provider = createFakeProvider({ failCreates: 2 });
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+    const deadline = (await readRouteRow(stub, SESSION))?.attempt_deadline_at;
+    expect(deadline).toBeGreaterThan(Date.now());
+
+    // Attempt 1 fails, spends the retry pause, and the tick starts the retry.
+    await waitFor(async () => expect(provider.createCalls).toBe(1));
+    await setAllocationField(stub, { create_deadline_at: Date.now() - 1 });
+    await waitFor(async () => {
+      await runAlarm(stub);
+      expect(provider.createCalls).toBe(2);
+    });
+    // Attempt 2 fails too: the budget is spent, so the episode stops even though
+    // the attempt deadline still had time left.
+    await waitFor(async () => {
+      await runAlarm(stub);
+      expect((await readState(stub)).kind).toBe('stopped');
+      expect(provider.createCalls).toBe(2);
+    });
+
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'failed',
+        attemptId,
+        reason: 'sandbox_create_failed',
+      })
+    );
+    const route = await readRouteRow(stub, SESSION);
+    expect(route).toMatchObject({ state: 'failed', reason: 'sandbox_create_failed' });
+    expect(route?.attempt_deadline_at).toBe(0);
+    // Budget spent and route failed: the stopped allocation starts no create.
+    expect(await readAlarm(stub)).toBeNull();
+    expect(provider.createCalls).toBe(2);
   });
 
   it('sends every attachment its own workspace configuration', async () => {
@@ -2208,7 +2292,10 @@ describe('SandboxControlV2 routes and forwarding', () => {
     await waitFor(() => expect(peer.events).toHaveLength(1));
     expect(peer.events[0]).toEqual({
       sessionId: SESSION,
-      notification: { events: [{ type: 'kilo.chunk', properties: { text: 'hi' } }] },
+      notification: {
+        events: [{ type: 'kilo.chunk', properties: { text: 'hi' } }],
+        delivery: { id: expect.any(String), expiresAt: expect.any(Number) },
+      },
     });
 
     wrapper.send({

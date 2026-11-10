@@ -9,6 +9,7 @@ import { fileStatusIcon, fileStatusLabel } from '@/components/pr-review/diff/pr-
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -112,17 +113,20 @@ export function FileHeaderRow({
           <StatusIcon size={14} color={colors.mutedForeground} />
           <View className="flex-1">
             <Text className="font-mono-medium text-sm text-foreground" numberOfLines={2}>
-              {pathLine}
+              {isolateLtrBidiText(pathLine)}
             </Text>
+            {/* Each count is its own run, and a sign is a neutral: an RTL
+                paragraph would take it and paint `+1` as `1+`. The isolate
+                pins the count's order; the row itself still mirrors. */}
             <View className="mt-0.5 flex-row items-center gap-2">
               <Text variant="muted" className="text-xs">
                 {fileStatusLabel(file.status)}
               </Text>
               <Text variant="muted" className="text-xs">
-                +{file.additions}
+                {isolateLtrBidiText(`+${file.additions}`)}
               </Text>
               <Text variant="muted" className="text-xs">
-                -{file.deletions}
+                {isolateLtrBidiText(`-${file.deletions}`)}
               </Text>
             </View>
           </View>
@@ -164,7 +168,7 @@ export function PatchMissingRow({
             {githubUrl ? t('prReview.fileRows.diffTooLarge') : t('prReview.fileRows.noPreview')}
           </Text>
           <Text variant="muted" className="text-xs">
-            {file.path}
+            {isolateLtrBidiText(file.path)}
           </Text>
         </View>
         {viewedToggle ? (

@@ -122,7 +122,7 @@ function formatWorkedDuration(durationMs: number): string {
   return minutes === 1 ? 'Worked for 1 minute' : `Worked for ${minutes} minutes`;
 }
 
-export function summarizeAgentWork(parts: Part[]): string {
+export function summarizeAgentWork(parts: Part[], working = false): string {
   const tools = parts.filter(isToolPart);
   const reasoning = parts.filter(shouldRenderReasoningPart);
   const subtasks = parts.filter(isSubtaskPart);
@@ -145,8 +145,11 @@ export function summarizeAgentWork(parts: Part[]): string {
   const durations = parts
     .map(part => (isToolPart(part) ? toolDurationMs(part) : reasoningDurationMs(part)))
     .filter((duration): duration is number => duration !== null);
-  const worked =
-    durations.length > 0 ? formatWorkedDuration(durations.reduce((a, b) => a + b, 0)) : null;
+  const worked = working
+    ? 'Working'
+    : durations.length > 0
+      ? formatWorkedDuration(durations.reduce((a, b) => a + b, 0))
+      : null;
 
   if (worked && details.length > 0) {
     return `${worked} · ${details.join(' · ')}`;
@@ -160,29 +163,40 @@ export function summarizeAgentWork(parts: Part[]): string {
   return 'Agent work';
 }
 
-export function groupAssistantParts(parts: Part[]): SharedTranscriptSegment[] {
+export function groupAssistantParts(
+  parts: Part[],
+  mode: 'shared' | 'live' = 'shared'
+): SharedTranscriptSegment[] {
   const segments: SharedTranscriptSegment[] = [];
 
   for (const part of parts) {
-    if (isHiddenSharedPart(part)) {
+    if (isHiddenSharedPart(part) && !(mode === 'live' && isSnapshotProgressPart(part))) {
       continue;
     }
 
-    const type = isChatPart(part) ? 'chat' : 'agent-work';
+    const standaloneTool =
+      mode === 'live' &&
+      isToolPart(part) &&
+      (part.tool === 'question' ||
+        part.tool === 'task' ||
+        part.tool === 'suggest' ||
+        part.state.status === 'error');
+    const type = isChatPart(part) || standaloneTool ? 'chat' : 'agent-work';
     const last = segments.at(-1);
     if (last?.type === type) {
       last.parts.push(part);
-      if (last.type === 'agent-work') {
-        last.summary = summarizeAgentWork(last.parts);
-      }
       continue;
     }
 
     if (type === 'agent-work') {
-      segments.push({ type, parts: [part], summary: summarizeAgentWork([part]) });
+      segments.push({ type, parts: [part], summary: '' });
     } else {
       segments.push({ type, parts: [part] });
     }
+  }
+
+  for (const segment of segments) {
+    if (segment.type === 'agent-work') segment.summary = summarizeAgentWork(segment.parts);
   }
 
   return segments;

@@ -1,19 +1,10 @@
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
+import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
-import {
-  USAGE_QUEUE_ONLY_ENABLED,
-  USAGE_QUEUE_SFO_CONFIG,
-  USAGE_QUEUE_FRA_CONFIG,
-} from '@kilocode/web-shared/lib/config.server';
-import {
-  enqueueUsage,
-  getUsagePublisherExecutionRegion,
-  type UsageEnqueueOutcome,
-} from './usage-publisher';
-import { isFraUsageQueueSelected, isSfoUsageQueueSelected } from './usage-queue-policy';
+import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
 import {
   describeDatabaseError,
   isUsageRowConflict,
@@ -23,6 +14,7 @@ import {
 } from './usage-record-diagnostics';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
+import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
 import type { OpenAI } from 'openai';
 import type { EventSourceMessage } from 'eventsource-parser';
@@ -90,6 +82,10 @@ import {
   parseMessagesMicrodollarUsageFromString,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
+import {
+  boundedMetadataValue,
+  clientIpLiteral,
+} from '@kilocode/web-shared/lib/ai-gateway/header-limits';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
   byokNonInferenceCost_mUsd,
@@ -181,7 +177,10 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     editor_name: usageContext.editor_name,
     api_kind: usageContext.api_kind,
     machine_id: usageContext.machine_id,
-    is_user_byok: usageContext.user_byok,
+    is_user_byok:
+      usageContext.user_byok ||
+      usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID ||
+      usageContext.provider === CLAUDE_BILLING_PROVIDER_ID,
     has_tools: usageContext.has_tools,
     feature: usageContext.feature,
     session_id: usageContext.session_id,
@@ -225,6 +224,60 @@ export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: 
   }
 }
 
+type UnrecordableMetadataValue = {
+  field: 'max_tokens' | 'finish_reason';
+  /** A `typeof` result, or for numbers why the value is not a safe integer. */
+  received:
+    | 'fractional'
+    | 'non_finite'
+    | 'unsafe_integer'
+    | 'string'
+    | 'number'
+    | 'bigint'
+    | 'boolean'
+    | 'symbol'
+    | 'undefined'
+    | 'object'
+    | 'function';
+};
+
+/**
+ * `max_tokens` echoes the client request and `finish_reason` the upstream response, and
+ * neither is validated at runtime. The usage contract types them as a safe integer
+ * (PostgreSQL `bigint` read as a JS number) and a string, and ingress rejects the whole
+ * record, billing fields included, when either is outside that type. A value the contract
+ * cannot represent is therefore recorded as null, meaning not recorded: rounding would
+ * invent a limit, and a number past the safe range already lost precision in `JSON.parse`.
+ * Only the usage record changes; the request forwarded upstream and the billing fields do not.
+ */
+function recordableMaxTokens(
+  value: unknown,
+  unrecordable: UnrecordableMetadataValue[]
+): number | null {
+  if (value == null) return null;
+  if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
+  const received =
+    typeof value !== 'number'
+      ? typeof value
+      : !Number.isFinite(value)
+        ? 'non_finite'
+        : Number.isInteger(value)
+          ? 'unsafe_integer'
+          : 'fractional';
+  unrecordable.push({ field: 'max_tokens', received });
+  return null;
+}
+
+function recordableFinishReason(
+  value: unknown,
+  unrecordable: UnrecordableMetadataValue[]
+): string | null {
+  if (value == null) return null;
+  if (typeof value === 'string') return value;
+  unrecordable.push({ field: 'finish_reason', received: typeof value });
+  return null;
+}
+
 export async function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
   usageContextInfo: UsageContextInfo
@@ -261,13 +314,15 @@ export async function toInsertableDbUsageRecord(
     project_id,
   };
 
+  const unrecordable: UnrecordableMetadataValue[] = [];
   const metadata: UsageMetaData = {
     ...metadataFromContext,
     id,
     created_at,
     message_id: usageStats.messageId ?? '<missing>',
+    max_tokens: recordableMaxTokens(metadataFromContext.max_tokens, unrecordable),
     upstream_id: usageStats.upstream_id,
-    finish_reason: usageStats.finish_reason,
+    finish_reason: recordableFinishReason(usageStats.finish_reason, unrecordable),
     latency: usageStats.latency ?? ttfb_ms,
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
@@ -279,6 +334,17 @@ export async function toInsertableDbUsageRecord(
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
+
+  if (unrecordable.length > 0) {
+    // Field names and type labels only: never log the client or upstream value itself.
+    console.warn('usage metadata value outside the usage contract; recorded as null', {
+      source: 'toInsertableDbUsageRecord',
+      usageId: id,
+      fields: unrecordable,
+      requested_model: usageContextInfo.requested_model,
+      provider,
+    });
+  }
 
   if (organization_id) {
     //never log any sensitive data for orgs
@@ -305,6 +371,16 @@ export async function toInsertableDbUsageRecord(
       provider,
     });
   }
+
+  // The five header-derived columns below are persisted through lookup tables, so each
+  // value is kept within the shared bound: the forward chain as one public IP literal,
+  // and every other value at the shared maximum or the oversized sentinel. `fraudHeaders`
+  // itself stays as received, because bouncer, the ja4 check and the log queries read it.
+  metadata.http_x_forwarded_for = clientIpLiteral(metadata.http_x_forwarded_for);
+  metadata.http_user_agent = boundedMetadataValue(metadata.http_user_agent);
+  metadata.http_x_vercel_ip_country = boundedMetadataValue(metadata.http_x_vercel_ip_country);
+  metadata.http_x_vercel_ip_city = boundedMetadataValue(metadata.http_x_vercel_ip_city);
+  metadata.http_x_vercel_ja4_digest = boundedMetadataValue(metadata.http_x_vercel_ja4_digest);
 
   return { core, metadata };
 }
@@ -351,12 +427,12 @@ async function enqueueUsageWithinLifetime(
 
 type UsageAccountingTransport = 'queue' | 'direct';
 
-function usageAccountingTransport(usageContext: MicrodollarUsageContext): UsageAccountingTransport {
-  return USAGE_QUEUE_ONLY_ENABLED ||
-    isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext) ||
-    isFraUsageQueueSelected(USAGE_QUEUE_FRA_CONFIG, usageContext)
-    ? 'queue'
-    : 'direct';
+function usageAccountingTransport(): UsageAccountingTransport {
+  const vercelEnv = process.env.VERCEL_ENV;
+  const targetEnv = process.env.VERCEL_TARGET_ENV;
+  const staging = targetEnv === 'staging' && vercelEnv !== 'production';
+  const production = vercelEnv === 'production' && targetEnv === 'production';
+  return staging || production ? 'queue' : 'direct';
 }
 
 export async function logMicrodollarUsage(
@@ -368,7 +444,7 @@ export async function logMicrodollarUsage(
     usageStats,
     usageContext,
     bouncerUsageEvent,
-    usageAccountingTransport(usageContext)
+    usageAccountingTransport()
   );
 }
 
@@ -395,7 +471,7 @@ async function logMicrodollarUsageWithTransport(
     if (outcome.kind === 'accepted') {
       console.info('usage accounting queued', {
         usageId: core.id,
-        execution_region: getUsagePublisherExecutionRegion(),
+        execution_region: getVercelExecutionRegion(),
       });
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
@@ -404,7 +480,7 @@ async function logMicrodollarUsageWithTransport(
       reportPublisherNotConfigured(core.id);
       console.warn('usage accounting queue publisher not configured', {
         usageId: core.id,
-        execution_region: getUsagePublisherExecutionRegion(),
+        execution_region: getVercelExecutionRegion(),
         fallback: 'direct',
       });
       return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
@@ -414,7 +490,7 @@ async function logMicrodollarUsageWithTransport(
       // Nothing was published, so the direct write cannot duplicate it.
       console.warn('usage accounting queue unavailable without a request lifetime', {
         usageId: core.id,
-        execution_region: getUsagePublisherExecutionRegion(),
+        execution_region: getVercelExecutionRegion(),
         reason: outcome.reason,
         fallback: 'direct',
       });
@@ -422,7 +498,7 @@ async function logMicrodollarUsageWithTransport(
     }
     console.error('usage accounting publication failed', {
       usageId: core.id,
-      execution_region: getUsagePublisherExecutionRegion(),
+      execution_region: getVercelExecutionRegion(),
       reason: outcome.reason,
     });
     return null;
@@ -457,15 +533,25 @@ async function recordUsageDirectly(
 }
 
 /**
- * Dispatches the usage write to whichever side of the Atlantic the PostgreSQL
- * primary is on.
+ * Direct (unselected or safe before-send fallback) usage write dispatch.
+ *
+ * Selected usage normally goes through `enqueueUsage` and the configured queue
+ * transport; the production Cloudflare consumer then calls the existing
+ * Frankfurt `/api/internal/usage/record` writer. This path is for unselected
+ * accounting, plus the two pre-publication fallbacks where nothing was sent:
+ * missing/unparseable publisher configuration and failed lifetime registration.
+ * It is not used after any publication attempt, because the event may already
+ * be queued.
+ *
+ * SFO instances hand this write to Frankfurt through
+ * `recordUsageInPrimaryRegion`; Frankfurt instances write locally.
  *
  * `kilocode-ai-gateway` executes in both Frankfurt and SFO while the primary is
  * Frankfurt-only. This write holds row locks on `kilocode_users`,
  * `organizations` and `organization_user_usage` across several sequential
  * statements, so from SFO the lock hold is dominated by transatlantic round
  * trips rather than by database work — which is what turns a contended counter
- * row into a queue and, downstream, exhausts the connection pool.
+ * row into a lock backlog and, downstream, exhausts the connection pool.
  *
  * Frankfurt instances keep writing directly: a Frankfurt-to-Frankfurt HTTP hop
  * would be pure overhead and a pointless new failure mode.
@@ -1201,7 +1287,9 @@ export function countAndStoreUsage(
   };
 
   const usesUserCredentials =
-    usageContext.user_byok || usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID;
+    usageContext.user_byok ||
+    usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID ||
+    usageContext.provider === CLAUDE_BILLING_PROVIDER_ID;
 
   if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {
@@ -1626,7 +1714,7 @@ export async function logMicrodollarUsageAndReportToBouncer(
   usageContext: MicrodollarUsageContext
 ): Promise<UsageAccountingResult | null> {
   const event = bouncerUsageEvent(usageStats, usageContext);
-  const transport = usageAccountingTransport(usageContext);
+  const transport = usageAccountingTransport();
   if (!event || usageContext.bouncer?.spendWatch !== true) {
     const accounting = logMicrodollarUsageWithTransport(usageStats, usageContext, null, transport);
     if (event && transport === 'queue') {

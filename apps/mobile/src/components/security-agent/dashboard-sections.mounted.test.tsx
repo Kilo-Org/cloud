@@ -10,8 +10,12 @@ import { type ComponentProps } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { DashboardSections, DashboardSectionsSkeleton } from './dashboard-sections';
+import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import {
+  DashboardSections,
+  DashboardSectionsSkeleton,
+  type SectionAction,
+} from './dashboard-sections';
 
 // The counted bucket helper is spied on: a line that names three counts can
 // only agree them if each bucket is handed to its own plural family with its
@@ -31,6 +35,7 @@ vi.mock('@/i18n', () => ({
   i18n: { language: 'en', t: (key: string) => key },
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
@@ -111,6 +116,8 @@ function renderSections(props: {
   data?: DashboardData;
   slaEnabled?: boolean;
   neverSynced?: boolean;
+  emptyGrant?: boolean;
+  emptyGrantAction?: SectionAction | null;
 }): TestRenderer.ReactTestRenderer {
   // The renderer only exists inside the act pass, so the slot starts empty.
   const slot: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -122,6 +129,8 @@ function renderSections(props: {
         slaEnabled={props.slaEnabled ?? true}
         repoFullName={undefined}
         neverSynced={props.neverSynced ?? false}
+        emptyGrant={props.emptyGrant ?? false}
+        emptyGrantAction={props.emptyGrantAction ?? null}
       />
     );
   });
@@ -319,6 +328,102 @@ describe('DashboardSections repository row', () => {
       expect(String(row.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
       expect(row.props.hitSlop).toBeUndefined();
     }
+  });
+});
+
+describe('DashboardSections repository card with an empty grant', () => {
+  // A grant that holds nothing cannot deliver the findings this card promises:
+  // nothing is in the sync scope, so no scan runs. The copy names the grant
+  // instead, and the card carries the step out of it.
+  function repositoryCard(renderer: TestRenderer.ReactTestRenderer): Instance {
+    const card = renderer.root
+      .findAllByType('View')
+      .find(node => copy(node).includes('securityAgent.dashboard.repositoryActionPlan'));
+    if (!card) {
+      throw new Error('repository card not found');
+    }
+    return card;
+  }
+
+  function emptyState(renderer: TestRenderer.ReactTestRenderer) {
+    const state = repositoryCard(renderer).findAllByType('EmptyState')[0];
+    if (!state) {
+      throw new Error('repository empty state not found');
+    }
+    return state;
+  }
+
+  type ActionNode = {
+    props: {
+      className?: string;
+      variant?: string;
+      loading?: boolean;
+      onPress: () => void;
+      children: { props: { children: string } };
+    };
+  };
+
+  /** The element the card hands `EmptyState`, which the string mock leaves unrendered. */
+  function actionOf(state: Instance): ActionNode {
+    const action = state.props.action as ActionNode | undefined;
+    if (!action) {
+      throw new Error('repository card offered no action');
+    }
+    return action;
+  }
+
+  it('names the grant instead of promising findings it cannot deliver', () => {
+    const state = emptyState(renderSections({ emptyGrant: true }));
+
+    expect(state.props.description).toBe('securityAgent.repositories.noRepositoriesDescription');
+    expect(state.props.description).not.toBe('securityAgent.dashboard.noRepositoryDataDescription');
+  });
+
+  it("offers the manager's repository settings as the step out", () => {
+    const handlePress = vi.fn<() => void>();
+    const state = emptyState(
+      renderSections({
+        emptyGrant: true,
+        emptyGrantAction: {
+          label: 'securityAgent.dashboard.manageRepositories',
+          pending: false,
+          handlePress,
+        },
+      })
+    );
+    const action = actionOf(state);
+
+    expect(action.props.className).toContain(STATE_ACTION_CLASS);
+    expect(action.props.variant).toBe('default');
+    act(() => {
+      action.props.onPress();
+    });
+    expect(handlePress).toHaveBeenCalledTimes(1);
+  });
+
+  // A member cannot change the policy on the repository settings screen, so
+  // their step is the GitHub App page where the grant is widened. The label the
+  // dashboard hands down is what distinguishes the two readings.
+  it('renders whichever step the dashboard hands down for the reader', () => {
+    const manageAccess: SectionAction = {
+      label: 'securityAgent.repositories.manageAccess',
+      pending: true,
+      handlePress: vi.fn<() => void>(),
+    };
+    const state = emptyState(renderSections({ emptyGrant: true, emptyGrantAction: manageAccess }));
+    const action = actionOf(state);
+
+    expect(action.props.children.props.children).toBe('securityAgent.repositories.manageAccess');
+    expect(action.props.loading).toBe(true);
+  });
+
+  // A scope whose grant holds repositories but has not synced yet has not found
+  // nothing: priorities are still to come, and there is no grant to fix.
+  it('keeps the pending copy and no action while the grant holds repositories', () => {
+    const state = emptyState(renderSections({ neverSynced: true, emptyGrant: false }));
+
+    expect(state.props.description).toBe('securityAgent.dashboard.noRepositoryDataDescription');
+    expect(state.props.action).toBeUndefined();
   });
 });
 

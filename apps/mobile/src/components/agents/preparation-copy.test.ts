@@ -2,11 +2,13 @@ import { type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
   preparationDetailText,
   preparationErrorText,
   preparationStepLabel,
+  splitFailureSentence,
 } from './preparation-copy';
 
 const { t } = i18n;
@@ -37,6 +39,8 @@ describe('preparationStepLabel', () => {
         'branch',
         'devcontainer_setup',
         'setup_commands',
+        'session_setup_commands',
+        'start_commands',
         'workspace_restore',
         'workspace_backup',
         'sandbox_provision',
@@ -55,6 +59,8 @@ describe('preparationStepLabel', () => {
       'Setting up branch',
       'Dev container setup',
       'Running setup commands',
+      'Running setup commands',
+      'Running commands',
       'Restoring workspace',
       'Saving workspace',
       'Provisioning sandbox',
@@ -94,6 +100,7 @@ describe('preparationDetailText', () => {
     expect(preparationDetailText('Retrying sandbox creation', t)).toBe('Retrying sandbox creation');
     expect(preparationDetailText('Warm workspace reused', t)).toBe('Warm workspace reused');
     expect(preparationDetailText('Importing session...', t)).toBe('Importing session');
+    expect(preparationDetailText('Running build commands', t)).toBe('Running setup commands');
   });
 
   it('reads a clone retry and git progress with localized numbers', async () => {
@@ -130,10 +137,66 @@ describe('preparationErrorText', () => {
   it('names the wrapper sentences a step failure carries', () => {
     expect(preparationErrorText('Setup command 2 failed', t)).toBe('Setup command 2 failed');
     expect(preparationErrorText('Setup command 1 timed out', t)).toBe('Setup command 1 timed out');
+    expect(preparationErrorText('Session setup command 1 failed', t)).toBe(
+      'Setup command 1 failed'
+    );
+    expect(preparationErrorText('Start command 3 timed out', t)).toBe('Setup command 3 timed out');
+    expect(preparationErrorText('Build command 2 failed', t)).toBe('Setup command 2 failed');
   });
 
   it('falls back to the attempt failure title for an unknown value', () => {
     expect(preparationErrorText('clone failed', t)).toBe('Preparation failed');
+  });
+});
+
+describe('splitFailureSentence', () => {
+  it('splits a two-sentence cause into what failed and what to do', () => {
+    expect(
+      splitFailureSentence(
+        'Container limit reached. Stop an existing container before starting another.'
+      )
+    ).toEqual({
+      title: 'Container limit reached.',
+      detail: 'Stop an existing container before starting another.',
+    });
+  });
+
+  it('keeps a one-sentence cause whole and never breaks at a decimal point', () => {
+    expect(splitFailureSentence('Environment preparation timed out')).toEqual({
+      title: 'Environment preparation timed out',
+    });
+    expect(splitFailureSentence('Restored 1.5 files after the retry')).toEqual({
+      title: 'Restored 1.5 files after the retry',
+    });
+  });
+
+  it('breaks at the stop a script writes, not only the Latin one', () => {
+    expect(splitFailureSentence('कंटेनर सीमा तक पहुँच गई। नया कंटेनर शुरू करने से पहले रोकें।')).toEqual({
+      title: 'कंटेनर सीमा तक पहुँच गई।',
+      detail: 'नया कंटेनर शुरू करने से पहले रोकें।',
+    });
+    expect(splitFailureSentence('เซสชันนี้ขาดการอัปเกรดที่จำเป็น เริ่มเซสชันใหม่เพื่อดำเนินการต่อ')).toEqual({
+      title: 'เซสชันนี้ขาดการอัปเกรดที่จำเป็น',
+      detail: 'เริ่มเซสชันใหม่เพื่อดำเนินการต่อ',
+    });
+  });
+
+  // A catalog loads on `changeLanguage`, not on `getFixedT`, so each tag is
+  // activated by its own case before its sentence stops are the ones under test.
+  it.each(SUPPORTED_LANGUAGES)('splits the two-sentence failure copy in %s', async tag => {
+    await i18n.changeLanguage(tag);
+    for (const [code, key] of [
+      ['container_limit_reached', 'agentChat.preparation.errorContainerLimitReached'],
+      ['credential_upgrade_required', 'agentChat.preparation.errorCredentialUpgradeRequired'],
+    ] as const) {
+      const catalogValue = i18n.getResource(tag, 'translation', key);
+      expect(catalogValue, `${tag} did not load its own catalog`).toBeTypeOf('string');
+      const text = preparationErrorText(code, i18n.t);
+      expect(text, `${tag} ${code} is not its catalog value`).toBe(catalogValue);
+      const sentence = splitFailureSentence(text);
+      expect(sentence.title.length, `${tag} ${code} has no headline`).toBeGreaterThan(0);
+      expect(sentence.detail, `${tag} ${code} lost its second sentence`).toBeTruthy();
+    }
   });
 });
 
@@ -145,7 +208,7 @@ describe('restore-incomplete report', () => {
         t
       )
     ).toBe(
-      'Session restore incomplete: 2 of 5 files were not restored (the patch did not apply, the file could not be written). Missing: a.ts, b.ts'
+      '2 of 5 files were not restored (the patch did not apply, the file could not be written). Missing: a.ts, b.ts'
     );
   });
 
@@ -156,7 +219,7 @@ describe('restore-incomplete report', () => {
         t
       )
     ).toBe(
-      'Session restore incomplete: 12 of 20 files were not restored (the path is outside the workspace). Missing: a.ts, b.ts and 10 more'
+      '12 of 20 files were not restored (the path is outside the workspace). Missing: a.ts, b.ts and 10 more'
     );
   });
 
@@ -166,7 +229,7 @@ describe('restore-incomplete report', () => {
         'Session restore incomplete: 1 of 5 files were not restored (binary file).',
         t
       )
-    ).toBe('Session restore incomplete: 1 of 5 files were not restored (an unknown reason).');
+    ).toBe('1 of 5 files were not restored (an unknown reason).');
   });
 });
 

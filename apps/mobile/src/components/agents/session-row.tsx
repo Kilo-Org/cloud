@@ -8,6 +8,7 @@ import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-sna
 import { SessionRow } from '@/components/ui/session-row';
 import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   isAttentionAcked,
@@ -18,14 +19,15 @@ import {
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
-  composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
   formatScheduledWake,
   formatSessionTotalCost,
   sectionAwareTimeMeta,
   storedSessionEyebrowLabel,
+  storedSessionEyebrowState,
 } from './session-list-helpers';
+import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
@@ -132,6 +134,13 @@ export function StoredSessionRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  // The row's time label is derived from the clock this row reads, not from a
+  // `Date.now()` hidden behind the render: React Compiler memoizes the label
+  // against its traced inputs, so a mounted row kept the instant it first
+  // painted. The shared minute ticker re-derives the relative label as it ages
+  // and the clock time as the device time zone changes, so the list agrees
+  // with the session detail while both stay open.
+  const now = useRelativeTimeNow();
   // The backend names an unnamed session with a raw ISO placeholder
   // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
   // should see. `namedSessionTitle` uses the shared display helper and keeps
@@ -145,6 +154,13 @@ export function StoredSessionRow({
   // Both save paths refuse an unchanged or blank value.
   const renameInitialValue = namedSessionTitle(session.title, session.session_id) ?? '';
   const agentLabel = storedSessionEyebrowLabel(session);
+  // Tint by what the eyebrow names, never by its string: the label predicate
+  // decides, so a translated word pins to one token in every script (the hash
+  // of a translation would drift per locale and split identical rows), and a
+  // repository named like a label cannot read as one. The repository, the
+  // origin and the agent type label the row's context, so each takes the muted
+  // pair and the session title leads.
+  const agentState = storedSessionEyebrowState(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
   const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
   // The scheduled branch keys off the status, not the `live` flag: a stored
@@ -211,12 +227,12 @@ export function StoredSessionRow({
   // A row under the section its relative label would restate (`YESTERDAY` under
   // the Yesterday heading) shows its clock time instead, and speaks the same
   // clock time rather than repeating the heading.
-  const timeMeta = sectionAwareTimeMeta(timestamp, sectionTitle);
+  const timeMeta = sectionAwareTimeMeta(timestamp, sectionTitle, now);
   const visibleMeta = composeStoredSessionVisibleMeta(
     formatSessionTotalCost(session.total_cost_microdollars),
     timeMeta.visible
   );
-  const spokenTime = timeMeta.clock ?? formatSpokenTimeAgo(timestamp);
+  const spokenTime = timeMeta.clock ?? formatSpokenTimeAgo(timestamp, now);
   const storedSpokenMeta = needsInput
     ? null
     : composeStoredSessionSpokenMeta(formatSpokenCost(session.total_cost_microdollars), spokenTime);
@@ -296,6 +312,7 @@ export function StoredSessionRow({
     >
       <SessionRow
         agentLabel={agentLabel}
+        agentState={agentState}
         title={title}
         subtitle={subtitle}
         meta={visibleMeta}

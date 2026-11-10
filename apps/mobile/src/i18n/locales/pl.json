@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo natywnego trybu zdalnego",
+    "sessionsEmpty": "Brak natywnych sesji",
+    "hosts": "Hosty online",
+    "hostsEmpty": "Brak hostów online",
+    "directory": "Katalog roboczy",
+    "createSession": "Utwórz natywną sesję",
+    "queueIfOffline": "Dodaj prompt do kolejki, jeśli host jest offline",
+    "prompt": "Prompt lub /command",
+    "localClear": "Wyczyść widok lokalny",
+    "abort": "Przerwij turę",
+    "failed": "Natywna akcja zdalna nie powiodła się",
+    "creationUnknown": "Wynik tworzenia jest nieznany. Odśwież sesje przed ponowieniem próby.",
+    "commandFailed": "Polecenie runnera nie powiodło się",
+    "invalidReply": "Nieprawidłowa odpowiedź runnera",
+    "unsafeCommand": "Użyj /compact, /new, /skill, /models, /agents lub /clear (tylko lokalnie).",
+    "status": "Połączenie: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Hosty: {{connection}}",
+    "commandStatus": "Dostarczenie polecenia: {{status}}",
+    "delivered": "Dostarczono",
+    "expired": "Wygasło"
+  },
   "common": {
     "cancel": "Anuluj",
     "done": "Gotowe",
@@ -110,6 +132,7 @@
     "newSession": "Nowa sesja",
     "noModelsAvailable": "Brak dostępnych modeli",
     "notFound": "Nie znaleziono elementu.",
+    "online": "W sieci",
     "open": "Otwórz {{name}}",
     "openPullRequest": "Otwórz PR",
     "completed": "Ukończono",
@@ -186,6 +209,7 @@
     "resendCode": "Wyślij kod ponownie",
     "termsPrefix": "Kontynuując, akceptujesz nasze ",
     "terms": "Warunki",
+    "termsInSentence": "Warunki",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Więcej opcji logowania",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Potwierdź usunięcie",
     "credits": "Środki",
     "failedToLoadBalance": "Nie udało się wczytać salda. Dotknij, aby spróbować ponownie.",
+    "balanceLoadFailed": "Nie udało się wczytać salda",
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
@@ -408,6 +433,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Aby zrobić zdjęcie, zezwól na dostęp do aparatu w ustawieniach."
+    },
+    "botStatus": {
+      "offline": "Brak połączenia"
     }
   },
   "codeReviewer": {
@@ -1106,6 +1134,7 @@
       "actionFailed": "Nie udało się ukończyć tej akcji. Spróbuj ponownie.",
       "actionBlocked": "Nie udało się ukończyć tej akcji. Najpierw należy rozwiązać problem.",
       "syncNoRepositories": "Żadne repozytoria nie znajdują się w zakresie synchronizacji. Wybierz repozytoria monitorowane przez Agenta bezpieczeństwa, a następnie zsynchronizuj ponownie.",
+      "syncNoRepositoriesNoManage": "Żadne repozytoria nie znajdują się w zakresie synchronizacji. Właściciel organizacji, administrator lub osoba zarządzająca rozliczeniami musi połączyć repozytoria, zanim będzie można przeprowadzić synchronizację.",
       "syncIntegrationInactive": "Połączenie z GitHub dla Agenta bezpieczeństwa nie jest aktywne. Połącz ponownie aplikację Kilo GitHub App, a następnie zsynchronizuj ponownie.",
       "syncMissingPermission": "Aplikacja Kilo GitHub App nie może odczytywać vulnerability alerts. Przyznaj to uprawnienie w GitHub, a następnie zsynchronizuj ponownie.",
       "configConflict": "Ustawienia Agenta bezpieczeństwa zmieniono gdzie indziej. Sprawdź najnowsze ustawienia i zapisz ponownie."
@@ -1301,6 +1330,7 @@
       "emptyDescription": "Wyślij wiadomość poniżej, aby rozpocząć.",
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
+      "emptyReadOnlyTitle": "Brak wiadomości w tej sesji",
       "renameAccessibility": "Zmień nazwę sesji: {{title}}",
       "cloningSession": "Klonowanie sesji",
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
@@ -1400,7 +1430,7 @@
       "selectRepositoryToStart": "Wybierz repozytorium, aby rozpocząć.",
       "enterPromptToStart": "Dodaj prompt, aby rozpocząć.",
       "enterPromptOrFileToStart": "Dodaj prompt lub plik, aby rozpocząć.",
-      "connectProviderToStart": "Połącz dostawcę, aby rozpocząć.",
+      "connectProviderToStart": "Repozytoria pochodzą z połączonego konta GitHub, GitLab lub Bitbucket.",
       "promptPlaceholder": "Nad czym chcesz pracować?",
       "couldNotLoadModels": "Nie udało się wczytać modeli.",
       "prefillRepoAndModelUnavailable": "Repozytorium i model z pierwotnej sesji nie są już dostępne. Wybierz je poniżej.",
@@ -1590,6 +1620,8 @@
       "assistantStopped": "Generowanie odpowiedzi zostało zatrzymane.",
       "assistantContextOverflow": "Rozmowa jest zbyt długa dla modelu.",
       "assistantProviderError": "Dostawca zwrócił błąd.",
+      "assistantProviderRefused": "Dostawca odrzucił to żądanie i nie można go ponowić.",
+      "assistantCreditsRefusal": "Brakuje środków na uruchomienie Cloud Agent.",
       "assistantOutputLimit": "Odpowiedź osiągnęła limit wyjścia modelu.",
       "assistantStructuredOutput": "Odpowiedź nie była zgodna z wymaganym formatem.",
       "assistantFailed": "Nie udało się wygenerować odpowiedzi."
@@ -1622,6 +1654,7 @@
       "preparingEnvironment": "Przygotowywanie środowiska",
       "preparationComplete": "Zakończono przygotowanie",
       "preparationFailed": "Przygotowanie nie powiodło się",
+      "preparationStageFailed": "Etap o nazwie {{stage}} nie powiódł się",
       "setupCommand": "Polecenie konfiguracyjne {{index}}",
       "setupCommandOf": "Polecenie konfiguracyjne {{index}} z {{displayCount}}",
       "stepWorkspaceSetup": "Konfiguracja przestrzeni roboczej",
@@ -1660,7 +1693,7 @@
       "detailSetupCommandTimedOut": "Upłynął limit czasu polecenia konfiguracyjnego {{index}}",
       "detailColdRestore": "Przywracanie na zimno, zastosowano migawkę, przywrócono pliki: {{applied}} z {{total}}",
       "detailProgressPercent": "Ukończono {{percent}}%",
-      "detailRestoreIncompleteReport": "Przywracanie sesji niekompletne: nie przywrócono plików — {{skipped}} z {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Nie przywrócono plików — {{skipped}} z {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Brakujące: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} i jeszcze {{omitted}}",
       "detailReasonPatchFailed": "łatka nie została zastosowana",
@@ -1917,16 +1950,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Rozmiar okna kontekstu niedostępny",
-      "tapToViewDetails": "Dotknij, aby zobaczyć szczegóły kontekstu.",
-      "costSuffix": ", koszt {{cost}}",
-      "tokensWindowUnavailable": "Kontekst: {{used}} tokenów, rozmiar okna niedostępny",
-      "tokensUsage": "Kontekst: {{used}} z {{window}} tokenów, wykorzystano {{percentage}}",
+      "tapToViewDetails": " Dotknij, aby zobaczyć szczegóły kontekstu.",
+      "costClause": ", koszt {{cost}}",
+      "loadingCostSpoken": "koszt {{cost}}.",
+      "tokensWindowUnavailable": "Kontekst: {{used}} tokenów, rozmiar okna niedostępny{{costClause}}.",
+      "tokensUsage": "Kontekst: {{used}} z {{window}} tokenów, wykorzystano {{percentage}}{{costClause}}.",
       "title": "Wykorzystanie kontekstu",
       "used": "Wykorzystano",
       "provider": "Dostawca",
       "totalCost": "Całkowity koszt",
       "usageReflectsLatest": "Wykorzystanie kontekstu uwzględnia ostatnią w pełni wygenerowaną odpowiedź asystenta.",
-      "usageUnavailable": "Wykorzystanie kontekstu niedostępne",
+      "usageUnavailable": "Wykorzystanie kontekstu niedostępne{{costClause}}.",
       "tokenUsage": "Zużycie tokenów",
       "cacheRate": "Udział pamięci podręcznej",
       "modelsCount": "Modele ({{displayCount}})",
@@ -2013,7 +2047,6 @@
   },
   "addCredits": {
     "cta": "Doładuj konto",
-    "description": "Doładuj konto, aby dalej korzystać z usługi.",
     "billingPage": "strona rozliczeń"
   },
   "deviceSessions": {
@@ -2316,10 +2349,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nie udało się sprawdzić połączenia z kontem GitHub.",
-      "checkFailedMessage": "Status logowania będzie dostępny dopiero po wczytaniu danych.",
+      "checkFailedMessage": "Nie udało się połączyć z GitHubem. Sprawdź połączenie i spróbuj ponownie.",
       "checkFailedTitleGitLab": "Nie udało się sprawdzić połączenia z kontem GitLab.",
       "checkFailedTitleBitbucket": "Nie udało się sprawdzić połączenia z kontem Bitbucket.",
-      "providerCheckFailedMessage": "Status połączenia będzie dostępny po wczytaniu danych.",
+      "providerCheckFailedMessage": "Nie udało się połączyć z dostawcą. Sprawdź połączenie i spróbuj ponownie.",
       "reconnectTitle": "Połącz ponownie konto GitHub",
       "reconnectTitleGitLab": "Połącz ponownie konto GitLab",
       "reconnectTitleBitbucket": "Połącz ponownie konto Bitbucket",
@@ -2469,7 +2502,6 @@
     },
     "fileList": {
       "filesList": "Lista plików",
-      "filesViewed": "Pliki · przejrzano {{viewed}} z {{total}}",
       "layout": "Układ",
       "listed": "(z listy)",
       "loadingFiles": "Wczytywanie plików",
@@ -3100,9 +3132,9 @@
       "searching": "Wyszukiwanie w sieci",
       "thinking": "Przemyśliwanie"
     },
-    "planOf": "z",
+    "planProgress": "{{done}} z {{total}}",
     "filesChanged": "zmienione pliki",
-    "finishedIn": "Zakończono w",
+    "finishedIn": "Zakończono w {{duration}}",
     "noActivityFor": "Brak aktywności przez",
     "prOpened": "Otwarto pull request",
     "permissionWants": "Chce uruchomić",
@@ -3412,7 +3444,7 @@
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"
     },
-    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość. Doładuj konto i spróbuj ponownie."
+    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość."
   },
   "settingsTools": {
     "confirmTitle": "Potwierdzić tę zmianę?"
@@ -3446,8 +3478,8 @@
     "saved": "Zapisano ustawienia alertów o wydatkach",
     "loadError": "Nie udało się wczytać alertów o wydatkach.",
     "saveError": "Nie udało się zapisać alertów o wydatkach.",
-    "empty": "Alerty o wydatkach są wyłączone. Włącz je, aby ostrzegać kontakty rozliczeniowe tego zakresu.",
-    "noSpend": "Nie zarejestrowano jeszcze żadnych wydatków",
+    "sendAlerts": "Wyślij alerty",
+    "noSpend": "Brak wydatków",
     "spend24h": "Wydatki z ostatnich 24 godzin",
     "multiplierError": "Podaj mnożnik równy 1 lub większy",
     "permissionDenied": "Nie masz uprawnień do zarządzania alertami o wydatkach.",
@@ -3873,5 +3905,8 @@
     "noEnabledContexts": "Brak kontekstów z włączonymi zaplanowanymi raportami",
     "sourceBlocker": "Sesja wymaga uwagi",
     "sourceMetadata": "Zapisane metadane sesji"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nie udało się otworzyć tego wyniku wyszukiwania"
   }
 }

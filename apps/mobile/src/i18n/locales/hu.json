@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Natív távelérési demó",
+    "sessionsEmpty": "Még nincsenek natív munkamenetek",
+    "hosts": "Online gazdagépek",
+    "hostsEmpty": "Nincsenek online gazdagépek",
+    "directory": "Munkakönyvtár",
+    "createSession": "Natív munkamenet létrehozása",
+    "queueIfOffline": "Prompt várólistára helyezése, ha a gazdagép offline",
+    "prompt": "Prompt vagy /command",
+    "localClear": "Helyi nézet törlése",
+    "abort": "Kör megszakítása",
+    "failed": "A natív távoli művelet sikertelen",
+    "creationUnknown": "A létrehozás eredménye ismeretlen. Újrapróbálás előtt frissítse a munkameneteket.",
+    "commandFailed": "A futtató parancsa sikertelen",
+    "invalidReply": "Érvénytelen válasz a futtatótól",
+    "unsafeCommand": "Használja a /compact, /new, /skill, /models, /agents vagy /clear (csak helyben) parancsot.",
+    "status": "Kapcsolat: {{connection}} · Futtató: {{runner}}",
+    "presenceStatus": "Gazdagépek: {{connection}}",
+    "commandStatus": "Parancs kézbesítése: {{status}}",
+    "delivered": "Kézbesítve",
+    "expired": "Lejárt"
+  },
   "common": {
     "cancel": "Mégse",
     "done": "Kész",
@@ -110,6 +132,7 @@
     "newSession": "Új munkamenet",
     "noModelsAvailable": "Nem érhetők el modellek",
     "notFound": "Nem található",
+    "online": "Elérhető",
     "open": "{{name}} megnyitása",
     "openPullRequest": "PR megnyitása",
     "completed": "Befejezve",
@@ -186,6 +209,7 @@
     "resendCode": "Kód újraküldése",
     "termsPrefix": "A folytatással elfogadod a ",
     "terms": "Felhasználási feltételeket",
+    "termsInSentence": "Felhasználási feltételeket",
     "termsConnector": " és a ",
     "termsSuffix": ".",
     "moreSignInOptions": "További bejelentkezési lehetőségek",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Törlés megerősítése",
     "credits": "Kreditek",
     "failedToLoadBalance": "Nem sikerült betölteni az egyenleget. Az újrapróbáláshoz koppints.",
+    "balanceLoadFailed": "Nem tölthető be az egyenleg",
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Ez a módosítási kérelem nem tartalmaz fájlmódosításokat.",
     "fileList": {
       "openNavigator": "Fájlböngésző megnyitása",
-      "filesViewed": "Fájlok · {{viewed}} / {{total}} megtekintve",
       "listed": "(felsorolva)",
       "layout": "Elrendezés",
       "unified": "Egyesített",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nem sikerült ellenőrizni a GitHub-kapcsolatot",
-      "checkFailedMessage": "A bejelentkezési állapot csak a betöltés után érhető el.",
+      "checkFailedMessage": "Nem sikerült elérni a GitHubot. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
       "checkFailedTitleGitLab": "Nem sikerült ellenőrizni a GitLab-kapcsolatot",
       "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
-      "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
+      "providerCheckFailedMessage": "Nem sikerült elérni a szolgáltatót. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
       "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
       "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Fotó készítéséhez engedélyezd a kamera használatát a Beállításokban."
+    },
+    "botStatus": {
+      "offline": "Nincs kapcsolat"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Nem sikerült befejezni ezt a műveletet. Próbáld újra.",
       "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell.",
       "syncNoRepositories": "Egyetlen adattár sem esik a szinkronizálás hatókörébe. Válassza ki azokat az adattárakat, amelyeket a Biztonsági ügynök figyel, majd szinkronizáljon újra.",
+      "syncNoRepositoriesNoManage": "Egyetlen adattár sem esik a szinkronizálás hatókörébe. A szervezet egyik tulajdonosának, adminisztrátorának vagy számlázási felelősének csatlakoztatnia kell az adattárakat ahhoz, hogy a szinkronizálás elindulhasson.",
       "syncIntegrationInactive": "A Biztonsági ügynök GitHub-kapcsolata nem aktív. Csatlakoztassa újra a Kilo GitHub App-ot, majd szinkronizáljon újra.",
       "syncMissingPermission": "A Kilo GitHub-alkalmazás nem tudja olvasni a sebezhetőségi riasztásokat. Add meg ezt az engedélyt a GitHubbon, majd szinkronizálj újra.",
       "configConflict": "A biztonsági ügynök beállításai máshol módosultak. Nézd át a legfrissebb beállításokat, és ments újra."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "A kezdéshez küldj egy üzenetet az alábbi mezőből.",
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
+      "emptyReadOnlyTitle": "Nincs üzenet ebben a munkamenetben",
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",
       "cloningSession": "Munkamenet klónozása…",
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Válassz egy adattárat az indításhoz.",
       "enterPromptToStart": "Adj hozzá egy promptot az indításhoz.",
       "enterPromptOrFileToStart": "Adj hozzá egy promptot vagy egy fájlt az indításhoz.",
-      "connectProviderToStart": "Csatlakoztass egy szolgáltatót az indításhoz.",
+      "connectProviderToStart": "Az adattárak egy csatlakoztatott GitHub-, GitLab- vagy Bitbucket-fiókból származnak.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
       "prefillRepoAndModelUnavailable": "Az eredeti munkamenet adattára és modellje már nem érhető el. Válassz helyettük másikat az alábbiak közül.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "A válasz létrehozása leállt.",
       "assistantContextOverflow": "A beszélgetés túl hosszú a modell számára.",
       "assistantProviderError": "A szolgáltató hibát adott vissza.",
+      "assistantProviderRefused": "A szolgáltató elutasította ezt a kérést, ezért nem lehet újrapróbálni.",
+      "assistantCreditsRefusal": "Nincs elég kredit a Cloud Agent futtatásához.",
       "assistantOutputLimit": "A válasz elérte a modell kimeneti korlátját.",
       "assistantStructuredOutput": "A válasz nem felelt meg a szükséges formátumnak.",
       "assistantFailed": "Nem sikerült létrehozni a választ."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Környezet előkészítése",
       "preparationComplete": "Az előkészítés befejeződött",
       "preparationFailed": "Az előkészítés meghiúsult",
+      "preparationStageFailed": "{{stage}} meghiúsult",
       "setupCommand": "{{index}}. beállítási parancs",
       "setupCommandOf": "{{index}}. beállítási parancs (összesen {{displayCount}})",
       "stepWorkspaceSetup": "Munkaterület beállítása",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "{{index}}. beállítási parancs időtúllépés miatt megszakadt",
       "detailColdRestore": "Hideg visszaállítás, pillanatkép alkalmazva, {{total}} fájlból {{applied}} helyreállítva",
       "detailProgressPercent": "{{percent}}% kész",
-      "detailRestoreIncompleteReport": "A munkamenet visszaállítása nem fejeződött be: {{total}} fájlból {{skipped}} nem lett visszaállítva ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{total}} fájlból {{skipped}} nem lett visszaállítva ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Hiányzó: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} és további {{omitted}}",
       "detailReasonPatchFailed": "a javítás nem alkalmazható",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "A kontextusablak mérete nem érhető el",
-      "tapToViewDetails": "A kontextus részleteihez koppints.",
-      "costSuffix": ", költség: {{cost}}",
-      "tokensWindowUnavailable": "Kontextus: {{used}} token, a kontextusablak mérete nem érhető el",
-      "tokensUsage": "Kontextus: {{used}} token az összesen {{window}} tokenből, {{percentage}} felhasználva",
+      "tapToViewDetails": " A kontextus részleteihez koppints.",
+      "costClause": ", költség: {{cost}}",
+      "loadingCostSpoken": "költség: {{cost}}.",
+      "tokensWindowUnavailable": "Kontextus: {{used}} token, a kontextusablak mérete nem érhető el{{costClause}}.",
+      "tokensUsage": "Kontextus: {{used}} token az összesen {{window}} tokenből, {{percentage}} felhasználva{{costClause}}.",
       "title": "Kontextushasználat",
       "used": "Felhasználva",
       "provider": "Szolgáltató",
       "totalCost": "Teljes költség",
       "usageReflectsLatest": "A használati adatok az asszisztens legutóbbi befejezett válaszát tükrözik.",
-      "usageUnavailable": "A kontextushasználat nem érhető el",
+      "usageUnavailable": "A kontextushasználat nem érhető el{{costClause}}.",
       "tokenUsage": "Tokenhasználat",
       "cacheRate": "Gyorsítótár találati aránya",
       "modelsCount": "Modellek ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Egyenleg feltöltése",
-    "description": "A további használathoz töltsd fel az egyenlegedet.",
     "billingPage": "számlázási oldal"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Webes keresés",
       "thinking": "Végiggondolás"
     },
-    "planOf": "/",
+    "planProgress": "{{done}}/{{total}}",
     "filesChanged": "módosított fájl",
-    "finishedIn": "Befejezve ennyi idő alatt:",
+    "finishedIn": "Befejezve {{duration}} alatt",
     "noActivityFor": "Nincs aktivitás ennyi ideje:",
     "prOpened": "Pull request megnyitva",
     "permissionWants": "Futtatni szeretne",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"
     },
-    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez. Töltsd fel az egyenleged, és próbáld újra."
+    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez."
   },
   "settingsTools": {
     "confirmTitle": "Megerősíted ezt a módosítást?"
@@ -3340,8 +3372,8 @@
     "saved": "A költésfigyelmeztetési beállítások elmentve",
     "loadError": "A költésfigyelmeztetéseket nem sikerült betölteni.",
     "saveError": "A költésfigyelmeztetéseket nem sikerült elmenteni.",
-    "empty": "A költésfigyelmeztetések ki vannak kapcsolva. Kapcsold be őket, hogy értesítsd a hatókör számlázási kapcsolatait.",
-    "noSpend": "Még nincs rögzített költés",
+    "sendAlerts": "Értesítések küldése",
+    "noSpend": "Nincs költés",
     "spend24h": "Költés az elmúlt 24 órában",
     "multiplierError": "Adj meg 1 vagy nagyobb szorzót",
     "permissionDenied": "Nincs jogosultságod a költésfigyelmeztetések kezelésére.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Egyetlen környezetben sincsenek engedélyezve az ütemezett jelentések",
     "sourceBlocker": "A munkamenet figyelmet igényel",
     "sourceMetadata": "A munkamenet rögzített metaadatai"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nem sikerült megnyitni ezt a keresési találatot"
   }
 }

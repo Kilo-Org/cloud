@@ -30,8 +30,8 @@ const mockUpdateCodeReviewStatus = jest.fn() as jest.MockedFunction<
 const mockUpdateCodeReviewStatusIfNonTerminal = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.updateCodeReviewStatusIfNonTerminal
 >;
-const mockUpdateCodeReviewUsage = jest.fn() as jest.MockedFunction<
-  typeof codeReviewsDbModule.updateCodeReviewUsage
+const mockBackfillCodeReviewUsage = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.backfillCodeReviewUsage
 >;
 const mockGetSessionUsageFromBilling = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.getSessionUsageFromBilling
@@ -133,7 +133,7 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   getCodeReviewById: mockGetCodeReviewById,
   updateCodeReviewStatus: mockUpdateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal: mockUpdateCodeReviewStatusIfNonTerminal,
-  updateCodeReviewUsage: mockUpdateCodeReviewUsage,
+  backfillCodeReviewUsage: mockBackfillCodeReviewUsage,
   getSessionUsageFromBilling: mockGetSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback: mockUpdateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt: mockGetLatestCodeReviewAttempt,
@@ -300,6 +300,7 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     previous_summary_head_sha: null,
     previous_summary_observed: null,
     manual_config: null,
+    manual_operation_key: null,
     review_type: 'standard',
     trigger_source: null,
     council_result: null,
@@ -473,7 +474,7 @@ beforeEach(async () => {
   mockFindKiloReviewNote.mockResolvedValue({ noteId: 88, body: 'existing note body' });
   mockUpdateKiloReviewNote.mockResolvedValue(undefined);
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
-  mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
+  mockBackfillCodeReviewUsage.mockResolvedValue(undefined);
   mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
   mockSetCodeReviewCouncilResult.mockResolvedValue(undefined);
   mockRecordCodeReviewAttemptPublicationStatus.mockResolvedValue(undefined);
@@ -4071,7 +4072,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         '2025-01-01T00:00:00Z',
         '2025-01-01T00:10:00Z'
       );
-      expect(mockUpdateCodeReviewUsage).toHaveBeenCalledWith(REVIEW_ID, {
+      expect(mockBackfillCodeReviewUsage).toHaveBeenCalledWith(REVIEW_ID, {
         totalTokensIn: 1000,
         totalTokensOut: 200,
         totalCostMusd: 100,

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Urruneko demo natiboa",
+    "sessionsEmpty": "Oraindik ez dago saio natiborik",
+    "hosts": "Linean dauden ostalariak",
+    "hostsEmpty": "Ez dago ostalaririk linean",
+    "directory": "Abiarazte-direktorioa",
+    "createSession": "Sortu saio natiboa",
+    "queueIfOffline": "Jarri gonbita ilaran ostalaria lineaz kanpo badago",
+    "prompt": "Gonbita edo /command",
+    "localClear": "Garbitu ikuspegi lokala",
+    "abort": "Eten txanda",
+    "failed": "Urruneko ekintza natiboak huts egin du",
+    "creationUnknown": "Sorreraren emaitza ezezaguna da. Freskatu saioak berriro saiatu aurretik.",
+    "commandFailed": "Exekutatzailearen komandoak huts egin du",
+    "invalidReply": "Exekutatzailearen erantzun baliogabea",
+    "unsafeCommand": "Erabili /compact, /new, /skill, /models, /agents edo /clear (lokalki soilik).",
+    "status": "Konexioa: {{connection}} · Exekutatzailea: {{runner}}",
+    "presenceStatus": "Ostalariak: {{connection}}",
+    "commandStatus": "Komandoen bidalketa: {{status}}",
+    "delivered": "Entregatuta",
+    "expired": "Iraungita"
+  },
   "common": {
     "cancel": "Utzi",
     "done": "Eginda",
@@ -110,6 +132,7 @@
     "newSession": "Saio berria",
     "noModelsAvailable": "Ez dago eredurik eskuragarri",
     "notFound": "Ez da aurkitu.",
+    "online": "Konektatuta",
     "open": "Ireki {{name}}",
     "openPullRequest": "Ireki bateratze-eskaera",
     "completed": "Amaituta",
@@ -186,6 +209,7 @@
     "resendCode": "Bidali kodea berriro",
     "termsPrefix": "Jarraitzean, onartzen dituzu gure ",
     "terms": "Baldintzak",
+    "termsInSentence": "Baldintzak",
     "termsConnector": " eta ",
     "termsSuffix": ".",
     "moreSignInOptions": "Saioa hasteko aukera gehiago",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Berretsi ezabaketa",
     "credits": "Kredituak",
     "failedToLoadBalance": "Ezin izan da saldoa kargatu. Sakatu berriro saiatzeko.",
+    "balanceLoadFailed": "Ezin izan da saldoa kargatu",
     "hideBalance": "Ezkutatu saldoa",
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Bateratze-eskaera honek ez du fitxategi-aldaketarik.",
     "fileList": {
       "openNavigator": "Ireki fitxategi-nabigatzailea",
-      "filesViewed": "Fitxategiak · {{viewed}} / {{total}} ikusita",
       "listed": "(zerrendatuta)",
       "layout": "Antolamendua",
       "unified": "Bateratua",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "Ezin izan da GitHub-ekiko konexioa egiaztatu.",
-      "checkFailedMessage": "Ezin da jakin saioa hasita dagoen hau kargatu arte.",
+      "checkFailedMessage": "Ezin izan da GitHub-ekin konektatu. Egiaztatu konexioa eta saiatu berriro.",
       "checkFailedTitleGitLab": "Ezin izan da GitLab-ekiko konexioa egiaztatu.",
       "checkFailedTitleBitbucket": "Ezin izan da Bitbucket-ekiko konexioa egiaztatu.",
-      "providerCheckFailedMessage": "Konexio-egoera ez dago eskuragarri kargatu arte.",
+      "providerCheckFailedMessage": "Ezin izan da hornitzailearekin konektatu. Egiaztatu konexioa eta saiatu berriro.",
       "reconnectTitle": "Konektatu GitHub berriro",
       "reconnectTitleGitLab": "Konektatu GitLab berriro",
       "reconnectTitleBitbucket": "Konektatu Bitbucket berriro",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Eman kamera erabiltzeko baimena ezarpenetan, argazki bat ateratzeko."
+    },
+    "botStatus": {
+      "offline": "Deskonektatuta"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro.",
       "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik.",
       "syncNoRepositories": "Ez dago biltegirik sinkronizazio-esparruan. Aukeratu Segurtasun-agenteak gainbegiratzen dituen biltegiak, eta gero sinkronizatu berriro.",
+      "syncNoRepositoriesNoManage": "Ez dago biltegirik sinkronizazio-esparruan. Erakundeko jabe batek, administratzaile batek edo fakturazio-kudeatzaile batek biltegiak konektatu behar ditu sinkronizatu ahal izateko.",
       "syncIntegrationInactive": "Segurtasun-agentearen GitHub konexioa ez dago aktibo. Konektatu berriro Kilo GitHub App, eta gero sinkronizatu berriro.",
       "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro.",
       "configConflict": "Segurtasun-agentearen ezarpenak beste leku batean aldatu dira. Berrikusi azken ezarpenak eta gorde berriro."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "Hasteko, bidali mezu bat behean.",
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
+      "emptyReadOnlyTitle": "Saio honetan ez dago mezurik",
       "renameAccessibility": "Berrizendatu saioa: {{title}}",
       "cloningSession": "Saioa klonatzen",
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Hautatu biltegi bat hasteko.",
       "enterPromptToStart": "Gehitu eskaera bat hasteko.",
       "enterPromptOrFileToStart": "Gehitu eskaera bat edo fitxategi bat hasteko.",
-      "connectProviderToStart": "Konektatu hornitzaile bat hasteko.",
+      "connectProviderToStart": "Biltegiak konektatuta dagoen GitHub, GitLab edo Bitbucket kontu batetik datoz.",
       "promptPlaceholder": "Zertan lan egin nahi zenuke?",
       "couldNotLoadModels": "Ezin izan dira modeloak kargatu.",
       "prefillRepoAndModelUnavailable": "Jatorrizko saioaren biltegia eta modeloa jada ez daude erabilgarri. Aukeratu beste batzuk behean.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "Erantzuna sortzea gelditu da.",
       "assistantContextOverflow": "Elkarrizketa luzeegia da modeloarentzat.",
       "assistantProviderError": "Hornitzaileak errore bat itzuli du.",
+      "assistantProviderRefused": "Hornitzaileak eskaera hau baztertu du eta ezin da berriro saiatu.",
+      "assistantCreditsRefusal": "Ez dago nahikoa kreditu Cloud Agent exekutatzeko.",
       "assistantOutputLimit": "Erantzunak modeloaren irteera-mugara iritsi da.",
       "assistantStructuredOutput": "Erantzunak ez zetorren bat eskatutako formatuarekin.",
       "assistantFailed": "Erantzunak huts egin du."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Ingurunea prestatzen",
       "preparationComplete": "Prestaketa amaituta",
       "preparationFailed": "Prestaketak huts egin du",
+      "preparationStageFailed": "{{stage}}: huts egin du",
       "setupCommand": "{{index}}. konfigurazio-komandoa",
       "setupCommandOf": "{{index}}. konfigurazio-komandoa ({{displayCount}} guztira)",
       "stepWorkspaceSetup": "Lan-eremuaren konfigurazioa",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "{{index}}. konfigurazio-komandoaren denbora-muga gainditu da",
       "detailColdRestore": "Berrezartze hotza, snapshot-a aplikatuta, berrezarritako fitxategiak: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% osatuta",
-      "detailRestoreIncompleteReport": "Saioaren berrezartzea osatu gabe, berrezarri gabeko fitxategiak: {{skipped}} / {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Berrezarri gabeko fitxategiak: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Falta dira: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} eta beste {{omitted}}",
       "detailReasonPatchFailed": "adabakia ezin izan da aplikatu",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Testuinguru-leihoaren tamaina ez dago erabilgarri",
-      "tapToViewDetails": "Sakatu testuinguruaren xehetasunak ikusteko.",
-      "costSuffix": ", kostua {{cost}}",
-      "tokensWindowUnavailable": "Testuinguruan {{used}} token, leihoaren tamaina ez dago erabilgarri",
-      "tokensUsage": "Testuinguruan {{window}} tokenetik {{used}} erabilita ({{percentage}})",
+      "tapToViewDetails": " Sakatu testuinguruaren xehetasunak ikusteko.",
+      "costClause": ", kostua {{cost}}",
+      "loadingCostSpoken": "kostua: {{cost}}.",
+      "tokensWindowUnavailable": "Testuinguruan {{used}} token, leihoaren tamaina ez dago erabilgarri{{costClause}}.",
+      "tokensUsage": "Testuinguruan {{window}} tokenetik {{used}} erabilita ({{percentage}}){{costClause}}.",
       "title": "Testuinguruaren erabilera",
       "used": "Erabilita",
       "provider": "Hornitzailea",
       "totalCost": "Kostu osoa",
       "usageReflectsLatest": "Erabilera-datuak laguntzaileak amaitu duen azken erantzunari dagozkio.",
-      "usageUnavailable": "Testuinguruaren erabilera ez dago erabilgarri",
+      "usageUnavailable": "Testuinguruaren erabilera ez dago erabilgarri{{costClause}}.",
       "tokenUsage": "Tokenen erabilera",
       "cacheRate": "Cache-tasa",
       "modelsCount": "Modeloak ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Gehitu kredituak",
-    "description": "Gehitu kredituak erabiltzen jarraitzeko.",
     "billingPage": "fakturazio-orria"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Web bilaketa",
       "thinking": "Hausnartzen"
     },
-    "planOf": "etik",
+    "planProgress": "{{total}}tik {{done}}",
     "filesChanged": "fitxategiak aldatuta",
-    "finishedIn": "Amaituta",
+    "finishedIn": "{{duration}} barru amaituta",
     "noActivityFor": "Jarduerarik gabe",
     "prOpened": "Pull request irekita",
     "permissionWants": "Exekutatu nahi du",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
     },
-    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko. Gehitu kredituak eta saiatu berriro."
+    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko."
   },
   "settingsTools": {
     "confirmTitle": "Aldaketa hau berretsi?"
@@ -3340,8 +3372,8 @@
     "saved": "Gastu-alerten ezarpenak gorde dira",
     "loadError": "Ezin izan dira gastu-alertak kargatu.",
     "saveError": "Ezin izan dira gastu-alertak gorde.",
-    "empty": "Gastu-alertak itzalita daude. Piztu itzazu eremu honetako fakturatze-kontaktuei abisatzeko.",
-    "noSpend": "Oraindik ez da gasturik erregistratu",
+    "sendAlerts": "Bidali gastu-alertak",
+    "noSpend": "Gasturik ez",
     "spend24h": "Azken 24 orduetako gastua",
     "multiplierError": "Sartu 1 edo handiagoa den biderkatzaile bat",
     "permissionDenied": "Ez duzu gastu-alertak kudeatzeko baimenik.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Ez dago testuingururik gaituta programatutako txostenetarako",
     "sourceBlocker": "Saioak arreta behar du",
     "sourceMetadata": "Jasotako saioaren metadatuak"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ezin izan da bilaketa-emaitza hau ireki"
   }
 }

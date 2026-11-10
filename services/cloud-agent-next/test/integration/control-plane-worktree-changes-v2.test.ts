@@ -327,7 +327,7 @@ describe('control-plane worktree changes (B10)', () => {
     async operation => {
       const sessionId = newSessionId();
       const worktreeId = `worktree_${crypto.randomUUID()}`;
-      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const sandboxId = await generateSandboxId(sessionId);
       const sandbox = await injectProvider(sandboxId, createFakeProvider());
       const context = worktreeChangesContext(
         metadata({ sessionId, sandboxId, worktreeId, kiloSessionId: kiloSessionId() }),
@@ -374,7 +374,7 @@ describe('control-plane worktree changes (B10)', () => {
     const sessionId = newSessionId();
     const siblingId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({ sessionId, sandboxId, provider, worktreeId });
     const second = await startSessionWithSandbox({
@@ -438,7 +438,7 @@ describe('control-plane worktree changes (B10)', () => {
     const sessionId = newSessionId();
     const siblingId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({ sessionId, sandboxId, provider, worktreeId });
     const second = await startSessionWithSandbox({
@@ -474,7 +474,7 @@ describe('control-plane worktree changes (B10)', () => {
   it('promotes newer historical sibling captures with lower revisions and rejects older seeds after eviction', async () => {
     const sessionId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({
       sessionId,
@@ -534,7 +534,7 @@ describe('control-plane worktree changes (B10)', () => {
   it('fences captures superseded by migration and never overwrites a live snapshot with historical data', async () => {
     const sessionId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({
       sessionId,
@@ -601,7 +601,7 @@ describe('control-plane worktree changes (B10)', () => {
     const sessionId = newSessionId();
     const siblingId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({
       sessionId,
@@ -677,7 +677,7 @@ describe('control-plane worktree changes (B10)', () => {
 
   it('coalesces concurrent sibling captures with a trailing capture and monotonic revisions', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
     await sandbox.ensureAllocation({
@@ -733,7 +733,7 @@ describe('control-plane worktree changes (B10)', () => {
     const worktreeId = `worktree_${crypto.randomUUID()}`;
     const sessionId = newSessionId();
     const siblingId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({ sessionId, sandboxId, provider, worktreeId });
     const second = await startSessionWithSandbox({
@@ -884,7 +884,7 @@ describe('control-plane worktree changes (B10)', () => {
   it('promotes a saved session snapshot to the shared owner before the wrapper connects', async () => {
     const sessionId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const patch = '+saved\n';
     const first = await startSessionWithSandbox({
@@ -908,7 +908,7 @@ describe('control-plane worktree changes (B10)', () => {
   it('seeds scoped file identities and net recovery to a fresh shared owner', async () => {
     const sessionId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const revision = 4;
     const scopes = ['uncommitted', 'against-base-branch'] as const;
@@ -982,7 +982,7 @@ describe('control-plane worktree changes (B10)', () => {
   });
   it('carries saved DO patches through credential projection to session.prepare without consuming them', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const patch =
       'diff --git a/lost.txt b/lost.txt\nnew file mode 100644\n--- /dev/null\n+++ b/lost.txt\n@@ -0,0 +1 @@\n+lost\n';
@@ -1011,7 +1011,7 @@ describe('control-plane worktree changes (B10)', () => {
     wrapper.close();
   });
   it('forwards a snapshot request to the wrapper and returns its result', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
     await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
@@ -1035,7 +1035,7 @@ describe('control-plane worktree changes (B10)', () => {
   });
 
   it('returns not_ready when no wrapper is connected', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
     await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
@@ -1055,7 +1055,7 @@ describe('control-plane worktree changes (B10)', () => {
   });
 
   it('does not hold the queue while awaiting the wrapper reply', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
     await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
@@ -1082,7 +1082,7 @@ describe('control-plane worktree changes (B10)', () => {
   });
 
   it('fails a pending request fast when its socket closes', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
     await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
@@ -1108,7 +1108,7 @@ describe('control-plane worktree changes (B10)', () => {
   });
 
   it('times out a wrapper that never replies', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
     await runInDurableObject(stub, instance => {
@@ -1137,7 +1137,7 @@ describe('control-plane worktree changes (B10)', () => {
 
   it('captures after attach and persists it through the V2 Session DO', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_session_b10');
@@ -1170,7 +1170,7 @@ describe('control-plane worktree changes (B10)', () => {
 
   it('persists and retrieves the same path in both scopes through the wrapper and Session DO', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_scoped');
@@ -1245,7 +1245,7 @@ describe('control-plane worktree changes (B10)', () => {
 
   it('suppresses a capture while preparing and runs it after ready', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_preparing');
@@ -1271,7 +1271,7 @@ describe('control-plane worktree changes (B10)', () => {
 
   it('reports offline when the Sandbox DO has no wrapper (not_ready)', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
     // No wrapper connects: the capture request cannot be delivered.
@@ -1283,7 +1283,7 @@ describe('control-plane worktree changes (B10)', () => {
 
   it('trims an over-budget saved snapshot to the largest prefix that fits when read', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const files = Array.from({ length: 1_000 }, (_, index) => ({
       path: `${index}/${'漢"\\\n'.repeat(25)}`,
@@ -1324,7 +1324,7 @@ describe('control-plane worktree changes (B10)', () => {
   it('ignores a child-session worktree event and captures for its own', async () => {
     const sessionId = newSessionId();
     const kiloId = kiloSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     await injectProvider(sandboxId, provider);
     const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
@@ -1356,7 +1356,7 @@ describe('control-plane worktree changes (B10)', () => {
   it('captures on an outcome, and on idle only after a user cancel', async () => {
     const sessionId = newSessionId();
     const kiloId = kiloSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     await injectProvider(sandboxId, provider);
     const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
@@ -1401,6 +1401,78 @@ describe('control-plane worktree changes (B10)', () => {
       events: [{ type: 'session.idle', properties: { sessionID: kiloId } }],
     });
     replySnapshot(wrapper, await awaitFrame(wrapper, 'worktree.snapshot'));
+    wrapper.close();
+  });
+});
+
+describe('SandboxSessionV2 preview service discovery', () => {
+  async function readySession(wrapperId: string) {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const provider = createFakeProvider();
+    const sessionStub = await startSessionWithSandbox({
+      sessionId,
+      sandboxId,
+      provider,
+      worktreeId: `worktree_${crypto.randomUUID()}`,
+    });
+    const wrapper = await connectAndHello(provider, sandboxId, wrapperId);
+    await markRouteReady(sessionStub, wrapper, sessionId);
+    await settleCaptures(wrapper);
+    return { sessionId, sandboxId, sessionStub, wrapper };
+  }
+
+  it('relays a bound wrapper scan to the session caller', async () => {
+    const { sessionStub, wrapper } = await readySession('wr_preview_ok');
+
+    const pending = sessionStub.listPreviewServices();
+    const frame = await awaitFrame(wrapper, 'preview.list');
+    wrapper.send({
+      type: 'preview.result',
+      requestId: frame.requestId,
+      ok: true,
+      result: { services: [{ port: 5173, name: 'Next.js' }] },
+    });
+
+    await expect(pending).resolves.toEqual({
+      services: [{ port: 5173, name: 'Next.js' }],
+      status: 'running',
+    });
+    wrapper.close();
+  });
+
+  it('surfaces a post-send timeout as an error instead of not_ready', async () => {
+    const { sessionId, sandboxId, wrapper } = await readySession('wr_preview_timeout');
+    const sandboxStub = sandboxes.getByName(sandboxId);
+    await runInDurableObject(sandboxStub, instance => {
+      instance.controlRequestTimeoutMs = 25;
+    });
+
+    const assertion = expect(
+      runInDurableObject(sandboxStub, instance => instance.previewServices(sessionId))
+    ).rejects.toThrow('Preview service discovery timed out');
+    await awaitFrame(wrapper, 'preview.list');
+
+    await assertion;
+    wrapper.close();
+  });
+
+  it('surfaces a wrapper scan error', async () => {
+    const { sessionId, sandboxId, wrapper } = await readySession('wr_preview_error');
+    const sandboxStub = sandboxes.getByName(sandboxId);
+
+    const assertion = expect(
+      runInDurableObject(sandboxStub, instance => instance.previewServices(sessionId))
+    ).rejects.toThrow('Preview service scan failed (scan_failed)');
+    const frame = await awaitFrame(wrapper, 'preview.list');
+    wrapper.send({
+      type: 'preview.result',
+      requestId: frame.requestId,
+      ok: false,
+      error: { code: 'scan_failed', message: 'denied', retryable: true },
+    });
+
+    await assertion;
     wrapper.close();
   });
 });

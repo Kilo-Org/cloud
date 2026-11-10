@@ -20,9 +20,14 @@ import {
   getGitLabInstanceUrlForOrganization,
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
+  getGitLabProjectAccessForRequester,
   validateGitLabRepoAccessForOrganization,
   validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import {
+  GitLabInstanceUrlError,
+  normalizeGitLabInstanceUrl,
+} from '@/lib/integrations/platforms/gitlab/instance-url';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { linkUploadedAttachments, releaseRefusedAttachments } from '@/lib/bot/attachments';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -44,6 +49,40 @@ function buildBotCallbackUrl(botRequestId: string, currentStep: number | undefin
   url.searchParams.set('currentStep', String(parseBotCallbackStep(String(currentStep ?? 0))));
   return url.toString();
 }
+
+/**
+ * A stored GitLab instance URL that fails policy normalization cannot work on
+ * retry, so the reply must name the connection a user has to fix. The account
+ * connection and the integration's own connection are separate settings with
+ * separate owners.
+ */
+class GitLabConnectionUrlError extends Error {
+  constructor(
+    readonly connection: 'account' | 'integration',
+    options?: { cause?: unknown }
+  ) {
+    super(`GitLab ${connection} connection has an invalid instance URL`, options);
+    this.name = 'GitLabConnectionUrlError';
+  }
+}
+
+function normalizeStoredGitLabInstanceUrl(
+  instanceUrl: string,
+  connection: 'account' | 'integration'
+): string {
+  try {
+    return normalizeGitLabInstanceUrl(instanceUrl);
+  } catch (error) {
+    throw new GitLabConnectionUrlError(connection, { cause: error });
+  }
+}
+
+const GITLAB_INVALID_INSTANCE_RESPONSE: Record<'account' | 'integration', string> = {
+  account:
+    'Error: The GitLab connection on your account has an invalid instance URL. Update your GitLab connection in your Kilo Code settings.',
+  integration:
+    "Error: The GitLab connection for this integration has an invalid instance URL. Update the integration's GitLab connection in Kilo Code settings.",
+};
 
 /**
  * Result from spawning a Cloud Agent session
@@ -102,6 +141,8 @@ export default async function spawnCloudAgentSession(
     attachments?: CloudAgentAttachments;
     /** Linked Kilo user the caller authenticates as; selects the balance-check client for org payers. */
     payerUserId?: string;
+    /** Linked Kilo user that triggered this bot run; authorizes repository access. */
+    requesterUserId?: string;
     /** GitHub login of the account that triggered this bot run. */
     actorLogin?: string;
     /** Repository of the conversation the bot was mentioned in. */
@@ -135,12 +176,21 @@ export default async function spawnCloudAgentSession(
     return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
   }
 
+  // The repository authorization below must read the same connection the
+  // session will use, so resolve the purpose first.
+  const githubAccessPurpose =
+    options?.chatPlatform === 'slack' && platformIntegration.platform === 'slack'
+      ? 'agent'
+      : 'workflow';
+
   if (args.githubRepo) {
     const targetAuthorization = await authorizeGitHubRepository({
       platformIntegration,
       repository: args.githubRepo,
       threadRepository: options?.threadRepository,
       actorLogin: options?.actorLogin,
+      requesterUserId: options?.requesterUserId,
+      purpose: githubAccessPurpose,
     });
     if (!targetAuthorization.allowed) {
       return { response: targetAuthorization.markdown };
@@ -164,19 +214,67 @@ export default async function spawnCloudAgentSession(
       return { response: 'Error: No acting user is configured for this GitLab organization.' };
     }
 
-    // Resolve the project through the account's GitLab connection first, as
-    // the GitHub branch of this tool does.
+    // Resolve the project through the connection's inventory, as the GitHub
+    // branch of this tool resolves the repository through its connection
+    // inventory. An organization-owned integration first requires the
+    // requesting account to reach the project through its own GitLab
+    // connection: the org connection later supplies only the session
+    // credential, not the authorization. Runs without a requesting account
+    // name no project.
     let projectResolved: boolean;
     try {
-      projectResolved =
-        owner.type === 'org'
-          ? await validateGitLabRepoAccessForOrganization(
-              owner.id,
-              gitLabActorUserId,
-              args.gitlabProject
-            )
-          : await validateGitLabRepoAccessForUser(owner.id, args.gitlabProject);
+      if (owner.type === 'org') {
+        if (!options?.requesterUserId) {
+          return {
+            response:
+              "Error: That GitLab project is not available through this account's GitLab integration.",
+          };
+        }
+        // A project path means the same thing only on the instance the
+        // session will clone from, so a requester whose own connection lives
+        // elsewhere gets a verdict, never a cross-instance lookup.
+        const [requesterInstanceUrl, orgInstanceUrl] = await Promise.all([
+          getGitLabInstanceUrlForUser(options.requesterUserId),
+          getGitLabInstanceUrlForOrganization(owner.id),
+        ]);
+        if (
+          normalizeStoredGitLabInstanceUrl(requesterInstanceUrl, 'account') !==
+          normalizeStoredGitLabInstanceUrl(orgInstanceUrl, 'integration')
+        ) {
+          return {
+            response:
+              "Error: That GitLab project is not available through this account's GitLab integration.",
+          };
+        }
+        const requesterAccess = await getGitLabProjectAccessForRequester(
+          options.requesterUserId,
+          args.gitlabProject
+        );
+        if (requesterAccess.outcome !== 'allowed') {
+          return {
+            response:
+              "Error: That GitLab project is not available through this account's GitLab integration.",
+          };
+        }
+        projectResolved = await validateGitLabRepoAccessForOrganization(
+          owner.id,
+          gitLabActorUserId,
+          args.gitlabProject
+        );
+      } else {
+        projectResolved = await validateGitLabRepoAccessForUser(owner.id, args.gitlabProject);
+      }
     } catch (error) {
+      // A stored instance URL that fails policy normalization cannot start
+      // working on retry, so it gets its own non-retryable answer instead of
+      // the retry message meant for provider and transport failures. The
+      // answer names the connection whose URL failed.
+      if (error instanceof GitLabConnectionUrlError) {
+        return { response: GITLAB_INVALID_INSTANCE_RESPONSE[error.connection] };
+      }
+      if (error instanceof GitLabInstanceUrlError) {
+        return { response: GITLAB_INVALID_INSTANCE_RESPONSE.integration };
+      }
       captureException(error, {
         tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session-gitlab-project' },
         extra: { botRequestId, ownerType: owner.type },
@@ -239,10 +337,6 @@ export default async function spawnCloudAgentSession(
       return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
     }
 
-    const githubAccessPurpose =
-      options?.chatPlatform === 'slack' && platformIntegration.platform === 'slack'
-        ? 'agent'
-        : 'workflow';
     const repository = await resolveGitHubRepositoryForOwner(
       owner,
       args.githubRepo,

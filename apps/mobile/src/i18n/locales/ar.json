@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "عرض تجريبي للتحكم عن بُعد ببروتوكول CLI الأصلي",
+    "sessionsEmpty": "لا توجد جلسات ببروتوكول CLI الأصلي بعد",
+    "hosts": "المضيفون المتصلون",
+    "hostsEmpty": "لا يوجد مضيفون متصلون",
+    "directory": "دليل العمل",
+    "createSession": "إنشاء جلسة ببروتوكول CLI الأصلي",
+    "queueIfOffline": "إضافة المطالبة إلى قائمة الانتظار إذا كان المضيف غير متصل",
+    "prompt": "مطالبة أو /command",
+    "localClear": "مسح العرض المحلي",
+    "abort": "إيقاف الدور",
+    "failed": "فشل إجراء التحكم عن بُعد ببروتوكول CLI الأصلي",
+    "creationUnknown": "نتيجة الإنشاء غير معروفة. حدّث الجلسات قبل إعادة المحاولة.",
+    "commandFailed": "فشل أمر المشغّل",
+    "invalidReply": "ردّ المشغّل غير صالح",
+    "unsafeCommand": "استخدم /compact أو /new أو /skill أو /models أو /agents أو /clear (محليًا فقط).",
+    "status": "الاتصال: {{connection}} · المشغّل: {{runner}}",
+    "presenceStatus": "المضيفون: {{connection}}",
+    "commandStatus": "تسليم الأمر: {{status}}",
+    "delivered": "تم التسليم",
+    "expired": "انتهت الصلاحية"
+  },
   "common": {
     "cancel": "إلغاء",
     "done": "تم",
@@ -110,6 +132,7 @@
     "newSession": "جلسة جديدة",
     "noModelsAvailable": "لا توجد نماذج متاحة",
     "notFound": "لم نعثر على العنصر المطلوب.",
+    "online": "متصل",
     "open": "فتح {{name}}",
     "openPullRequest": "فتح طلب السحب",
     "completed": "تم الاكتمال",
@@ -186,6 +209,7 @@
     "resendCode": "إعادة إرسال الرمز",
     "termsPrefix": "بالمتابعة، توافق على ",
     "terms": "الشروط",
+    "termsInSentence": "الشروط",
     "termsConnector": " و ",
     "termsSuffix": ".",
     "moreSignInOptions": "المزيد من خيارات تسجيل الدخول",
@@ -222,6 +246,7 @@
     "confirmDeletion": "تأكيد الحذف",
     "credits": "الرصيد",
     "failedToLoadBalance": "تعذّر تحميل الرصيد. اضغط لإعادة المحاولة.",
+    "balanceLoadFailed": "تعذّر تحميل الرصيد",
     "hideBalance": "إخفاء الرصيد",
     "showBalance": "إظهار الرصيد",
     "balanceHidden": "الرصيد مخفي",
@@ -408,6 +433,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة."
+    },
+    "botStatus": {
+      "offline": "غير متصل"
     }
   },
   "codeReviewer": {
@@ -1134,6 +1162,7 @@
       "actionFailed": "تعذّر إكمال هذا الإجراء. حاول مرة أخرى.",
       "actionBlocked": "تعذّر إكمال هذا الإجراء. يجب إصلاح المشكلة أولاً قبل إعادة المحاولة.",
       "syncNoRepositories": "لا توجد مستودعات ضمن نطاق المزامنة. اختر المستودعات التي يراقبها وكيل الأمان، ثم زامِن مرة أخرى.",
+      "syncNoRepositoriesNoManage": "لا توجد مستودعات ضمن نطاق المزامنة. يجب على مالك المؤسسة أو المشرف أو مدير الفوترة ربط المستودعات قبل أن تتم المزامنة.",
       "syncIntegrationInactive": "اتصال GitHub الخاص بـ«وكيل الأمان» غير نشط. أعد ربط تطبيق Kilo على GitHub، ثم قم بالمزامنة مرة أخرى.",
       "syncMissingPermission": "لا يستطيع تطبيق Kilo على GitHub قراءة تنبيهات الثغرات. امنح هذه الصلاحية في GitHub، ثم أعد المزامنة.",
       "configConflict": "تغيّرت إعدادات وكيل الأمان في مكان آخر. راجع أحدث الإعدادات واحفظ مرة أخرى."
@@ -1337,6 +1366,7 @@
       "emptyDescription": "أرسل رسالة أدناه للبدء.",
       "scrollToBottom": "التمرير إلى الأسفل",
       "emptyTitle": "لا توجد رسائل بعد",
+      "emptyReadOnlyTitle": "لا توجد رسائل في هذه الجلسة",
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
       "cloningSession": "جارٍ استنساخ الجلسة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة.",
@@ -1436,7 +1466,7 @@
       "selectRepositoryToStart": "اختر مستودعًا للبدء.",
       "enterPromptToStart": "أضِف موجِّهًا للبدء.",
       "enterPromptOrFileToStart": "أضِف موجِّهًا أو ملفًا للبدء.",
-      "connectProviderToStart": "اربط مزوّدًا للبدء.",
+      "connectProviderToStart": "تأتي المستودعات من حساب مرتبط على GitHub أو GitLab أو Bitbucket.",
       "promptPlaceholder": "ما الذي تريد العمل عليه؟",
       "couldNotLoadModels": "تعذّر تحميل النماذج.",
       "prefillRepoAndModelUnavailable": "لم يعد مستودع الجلسة الأصلية ونموذجها متاحين. اختر مستودعًا ونموذجًا أدناه.",
@@ -1634,6 +1664,8 @@
       "assistantStopped": "تم إيقاف إنشاء الرد.",
       "assistantContextOverflow": "المحادثة أطول من أن يستوعبها النموذج.",
       "assistantProviderError": "أعاد المزود رسالة خطأ.",
+      "assistantProviderRefused": "رفض المزود هذا الطلب ولا يمكن إعادة المحاولة.",
+      "assistantCreditsRefusal": "رصيدك غير كافٍ لتشغيل Cloud Agent.",
       "assistantOutputLimit": "وصل الرد إلى حدّ الإخراج الأقصى للنموذج.",
       "assistantStructuredOutput": "لم يتطابق الرد مع التنسيق المطلوب.",
       "assistantFailed": "تعذّر إنشاء الرد."
@@ -1666,6 +1698,7 @@
       "preparingEnvironment": "جارٍ إعداد البيئة",
       "preparationComplete": "اكتمل الإعداد",
       "preparationFailed": "فشل الإعداد",
+      "preparationStageFailed": "{{stage}}: فشل",
       "setupCommand": "أمر الإعداد {{index}}",
       "setupCommandOf": "أمر الإعداد {{index}} من {{displayCount}}",
       "stepWorkspaceSetup": "إعداد مساحة العمل",
@@ -1704,7 +1737,7 @@
       "detailSetupCommandTimedOut": "انتهت مهلة أمر الإعداد {{index}}",
       "detailColdRestore": "استعادة باردة، تم تطبيق اللقطة، الملفات المستعادة: {{applied}} من {{total}}",
       "detailProgressPercent": "اكتمل {{percent}}%",
-      "detailRestoreIncompleteReport": "استعادة الجلسة غير مكتملة، الملفات غير المستعادة: {{skipped}} من {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "الملفات غير المستعادة: {{skipped}} من {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "المفقود: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} و{{omitted}} أخرى",
       "detailReasonPatchFailed": "لم يتم تطبيق الرقعة",
@@ -1969,16 +2002,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "حجم نافذة السياق غير متاح",
-      "tapToViewDetails": "اضغط لعرض تفاصيل السياق.",
-      "costSuffix": "، التكلفة {{cost}}",
-      "tokensWindowUnavailable": "السياق: {{used}} من الرموز، حجم نافذة السياق غير متاح",
-      "tokensUsage": "السياق: {{used}} من أصل {{window}} من الرموز، نسبة الاستخدام {{percentage}}",
+      "tapToViewDetails": " اضغط لعرض تفاصيل السياق.",
+      "costClause": "، التكلفة {{cost}}",
+      "loadingCostSpoken": "التكلفة {{cost}}.",
+      "tokensWindowUnavailable": "السياق: {{used}} من الرموز، حجم نافذة السياق غير متاح{{costClause}}.",
+      "tokensUsage": "السياق: {{used}} من أصل {{window}} من الرموز، نسبة الاستخدام {{percentage}}{{costClause}}.",
       "title": "استخدام السياق",
       "used": "المُستخدَم",
       "provider": "المزود",
       "totalCost": "التكلفة الإجمالية",
       "usageReflectsLatest": "تعكس بيانات الاستخدام آخر رد مكتمل من المساعد.",
-      "usageUnavailable": "استخدام السياق غير متوفر",
+      "usageUnavailable": "استخدام السياق غير متوفر{{costClause}}.",
       "tokenUsage": "استخدام الرموز",
       "cacheRate": "نسبة التخزين المؤقت",
       "modelsCount": "النماذج ({{displayCount}})",
@@ -2071,7 +2105,6 @@
   },
   "addCredits": {
     "cta": "شحن الرصيد",
-    "description": "اشحن رصيدك لمواصلة الاستخدام.",
     "billingPage": "صفحة الفوترة"
   },
   "deviceSessions": {
@@ -2384,10 +2417,10 @@
     },
     "connect": {
       "checkFailedTitle": "تعذّر التحقق من ربط حساب GitHub.",
-      "checkFailedMessage": "لا يمكن معرفة حالة تسجيل الدخول حتى يكتمل التحميل.",
+      "checkFailedMessage": "تعذّر الوصول إلى GitHub. تحقق من اتصالك وحاول مرة أخرى.",
       "checkFailedTitleGitLab": "تعذّر التحقق من ربط حساب GitLab.",
       "checkFailedTitleBitbucket": "تعذّر التحقق من ربط حساب Bitbucket.",
-      "providerCheckFailedMessage": "حالة الاتصال غير متاحة حتى يتم تحميلها.",
+      "providerCheckFailedMessage": "تعذّر الوصول إلى المزوّد. تحقق من اتصالك وحاول مرة أخرى.",
       "reconnectTitle": "إعادة ربط GitHub",
       "reconnectTitleGitLab": "إعادة ربط GitLab",
       "reconnectTitleBitbucket": "إعادة ربط Bitbucket",
@@ -2543,7 +2576,6 @@
     },
     "fileList": {
       "filesList": "قائمة الملفات",
-      "filesViewed": "الملفات · تم الاطلاع على {{viewed}} من {{total}}",
       "layout": "طريقة العرض",
       "listed": "(ضمن القائمة)",
       "loadingFiles": "جارٍ تحميل الملفات",
@@ -3204,9 +3236,9 @@
       "searching": "بحث في الويب",
       "thinking": "التفكير بعمق"
     },
-    "planOf": "من",
+    "planProgress": "{{done}} من {{total}}",
     "filesChanged": "ملفات متغيّرة",
-    "finishedIn": "اكتمل في",
+    "finishedIn": "اكتمل في {{duration}}",
     "noActivityFor": "لا نشاط لمدة",
     "prOpened": "تم فتح طلب سحب",
     "permissionWants": "يريد التشغيل",
@@ -3518,7 +3550,7 @@
     "reasoningEffort": {
       "modelFlag": "يدعم هذا النموذج جهد التفكير"
     },
-    "creditsRequired": "لا يوجد رصيد كافٍ لإرسال هذه الرسالة. اشحن الرصيد وحاول مرة أخرى."
+    "creditsRequired": "لا يوجد رصيد كافٍ لإرسال هذه الرسالة."
   },
   "settingsTools": {
     "confirmTitle": "تأكيد هذا التغيير؟"
@@ -3552,8 +3584,8 @@
     "saved": "تم حفظ إعدادات تنبيهات الإنفاق",
     "loadError": "تعذّر تحميل تنبيهات الإنفاق.",
     "saveError": "تعذّر حفظ تنبيهات الإنفاق.",
-    "empty": "تنبيهات الإنفاق متوقفة. فعّلها لتنبيه جهات اتصال الفوترة لهذا النطاق.",
-    "noSpend": "لم يُسجَّل أي إنفاق بعد",
+    "sendAlerts": "إرسال تنبيهات الإنفاق",
+    "noSpend": "لا إنفاق بعد",
     "spend24h": "الإنفاق خلال آخر 24 ساعة",
     "multiplierError": "أدخل مضاعفًا يساوي 1 أو أكثر",
     "permissionDenied": "ليست لديك صلاحية لإدارة تنبيهات الإنفاق.",
@@ -3999,5 +4031,8 @@
     "noEnabledContexts": "لا توجد سياقات مفعّلة للتقارير المجدولة",
     "sourceBlocker": "الجلسة تحتاج إلى اهتمام",
     "sourceMetadata": "البيانات الوصفية الملتقطة للجلسة"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "تعذّر فتح نتيجة البحث هذه"
   }
 }

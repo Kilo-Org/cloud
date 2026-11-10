@@ -3,6 +3,11 @@ import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { generateKeyPairSync } from 'node:crypto';
+import jwt from 'jsonwebtoken';
+import type * as VercelIdentityModule from '../../src/scm-broker/vercel-identity.js';
+import type * as byocCredentials from '../../src/byoc/vercel-credential-resolver.js';
+import type * as VercelJwksModule from '../../src/scm-broker/vercel-jwks.js';
 import { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { startAttempt, type RouteContext } from '../../src/control-plane/sandbox/routes.js';
 import * as scopeHandleAdoption from '../../src/control-plane/sandbox/scope-handle-adoption.js';
@@ -21,7 +26,12 @@ import {
 import { readScopeGrant, listScopeGrants } from '../../src/control-plane/sandbox/scope-grants.js';
 import { deleteRoute } from '../../src/control-plane/sandbox/routes.js';
 import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
-import { buildControlNetworkPolicy } from '../../src/sandbox-control/session-credentials.js';
+import {
+  buildControlNetworkPolicy,
+  persistedSessionCredentialGrantSchema,
+  sessionCredentialGrantSchema,
+} from '../../src/sandbox-control/session-credentials.js';
+import type { VercelProviderLocator } from '../../src/sandbox-control/vercel-provider.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/provider-ref.js';
 import type {
   ProviderAdapter,
@@ -58,6 +68,29 @@ const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
 const NATIVE_GIT_TOKEN = 'ghp_nativeGittoken0000000000000000000000';
 const VERCEL_TARGET = 'https://worker.example.com';
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
+const syntheticIdentity = vi.hoisted(() => ({
+  contract: null as VercelIdentityModule.VercelSandboxIdentityContract | null,
+  key: vi.fn(),
+  credential: null as byocCredentials.ByocVercelCredential | null,
+}));
+vi.mock('../../src/scm-broker/vercel-identity.js', async importOriginal => ({
+  ...(await importOriginal<typeof VercelIdentityModule>()),
+  get verifiedVercelSandboxIdentityContract() {
+    return syntheticIdentity.contract;
+  },
+}));
+vi.mock('../../src/scm-broker/vercel-jwks.js', async importOriginal => ({
+  ...(await importOriginal<typeof VercelJwksModule>()),
+  vercelJwksCache: { key: (...args: unknown[]) => syntheticIdentity.key(...args) },
+}));
+vi.mock('../../src/byoc/vercel-credential-resolver.js', async importOriginal => {
+  const actual = await importOriginal<typeof byocCredentials>();
+  return {
+    ...actual,
+    fetchByocVercelCredential: (...args: Parameters<typeof actual.fetchByocVercelCredential>) =>
+      syntheticIdentity.credential ?? actual.fetchByocVercelCredential(...args),
+  };
+});
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
@@ -132,7 +165,9 @@ function createFakeProvider(): FakeProvider {
       }
       // The real adapter builds the policy, so validation of the grant set
       // (shared-scope alias/sandbox mismatch) must run here too.
-      provider.policyCalls.push(buildControlNetworkPolicy(grants));
+      provider.policyCalls.push(
+        buildControlNetworkPolicy(grants, undefined, { WORKER_URL: VERCEL_TARGET })
+      );
       provider.policyFrameCounts.push(provider.framesSeen());
     },
     async logs() {
@@ -143,6 +178,7 @@ function createFakeProvider(): FakeProvider {
 }
 
 function kiloSessionIdFor(sessionId: string): string {
+  if (sessionId === LEGACY_SESSION) return LEGACY_KILO_SESSION;
   return sessionId === SESSION_NEXT
     ? 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb'
     : 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -298,10 +334,7 @@ async function setup(
   }));
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    // This suite asserts contained grants; keep containment on by default so the
-    // local `.dev.vars` value cannot change what each test means.
     installFakeCredentialEnv(instance.env, broker, {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'true',
       WORKER_URL: VERCEL_TARGET,
       KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
       KILO_OPENROUTER_BASE: 'https://api.kilo.ai',
@@ -363,7 +396,8 @@ function vercelSource(sessionId: string): ControlPlaneCredentialSource {
 
 async function setupVercel(
   provider: FakeProvider,
-  broker: FakeCredentialBroker
+  broker: FakeCredentialBroker,
+  allocation?: { allocationName: string; locator: VercelProviderLocator }
 ): Promise<DurableObjectStub<SandboxControlV2>> {
   const stub = await setup(provider, broker, {
     WORKER_URL: VERCEL_TARGET,
@@ -379,6 +413,7 @@ async function setupVercel(
         credentialId: '22222222-2222-4222-8222-222222222222',
       },
       allocationName: SANDBOX_ID,
+      ...allocation,
       containment: WORKTREE_CREDENTIAL_CONTAINMENT,
     });
   });
@@ -436,7 +471,18 @@ async function reconstructPreB(
     });
     for (const [key, value] of retained) await state.storage.put(key, value);
     expect(await state.storage.get('control_plane_generation')).toBe(2);
-    db.insert(allocationTable).values(allocation).run();
+    // Raw SQL: the pre-B allocation table predates `create_attempt`.
+    db.run(
+      sql`INSERT INTO allocation (id, state, allocation_id, connection_id, provider_ref, wrapper_id,
+              last_frame_at, last_activity_at, create_deadline_at, first_connect_deadline_at,
+              stop_attempt, stop_pending, stop_at, unconfirmed_provider_ref, provider_pin)
+          VALUES (${allocation.id}, ${allocation.state}, ${allocation.allocation_id},
+              ${allocation.connection_id}, ${allocation.provider_ref}, ${allocation.wrapper_id},
+              ${allocation.last_frame_at}, ${allocation.last_activity_at},
+              ${allocation.create_deadline_at}, ${allocation.first_connect_deadline_at},
+              ${allocation.stop_attempt}, ${allocation.stop_pending}, ${allocation.stop_at},
+              ${allocation.unconfirmed_provider_ref}, ${allocation.provider_pin})`
+    );
     // Raw SQL: the pre-B routes table predates `repo_key`, which the schema now carries.
     for (const snapshot of snapshots) {
       db.run(
@@ -465,10 +511,568 @@ async function reconstructPreB(
 }
 
 afterEach(async () => {
+  syntheticIdentity.contract = null;
+  syntheticIdentity.credential = null;
+  syntheticIdentity.key.mockReset();
+  vi.restoreAllMocks();
   await reset();
 });
 
+const SCM_REPOSITORIES = {
+  github: { type: 'github', repo: 'acme/widgets' },
+  gitlab: { type: 'gitlab', url: 'https://gitlab.example/acme/widgets.git' },
+  bitbucket: {
+    type: 'bitbucket',
+    url: 'https://bitbucket.org/acme/widgets.git',
+    workspaceUuid: '11111111-1111-4111-8111-111111111111',
+    repositoryUuid: '22222222-2222-4222-8222-222222222222',
+    bitbucketIntegrationId: '33333333-3333-4333-8333-333333333333',
+  },
+} satisfies Record<string, ControlPlaneCredentialSource['repository']>;
+
+async function setupSyntheticVercel(provider: FakeProvider) {
+  syntheticIdentity.contract = {
+    issuerForTeam: () => 'https://oidc.vercel.com/synthetic',
+    sandboxIdForRef: ref => ref.sessionId,
+  };
+  const signing = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  syntheticIdentity.key.mockResolvedValue(signing.publicKey);
+  syntheticIdentity.credential = {
+    userId: 'user_123',
+    credentialId: '22222222-2222-4222-8222-222222222222',
+    setupStatus: 'ready',
+    teamId: 'team-synthetic',
+    projectId: 'project-synthetic',
+    teamSlug: 'synthetic',
+  } as byocCredentials.ByocVercelCredential;
+  provider.adapter.create = async intent => {
+    provider.intents.push(intent);
+    const providerRef = JSON.stringify({
+      sandboxName: intent.allocationName,
+      sessionId: intent.intentId,
+    });
+    provider.refs.push(providerRef);
+    return { providerRef };
+  };
+  const broker = createFakeCredentialBroker();
+  const issue = broker.issueGitHubSessionCapability;
+  Object.assign(broker, {
+    getTokenForRepo: async () => ({
+      success: true,
+      token: 'synthetic-legacy-token',
+      installationId: '1',
+      accountLogin: 'acme',
+      appType: 'standard',
+    }),
+    issueGitHubSessionCapability: async () => ({
+      ...(await issue()),
+      source: 'installation',
+      permissionScope: 'repository',
+    }),
+    issueGitLabSessionCapability: async () => ({
+      success: true,
+      capability: 'kgl2.synthetic',
+      instanceOrigin: 'https://gitlab.example',
+      instanceHost: 'gitlab.example',
+      projectPath: 'acme/widgets',
+      integrationId: '33333333-3333-4333-8333-333333333333',
+      authType: 'oauth',
+      identity: { accountId: 'synthetic-account', accountLogin: null },
+      glabIsOAuth2: true,
+    }),
+    issueBitbucketSessionCapability: async () => ({
+      success: true,
+      capability: 'kbb1.synthetic',
+      gitUrl: SCM_REPOSITORIES.bitbucket.url,
+    }),
+  });
+  const stub = await setupVercel(provider, broker, {
+    allocationName: 'physical-synthetic',
+    locator: {
+      teamId: 'team-synthetic',
+      projectId: 'project-synthetic',
+      snapshotId: 'snapshot-synthetic',
+      runtimeBuildId: 'runtime-synthetic',
+      runtime: 'node24',
+    },
+  });
+  const admission = async (
+    url: string,
+    authorization: { authorization?: string; privateToken?: string },
+    claims: Record<string, unknown> = {},
+    receiver: Pick<SandboxControlV2, 'getAllocationState' | 'admitScmForward'> = stub
+  ) => {
+    const state = await receiver.getAllocationState();
+    const ref = JSON.parse(state.providerRef ?? '{}');
+    return receiver.admitScmForward({
+      oidcToken: jwt.sign(
+        {
+          iss: 'https://oidc.vercel.com/synthetic',
+          aud: `${VERCEL_TARGET}/scm/vercel/${SANDBOX_ID}`,
+          exp: Math.floor(Date.now() / 1000) + 600,
+          team_id: 'team-synthetic',
+          project_id: 'project-synthetic',
+          sandbox_id: ref.sessionId,
+          ...claims,
+        },
+        signing.privateKey,
+        { algorithm: 'RS256', keyid: 'synthetic' }
+      ),
+      target: { url, method: 'GET' },
+      authorization,
+    });
+  };
+  return { stub, admission, broker };
+}
+
+describe.each(['cloudflare', 'vercel'] as const)(
+  '%s shared admission persistence',
+  providerName => {
+    it('renews expired capability material through the real DO and preserves its alias', async () => {
+      const provider = createFakeProvider();
+      const nativeBroker = createFakeCredentialBroker();
+      const setupResult =
+        providerName === 'vercel'
+          ? await setupSyntheticVercel(provider)
+          : { stub: await setup(provider, nativeBroker), broker: nativeBroker, admission: null };
+      const { stub, broker, admission } = setupResult;
+      await prepareWarmRoute(stub, provider);
+      const initial = sessionCredentialGrantSchema.parse(
+        JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}')
+      );
+      if (!initial.scm?.alias || !initial.scm.capability || !initial.outboundContainerId)
+        throw new Error('missing bound SCM grant');
+      const alias = initial.scm.alias;
+      await patchGrant(stub, SESSION, value => {
+        const current = sessionCredentialGrantSchema.parse(value);
+        if (!current.scm?.capability) throw new Error('missing capability');
+        return {
+          ...current,
+          scm: {
+            ...current.scm,
+            capability: {
+              ...current.scm.capability,
+              issuedAt: Date.now() - 60_000,
+              expiresAt: Date.now() - 1000,
+            },
+          },
+        };
+      });
+      const beforeIssued = broker.githubIssued();
+      const url = 'https://github.com/acme/widgets.git/info/refs';
+      if (admission) {
+        expect(await admission(url, { authorization: `Bearer ${alias}` })).toMatchObject({
+          ok: true,
+          authority: { type: 'managed', provider: 'github' },
+        });
+      } else {
+        expect(
+          await stub.resolveCredential({
+            credential: alias,
+            outboundContainerId: initial.outboundContainerId,
+            url,
+            method: 'GET',
+          })
+        ).not.toBeNull();
+      }
+      expect(broker.githubIssued()).toBe(beforeIssued + 1);
+      await runInDurableObject(stub, async (instance, state) => {
+        const reconstructed = new SandboxControlV2(state, instance.env);
+        await reconstructed.getAllocationState();
+        const persisted = listScopeGrants(drizzle(state.storage));
+        expect(persisted).toHaveLength(1);
+        expect(persisted[0].scm?.alias).toBe(alias);
+        expect(persisted[0].scm?.capability?.credential).not.toBe(
+          initial.scm?.capability?.credential
+        );
+        expect(persisted[0].scm?.capability?.expiresAt).toBeGreaterThan(Date.now());
+      });
+    });
+  }
+);
+
+describe('bound Vercel SCM lifecycle with synthetic provider contracts', () => {
+  it.each(['gitlab', 'bitbucket'] as const)(
+    'keeps new %s preparation dormant without verified provider contracts',
+    async purpose => {
+      const provider = createFakeProvider();
+      const { stub } = await setupSyntheticVercel(provider);
+      syntheticIdentity.contract = null;
+      expect(
+        await stub.prepare(
+          prepareInput(
+            SESSION,
+            credentialsSource(SESSION, { repository: SCM_REPOSITORIES[purpose] })
+          )
+        )
+      ).toMatchObject({ state: 'failed', reason: 'provider_identity_mismatch' });
+      expect(provider.policyCalls).toEqual([]);
+      expect((await readRouteRow(stub, SESSION))?.grant).toBeNull();
+      await runInDurableObject(stub, (_instance, state) =>
+        expect(listScopeGrants(drizzle(state.storage))).toEqual([])
+      );
+    }
+  );
+
+  it.each(['github', 'gitlab', 'bitbucket'] as const)(
+    'reconstructs %s authority and admits every carrier through the real DO',
+    async purpose => {
+      const provider = createFakeProvider();
+      const { stub, admission } = await setupSyntheticVercel(provider);
+      const source = credentialsSource(SESSION, { repository: SCM_REPOSITORIES[purpose] });
+      const { prepareFrame } = await prepareWarmRoute(
+        stub,
+        provider,
+        prepareInput(SESSION, source)
+      );
+      if (prepareFrame?.type !== 'session.prepare' || !prepareFrame.credentials.git)
+        throw new Error('missing SCM preparation');
+      const alias = prepareFrame.credentials.git.token;
+      const row = await readRouteRow(stub, SESSION);
+      const grant = sessionCredentialGrantSchema.parse(JSON.parse(row?.grant ?? '{}'));
+      if (!grant.scm?.capability) throw new Error('missing bound grant');
+      expect(grant.outboundContainerId).toBe(SANDBOX_ID);
+      expect(grant.scm?.nativeToken).toBeUndefined();
+      expect(JSON.stringify(prepareFrame)).not.toContain(grant.scm?.capability?.credential);
+      const malformed = [
+        { ...grant, scm: { ...grant.scm, nativeToken: 'synthetic-mixed-token' } },
+        { ...grant, outboundContainerId: undefined },
+        {
+          ...grant,
+          scm: {
+            ...grant.scm,
+            capability: { ...grant.scm.capability, outboundContainerId: 'foreign-binding' },
+          },
+        },
+        {
+          ...grant,
+          scm: {
+            ...grant.scm,
+            capability: {
+              ...grant.scm.capability,
+              credential: purpose === 'github' ? 'kgl2.wrong' : 'kgh2.wrong',
+            },
+          },
+        },
+        {
+          ...grant,
+          scm: { ...grant.scm, alias: createControlPlaneCredential(SANDBOX_ID, 'kilo') },
+        },
+        ...(purpose === 'github'
+          ? [{ ...grant, repository: { ...grant.repository, authentication: 'explicit' } }]
+          : [{ ...grant, scm: { ...grant.scm, githubAppType: 'standard' } }]),
+        ...(purpose === 'gitlab'
+          ? [
+              { ...grant, scm: { ...grant.scm, gitlab: undefined } },
+              ...['projectPath', 'integrationId', 'authType', 'identity'].map(key => ({
+                ...grant,
+                scm: { ...grant.scm, gitlab: { ...grant.scm?.gitlab, [key]: undefined } },
+              })),
+              {
+                ...grant,
+                scm: {
+                  ...grant.scm,
+                  gitlab: {
+                    ...grant.scm.gitlab,
+                    identity: { accountId: null, accountLogin: null },
+                  },
+                },
+              },
+            ]
+          : []),
+        ...(purpose === 'bitbucket'
+          ? [
+              { ...grant, orgId: undefined },
+              { ...grant, repository: { ...grant.repository, repositoryUuid: undefined } },
+            ]
+          : []),
+      ];
+      for (const value of malformed) {
+        expect(persistedSessionCredentialGrantSchema.safeParse(value).success).toBe(false);
+        expect(sessionCredentialGrantSchema.safeParse(value).success).toBe(false);
+      }
+      await runInDurableObject(stub, async (instance, state) => {
+        const reconstructed = new SandboxControlV2(state, instance.env);
+        expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('ready');
+        expect(listScopeGrants(drizzle(state.storage))).toEqual([grant]);
+        expect(
+          await reconstructed.resolveCredential({
+            credential: alias,
+            outboundContainerId: SANDBOX_ID,
+            url: grant.scm?.gitUrl ?? '',
+            method: 'GET',
+          })
+        ).toBeNull();
+        expect(
+          await admission(
+            `${grant.scm?.gitUrl}/info/refs`,
+            { authorization: `Bearer ${alias}` },
+            {},
+            reconstructed
+          )
+        ).toMatchObject({ ok: true, authority: { type: 'managed', provider: purpose } });
+      });
+      const url = `${grant.scm?.gitUrl}/info/refs?service=git-upload-pack`;
+      const username = { github: 'x-access-token', gitlab: 'oauth2', bitbucket: 'x-token-auth' }[
+        purpose
+      ];
+      for (const authorization of [
+        {},
+        { authorization: 'Bearer caller-owned' },
+        { authorization: `Bearer ${alias}` },
+        { authorization: `Basic ${btoa(`${username}:${alias}`)}` },
+        ...(purpose === 'gitlab'
+          ? [{ privateToken: alias }, { authorization: `Bearer ${alias}`, privateToken: alias }]
+          : []),
+      ]) {
+        expect(await admission(url, authorization)).toEqual(expect.objectContaining({ ok: true }));
+        expect(await admission(url, authorization, { team_id: 'foreign-team' })).toMatchObject({
+          ok: false,
+          status: 401,
+        });
+        expect(
+          await admission(url, authorization, { sandbox_id: 'retired-instance' })
+        ).toMatchObject({ ok: false, status: 401 });
+        expect(
+          await admission(url, authorization, { sandbox_name: 'wrong-physical-name' })
+        ).toMatchObject({ ok: false, status: 401 });
+        expect(await admission('https://off-list.example/repo', authorization)).toMatchObject({
+          ok: false,
+          code: 'target_denied',
+        });
+      }
+      expect(
+        await admission(url, {
+          authorization: `Bearer ${createControlPlaneCredential(SANDBOX_ID, purpose)}`,
+        })
+      ).toMatchObject({ ok: false, code: 'credential_denied' });
+      expect(
+        await admission(url, {
+          authorization: `Bearer ${createControlPlaneCredential('sbx_foreign', purpose)}`,
+        })
+      ).toMatchObject({ ok: false, code: 'credential_denied' });
+      expect(
+        await admission(url, { authorization: `Bearer ${alias}`, privateToken: 'caller-owned' })
+      ).toMatchObject({ ok: false, code: 'credential_denied' });
+      await stub.release({ sessionId: SESSION });
+      expect(await admission(url, { authorization: `Bearer ${alias}` })).toMatchObject({
+        ok: false,
+      });
+    }
+  );
+
+  it.each([
+    ['capability', 'git'],
+    ['git', 'capability'],
+  ] as const)('composes %s and %s scopes and removes only retired forwarding', async (...order) => {
+    const provider = createFakeProvider();
+    const { stub, admission } = await setupSyntheticVercel(provider);
+    const sessions = [SESSION, SESSION_NEXT];
+    const sources = order.map((kind, index) => ({
+      ...credentialsSource(sessions[index]),
+      repository:
+        kind === 'git'
+          ? { type: 'git' as const, url: 'https://github.com/acme/public.git' }
+          : { type: 'github' as const, repo: 'acme/widgets' },
+    }));
+    const first = await prepareWarmRoute(stub, provider, prepareInput(sessions[0], sources[0]));
+    expect((await stub.prepare(prepareInput(sessions[1], sources[1]))).state).toBe('preparing');
+    expect((await first.wrapper.next())?.type).toBe('session.prepare');
+    const grants = await runInDurableObject(stub, (_instance, state) =>
+      listScopeGrants(drizzle(state.storage))
+    );
+    expect(grants).toHaveLength(2);
+    for (const grant of grants)
+      expect(sessionCredentialGrantSchema.safeParse(grant).success).toBe(true);
+    const capability = grants.find(grant => grant.scm?.capability);
+    if (!capability?.scm?.alias) throw new Error('missing managed scope');
+    const installed = provider.policyCalls.at(-1) as ReturnType<typeof buildControlNetworkPolicy>;
+    expect(installed.allow['api.github.com']?.at(-1)).toEqual({
+      forwardURL: `${VERCEL_TARGET}/scm/vercel/${SANDBOX_ID}`,
+    });
+    expect(
+      await admission('https://github.com/acme/widgets.git/info/refs', {
+        authorization: `Bearer ${capability.scm.alias}`,
+      })
+    ).toMatchObject({ ok: true, authority: { type: 'managed' } });
+    await stub.release({ sessionId: capability.members[0].sessionId });
+    expect(JSON.stringify(provider.policyCalls.at(-1))).not.toContain('forwardURL');
+    expect(
+      await admission('https://github.com/acme/widgets.git/info/refs', {
+        authorization: `Bearer ${capability.scm.alias}`,
+      })
+    ).toMatchObject({ ok: false });
+    await runInDurableObject(stub, async (instance, state) => {
+      const reconstructed = new SandboxControlV2(state, instance.env);
+      const retained = listScopeGrants(drizzle(state.storage));
+      expect(retained).toHaveLength(1);
+      for (const grant of retained)
+        expect(
+          (await reconstructed.status({ sessionId: grant.members[0].sessionId })).view.state
+        ).not.toBe('failed');
+    });
+  });
+
+  it('publishes neither a managed scope nor session.credentials after failed policy installation', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setupSyntheticVercel(provider);
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION))
+    );
+    provider.framesSeen = () => wrapper.receivedFrames();
+    const before = (await readRouteRow(stub, SESSION))?.grant;
+    provider.failPolicy = true;
+    const view = await stub.prepare(prepareInput(SESSION_NEXT));
+    expect(view.state).toBe('failed');
+    expect((await readRouteRow(stub, SESSION_NEXT))?.grant).toBeNull();
+    expect((await readRouteRow(stub, SESSION))?.grant).toBe(before);
+    expect(await wrapper.next(50)).toBeNull();
+    await runInDurableObject(stub, (_instance, state) =>
+      expect(listScopeGrants(drizzle(state.storage))).toHaveLength(1)
+    );
+  });
+});
+
 describe('SandboxControlV2 credentials (B3)', () => {
+  it.each(['create', 'launch'] as const)(
+    'admits a fail-closed probe while provider %s remains pending outside the lifecycle queue',
+    async stage => {
+      const provider = createFakeProvider();
+      const gate = createDeferred();
+      let pending = false;
+      if (stage === 'create') {
+        const create = provider.adapter.create;
+        provider.adapter.create = async intent => {
+          pending = true;
+          await gate.promise;
+          return create(intent);
+        };
+      } else {
+        const launch = provider.adapter.launch;
+        provider.adapter.launch = async (ref, input) => {
+          pending = true;
+          await gate.promise;
+          return launch(ref, input);
+        };
+      }
+      const stub = await setupVercel(provider, createFakeCredentialBroker());
+      try {
+        await waitFor(() => expect(pending).toBe(true));
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const admission = await Promise.race([
+            stub.admitScmForward({
+              oidcToken: 'synthetic-probe',
+              target: {
+                url: 'https://github.com/acme/widgets.git/info/refs?service=git-upload-pack',
+                method: 'GET',
+              },
+              authorization: {},
+            }),
+            new Promise<never>((_resolve, reject) => {
+              timeout = setTimeout(
+                () => reject(new Error('Admission waited on provider work')),
+                1000
+              );
+            }),
+          ]);
+          expect(admission).toEqual({ ok: false, status: 403, code: 'allocation_unavailable' });
+        } finally {
+          clearTimeout(timeout);
+        }
+      } finally {
+        gate.resolve();
+        await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      }
+    }
+  );
+
+  it('fails new managed Vercel preparation specifically when provider contracts are unverified, without injection fallback or grant publication', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const issue = broker.issueGitHubSessionCapability;
+    Object.assign(broker, {
+      issueGitHubSessionCapability: async () => ({
+        ...(await issue()),
+        source: 'installation',
+        permissionScope: 'repository',
+      }),
+    });
+    const stub = await setupVercel(provider, broker);
+    const view = await stub.prepare(
+      prepareInput(SESSION, {
+        ...credentialsSource(SESSION),
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    );
+    expect(view).toEqual({
+      state: 'failed',
+      attemptId: expect.any(String),
+      reason: 'provider_identity_mismatch',
+    });
+    expect(provider.policyCalls).toEqual([]);
+    expect((await readRouteRow(stub, SESSION))?.grant).toBeNull();
+    await runInDurableObject(stub, (_instance, state) => {
+      expect(listScopeGrants(drizzle(state.storage))).toEqual([]);
+    });
+  });
+
+  it('retires a saved direct allocation before replacing it with containment', async () => {
+    const provider = createFakeProvider();
+    let stops = 0;
+    provider.adapter.stop = async () => {
+      stops += 1;
+      return 'terminal';
+    };
+    const stub = await setup(provider);
+    await prepareWarmRoute(stub, provider);
+    await runInDurableObject(stub, async (instance, state) => {
+      const db = drizzle(state.storage);
+      const allocation = db.select().from(allocationTable).get();
+      if (!allocation?.provider_pin) throw new Error('Missing provider pin');
+      const pin = JSON.parse(allocation.provider_pin);
+      db.update(allocationTable)
+        .set({
+          provider_pin: JSON.stringify({ ...pin, containment: { kilocode: false, github: false } }),
+        })
+        .where(eq(allocationTable.id, 'current'))
+        .run();
+      const reconstructed = new SandboxControlV2(state, instance.env);
+      Object.assign(reconstructed, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+        sessionPeerFor: () => ({
+          onRoute: async () => {},
+          onEvents: async () => {},
+          onOutcome: async () => {},
+        }),
+      });
+      expect((await reconstructed.getAllocationState()).kind).toBe('stopping');
+      expect(db.select().from(scopeGrants).all()).toEqual([]);
+      expect(
+        await reconstructed.deliver({
+          sessionId: SESSION,
+          messages: [promptPayload('msg_direct_upgrade')],
+        })
+      ).toBe('not_ready');
+      expect(stops).toBe(0);
+      await reconstructed.alarm();
+      await waitFor(async () =>
+        expect((await reconstructed.getAllocationState()).kind).toBe('stopped')
+      );
+      await reconstructed.prepare(prepareInput(SESSION));
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+      expect(stops).toBe(1);
+      expect(provider.intents[1]?.containment).toEqual({
+        kilocode: true,
+        github: true,
+        worktreeScoped: true,
+      });
+    });
+  });
+
   it('retires pre-B generation-2 JSON grants and recovers modern shared sends', async () => {
     const provider = createFakeProvider();
     let stopCalls = 0;
@@ -599,8 +1203,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
         method,
       });
     expect(first.credentials.proxy?.handle === second.credentials.proxy?.handle).toBe(false);
-    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
-    expect(Object.keys(grant.kilo.capabilities)).toEqual([]);
     expect(await resolve('https://api.kilo.ai/api/openrouter/chat/completions')).toBeNull();
     await stub.release({ sessionId: SESSION });
     expect((await stub.getAllocationState()).kind).toBe('connected');
@@ -800,7 +1402,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const before = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
     expect(before.members).toHaveLength(2);
     expect(before.kilo.runtimeProxy.members).toHaveLength(2);
-    expect(broker.kiloIssued()).toBe(0);
     await stub.release({ sessionId: SESSION });
     const fence = (sessionId: string) =>
       stub.getRuntimeCredentialProxyFence({
@@ -972,7 +1573,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
   it('denies a containment-off selection with a legacy user token', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
-    const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
+    const stub = await setup(provider, broker);
     const source = credentialsSource(SESSION, {
       kiloToken: NATIVE_KILO_TOKEN,
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
@@ -993,14 +1594,13 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(JSON.stringify(row)).not.toContain(NATIVE_KILO_TOKEN);
   });
 
-  it('prepares a containment-off selection with a session runtime proxy when no containment namespaces are bound', async () => {
+  it('rejects preparation when mandatory containment namespaces are missing', async () => {
     // Reproduces the deployed e2e Worker: containment is off and the containment
     // container classes are stripped from the config. A session-bound runtime
     // proxy is the only safe Kilo credential path here.
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker, {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
       WORKER_URL: 'https://api.kilo.ai',
     });
     await runInDurableObject(stub, instance => {
@@ -1019,33 +1619,16 @@ describe('SandboxControlV2 credentials (B3)', () => {
         containment: { kilocode: false, github: false },
       },
     };
-    const { prepareFrame } = await prepareWarmRoute(stub, provider, input);
-    expect(prepareFrame?.type).toBe('session.prepare');
-    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
-    expect(prepareFrame.credentials.kilo.token).toMatch(/^kcp1\./);
-    expect(prepareFrame.credentials.proxy?.handle).toBeDefined();
-    expect(prepareFrame.spec.env?.KILOCODE_TOKEN).toBe(prepareFrame.credentials.kilo.token);
-    expect(JSON.stringify(prepareFrame)).not.toContain(NATIVE_KILO_TOKEN);
-    expect(JSON.stringify(prepareFrame)).not.toContain('runtimeAuthorization');
-
-    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
-      containmentEnabled?: boolean;
-      outboundContainerId?: string;
-      kilo?: { alias?: string; runtimeProxy?: unknown; token?: string };
-    };
-    expect(grant.containmentEnabled).toBe(false);
-    expect(grant.kilo?.alias).toBe(prepareFrame.credentials.kilo.token);
-    expect(grant.kilo?.runtimeProxy).toBeDefined();
-    expect(grant.kilo?.token).toBe(runtimeAuthorizedKiloToken());
-    expect(grant.outboundContainerId).toBeUndefined();
-    await waitFor(() => expect(provider.intents).toHaveLength(1));
-    expect(provider.intents[0]?.containment).toEqual({ kilocode: false, github: false });
+    const view = await stub.prepare(input);
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    expect(provider.intents).toHaveLength(0);
+    expect((await readRouteRow(stub, SESSION))?.grant).toBeNull();
   });
 
   it('stays contained when the selection carries containment on', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
-    const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'true' });
+    const stub = await setup(provider, broker);
     const source = credentialsSource(SESSION, {
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
     });
@@ -1065,13 +1648,17 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(grant.containmentEnabled).toBeUndefined();
     expect(grant.kilo?.alias).toBeDefined();
     await waitFor(() => expect(provider.intents).toHaveLength(1));
-    expect(provider.intents[0]?.containment).toEqual({ kilocode: true, github: true });
+    expect(provider.intents[0]?.containment).toEqual({
+      kilocode: true,
+      github: true,
+      worktreeScoped: true,
+    });
   });
 
   it('denies the containment default with a legacy user token instead of issuing direct credentials', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
-    const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
+    const stub = await setup(provider, broker);
     const source = credentialsSource(SESSION, {
       kiloToken: NATIVE_KILO_TOKEN,
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
@@ -1102,7 +1689,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
       reason: 'credential_upgrade_required',
     });
     expect(provider.intents).toHaveLength(0);
-    expect(broker.kiloIssued()).toBe(0);
     expect(broker.githubIssued()).toBe(0);
   });
 
@@ -1179,9 +1765,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
   it('fails a persisted legacy containment-off grant with the upgrade stage', async () => {
     const provider = createFakeProvider();
-    const stub = await setup(provider, createFakeCredentialBroker(), {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
-    });
+    const stub = await setup(provider, createFakeCredentialBroker(), {});
     const spec = { ...routeSpec(SESSION), directory: '/workspace/legacy' };
     const legacy = legacyGrant({
       sessionId: SESSION,
@@ -1323,7 +1907,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
     };
     expect(grant.kilo.token).toBe(runtimeAuthorizedKiloToken());
     expect(grant.kilo.alias).toBe(prepareFrame.credentials?.kilo.token);
-    expect(broker.kiloIssued()).toBe(0);
     expect(broker.githubIssued()).toBe(1);
   });
 
@@ -1374,7 +1957,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
       expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
         'sent'
       );
-      expect(broker.kiloIssued()).toBe(0);
       expect(broker.githubIssued()).toBe(2);
       expect((await wrapper.next())?.type).toBe('session.credentials');
       expect((await wrapper.next())?.type).toBe('session.prompt');
@@ -1394,7 +1976,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
       kilo: { alias: string };
     };
     const firstAlias = first.kilo.alias;
-    expect(broker.kiloIssued()).toBe(0);
 
     await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
 
@@ -1411,12 +1992,134 @@ describe('SandboxControlV2 credentials (B3)', () => {
       expiresAt: number;
     };
     expect(refreshed.kilo.alias === firstAlias).toBe(true);
-    expect(broker.kiloIssued()).toBe(0);
     expect(broker.githubIssued()).toBe(2);
     expect(refreshed.expiresAt - Date.now()).toBeGreaterThan(TIMERS.credentialGrantReissueBelowMs);
     if (credentialsFrame?.type !== 'session.credentials') throw new Error('missing frame');
     expect(credentialsFrame.kilo.token).toBe(refreshed.kilo.alias);
     expect(credentialsFrame.sessionId).toBe(SESSION);
+  });
+
+  it('renews a due grant from the alarm without a message and keeps the sandbox-visible values', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    const before = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      kilo: { alias: string; runtimeProxy?: unknown };
+    };
+    const issuedBefore = broker.githubIssued();
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+
+    // A long execution sends no message, so only the alarm can renew the lease.
+    await runInDurableObject(stub, instance => instance.alarm());
+
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.credentials') throw new Error('expected session.credentials');
+    const renewed = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      kilo: { alias: string; runtimeProxy?: unknown };
+      expiresAt: number;
+    };
+    expect(renewed.kilo.alias === before.kilo.alias).toBe(true);
+    expect(
+      JSON.stringify(renewed.kilo.runtimeProxy) === JSON.stringify(before.kilo.runtimeProxy)
+    ).toBe(true);
+    expect(frame.kilo.token === renewed.kilo.alias).toBe(true);
+    expect(renewed.expiresAt - Date.now()).toBeGreaterThan(TIMERS.credentialGrantReissueBelowMs);
+    expect(broker.githubIssued()).toBe(issuedBefore + 1);
+    expect(await wrapper.next(50)).toBeNull();
+    expect(await stub.status({ sessionId: SESSION })).toMatchObject({ view: { state: 'ready' } });
+
+    // The renewed grant is outside the window, so the next alarm does nothing.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(broker.githubIssued()).toBe(issuedBefore + 1);
+  });
+
+  it('retries a failed alarm renewal after a pause and fails the route when the grant expires', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+    );
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    const framesBefore = wrapper.receivedFrames();
+    let attempts = 0;
+    const update = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
+      attempts += 1;
+      return update(ref, grants);
+    };
+    provider.failPolicy = true;
+
+    // The grant is still valid: no frame, and the route stays ready.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+    expect(wrapper.receivedFrames()).toBe(framesBefore);
+    expect(await stub.status({ sessionId: SESSION })).toMatchObject({ view: { state: 'ready' } });
+
+    // Before the retry time, a second alarm does not attempt again.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+
+    // At expiry, the pending retry does not delay the attempt, and the route fails.
+    await setGrantExpiry(stub, SESSION, Date.now() - 1);
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(2);
+    expect(await stub.status({ sessionId: SESSION })).toEqual({
+      sessionId: SESSION,
+      view: { state: 'failed', attemptId: expect.any(String), reason: 'workspace_setup_failed' },
+    });
+    expect(await wrapper.next(50)).toBeNull();
+    expect(wrapper.receivedFrames()).toBe(framesBefore);
+  });
+
+  it('attempts a failed shared-scope renewal once for all members', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const input = (sessionId: string) =>
+      prepareInput(
+        sessionId,
+        { ...vercelSource(sessionId), scopeId: 'shared_modern' },
+        {
+          ...routeSpec(sessionId),
+          directory: '/workspace/shared_modern',
+          runtimeIsolation: 'per-session',
+        }
+      );
+    const { wrapper } = await prepareWarmRoute(stub, provider, input(SESSION));
+    await stub.prepare(input(SESSION_NEXT));
+    if ((await wrapper.next())?.type !== 'session.prepare') throw new Error('missing prepare');
+    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () => {
+      expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready');
+    });
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    let attempts = 0;
+    const update = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
+      attempts += 1;
+      return update(ref, grants);
+    };
+    provider.failPolicy = true;
+
+    // Both members share one grant, so one failed attempt sets one retry.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+
+    // At expiry, one more attempt fails both members.
+    await setGrantExpiry(stub, SESSION, Date.now() - 1);
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(2);
+    for (const sessionId of [SESSION, SESSION_NEXT]) {
+      expect(await stub.status({ sessionId })).toMatchObject({
+        view: { state: 'failed', reason: 'workspace_setup_failed' },
+      });
+    }
   });
 
   it('replaces scoped MCP credentials on normal warm credential renewal without persisting them', async () => {
@@ -1487,7 +2190,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
         expect(renewed.expiresAt - Date.now()).toBeGreaterThan(
           TIMERS.credentialGrantReissueBelowMs
         );
-        expect(broker.kiloIssued()).toBe(0);
         expect(broker.githubIssued()).toBe(2);
         expect(await stub.status({ sessionId: SESSION })).toMatchObject({
           view: { state: 'ready' },
@@ -1521,52 +2223,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
       }
     }
   );
-
-  it('preserves the resolved GitHub app for managed Vercel review credentials', async () => {
-    const provider = createFakeProvider();
-    const broker = Object.assign(createFakeCredentialBroker('lite'), {
-      getCloudAgentAuthForRepo: async () => ({
-        success: true,
-        githubToken: 'native-github-review-test-token',
-        installationId: 1,
-        appType: 'lite',
-        accountLogin: 'acme',
-        source: 'installation',
-        gitAuthor: {
-          name: 'review-lite[bot]',
-          email: '456+review-lite[bot]@users.noreply.github.com',
-        },
-      }),
-    });
-    const stub = await setupVercel(provider, broker);
-    await runInDurableObject(stub, instance => {
-      instance.env.GITHUB_LITE_APP_SLUG = 'review-lite';
-      instance.env.GITHUB_LITE_APP_BOT_USER_ID = '456';
-    });
-    const source = {
-      ...vercelSource(SESSION),
-      createdOnPlatform: 'code-review',
-      repository: { type: 'github' as const, repo: 'acme/widgets', pullRequestNumber: 42 },
-    };
-    const spec = {
-      ...routeSpec(SESSION),
-      runtimeIsolation: 'per-session' as const,
-      permission: { question: 'deny' as const, edit: 'deny' as const },
-    };
-    const { prepareFrame } = await prepareWarmRoute(
-      stub,
-      provider,
-      prepareInput(SESSION, source, spec)
-    );
-    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
-    expect(prepareFrame.spec.githubReviewTarget).toEqual({
-      repo: 'acme/widgets',
-      pullRequestNumber: 42,
-      appType: 'lite',
-      botUserId: '456',
-    });
-    expect(prepareFrame.spec.permission).toEqual(spec.permission);
-  });
 
   it('keeps reviews usable when the selected app bot identity is not configured', async () => {
     const provider = createFakeProvider();
@@ -1608,7 +2264,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(await resolve(alias, 'other-container')).toBeNull();
     await setGrantExpiry(stub, SESSION, Date.now() - 1000);
     expect(await resolve(alias)).toBeNull();
-    expect(broker.kiloIssued()).toBe(0);
   });
 
   it('never redeems Kilo aliases through the credential broker', async () => {
@@ -1632,7 +2287,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
         })
       ).toBeNull();
     }
-    expect(broker.kiloIssued()).toBe(0);
   });
 
   it('revokes the grant on release and rejects the stale alias afterwards', async () => {
@@ -2181,7 +2835,7 @@ const REPO_SECRET = 'repo_secret_442';
 const CONTENT_SECRET = 'content_secret_773';
 const GITHUB_INTEGRATION_ID = '11111111-1111-4111-8111-111111111111';
 
-type GrantBrokerCalls = { kilo: number; github: number; gitlab: number; authorize: number };
+type GrantBrokerCalls = { github: number; gitlab: number; authorize: number };
 
 /**
  * The broker seam: the object bound to `GIT_TOKEN_SERVICE` carries only service
@@ -2189,7 +2843,6 @@ type GrantBrokerCalls = { kilo: number; github: number; gitlab: number; authoriz
  * counters live on the sibling test object.
  */
 type GrantBrokerService = {
-  issueKiloSessionCapability: () => Promise<unknown>;
   issueGitHubSessionCapability: () => Promise<unknown>;
   issueGitLabSessionCapability: () => Promise<unknown>;
   authorizeCloudAgentGitHubRepo: () => Promise<unknown>;
@@ -2198,12 +2851,8 @@ type GrantBrokerService = {
 };
 
 function createGrantBroker(): { calls: GrantBrokerCalls; service: GrantBrokerService } {
-  const calls: GrantBrokerCalls = { kilo: 0, github: 0, gitlab: 0, authorize: 0 };
+  const calls: GrantBrokerCalls = { github: 0, gitlab: 0, authorize: 0 };
   const service: GrantBrokerService = {
-    async issueKiloSessionCapability() {
-      calls.kilo += 1;
-      return { success: true, capability: `kka1.${calls.kilo}` };
-    },
     async issueGitHubSessionCapability() {
       calls.github += 1;
       return {
@@ -2290,7 +2939,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       reason: 'workspace_setup_failed',
       provider: 'cloudflare-containers',
     });
-    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+    expect(broker.calls).toEqual({ github: 0, gitlab: 0, authorize: 0 });
     const row = await readRouteRow(stub, SESSION);
     expect(row?.state).toBe('failed');
     expect(row?.attempt_deadline_at).toBe(0);
@@ -2322,7 +2971,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       repositoryKind: 'github',
       tokenClass: 'runtime_authorized',
     });
-    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+    expect(broker.calls).toEqual({ github: 0, gitlab: 0, authorize: 0 });
   });
 
   it('labels an invalid Kilo token as validation and omits the token class', async () => {
@@ -2351,7 +3000,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     // has already decoded the token for its own decision; the helper has not.
     expect(events[0]).not.toHaveProperty('repositoryKind');
     expect(events[0]).not.toHaveProperty('tokenClass');
-    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+    expect(broker.calls).toEqual({ github: 0, gitlab: 0, authorize: 0 });
     expect(JSON.stringify(events)).not.toContain(SUPER_SECRET_TOKEN);
     expect(JSON.stringify(events)).not.toContain(USER_SECRET);
   });
@@ -2396,7 +3045,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       repositoryKind: 'github',
       tokenClass: 'runtime_authorized',
     });
-    expect(broker.calls).toEqual({ kilo: 0, github: 1, gitlab: 0, authorize: 0 });
+    expect(broker.calls).toEqual({ github: 1, gitlab: 0, authorize: 0 });
     const serialized = JSON.stringify(events[0]);
     expect(serialized.length).toBeLessThanOrEqual(2048);
     for (const marker of [SUPER_SECRET_TOKEN, USER_SECRET, REPO_SECRET, CONTENT_SECRET]) {
@@ -2438,7 +3087,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       grantPhase: 'broker_authorization',
       grantFailureReason: 'integration_mismatch',
     });
-    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 1 });
+    expect(broker.calls).toEqual({ github: 0, gitlab: 0, authorize: 1 });
   });
 
   it('labels a missing whole service binding as configuration', async () => {
@@ -2468,7 +3117,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       stage: 'credential_grant_failed',
       reason: 'workspace_setup_failed',
     });
-    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+    expect(broker.calls).toEqual({ github: 0, gitlab: 0, authorize: 0 });
     const row = await readRouteRow(stub, SESSION);
     expect(row?.state).toBe('failed');
     expect(row?.attempt_deadline_at).toBe(0);
@@ -2669,13 +3318,11 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     // reads only `success`/`reason`, so the raw response must not be echoed.
     const brokerSecretMarker = 'broker_payload_secret_marker_8675309';
     let brokerCalls = 0;
-    broker.service.getCloudAgentAuthForRepo = async () => {
+    broker.service.issueGitHubSessionCapability = async () => {
       brokerCalls += 1;
       return { success: false, reason: sentinelReason, secret: brokerSecretMarker };
     };
-    const stub = await setup(provider, createFakeCredentialBroker(), {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
-    });
+    const stub = await setup(provider, createFakeCredentialBroker(), {});
     await installGrantBroker(stub, broker.service);
     // A synthetic user secret genuinely carried through the credential source.
     const source = credentialsSource(SESSION, { userId: USER_SECRET });
@@ -2757,7 +3404,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       grantPhase: 'broker_issuance',
       grantFailureReason: 'unknown',
       provider: 'cloudflare-containers',
-      containment: 'disabled',
+      containment: 'enabled',
       repositoryKind: 'github',
       tokenClass: 'runtime_authorized',
     });
@@ -2790,7 +3437,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       grantPhase: 'validation',
       grantFailureReason: 'invalid_member',
       provider: 'cloudflare-containers',
-      containment: 'disabled',
+      containment: 'enabled',
       sessionId: 'redacted',
     });
     expect(JSON.stringify(oversizedEvent)).not.toContain(oversizedSessionId);
@@ -2847,8 +3494,8 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     expect(ceilingFor(oversizedEvent)).toBe(1209);
     // Measured UTF-8 bytes of the captured payloads. `attemptId` is a fixed-length
     // UUID and every other value is pinned above, so these are deterministic.
-    expect(actualBytes(brokerEvent)).toBe(423);
-    expect(actualBytes(oversizedEvent)).toBe(327);
+    expect(actualBytes(brokerEvent)).toBe(422);
+    expect(actualBytes(oversizedEvent)).toBe(326);
     expect(actualBytes(brokerEvent)).toBeLessThan(ceilingFor(brokerEvent));
     expect(actualBytes(brokerEvent)).toBeLessThanOrEqual(2048);
     expect(actualBytes(oversizedEvent)).toBeLessThan(ceilingFor(oversizedEvent));
@@ -2891,293 +3538,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     });
   });
 
-  it('labels a contained GitHub resolution failure with the broker reason', async () => {
-    const provider = createFakeProvider();
-    const broker = createGrantBroker();
-    const authCalls: Record<string, unknown>[] = [];
-    broker.service.getCloudAgentAuthForRepo = async params => {
-      authCalls.push(params);
-      return { success: false, reason: 'repository_not_installed' };
-    };
-    const stub = await setupVercel(provider, createFakeCredentialBroker());
-    await installGrantBroker(stub, broker.service);
-    const source = {
-      ...credentialsSource(SESSION, {
-        repository: {
-          type: 'github' as const,
-          repo: 'acme/widgets',
-          githubIntegrationId: GITHUB_INTEGRATION_ID,
-          githubAccessPurpose: 'agent' as const,
-        },
-      }),
-      createdOnPlatform: 'cloud-agent-web',
-    };
-
-    const capture = captureRouteFailed();
-    const view = await stub.prepare(prepareInput(SESSION, source));
-    const events = capture.forAttempt(failedAttemptId(view));
-    capture.restore();
-
-    expect(view).toEqual({
-      state: 'failed',
-      attemptId: expect.any(String),
-      reason: 'workspace_setup_failed',
-    });
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      stage: 'credential_grant_failed',
-      reason: 'workspace_setup_failed',
-      grantPhase: 'broker_issuance',
-      grantFailureReason: 'repository_not_installed',
-    });
-    expect(authCalls).toHaveLength(1);
-    // `cloud-agent-web` would make the repository flag true; the contained
-    // caller must pass false regardless.
-    expect(authCalls[0]).toMatchObject({
-      allowUserAuthorization: false,
-      accessPurpose: 'agent',
-      orgId: 'org_123',
-      expectedIntegrationId: GITHUB_INTEGRATION_ID,
-      userId: 'user_123',
-      githubRepo: 'acme/widgets',
-    });
-    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
-  });
-
-  it('collapses an unlisted contained-off GitHub resolution reason to unknown', async () => {
-    const provider = createFakeProvider();
-    const broker = createGrantBroker();
-    const authCalls: Record<string, unknown>[] = [];
-    broker.service.getCloudAgentAuthForRepo = async params => {
-      authCalls.push(params);
-      return { success: false, reason: 'https://secret.example/leak' };
-    };
-    const stub = await setup(provider, createFakeCredentialBroker(), {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
-    });
-    await installGrantBroker(stub, broker.service);
-    const source: ControlPlaneCredentialSource = {
-      ...credentialsSource(SESSION),
-      createdOnPlatform: 'slack',
-    };
-    delete source.orgId;
-
-    const capture = captureRouteFailed();
-    const view = await stub.prepare({
-      ...prepareInput(SESSION, source),
-      sandboxSelection: {
-        provider: 'cloudflare-containers',
-        containment: { kilocode: false, github: false },
-      },
-    });
-    const events = capture.forAttempt(failedAttemptId(view));
-    capture.restore();
-
-    expect(view).toEqual({
-      state: 'failed',
-      attemptId: expect.any(String),
-      reason: 'workspace_setup_failed',
-    });
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      stage: 'credential_grant_failed',
-      reason: 'workspace_setup_failed',
-      grantPhase: 'broker_issuance',
-      grantFailureReason: 'unknown',
-    });
-    expect(authCalls).toHaveLength(1);
-    // `slack` makes the repository flag true; the direct caller must pass it.
-    expect(authCalls[0]).toMatchObject({
-      allowUserAuthorization: true,
-      accessPurpose: 'workflow',
-      userId: 'user_123',
-      githubRepo: 'acme/widgets',
-    });
-    expect(authCalls[0]).not.toHaveProperty('orgId');
-    expect(authCalls[0]).not.toHaveProperty('expectedIntegrationId');
-    expect(JSON.stringify(events)).not.toContain('https://secret.example/leak');
-  });
-
-  it('allows GitHub user authorization for an explicitly authorized webhook repository', async () => {
-    const provider = createFakeProvider();
-    const broker = createGrantBroker();
-    const authCalls: Record<string, unknown>[] = [];
-    broker.service.getCloudAgentAuthForRepo = async params => {
-      authCalls.push(params);
-      return { success: false, reason: 'repository_not_installed' };
-    };
-    const stub = await setup(provider, createFakeCredentialBroker(), {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
-    });
-    await installGrantBroker(stub, broker.service);
-    const source: ControlPlaneCredentialSource = {
-      ...credentialsSource(SESSION, {
-        repository: {
-          type: 'github',
-          repo: 'acme/widgets',
-          allowUserAuthorization: true,
-        },
-      }),
-      createdOnPlatform: 'webhook',
-    };
-
-    const capture = captureRouteFailed();
-    const view = await stub.prepare({
-      ...prepareInput(SESSION, source),
-      sandboxSelection: {
-        provider: 'cloudflare-containers',
-        containment: { kilocode: false, github: false },
-      },
-    });
-    capture.forAttempt(failedAttemptId(view));
-    capture.restore();
-
-    expect(view).toEqual({
-      state: 'failed',
-      attemptId: expect.any(String),
-      reason: 'workspace_setup_failed',
-    });
-    expect(authCalls).toHaveLength(1);
-    expect(authCalls[0]).toMatchObject({
-      allowUserAuthorization: true,
-      accessPurpose: 'workflow',
-      orgId: 'org_123',
-      userId: 'user_123',
-      githubRepo: 'acme/widgets',
-    });
-  });
-
-  it('maps a contained-off GitHub configuration reason to the configuration phase', async () => {
-    const provider = createFakeProvider();
-    const broker = createGrantBroker();
-    const authCalls: Record<string, unknown>[] = [];
-    broker.service.getCloudAgentAuthForRepo = async params => {
-      authCalls.push(params);
-      return { success: false, reason: 'service_not_configured' };
-    };
-    const stub = await setup(provider, createFakeCredentialBroker(), {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
-    });
-    await installGrantBroker(stub, broker.service);
-    const source: ControlPlaneCredentialSource = {
-      ...credentialsSource(SESSION),
-      createdOnPlatform: 'slack',
-    };
-    delete source.orgId;
-
-    const capture = captureRouteFailed();
-    const view = await stub.prepare({
-      ...prepareInput(SESSION, source),
-      sandboxSelection: {
-        provider: 'cloudflare-containers',
-        containment: { kilocode: false, github: false },
-      },
-    });
-    const events = capture.forAttempt(failedAttemptId(view));
-    capture.restore();
-
-    // The shared helper still routes through `brokerGrantFailure`, so an
-    // operator-setting reason overrides the `broker_issuance` phase.
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      grantPhase: 'configuration',
-      grantFailureReason: 'service_not_configured',
-    });
-    expect(authCalls).toHaveLength(1);
-  });
-
-  it('rejects a managed GitHub resolve that returns no native token', async () => {
-    const provider = createFakeProvider();
-    const broker = createGrantBroker();
-    const authCalls: Record<string, unknown>[] = [];
-    broker.service.getCloudAgentAuthForRepo = async params => {
-      authCalls.push(params);
-      return {
-        success: true,
-        githubToken: '',
-        installationId: 1,
-        appType: 'standard',
-        accountLogin: 'acme',
-        source: 'installation',
-        gitAuthor: { name: 'acme[bot]', email: '1+acme[bot]@users.noreply.github.com' },
-      };
-    };
-    const stub = await setup(provider, createFakeCredentialBroker(), {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
-    });
-    await installGrantBroker(stub, broker.service);
-
-    const capture = captureRouteFailed();
-    const view = await stub.prepare({
-      ...prepareInput(SESSION),
-      sandboxSelection: {
-        provider: 'cloudflare-containers',
-        containment: { kilocode: false, github: false },
-      },
-    });
-    const events = capture.forAttempt(failedAttemptId(view));
-    capture.restore();
-
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      grantPhase: 'validation',
-      grantFailureReason: 'missing_native_token',
-    });
-    // The broker call happened; the empty token is the post-assignment check.
-    expect(authCalls).toHaveLength(1);
-  });
-
-  it('keeps the resolved GitHub app and alias for a contained Vercel grant', async () => {
-    const provider = createFakeProvider();
-    const broker = createGrantBroker();
-    const authCalls: Record<string, unknown>[] = [];
-    broker.service.getCloudAgentAuthForRepo = async params => {
-      authCalls.push(params);
-      return {
-        success: true,
-        githubToken: 'native-github-contained-token',
-        installationId: 1,
-        appType: 'lite',
-        accountLogin: 'acme',
-        source: 'installation',
-        gitAuthor: {
-          name: 'review-lite[bot]',
-          email: '456+review-lite[bot]@users.noreply.github.com',
-        },
-      };
-    };
-    const stub = await setupVercel(provider, createFakeCredentialBroker());
-    await installGrantBroker(stub, broker.service);
-    const source = {
-      ...credentialsSource(SESSION, {
-        repository: { type: 'github' as const, repo: 'acme/widgets' },
-      }),
-      createdOnPlatform: 'cloud-agent-web',
-    };
-
-    const view = await stub.prepare(prepareInput(SESSION, source));
-    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
-
-    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
-      scm?: {
-        nativeToken?: string;
-        alias?: string;
-        githubAppType?: string;
-        author?: { name: string; email: string };
-      };
-    };
-    expect(grant.scm?.nativeToken).toBe('native-github-contained-token');
-    expect(grant.scm?.alias).toBeDefined();
-    expect(grant.scm?.githubAppType).toBe('lite');
-    expect(grant.scm?.author).toEqual({
-      name: 'review-lite[bot]',
-      email: '456+review-lite[bot]@users.noreply.github.com',
-    });
-    expect(authCalls).toHaveLength(1);
-    expect(authCalls[0]).toMatchObject({ allowUserAuthorization: false });
-  });
-
-  it('keeps an explicit native GitHub token without calling the broker', async () => {
+  it('rejects an explicit native GitHub token without calling the broker', async () => {
     const provider = createFakeProvider();
     const broker = createGrantBroker();
     const authCalls: Record<string, unknown>[] = [];
@@ -3185,9 +3546,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       authCalls.push(params);
       return { success: false, reason: 'unexpected' };
     };
-    const stub = await setup(provider, createFakeCredentialBroker(), {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
-    });
+    const stub = await setup(provider, createFakeCredentialBroker(), {});
     await installGrantBroker(stub, broker.service);
     const explicitToken = 'ghp_explicit_native_token_value';
     const source = credentialsSource(SESSION, {
@@ -3201,17 +3560,11 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
         containment: { kilocode: false, github: false },
       },
     });
-    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
-
-    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
-      scm?: { nativeToken?: string; alias?: string; githubAppType?: string; author?: unknown };
-    };
-    expect(grant.scm?.nativeToken).toBe(explicitToken);
-    expect(grant.scm?.alias).toBeUndefined();
-    expect(grant.scm?.githubAppType).toBeUndefined();
-    expect(grant.scm?.author).toBeUndefined();
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    expect((await readRouteRow(stub, SESSION))?.grant).toBeNull();
+    expect(provider.intents).toHaveLength(0);
     expect(authCalls).toHaveLength(0);
-    expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
+    expect(broker.calls).toEqual({ github: 0, gitlab: 0, authorize: 0 });
   });
 });
 
@@ -3595,7 +3948,7 @@ describe('SandboxControlV2 environment repository credentials', () => {
               projectPath: 'group/sub/project',
               integrationId: 'integration-1',
               authType: 'pat',
-              identity: { accountId: null, accountLogin: null },
+              identity: { accountId: '42', accountLogin: 'group-bot' },
               glabIsOAuth2: false,
             };
           },
@@ -3807,31 +4160,30 @@ describe('SandboxControlV2 environment repository credentials', () => {
     expect(events[0]).toMatchObject({ stage: 'credential_grant_failed' });
   });
 
-  it('fails a V2 start whose grant would be direct, before the sandbox starts', async () => {
+  it('starts a contained V2 grant when selection asks to disable containment', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker, {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
       WORKER_URL: 'https://api.kilo.ai',
     });
-    const capture = captureRouteFailed();
     const view = await stub.prepare({
       ...environmentInput([WIDGETS, GADGETS]),
       sandboxSelection: {
-        provider: 'cloudflare' as const,
+        provider: 'cloudflare-containers' as const,
         containment: { kilocode: false, github: false },
       },
     });
-    const events = capture.forAttempt(failedAttemptId(view));
-    capture.restore();
 
-    expect(events[0]).toMatchObject({
-      stage: 'credential_grant_failed',
-      grantPhase: 'validation',
-      grantFailureReason: 'invalid_grant',
-    });
-    expect(broker.githubIssued()).toBe(0);
-    expect(provider.intents).toHaveLength(0);
+    expect(view).toMatchObject({ state: 'preparing' });
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      containmentEnabled?: boolean;
+      scm?: { alias?: string };
+      additionalRepositories?: unknown[];
+    };
+    expect(grant.containmentEnabled).toBeUndefined();
+    expect(grant.scm?.alias).toEqual(expect.any(String));
+    expect(grant.additionalRepositories).toHaveLength(1);
+    expect(broker.githubIssued()).toBeGreaterThan(0);
   });
 
   it('fails a V2 start on a Vercel sandbox and still starts a V1 session there', async () => {

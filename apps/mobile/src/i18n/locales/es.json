@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo remota nativa",
+    "sessionsEmpty": "Aún no hay sesiones nativas",
+    "hosts": "Hosts conectados",
+    "hostsEmpty": "No hay hosts conectados",
+    "directory": "Directorio de trabajo",
+    "createSession": "Crear sesión nativa",
+    "queueIfOffline": "Poner la instrucción en cola si el host está desconectado",
+    "prompt": "Instrucción o /command",
+    "localClear": "Limpiar vista local",
+    "abort": "Abortar turno",
+    "failed": "La acción remota nativa falló",
+    "creationUnknown": "Se desconoce el resultado de la creación. Actualiza las sesiones antes de volver a intentarlo.",
+    "commandFailed": "El comando del proceso ejecutor falló",
+    "invalidReply": "Respuesta no válida del proceso ejecutor",
+    "unsafeCommand": "Usa /compact, /new, /skill, /models, /agents o /clear (solo local).",
+    "status": "Conexión: {{connection}} · Ejecutor: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Entrega del comando: {{status}}",
+    "delivered": "Entregado",
+    "expired": "Caducado"
+  },
   "common": {
     "cancel": "Cancelar",
     "done": "Hecho",
@@ -110,6 +132,7 @@
     "newSession": "Nueva sesión",
     "noModelsAvailable": "No hay modelos disponibles",
     "notFound": "No se ha encontrado.",
+    "online": "En línea",
     "open": "Abrir {{name}}",
     "openPullRequest": "PR abierta",
     "completed": "Completado",
@@ -186,6 +209,7 @@
     "resendCode": "Reenviar código",
     "termsPrefix": "Al continuar, aceptas nuestros ",
     "terms": "Términos",
+    "termsInSentence": "Términos",
     "termsConnector": " y ",
     "termsSuffix": ".",
     "moreSignInOptions": "Más opciones de inicio de sesión",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Confirmar eliminación",
     "credits": "Créditos",
     "failedToLoadBalance": "No se pudo cargar el saldo. Toca para reintentar.",
+    "balanceLoadFailed": "No se pudo cargar el saldo",
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
@@ -408,6 +433,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Permite el acceso a la cámara en Ajustes para tomar una foto."
+    },
+    "botStatus": {
+      "offline": "Desconectado"
     }
   },
   "codeReviewer": {
@@ -1092,6 +1120,7 @@
       "actionFailed": "No se pudo completar esta acción. Inténtalo de nuevo.",
       "actionBlocked": "No se pudo completar esta acción. Hay que solucionar el problema antes de poder reintentarlo.",
       "syncNoRepositories": "No hay repositorios en el ámbito de sincronización. Elige qué repositorios supervisa el agente de seguridad y sincroniza de nuevo.",
+      "syncNoRepositoriesNoManage": "No hay repositorios en el ámbito de sincronización. Un propietario de la organización, un administrador o un gestor de facturación debe conectar repositorios antes de que se pueda sincronizar.",
       "syncIntegrationInactive": "La conexión de GitHub para el agente de seguridad no está activa. Vuelve a conectar la aplicación de Kilo en GitHub y sincroniza de nuevo.",
       "syncMissingPermission": "La aplicación de Kilo en GitHub no puede leer las alertas de vulnerabilidades. Concede ese permiso en GitHub y sincroniza de nuevo.",
       "configConflict": "Los ajustes del agente de seguridad se cambiaron en otro lugar. Revisa los ajustes más recientes y guarda de nuevo."
@@ -1283,6 +1312,7 @@
       "emptyDescription": "Envía un mensaje para empezar.",
       "scrollToBottom": "Desplazarse al final",
       "emptyTitle": "Aún no hay mensajes",
+      "emptyReadOnlyTitle": "Esta sesión no tiene mensajes",
       "renameAccessibility": "Cambiar nombre de la sesión: {{title}}",
       "cloningSession": "Clonando sesión",
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
@@ -1382,7 +1412,7 @@
       "selectRepositoryToStart": "Selecciona un repositorio para empezar.",
       "enterPromptToStart": "Añade un prompt para empezar.",
       "enterPromptOrFileToStart": "Añade un prompt o un archivo para empezar.",
-      "connectProviderToStart": "Conecta un proveedor para empezar.",
+      "connectProviderToStart": "Los repositorios provienen de una cuenta conectada de GitHub, GitLab o Bitbucket.",
       "promptPlaceholder": "¿En qué te gustaría trabajar?",
       "couldNotLoadModels": "No se pudieron cargar los modelos.",
       "prefillRepoAndModelUnavailable": "El repositorio y el modelo de la sesión original ya no están disponibles. Elígelos a continuación.",
@@ -1568,6 +1598,8 @@
       "assistantStopped": "Se detuvo la generación de la respuesta.",
       "assistantContextOverflow": "La conversación es demasiado larga para el modelo.",
       "assistantProviderError": "El proveedor devolvió un error.",
+      "assistantProviderRefused": "El proveedor rechazó esta solicitud y no se puede reintentar.",
+      "assistantCreditsRefusal": "No hay suficientes créditos para ejecutar Cloud Agent.",
       "assistantOutputLimit": "La respuesta alcanzó el límite de salida del modelo.",
       "assistantStructuredOutput": "La respuesta no coincidió con el formato requerido.",
       "assistantFailed": "No se pudo generar la respuesta."
@@ -1600,6 +1632,7 @@
       "preparingEnvironment": "Preparando el entorno",
       "preparationComplete": "Preparación completada",
       "preparationFailed": "Error de preparación",
+      "preparationStageFailed": "{{stage}}: error",
       "setupCommand": "Comando de configuración {{index}}",
       "setupCommandOf": "Comando de configuración {{index}} de {{displayCount}}",
       "stepWorkspaceSetup": "Configuración del espacio de trabajo",
@@ -1638,7 +1671,7 @@
       "detailSetupCommandTimedOut": "Tiempo de espera agotado en el comando de configuración {{index}}",
       "detailColdRestore": "Restauración en frío, snapshot aplicado, archivos restaurados: {{applied}} de {{total}}",
       "detailProgressPercent": "{{percent}}% completado",
-      "detailRestoreIncompleteReport": "Restauración de sesión incompleta, archivos sin restaurar: {{skipped}} de {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Archivos sin restaurar: {{skipped}} de {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Faltan: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} y {{omitted}} más",
       "detailReasonPatchFailed": "el parche no se aplicó",
@@ -1891,16 +1924,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Tamaño de la ventana de contexto no disponible",
-      "tapToViewDetails": "Toca para ver los detalles del contexto.",
-      "costSuffix": ", coste {{cost}}",
-      "tokensWindowUnavailable": "Contexto: {{used}} tokens, tamaño de la ventana no disponible",
-      "tokensUsage": "Contexto: {{used}} de {{window}} tokens, {{percentage}} en uso",
+      "tapToViewDetails": " Toca para ver los detalles del contexto.",
+      "costClause": ", coste {{cost}}",
+      "loadingCostSpoken": "coste de {{cost}}.",
+      "tokensWindowUnavailable": "Contexto: {{used}} tokens, tamaño de la ventana no disponible{{costClause}}.",
+      "tokensUsage": "Contexto: {{used}} de {{window}} tokens, {{percentage}} en uso{{costClause}}.",
       "title": "Uso del contexto",
       "used": "Usado",
       "provider": "Proveedor",
       "totalCost": "Coste total",
       "usageReflectsLatest": "El uso corresponde a la última respuesta completa del asistente.",
-      "usageUnavailable": "Uso de contexto no disponible",
+      "usageUnavailable": "Uso de contexto no disponible{{costClause}}.",
       "tokenUsage": "Uso de tokens",
       "cacheRate": "Porcentaje de uso de la caché",
       "modelsCount": "Modelos ({{displayCount}})",
@@ -1984,7 +2018,6 @@
   },
   "addCredits": {
     "cta": "Añadir créditos",
-    "description": "Añade créditos para seguir usando el servicio.",
     "billingPage": "página de facturación"
   },
   "deviceSessions": {
@@ -2282,10 +2315,10 @@
     },
     "connect": {
       "checkFailedTitle": "No se pudo comprobar la conexión con GitHub.",
-      "checkFailedMessage": "No se puede consultar el estado de tu sesión hasta que termine la carga.",
+      "checkFailedMessage": "No se pudo conectar con GitHub. Comprueba tu conexión e inténtalo de nuevo.",
       "checkFailedTitleGitLab": "No se pudo comprobar la conexión con GitLab.",
       "checkFailedTitleBitbucket": "No se pudo comprobar la conexión con Bitbucket.",
-      "providerCheckFailedMessage": "No se puede consultar el estado de la conexión hasta que termine la carga.",
+      "providerCheckFailedMessage": "No se pudo conectar con el proveedor. Comprueba tu conexión e inténtalo de nuevo.",
       "reconnectTitle": "Volver a conectar GitHub",
       "reconnectTitleGitLab": "Volver a conectar GitLab",
       "reconnectTitleBitbucket": "Volver a conectar Bitbucket",
@@ -2432,7 +2465,6 @@
     },
     "fileList": {
       "filesList": "Lista de archivos",
-      "filesViewed": "Archivos · {{viewed}} de {{total}} vistos",
       "layout": "Vista",
       "listed": "(en la lista)",
       "loadingFiles": "Cargando archivos",
@@ -3048,9 +3080,9 @@
       "searching": "Búsqueda web",
       "thinking": "Pensando a fondo"
     },
-    "planOf": "de",
+    "planProgress": "{{done}} de {{total}}",
     "filesChanged": "archivos modificados",
-    "finishedIn": "Terminado en",
+    "finishedIn": "Terminado en {{duration}}",
     "noActivityFor": "Sin actividad durante",
     "prOpened": "Pull request abierto",
     "permissionWants": "Quiere ejecutar",
@@ -3359,7 +3391,7 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esfuerzo de razonamiento"
     },
-    "creditsRequired": "No hay suficientes créditos para enviar este mensaje. Añade créditos y vuelve a intentarlo."
+    "creditsRequired": "No hay suficientes créditos para enviar este mensaje."
   },
   "settingsTools": {
     "confirmTitle": "¿Confirmar este cambio?"
@@ -3393,8 +3425,8 @@
     "saved": "Ajustes de alertas de gasto guardados",
     "loadError": "No se pudieron cargar las alertas de gasto.",
     "saveError": "No se pudieron guardar las alertas de gasto.",
-    "empty": "Las alertas de gasto están desactivadas. Actívalas para avisar a los contactos de facturación de este ámbito.",
-    "noSpend": "Aún no se ha registrado ningún gasto",
+    "sendAlerts": "Enviar alertas",
+    "noSpend": "Sin gastos",
     "spend24h": "Gasto en las últimas 24 horas",
     "multiplierError": "Introduce un multiplicador de 1 o más",
     "permissionDenied": "No tienes permiso para gestionar las alertas de gasto.",
@@ -3810,5 +3842,8 @@
     "noEnabledContexts": "No hay contextos activados para los informes programados",
     "sourceBlocker": "La sesión necesita atención",
     "sourceMetadata": "Metadatos de la sesión capturados"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "No se pudo abrir este resultado de búsqueda"
   }
 }

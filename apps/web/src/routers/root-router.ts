@@ -5,12 +5,14 @@ import { testRouter } from '@/routers/test-router';
 import { debugRouter } from '@/routers/debug-router';
 import { userRouter } from '@/routers/user-router';
 import { adminRouter } from '@/routers/admin-router';
+import { stepUpRouter } from '@/routers/step-up-router';
 import { codeIndexingRouter } from '@/routers/code-indexing/code-indexing-router';
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { workspaceFoldersRouter } from '@/routers/workspace-folders-router';
 import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
+import { cloudAgentNextFailuresRouter } from '@/routers/cloud-agent-next-failures-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
 import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
@@ -23,6 +25,7 @@ import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router'
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
 import { openAiChatGptRouter } from '@/routers/openai-chatgpt-router';
+import { claudeBillingRouter } from '@/routers/claude-billing-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
 import { appReportedMessagesRouter } from '@/routers/app-reported-messages-router';
@@ -57,6 +60,7 @@ export const rootRouter = createTRPCRouter({
   debug: debugRouter,
   user: userRouter,
   admin: adminRouter,
+  stepUp: stepUpRouter,
   codeIndexing: codeIndexingRouter,
   cliSessions: cliSessionsRouter,
   cliSessionsV2: cliSessionsV2Router,
@@ -70,11 +74,13 @@ export const rootRouter = createTRPCRouter({
   dolthub: dolthubRouter,
   discord: discordRouter,
   cloudAgentNext: cloudAgentNextRouter,
+  cloudAgentNextFailures: cloudAgentNextFailuresRouter,
   codeReviews: codeReviewRouter,
   reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,
   byok: byokRouter,
   openAiChatGpt: openAiChatGptRouter,
+  claudeBilling: claudeBillingRouter,
   securityAgent: securityAgentRouter,
   securityAuditLog: securityAuditLogRouter,
   appReportedMessages: appReportedMessagesRouter,

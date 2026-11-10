@@ -16,7 +16,6 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'find',
   'grep',
   'rg',
-  'awk',
   'wc',
   'sort',
   'uniq',
@@ -46,7 +45,6 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'file',
   'head',
   'tail',
-  'sed',
   'cd',
   'mkdir',
   'touch',
@@ -112,17 +110,17 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'sh',
   'zsh',
   'fish',
-  'sed -i',
-  'sed -*i',
-  'sed --in-place',
-  'sed --in-place*',
-  'sed * -i',
-  'sed * -*i',
-  'sed * --in-place',
-  'sed * --in-place*',
-  'awk * -i*',
-  'awk * --in-place*',
-  'awk *system(*',
+  // A rule is evaluated against the whole command text, and the matcher has no
+  // character class, so a rule cannot test one argument token. The entries
+  // below therefore refuse the find and sort options that start another program
+  // or write a file by name. A command that matches no rule resolves to a
+  // prompt, and a code-review session rejects every prompt, so a utility whose
+  // only permitted forms cannot be written as a rule keeps no allow rule.
+  'find *-exec*',
+  'find *-ok*',
+  'find *-delete*',
+  'find *-fprint*',
+  'find *-fls*',
   'sort -o',
   'sort -o*',
   'sort -*o',
@@ -133,6 +131,8 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   'sort * -*o',
   'sort * --output',
   'sort * --output*',
+  'sort *--compress-program*',
+  'sort *--co*',
   'uniq * *',
   'python',
   'python3',

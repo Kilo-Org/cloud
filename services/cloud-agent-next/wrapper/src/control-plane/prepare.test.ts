@@ -19,6 +19,8 @@ import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plan
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions, ProcessOutputStream, ProcessSpawn } from '../utils.js';
+import type { Harness as HarnessClient } from './harness.js';
+import { createKiloHarness } from './kilo-harness.js';
 import * as processUtils from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
@@ -704,6 +706,7 @@ type Harness = {
   stamp: () => WorkspaceStamp | null;
   setHasGit: (value: boolean) => void;
   setSetupResult: (value: ExecResult) => void;
+  setupCalls: string[];
   setSetupOutput: (
     value: (onOutput: (stream: ProcessOutputStream, output: string) => void) => void
   ) => void;
@@ -765,6 +768,7 @@ function createHarness(
   let ensureCalls = 0;
   let ensureSessionCalls = 0;
   let setupResult = result(0);
+  const setupCalls: string[] = [];
   let setupOutput:
     | ((onOutput: (stream: ProcessOutputStream, output: string) => void) => void)
     | undefined;
@@ -773,7 +777,7 @@ function createHarness(
   const unavailableKeys = new Set<string>();
   let activeClones = 0;
   let maxActiveClones = 0;
-  let currentClient: WrapperKiloClient | undefined;
+  let currentClient: HarnessClient | undefined;
   const runtimeKeys = new Set<string>();
   let runtimeRestarting = false;
 
@@ -783,7 +787,7 @@ function createHarness(
       ensureInputs.push({ key: input.key, directory: input.directory, env: input.env });
       runtimeKeys.add(input.key);
       await options.beforeEnsure?.();
-      if (ensureHung) return new Promise<WrapperKiloClient>(() => undefined);
+      if (ensureHung) return new Promise<HarnessClient>(() => undefined);
       if (ensureError !== undefined) throw ensureError;
       if (ensureRejects) throw new Error('kilo server failed to start');
       const client = {
@@ -839,8 +843,22 @@ function createHarness(
           if (cleanupFailure) throw new Error('stop failed');
         },
       } as unknown as WrapperKiloClient;
-      currentClient = client;
-      return client;
+      currentClient = createKiloHarness({
+        client,
+        server: { url: 'http://127.0.0.1:1' },
+        directory: input.directory,
+        restore: (async (...args: unknown[]) => {
+          restoreArgs.push(args[3] as Record<string, unknown> | undefined);
+          return restore();
+        }) as never,
+        seedRegistration: async () => undefined,
+        sessionExists: async () => {
+          if (sessionExistsHung) return new Promise<boolean>(() => undefined);
+          return sessionExists;
+        },
+        log: message => logs.push(message),
+      });
+      return currentClient;
     },
     installCredentials: async (key, env, cloudAgentMcp) => {
       installCalls.push({ key, env, cloudAgentMcp });
@@ -897,21 +915,13 @@ function createHarness(
       }
       return result(0);
     },
-    runSetup: async (_command, _directory, _env, onOutput) => {
+    runSetup: async (command, _directory, _env, onOutput) => {
+      setupCalls.push(command);
       await options.beforeWorkspace?.();
       setupOutput?.(onOutput ?? (() => undefined));
       return setupResult;
     },
-    restore: (async (...args: unknown[]) => {
-      restoreArgs.push(args[3] as Record<string, unknown> | undefined);
-      return restore();
-    }) as never,
-    seedRegistration: async () => undefined,
     recoverWorktree: options.recoverWorktree,
-    sessionExists: async () => {
-      if (sessionExistsHung) return new Promise<boolean>(() => undefined);
-      return sessionExists;
-    },
     sleep: async () => undefined,
   });
 
@@ -991,6 +1001,7 @@ function createHarness(
     setSetupResult: value => {
       setupResult = value;
     },
+    setupCalls,
     setSetupOutput: value => {
       setupOutput = value;
     },
@@ -1074,8 +1085,8 @@ function createRegistryRuntimes(): {
         get env() {
           return env;
         },
-        client: {} as WrapperKiloClient,
-        ensure: async () => ({}) as WrapperKiloClient,
+        client: { open: async () => true } as unknown as HarnessClient,
+        ensure: async () => ({ open: async () => true }) as unknown as HarnessClient,
         installCredentials: async (next: Record<string, string>) => {
           env = next;
         },
@@ -1863,7 +1874,7 @@ describe('createPreparationManager', () => {
     expect(harness.manager.sessionCount()).toBe(0);
   });
 
-  it('does not publish silent setup command bodies containing inline credentials', async () => {
+  it('publishes setup command bodies only after redaction', async () => {
     const harness = createHarness();
     await harness.manager.prepare(
       routeSpec({
@@ -1880,15 +1891,25 @@ describe('createPreparationManager', () => {
         : []
     );
     expect(started.map(event => event.properties)).toEqual([
-      { command: 1, commandCount: 2 },
-      { command: 2, commandCount: 2 },
+      {
+        command: 1,
+        commandCount: 2,
+        kind: 'session_setup',
+        commandText: 'npm config set //registry.npmjs.org/:_authToken [REDACTED]',
+      },
+      {
+        command: 2,
+        commandCount: 2,
+        kind: 'session_setup',
+        commandText: 'curl -u [REDACTED] https://example.com',
+      },
     ]);
     expect(JSON.stringify(harness.frames)).not.toContain('inline-token-canary');
     expect(JSON.stringify(harness.frames)).not.toContain('inline-password-canary');
     expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
   });
 
-  it('fails the setup step when a setup command exits non-zero', async () => {
+  it('reports a failing session setup command non-fatally and continues', async () => {
     const harness = createHarness();
     harness.setSetupResult(result(1, 'command failed'));
     const spec = routeSpec({ setupCommands: ['exit 1'] });
@@ -1896,10 +1917,17 @@ describe('createPreparationManager', () => {
     await harness.manager.prepare(spec);
 
     expect(lastFrame(harness.frames)).toMatchObject({
-      type: 'session.failed',
-      step: 'setup',
-      subtype: 'setup_command_failed',
+      type: 'session.ready',
+      commandFailures: [
+        {
+          kind: 'session_setup',
+          index: 1,
+          commandText: 'exit 1',
+          exitCode: 1,
+        },
+      ],
     });
+    expect(controlPlaneWrapperFrameSchema.safeParse(lastFrame(harness.frames)).success).toBe(true);
   });
 
   it('bounds setup commands with the 5-minute inactivity and 8-minute hard timeout', async () => {
@@ -1912,9 +1940,8 @@ describe('createPreparationManager', () => {
         runtimes: {
           ensure: async () =>
             ({
-              serverUrl: 'http://127.0.0.1:1',
-              ensureSession: async () => undefined,
-            }) as unknown as WrapperKiloClient,
+              open: async () => true,
+            }) as unknown as HarnessClient,
           installCredentials: async () => undefined,
           isUnavailable: () => false,
           getLiveClient: () => undefined,
@@ -1928,8 +1955,6 @@ describe('createPreparationManager', () => {
         writeStamp: async () => undefined,
         mkdir: async () => undefined,
         configureGitAuthor: async () => undefined,
-        seedRegistration: async () => undefined,
-        sessionExists: async () => true,
       });
 
       await manager.prepare(routeSpec({ setupCommands: ['pnpm install'] }));
@@ -1949,10 +1974,10 @@ describe('createPreparationManager', () => {
 
   it('logs distinct setup failure diagnostics with the configured limits', async () => {
     const cases = [
-      { terminationReason: 'hard_timeout', subtype: 'setup_command_timeout', code: 124 },
-      { terminationReason: 'inactivity_timeout', subtype: 'setup_command_timeout', code: 124 },
-      { terminationReason: 'abort', subtype: 'setup_command_timeout', code: 124 },
-      { terminationReason: undefined, subtype: 'setup_command_failed', code: 1 },
+      { terminationReason: 'hard_timeout', code: 124 },
+      { terminationReason: 'inactivity_timeout', code: 124 },
+      { terminationReason: 'abort', code: 124 },
+      { terminationReason: undefined, code: 1 },
     ] as const;
 
     for (const testCase of cases) {
@@ -1967,20 +1992,100 @@ describe('createPreparationManager', () => {
       await harness.manager.prepare(routeSpec({ setupCommands: ['secret-command'] }));
 
       const failureLog =
-        harness.logs.find(line => line.includes('control-plane setup command failed')) ?? '';
+        harness.logs.find(line => line.includes('control-plane session_setup command failed')) ??
+        '';
       expect(failureLog).toContain(`terminationReason=${testCase.terminationReason ?? 'nonzero'}`);
       expect(failureLog).toContain('attemptId=attempt-1');
+      expect(failureLog).toContain('kind=session_setup');
       expect(failureLog).toContain('index=1 count=1');
       expect(failureLog).toContain('inactivityTimeoutMs=300000 hardTimeoutMs=480000');
       expect(failureLog).not.toContain('secret-command');
       expect(failureLog).not.toContain('STDOUT_LEAK_CANARY');
       expect(failureLog).not.toContain('STDERR_LEAK_CANARY');
+      const finished = harness.frames
+        .flatMap(frame => (frame.type === 'session.events' ? frame.events : []))
+        .find(event => event.type === 'session.setup.finished');
+      expect(finished?.properties).toMatchObject({
+        kind: 'session_setup',
+        exitCode: testCase.code,
+      });
+      if (testCase.terminationReason === undefined) {
+        expect(finished?.properties).not.toHaveProperty('terminationReason');
+      } else {
+        expect(finished?.properties).toMatchObject({
+          terminationReason: testCase.terminationReason,
+        });
+      }
       expect(lastFrame(harness.frames)).toMatchObject({
-        type: 'session.failed',
-        step: 'setup',
-        subtype: testCase.subtype,
+        type: 'session.ready',
+        commandFailures: [
+          {
+            kind: 'session_setup',
+            index: 1,
+            commandText: 'secret-command',
+            exitCode: testCase.code,
+            ...(testCase.terminationReason === undefined
+              ? {}
+              : { terminationReason: testCase.terminationReason }),
+          },
+        ],
       });
     }
+  });
+
+  it('runs environment build commands only in the environment build', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({
+      git: { url: REPO },
+      setupCommands: ['env-build', 'session-setup'],
+      environmentSetupCommandCount: 1,
+      startCommands: ['serve'],
+    });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.setupCalls).toEqual(['session-setup', 'serve']);
+    const started = harness.frames.flatMap(frame =>
+      frame.type === 'session.events'
+        ? frame.events.filter(event => event.type === 'session.setup.started')
+        : []
+    );
+    expect(started.map(event => event.properties)).toEqual([
+      { command: 1, commandCount: 1, kind: 'session_setup', commandText: 'session-setup' },
+      { command: 1, commandCount: 1, kind: 'start', commandText: 'serve' },
+    ]);
+  });
+
+  it('reports the redacted last output of a failed start command', async () => {
+    const harness = createHarness();
+    harness.setSetupResult(result(2));
+    harness.setSetupOutput(onOutput => {
+      onOutput('stdout', 'first line\n');
+      onOutput('stderr', 'last line with secret-canary\n');
+    });
+
+    await harness.manager.prepare(
+      routeSpec({
+        startCommands: ['serve'],
+        env: { TOKEN: 'secret-canary' },
+        secretEnvKeys: ['TOKEN'],
+      })
+    );
+
+    const failures = (
+      lastFrame(harness.frames) as Extract<ControlPlaneWrapperFrame, { type: 'session.ready' }>
+    ).commandFailures;
+    expect(failures).toEqual([
+      expect.objectContaining({
+        kind: 'start',
+        index: 1,
+        commandText: 'serve',
+        exitCode: 2,
+        elapsedMs: expect.any(Number),
+        outputTail: 'first line\nlast line with [REDACTED]\n',
+      }),
+    ]);
+    expect(JSON.stringify(harness.frames)).not.toContain('secret-canary');
   });
 
   it('creates the Kilo session when the ingest export is missing', async () => {
@@ -2664,7 +2769,7 @@ describe('createPreparationManager', () => {
       timers: FAST_TIMERS,
       emit: frame => harness.frames.push(frame),
       runtimes: {
-        ensure: async () => ({ serverUrl: 'http://127.0.0.1:1' }) as unknown as WrapperKiloClient,
+        ensure: async () => ({ open: async () => true }) as unknown as HarnessClient,
         installCredentials: async () => undefined,
         isUnavailable: () => false,
         getLiveClient: () => undefined,
@@ -2684,14 +2789,6 @@ describe('createPreparationManager', () => {
         onOutput?.('stdout', 'installing dependencies\n');
         return result(1);
       },
-      restore: (async () => ({
-        ok: false,
-        code: 404,
-        error: 'missing',
-        step: 'download',
-      })) as never,
-      seedRegistration: async () => undefined,
-      sessionExists: async () => true,
       sleep: async () => undefined,
     });
     const spec = routeSpec({ setupCommands: ['npm install'] });
@@ -2703,7 +2800,18 @@ describe('createPreparationManager', () => {
       .flatMap(frame => (frame.type === 'session.events' ? frame.events : []))
       .find(event => event.type === 'session.setup.output');
     expect(output?.properties.output).toBe('installing dependencies\n');
-    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.failed', step: 'setup' });
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.ready',
+      commandFailures: [
+        expect.objectContaining({
+          kind: 'session_setup',
+          index: 1,
+          commandText: 'npm install',
+          exitCode: 1,
+          outputTail: 'installing dependencies\n',
+        }),
+      ],
+    });
   });
 
   it('separates streamed setup output and normalizes terminal progress like the legacy path', async () => {
@@ -2856,6 +2964,53 @@ function gitKinds(calls: string[][]): string[] {
   return calls.map(args => args.slice(0, args[0] === 'remote' ? 2 : 1).join(' '));
 }
 
+describe('restoring a workspace tail snapshot', () => {
+  it('runs no commands and reports no command failures', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-tail-'));
+    const directory = path.join(root, 'workspace');
+    await fs.mkdir(directory);
+    const workspaceId = 'worktree_00000000-0000-4000-8000-000000000000';
+    try {
+      const harness = createHarness(FAST_TIMERS, { hasGit: true });
+      harness.setStamp({
+        allocationId: 'alloc-builder',
+        commit: 'old-commit',
+        workspaceId,
+        directory,
+      });
+      harness.setSetupResult(result(1, 'would fail if run'));
+      const spec = routeSpec({
+        directory,
+        kilo: { ...routeSpec().kilo!, scopeId: workspaceId },
+        git: { url: REPO },
+        setupCommands: ['env-build', 'session-setup'],
+        environmentSetupCommandCount: 1,
+        startCommands: ['serve'],
+        workspaceSnapshot: {
+          sourceAllocationId: 'alloc-builder',
+          workspaceId,
+          directory,
+        },
+      });
+
+      await harness.manager.prepare(spec);
+
+      expect(harness.setupCalls).toEqual([]);
+      const setupEvents = harness.frames.flatMap(frame =>
+        frame.type === 'session.events'
+          ? frame.events.filter(event => event.type.startsWith('session.setup.'))
+          : []
+      );
+      expect(setupEvents).toEqual([]);
+      const ready = lastFrame(harness.frames);
+      expect(ready).toMatchObject({ type: 'session.ready', workspace: 'adopted' });
+      expect(ready).not.toHaveProperty('commandFailures');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('adopting an environment snapshot', () => {
   function adoptHarness() {
     const harness = createHarness(FAST_TIMERS, { hasGit: true });
@@ -2897,10 +3052,10 @@ describe('adopting an environment snapshot', () => {
       'refs/remotes/origin/HEAD',
     ]);
     expect(harness.authorCalls).toEqual([{ name: 'A', email: 'a@b.c' }]);
+    // Command phases come from the typed setup events, not a generic progress step.
     expect(progressSteps(harness.frames)).toEqual([
       'restore',
       'checkout',
-      'setup',
       'kilo_runtime',
       'kilo_session',
     ]);
@@ -2984,15 +3139,27 @@ describe('adopting an environment snapshot', () => {
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
   });
 
-  it('runs the setup commands after an adopt and fails the route when one fails', async () => {
+  it('runs session setup and start commands after an environment snapshot adopt and reports failures', async () => {
     const harness = adoptHarness();
-    harness.setSetupResult(result(1, 'install failed'));
-    const spec = routeSpec({ git: { url: REPO }, setupCommands: ['npm install'] });
+    harness.setSetupResult(result(1, 'serve failed'));
+    const spec = routeSpec({
+      git: { url: REPO },
+      setupCommands: ['env-build', 'session-setup'],
+      environmentSetupCommandCount: 1,
+      startCommands: ['serve'],
+    });
 
     await harness.manager.prepare(spec);
 
-    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.failed', step: 'setup' });
-    expect(harness.stamp()).toEqual(FOREIGN_STAMP);
+    expect(harness.setupCalls).toEqual(['session-setup', 'serve']);
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.ready',
+      commandFailures: [
+        { kind: 'session_setup', index: 1, commandText: 'session-setup', exitCode: 1 },
+        { kind: 'start', index: 1, commandText: 'serve', exitCode: 1 },
+      ],
+    });
+    expect(harness.stamp()).toEqual({ allocationId: 'alloc-current', commit: 'new-commit' });
   });
 
   it('preserves the snapshot and reports the fetch failure without cloning', async () => {
@@ -4351,12 +4518,12 @@ describe('release cleanup with no live runtime client', () => {
       runtimes: {
         ensure: async () =>
           ({
-            serverUrl: 'http://127.0.0.1:1',
-            ensureSession: async () => undefined,
-            abortSessionForCleanup: async (opts: { sessionId: string }) => {
+            open: async () => true,
+            release: async (opts: { sessionId: string }) => {
               abortCalls.push(opts.sessionId);
+              return { ok: true, sessions: 1, failures: 0, elapsedMs: 0 };
             },
-          }) as unknown as WrapperKiloClient,
+          }) as unknown as HarnessClient,
         installCredentials: async () => undefined,
         isUnavailable: () => false,
         // The runtime is restarting: the real adapter reports no live client.
@@ -4371,8 +4538,6 @@ describe('release cleanup with no live runtime client', () => {
       writeStamp: async () => undefined,
       mkdir: async () => undefined,
       configureGitAuthor: async () => undefined,
-      seedRegistration: async () => undefined,
-      sessionExists: async () => true,
     });
     const directory = '/tmp/release-no-client';
     await manager.prepare(routeSpec({ sessionId: 'ses_a', directory }));

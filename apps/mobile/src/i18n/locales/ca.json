@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo de control remot natiu",
+    "sessionsEmpty": "Encara no hi ha sessions natives",
+    "hosts": "Amfitrions en línia",
+    "hostsEmpty": "No hi ha amfitrions en línia",
+    "directory": "Directori de treball",
+    "createSession": "Crea una sessió nativa",
+    "queueIfOffline": "Posa la instrucció en cua si l'amfitrió està desconnectat",
+    "prompt": "Instrucció o /command",
+    "localClear": "Neteja la vista local",
+    "abort": "Interromp el torn",
+    "failed": "Ha fallat l'acció de control remot natiu",
+    "creationUnknown": "Es desconeix el resultat de la creació. Actualitza les sessions abans de tornar-ho a provar.",
+    "commandFailed": "Ha fallat l'ordre de l'executor",
+    "invalidReply": "Resposta de l'executor no vàlida",
+    "unsafeCommand": "Fes servir /compact, /new, /skill, /models, /agents o /clear (només local).",
+    "status": "Connexió: {{connection}} · Executor: {{runner}}",
+    "presenceStatus": "Amfitrions: {{connection}}",
+    "commandStatus": "Lliurament de l'ordre: {{status}}",
+    "delivered": "Lliurada",
+    "expired": "Caducada"
+  },
   "common": {
     "cancel": "Cancel·la",
     "done": "Fet",
@@ -110,6 +132,7 @@
     "newSession": "Nova sessió",
     "noModelsAvailable": "Cap model disponible",
     "notFound": "No s'ha trobat l'element.",
+    "online": "En línia",
     "open": "Obre {{name}}",
     "openPullRequest": "PR oberta",
     "completed": "Finalitzada",
@@ -186,6 +209,7 @@
     "resendCode": "Torna a enviar el codi",
     "termsPrefix": "En continuar, acceptes les nostres ",
     "terms": "Condicions d'ús",
+    "termsInSentence": "Condicions d'ús",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Més opcions d'inici de sessió",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Confirma l'eliminació",
     "credits": "Crèdits",
     "failedToLoadBalance": "No s'ha pogut carregar el saldo. Toca per tornar-ho a provar.",
+    "balanceLoadFailed": "No s'ha pogut carregar el saldo",
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Aquesta sol·licitud d'integració no modifica cap fitxer.",
     "fileList": {
       "openNavigator": "Obre el navegador de fitxers",
-      "filesViewed": "Fitxers · {{viewed}} de {{total}} vistos",
       "listed": "(llistats)",
       "layout": "Disposició",
       "unified": "Unificat",
@@ -687,10 +711,10 @@
     },
     "connect": {
       "checkFailedTitle": "No s'ha pogut comprovar la connexió amb GitHub.",
-      "checkFailedMessage": "No es pot saber si has iniciat la sessió fins que es carregui aquesta informació.",
+      "checkFailedMessage": "No s'ha pogut connectar amb GitHub. Comprova la connexió i torna-ho a provar.",
       "checkFailedTitleGitLab": "No s'ha pogut comprovar la connexió amb GitLab.",
       "checkFailedTitleBitbucket": "No s'ha pogut comprovar la connexió amb Bitbucket.",
-      "providerCheckFailedMessage": "L'estat de la connexió no està disponible fins que es carregui.",
+      "providerCheckFailedMessage": "No s'ha pogut connectar amb el proveïdor. Comprova la connexió i torna-ho a provar.",
       "reconnectTitle": "Torna a connectar GitHub",
       "reconnectTitleGitLab": "Torna a connectar GitLab",
       "reconnectTitleBitbucket": "Torna a connectar Bitbucket",
@@ -968,6 +992,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Permet l'accés a la càmera a la configuració per fer una foto."
+    },
+    "botStatus": {
+      "offline": "Desconnectat"
     }
   },
   "codeReviewer": {
@@ -1652,6 +1679,7 @@
       "actionFailed": "No s'ha pogut completar aquesta acció. Torna-ho a provar.",
       "actionBlocked": "No s'ha pogut completar aquesta acció. Cal resoldre el problema abans de poder tornar-ho a provar.",
       "syncNoRepositories": "No hi ha cap repositori a l'abast de la sincronització. Tria quins repositoris supervisa l'agent de seguretat i torna a sincronitzar.",
+      "syncNoRepositoriesNoManage": "No hi ha cap repositori a l'abast de la sincronització. Un propietari, un administrador o un gestor de facturació de l'organització ha de connectar repositoris abans que es pugui sincronitzar.",
       "syncIntegrationInactive": "La connexió de GitHub per a l'agent de seguretat no està activa. Torna a connectar l'aplicació de GitHub de Kilo i torna a sincronitzar.",
       "syncMissingPermission": "L'aplicació de GitHub de Kilo no pot llegir els avisos de vulnerabilitat. Concedeix aquest permís a GitHub i torna a sincronitzar.",
       "configConflict": "La configuració de l'agent de seguretat s'ha canviat en un altre lloc. Revisa la configuració més recent i desa de nou."
@@ -1843,6 +1871,7 @@
       "emptyDescription": "Envia un missatge a continuació per començar.",
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
+      "emptyReadOnlyTitle": "No hi ha missatges en aquesta sessió",
       "renameAccessibility": "Reanomena la sessió: {{title}}",
       "cloningSession": "Clonant la sessió…",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
@@ -1942,7 +1971,7 @@
       "selectRepositoryToStart": "Selecciona un repositori per començar.",
       "enterPromptToStart": "Afegeix un prompt per començar.",
       "enterPromptOrFileToStart": "Afegeix un prompt o un fitxer per començar.",
-      "connectProviderToStart": "Connecta un proveïdor per començar.",
+      "connectProviderToStart": "Els repositoris provenen d'un compte connectat de GitHub, GitLab o Bitbucket.",
       "promptPlaceholder": "En què vols treballar?",
       "couldNotLoadModels": "No s'han pogut carregar els models.",
       "prefillRepoAndModelUnavailable": "El repositori i el model de la sessió original ja no estan disponibles. Tria'ls a continuació.",
@@ -2128,6 +2157,8 @@
       "assistantStopped": "S'ha aturat la generació de la resposta.",
       "assistantContextOverflow": "La conversa és massa llarga per al model.",
       "assistantProviderError": "El proveïdor ha retornat un error.",
+      "assistantProviderRefused": "El proveïdor ha rebutjat aquesta sol·licitud i no es pot tornar a intentar.",
+      "assistantCreditsRefusal": "No tens prou crèdits per executar Cloud Agent.",
       "assistantOutputLimit": "La resposta ha arribat al límit de sortida del model.",
       "assistantStructuredOutput": "La resposta no coincideix amb el format requerit.",
       "assistantFailed": "No s'ha pogut generar la resposta."
@@ -2160,6 +2191,7 @@
       "preparingEnvironment": "Preparant l'entorn",
       "preparationComplete": "Preparació completada",
       "preparationFailed": "La preparació ha fallat",
+      "preparationStageFailed": "{{stage}} ha fallat",
       "setupCommand": "Ordre de configuració {{index}}",
       "setupCommandOf": "Ordre de configuració {{index}} de {{displayCount}}",
       "stepWorkspaceSetup": "Configuració de l'espai de treball",
@@ -2198,7 +2230,7 @@
       "detailSetupCommandTimedOut": "L'ordre de configuració {{index}} ha excedit el temps",
       "detailColdRestore": "Restauració en fred, instantània aplicada, fitxers restaurats: {{applied}} de {{total}}",
       "detailProgressPercent": "{{percent}}% completat",
-      "detailRestoreIncompleteReport": "Restauració de la sessió incompleta — fitxers no restaurats: {{skipped}} de {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Fitxers no restaurats: {{skipped}} de {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Falten: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} i {{omitted}} més",
       "detailReasonPatchFailed": "el pedaç no s'ha pogut aplicar",
@@ -2451,16 +2483,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Mida de la finestra de context no disponible",
-      "tapToViewDetails": "Toca per veure els detalls del context.",
-      "costSuffix": ", amb un cost de {{cost}}",
-      "tokensWindowUnavailable": "Context: {{used}} tòkens, mida de la finestra no disponible",
-      "tokensUsage": "Context: {{used}} de {{window}} tòkens, {{percentage}} utilitzat",
+      "tapToViewDetails": " Toca per veure els detalls del context.",
+      "costClause": ", amb un cost de {{cost}}",
+      "loadingCostSpoken": "import de {{cost}}.",
+      "tokensWindowUnavailable": "Context: {{used}} tòkens, mida de la finestra no disponible{{costClause}}.",
+      "tokensUsage": "Context: {{used}} de {{window}} tòkens, {{percentage}} utilitzat{{costClause}}.",
       "title": "Ús del context",
       "used": "Utilitzat",
       "provider": "Proveïdor",
       "totalCost": "Cost total",
       "usageReflectsLatest": "L'ús correspon a l'última resposta completa de l'assistent.",
-      "usageUnavailable": "L'ús del context no està disponible",
+      "usageUnavailable": "L'ús del context no està disponible{{costClause}}.",
       "tokenUsage": "Ús de tòkens",
       "cacheRate": "Percentatge de memòria cau",
       "modelsCount": "Models utilitzats ({{displayCount}})",
@@ -2544,7 +2577,6 @@
   },
   "addCredits": {
     "cta": "Afegeix crèdits",
-    "description": "Afegeix crèdits per continuar utilitzant el servei.",
     "billingPage": "pàgina de facturació"
   },
   "deviceSessions": {
@@ -3048,9 +3080,9 @@
       "searching": "Cerca web",
       "thinking": "Pensant-ho bé"
     },
-    "planOf": "de",
+    "planProgress": "{{done}} de {{total}}",
     "filesChanged": "fitxers modificats",
-    "finishedIn": "Acabat en",
+    "finishedIn": "Acabat en {{duration}}",
     "noActivityFor": "Sense activitat durant",
     "prOpened": "Sol·licitud d'extracció oberta",
     "permissionWants": "Vol executar",
@@ -3359,7 +3391,7 @@
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"
     },
-    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge. Afegeix crèdits i torna-ho a provar."
+    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar aquest canvi?"
@@ -3393,8 +3425,8 @@
     "saved": "S'ha desat la configuració de les alertes de despesa",
     "loadError": "No s'han pogut carregar les alertes de despesa.",
     "saveError": "No s'han pogut desar les alertes de despesa.",
-    "empty": "Les alertes de despesa estan desactivades. Activa-les per avisar els contactes de facturació d'aquest àmbit.",
-    "noSpend": "Encara no s'ha registrat cap despesa",
+    "sendAlerts": "Envia alertes",
+    "noSpend": "Cap despesa",
     "spend24h": "Despesa de les últimes 24 hores",
     "multiplierError": "Introdueix un multiplicador d'1 o més",
     "permissionDenied": "No tens permís per gestionar les alertes de despesa.",
@@ -3810,5 +3842,8 @@
     "noEnabledContexts": "No hi ha cap context activat per als informes programats",
     "sourceBlocker": "La sessió requereix atenció",
     "sourceMetadata": "Metadades de sessió capturades"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "No s'ha pogut obrir aquest resultat de la cerca"
   }
 }

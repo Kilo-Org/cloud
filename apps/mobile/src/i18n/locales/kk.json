@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "CLI v2 қашықтан басқару демосы",
+    "sessionsEmpty": "Әзірге CLI v2 сессиялары жоқ",
+    "hosts": "Желідегі хосттар",
+    "hostsEmpty": "Желіде хосттар жоқ",
+    "directory": "Жұмыс каталогы",
+    "createSession": "CLI v2 сессиясын жасау",
+    "queueIfOffline": "Хост желіде болмаса, сұрауды кезекке қою",
+    "prompt": "Сұрау немесе /command",
+    "localClear": "Жергілікті көріністі тазалау",
+    "abort": "Ағымдағы қадамды тоқтату",
+    "failed": "CLI v2 қашықтан басқару әрекеті орындалмады",
+    "creationUnknown": "Жасау нәтижесі белгісіз. Қайталап көру алдында сессияларды жаңартыңыз.",
+    "commandFailed": "Орындаушы процесс командасы орындалмады",
+    "invalidReply": "Орындаушы процестің жауабы жарамсыз",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents немесе /clear (тек жергілікті) қолданыңыз.",
+    "status": "Байланыс: {{connection}} · Орындаушы процесс: {{runner}}",
+    "presenceStatus": "Хосттар: {{connection}}",
+    "commandStatus": "Команданың жеткізілуі: {{status}}",
+    "delivered": "Жеткізілді",
+    "expired": "Мерзімі өтті"
+  },
   "common": {
     "cancel": "Болдырмау",
     "done": "Дайын",
@@ -110,6 +132,7 @@
     "newSession": "Жаңа сессия",
     "noModelsAvailable": "Қолжетімді модельдер жоқ",
     "notFound": "Табылмады.",
+    "online": "Желіде",
     "open": "{{name}} ашу",
     "openPullRequest": "Біріктіру сұрауын ашу",
     "completed": "Аяқталды",
@@ -186,6 +209,7 @@
     "resendCode": "Кодты қайта жіберу",
     "termsPrefix": "Жалғастыру арқылы мына құжаттармен келісесіз: ",
     "terms": "Шарттар",
+    "termsInSentence": "Шарттар",
     "termsConnector": " және ",
     "termsSuffix": ".",
     "moreSignInOptions": "Басқа кіру тәсілдері",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Жоюды растау",
     "credits": "Кредиттер",
     "failedToLoadBalance": "Балансты жүктеу мүмкін болмады. Қайталап көру үшін түртіңіз.",
+    "balanceLoadFailed": "Теңгерімді жүктеу мүмкін болмады",
     "hideBalance": "Теңгерімді жасыру",
     "showBalance": "Теңгерімді көрсету",
     "balanceHidden": "Теңгерім жасырылған",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Бұл біріктіру сұрауында файлдарға өзгеріс енгізілмеген.",
     "fileList": {
       "openNavigator": "Файлдар тізімін ашу",
-      "filesViewed": "Файлдар · {{viewed}}/{{total}} қаралды",
       "listed": "(тізімдегі)",
       "layout": "Көрініс",
       "unified": "Біріктірілген",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub қосылымын тексеру мүмкін болмады.",
-      "checkFailedMessage": "Бұл деректер жүктелмейінше, жүйеге кіру күйін анықтау мүмкін емес.",
+      "checkFailedMessage": "GitHub-қа қосылу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
       "checkFailedTitleGitLab": "GitLab қосылымын тексеру мүмкін болмады.",
       "checkFailedTitleBitbucket": "Bitbucket қосылымын тексеру мүмкін болмады.",
-      "providerCheckFailedMessage": "Жүктелгенше қосылым күйі қолжетімсіз.",
+      "providerCheckFailedMessage": "Провайдерге қосылу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
       "reconnectTitle": "GitHub-қа қайта қосылу",
       "reconnectTitleGitLab": "GitLab-қа қайта қосылу",
       "reconnectTitleBitbucket": "Bitbucket-қа қайта қосылу",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Фото түсіру үшін параметрлерден камераны пайдалануға рұқсат беріңіз."
+    },
+    "botStatus": {
+      "offline": "Желіде емес"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Бұл әрекетті аяқтау мүмкін болмады. Қайталап көріңіз.",
       "actionBlocked": "Бұл әрекетті аяқтау мүмкін болмады. Мәселені алдымен шешу қажет.",
       "syncNoRepositories": "Синхрондау аясында репозиторийлер жоқ. Қауіпсіздік агенті бақылайтын репозиторийлерді таңдап, қайтадан синхрондаңыз.",
+      "syncNoRepositoriesNoManage": "Синхрондау аясында репозиторийлер жоқ. Синхрондау мүмкін болуы үшін ұйым иесі, әкімшісі немесе төлем менеджері репозиторийлерді қосуы керек.",
       "syncIntegrationInactive": "Қауіпсіздік агенті үшін GitHub байланысы белсенді емес. Kilo GitHub App қайта қосып, қайтадан синхрондаңыз.",
       "syncMissingPermission": "Kilo GitHub App осалдықтар туралы ескертулерді оқи алмайды. GitHub-та сол рұқсатты беріп, қайтадан синхрондаңыз.",
       "configConflict": "Қауіпсіздік агентінің параметрлері басқа жерде өзгертілді. Ең соңғы параметрлерді қарап, қайта сақтаңыз."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "Бастау үшін төмендегі өрістен хабарлама жіберіңіз.",
       "scrollToBottom": "Ең төменге айналдыру",
       "emptyTitle": "Әзірге хабарламалар жоқ",
+      "emptyReadOnlyTitle": "Бұл сессияда хабарламалар жоқ",
       "renameAccessibility": "Сессия атауын өзгерту: {{title}}",
       "cloningSession": "Сессия көшірмесі жасалуда",
       "couldNotLoadThisSession": "Бұл сессияны жүктеу мүмкін болмады.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Бастау үшін репозиторий таңдаңыз.",
       "enterPromptToStart": "Бастау үшін сұрау қосыңыз.",
       "enterPromptOrFileToStart": "Бастау үшін сұрау немесе файл қосыңыз.",
-      "connectProviderToStart": "Бастау үшін провайдерді қосыңыз.",
+      "connectProviderToStart": "Репозиторийлер қосылған GitHub, GitLab немесе Bitbucket тіркелгісінен келеді.",
       "promptPlaceholder": "Немен жұмыс істегіңіз келеді?",
       "couldNotLoadModels": "Модельдерді жүктеу мүмкін болмады.",
       "prefillRepoAndModelUnavailable": "Бастапқы сессияның репозиторийі мен моделі енді қолжетімсіз. Оларды төменде таңдаңыз.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "Жауапты жасау тоқтатылды.",
       "assistantContextOverflow": "Сөйлесу көлемі модельдің шегінен асты.",
       "assistantProviderError": "Провайдер қате қайтарды.",
+      "assistantProviderRefused": "Провайдер бұл сұрауды қабылдамады және оны қайталау мүмкін емес.",
+      "assistantCreditsRefusal": "Cloud Agent қызметін іске қосуға кредит жеткіліксіз.",
       "assistantOutputLimit": "Жауап модельдің шығыс шегіне жетті.",
       "assistantStructuredOutput": "Жауап қажетті форматқа сәйкес келмеді.",
       "assistantFailed": "Жауапты жасау мүмкін болмады."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Орта дайындалуда",
       "preparationComplete": "Дайындық аяқталды",
       "preparationFailed": "Дайындық сәтсіз аяқталды",
+      "preparationStageFailed": "{{stage}} сәтсіз аяқталды",
       "setupCommand": "Баптау пәрмені: {{index}}",
       "setupCommandOf": "Баптау пәрмені: {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "Жұмыс кеңістігін баптау",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "{{index}} баптау пәрменінің уақыты бітті",
       "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, қалпына келтірілген файлдар: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% аяқталды",
-      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады — қалпына келтірілмеген файлдар: {{skipped}} / {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Қалпына келтірілмеген файлдар: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Жетіспейді: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} және тағы {{omitted}}",
       "detailReasonPatchFailed": "патч қолданылмады",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Контекст терезесінің көлемі белгісіз",
-      "tapToViewDetails": "Контекст мәліметтерін қарау үшін түртіңіз.",
-      "costSuffix": ", құны {{cost}}",
-      "tokensWindowUnavailable": "Контексте {{used}} токен бар, терезе көлемі белгісіз",
-      "tokensUsage": "Контекст: барлығы {{window}} токен, қолданылғаны {{used}} токен, {{percentage}}",
+      "tapToViewDetails": " Контекст мәліметтерін қарау үшін түртіңіз.",
+      "costClause": ", құны {{cost}}",
+      "loadingCostSpoken": "құны {{cost}}.",
+      "tokensWindowUnavailable": "Контексте {{used}} токен бар, терезе көлемі белгісіз{{costClause}}.",
+      "tokensUsage": "Контекст: барлығы {{window}} токен, қолданылғаны {{used}} токен, {{percentage}}{{costClause}}.",
       "title": "Контекст қолданысы",
       "used": "Қолданылған",
       "provider": "Провайдер",
       "totalCost": "Жалпы құны",
       "usageReflectsLatest": "Қолданыс деректері көмекшінің соңғы аяқталған жауабына негізделген.",
-      "usageUnavailable": "Контекстті пайдалану қолжетімсіз",
+      "usageUnavailable": "Контекстті пайдалану қолжетімсіз{{costClause}}.",
       "tokenUsage": "Токен қолданысы",
       "cacheRate": "Кэш үлесі",
       "modelsCount": "Модельдер ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Кредит қосу",
-    "description": "Қолдануды жалғастыру үшін кредит қосыңыз.",
     "billingPage": "төлем беті"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Веб іздеу",
       "thinking": "Ойлану"
     },
-    "planOf": "/",
+    "planProgress": "{{done}} / {{total}}",
     "filesChanged": "файл өзгертілді",
-    "finishedIn": "Аяқталды",
+    "finishedIn": "{{duration}} ішінде аяқталды",
     "noActivityFor": "Белсенділік жоқ",
     "prOpened": "Pull request ашылды",
     "permissionWants": "Іске қосуды қалайды",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Бұл модель ойлау деңгейін қолдайды"
     },
-    "creditsRequired": "Бұл хабарламаны жіберу үшін кредит жеткіліксіз. Кредит қосыңыз да, қайталап көріңіз."
+    "creditsRequired": "Бұл хабарламаны жіберу үшін кредит жеткіліксіз."
   },
   "settingsTools": {
     "confirmTitle": "Осы өзгеріс расталсын ба?"
@@ -3340,8 +3372,8 @@
     "saved": "Шығыс ескертуінің параметрлері сақталды",
     "loadError": "Шығыс ескертулері жүктелмеді.",
     "saveError": "Шығыс ескертулері сақталмады.",
-    "empty": "Шығыс ескертулері өшірулі. Осы ауқымның төлем бойынша байланыстарын ескерту үшін оларды қос.",
-    "noSpend": "Әзірге шығыс тіркелмеген",
+    "sendAlerts": "Ескертулерді жібер",
+    "noSpend": "Әзірге шығыс жоқ",
     "spend24h": "Соңғы 24 сағаттағы шығыс",
     "multiplierError": "1 немесе одан үлкен көбейткіш енгіз",
     "permissionDenied": "Шығыс ескертулерін басқаруға рұқсатыңыз жоқ.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Жоспарланған шолулар үшін қосылған контекстер жоқ",
     "sourceBlocker": "Сеанс назар аударуды қажет етеді",
     "sourceMetadata": "Сақталған сеанс метадеректері"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Бұл іздеу нәтижесі ашылмады"
   }
 }

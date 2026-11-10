@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Natīvā attālā demonstrācija",
+    "sessionsEmpty": "Vēl nav natīvo sesiju",
+    "hosts": "Resursdatori tiešsaistē",
+    "hostsEmpty": "Nav resursdatoru tiešsaistē",
+    "directory": "Darba direktorija",
+    "createSession": "Izveidot natīvo sesiju",
+    "queueIfOffline": "Ievietot uzvedni rindā, ja resursdators ir bezsaistē",
+    "prompt": "Uzvedne vai /command",
+    "localClear": "Notīrīt lokālo skatu",
+    "abort": "Pārtraukt gājienu",
+    "failed": "Natīvā attālā darbība neizdevās",
+    "creationUnknown": "Izveides rezultāts nav zināms. Pirms atkārtota mēģinājuma atsvaidzināt sesijas.",
+    "commandFailed": "Izpildītāja komanda neizdevās",
+    "invalidReply": "Nederīga izpildītāja atbilde",
+    "unsafeCommand": "Izmantot /compact, /new, /skill, /models, /agents vai /clear (tikai lokāli).",
+    "status": "Savienojums: {{connection}} · Izpildītājs: {{runner}}",
+    "presenceStatus": "Resursdatori: {{connection}}",
+    "commandStatus": "Komandas piegāde: {{status}}",
+    "delivered": "Piegādāts",
+    "expired": "Termiņš beidzies"
+  },
   "common": {
     "cancel": "Atcelt",
     "done": "Gatavs",
@@ -110,6 +132,7 @@
     "newSession": "Jauna sesija",
     "noModelsAvailable": "Nav pieejamu modeļu",
     "notFound": "Neizdevās atrast meklēto.",
+    "online": "Tiešsaistē",
     "open": "Atvērt {{name}}",
     "openPullRequest": "Atvērt izmaiņu pieprasījumu",
     "completed": "Pabeigts",
@@ -186,6 +209,7 @@
     "resendCode": "Nosūtīt kodu vēlreiz",
     "termsPrefix": "Turpinot, tu piekrīti mūsu ",
     "terms": "Noteikumiem",
+    "termsInSentence": "Noteikumiem",
     "termsConnector": " un ",
     "termsSuffix": ".",
     "moreSignInOptions": "Citas pierakstīšanās iespējas",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Apstiprināt dzēšanu",
     "credits": "Kredīti",
     "failedToLoadBalance": "Neizdevās ielādēt atlikumu. Pieskaries, lai mēģinātu vēlreiz.",
+    "balanceLoadFailed": "Neizdevās ielādēt atlikumu",
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Šajā izmaiņu pieprasījumā nav failu izmaiņu.",
     "fileList": {
       "openNavigator": "Atvērt failu navigatoru",
-      "filesViewed": "Faili · apskatīti {{viewed}} no {{total}}",
       "listed": "(uzskaitīti)",
       "layout": "Izkārtojums",
       "unified": "Vienots",
@@ -687,10 +711,10 @@
     },
     "connect": {
       "checkFailedTitle": "Neizdevās pārbaudīt GitHub savienojumu.",
-      "checkFailedMessage": "Pierakstīšanās statuss būs pieejams pēc ielādes.",
+      "checkFailedMessage": "Neizdevās sasniegt GitHub. Pārbaudi savienojumu un mēģini vēlreiz.",
       "checkFailedTitleGitLab": "Neizdevās pārbaudīt GitLab savienojumu.",
       "checkFailedTitleBitbucket": "Neizdevās pārbaudīt Bitbucket savienojumu.",
-      "providerCheckFailedMessage": "Savienojuma statuss būs pieejams pēc ielādes.",
+      "providerCheckFailedMessage": "Neizdevās sasniegt pakalpojumu sniedzēju. Pārbaudi savienojumu un mēģini vēlreiz.",
       "reconnectTitle": "Atkārtoti savienot GitHub",
       "reconnectTitleGitLab": "Atkārtoti savienot GitLab",
       "reconnectTitleBitbucket": "Atkārtoti savienot Bitbucket",
@@ -968,6 +992,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Lai uzņemtu fotoattēlu, iestatījumos atļauj piekļuvi kamerai."
+    },
+    "botStatus": {
+      "offline": "Bezsaistē"
     }
   },
   "codeReviewer": {
@@ -1652,6 +1679,7 @@
       "actionFailed": "Neizdevās pabeigt šo darbību. Lūdzu, mēģini vēlreiz.",
       "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz.",
       "syncNoRepositories": "Sinhronizācijas tvērumā nav neviena repozitorija. Izvēlieties repozitorijus, kurus pārrauga Drošības aģents, un pēc tam sinhronizējiet vēlreiz.",
+      "syncNoRepositoriesNoManage": "Sinhronizācijas tvērumā nav neviena repozitorija. Organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam ir jāpievieno repozitoriji, pirms var sākt sinhronizāciju.",
       "syncIntegrationInactive": "Drošības aģenta GitHub savienojums nav aktīvs. Atkārtoti pievienojiet Kilo GitHub App un pēc tam sinhronizējiet vēlreiz.",
       "syncMissingPermission": "Kilo GitHub lietotne nevar lasīt ievainojamību brīdinājumus. Piešķir šo atļauju GitHub un pēc tam sinhronizē vēlreiz.",
       "configConflict": "Drošības aģenta iestatījumi ir mainīti citur. Pārskati jaunākos iestatījumus un saglabā vēlreiz."
@@ -1843,6 +1871,7 @@
       "emptyDescription": "Lai sāktu, nosūti ziņojumu zemāk esošajā laukā.",
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
+      "emptyReadOnlyTitle": "Šajā sesijā nav ziņojumu",
       "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
       "cloningSession": "Klonē sesiju…",
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju.",
@@ -1942,7 +1971,7 @@
       "selectRepositoryToStart": "Lai sāktu, izvēlies repozitoriju.",
       "enterPromptToStart": "Lai sāktu, pievieno promptu.",
       "enterPromptOrFileToStart": "Lai sāktu, pievieno promptu vai failu.",
-      "connectProviderToStart": "Lai sāktu, pievieno pakalpojuma sniedzēju.",
+      "connectProviderToStart": "Repozitoriji nāk no pievienota GitHub, GitLab vai Bitbucket konta.",
       "promptPlaceholder": "Pie kā vēlētos strādāt?",
       "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
       "prefillRepoAndModelUnavailable": "Sākotnējās sesijas repozitorijs un modelis vairs nav pieejami. Izvēlies tos zemāk.",
@@ -2128,6 +2157,8 @@
       "assistantStopped": "Atbildes sagatavošana tika apturēta.",
       "assistantContextOverflow": "Saruna modelim ir pārāk gara.",
       "assistantProviderError": "Pakalpojumu sniedzējs atgrieza kļūdu.",
+      "assistantProviderRefused": "Pakalpojumu sniedzējs noraidīja šo pieprasījumu, un to nevar atkārtot.",
+      "assistantCreditsRefusal": "Nepietiek kredītu, lai palaistu Cloud Agent.",
       "assistantOutputLimit": "Atbilde sasniedza modeļa izvades ierobežojumu.",
       "assistantStructuredOutput": "Atbilde neatbilda pieprasītajam formātam.",
       "assistantFailed": "Neizdevās sagatavot atbildi."
@@ -2160,6 +2191,7 @@
       "preparingEnvironment": "Sagatavo vidi",
       "preparationComplete": "Sagatavošana pabeigta",
       "preparationFailed": "Sagatavošana neizdevās",
+      "preparationStageFailed": "Neizdevās: {{stage}}",
       "setupCommand": "Sagatavošanas komanda {{index}}",
       "setupCommandOf": "Sagatavošanas komanda {{index}} no {{displayCount}}",
       "stepWorkspaceSetup": "Darbvietas iestatīšana",
@@ -2198,7 +2230,7 @@
       "detailSetupCommandTimedOut": "Sagatavošanas komandai {{index}} iestājās noilgums",
       "detailColdRestore": "Aukstā atjaunošana, moments piemērots, atjaunotie faili: {{applied}} no {{total}}",
       "detailProgressPercent": "{{percent}}% pabeigti",
-      "detailRestoreIncompleteReport": "Sesijas atjaunošana nepabeigta, neizdevās atjaunot failus: {{skipped}} no {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Neizdevās atjaunot failus: {{skipped}} no {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Trūkst: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} un vēl {{omitted}}",
       "detailReasonPatchFailed": "iestākums netika piemērots",
@@ -2451,16 +2483,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Konteksta loga lielums nav pieejams",
-      "tapToViewDetails": "Pieskaries, lai skatītu detalizētu informāciju par kontekstu.",
-      "costSuffix": ", izmaksas {{cost}}",
-      "tokensWindowUnavailable": "Kontekstā izmantotie tokeni: {{used}}, konteksta loga lielums nav pieejams",
-      "tokensUsage": "Konteksts: {{used}} no {{window}} tokeniem, izmantoti {{percentage}}",
+      "tapToViewDetails": " Pieskaries, lai skatītu detalizētu informāciju par kontekstu.",
+      "costClause": ", izmaksas {{cost}}",
+      "loadingCostSpoken": "izmaksas {{cost}}.",
+      "tokensWindowUnavailable": "Kontekstā izmantotie tokeni: {{used}}, konteksta loga lielums nav pieejams{{costClause}}.",
+      "tokensUsage": "Konteksts: {{used}} no {{window}} tokeniem, izmantoti {{percentage}}{{costClause}}.",
       "title": "Konteksta izmantojums",
       "used": "Izmantots",
       "provider": "Pakalpojumu sniedzējs",
       "totalCost": "Kopējās izmaksas",
       "usageReflectsLatest": "Izmantojuma dati atbilst pēdējai pabeigtajai asistenta atbildei.",
-      "usageUnavailable": "Konteksta izmantošana nav pieejama",
+      "usageUnavailable": "Konteksta izmantošana nav pieejama{{costClause}}.",
       "tokenUsage": "Tokenu izmantojums",
       "cacheRate": "Kešatmiņas īpatsvars",
       "modelsCount": "Modeļi ({{displayCount}})",
@@ -2544,7 +2577,6 @@
   },
   "addCredits": {
     "cta": "Papildināt kredītus",
-    "description": "Papildini kredītus, lai turpinātu lietošanu.",
     "billingPage": "norēķinu lapa"
   },
   "deviceSessions": {
@@ -3048,9 +3080,9 @@
       "searching": "Tīmekļa meklēšana",
       "thinking": "Domāšana"
     },
-    "planOf": "no",
+    "planProgress": "{{done}} no {{total}}",
     "filesChanged": "mainīti faili",
-    "finishedIn": "Pabeigts pēc",
+    "finishedIn": "Pabeigts {{duration}} laikā",
     "noActivityFor": "Nav aktivitātes",
     "prOpened": "Atvērts pull pieprasījums",
     "permissionWants": "Vēlas palaist",
@@ -3359,7 +3391,7 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
     },
-    "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu, tāpēc papildiniet kredītus un mēģiniet vēlreiz."
+    "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu."
   },
   "settingsTools": {
     "confirmTitle": "Apstiprināt šo izmaiņu?"
@@ -3393,8 +3425,8 @@
     "saved": "Izdevumu brīdinājumu iestatījumi saglabāti",
     "loadError": "Neizdevās ielādēt izdevumu brīdinājumus.",
     "saveError": "Neizdevās saglabāt izdevumu brīdinājumus.",
-    "empty": "Izdevumu brīdinājumi ir izslēgti. Ieslēdz tos, lai brīdinātu šīs jomas norēķinu kontaktpersonas.",
-    "noSpend": "Izdevumi vēl nav reģistrēti",
+    "sendAlerts": "Sūtīt brīdinājumus",
+    "noSpend": "Vēl nav izdevumu",
     "spend24h": "Izdevumi pēdējo 24 stundu laikā",
     "multiplierError": "Ievadi reizinātāju, kas ir 1 vai lielāks",
     "permissionDenied": "Tev nav atļaujas pārvaldīt izdevumu brīdinājumus.",
@@ -3810,5 +3842,8 @@
     "noEnabledContexts": "Plānotajām atskaitēm nav iespējots neviens konteksts",
     "sourceBlocker": "Sesijai jāpievērš uzmanība",
     "sourceMetadata": "Fiksētie sesijas metadati"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Neizdevās atvērt šo meklēšanas rezultātu"
   }
 }

@@ -19,7 +19,7 @@ import { randomUUID } from 'node:crypto';
 import { kilocode_users, organizations, organization_memberships } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, like, or, sql } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import {
   FIXTURE_SETTINGS_KEY,
@@ -189,6 +189,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`Unexpected extra arguments: ${rest.join(' ')}`);
   }
 
+  assertLocalSeedDatabase('app:w4c-org-pair');
   const db = getSeedDb();
   const trimmedOwnerEmail = ownerEmail.trim();
   const trimmedMemberEmail = memberEmail.trim();

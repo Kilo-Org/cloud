@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ContextPickerSheet } from '@/components/context-picker-sheet';
@@ -41,6 +42,19 @@ export function useContextPicker(
   const { setOrganizationId, organizationId } = useOrganization();
   const [open, setOpen] = useState(false);
   const shownId = shownOrganizationId !== undefined ? shownOrganizationId : organizationId;
+  // The sheet is a separate native window that stacks over every screen, so a
+  // link (or a tab switch) that moves the app to another route while it is open
+  // leaves it covering the screen the person was sent to. Close it when the
+  // owning screen loses focus; the picker's own dismissal paths (Cancel,
+  // backdrop, drag, a pick) are untouched while it stays focused.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        setOpen(false);
+      },
+      []
+    )
+  );
 
   const labels = [
     t('common.personal'),
@@ -192,7 +206,9 @@ export function ContextControl({
         field ? 'flex-1 text-base text-foreground' : 'shrink text-sm text-muted-foreground'
       )}
       numberOfLines={1}
-      ellipsizeMode="tail"
+      // Memberships of one workspace share their leading words, so the tail is
+      // what tells them apart: cutting it drops the account's own name.
+      ellipsizeMode="middle"
     >
       {label}
     </Text>

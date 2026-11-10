@@ -4,8 +4,7 @@ const mockAuth = jest.fn();
 jest.mock('@octokit/auth-app', () => ({ createAppAuth: jest.fn(() => mockAuth) }));
 jest.mock('./app-selector', () => ({ getGitHubAppCredentials: jest.fn() }));
 jest.mock('../../github/runtime-authorization', () => ({
-  assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
-    mockAuthorize(installationId, appType),
+  assertGitHubInstallationRuntimeAuthorized: (...args: unknown[]) => mockAuthorize(...args),
 }));
 
 import { getGitHubAppCredentials } from './app-selector';
@@ -29,7 +28,13 @@ describe('generateGitHubInstallationToken', () => {
       token: 'installation-token',
       expires_at: '2099-01-01T00:00:00.000Z',
     });
-    expect(mockAuthorize).toHaveBeenCalledWith('installation-1', 'standard');
+    expect(mockAuthorize).toHaveBeenCalledWith('installation-1', 'standard', undefined, 'workflow');
+  });
+
+  it('forwards the caller purpose and association to the authorization', async () => {
+    await generateGitHubInstallationToken('installation-1', 'standard', 'pi_1', 'agent');
+
+    expect(mockAuthorize).toHaveBeenCalledWith('installation-1', 'standard', 'pi_1', 'agent');
   });
 
   it('denies a locally disconnected installation before token minting', async () => {

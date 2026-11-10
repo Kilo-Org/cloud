@@ -174,6 +174,8 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     isError: false,
     hasFreshHistory: true,
     isFetchingNextPage: false,
+    isFetchNextPageError: false,
+    onRetryNextPage: () => undefined,
     refetch: vi.fn<ContentProps['refetch']>().mockResolvedValue(undefined),
     onRetry: () => undefined,
     onEndReached: () => undefined,
@@ -837,5 +839,81 @@ describe('AgentSessionListContent liveness', () => {
     expect(start.props.loading).toBeUndefined();
     press(start);
     expect(onCreateSession).toHaveBeenCalledOnce();
+  });
+});
+
+describe('AgentSessionListContent next-page footer', () => {
+  const page = [{ title: 'Today', data: [session('a'), session('b')] }];
+
+  it('keeps the loaded rows and offers a retry when the next page failed', () => {
+    const onRetryNextPage = vi.fn<() => void>();
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isFetchNextPageError: true,
+        onRetryNextPage,
+      })
+    );
+    // The rows the list already loaded stay: a failed older page must never
+    // replace the history the reader can see.
+    expect(rows(renderer).map(row => row.id)).toEqual(['a', 'b']);
+    const retry = hosts(renderer, 'Button')[0];
+    if (!retry) {
+      throw new Error('the failed next page rendered no retry');
+    }
+    expect(retry.props.accessibilityLabel).toBe(i18n.t('common.retry'));
+    press(retry);
+    expect(onRetryNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('shows the retry line without a spinner while the failed page stands', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isFetchNextPageError: true,
+        onRetryNextPage: () => undefined,
+      })
+    );
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('common.couldnTLoadMore')
+    );
+  });
+
+  it('shows only the spinner while the next page loads', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isFetchingNextPage: true,
+      })
+    );
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('common.couldnTLoadMore')
+    );
+  });
+
+  it('renders no footer once the next page fails and the list recovers', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isFetchNextPageError: true,
+        onRetryNextPage: () => undefined,
+      })
+    );
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('common.couldnTLoadMore')
+    );
+    act(() => {
+      renderer.update(
+        createElement(AgentSessionListContent, {
+          ...contentProps({ sections: page }),
+        })
+      );
+    });
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('common.couldnTLoadMore')
+    );
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
   });
 });

@@ -76,7 +76,7 @@ export function createDrawerStack<T>() {
   // Monotonic counter used so `AnimatePresence` retains exit animations even
   // when two consecutive entries have identical user-facing identity.
   // Scoped inside the factory so each `createDrawerStack<T>()` caller gets
-  // its own counter — gastown and wasteland don't share a sequence.
+  // its own counter.
   let keyCounter = 0;
   const makeKey = () => `drawer-${++keyCounter}`;
 

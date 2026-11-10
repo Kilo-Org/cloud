@@ -42,6 +42,31 @@ export function formatMoney(amount: number, locale: string): string {
 }
 
 /**
+ * A USD amount with the symbol in front of the number whatever the locale's
+ * money pattern says. A right-to-left language puts the currency behind the
+ * amount behind a no-break space ("0.00 $"), which reads as a different figure
+ * beside the "$0.00" the same screen paints elsewhere; here the digits and
+ * their separators are the locale's, and the sign the locale writes leads the
+ * symbol (`-$5.00`, or the locale's own minus glyph).
+ */
+export function formatPrefixedUsd(
+  amount: number,
+  locale: string,
+  options: Intl.NumberFormatOptions = {}
+): string {
+  const parts = numberFormat(locale, { ...options, style: 'decimal' }).formatToParts(amount);
+  const sign = parts
+    .filter(candidate => candidate.type === 'minusSign')
+    .map(candidate => candidate.value)
+    .join('');
+  const digits = parts
+    .filter(candidate => candidate.type !== 'minusSign')
+    .map(candidate => candidate.value)
+    .join('');
+  return `${sign}$${digits}`;
+}
+
+/**
  * Currency with an explicit fraction-digit count. Session cost surfaces need
  * four decimals below half a cent and two above; the shared `formatMoney`
  * always pins two.
@@ -75,6 +100,33 @@ export function formatDate(
   return dateTimeFormat(locale, options).format(date);
 }
 
+const CLOCK_TIME: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+
+/**
+ * Time of day in `locale` (`"2:40 AM"`), for a clock beside another.
+ *
+ * Asking for a numeric hour is not enough: a locale whose short time pattern
+ * carries a padded hour pads it to two digits even then, so Gujarati reads
+ * `02:40 AM` beside the `11:40 AM` that English and Arabic print. On a
+ * twelve-hour clock the padded hour loses its leading zero; every other
+ * character keeps the locale's own text, order and digits. A twenty-four-hour
+ * clock keeps the padded hour, which is its uniform-width convention.
+ */
+export function formatClockTime(date: Date, locale: string): string {
+  const formatter = dateTimeFormat(locale, CLOCK_TIME);
+  const formatted = formatter.format(date);
+  const parts = formatter.formatToParts(date);
+  if (!parts.some(part => part.type === 'dayPeriod')) {
+    return formatted;
+  }
+  const hour = parts.find(part => part.type === 'hour')?.value;
+  const zero = numberFormat(locale, { useGrouping: false }).format(0);
+  if (hour === undefined || hour.length !== zero.length + 1 || !hour.startsWith(zero)) {
+    return formatted;
+  }
+  return formatted.replace(hour, hour.slice(zero.length));
+}
+
 export function formatCalendarDate(value: string, locale: string): string {
   return dateTimeFormat(locale, { timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`));
 }
@@ -96,14 +148,34 @@ export function formatList(values: readonly string[], locale: string): string {
 }
 
 export function formatDuration(seconds: number, locale: string): string {
+  return durationFormat(locale, { style: 'short' }).format(durationFields(seconds));
+}
+
+/**
+ * A duration that always names its value. `Intl.DurationFormat` omits every
+ * zero field, so `formatDuration` writes an empty string for a zero duration and
+ * a line that appends it ends in a bare separator. Asking the same formatter to
+ * keep the seconds field writes the zero one — `0 sec`, `0 Sek.`, `٠ s` — in the
+ * reader's own catalog, so a counter that starts at zero never has an empty slot.
+ */
+export function formatDurationIncludingZero(seconds: number, locale: string): string {
+  const formatted = formatDuration(seconds, locale);
+  if (formatted.length > 0) {
+    return formatted;
+  }
+  return durationFormat(locale, { style: 'short', secondsDisplay: 'always' }).format(
+    durationFields(seconds)
+  );
+}
+
+/** The fields `DurationFormat` reads, split from a whole number of seconds. */
+function durationFields(seconds: number) {
   const wholeSeconds = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(wholeSeconds / 3600);
-  const minutes = Math.floor((wholeSeconds % 3600) / 60);
-  return durationFormat(locale, { style: 'short' }).format({
-    hours,
-    minutes,
+  return {
+    hours: Math.floor(wholeSeconds / 3600),
+    minutes: Math.floor((wholeSeconds % 3600) / 60),
     seconds: wholeSeconds % 60,
-  });
+  };
 }
 
 export function formatFileSize(bytes: number, locale: string): string {
@@ -117,7 +189,9 @@ export function formatFileSize(bytes: number, locale: string): string {
   return formatNumber(value, locale, {
     style: 'unit',
     unit: units[unit],
-    unitDisplay: 'short',
+    // CLDR has no plural for the abbreviated byte unit ("564 byte"), so a whole
+    // byte count takes the long form: "1 byte", "564 bytes", "564 octets".
+    unitDisplay: unit === 0 ? 'long' : 'short',
     maximumFractionDigits: unit === 0 ? 0 : 2,
   });
 }

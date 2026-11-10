@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { readSessionSnapshot } from './session-snapshot.js';
+import { kiloActivityReads } from './kilo-message-activity.js';
+import type { ActivitySnapshotMessage } from './harness-activity.js';
 
 function fixture() {
   const readDirectories: string[] = [];
@@ -33,6 +35,7 @@ function fixture() {
             messageID: messageId,
             sessionID: 'child',
             type: 'tool',
+            callID: 'call',
             tool: 'bash',
             state: { status: 'running' },
           },
@@ -40,7 +43,11 @@ function fixture() {
       };
     },
   } as unknown as WrapperKiloClient;
-  return { client, readDirectories, messageReads };
+  return {
+    client: { ...client, ...kiloActivityReads(client) },
+    readDirectories,
+    messageReads,
+  };
 }
 
 describe('session activity snapshots', () => {
@@ -106,6 +113,56 @@ describe('session activity snapshots', () => {
     expect(snapshot.find(session => session.id === 'child')?.interactions).toEqual([
       { id: 'q1', blocking: true, callID: 'call' },
     ]);
+  });
+
+  it('re-reads known in-flight and pending request messages already present in the recent list', async () => {
+    const f = fixture();
+    f.client.getSessionStatuses = async directory =>
+      (directory === '/two' ? { child: { type: 'busy' } } : {}) as Awaited<
+        ReturnType<WrapperKiloClient['getSessionStatuses']>
+      >;
+    // The recent-list projection lags the per-message read: both entries exist
+    // but carry no live tool state.
+    const recent: ActivitySnapshotMessage[] = [
+      { sessionId: 'child', id: 'inflight', role: 'assistant', time: { created: 1 }, parts: [] },
+      {
+        sessionId: 'child',
+        id: 'pending-tool',
+        role: 'assistant',
+        time: { created: 1 },
+        parts: [],
+      },
+    ];
+    f.client.getRecentActivity = async () => recent;
+    f.client.getQuestions = async directory =>
+      directory === '/two'
+        ? [
+            {
+              id: 'q1',
+              sessionID: 'child',
+              questions: [],
+              tool: { messageID: 'pending-tool', callID: 'call' },
+            },
+          ]
+        : [];
+    const snapshot = await readSessionSnapshot({
+      client: f.client,
+      directory: '/one',
+      observedDirectories: [],
+      knownSessions: [{ id: 'child', directory: '/two', messageIds: ['inflight'] }],
+      signal: AbortSignal.timeout(1000),
+    });
+    expect(f.messageReads.sort()).toEqual(['inflight', 'pending-tool']);
+    const messages = snapshot.find(session => session.id === 'child')?.messages ?? [];
+    expect(messages.map(message => message.id).sort()).toEqual(['inflight', 'pending-tool']);
+    for (const message of messages) {
+      expect(message.parts).toContainEqual(
+        expect.objectContaining({
+          kind: 'tool',
+          tool: expect.objectContaining({ status: 'running' }),
+        })
+      );
+    }
   });
 
   it('carries the message of a retry status', async () => {

@@ -1271,7 +1271,11 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await awaitLaunch(provider);
 
     expect(provider.createInputs[0]?.billing).toEqual(billing);
-    expect(provider.createInputs[0]?.containment).toEqual({ kilocode: true });
+    expect(provider.createInputs[0]?.containment).toEqual({
+      kilocode: true,
+      github: true,
+      worktreeScoped: true,
+    });
   });
 
   it('stops the sandbox when the wrapper never connects within the first-connect window', async () => {
@@ -1752,6 +1756,37 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     }
   );
 
+  it('reports versions observed at upgrade for a Vercel allocation with an unknown type', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, { provider: 'vercel' });
+    await awaitLaunch(provider);
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_owner', 'owner-1')
+    );
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      kiloCliVersion: '7.4.20',
+      wrapperVersion: '2.4.0',
+    });
+    expect(await wrapper.hello({ wrapperId: 'wr_vercel', allocationId })).toMatchObject({
+      type: 'welcome',
+    });
+
+    expect(await stub.getStatusSnapshot()).toMatchObject({
+      provider: 'Vercel',
+      runtime: {
+        sandboxType: 'unknown',
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+        startedAt: null,
+        stoppedAt: null,
+      },
+    });
+    wrapper.close();
+  });
+
   it.each([
     { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
     { provider: 'vercel', resources: { vcpus: 4, memory: 8192 } },
@@ -2064,7 +2099,6 @@ describe('SandboxControlV2 allocation egress policy', () => {
         KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com',
         KILO_OPENROUTER_BASE: 'https://gateway.example.com/api',
         KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
-        CREDENTIAL_CONTAINMENT_ENABLED: 'false',
         ...extraEnv,
       });
       Object.assign(instance, {
@@ -2912,6 +2946,25 @@ describe('SandboxControlV2 previewTarget', () => {
       return { result, enqueueCalls };
     });
     expect(observed.result).toEqual({ status: 'not_running' });
+    expect(observed.enqueueCalls).toBe(0);
+  });
+
+  it('answers an unrouted preview service inquiry as not_running and never enqueues', async () => {
+    const stub = sandboxNamespace.getByName(`${SANDBOX_ID}__preview_services`);
+    const observed = await runInDurableObject(stub, async instance => {
+      const target = instance as unknown as {
+        enqueue: (task: () => Promise<unknown>) => Promise<unknown>;
+      };
+      let enqueueCalls = 0;
+      const original = target.enqueue.bind(instance);
+      target.enqueue = task => {
+        enqueueCalls += 1;
+        return original(task);
+      };
+      const result = await instance.previewServices('workspace_preview_unrouted');
+      return { result, enqueueCalls };
+    });
+    expect(observed.result).toEqual({ services: [], status: 'not_running' });
     expect(observed.enqueueCalls).toBe(0);
   });
 });

@@ -14,6 +14,7 @@ import {
   sessionDiffReadSchema,
   sessionIdSchema,
   sessionShareOptionsSchema,
+  storedSessionIdSchema,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
@@ -134,6 +135,12 @@ async function deleteOwnedLeafSession(
   sessionId: string
 ) {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  // The worktree deletion owns its members' rows while it runs; deleting one
+  // here would race that delete and strand local session state.
+  if (await isWorktreeSessionDeleting(db, kiloUserId, sessionId)) {
+    return c.json({ success: false, error: 'worktree_deleting' }, 409);
+  }
+
   const existingRows = await db
     .select()
     .from(cli_sessions_v2)
@@ -235,6 +242,29 @@ const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
 
+  // Reject known retired ids before inserting. If this initial probe fails,
+  // the required post-insert tombstone check must still confirm availability.
+  try {
+    const retired = await withDORetry(
+      () =>
+        getSessionIngestDO(c.env, {
+          kiloUserId: c.get('user_id'),
+          sessionId: body.sessionId,
+        }),
+      stub => stub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+    if (retired) {
+      return c.json({ success: false, error: 'session_retired' }, 409);
+    }
+  } catch (error) {
+    console.error('Failed to probe session availability before create', {
+      kiloUserId: c.get('user_id'),
+      sessionId: body.sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   // Persist a placeholder session row.
   // This is intentionally minimal; we only need a working Hyperdrive -> Postgres path.
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
@@ -264,6 +294,43 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   }
 
   const { createdRow } = result;
+
+  // Worktree deletion writes this tombstone before deleting rows. Checking after
+  // insertion prevents a still-running runtime from recreating deleted history.
+  let ingestDeleted: boolean;
+  try {
+    ingestDeleted = await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: body.sessionId }),
+      async sessionStub => sessionStub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+  } catch (error) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    throw error;
+  }
+
+  if (ingestDeleted) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    return c.json({ success: false, error: 'session_deleted' }, 409);
+  }
 
   if (createdRow) {
     const session = mapSessionEventRow(createdRow);
@@ -524,9 +591,15 @@ api.post('/session/:sessionId/ingest', async c => {
   return c.json(result.body, result.status);
 });
 
+/**
+ * The stored session snapshot for one Kilo session the user can read. Its id
+ * takes `storedSessionIdSchema` for the same reason the message page does: a
+ * session created before the canonical `ses_…` shape keeps the id it was
+ * created with, and its stored transcript is exported by that id.
+ */
 api.get('/session/:sessionId/export', async c => {
   const rawSessionId = c.req.param('sessionId');
-  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  const parsed = storedSessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
@@ -560,9 +633,14 @@ api.get('/session/:sessionId/export', async c => {
 /**
  * The stored cumulative session diff (`session_diff` item) for one Kilo
  * session the user can read. Reads only that row, never the transcript.
+ *
+ * The id takes `storedSessionIdSchema`, like every other read of a stored
+ * session: a session created before the canonical `ses_…` shape keeps the id it
+ * was created with, and the details surface of such a session reads its
+ * changes through this route.
  */
 api.get('/session/:sessionId/diff', async c => {
-  const parsed = sessionIdSchema.safeParse(c.req.param('sessionId'));
+  const parsed = storedSessionIdSchema.safeParse(c.req.param('sessionId'));
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
@@ -600,10 +678,15 @@ api.get('/session/:sessionId/diff', async c => {
  * read to `SessionIngestDO.readKiloSdkMessages`. Mobile uses the default
  * page size of 50; the existing max of 100 is honored for callers that
  * request more.
+ *
+ * The id takes `storedSessionIdSchema`: a session created before the
+ * canonical `ses_…` shape was issued keeps the id it was created with, and
+ * this read is what shows its stored transcript. The access check below, not
+ * the id shape, decides who may read it.
  */
 api.get('/session/:sessionId/messages', async c => {
   const rawSessionId = c.req.param('sessionId');
-  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  const parsed = storedSessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }

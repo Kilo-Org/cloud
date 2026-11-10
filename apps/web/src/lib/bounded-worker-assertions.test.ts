@@ -260,19 +260,24 @@ const operations: WorkerOperation[] = [
         credentialVersion: 1,
       }),
     },
-    invoke: () => {
-      __resetGitHubUserAccessTokenClientForTests();
+    invoke: async () => {
+      await __resetGitHubUserAccessTokenClientForTests();
       return getGitHubUserAccessToken(userId, { op: 'fetch' });
     },
   },
   {
     name: 'GitHub authorization disconnect',
+    body: { authorizationId: null, credentialVersion: null },
     audience: GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
     legacyAudience: false,
     url: `${mockConfig.gitTokenServiceUrl}/internal/github-user-authorizations/disconnect`,
     response: () => jsonResponse({ disconnected: true }),
     expectedResult: undefined,
-    invoke: () => disconnectStoredGitHubUserAuthorization(userId),
+    invoke: () =>
+      disconnectStoredGitHubUserAuthorization(userId, {
+        authorizationId: null,
+        credentialVersion: null,
+      }),
   },
   {
     name: 'user-data export dispatch',
@@ -308,9 +313,9 @@ const operations: WorkerOperation[] = [
 ];
 
 describe('bounded Worker assertions', () => {
-  afterEach(() => {
+  afterEach(async () => {
     jest.restoreAllMocks();
-    __resetGitHubUserAccessTokenClientForTests();
+    await __resetGitHubUserAccessTokenClientForTests();
     if (originalBoundedTokenFlag === undefined) {
       delete process.env[boundedTokenFlag];
     } else {

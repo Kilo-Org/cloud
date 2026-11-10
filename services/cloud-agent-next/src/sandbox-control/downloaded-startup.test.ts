@@ -7,7 +7,7 @@ import { selectedRuntimeCli } from '../shared/runtime-distribution.js';
 import { classifyControlPlaneFailure } from '../telemetry/control-plane-failure.js';
 import { loadRuntimeRelease } from './runtime-release-loader.js';
 import { downloadedStartup } from './downloaded-startup.js';
-import { selectStartup, startupRepositoryKey } from './startup-selection.js';
+import { newSandboxHarness, selectStartup, startupRepositoryKey } from './startup-selection.js';
 import {
   mintRuntimeArtifactGrant,
   validateRuntimeArtifactGrant,
@@ -17,6 +17,7 @@ import { STARTUP_FAILURES, registerStartupFailureRoute } from './startup-failure
 import { mintSandboxLaunchCredential } from './credential.js';
 import {
   RUNTIME_BASE_ABI,
+  runtimeReleaseHarness,
   serializeRuntimeRelease,
   type RuntimeInventoryEntry,
   type RuntimeReleaseDescriptor,
@@ -48,6 +49,16 @@ const descriptor: RuntimeReleaseDescriptor = {
   ],
 };
 const text = JSON.stringify(descriptor);
+const kilo2Descriptor: RuntimeReleaseDescriptor = {
+  ...descriptor,
+  cliVersion: 'kilo2 v0.0.0-v2-13',
+  cliExecutable: 'package/bin/kilo2',
+  inventory: [
+    ['cli', 'package/bin/kilo2', 0o755, 1, hashes[0]],
+    ['control', 'usr/local/bin/wrapper', 0o755, 1, hashes[1]],
+  ],
+};
+const kilo2Text = JSON.stringify(kilo2Descriptor);
 
 const interactiveOrgId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const otherOrgId = '11111111-1111-4111-8111-111111111111';
@@ -400,6 +411,141 @@ describe('startup selection and preflight', () => {
       expect(() => selectedRuntimeCli({ KILO_RUNTIME_CLI_PATH: path })).toThrow(
         'Invalid selected runtime CLI'
       );
+  });
+});
+
+describe('runtime harness selection', () => {
+  const webRoute = { ...orgRoute, billingOrigin: 'cloud-agent-web' };
+  const webCohort = { ...isolatedCohort, preparingRoutes: [webRoute] };
+  const kilo2Env = {
+    ...scopedEnv,
+    RUNTIME_INTERACTIVE_ORG_IDS: undefined,
+    RUNTIME_KILO2_ORG_IDS: interactiveOrgId,
+    RUNTIME_RELEASE_DESCRIPTOR_KILO2: kilo2Text,
+  };
+  const bucket = {
+    async head() {
+      return { size: 1 };
+    },
+  } as unknown as R2Bucket;
+  const render = (value: string, harness?: 'kilo' | 'kilo2') =>
+    downloadedStartup({
+      harness,
+      env: {
+        WORKER_URL: 'https://worker.test',
+        NEXTAUTH_SECRET: secret,
+        RUNTIME_RELEASE_BUCKET: bucket,
+      },
+      descriptor: value,
+      sandboxId: 'sbx_test',
+      allocationId: crypto.randomUUID(),
+      deadlineAt: Date.now() + 420000,
+    });
+  const execLine = (command: { argv: readonly string[] }) =>
+    command.argv[2]?.split('\n').findLast(line => line.startsWith('exec ')) ?? '';
+
+  it('derives the harness from the release CLI executable', () => {
+    expect(runtimeReleaseHarness(descriptor)).toBe('kilo');
+    expect(runtimeReleaseHarness(kilo2Descriptor)).toBe('kilo2');
+    expect(runtimeReleaseHarness({ ...descriptor, cliExecutable: 'kilo2/bin/kilo' })).toBe('kilo');
+  });
+  it('passes the release harness to the main process through the clean environment', async () => {
+    expect(execLine(await render(text))).toContain(
+      `KILO_RUNTIME_CLI_PATH="$cli_path" KILO_RUNTIME_HARNESS='kilo' `
+    );
+    expect(execLine(await render(kilo2Text, 'kilo2'))).toContain(
+      `KILO_RUNTIME_CLI_PATH="$cli_path" KILO_RUNTIME_HARNESS='kilo2' `
+    );
+  });
+  it('rejects a release for another harness than the sandbox stored', async () => {
+    await expect(render(kilo2Text)).rejects.toMatchObject({
+      permanentReason: 'invalid_configuration',
+    });
+    await expect(render(text, 'kilo2')).rejects.toMatchObject({
+      permanentReason: 'invalid_configuration',
+    });
+  });
+  it('selects v2 only for web routes that all belong to one listed organization', () => {
+    expect(newSandboxHarness(kilo2Env, 'cloudflare-containers', webCohort)).toBe('kilo2');
+    expect(newSandboxHarness(kilo2Env, 'vercel', { preparingRoutes: [webRoute] })).toBe('kilo2');
+    for (const preparingRoutes of [
+      [{ ...webRoute, orgId: otherOrgId }],
+      [{}],
+      [webRoute, { ...webRoute, orgId: otherOrgId }],
+      [],
+    ])
+      expect(
+        newSandboxHarness(kilo2Env, 'cloudflare-containers', { ...webCohort, preparingRoutes })
+      ).toBe('kilo');
+    expect(
+      newSandboxHarness(kilo2Env, 'cloudflare-containers', {
+        ...webCohort,
+        sandboxKind: 'shared',
+      })
+    ).toBe('kilo');
+  });
+  it.each(['code-review', 'desktop', 'agent-manager', 'slack', 'unknown', '', undefined])(
+    'keeps v1 for a listed organization when the origin is %s',
+    billingOrigin => {
+      const route = { ...webRoute, billingOrigin, createdOnPlatform: 'cloud-agent-web' };
+      for (const provider of ['cloudflare-containers', 'vercel'] as const) {
+        for (const preparingRoutes of [[route], [webRoute, route], [route, webRoute]]) {
+          expect(newSandboxHarness(kilo2Env, provider, { ...webCohort, preparingRoutes })).toBe(
+            'kilo'
+          );
+        }
+      }
+    }
+  );
+  it('keeps v1 when the list is unset or empty, or startup is not downloaded', () => {
+    for (const ids of [undefined, ''])
+      expect(
+        newSandboxHarness(
+          { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: ids },
+          'cloudflare-containers',
+          webCohort
+        )
+      ).toBe('kilo');
+    expect(newSandboxHarness(kilo2Env, 'cloudflare', webCohort)).toBe('kilo');
+    expect(
+      newSandboxHarness(
+        { ...kilo2Env, RUNTIME_INTERACTIVE_ORG_IDS: otherOrgId },
+        'cloudflare-containers',
+        webCohort
+      )
+    ).toBe('kilo');
+    expect(() =>
+      newSandboxHarness(
+        { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: '*' },
+        'cloudflare-containers',
+        webCohort
+      )
+    ).toThrow('configuration');
+  });
+  it('starts a v2 sandbox only from the v2 release', () => {
+    expect(selectStartup(kilo2Env, 'cloudflare-containers', isolatedCohort, 'kilo2')).toEqual({
+      ...scopedDownloaded,
+      descriptor: kilo2Text,
+    });
+    expect(selectStartup(kilo2Env, 'cloudflare-containers', isolatedCohort, 'kilo')).toEqual(
+      scopedDownloaded
+    );
+    expect(() =>
+      selectStartup(
+        { ...kilo2Env, RUNTIME_RELEASE_DESCRIPTOR_KILO2: undefined },
+        'cloudflare-containers',
+        isolatedCohort,
+        'kilo2'
+      )
+    ).toThrow('configuration');
+    expect(() =>
+      selectStartup(
+        { ...kilo2Env, RUNTIME_STARTUP_MODE: 'preinstalled', NATIVE_RUNTIME_IMAGE: 'all-in-one' },
+        'cloudflare-containers',
+        isolatedCohort,
+        'kilo2'
+      )
+    ).toThrow('configuration');
   });
 });
 

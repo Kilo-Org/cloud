@@ -1,3 +1,4 @@
+import { createEmptyEnkryptOutputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import {
   evaluateMcpConnect,
   isVersionAtLeast,
@@ -35,6 +36,7 @@ describe('resolveGuardrailsSettings', () => {
       )
     ).toEqual({
       inputScan: { enabled: false, scanToolResults: false },
+      outputScan: { enabled: false, buffersResponses: false },
       mcpEnforcement: 'off',
       skill: { enabled: false, scanBeforeUse: false },
     });
@@ -43,6 +45,7 @@ describe('resolveGuardrailsSettings', () => {
   it('defaults to off with scanning before skill use', () => {
     expect(resolveGuardrailsSettings(organization({ kilo_encrypt: true }))).toEqual({
       inputScan: { enabled: false, scanToolResults: false },
+      outputScan: { enabled: false, buffersResponses: false },
       mcpEnforcement: 'off',
       skill: { enabled: false, scanBeforeUse: true },
     });
@@ -59,14 +62,41 @@ describe('resolveGuardrailsSettings', () => {
           },
           enkrypt: {
             input_guardrail: { enabled: true, scan_tool_results: false },
+            output_guardrail: {
+              enabled: true,
+              detectors: {
+                ...createEmptyEnkryptOutputDetectors(),
+                pii: { enabled: true, action: 'log', entities: ['secrets'] },
+              },
+            },
           },
         })
       )
     ).toEqual({
-      inputScan: { enabled: true, scanToolResults: false },
+      inputScan: { enabled: true, scanToolResults: true },
+      outputScan: { enabled: true, buffersResponses: false },
       mcpEnforcement: 'shadow',
       skill: { enabled: true, scanBeforeUse: false },
     });
+  });
+
+  it('reports that a blocking response detector buffers responses', () => {
+    expect(
+      resolveGuardrailsSettings(
+        organization({
+          kilo_encrypt: true,
+          enkrypt: {
+            output_guardrail: {
+              enabled: true,
+              detectors: {
+                ...createEmptyEnkryptOutputDetectors(),
+                toxicity: { enabled: true, action: 'block' },
+              },
+            },
+          },
+        })
+      ).outputScan
+    ).toEqual({ enabled: true, buffersResponses: true });
   });
 });
 

@@ -171,6 +171,7 @@ const ProfileResponseSchema = z.object({
   isDefault: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  lastUsedAt: z.iso.datetime().nullable(),
   vars: z.array(ProfileVarResponseSchema),
   commands: z.array(ProfileCommandResponseSchema),
   mcpServers: z.array(ProfileMcpServerResponseSchema),

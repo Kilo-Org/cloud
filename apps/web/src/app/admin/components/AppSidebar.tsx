@@ -95,6 +95,11 @@ const userManagementItems: MenuItem[] = [
     icon: () => <Building2 />,
   },
   {
+    title: () => 'Support access',
+    url: '/admin/support-access',
+    icon: () => <KeyRound />,
+  },
+  {
     title: () => 'Trial Organizations',
     url: '/admin/organizations/trials',
     icon: () => <Clock />,
@@ -211,11 +216,6 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <MailCheck />,
   },
   {
-    title: () => 'Gas Town',
-    url: '/admin/gastown',
-    icon: () => <Network />,
-  },
-  {
     title: () => 'Gateway',
     url: '/admin/gateway',
     icon: () => <Network />,
@@ -315,6 +315,7 @@ type AppSidebarViewProps = {
   pendingDisputesCount?: number;
   canViewSessions?: boolean;
   isSuperadmin?: boolean;
+  supportAccessEnabled?: boolean;
 } & React.ComponentProps<typeof Sidebar>;
 
 export function AppSidebarView({
@@ -324,6 +325,7 @@ export function AppSidebarView({
   pendingDisputesCount = 0,
   canViewSessions = false,
   isSuperadmin = false,
+  supportAccessEnabled = false,
   ...props
 }: AppSidebarViewProps) {
   return (
@@ -359,6 +361,7 @@ export function AppSidebarView({
                 {section.items
                   .filter(item => item.url !== '/admin/session-traces' || canViewSessions)
                   .filter(item => item.url !== '/admin/action-audit-log' || isSuperadmin)
+                  .filter(item => item.url !== '/admin/support-access' || supportAccessEnabled)
                   .map(item => {
                     const isActive = isAdminMenuItemActive(pathname, item.url);
 
@@ -403,8 +406,11 @@ export function AppSidebarView({
 
 export function AppSidebar({
   children,
+  supportAccessEnabled,
   ...props
-}: { children: React.ReactNode } & React.ComponentProps<typeof Sidebar>) {
+}: { children: React.ReactNode; supportAccessEnabled: boolean } & React.ComponentProps<
+  typeof Sidebar
+>) {
   const session = useSession();
   const pathname = usePathname();
   const trpc = useTRPC();
@@ -423,6 +429,7 @@ export function AppSidebar({
       pendingDisputesCount={pendingDisputesCount}
       canViewSessions={canViewSessions}
       isSuperadmin={isSuperadmin}
+      supportAccessEnabled={supportAccessEnabled}
     >
       {children}
     </AppSidebarView>

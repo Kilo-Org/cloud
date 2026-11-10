@@ -590,6 +590,45 @@ async function expectPlatformCredentialConstraintViolation(
 }
 
 describe('database schema', () => {
+  it('enforces blacklisted domain primary key values', async () => {
+    const rollback = new Error('rollback blacklisted domain fixtures');
+    await expect(
+      schemaTestDb.db.transaction(async tx => {
+        const domain = 'Api.Deep.Example.COM';
+        const [inserted] = await tx
+          .insert(schema.blacklisted_domains)
+          .values({ domain })
+          .returning();
+        expect(inserted).toEqual({ domain });
+
+        await expect(
+          tx.transaction(nested => nested.insert(schema.blacklisted_domains).values({ domain }))
+        ).rejects.toMatchObject({
+          cause: { constraint: 'blacklisted_domains_pkey' },
+        });
+
+        await expect(
+          tx.transaction(nested =>
+            nested.execute(sql`INSERT INTO ${schema.blacklisted_domains} (domain) VALUES (NULL)`)
+          )
+        ).rejects.toMatchObject({ cause: { code: '23502', column: 'domain' } });
+
+        throw rollback;
+      })
+    ).rejects.toBe(rollback);
+  });
+
+  it('indexes Enkrypt usage lookups by inference usage across monthly partitions', async () => {
+    await schemaTestDb.db.transaction(async tx => {
+      await tx.execute(sql`SET LOCAL enable_seqscan = off`);
+      const plan = await tx.execute(sql`
+        EXPLAIN SELECT * FROM ${schema.enkrypt_usage}
+        WHERE ${schema.enkrypt_usage.microdollar_usage_id} = ${crypto.randomUUID()}::uuid
+      `);
+      expect(JSON.stringify(plan.rows)).toContain('Index Cond: (microdollar_usage_id =');
+    });
+  });
+
   it('indexes Enkrypt usage lookups by user across monthly partitions', async () => {
     await schemaTestDb.db.transaction(async tx => {
       await tx.execute(sql`SET LOCAL enable_seqscan = off`);
@@ -638,6 +677,7 @@ describe('database schema', () => {
           id: crypto.randomUUID(),
           organization_id: crypto.randomUUID(),
           kilo_user_id: 'oauth/enkrypt-partition-test',
+          microdollar_usage_id: crypto.randomUUID(),
           api_kind_id: apiKind.api_kind_id,
           decision_id: decision.decision_id,
           charged_microdollars: 100,
@@ -1582,6 +1622,7 @@ describe('database schema', () => {
       ImpactConversionReportState: ['queued', 'retrying', 'delivered', 'failed'],
       ImpactAdvocateRewardRedemptionState: ['queued', 'retrying', 'redeemed', 'failed'],
       BYOKManagementSource: ['user', 'coding_plan'],
+      ClaudeBillingConnectionStatus: ['pending', 'connected', 'billing_unavailable', 'removed'],
       CodingPlanCredentialStatus: [
         'available',
         'assigned',

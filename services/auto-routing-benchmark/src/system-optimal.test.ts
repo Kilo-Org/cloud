@@ -94,38 +94,44 @@ function pairsFor(
 const noPricing = new Map<string, null>();
 
 describe('optimizeThresholdPolicy', () => {
-  it('picks the middle of a stable plateau instead of its edge', () => {
-    const optimization = optimizeThresholdPolicy({
-      pairs: pairsFor([
-        {
-          model: 'strong',
-          train: { score: 1, costUsd: 0.001 },
-          heldOut: { score: 1, costUsd: 0.001 },
-        },
-        {
-          model: 'also-strong',
-          train: { score: 1, costUsd: 0.01 },
-          heldOut: { score: 1, costUsd: 0.01 },
-        },
-      ]),
-      profile: null,
-      pricing: noPricing,
-    });
-
-    // Every grid point produces the same table, so the plateau spans the whole
-    // grid: the chosen point is its middle, not 0.5 / band 0. The evaluated
-    // cases are the picked model's held-out cases: 12 per route on 2 routes.
-    expect(optimization).toMatchObject({
-      minAccuracy: 0.7,
-      accuracyNoiseBand: 0.05,
-      heldOutAccuracy: 1,
-      heldOutCases: 24,
-      routes: 2,
-    });
-  });
+  it.each([
+    { router: 'efficient', accuracy: 0.95, cost: 0.0000001 },
+    { router: 'frontier', accuracy: 1, cost: 0.001 },
+  ] as const)(
+    'selects the $router objective within its reference constraint',
+    ({ router, accuracy, cost }) => {
+      const optimization = optimizeThresholdPolicy({
+        router,
+        referencePolicy: { minAccuracy: 0.95, accuracyNoiseBand: 0 },
+        pairs: pairsFor([
+          {
+            model: 'reference',
+            train: { score: 1, costUsd: 0.02 },
+            heldOut: { score: 0.95, costUsd: 0.02 },
+          },
+          {
+            model: 'accurate',
+            train: { score: 0.9, costUsd: 0.001 },
+            heldOut: { score: 1, costUsd: 0.001 },
+          },
+          {
+            model: 'economical',
+            train: { score: 0.6, costUsd: 0.0000001 },
+            heldOut: { score: 0.95, costUsd: 0.0000001 },
+          },
+        ]),
+        profile: null,
+        pricing: noPricing,
+      });
+      expect(optimization?.heldOutAccuracy).toBeCloseTo(accuracy);
+      expect(optimization?.estimatedRequestCostUsd).toBeCloseTo(cost, 10);
+    }
+  );
 
   it('returns null when the held-out sample is too small', () => {
     const optimization = optimizeThresholdPolicy({
+      router: 'efficient',
+      referencePolicy: { minAccuracy: 0.7, accuracyNoiseBand: 0.05 },
       pairs: pairsFor(
         [
           {
@@ -151,6 +157,8 @@ describe('optimizeThresholdPolicy', () => {
 
   it('returns null when only one route carries held-out results', () => {
     const optimization = optimizeThresholdPolicy({
+      router: 'efficient',
+      referencePolicy: { minAccuracy: 0.7, accuracyNoiseBand: 0.05 },
       pairs: pairsFor(
         [
           {
@@ -177,6 +185,8 @@ describe('optimizeThresholdPolicy', () => {
     // Six distinct held-out cases on each of two routes is 12 cases, below the
     // 20-case gate, even though three models graded them (36 graded rows).
     const optimization = optimizeThresholdPolicy({
+      router: 'efficient',
+      referencePolicy: { minAccuracy: 0.7, accuracyNoiseBand: 0.05 },
       pairs: pairsFor(
         ['first', 'second', 'third'].map(model => ({
           model,
@@ -191,6 +201,92 @@ describe('optimizeThresholdPolicy', () => {
     });
 
     expect(optimization).toBeNull();
+  });
+  it.each([0, 1])('declines when pair %i lacks a complete route', pairIndex => {
+    const pairs = pairsFor(
+      ['reference', 'alternative'].map(model => ({
+        model,
+        train: { score: 1, costUsd: 0.001 },
+        heldOut: { score: 1, costUsd: 0.001 },
+      }))
+    );
+    const incomplete = pairs[pairIndex];
+    if (!incomplete) throw new Error('Missing pair fixture');
+    incomplete.results = incomplete.results.filter(
+      result => result.routeKey === 'implementation/code_generation'
+    );
+    expect(
+      optimizeThresholdPolicy({
+        router: 'efficient',
+        referencePolicy: { minAccuracy: 0.95, accuracyNoiseBand: 0 },
+        pairs,
+        profile: null,
+        pricing: noPricing,
+      })
+    ).toBeNull();
+  });
+
+  it.each(['missing_cost', 'execution_error', 'different_cases', 'duplicate_case'])(
+    'keeps the published policy when comparisons contain $0',
+    issue => {
+      const pairs = pairsFor(
+        ['reference', 'alternative'].map(model => ({
+          model,
+          train: { score: 1, costUsd: 0.001 },
+          heldOut: { score: 1, costUsd: 0.001 },
+        }))
+      );
+      const alternative = pairs[1];
+      if (!alternative) throw new Error('Missing alternative fixture');
+      if (issue === 'missing_cost') {
+        alternative.results[0] = { ...alternative.results[0], costUsd: null };
+      } else if (issue === 'execution_error') {
+        alternative.results[0] = {
+          ...alternative.results[0],
+          error: 'provider_failure',
+          score: null,
+        };
+      } else if (issue === 'different_cases') {
+        const trainIds = caseIdsFor('train', 24).slice(12);
+        const validationIds = caseIdsFor('heldOut', 24).slice(12);
+        alternative.results = alternative.results.map((result, index) => ({
+          ...result,
+          caseId:
+            (result.split === 'train' ? trainIds[index % 12] : validationIds[index % 12]) ??
+            result.caseId,
+        }));
+      } else {
+        const first = alternative.results[0];
+        if (!first) throw new Error('Missing result fixture');
+        alternative.results.push(first);
+      }
+      expect(
+        optimizeThresholdPolicy({
+          router: 'efficient',
+          referencePolicy: { minAccuracy: 0.95, accuracyNoiseBand: 0 },
+          pairs,
+          profile: null,
+          pricing: noPricing,
+        })
+      ).toBeNull();
+    }
+  );
+
+  it('keeps an equivalent reference without changing its thresholds', () => {
+    const optimization = optimizeThresholdPolicy({
+      router: 'frontier',
+      referencePolicy: { minAccuracy: 0.95, accuracyNoiseBand: 0.02 },
+      pairs: pairsFor([
+        {
+          model: 'reference',
+          train: { score: 1, costUsd: 0.001 },
+          heldOut: { score: 1, costUsd: 0.001 },
+        },
+      ]),
+      profile: null,
+      pricing: noPricing,
+    });
+    expect(optimization).toMatchObject({ minAccuracy: 0.95, accuracyNoiseBand: 0.02 });
   });
 });
 

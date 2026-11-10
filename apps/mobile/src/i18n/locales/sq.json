@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo e kontrollit në distancë me protokollin native",
+    "sessionsEmpty": "Ende nuk ka sesione native",
+    "hosts": "Hoste në linjë",
+    "hostsEmpty": "Nuk ka hoste në linjë",
+    "directory": "Dosja e punës",
+    "createSession": "Krijo sesion native",
+    "queueIfOffline": "Vendose udhëzimin në radhë nëse hosti është jashtë linje",
+    "prompt": "Udhëzim ose /command",
+    "localClear": "Pastro pamjen lokale",
+    "abort": "Ndërprit radhën",
+    "failed": "Veprimi në distancë me protokollin native dështoi",
+    "creationUnknown": "Rezultati i krijimit nuk dihet. Rifresko sesionet para se të provosh përsëri.",
+    "commandFailed": "Komanda e ekzekutuesit dështoi",
+    "invalidReply": "Përgjigje e pavlefshme nga ekzekutuesi",
+    "unsafeCommand": "Përdor /compact, /new, /skill, /models, /agents ose /clear (vetëm lokalisht).",
+    "status": "Lidhja: {{connection}} · Ekzekutuesi: {{runner}}",
+    "presenceStatus": "Hostet: {{connection}}",
+    "commandStatus": "Dorëzimi i komandës: {{status}}",
+    "delivered": "Dorëzuar",
+    "expired": "Skaduar"
+  },
   "common": {
     "cancel": "Anulo",
     "done": "U krye",
@@ -110,6 +132,7 @@
     "newSession": "Sesion i ri",
     "noModelsAvailable": "Nuk ka modele të disponueshme",
     "notFound": "Nuk u gjet.",
+    "online": "Në linjë",
     "open": "Hap {{name}}",
     "openPullRequest": "Hapja e kërkesës së bashkimit",
     "completed": "Përfunduar",
@@ -186,6 +209,7 @@
     "resendCode": "Ridërgo kodin",
     "termsPrefix": "Duke vazhduar, pajtohesh me ",
     "terms": "Kushtet",
+    "termsInSentence": "Kushtet",
     "termsConnector": " dhe ",
     "termsSuffix": ".",
     "moreSignInOptions": "Më shumë opsione hyrjeje",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Konfirmo fshirjen",
     "credits": "Kreditet",
     "failedToLoadBalance": "Nuk u ngarkua gjendja. Prek për të provuar përsëri.",
+    "balanceLoadFailed": "Nuk u ngarkua gjendja",
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Kjo kërkesë për bashkim nuk përmban ndryshime në skedarë.",
     "fileList": {
       "openNavigator": "Hap shfletuesin e skedarëve",
-      "filesViewed": "Skedarë · {{viewed}} nga {{total}} të parë",
       "listed": "(të listuar)",
       "layout": "Paraqitja",
       "unified": "E bashkuar",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nuk u kontrollua lidhja me GitHub.",
-      "checkFailedMessage": "Statusi i hyrjes nuk është i disponueshëm derisa të ngarkohet ky informacion.",
+      "checkFailedMessage": "Nuk u arrit të lidhej me GitHub. Kontrollo lidhjen dhe provo përsëri.",
       "checkFailedTitleGitLab": "Nuk u kontrollua lidhja me GitLab.",
       "checkFailedTitleBitbucket": "Nuk u kontrollua lidhja me Bitbucket.",
-      "providerCheckFailedMessage": "Gjendja e lidhjes nuk është e disponueshme derisa të ngarkohet.",
+      "providerCheckFailedMessage": "Nuk u arrit të lidhej me ofruesin. Kontrollo lidhjen dhe provo përsëri.",
       "reconnectTitle": "Rilidhu me GitHub",
       "reconnectTitleGitLab": "Rilidhu me GitLab",
       "reconnectTitleBitbucket": "Rilidhu me Bitbucket",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Lejo qasjen te kamera në cilësime për të bërë një foto."
+    },
+    "botStatus": {
+      "offline": "Jashtë linje"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Ky veprim nuk u përfundua dot. Provo përsëri.",
       "actionBlocked": "Ky veprim nuk u përfundua dot. Problemi duhet zgjidhur përpara se të provosh përsëri.",
       "syncNoRepositories": "Asnjë depo nuk është në fushëveprimin e sinkronizimit. Zgjidhni depot që monitoron Agjenti i sigurisë, më pas sinkronizoni përsëri.",
+      "syncNoRepositoriesNoManage": "Asnjë depo nuk është në fushëveprimin e sinkronizimit. Një pronar, administrator ose menaxher faturimi i organizatës duhet të lidhë depot përpara se të mund të sinkronizohet.",
       "syncIntegrationInactive": "Lidhja e GitHub për Agjentin e sigurisë nuk është aktive. Rilidhni Kilo GitHub App, më pas sinkronizoni përsëri.",
       "syncMissingPermission": "Aplikacioni Kilo për GitHub nuk mund të lexojë alarmet e dobësive. Jepi atë leje në GitHub, pastaj sinkronizo përsëri.",
       "configConflict": "Cilësimet e Agjentit të sigurisë u ndryshuan diku tjetër. Rishiko cilësimet më të fundit dhe ruaj përsëri."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "Dërgo një mesazh më poshtë për të filluar.",
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende nuk ka mesazhe",
+      "emptyReadOnlyTitle": "Nuk ka mesazhe në këtë seancë",
       "renameAccessibility": "Riemërto seancën: {{title}}",
       "cloningSession": "Duke klonuar seancën",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Zgjidh një depo për të filluar.",
       "enterPromptToStart": "Shto një kërkesë për të filluar.",
       "enterPromptOrFileToStart": "Shto një kërkesë ose një skedar për të filluar.",
-      "connectProviderToStart": "Lidh një ofrues për të filluar.",
+      "connectProviderToStart": "Depot vijnë nga një llogari e lidhur e GitHub, GitLab ose Bitbucket.",
       "promptPlaceholder": "Me çfarë do të punosh?",
       "couldNotLoadModels": "Nuk u ngarkuan modelet.",
       "prefillRepoAndModelUnavailable": "Depoja dhe modeli i seancës fillestare nuk janë më të disponueshëm. Zgjidhi më poshtë.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "Gjenerimi i përgjigjes u ndal.",
       "assistantContextOverflow": "Biseda është shumë e gjatë për modelin.",
       "assistantProviderError": "Ofruesi ktheu një gabim.",
+      "assistantProviderRefused": "Ofruesi e refuzoi këtë kërkesë dhe ajo nuk mund të riprovohet.",
+      "assistantCreditsRefusal": "Nuk ke mjaft kredite për të ekzekutuar Cloud Agent.",
       "assistantOutputLimit": "Përgjigja arriti kufirin e daljes së modelit.",
       "assistantStructuredOutput": "Përgjigja nuk përputhej me formatin e kërkuar.",
       "assistantFailed": "Gjenerimi i përgjigjes dështoi."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Duke përgatitur mjedisin",
       "preparationComplete": "Përgatitja përfundoi",
       "preparationFailed": "Përgatitja dështoi",
+      "preparationStageFailed": "{{stage}}: dështoi",
       "setupCommand": "Komanda e konfigurimit {{index}}",
       "setupCommandOf": "Komanda e konfigurimit {{index}} nga {{displayCount}}",
       "stepWorkspaceSetup": "Konfigurimi i hapësirës së punës",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "Komandës së konfigurimit {{index}} i mbaroi koha",
       "detailColdRestore": "Rikthim i ftohtë, snapshot-i u aplikua, skedarë të rikthyer: {{applied}} nga {{total}}",
       "detailProgressPercent": "{{percent}}% e përfunduar",
-      "detailRestoreIncompleteReport": "Rikthimi i sesionit nuk u plotësua, skedarë të parikthyer: {{skipped}} nga {{total}} ({{reasons}})",
+      "detailRestoreIncompleteFiles": "Skedarë të parikthyer: {{skipped}} nga {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Mungojnë: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} dhe {{omitted}} të tjera",
       "detailReasonPatchFailed": "patch-i nuk u aplikua",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Madhësia e dritares së kontekstit nuk është e disponueshme",
-      "tapToViewDetails": "Prek për të parë detajet e kontekstit.",
-      "costSuffix": ", kostoja {{cost}}",
-      "tokensWindowUnavailable": "Konteksti: {{used}} tokenë, madhësia e dritares nuk është e disponueshme",
-      "tokensUsage": "Konteksti: {{used}} nga {{window}} tokenë, përdorimi: {{percentage}}",
+      "tapToViewDetails": " Prek për të parë detajet e kontekstit.",
+      "costClause": ", kostoja {{cost}}",
+      "loadingCostSpoken": "kostoja {{cost}}.",
+      "tokensWindowUnavailable": "Konteksti: {{used}} tokenë, madhësia e dritares nuk është e disponueshme{{costClause}}.",
+      "tokensUsage": "Konteksti: {{used}} nga {{window}} tokenë, përdorimi: {{percentage}}{{costClause}}.",
       "title": "Përdorimi i kontekstit",
       "used": "Përdorur",
       "provider": "Ofruesi",
       "totalCost": "Kostoja totale",
       "usageReflectsLatest": "Përdorimi pasqyron përgjigjen më të fundit të përfunduar të asistentit.",
-      "usageUnavailable": "Përdorimi i kontekstit nuk është i disponueshëm",
+      "usageUnavailable": "Përdorimi i kontekstit nuk është i disponueshëm{{costClause}}.",
       "tokenUsage": "Përdorimi i tokenëve",
       "cacheRate": "Përqindja nga memoria e përkohshme",
       "modelsCount": "Modelet ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Shto kredite",
-    "description": "Shto kredite për të vazhduar përdorimin.",
     "billingPage": "faqja e faturimit"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Kërkim në web",
       "thinking": "Duke e menduar"
     },
-    "planOf": "nga",
+    "planProgress": "{{done}} nga {{total}}",
     "filesChanged": "skedarë të ndryshuar",
-    "finishedIn": "Përfundoi në",
+    "finishedIn": "Përfundoi në {{duration}}",
     "noActivityFor": "Pa aktivitet për",
     "prOpened": "U hap kërkesa për tërheqje",
     "permissionWants": "Dëshiron të ekzekutojë",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"
     },
-    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh. Shto kredite dhe provo sërish."
+    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh."
   },
   "settingsTools": {
     "confirmTitle": "Të konfirmohet ky ndryshim?"
@@ -3340,8 +3372,8 @@
     "saved": "Cilësimet e njoftimeve për shpenzimet u ruajtën",
     "loadError": "Njoftimet për shpenzimet nuk u ngarkuan dot.",
     "saveError": "Njoftimet për shpenzimet nuk u ruajtën dot.",
-    "empty": "Njoftimet për shpenzimet janë të fikura. Ndizni ato për të paralajmëruar kontaktet e faturimit të këtij fushëveprimi.",
-    "noSpend": "Nuk është regjistruar ende asnjë shpenzim",
+    "sendAlerts": "Dërgo njoftime",
+    "noSpend": "Ende asnjë shpenzim",
     "spend24h": "Shpenzimet në 24 orët e fundit",
     "multiplierError": "Vendos një shumëzues 1 ose më shumë",
     "permissionDenied": "Nuk ke leje për të menaxhuar njoftimet për shpenzimet.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Asnjë kontekst i aktivizuar për raportet e planifikuara",
     "sourceBlocker": "Seanca kërkon vëmendje",
     "sourceMetadata": "Metatëdhënat e regjistruara të seancës"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nuk u hap dot ky rezultat kërkimi"
   }
 }

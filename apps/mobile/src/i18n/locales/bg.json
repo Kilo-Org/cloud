@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Демо за нативно дистанционно управление",
+    "sessionsEmpty": "Все още няма нативни сесии",
+    "hosts": "Хостове на линия",
+    "hostsEmpty": "Няма хостове на линия",
+    "directory": "Работна директория",
+    "createSession": "Създай нативна сесия",
+    "queueIfOffline": "Постави подканата на опашка, ако хостът е офлайн",
+    "prompt": "Подкана или /command",
+    "localClear": "Изчисти локалния изглед",
+    "abort": "Прекъсни хода",
+    "failed": "Неуспешно нативно дистанционно действие",
+    "creationUnknown": "Резултатът от създаването е неизвестен. Опресни сесиите, преди да опиташ отново.",
+    "commandFailed": "Командата към CLI процеса е неуспешна",
+    "invalidReply": "Невалиден отговор от CLI процеса",
+    "unsafeCommand": "Използвай /compact, /new, /skill, /models, /agents или /clear (само локално).",
+    "status": "Връзка: {{connection}} · CLI процес: {{runner}}",
+    "presenceStatus": "Хостове: {{connection}}",
+    "commandStatus": "Доставка на командата: {{status}}",
+    "delivered": "Доставено",
+    "expired": "Изтекло"
+  },
   "common": {
     "cancel": "Откажи",
     "done": "Готово",
@@ -110,6 +132,7 @@
     "newSession": "Нова сесия",
     "noModelsAvailable": "Няма налични модели",
     "notFound": "Не е намерено.",
+    "online": "Онлайн",
     "open": "Отвори {{name}}",
     "openPullRequest": "Отваряне на заявка за сливане",
     "completed": "Завършено",
@@ -186,6 +209,7 @@
     "resendCode": "Изпрати кода отново",
     "termsPrefix": "Като продължиш, приемаш нашите ",
     "terms": "Условия",
+    "termsInSentence": "Условия",
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Още опции за влизане",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Потвърди изтриването",
     "credits": "Кредити",
     "failedToLoadBalance": "Не успяхме да заредим наличността. Докосни, за да опиташ отново.",
+    "balanceLoadFailed": "Не успяхме да заредим наличността",
     "hideBalance": "Скрий наличността",
     "showBalance": "Покажи наличността",
     "balanceHidden": "Наличността е скрита",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "В тази заявка за обединяване няма промени по файловете.",
     "fileList": {
       "openNavigator": "Отвори навигатора за файлове",
-      "filesViewed": "Файлове · прегледани {{viewed}} от {{total}}",
       "listed": "(в списъка)",
       "layout": "Оформление",
       "unified": "Обединено",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "Не можахме да проверим връзката с GitHub.",
-      "checkFailedMessage": "Не можем да проверим дали си влязъл, докато данните не се заредят.",
+      "checkFailedMessage": "Не можахме да се свържем с GitHub. Провери връзката си и опитай отново.",
       "checkFailedTitleGitLab": "Не можа да се провери връзката с GitLab",
       "checkFailedTitleBitbucket": "Не можа да се провери връзката с Bitbucket",
-      "providerCheckFailedMessage": "Състоянието на връзката е недостъпно, докато това се зареди.",
+      "providerCheckFailedMessage": "Не можахме да се свържем с доставчика. Провери връзката си и опитай отново.",
       "reconnectTitle": "Повторно свързване с GitHub",
       "reconnectTitleGitLab": "Повторно свързване с GitLab",
       "reconnectTitleBitbucket": "Повторно свързване с Bitbucket",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Разреши достъпа до камерата в настройките, за да направиш снимка."
+    },
+    "botStatus": {
+      "offline": "Офлайн"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Не можахме да завършим това действие. Опитай отново.",
       "actionBlocked": "Не можахме да завършим това действие. Проблемът трябва да бъде отстранен, преди да опиташ отново.",
       "syncNoRepositories": "Няма репозиторита в обхвата на синхронизиране. Изберете репозиторитата, които Агентът по сигурността наблюдава, и синхронизирайте отново.",
+      "syncNoRepositoriesNoManage": "Няма репозиторита в обхвата на синхронизиране. Собственик на организацията, администратор или отговорник за плащанията трябва да свърже репозиторита, преди да може да се извърши синхронизиране.",
       "syncIntegrationInactive": "Връзката с GitHub за Агент по сигурността не е активна. Свържете отново Kilo GitHub App и след това синхронизирайте отново.",
       "syncMissingPermission": "Приложението на Kilo за GitHub не може да чете vulnerability alerts. Дай това разрешение в GitHub и синхронизирай отново.",
       "configConflict": "Настройките на Агента по сигурността са променени другаде. Прегледай последните настройки и запази отново."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "Изпрати съобщение по-долу, за да започнеш.",
       "scrollToBottom": "Превърти до края",
       "emptyTitle": "Все още няма съобщения",
+      "emptyReadOnlyTitle": "В тази сесия няма съобщения",
       "renameAccessibility": "Преименувай сесията: {{title}}",
       "cloningSession": "Клониране на сесия",
       "couldNotLoadThisSession": "Не успяхме да заредим тази сесия.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Избери хранилище, за да започнеш.",
       "enterPromptToStart": "Добави заявка, за да започнеш.",
       "enterPromptOrFileToStart": "Добави заявка или файл, за да започнеш.",
-      "connectProviderToStart": "Свържи доставчик, за да започнеш.",
+      "connectProviderToStart": "Хранилищата идват от свързан акаунт в GitHub, GitLab или Bitbucket.",
       "promptPlaceholder": "Върху какво искаш да работиш?",
       "couldNotLoadModels": "Не успяхме да заредим моделите.",
       "prefillRepoAndModelUnavailable": "Хранилището и моделът от първоначалната сесия вече не са достъпни. Избери други по-долу.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "Генерирането на отговора беше спряно.",
       "assistantContextOverflow": "Разговорът е твърде дълъг за модела.",
       "assistantProviderError": "Доставчикът върна грешка.",
+      "assistantProviderRefused": "Доставчикът отказа тази заявка и тя не може да бъде повторена.",
+      "assistantCreditsRefusal": "Нямаш достатъчно кредити за стартиране на Cloud Agent.",
       "assistantOutputLimit": "Отговорът достигна ограничението за изходни данни на модела.",
       "assistantStructuredOutput": "Отговорът не съответства на изисквания формат.",
       "assistantFailed": "Не успяхме да генерираме отговор."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Подготовка на средата",
       "preparationComplete": "Подготовката приключи",
       "preparationFailed": "Неуспешна подготовка",
+      "preparationStageFailed": "Етапът {{stage}} се провали",
       "setupCommand": "Команда за настройка {{index}}",
       "setupCommandOf": "Команда за настройка {{index}} от {{displayCount}}",
       "stepWorkspaceSetup": "Настройка на работното пространство",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "Командата за настройка {{index}} изтече по време",
       "detailColdRestore": "Студено възстановяване, снимката е приложена, възстановени файлове: {{applied}} от {{total}}",
       "detailProgressPercent": "{{percent}}% завършено",
-      "detailRestoreIncompleteReport": "Възстановяването на сесията е непълно — невъзстановени файлове: {{skipped}} от {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Невъзстановени файлове: {{skipped}} от {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Липсват: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} и още {{omitted}}",
       "detailReasonPatchFailed": "кръпката не беше приложена",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Неизвестен размер на контекстния прозорец",
-      "tapToViewDetails": "Докосни, за да видиш подробностите за контекста.",
-      "costSuffix": ", разход {{cost}}",
-      "tokensWindowUnavailable": "Контекст: {{used}} токена, размерът на прозореца е неизвестен",
-      "tokensUsage": "Контекст: {{used}} от {{window}} токена, използвани {{percentage}}",
+      "tapToViewDetails": " Докосни, за да видиш подробностите за контекста.",
+      "costClause": ", разход {{cost}}",
+      "loadingCostSpoken": "разход {{cost}}.",
+      "tokensWindowUnavailable": "Контекст: {{used}} токена, размерът на прозореца е неизвестен{{costClause}}.",
+      "tokensUsage": "Контекст: {{used}} от {{window}} токена, използвани {{percentage}}{{costClause}}.",
       "title": "Използване на контекста",
       "used": "Използвани",
       "provider": "Доставчик",
       "totalCost": "Общ разход",
       "usageReflectsLatest": "Данните за използването са от последния завършен отговор на асистента.",
-      "usageUnavailable": "Използването на контекста е недостъпно",
+      "usageUnavailable": "Използването на контекста е недостъпно{{costClause}}.",
       "tokenUsage": "Използване на токени",
       "cacheRate": "Дял на кешираните токени",
       "modelsCount": "Модели ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Добави кредити",
-    "description": "Добави кредити, за да продължиш да използваш услугата.",
     "billingPage": "страницата за плащания"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Търсене в мрежата",
       "thinking": "Обмисляне"
     },
-    "planOf": "от",
+    "planProgress": "{{done}} от {{total}}",
     "filesChanged": "променени файла",
-    "finishedIn": "Завършено за",
+    "finishedIn": "Завършено за {{duration}}",
     "noActivityFor": "Няма активност за",
     "prOpened": "Отворена заявка за сливане",
     "permissionWants": "Иска да изпълни",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Този модел поддържа усилие за разсъждение"
     },
-    "creditsRequired": "Нямате достатъчно кредити, за да изпратите това съобщение. Добавете кредити и опитайте отново."
+    "creditsRequired": "Нямате достатъчно кредити, за да изпратите това съобщение."
   },
   "settingsTools": {
     "confirmTitle": "Да се потвърди ли тази промяна?"
@@ -3340,8 +3372,8 @@
     "saved": "Настройките за известия за разходи са запазени",
     "loadError": "Известията за разходи не можаха да се заредят.",
     "saveError": "Известията за разходи не можаха да се запазят.",
-    "empty": "Известията за разходи са изключени. Включи ги, за да предупреждаваш контактите за фактуриране на този обхват.",
-    "noSpend": "Още няма записани разходи",
+    "sendAlerts": "Изпращай известия",
+    "noSpend": "Още няма разходи",
     "spend24h": "Разходи през последните 24 часа",
     "multiplierError": "Въведи множител 1 или повече",
     "permissionDenied": "Нямаш разрешение да управляваш известията за разходи.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Няма включени контексти за планирани брифинги",
     "sourceBlocker": "Сесията изисква внимание",
     "sourceMetadata": "Запазени метаданни за сесията"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Не можахме да отворим този резултат от търсенето"
   }
 }

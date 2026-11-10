@@ -16,6 +16,7 @@ import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
 import { t } from '../auth.js';
 import { PrepareSessionInput, StartSessionInput } from '../schemas.js';
 import type { TRPCContext } from '../../types.js';
+import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import {
   createSessionPrepareHandlers,
   prepareInputToSessionCreateRequest,
@@ -41,6 +42,7 @@ function environmentLoad(
 
 const {
   mergeProfileConfigurationMock,
+  getBuiltinAgentSettingsMock,
   loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertBitbucketRepositoryAccessMock,
@@ -50,8 +52,11 @@ const {
   createSessionWithLedgerMock,
   parentSpawnContextMock,
   parentMetadataMock,
+  getSandboxSessionStubMock,
+  requireCurrentSessionAccessMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
+  getBuiltinAgentSettingsMock: vi.fn().mockResolvedValue({}),
   loadEnvironmentForSessionMock: vi.fn().mockResolvedValue({ status: 'none' }),
   parentSpawnContextMock: vi.fn().mockResolvedValue({
     token: 'trusted-parent-model-token',
@@ -96,6 +101,12 @@ const {
     cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
     kiloSessionId: 'cli-session-abc123',
   }),
+  getSandboxSessionStubMock: vi.fn(),
+  requireCurrentSessionAccessMock: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../session-access.js', () => ({
+  requireCurrentSessionAccess: requireCurrentSessionAccessMock,
 }));
 
 vi.mock('@kilocode/cloud-agent-profile', async importActual => {
@@ -103,6 +114,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
@@ -131,10 +143,7 @@ vi.mock('../../session/session-registration.js', () => ({
 }));
 
 vi.mock('../../sandbox-session/session-stub.js', () => ({
-  getSandboxSessionStub: () => ({
-    getCloudAgentSpawnContext: parentSpawnContextMock,
-    getMetadata: parentMetadataMock,
-  }),
+  getSandboxSessionStub: getSandboxSessionStubMock,
 }));
 vi.mock('../../balance-validation.js', () => ({
   validateBalanceOnly: vi.fn(async () => ({ success: true })),
@@ -164,6 +173,7 @@ function createContext(overrides?: {
     request: { headers } as Request,
     env: {
       INTERNAL_API_SECRET: 'test-internal-api-secret',
+      NEXTAUTH_SECRET: 'test-secret',
       HYPERDRIVE: {
         connectionString: 'postgres://handler-test',
       },
@@ -173,10 +183,48 @@ function createContext(overrides?: {
 
 const OPERATION_KEY = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 
+const WORKSPACE_PARENT_ID = 'workspace_12345678-1234-4234-8234-123456789abc';
+const WORKSPACE_TARGET_ID = 'workspace_22345678-1234-4234-8234-123456789abc';
+const WORKSPACE_WORKTREE_ID = 'worktree_12345678-1234-4234-8234-123456789abc';
+
+function callbackMetadata(
+  sessionId: string,
+  overrides: {
+    worktreeId?: string;
+    parentId?: string;
+    allowSubagentSessions?: boolean;
+  } = {}
+): SessionMetadata {
+  return {
+    metadataSchemaVersion: 2,
+    identity: { userId: 'test-user-123', sessionId },
+    auth: { kiloSessionId: `ses_${sessionId.slice(-8)}` },
+    lifecycle: { version: 1, timestamp: 1 },
+    allowSubagentSessions: overrides.allowSubagentSessions ?? true,
+    ...(overrides.worktreeId ? { workspace: { worktreeId: overrides.worktreeId } } : {}),
+    ...(overrides.parentId ? { parentCloudAgentSessionId: overrides.parentId } : {}),
+  } as SessionMetadata;
+}
+
+function useSessionMetadata(entries: ReadonlyArray<readonly [string, SessionMetadata | null]>) {
+  const metadata = new Map(entries);
+  getSandboxSessionStubMock.mockImplementation(
+    (_env: unknown, _userId: string, sessionId: string) => ({
+      getCloudAgentSpawnContext: parentSpawnContextMock,
+      getMetadata: async () => metadata.get(sessionId) ?? null,
+    })
+  );
+}
+
 describe('prepareSession operation-ledger admission gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getSandboxSessionStubMock.mockImplementation(() => ({
+      getCloudAgentSpawnContext: parentSpawnContextMock,
+      getMetadata: parentMetadataMock,
+    }));
     mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertBitbucketRepositoryAccessMock.mockResolvedValue(undefined);
@@ -256,22 +304,69 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(parsed).not.toHaveProperty('allowSubagentSessions');
   });
 
-  it('derives child lineage from authority and requires a ledger operation key', async () => {
+  it.each(['workspace:new-chat'])(
+    'derives child lineage from authority and requires a ledger operation key for %s',
+    async url => {
+      const context = createContext();
+      context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
+      const authority = {
+        version: 1,
+        ownerId: context.userId ?? 'user-123',
+        parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+        organizationId: null,
+        authorizationId: '12345678-1234-4234-8234-123456789abc',
+        expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+      } satisfies NonNullable<TRPCContext['cloudAgentAuthority']>;
+      context.cloudAgentAuthority = authority;
+      const caller = router.createCaller(context);
+      await caller.prepareSession({
+        prompt: 'child',
+        callbackTarget: { url },
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'cloud-agent',
+      });
+      const [request, registration, options] = createSessionWithLedgerMock.mock.calls[0];
+      expect(request.parentCloudAgentSessionId).toBe(authority.parentSessionId);
+      expect(request).not.toHaveProperty('allowSubagentSessions');
+      expect(request.options.createdOnPlatform).toBe('cloud-agent-web');
+      expect(request.options.callbackTarget).toEqual({ url });
+      expect(registration.cloudAgentAuthority).toEqual(context.cloudAgentAuthority);
+      expect(options.operationKey).toBe(OPERATION_KEY);
+      expect(startNewSessionMock).not.toHaveBeenCalled();
+      expect(registerNewSessionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('accepts one workspace session callback target in the child workspace', async () => {
+    useSessionMetadata([
+      [
+        WORKSPACE_PARENT_ID,
+        callbackMetadata(WORKSPACE_PARENT_ID, { worktreeId: WORKSPACE_WORKTREE_ID }),
+      ],
+      [
+        WORKSPACE_TARGET_ID,
+        callbackMetadata(WORKSPACE_TARGET_ID, { worktreeId: WORKSPACE_WORKTREE_ID }),
+      ],
+    ]);
     const context = createContext();
     context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
-    const authority = {
+    context.cloudAgentAuthority = {
       version: 1,
       ownerId: context.userId ?? 'user-123',
-      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      parentSessionId: WORKSPACE_PARENT_ID,
       organizationId: null,
       authorizationId: '12345678-1234-4234-8234-123456789abc',
       expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
-    } satisfies NonNullable<TRPCContext['cloudAgentAuthority']>;
-    context.cloudAgentAuthority = authority;
+    };
     const caller = router.createCaller(context);
+
     await caller.prepareSession({
       prompt: 'child',
-      callbackTarget: { url: 'session:parent' },
+      callbackTarget: { url: `workspace:${WORKSPACE_TARGET_ID}` },
       mode: 'code',
       model: 'kilo/test-model',
       githubRepo: 'acme/repo',
@@ -279,15 +374,110 @@ describe('prepareSession operation-ledger admission gate', () => {
       operationKey: OPERATION_KEY,
       createdOnPlatform: 'cloud-agent',
     });
-    const [request, registration, options] = createSessionWithLedgerMock.mock.calls[0];
-    expect(request.parentCloudAgentSessionId).toBe(authority.parentSessionId);
-    expect(request).not.toHaveProperty('allowSubagentSessions');
-    expect(request.options.createdOnPlatform).toBe('cloud-agent-web');
-    expect(request.options.callbackTarget).toEqual({ url: 'session:parent' });
-    expect(registration.cloudAgentAuthority).toEqual(context.cloudAgentAuthority);
-    expect(options.operationKey).toBe(OPERATION_KEY);
-    expect(startNewSessionMock).not.toHaveBeenCalled();
-    expect(registerNewSessionMock).not.toHaveBeenCalled();
+
+    const [request] = createSessionWithLedgerMock.mock.calls[0];
+    expect(request.options.callbackTarget).toEqual({
+      url: `workspace:${WORKSPACE_TARGET_ID}`,
+    });
+  });
+
+  it.each([
+    ['a target in another workspace', { worktreeId: 'worktree_other' }],
+    ['a child target', { parentId: WORKSPACE_PARENT_ID }],
+    ['a target that cannot spawn children', { allowSubagentSessions: false }],
+  ])('rejects a workspace session callback with %s', async (_label, override) => {
+    useSessionMetadata([
+      [
+        WORKSPACE_PARENT_ID,
+        callbackMetadata(WORKSPACE_PARENT_ID, { worktreeId: WORKSPACE_WORKTREE_ID }),
+      ],
+      [
+        WORKSPACE_TARGET_ID,
+        callbackMetadata(WORKSPACE_TARGET_ID, {
+          worktreeId: 'worktreeId' in override ? override.worktreeId : WORKSPACE_WORKTREE_ID,
+          parentId: 'parentId' in override ? override.parentId : undefined,
+          allowSubagentSessions:
+            'allowSubagentSessions' in override ? override.allowSubagentSessions : true,
+        }),
+      ],
+    ]);
+    const context = createContext();
+    context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
+    context.cloudAgentAuthority = {
+      version: 1,
+      ownerId: context.userId ?? 'user-123',
+      parentSessionId: WORKSPACE_PARENT_ID,
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    const caller = router.createCaller(context);
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'child',
+        callbackTarget: { url: `workspace:${WORKSPACE_TARGET_ID}` },
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'cloud-agent',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a workspace session callback when the authority parent metadata is unavailable', async () => {
+    useSessionMetadata([
+      [
+        WORKSPACE_TARGET_ID,
+        callbackMetadata(WORKSPACE_TARGET_ID, { worktreeId: WORKSPACE_WORKTREE_ID }),
+      ],
+    ]);
+    const context = createContext();
+    context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
+    context.cloudAgentAuthority = {
+      version: 1,
+      ownerId: context.userId ?? 'user-123',
+      parentSessionId: WORKSPACE_PARENT_ID,
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    const caller = router.createCaller(context);
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'child',
+        callbackTarget: { url: `workspace:${WORKSPACE_TARGET_ID}` },
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'cloud-agent',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a workspace session callback without a parent authority', async () => {
+    const caller = router.createCaller(createContext());
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'child',
+        callbackTarget: { url: `workspace:${WORKSPACE_TARGET_ID}` },
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'cloud-agent',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
   });
 
   it('rejects a scoped child launch without a ledger operation key', async () => {
@@ -482,7 +672,6 @@ describe('prepareSession operation-ledger admission gate', () => {
         egressAllowlist: ['changed.example.com'],
       },
     });
-    context.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
     context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
     context.cloudAgentAuthority = {
       version: 1,
@@ -539,16 +728,18 @@ describe('prepareSession operation-ledger admission gate', () => {
   });
 
   it('rejects a parent callback without authenticated spawn authority before creating a session', async () => {
-    await expect(
-      router.createCaller(createContext()).prepareSession({
-        prompt: 'ordinary session',
-        mode: 'code',
-        model: 'kilo/test-model',
-        githubRepo: 'acme/repo',
-        autoInitiate: true,
-        callbackTarget: { url: 'session:parent' },
-      })
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    for (const url of ['workspace:new-chat']) {
+      await expect(
+        router.createCaller(createContext()).prepareSession({
+          prompt: 'ordinary session',
+          mode: 'code',
+          model: 'kilo/test-model',
+          githubRepo: 'acme/repo',
+          autoInitiate: true,
+          callbackTarget: { url },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    }
     expect(startNewSessionMock).not.toHaveBeenCalled();
     expect(registerNewSessionMock).not.toHaveBeenCalled();
   });
@@ -567,7 +758,26 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(startNewSessionMock.mock.calls[0][0].parentCloudAgentSessionId).toBeUndefined();
   });
 
-  it('rejects setting a parent callback through updateSession before accessing the session', async () => {
+  it('rejects setting a workspace callback through updateSession before accessing the session', async () => {
+    for (const url of [
+      'workspace:new-chat',
+      'workspace:workspace_22345678-1234-4234-8234-123456789abc',
+      'workspace:foo',
+    ]) {
+      await expect(
+        router.createCaller(createContext()).updateSession({
+          cloudAgentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+          callbackTarget: { url },
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message:
+          'A workspace callback can only be set when a Cloud Agent parent launches a session',
+      });
+    }
+  });
+
+  it('rejects the retired session:parent target through updateSession', async () => {
     await expect(
       router.createCaller(createContext()).updateSession({
         cloudAgentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
@@ -575,7 +785,7 @@ describe('prepareSession operation-ledger admission gate', () => {
       })
     ).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: 'A parent callback can only be set when a Cloud Agent parent launches a session',
+      message: 'Unsupported callback target',
     });
   });
 

@@ -321,6 +321,7 @@
     "manual review",
     "merge",
     "no changes needed",
+    "only adding {{accepted}} of {{total}} files (max {{max}})",
     "open",
     "open pull request",
     "pr opened",
@@ -396,6 +397,7 @@
     "deleted",
     "dismissed",
     "manual review",
+    "merge",
     "open",
     "open pull request",
     "pr opened",
@@ -404,6 +406,8 @@
     "remediation failed",
     "remediation requested",
     "review",
+    "search repositories",
+    "stopped",
     "superseded",
     "tokens"
   ],
@@ -420,7 +424,8 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
-    "superseded"
+    "superseded",
+    "tokens"
   ],
   "is": [
     "dismissed",
@@ -606,12 +611,16 @@
     "block",
     "cancelled",
     "dismissed",
+    "edit",
     "manual review",
     "no changes needed",
+    "none",
+    "open",
     "open pull request",
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "review",
     "superseded"
   ],
   "ms": ["deleted", "dismissed", "open", "open pull request", "review"],

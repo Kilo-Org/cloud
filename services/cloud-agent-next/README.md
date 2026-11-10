@@ -9,21 +9,37 @@ Every session uses the control plane in [`docs/control-plane.md`](docs/control-p
 ### Child session callbacks
 
 An opted-in Cloud Agent can request a callback when it launches a child through
-`cloudAgentNext.prepareSession` (or the organization equivalent):
+`cloudAgentNext.prepareSession` (or the organization equivalent). Two workspace
+destinations are supported:
 
 ```json
-{ "callbackTarget": { "url": "session:parent" } }
+{ "callbackTarget": { "url": "workspace:<session-id>" } }
+{ "callbackTarget": { "url": "workspace:new-chat" } }
 ```
 
-The server resolves the parent from the authenticated spawn authority. Completion,
-failure, or interruption sends a queued message with the child's IDs, status,
-branch, and up to 12,000 characters of output. An idle parent resumes; an active
-parent receives a queued follow-up. The parent uses its current authorization.
-Delivery uses the existing five-attempt callback retry policy and one persisted
-message ID per callback. Missing or inaccessible parents reject delivery.
+`workspace:<session-id>` queues the child result into that existing chat. The
+server verifies the target exists, belongs to the same user and organization as
+the authenticated spawn authority, shares the spawning parent's workspace, is a
+root or sibling chat rather than a child session, and is still accessible. The
+invoking chat receives its own session id in a `cloud-agent-context` line so it
+can pass that id to `spawn_session`; the MCP transport does not carry the
+invoking chat's identity, so a callback is scoped to the workspace rather than
+cryptographically proven to come from that chat.
 
-Omit `callbackTarget` for no callback. Arbitrary session destinations are not
-supported. Existing HTTP callback targets remain available to trusted integrations.
+`workspace:new-chat` opens a new chat in the parent workspace. Its first message
+contains the same child result and the new chat's own session ID. The new chat
+inherits the workspace's repository, sandbox and agent, and can itself launch
+children when the workspace allows it. Queue retries do not duplicate the chat.
+
+Completion, failure, or interruption sends the child's IDs, status, branch, and
+up to 12,000 characters of output. The destination chat uses its current
+authorization. Delivery uses the existing five-attempt callback retry policy and
+one persisted message ID per callback.
+
+Omit `callbackTarget` for no callback. A target outside the spawning parent's
+workspace is rejected, as is any target that is a child session. Callback
+targets are available only with authenticated spawn authority. Existing HTTP
+callback targets remain available to trusted integrations.
 
 ### Sandbox images
 
@@ -45,6 +61,11 @@ endpoints for their configured repository. REST project selectors use the full
 project path; project credentials also support their recorded numeric project ID.
 The configured instance base path and outbound container binding remain part of
 request authorization.
+
+The request method is part of authorization. A listed project resource answers
+the methods its policy allows: credential endpoints answer none, and
+configuration, membership and lifecycle endpoints answer reads only. The
+project root answers reads only.
 
 ## API Documentation
 
@@ -667,10 +688,6 @@ cp .dev.vars.example .dev.vars
 # The worker will reuse the Authorization bearer token as the kilo code api token (because thats what it is).
 ```
 
-For existing `.dev.vars` files, set `CREDENTIAL_CONTAINMENT_ENABLED=true`,
-`CLOUDFLARE_CONTAINERS_ORG_IDS=*`, and `CODE_REVIEW_CONTAINERS_ORG_IDS=*`.
-These values select the retained runtimes. Non-contained runtimes have been retired.
-
 3. Run locally:
 
 ```bash
@@ -770,8 +787,8 @@ issuance while retaining real Session DO notifications. A fake wrapper answers
 #### Other Quality Checks
 
 ```bash
-# Type checking
-pnpm --filter cloud-agent-next typecheck
+# Type checking (this service and its nested wrapper workspace)
+pnpm --filter cloud-agent-next typecheck:wrapper
 
 # Linting
 pnpm --filter cloud-agent-next lint

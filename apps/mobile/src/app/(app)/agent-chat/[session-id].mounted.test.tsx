@@ -102,10 +102,10 @@ const confirmationRequests = vi.hoisted(() => ({
 
 const navigationRoutes = ['session-detail'];
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-// The New-session fallback the route renders for a session id that cannot be a
-// real session: the composer's full graph (drafts, voice input, spawn hooks)
-// cannot load in the node-mounted harness, and this suite only needs to pin
-// which surface the route chose.
+// The New-session composer mounts only from its own route; this suite asserts
+// the session route never puts it on screen for a `session-id` param. The
+// composer's full graph (drafts, voice input, spawn hooks) cannot load in the
+// node-mounted harness, so both parts are stubs.
 vi.mock('@/components/agents/new-session-model-provider', () => ({
   NewSessionModelProvider: 'NewSessionModelProvider',
 }));
@@ -299,6 +299,7 @@ vi.mock('@/components/agents/session-detail-content', async () => {
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
   SessionComposerSkeleton: 'SessionComposerSkeleton',
+  SessionReadOnlyFooterPlaceholder: 'SessionReadOnlyFooterPlaceholder',
 }));
 
 vi.mock('@/components/agents/session-context-metrics', () => ({
@@ -535,11 +536,13 @@ beforeEach(() => {
     },
     // The POP_TO end state the component relies on: find the destination at or
     // below the current index, truncate everything above it; with no match,
-    // drop the current route and land on the destination.
-    dismissTo: (href: string) => {
-      const index = navigationRoutes.lastIndexOf(href.split('?')[0] ?? href);
+    // drop the current route and land on the destination. An object href lands
+    // on its pathname, as the real router does.
+    dismissTo: (href: string | { pathname: string }) => {
+      const path = typeof href === 'string' ? (href.split('?')[0] ?? href) : href.pathname;
+      const index = navigationRoutes.lastIndexOf(path);
       if (index === -1) {
-        navigationRoutes.splice(0, navigationRoutes.length, href);
+        navigationRoutes.splice(0, navigationRoutes.length, path);
       } else {
         navigationRoutes.splice(index + 1);
       }
@@ -604,46 +607,37 @@ describe('SessionDetailScreen invalid session-id', () => {
     expect(queryEnabled()).toBe(false);
   });
 
-  it('renders the New-session composer when the param cannot be a real session id', async () => {
-    // A malformed or hand-built deep link can deliver a segment that can never
-    // resolve to a session (the all-zeros UUID was observed in the wild from a
-    // press on the Agents New session button). The id fails the server-side
-    // shape, so the route renders the composer the user asked for instead of
-    // mounting a session screen that can only end in "Not found".
-    // No `organizationId` param: this is the exact shape the in-the-wild deep
-    // link carried, whose metadata gate would otherwise stay enabled.
+  it('opens a stored session whose id predates the canonical shape instead of the composer', async () => {
+    // History rows carry the id the store holds. A session created before the
+    // canonical `ses_` shape was issued keeps its own id (an older editor
+    // session, for example), and the row press pushes exactly that id. The
+    // route must open it as a session: the metadata read is what decides, and
+    // the composer the user did not ask for must never replace the row.
     useLocalSearchParamsMock.mockReturnValue({
-      'session-id': '00000000-0000-0000-0000-000000000000',
+      'session-id': 'xmw2l780h18',
+      title: 'Stored session title',
     });
     const renderer = await mountRoute();
 
-    expect(findByType(renderer.root, 'NewSessionScreenBody')).toHaveLength(1);
-    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(findByType(renderer.root, 'NewSessionScreenBody')).toHaveLength(0);
     expect(findByType(renderer.root, 'InvalidRouteState')).toHaveLength(0);
-    // The doomed id never starts a metadata read, even with the gate's other
-    // conditions (confirmed owner, no organization route) all true.
-    expect(queryEnabled()).toBe(false);
+    expect(queryEnabled()).toBe(true);
   });
 
-  it('holds the composer behind the account retry when the account list cannot be restored', async () => {
-    // The composer mounts account-scoped reads (model catalog, repositories,
-    // profiles, create), so a scope that only the active account can decide
-    // does not fall back to Personal while the account list is what failed.
-    useLocalSearchParamsMock.mockReturnValue({
-      'session-id': '00000000-0000-0000-0000-000000000000',
-    });
-    globalContext.error = 'restore';
-    onTestFinished(() => {
-      globalContext.error = null;
-    });
+  it('shows the permanent not-found state for a param the store cannot address', async () => {
+    // A hand-built destination can carry a segment no stored id can take (a
+    // space here). It can never resolve, so the route says so once and starts
+    // no read; the composer is never the answer to a session param.
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_123 456' });
     const renderer = await mountRoute();
 
+    const errors = findByType(renderer.root, 'QueryError');
+    expect(errors).toHaveLength(1);
+    expect(propOf(errors[0], 'variant')).toBe('not-found');
+    expect(propOf(errors[0], 'onRetry')).toBeUndefined();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
     expect(findByType(renderer.root, 'NewSessionScreenBody')).toHaveLength(0);
-    expect(findByType(renderer.root, 'NewSessionModelProvider')).toHaveLength(0);
-    act(() => {
-      pressControl(retryControl(renderer));
-    });
-    expect(globalContext.retry).toHaveBeenCalled();
     expect(queryEnabled()).toBe(false);
   });
 });
@@ -805,7 +799,11 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
     queryState.fetchStatus = 'fetching';
     const renderer = await mountRoute();
 
-    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
+    // Nothing has resolved the session's kind, so the bottom slot reserves the
+    // read-only footer's shape instead of offering a composer the session may
+    // not get.
+    expect(findByType(renderer.root, 'SessionReadOnlyFooterPlaceholder')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
 
     // The same threshold the session body applies to a stalled transport.
@@ -814,6 +812,7 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
     });
 
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionReadOnlyFooterPlaceholder')).toHaveLength(0);
     expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
   });
 
@@ -1575,7 +1574,10 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       expect(propOf(header, 'title')).toBeTruthy();
       expect(propOf(header, 'title')).not.toBe('Account A private title');
       expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
-      expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
+      // The account is unconfirmed, so no metadata has named the session's
+      // kind: the bottom slot reserves the read-only footer's shape.
+      expect(findByType(renderer.root, 'SessionReadOnlyFooterPlaceholder')).toHaveLength(1);
+      expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
       expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
       expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
       expect(
@@ -1589,6 +1591,23 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       expect(queryEnabled()).toBe(false);
     }
   );
+
+  it('holds the composer while the remote-spawn open waits for its new session', async () => {
+    // A `kilo remote` spawn has no row to read yet (the ingest one the retry
+    // below waits for), but the spawn itself is the writer: the account window
+    // holds the composer the spawned session ends in.
+    queryState.data = null;
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': 'ses_12345678901234567890123456',
+      spawned: '1',
+    });
+    const renderer = await mountRoute(
+      createElement('RouteAndSibling', null, createElement(SessionDetailScreen))
+    );
+
+    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionReadOnlyFooterPlaceholder')).toHaveLength(0);
+  });
 
   it('keeps repeated failures recoverable and opens current root and child rows after user Retry', async () => {
     const repeatedFailure = Promise.withResolvers<{ id: string }>();

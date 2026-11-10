@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "הדגמת שליטה מרחוק בפרוטוקול נייטיב",
+    "sessionsEmpty": "עדיין אין סשנים בפרוטוקול נייטיב",
+    "hosts": "מארחים מחוברים",
+    "hostsEmpty": "אין מארחים מחוברים",
+    "directory": "תיקיית עבודה",
+    "createSession": "יצירת סשן בפרוטוקול נייטיב",
+    "queueIfOffline": "הוספת הפרומפט לתור אם המארח לא מחובר",
+    "prompt": "פרומפט או /command",
+    "localClear": "ניקוי התצוגה המקומית",
+    "abort": "עצירת הסבב",
+    "failed": "פעולת השליטה מרחוק בפרוטוקול נייטיב נכשלה",
+    "creationUnknown": "תוצאת היצירה אינה ידועה. יש לרענן את רשימת הסשנים לפני ניסיון נוסף.",
+    "commandFailed": "הפקודה לתהליך ההרצה נכשלה",
+    "invalidReply": "תגובה לא תקינה מתהליך ההרצה",
+    "unsafeCommand": "יש להשתמש בפקודות /compact, /new, /skill, /models, /agents או /clear (מקומית בלבד).",
+    "status": "חיבור: {{connection}} · תהליך הרצה: {{runner}}",
+    "presenceStatus": "מארחים: {{connection}}",
+    "commandStatus": "מסירת הפקודה: {{status}}",
+    "delivered": "נמסרה",
+    "expired": "פג התוקף"
+  },
   "common": {
     "cancel": "ביטול",
     "done": "סיום",
@@ -110,6 +132,7 @@
     "newSession": "סשן חדש",
     "noModelsAvailable": "אין מודלים זמינים",
     "notFound": "לא נמצא.",
+    "online": "מקוון",
     "open": "פתיחת {{name}}",
     "openPullRequest": "PR פתוח",
     "completed": "הושלם",
@@ -186,6 +209,7 @@
     "resendCode": "שליחת הקוד שוב",
     "termsPrefix": "המשך השימוש מהווה הסכמה למסמכים הבאים: ",
     "terms": "תנאי השימוש",
+    "termsInSentence": "תנאי השימוש",
     "termsConnector": " וכן ",
     "termsSuffix": ".",
     "moreSignInOptions": "אפשרויות כניסה נוספות",
@@ -222,6 +246,7 @@
     "confirmDeletion": "אישור המחיקה",
     "credits": "קרדיטים",
     "failedToLoadBalance": "לא ניתן לטעון את היתרה. הקש כדי לנסות שוב.",
+    "balanceLoadFailed": "לא ניתן לטעון את היתרה",
     "hideBalance": "הסתר יתרה",
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",
@@ -408,6 +433,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "כדי לצלם תמונה, צריך לאפשר גישה למצלמה בהגדרות."
+    },
+    "botStatus": {
+      "offline": "מנותק"
     }
   },
   "codeReviewer": {
@@ -1092,6 +1120,7 @@
       "actionFailed": "לא ניתן להשלים את הפעולה הזו. נסה שוב.",
       "actionBlocked": "לא ניתן להשלים את הפעולה הזו. יש לתקן את הבעיה לפני שניתן יהיה לנסות שוב.",
       "syncNoRepositories": "אין מאגרים בהיקף הסנכרון. יש לבחור את המאגרים שסוכן האבטחה עוקב אחריהם, ואז לסנכרן שוב.",
+      "syncNoRepositoriesNoManage": "אין מאגרים בהיקף הסנכרון. על בעל ארגון, מנהל או מנהל חיובים לחבר מאגרים לפני שניתן לסנכרן.",
       "syncIntegrationInactive": "החיבור של GitHub עבור סוכן האבטחה אינו פעיל. יש לחבר מחדש את אפליקציית Kilo GitHub, ואז לסנכרן שוב.",
       "syncMissingPermission": "אפליקציית Kilo GitHub אינה יכולה לקרוא vulnerability alerts. יש להעניק הרשאה זו ב-GitHub, ואז לסנכרן שוב.",
       "configConflict": "ההגדרות של סוכן האבטחה שונו במקום אחר. בדוק את ההגדרות העדכניות ושמור שוב."
@@ -1283,6 +1312,7 @@
       "emptyDescription": "שלח הודעה למטה כדי להתחיל.",
       "scrollToBottom": "גלילה לתחתית",
       "emptyTitle": "אין עדיין הודעות",
+      "emptyReadOnlyTitle": "אין הודעות בסשן הזה",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
       "cloningSession": "משכפל סשן…",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
@@ -1382,7 +1412,7 @@
       "selectRepositoryToStart": "בחר מאגר כדי להתחיל.",
       "enterPromptToStart": "הוסף פרומפט כדי להתחיל.",
       "enterPromptOrFileToStart": "הוסף פרומפט או קובץ כדי להתחיל.",
-      "connectProviderToStart": "חבר ספק כדי להתחיל.",
+      "connectProviderToStart": "מאגרים מגיעים מחשבון מחובר של GitHub, GitLab או Bitbucket.",
       "promptPlaceholder": "על מה תרצה לעבוד?",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",
       "prefillRepoAndModelUnavailable": "המאגר והמודל מהסשן המקורי כבר אינם זמינים. בחר מאגר ומודל אחרים למטה.",
@@ -1568,6 +1598,8 @@
       "assistantStopped": "התשובה הופסקה.",
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
       "assistantProviderError": "הספק החזיר שגיאה.",
+      "assistantProviderRefused": "הספק סירב לבקשה זו ולא ניתן לנסות אותה שוב.",
+      "assistantCreditsRefusal": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent.",
       "assistantOutputLimit": "התשובה הגיעה למגבלת הפלט של המודל.",
       "assistantStructuredOutput": "התשובה לא התאימה לפורמט הנדרש.",
       "assistantFailed": "יצירת התשובה נכשלה."
@@ -1600,6 +1632,7 @@
       "preparingEnvironment": "מכין את הסביבה",
       "preparationComplete": "ההכנה הושלמה",
       "preparationFailed": "ההכנה נכשלה",
+      "preparationStageFailed": "{{stage}} נכשל",
       "setupCommand": "פקודת הכנה {{index}}",
       "setupCommandOf": "פקודת הכנה {{index}} מתוך {{displayCount}}",
       "stepWorkspaceSetup": "מגדיר את סביבת העבודה",
@@ -1638,7 +1671,7 @@
       "detailSetupCommandTimedOut": "פקודת ההכנה {{index}} חרגה מהזמן",
       "detailColdRestore": "שחזור קר, תמונת מצב הוחלה, שחזור קבצים: {{applied}} מתוך {{total}}",
       "detailProgressPercent": "{{percent}}% הושלם",
-      "detailRestoreIncompleteReport": "שחזור ההפעלה לא הושלם, קבצים ללא שחזור: {{skipped}} מתוך {{total}} ({{reasons}})",
+      "detailRestoreIncompleteFiles": "קבצים ללא שחזור: {{skipped}} מתוך {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "חסרים: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ועוד {{omitted}}",
       "detailReasonPatchFailed": "הטלאי לא הוחל",
@@ -1891,16 +1924,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "גודל חלון ההקשר אינו זמין",
-      "tapToViewDetails": "הקש כדי לצפות בפרטי ההקשר.",
-      "costSuffix": ", עלות {{cost}}",
-      "tokensWindowUnavailable": "הקשר: {{used}} טוקנים, גודל חלון ההקשר אינו זמין",
-      "tokensUsage": "הקשר: {{used}} מתוך {{window}} טוקנים, {{percentage}} בשימוש",
+      "tapToViewDetails": " הקש כדי לצפות בפרטי ההקשר.",
+      "costClause": ", עלות {{cost}}",
+      "loadingCostSpoken": "עלות {{cost}}.",
+      "tokensWindowUnavailable": "הקשר: {{used}} טוקנים, גודל חלון ההקשר אינו זמין{{costClause}}.",
+      "tokensUsage": "הקשר: {{used}} מתוך {{window}} טוקנים, {{percentage}} בשימוש{{costClause}}.",
       "title": "שימוש בהקשר",
       "used": "בשימוש",
       "provider": "ספק",
       "totalCost": "עלות כוללת",
       "usageReflectsLatest": "נתוני השימוש משקפים את תשובת העוזר האחרונה שהושלמה.",
-      "usageUnavailable": "ניצול ההקשר אינו זמין",
+      "usageUnavailable": "ניצול ההקשר אינו זמין{{costClause}}.",
       "tokenUsage": "שימוש בטוקנים",
       "cacheRate": "שיעור השימוש במטמון",
       "modelsCount": "מודלים ({{displayCount}})",
@@ -1984,7 +2018,6 @@
   },
   "addCredits": {
     "cta": "הוספת קרדיטים",
-    "description": "הוסף קרדיטים כדי להמשיך להשתמש בשירות.",
     "billingPage": "דף החיוב"
   },
   "deviceSessions": {
@@ -2282,10 +2315,10 @@
     },
     "connect": {
       "checkFailedTitle": "לא ניתן היה לבדוק את החיבור ל-GitHub.",
-      "checkFailedMessage": "מצב ההתחברות אינו זמין עד לסיום הטעינה.",
+      "checkFailedMessage": "לא ניתן היה להתחבר אל GitHub. בדוק את החיבור ונסה שוב.",
       "checkFailedTitleGitLab": "לא ניתן היה לבדוק את החיבור ל-GitLab.",
       "checkFailedTitleBitbucket": "לא ניתן היה לבדוק את החיבור ל-Bitbucket.",
-      "providerCheckFailedMessage": "מצב החיבור אינו זמין עד לסיום הטעימה.",
+      "providerCheckFailedMessage": "לא ניתן היה להתחבר לספק. בדוק את החיבור ונסה שוב.",
       "reconnectTitle": "חיבור מחדש ל-GitHub",
       "reconnectTitleGitLab": "חיבור מחדש ל-GitLab",
       "reconnectTitleBitbucket": "חיבור מחדש ל-Bitbucket",
@@ -2432,7 +2465,6 @@
     },
     "fileList": {
       "filesList": "רשימת קבצים",
-      "filesViewed": "קבצים · נצפו {{viewed}} מתוך {{total}}",
       "layout": "פריסה",
       "listed": "(ברשימה)",
       "loadingFiles": "הקבצים נטענים",
@@ -3048,9 +3080,9 @@
       "searching": "חיפוש באינטרנט",
       "thinking": "חשיבה מעמיקה"
     },
-    "planOf": "מתוך",
+    "planProgress": "{{done}} מתוך {{total}}",
     "filesChanged": "קבצים שונו",
-    "finishedIn": "הסתיים תוך",
+    "finishedIn": "הסתיים תוך {{duration}}",
     "noActivityFor": "אין פעילות במשך",
     "prOpened": "בקשת משיכה נפתחה",
     "permissionWants": "רוצה להריץ",
@@ -3359,7 +3391,7 @@
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"
     },
-    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו. הוסף קרדיטים ונסה שוב."
+    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו."
   },
   "settingsTools": {
     "confirmTitle": "לאשר את השינוי הזה?"
@@ -3393,8 +3425,8 @@
     "saved": "הגדרות התראות ההוצאות נשמרו",
     "loadError": "לא ניתן לטעון את התראות ההוצאות.",
     "saveError": "לא ניתן לשמור את התראות ההוצאות.",
-    "empty": "התראות ההוצאות כבויות. הפעל אותן כדי ליידע את אנשי הקשר לחיוב של תחום זה.",
-    "noSpend": "עדיין לא נרשמה הוצאה",
+    "sendAlerts": "שלח התראות",
+    "noSpend": "אין עדיין הוצאות",
     "spend24h": "הוצאה ב־24 השעות האחרונות",
     "multiplierError": "הזן מכפיל של 1 או יותר",
     "permissionDenied": "אין לך הרשאה לנהל התראות הוצאות.",
@@ -3810,5 +3842,8 @@
     "noEnabledContexts": "אין הקשרים שבהם מופעלים דוחות מתוזמנים",
     "sourceBlocker": "הסשן דורש תשומת לב",
     "sourceMetadata": "מטא־נתונים של הסשן שנלכדו"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "לא ניתן היה לפתוח את תוצאת החיפוש הזו"
   }
 }

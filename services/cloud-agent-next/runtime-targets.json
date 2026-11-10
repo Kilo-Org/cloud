@@ -1,4 +1,10 @@
 {
-  "default": { "mode": "downloaded", "image": "runtime-free" },
+  "default": {
+    "mode": "downloaded",
+    "image": "runtime-free",
+    "kilo2": {
+      "orgIds": ["9d278969-5453-4ae3-a51f-a8d2274a7b56", "30f1620a-4aad-4456-bf4d-550f335e6f55"]
+    }
+  },
   "targets": {}
 }

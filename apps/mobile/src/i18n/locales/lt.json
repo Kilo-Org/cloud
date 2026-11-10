@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Nuotolinio valdymo per v2 CLI demonstracija",
+    "sessionsEmpty": "Dar nėra v2 CLI sesijų",
+    "hosts": "Prisijungę vykdymo procesai",
+    "hostsEmpty": "Nėra prisijungusių vykdymo procesų",
+    "directory": "Darbinis katalogas",
+    "createSession": "Sukurti v2 CLI sesiją",
+    "queueIfOffline": "Įtraukti užklausą į eilę, jei vykdymo procesas atsijungęs",
+    "prompt": "Užklausa arba /command",
+    "localClear": "Išvalyti vietinį rodinį",
+    "abort": "Nutraukti ėjimą",
+    "failed": "Nepavyko atlikti nuotolinio v2 CLI veiksmo",
+    "creationUnknown": "Sukūrimo rezultatas nežinomas. Prieš bandydami dar kartą, atnaujinkite sesijų sąrašą.",
+    "commandFailed": "Vykdymo proceso komanda nepavyko",
+    "invalidReply": "Netinkamas vykdymo proceso atsakymas",
+    "unsafeCommand": "Naudokite /compact, /new, /skill, /models, /agents arba /clear (tik vietiniam rodiniui).",
+    "status": "Ryšys: {{connection}} · Vykdymo procesas: {{runner}}",
+    "presenceStatus": "Vykdymo procesai: {{connection}}",
+    "commandStatus": "Komandos pristatymas: {{status}}",
+    "delivered": "Pristatyta",
+    "expired": "Galiojimas baigėsi"
+  },
   "common": {
     "cancel": "Atšaukti",
     "done": "Baigti",
@@ -110,6 +132,7 @@
     "newSession": "Nauja sesija",
     "noModelsAvailable": "Nėra modelių",
     "notFound": "Nerasta.",
+    "online": "Prisijungęs",
     "open": "Atidaryti {{name}}",
     "openPullRequest": "Atidaryti pakeitimų užklausą",
     "completed": "Baigta",
@@ -186,6 +209,7 @@
     "resendCode": "Siųsti kodą iš naujo",
     "termsPrefix": "Tęsdamas sutinki su mūsų ",
     "terms": "Sąlygomis",
+    "termsInSentence": "Sąlygomis",
     "termsConnector": " ir ",
     "termsSuffix": ".",
     "moreSignInOptions": "Daugiau prisijungimo parinkčių",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Patvirtinti ištrynimą",
     "credits": "Kreditai",
     "failedToLoadBalance": "Nepavyko įkelti likučio. Bakstelėkite, kad bandytumėte dar kartą.",
+    "balanceLoadFailed": "Nepavyko įkelti likučio",
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Šioje pakeitimų užklausoje nėra failų pakeitimų.",
     "fileList": {
       "openNavigator": "Atidaryti failų naršyklę",
-      "filesViewed": "Failai · peržiūrėta {{viewed}} iš {{total}}",
       "listed": "(sąraše)",
       "layout": "Išdėstymas",
       "unified": "Bendras",
@@ -702,10 +726,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nepavyko patikrinti GitHub ryšio.",
-      "checkFailedMessage": "Kol duomenys neįkelti, prisijungimo būsena nepasiekiama.",
+      "checkFailedMessage": "Nepavyko pasiekti GitHub. Patikrink ryšį ir bandyk dar kartą.",
       "checkFailedTitleGitLab": "Nepavyko patikrinti GitLab ryšio.",
       "checkFailedTitleBitbucket": "Nepavyko patikrinti Bitbucket ryšio.",
-      "providerCheckFailedMessage": "Ryšio būsena bus prieinama įkėlus duomenis.",
+      "providerCheckFailedMessage": "Nepavyko pasiekti tiekėjo. Patikrink ryšį ir bandyk dar kartą.",
       "reconnectTitle": "Prisijungti prie GitHub iš naujo",
       "reconnectTitleGitLab": "Prisijungti prie GitLab iš naujo",
       "reconnectTitleBitbucket": "Prisijungti prie Bitbucket iš naujo",
@@ -989,6 +1013,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Jei nori fotografuoti, nustatymuose leisk naudoti kamerą."
+    },
+    "botStatus": {
+      "offline": "Atsijungęs"
     }
   },
   "codeReviewer": {
@@ -1687,6 +1714,7 @@
       "actionFailed": "Nepavyko užbaigti šio veiksmo. Bandyk dar kartą.",
       "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą.",
       "syncNoRepositories": "Sinchronizavimo apimtyje nėra saugyklų. Pasirinkite saugyklas, kurias stebi Saugos agentas, ir sinchronizuokite dar kartą.",
+      "syncNoRepositoriesNoManage": "Sinchronizavimo apimtyje nėra saugyklų. Kad būtų galima sinchronizuoti, organizacijos savininkas, administratorius arba atsiskaitymų administratorius turi prijungti saugyklas.",
       "syncIntegrationInactive": "Saugos agento GitHub ryšys neaktyvus. Iš naujo prijunkite Kilo GitHub App, tada sinchronizuokite dar kartą.",
       "syncMissingPermission": "Kilo GitHub programėlė negali skaityti vulnerability alerts. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą.",
       "configConflict": "Saugos agento nustatymai pakeisti kitoje vietoje. Peržiūrėk naujausius nustatymus ir išsaugok dar kartą."
@@ -1882,6 +1910,7 @@
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
+      "emptyReadOnlyTitle": "Šioje sesijoje nėra žinučių",
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos.",
@@ -1981,7 +2010,7 @@
       "selectRepositoryToStart": "Norėdami pradėti, pasirinkite saugyklą.",
       "enterPromptToStart": "Norėdami pradėti, pridėkite promptą.",
       "enterPromptOrFileToStart": "Norėdami pradėti, pridėkite promptą arba failą.",
-      "connectProviderToStart": "Norėdami pradėti, prijunkite paslaugų teikėją.",
+      "connectProviderToStart": "Saugyklos gaunamos iš susietos GitHub, GitLab arba Bitbucket paskyros.",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių.",
       "prefillRepoAndModelUnavailable": "Pradinės sesijos saugykla ir modelis nebepasiekiami. Pasirinkite kitus žemiau.",
@@ -2171,6 +2200,8 @@
       "assistantStopped": "Atsakymo generavimas sustabdytas.",
       "assistantContextOverflow": "Pokalbis per ilgas šiam modeliui.",
       "assistantProviderError": "Teikėjas grąžino klaidą.",
+      "assistantProviderRefused": "Teikėjas atmetė šią užklausą, todėl jos pakartoti nebegalima.",
+      "assistantCreditsRefusal": "Nepakanka kreditų „Cloud Agent“ paleisti.",
       "assistantOutputLimit": "Atsakymas pasiekė modelio išvesties limitą.",
       "assistantStructuredOutput": "Atsakymas neatitiko reikalaujamo formato.",
       "assistantFailed": "Nepavyko sugeneruoti atsakymo."
@@ -2203,6 +2234,7 @@
       "preparingEnvironment": "Rengiama aplinka",
       "preparationComplete": "Parengimas baigtas",
       "preparationFailed": "Parengimas nepavyko",
+      "preparationStageFailed": "{{stage}}: nepavyko",
       "setupCommand": "Sąrankos komanda {{index}}",
       "setupCommandOf": "Sąrankos komanda {{index}} iš {{displayCount}}",
       "stepWorkspaceSetup": "Darbo srities sąranka",
@@ -2241,7 +2273,7 @@
       "detailSetupCommandTimedOut": "Baigėsi sąrankos komandos {{index}} laikas",
       "detailColdRestore": "Šaltis atkūrimas, momentinė kopija pritaikyta, atkurti failai: {{applied}} iš {{total}}",
       "detailProgressPercent": "Atlikta {{percent}}%",
-      "detailRestoreIncompleteReport": "Sesijos atkūrimas neišsamus, neatkurti failai: {{skipped}} iš {{total}} ({{reasons}})",
+      "detailRestoreIncompleteFiles": "Neatkurti failai: {{skipped}} iš {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Trūksta: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ir dar {{omitted}}",
       "detailReasonPatchFailed": "patch nepavyko pritaikyti",
@@ -2498,16 +2530,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Konteksto lango dydis nežinomas",
-      "tapToViewDetails": "Bakstelėkite, kad pamatytumėte konteksto informaciją.",
-      "costSuffix": ", kaina {{cost}}",
-      "tokensWindowUnavailable": "Konteksto žetonų: {{used}}, lango dydis nežinomas",
-      "tokensUsage": "Konteksto žetonų: {{used}} iš {{window}}, panaudota {{percentage}}",
+      "tapToViewDetails": " Bakstelėkite, kad pamatytumėte konteksto informaciją.",
+      "costClause": ", kaina {{cost}}",
+      "loadingCostSpoken": "kaina {{cost}}.",
+      "tokensWindowUnavailable": "Konteksto žetonų: {{used}}, lango dydis nežinomas{{costClause}}.",
+      "tokensUsage": "Konteksto žetonų: {{used}} iš {{window}}, panaudota {{percentage}}{{costClause}}.",
       "title": "Konteksto naudojimas",
       "used": "Panaudota",
       "provider": "Teikėjas",
       "totalCost": "Bendra kaina",
       "usageReflectsLatest": "Naudojimo duomenys atitinka paskutinį baigtą asistento atsakymą.",
-      "usageUnavailable": "Konteksto naudojimas neprieinamas",
+      "usageUnavailable": "Konteksto naudojimas neprieinamas{{costClause}}.",
       "tokenUsage": "Žetonų naudojimas",
       "cacheRate": "Iš talpyklos gauta dalis",
       "modelsCount": "Modeliai ({{displayCount}})",
@@ -2594,7 +2627,6 @@
   },
   "addCredits": {
     "cta": "Papildyti kreditus",
-    "description": "Papildykite kreditus, kad galėtumėte naudotis toliau.",
     "billingPage": "atsiskaitymų puslapis"
   },
   "deviceSessions": {
@@ -3100,9 +3132,9 @@
       "searching": "Paieška žiniatinklyje",
       "thinking": "Mąstoma"
     },
-    "planOf": "iš",
+    "planProgress": "{{done}} iš {{total}}",
     "filesChanged": "pakeisti failai",
-    "finishedIn": "Baigta per",
+    "finishedIn": "Baigta per {{duration}}",
     "noActivityFor": "Nėra veiklos",
     "prOpened": "Atidaryta pull užklausa",
     "permissionWants": "Nori vykdyti",
@@ -3412,7 +3444,7 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     },
-    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti. Papildykite kreditų ir bandykite dar kartą."
+    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti."
   },
   "settingsTools": {
     "confirmTitle": "Patvirtinti šį pakeitimą?"
@@ -3446,8 +3478,8 @@
     "saved": "Išlaidų įspėjimų nustatymai išsaugoti",
     "loadError": "Nepavyko įkelti išlaidų įspėjimų.",
     "saveError": "Nepavyko išsaugoti išlaidų įspėjimų.",
-    "empty": "Išlaidų įspėjimai išjungti. Įjunk juos, kad įspėtum šios srities atsiskaitymo kontaktus.",
-    "noSpend": "Išlaidų dar neužregistruota",
+    "sendAlerts": "Siųsti įspėjimus",
+    "noSpend": "Kol kas jokių išlaidų",
     "spend24h": "Išlaidos per paskutines 24 valandas",
     "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
     "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
@@ -3873,5 +3905,8 @@
     "noEnabledContexts": "Nė viename kontekste neįjungtos suplanuotos suvestinės",
     "sourceBlocker": "Sesijai reikia dėmesio",
     "sourceMetadata": "Užfiksuoti sesijos metaduomenys"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
   }
 }

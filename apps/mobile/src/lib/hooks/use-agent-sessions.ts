@@ -126,12 +126,16 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
     refetch: query.refetch,
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
+    isFetchNextPageError: query.isFetchNextPageError,
     isPlaceholderData: query.isPlaceholderData,
     fetchNextPage: query.fetchNextPage,
   };
 }
 
 // ── Main hook ────────────────────────────────────────────────────────
+
+/** Nothing retained for this scope, shared so the empty case allocates nothing. */
+const NO_CONFIRMED_ROWS: ActiveSession[] = [];
 
 export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const sortBy = resolveSortBy(options?.sortBy);
@@ -335,6 +339,11 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     activeIsPaused: active.isPaused,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
+    // The last next-page attempt failed. The loaded rows stay, so the footer
+    // owns a Retry that calls `fetchNextPage`, and the end-reach gate must stop
+    // re-firing until a page lands: the other paginated lists read the same
+    // flag for the same reason.
+    isFetchNextPageError: stored.isFetchNextPageError,
     fetchNextPage,
     // Pull-to-refresh, retry and the Share Gate's refresh reconcile page one
     // as well: after `maxPages` evicts page one, a plain stored `refetch()`
@@ -363,7 +372,7 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
   );
   const getSnapshot = useCallback(() => getActiveSessionsQueryMetadata(query), [query]);
   const metadata = useSyncExternalStore(subscribe, getSnapshot);
-  const activeSessions = useMemo(
+  const cacheSessions = useMemo(
     () =>
       sortActiveSessionsByCreatedAt(
         filterActiveSessionsByOrganization(
@@ -374,6 +383,54 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     [active.canRead, active.data, options?.organizationId]
   );
 
+  // The last accepted server answer listed sessions while the cache reads
+  // empty: that emptiness came from a write no server answer confirmed (a
+  // socket write, or the floor poll's own `setQueryData`), so it is not proof
+  // that nothing runs. The surface keeps the rows this hook instance last
+  // rendered, and a fresh instance (a remount, such as the route reset this
+  // finding reports) paints its loading card until the confirmation answer
+  // lands. Only an accepted answer that lists no sessions resolves the zero
+  // state.
+  const confirmedRowsRef = useRef<{ scopeKey: string; rows: ActiveSession[] }>({
+    scopeKey: '',
+    rows: NO_CONFIRMED_ROWS,
+  });
+  const scopeKey = JSON.stringify(active.queryKey);
+  useEffect(() => {
+    if (cacheSessions.length > 0) {
+      confirmedRowsRef.current = { scopeKey, rows: cacheSessions };
+    } else if (confirmedRowsRef.current.scopeKey !== scopeKey) {
+      // A context change must never show the previous context's rows (the same
+      // rule the render hold's scope key keeps).
+      confirmedRowsRef.current = { scopeKey, rows: NO_CONFIRMED_ROWS };
+    }
+  }, [cacheSessions, scopeKey]);
+  const retained = confirmedRowsRef.current;
+  const confirmedRows = retained.scopeKey === scopeKey ? retained.rows : NO_CONFIRMED_ROWS;
+  const unconfirmedEmpty = cacheSessions.length === 0 && metadata.acceptedSessionIds.size > 0;
+  const activeSessions = unconfirmedEmpty ? confirmedRows : cacheSessions;
+  // One confirmation per emptiness episode: the answer either lists the rows
+  // again or confirms the emptiness, and a repeated empty (rows back, then
+  // gone again) re-arms it. Without the latch a failing answer would loop. The
+  // fetch is also what a remount needs: the cached empty list can be fresh
+  // enough that mounting the query fetches nothing.
+  const confirmationRequestedRef = useRef(false);
+  // Aliased so the confirmation effect lists stable values (the query object
+  // itself is rebuilt every render).
+  const activeCanRead = active.canRead;
+  const activeRefetch = active.refetch;
+  useEffect(() => {
+    if (!unconfirmedEmpty) {
+      confirmationRequestedRef.current = false;
+      return;
+    }
+    if (!activeCanRead || confirmationRequestedRef.current) {
+      return;
+    }
+    confirmationRequestedRef.current = true;
+    void activeRefetch();
+  }, [unconfirmedEmpty, activeCanRead, activeRefetch]);
+
   // The socket writers (`sessions.list`, `sessions.heartbeat`,
   // `cli.disconnected`) empty the live set the moment a CLI socket blips, and
   // the reconnect restores the rows a moment later. Hold the last rows through
@@ -381,7 +438,7 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
   // the hold is scoped to the query key so a context change still loads.
   const renderedActiveSessions = useLiveSessionsHold({
     current: activeSessions,
-    scopeKey: JSON.stringify(active.queryKey),
+    scopeKey,
     canHold: active.canRead,
   });
 
@@ -391,7 +448,10 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     // to distinguish unconfirmed empty data from accepted empty success.
     isLoading: active.isLoading,
     isError: active.isError,
-    hasAcceptedSuccess: metadata.acceptedRevision > 0,
+    // Empty success needs the accepted answer to be the empty list. While an
+    // earlier answer still lists rows, the surface stays unresolved instead of
+    // presenting those rows as gone.
+    hasAcceptedSuccess: metadata.acceptedRevision > 0 && !unconfirmedEmpty,
     terminalError: metadata.terminalError,
     isFetching: active.canRead && active.isFetching,
     isPaused: active.canRead && active.isPaused,

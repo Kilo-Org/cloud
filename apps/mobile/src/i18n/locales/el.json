@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Επίδειξη απομακρυσμένου ελέγχου native",
+    "sessionsEmpty": "Δεν υπάρχουν ακόμη συνεδρίες native",
+    "hosts": "Host σε σύνδεση",
+    "hostsEmpty": "Δεν υπάρχουν host σε σύνδεση",
+    "directory": "Κατάλογος εργασίας",
+    "createSession": "Δημιουργία συνεδρίας native",
+    "queueIfOffline": "Προτροπή σε αναμονή αν ο host είναι εκτός σύνδεσης",
+    "prompt": "Προτροπή ή /command",
+    "localClear": "Εκκαθάριση τοπικής προβολής",
+    "abort": "Διακοπή γύρου",
+    "failed": "Η ενέργεια απομακρυσμένου ελέγχου native απέτυχε",
+    "creationUnknown": "Άγνωστο αποτέλεσμα δημιουργίας. Ανανεώστε τις συνεδρίες πριν δοκιμάσετε ξανά.",
+    "commandFailed": "Η εντολή προς τη διεργασία CLI απέτυχε",
+    "invalidReply": "Μη έγκυρη απάντηση από τη διεργασία CLI",
+    "unsafeCommand": "Χρησιμοποιήστε /compact, /new, /skill, /models, /agents ή /clear (μόνο τοπικά).",
+    "status": "Σύνδεση: {{connection}} · Διεργασία CLI: {{runner}}",
+    "presenceStatus": "Host: {{connection}}",
+    "commandStatus": "Παράδοση εντολής: {{status}}",
+    "delivered": "Παραδόθηκε",
+    "expired": "Έληξε"
+  },
   "common": {
     "cancel": "Ακύρωση",
     "done": "Τέλος",
@@ -110,6 +132,7 @@
     "newSession": "Νέα συνεδρία",
     "noModelsAvailable": "Δεν υπάρχουν διαθέσιμα μοντέλα",
     "notFound": "Δεν βρέθηκε.",
+    "online": "Σε σύνδεση",
     "open": "Άνοιγμα {{name}}",
     "openPullRequest": "Άνοιγμα αιτήματος ενσωμάτωσης",
     "completed": "Ολοκληρώθηκε",
@@ -186,6 +209,7 @@
     "resendCode": "Επαναποστολή κωδικού",
     "termsPrefix": "Συνεχίζοντας, αποδέχεσαι τους ",
     "terms": "όρους μας",
+    "termsInSentence": "όρους μας",
     "termsConnector": " και ",
     "termsSuffix": ".",
     "moreSignInOptions": "Περισσότερες επιλογές σύνδεσης",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Επιβεβαίωση διαγραφής",
     "credits": "Πιστώσεις",
     "failedToLoadBalance": "Δεν ήταν δυνατή η φόρτωση του υπολοίπου. Πάτησε για να δοκιμάσεις ξανά.",
+    "balanceLoadFailed": "Αδυναμία φόρτωσης υπολοίπου",
     "hideBalance": "Απόκρυψη υπολοίπου",
     "showBalance": "Εμφάνιση υπολοίπου",
     "balanceHidden": "Το υπόλοιπο είναι κρυφό",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Αυτό το αίτημα ενσωμάτωσης δεν περιέχει αλλαγές σε αρχεία.",
     "fileList": {
       "openNavigator": "Άνοιγμα περιήγησης αρχείων",
-      "filesViewed": "Αρχεία · {{viewed}} από {{total}} προβλήθηκαν",
       "listed": "(στη λίστα)",
       "layout": "Διάταξη",
       "unified": "Ενοποιημένη",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το GitHub.",
-      "checkFailedMessage": "Η κατάσταση σύνδεσης δεν είναι διαθέσιμη μέχρι να ολοκληρωθεί η φόρτωση.",
+      "checkFailedMessage": "Δεν ήταν δυνατή η σύνδεση με το GitHub. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
       "checkFailedTitleGitLab": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το GitLab.",
       "checkFailedTitleBitbucket": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το Bitbucket.",
-      "providerCheckFailedMessage": "Η κατάσταση σύνδεσης δεν είναι διαθέσιμη έως ότου φορτωθεί.",
+      "providerCheckFailedMessage": "Δεν ήταν δυνατή η σύνδεση με τον πάροχο. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
       "reconnectTitle": "Επανασύνδεση με το GitHub",
       "reconnectTitleGitLab": "Επανασύνδεση με το GitLab",
       "reconnectTitleBitbucket": "Επανασύνδεση με το Bitbucket",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Επίτρεψε την πρόσβαση στην κάμερα από τις ρυθμίσεις για να τραβήξεις φωτογραφία."
+    },
+    "botStatus": {
+      "offline": "Εκτός σύνδεσης"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Δεν ήταν δυνατή η ολοκλήρωση αυτής της ενέργειας. Δοκίμασε ξανά.",
       "actionBlocked": "Δεν ήταν δυνατή η ολοκλήρωση αυτής της ενέργειας. Το πρόβλημα πρέπει να διορθωθεί πρώτα.",
       "syncNoRepositories": "Κανένα αποθετήριο δεν βρίσκεται στο εύρος συγχρονισμού. Επιλέξτε τα αποθετήρια που παρακολουθεί ο Πράκτορας ασφάλειας και, στη συνέχεια, συγχρονίστε ξανά.",
+      "syncNoRepositoriesNoManage": "Κανένα αποθετήριο δεν βρίσκεται στο εύρος συγχρονισμού. Ένας κάτοχος του οργανισμού, διαχειριστής ή διαχειριστής χρέωσης πρέπει να συνδέσει αποθετήρια πριν να μπορεί να πραγματοποιηθεί συγχρονισμός.",
       "syncIntegrationInactive": "Η σύνδεση GitHub του Πράκτορα ασφάλειας δεν είναι ενεργή. Επανασυνδέστε την Kilo GitHub App και, στη συνέχεια, συγχρονίστε ξανά.",
       "syncMissingPermission": "Η εφαρμογή Kilo GitHub δεν μπορεί να διαβάσει ειδοποιήσεις ευπάθειας. Χορήγησε αυτό το δικαίωμα στο GitHub και μετά συγχρόνισε ξανά.",
       "configConflict": "Οι ρυθμίσεις του πράκτορα ασφάλειας άλλαξαν αλλού. Έλεγξε τις πιο πρόσφατες ρυθμίσεις και αποθήκευσε ξανά."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "Στείλε ένα μήνυμα παρακάτω για να ξεκινήσεις.",
       "scrollToBottom": "Μετάβαση στο κάτω μέρος",
       "emptyTitle": "Δεν υπάρχουν ακόμα μηνύματα",
+      "emptyReadOnlyTitle": "Δεν υπάρχουν μηνύματα σε αυτή τη συνεδρία",
       "renameAccessibility": "Μετονομασία συνεδρίας: {{title}}",
       "cloningSession": "Κλωνοποίηση συνεδρίας…",
       "couldNotLoadThisSession": "Δεν ήταν δυνατή η φόρτωση αυτής της συνεδρίας.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Επίλεξε ένα αποθετήριο για να ξεκινήσεις.",
       "enterPromptToStart": "Πρόσθεσε μια οδηγία για να ξεκινήσεις.",
       "enterPromptOrFileToStart": "Πρόσθεσε μια οδηγία ή ένα αρχείο για να ξεκινήσεις.",
-      "connectProviderToStart": "Σύνδεσε έναν πάροχο για να ξεκινήσεις.",
+      "connectProviderToStart": "Τα αποθετήρια προέρχονται από έναν συνδεδεμένο λογαριασμό GitHub, GitLab ή Bitbucket.",
       "promptPlaceholder": "Με τι θέλεις να ασχοληθείς;",
       "couldNotLoadModels": "Δεν ήταν δυνατή η φόρτωση των μοντέλων.",
       "prefillRepoAndModelUnavailable": "Το αποθετήριο και το μοντέλο της αρχικής συνεδρίας δεν είναι πλέον διαθέσιμα. Επίλεξε άλλα παρακάτω.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "Η δημιουργία της απάντησης διακόπηκε.",
       "assistantContextOverflow": "Η συνομιλία είναι πολύ μεγάλη για το μοντέλο.",
       "assistantProviderError": "Ο πάροχος επέστρεψε ένα σφάλμα.",
+      "assistantProviderRefused": "Ο πάροχος απέρριψε αυτό το αίτημα και δεν μπορεί να επαναληφθεί.",
+      "assistantCreditsRefusal": "Δεν υπάρχουν αρκετές πιστώσεις για την εκτέλεση του Cloud Agent.",
       "assistantOutputLimit": "Η απάντηση έφτασε το όριο εξόδου του μοντέλου.",
       "assistantStructuredOutput": "Η απάντηση δεν είχε την απαιτούμενη μορφή.",
       "assistantFailed": "Η δημιουργία της απάντησης απέτυχε."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Προετοιμασία περιβάλλοντος",
       "preparationComplete": "Η προετοιμασία ολοκληρώθηκε",
       "preparationFailed": "Η προετοιμασία απέτυχε",
+      "preparationStageFailed": "Αποτυχία: {{stage}}",
       "setupCommand": "Εντολή ρύθμισης {{index}}",
       "setupCommandOf": "Εντολή ρύθμισης {{index}} από {{displayCount}}",
       "stepWorkspaceSetup": "Ρύθμιση χώρου εργασίας",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "Η εντολή ρύθμισης {{index}} ξεπέρασε το χρονικό όριο",
       "detailColdRestore": "Cold restore, εφαρμόστηκε στιγμιότυπο, αρχεία που επαναφέρθηκαν: {{applied}} από {{total}}",
       "detailProgressPercent": "Ολοκληρώθηκε {{percent}}%",
-      "detailRestoreIncompleteReport": "Η επαναφορά συνεδρίας δεν ολοκληρώθηκε — αρχεία που δεν επαναφέρθηκαν: {{skipped}} από {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Αρχεία που δεν επαναφέρθηκαν: {{skipped}} από {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Λείπουν: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} και άλλα {{omitted}}",
       "detailReasonPatchFailed": "το patch δεν εφαρμόστηκε",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Μη διαθέσιμο μέγεθος παραθύρου συμφραζομένων",
-      "tapToViewDetails": "Πάτησε για να δεις τις λεπτομέρειες των συμφραζομένων.",
-      "costSuffix": ", κόστος {{cost}}",
-      "tokensWindowUnavailable": "Συμφραζόμενα: {{used}} διακριτικά, μη διαθέσιμο μέγεθος παραθύρου",
-      "tokensUsage": "Συμφραζόμενα: {{used}} από {{window}} διακριτικά, χρήση {{percentage}}",
+      "tapToViewDetails": " Πάτησε για να δεις τις λεπτομέρειες των συμφραζομένων.",
+      "costClause": ", κόστος {{cost}}",
+      "loadingCostSpoken": "κόστος {{cost}}.",
+      "tokensWindowUnavailable": "Συμφραζόμενα: {{used}} διακριτικά, μη διαθέσιμο μέγεθος παραθύρου{{costClause}}.",
+      "tokensUsage": "Συμφραζόμενα: {{used}} από {{window}} διακριτικά, χρήση {{percentage}}{{costClause}}.",
       "title": "Χρήση συμφραζομένων",
       "used": "Σε χρήση",
       "provider": "Πάροχος",
       "totalCost": "Συνολικό κόστος",
       "usageReflectsLatest": "Η χρήση αντικατοπτρίζει την τελευταία ολοκληρωμένη απάντηση του βοηθού.",
-      "usageUnavailable": "Η χρήση πλαισίου δεν είναι διαθέσιμη",
+      "usageUnavailable": "Η χρήση πλαισίου δεν είναι διαθέσιμη{{costClause}}.",
       "tokenUsage": "Χρήση διακριτικών",
       "cacheRate": "Ποσοστό χρήσης κρυφής μνήμης",
       "modelsCount": "Μοντέλα ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Προσθήκη πιστώσεων",
-    "description": "Πρόσθεσε πιστώσεις για να συνεχίσεις τη χρήση.",
     "billingPage": "σελίδα χρέωσης"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Αναζήτηση ιστού",
       "thinking": "Εμβάθυνση"
     },
-    "planOf": "από",
+    "planProgress": "{{done}} από {{total}}",
     "filesChanged": "αρχεία άλλαξαν",
-    "finishedIn": "Ολοκληρώθηκε σε",
+    "finishedIn": "Ολοκληρώθηκε σε {{duration}}",
     "noActivityFor": "Καμία δραστηριότητα για",
     "prOpened": "Άνοιξε pull request",
     "permissionWants": "Θέλει να εκτελέσει",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Αυτό το μοντέλο υποστηρίζει ένταση σκέψης"
     },
-    "creditsRequired": "Δεν υπάρχουν αρκετές πιστώσεις για την αποστολή αυτού του μηνύματος. Προσθέστε πιστώσεις και δοκιμάστε ξανά."
+    "creditsRequired": "Δεν υπάρχουν αρκετές πιστώσεις για την αποστολή αυτού του μηνύματος."
   },
   "settingsTools": {
     "confirmTitle": "Επιβεβαίωση αυτής της αλλαγής;"
@@ -3340,8 +3372,8 @@
     "saved": "Οι ρυθμίσεις ειδοποιήσεων δαπανών αποθηκεύτηκαν",
     "loadError": "Δεν ήταν δυνατή η φόρτωση των ειδοποιήσεων δαπανών.",
     "saveError": "Δεν ήταν δυνατή η αποθήκευση των ειδοποιήσεων δαπανών.",
-    "empty": "Οι ειδοποιήσεις δαπανών είναι ανενεργές. Ενεργοποίησέ τις για να ειδοποιούνται οι επαφές χρέωσης του λογαριασμού ή οργανισμού.",
-    "noSpend": "Δεν έχει καταγραφεί ακόμη καμία δαπάνη",
+    "sendAlerts": "Στείλε ειδοποιήσεις",
+    "noSpend": "Καμία δαπάνη ακόμη",
     "spend24h": "Δαπάνη τις τελευταίες 24 ώρες",
     "multiplierError": "Εισήγαγε πολλαπλασιαστή 1 ή μεγαλύτερο",
     "permissionDenied": "Δεν έχεις δικαίωμα να διαχειρίζεσαι τις ειδοποιήσεις δαπανών.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Δεν υπάρχουν ενεργοποιημένα πλαίσια για προγραμματισμένες αναφορές",
     "sourceBlocker": "Η συνεδρία χρειάζεται προσοχή",
     "sourceMetadata": "Καταγεγραμμένα μεταδεδομένα συνεδρίας"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Δεν ήταν δυνατό το άνοιγμα αυτού του αποτελέσματος αναζήτησης"
   }
 }

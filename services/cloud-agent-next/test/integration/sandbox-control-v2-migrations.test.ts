@@ -10,6 +10,8 @@ import {
   allocation as allocationTable,
   routes as routesTable,
   scopeGrants,
+  workspaceDiskAllocation,
+  workspaceDiskSnapshots,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -36,6 +38,7 @@ type MigrationDb = ReturnType<typeof drizzle>;
 const EXPECTED_ALLOCATION_COLUMNS: ColumnSignature[] = [
   { name: 'allocation_id', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'connection_id', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
+  { name: 'create_attempt', type: 'integer', notnull: 1, dflt_value: '0', pk: 0 },
   { name: 'create_deadline_at', type: 'integer', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'first_connect_deadline_at', type: 'integer', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
@@ -69,6 +72,8 @@ const CONSOLIDATED_MIGRATION_AT = 1790455891314;
 const SCOPE_GRANTS_MIGRATION_AT = 1790793579352;
 const REPO_KEY_MIGRATION_AT = 1790860790832;
 const ROUTE_ENVIRONMENT_MIGRATION_AT = 1792104724546;
+const WORKSPACE_DISK_MIGRATION_AT = 1793713237356;
+const CREATE_ATTEMPT_MIGRATION_AT = 1794145671968;
 
 const OLD_FOUR_MIGRATIONS = {
   journal: {
@@ -119,6 +124,8 @@ function newSandboxStub(): DurableObjectStub<SandboxControlV2> {
 }
 
 function clearSchema(db: MigrationDb): void {
+  db.run(sql`DROP TABLE IF EXISTS workspace_disk_allocation`);
+  db.run(sql`DROP TABLE IF EXISTS workspace_disk_snapshots`);
   db.run(sql`DROP TABLE IF EXISTS scope_grants`);
   db.run(sql`DROP TABLE IF EXISTS allocation`);
   db.run(sql`DROP TABLE IF EXISTS routes`);
@@ -174,9 +181,26 @@ describe('sandbox control V2 consolidated migrations', () => {
 
       await migrate(db, migrations);
 
-      expect(appTableNames(db)).toEqual(['allocation', 'routes', 'scope_grants']);
+      expect(appTableNames(db)).toEqual([
+        'allocation',
+        'routes',
+        'scope_grants',
+        'workspace_disk_allocation',
+        'workspace_disk_snapshots',
+      ]);
       expect(columnSignatures(db, 'allocation')).toEqual(EXPECTED_ALLOCATION_COLUMNS);
       expect(columnSignatures(db, 'routes')).toEqual(EXPECTED_ROUTES_COLUMNS);
+      expect(columnSignatures(db, 'workspace_disk_allocation')).toEqual([
+        { name: 'data', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+      ]);
+      expect(columnSignatures(db, 'workspace_disk_snapshots')).toEqual([
+        { name: 'data', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'workspace_id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+      ]);
+      expect(db.select().from(workspaceDiskAllocation).all()).toEqual([]);
+      expect(db.select().from(workspaceDiskSnapshots).all()).toEqual([]);
+
       expect(columnSignatures(db, 'scope_grants')).toEqual([
         { name: 'grant', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
         { name: 'id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
@@ -186,6 +210,8 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: SCOPE_GRANTS_MIGRATION_AT },
         { hash: '', created_at: REPO_KEY_MIGRATION_AT },
         { hash: '', created_at: ROUTE_ENVIRONMENT_MIGRATION_AT },
+        { hash: '', created_at: WORKSPACE_DISK_MIGRATION_AT },
+        { hash: '', created_at: CREATE_ATTEMPT_MIGRATION_AT },
       ]);
       const applied = appliedMigrations(db);
       await migrate(db, migrations);
@@ -205,13 +231,12 @@ describe('sandbox control V2 consolidated migrations', () => {
       const oldApplied = appliedMigrations(db);
       expect(oldApplied.at(-1)?.created_at).toBe(1790511032804);
 
-      await db.insert(allocationTable).values({
-        id: 'current',
-        state: 'stopped',
-        stop_attempt: 0,
-        stop_pending: false,
-        unconfirmed_provider_ref: '{"fixture":"old-provider-ref"}',
-      });
+      // Raw SQL: the table schema already has `create_attempt`, which the old
+      // database lacks.
+      db.run(
+        sql`INSERT INTO allocation (id, state, stop_attempt, stop_pending, unconfirmed_provider_ref)
+            VALUES ('current', 'stopped', 0, 0, '{"fixture":"old-provider-ref"}')`
+      );
       // Raw SQL: the table schema already has `repo_key`, which the old database lacks.
       db.run(
         sql`INSERT INTO routes (session_id, spec, state, attempt_id, updated_at, grant, credential_source)
@@ -226,10 +251,23 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: SCOPE_GRANTS_MIGRATION_AT },
         { hash: '', created_at: REPO_KEY_MIGRATION_AT },
         { hash: '', created_at: ROUTE_ENVIRONMENT_MIGRATION_AT },
+        { hash: '', created_at: WORKSPACE_DISK_MIGRATION_AT },
+        { hash: '', created_at: CREATE_ATTEMPT_MIGRATION_AT },
       ]);
       expect(db.select().from(scopeGrants).all()).toEqual([]);
-      expect(columnSignatures(db, 'allocation')).toEqual(oldAllocationColumns);
+      expect(columnSignatures(db, 'allocation')).toEqual(EXPECTED_ALLOCATION_COLUMNS);
       expect(columnSignatures(db, 'routes')).toEqual(EXPECTED_ROUTES_COLUMNS);
+      expect(columnSignatures(db, 'workspace_disk_allocation')).toEqual([
+        { name: 'data', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+      ]);
+      expect(columnSignatures(db, 'workspace_disk_snapshots')).toEqual([
+        { name: 'data', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'workspace_id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+      ]);
+      expect(db.select().from(workspaceDiskAllocation).all()).toEqual([]);
+      expect(db.select().from(workspaceDiskSnapshots).all()).toEqual([]);
+
       expect(
         columnSignatures(db, 'routes').filter(
           column => column.name !== 'repo_key' && column.name !== 'environment'

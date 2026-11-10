@@ -10,6 +10,7 @@ import { sendMagicLink } from '@/lib/auth/send-magic-link';
 import { shouldDiscardSsoHintOnError } from '@/lib/auth/sign-in-hint-recovery';
 import { SignInDiscoveryResponseSchema } from '@/lib/schemas/sso-organizations';
 import { orderNewAccountProviders, resolveSignInMethods } from '@/lib/auth/sign-in-methods';
+import { prepareWatchwoodSignup, submitWatchwoodSignup } from '@/lib/auth/watchwood.client';
 
 export type FlowState = 'landing' | 'provider-select' | 'magic-link-sent' | 'redirecting';
 export type Tier = 'returning' | 'new' | 'invite';
@@ -114,6 +115,10 @@ export function useSignInFlow({
   const saveHint = realHint.saveHint;
   // For storybook, consider hints always loaded; otherwise use the real loading state
   const isHintLoaded = storybookInitialState ? true : realHint.isLoaded;
+
+  useEffect(() => {
+    if (!storybookInitialState) void prepareWatchwoodSignup();
+  }, [storybookInitialState]);
   const [isInviteCleared, setIsInviteCleared] = useState(false);
 
   // Determine tier based on hint and params
@@ -666,6 +671,9 @@ export function useSignInFlow({
           setTurnstileError(true);
           return;
         }
+
+        await submitWatchwoodSignup();
+        if (!isCurrentDiscoveryRequest(discoveryGeneration)) return;
 
         // Handle SSO redirect (from returning user or invite)
         const pendingSSOOrgId = pendingSSOOrgIdRef.current;

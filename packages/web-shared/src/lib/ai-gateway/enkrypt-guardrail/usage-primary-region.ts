@@ -6,7 +6,7 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   ENKRYPT_USAGE_WRITE_PATH,
   EnkryptUsageWriteResponseSchema,
-  type EnkryptUsageWrite,
+  type EnkryptUsageWriteInput,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 
 /** Must stay below the endpoint's `maxDuration`; matches `recordUsageInPrimaryRegion`. */
@@ -17,7 +17,7 @@ const HANDOFF_TIMEOUT_MS = 90_000;
  * Returns false when the write may not have happened there, so the caller writes it locally.
  */
 export async function recordEnkryptUsageInPrimaryRegion(
-  usageWrite: EnkryptUsageWrite
+  usageWrite: EnkryptUsageWriteInput
 ): Promise<boolean> {
   const reason = await handOff(usageWrite);
   if (reason === null) return true;
@@ -35,7 +35,7 @@ export async function recordEnkryptUsageInPrimaryRegion(
   return false;
 }
 
-async function handOff(usageWrite: EnkryptUsageWrite): Promise<string | null> {
+async function handOff(usageWrite: EnkryptUsageWriteInput): Promise<string | null> {
   if (!INTERNAL_API_SECRET) return 'missing_internal_api_secret';
   if (!APP_URL) return 'missing_app_url';
 

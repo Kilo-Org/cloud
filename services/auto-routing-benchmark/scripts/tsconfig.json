@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": [
+      "@types/node",
+      "@cloudflare/workers-types",
+      "../../auto-routing/worker-configuration.d.ts"
+    ]
+  },
+  "include": ["router-runtime.ts", "router-isolated-worker.ts"]
+}

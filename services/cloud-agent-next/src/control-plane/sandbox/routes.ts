@@ -36,6 +36,7 @@ import type { SyncAcceptedHandleStorage } from './accepted-handles.js';
 import { lastSentHandleKey } from './scope-handle-delivery.js';
 import { readScopeGrant, removeScopeMember, scopeGrantId } from './scope-grants.js';
 import { admissionFailureStage } from './scope-handle-adoption.js';
+import { VercelScmContainmentError } from '../../scm-broker/vercel-identity.js';
 
 export type RouteDatabase = ReturnType<typeof drizzle>;
 
@@ -71,6 +72,7 @@ export type RouteRecord = {
 export type RoutePreparationProgress = {
   step: ControlPlanePreparationStep;
   detail?: string;
+  snapshotCapturedAt?: number;
 };
 
 /** The grant outcome for a route attempt: a re-projected spec plus the grant. */
@@ -277,6 +279,10 @@ function redactRouteSpec(spec: ControlPlaneRouteSpec): ControlPlaneRouteSpec {
     ...(spec.branch === undefined ? {} : { branch: spec.branch }),
     ...(spec.branchMode === undefined ? {} : { branchMode: spec.branchMode }),
     ...(spec.setupCommands === undefined ? {} : { setupCommands: spec.setupCommands }),
+    ...(spec.startCommands === undefined ? {} : { startCommands: spec.startCommands }),
+    ...(spec.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
     attemptId: spec.attemptId,
   };
 }
@@ -287,7 +293,8 @@ export async function failRoute(
   attemptId: string,
   reason: ControlPlaneFailureReason,
   stage = 'route',
-  diagnostic?: GrantDiagnosticSnapshot
+  diagnostic?: GrantDiagnosticSnapshot,
+  subtype?: ControlPlaneWorkspaceFailureSubtype
 ): Promise<RouteRecord> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   const route: RouteRecord = {
@@ -307,9 +314,15 @@ export async function failRoute(
     attemptId,
     reason,
     stage,
+    subtype,
     ...(diagnostic === undefined ? {} : pickGrantDiagnosticFields(diagnostic)),
   });
-  await ctx.notify(spec.sessionId, { state: 'failed', attemptId, reason });
+  await ctx.notify(spec.sessionId, {
+    state: 'failed',
+    attemptId,
+    reason,
+    ...(subtype === undefined ? {} : { subtype }),
+  });
   return route;
 }
 
@@ -334,11 +347,12 @@ export async function failCurrentAttempt(
   sessionId: string,
   attemptId: string,
   reason: ControlPlaneFailureReason,
-  stage = 'attempt'
+  stage = 'attempt',
+  subtype?: ControlPlaneWorkspaceFailureSubtype
 ): Promise<void> {
   const route = await readRoute(ctx.db, sessionId);
   if (!isCurrentPreparingAttempt(route, attemptId)) return;
-  await failRoute(ctx, route.spec, attemptId, reason, stage);
+  await failRoute(ctx, route.spec, attemptId, reason, stage, undefined, subtype);
 }
 
 /**
@@ -365,6 +379,9 @@ export function grantIssueFailure(
   }
   if (error instanceof EnvironmentMemberCredentialError) {
     return { reason: 'repository_access_failed', stage: memberCredentialFailureStage(error) };
+  }
+  if (error instanceof VercelScmContainmentError) {
+    return { reason: error.reason, stage: admissionFailureStage(error, fallbackStage) };
   }
   return { reason: 'workspace_setup_failed', stage: admissionFailureStage(error, fallbackStage) };
 }

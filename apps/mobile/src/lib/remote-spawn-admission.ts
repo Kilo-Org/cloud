@@ -48,25 +48,17 @@ export function resolveRemoteStartPlan(input: RemoteStartPlanInput):
 }
 
 /**
- * The plan explanation a remote target shows before any press, or `null` when
- * it may start. Split from `resolveRemoteStartPlan` so the screen body asks one
- * question: a cloud target is never refused for the organization's plan (the
- * server's own gate answers that path and the form shows its rejection), and a
- * remote target reads the verdict the list already carries.
+ * The plan explanation the new-session form shows under the composer before any
+ * press, or `null` when the selected account may start. It answers for every
+ * run target: a Cloud Agent create is `organizations.cloudAgentNext.prepareSession`,
+ * an organization mutation that `requireActiveSubscriptionOrTrial` refuses for
+ * the same state, and a remote spawn is refused by `resolveRemoteStartPlan` at
+ * the press. Reading the verdict before the press is what keeps a lapsed
+ * organization's Start disabled with its reason on screen, instead of failing
+ * after a create or naming a step (a provider connect) that cannot fix it.
  */
-export function remoteStartPlanRefusal(input: {
-  /** True when the run target is a remote CLI instance (or the computer target). */
-  isRemoteTargetSelected: boolean;
-  organizationId?: string | null;
-  organizations?: readonly OrganizationPlanState[];
-}): string | null {
-  if (!input.isRemoteTargetSelected) {
-    return null;
-  }
-  const plan = resolveRemoteStartPlan({
-    organizationId: input.organizationId,
-    organizations: input.organizations,
-  });
+export function startPlanRefusal(input: RemoteStartPlanInput): string | null {
+  const plan = resolveRemoteStartPlan(input);
   return plan.allowed ? null : plan.toast;
 }
 

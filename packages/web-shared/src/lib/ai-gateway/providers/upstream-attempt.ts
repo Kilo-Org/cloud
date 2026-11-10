@@ -1,10 +1,23 @@
 import { after, NextResponse } from 'next/server';
+import { captureMessage } from '@sentry/nextjs';
 
 import {
   getToolsAvailable,
   getToolsUsed,
 } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
+import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
+import { invalidateClaudeOperatorToken } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
+import {
+  claudeBillingRefusalCodeFor,
+  isClaudeBillingConnectionDead,
+  isClaudeBillingRefusedStatus,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/refusal';
+import {
+  clearClaudeBillingRefusal,
+  markClaudeBillingUnavailable,
+  recordClaudeBillingRefusal,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import {
   isChatGptUserNotEligible,
   OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
@@ -20,6 +33,7 @@ import { readChatGptUsageLimit } from '@kilocode/web-shared/lib/ai-gateway/opena
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
@@ -89,7 +103,8 @@ export async function sendUpstreamAttempt({
     isNonTrialEnterprise,
     dataRegion
   );
-  if (costLimit) {
+  // This bound limits Kilo debits. The connected Claude organization pays its own bill.
+  if (costLimit && providerContext.provider.type !== CLAUDE_BILLING_PROVIDER_ID) {
     const decision = await enforceRequestCostLimit(
       costLimit.maximumMicrodollars,
       requestedModel,
@@ -132,12 +147,14 @@ export async function sendUpstreamAttempt({
 
   if (providerContext.provider.type === OPENAI_CHATGPT_PROVIDER_ID) {
     const owner = providerContext.provider.chatGptOwner;
-    await syncChatGptUsageLimit(result.response, owner);
-    await recordChatGptNotEligible(
-      result.response,
-      owner,
-      extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER]
-    );
+    // The token that served this request names the connection the report
+    // belongs to; a reconnect during the request replaces it.
+    const accessToken = extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER];
+    await syncChatGptUsageLimit(result.response, owner, accessToken);
+    await recordChatGptNotEligible(result.response, owner, accessToken);
+  }
+  if (providerContext.provider.type === CLAUDE_BILLING_PROVIDER_ID) {
+    await recordClaudeBillingRefusalResponse(result.response, providerContext.provider);
   }
 
   return {
@@ -146,6 +163,57 @@ export async function sendUpstreamAttempt({
     toolsAvailable: getToolsAvailable(request),
     toolsUsed: getToolsUsed(request),
   };
+}
+
+/**
+ * Keeps the stored Claude billing connection in step with Anthropic's answer.
+ * A `user_profile_not_billable` response means the connection can no longer
+ * bill, so later requests fail without an upstream call; the other refusals
+ * leave it usable and are recorded for the owner to explain. A billed request
+ * that succeeds clears the record. Best-effort: a database failure never
+ * changes the upstream response the caller already has.
+ */
+async function recordClaudeBillingRefusalResponse(
+  response: Response,
+  provider: Provider
+): Promise<void> {
+  if (response.status === 401) invalidateClaudeOperatorToken();
+  const userProfileId = provider.claudeBillingUserProfileId;
+  const connectedAt = provider.claudeBillingConnectedAt;
+  if (!userProfileId || !connectedAt) return;
+
+  try {
+    if (response.status < 400) {
+      after(async () => {
+        try {
+          await clearClaudeBillingRefusal(userProfileId, connectedAt);
+        } catch {
+          // Best-effort, like the refusal paths below.
+        }
+      });
+      return;
+    }
+    if (!isClaudeBillingRefusedStatus(response.status)) return;
+    const code = claudeBillingRefusalCodeFor(
+      response.status,
+      await response
+        .clone()
+        .json()
+        .catch(() => null)
+    );
+    if (!code) return;
+    if (isClaudeBillingConnectionDead(code)) {
+      captureMessage('Claude customer billing refused', {
+        level: 'error',
+        tags: { source: 'claude-billing', refusal_code: code },
+      });
+      await markClaudeBillingUnavailable(userProfileId, code, connectedAt);
+    } else {
+      await recordClaudeBillingRefusal(userProfileId, code, connectedAt);
+    }
+  } catch {
+    // Best-effort: the caller still receives the upstream response.
+  }
 }
 
 /**
@@ -160,23 +228,27 @@ export async function sendUpstreamAttempt({
  * that a person applied a reset in ChatGPT. The clear runs after the response,
  * so it never adds latency to a request that worked.
  *
- * The owner is the connection the provider named, so the record lands on the
- * exact row that served the request: the organization's shared-services
- * connection for a service run, and the caller's own row otherwise. Both
- * directions are best-effort: a database failure must never change the
- * request's outcome, which is the upstream response the caller already has.
+ * The owner is the connection the provider named, and the token is the
+ * credential that served this request: together they name the exact row the
+ * report belongs to. A reconnect that replaced the credential while the request
+ * was in flight owns a different connection, and the write is skipped, so the
+ * fresh connection never shows a limit it did not report. A request without a
+ * delegated token names no connection at all. Both directions are best-effort: a
+ * database failure must never change the request's outcome, which is the
+ * upstream response the caller already has.
  */
 async function syncChatGptUsageLimit(
   response: Response,
-  owner: OpenAiChatGptOwner | undefined
+  owner: OpenAiChatGptOwner | undefined,
+  accessToken: string | undefined
 ): Promise<void> {
-  if (!owner) return;
+  if (!owner || !accessToken) return;
 
   if (response.status < 400) {
     try {
       after(async () => {
         try {
-          await clearOpenAiChatGptUsageLimit(owner);
+          await clearOpenAiChatGptUsageLimit(owner, accessToken);
         } catch {
           // Best-effort, exactly like the record path below.
         }
@@ -193,7 +265,7 @@ async function syncChatGptUsageLimit(
   try {
     const limit = readChatGptUsageLimit(response.status, await response.clone().json());
     if (!limit) return;
-    await recordOpenAiChatGptUsageLimit(owner, limit);
+    await recordOpenAiChatGptUsageLimit(owner, accessToken, limit);
   } catch {
     // Best-effort: the caller still receives the upstream response.
   }

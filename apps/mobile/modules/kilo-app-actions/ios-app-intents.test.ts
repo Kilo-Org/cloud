@@ -1,5 +1,9 @@
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only contract check, runs in node, never bundled into the app
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only contract check, runs in node, never bundled into the app
+import { tmpdir } from 'node:os';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only contract check, runs in node, never bundled into the app
+import { join } from 'node:path';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only contract check, runs in node, never bundled into the app
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +17,7 @@ import {
   renderLocalizableStrings,
 } from '../../plugins/app-intent-copy.js';
 import { mergeIntoResourcesPhase } from '../../plugins/app-intent-resources.js';
+import { installPublisher, sourceFiles } from '../../plugins/kilo-app-intents-sources.js';
 import {
   APP_ACTION_IDS,
   APP_ACTION_SLUGS,
@@ -34,7 +39,15 @@ function readSource(name: string): string {
   return readFileSync(fileURLToPath(new URL(name, iosModuleDirectory)), 'utf8');
 }
 
-const intents = readSource('KiloAppIntents.swift');
+const intents = readSource('AppIntents/KiloAppIntents.swift');
+const jsBridgeSource = readFileSync(
+  fileURLToPath(new URL('../../src/lib/app-actions/native-bridge.ts', import.meta.url)),
+  'utf8'
+);
+const collectorSource = readFileSync(
+  fileURLToPath(new URL('../../src/lib/system-search-collect.ts', import.meta.url)),
+  'utf8'
+);
 const configSource = readFileSync(
   fileURLToPath(new URL('../../app.config.ts', import.meta.url)),
   'utf8'
@@ -156,8 +169,9 @@ describe('the four App Intents', () => {
     // `Localizable.strings` carries.
     const labels = intents.split('\n').filter(line => LABEL_LINE.test(line));
     // Four titles, four shortcut titles, the failure copy, and five parameters:
-    // one per action plus the session `StartAgent` takes as well.
-    expect(labels).toHaveLength(APP_ACTION_IDS.length * 3 + 2);
+    // one per action plus the session `StartAgent` takes as well — and, beside
+    // that, the named-session action's own title and its entity parameter.
+    expect(labels).toHaveLength(APP_ACTION_IDS.length * 3 + 4);
     const copy = new Set(Object.values(ENGLISH_COPY));
     for (const line of labels) {
       const literal = /"([^"]+)"/.exec(line)?.[1];
@@ -233,6 +247,141 @@ describe('the Swift action URLs', () => {
     for (const field of ['action', 'prompt', 'repository', 'sessionId', 'pullRequest']) {
       expect(intents, `${field} is not sent`).toContain(`"${field}"`);
     }
+  });
+});
+
+describe('the session entity catalog', () => {
+  const entity = readSource('AppIntents/KiloSessionEntity.swift');
+  const catalog = readSource('KiloSessionCatalog.swift');
+  const visible = readSource('AppIntents/KiloVisibleSession.swift');
+  const module = readSource('KiloAppActionsModule.swift');
+
+  it('resolves a session by id, by list, and by title', () => {
+    expect(entity).toContain('struct KiloSessionEntity: AppEntity {');
+    expect(entity).toContain('struct KiloSessionEntityQuery: EntityQuery, EntityStringQuery {');
+    // `EntityQuery` draws the picker and resolves a saved value; the string
+    // query is what lets Siri match a spoken title. Both are required, and a
+    // plain `EntityQuery` is not enough.
+    expect(entity).toContain('func entities(for identifiers: [String]) async throws');
+    expect(entity).toContain('func suggestedEntities() async throws');
+    expect(entity).toContain('func entities(matching string: String) async throws');
+  });
+
+  it('never answers an ambiguous name with one arbitrary session', () => {
+    // The query returns every match, so the system asks. An exact title narrows
+    // to that title's rows rather than picking the first of a containment set.
+    expect(entity).toContain('let exact = entries.filter');
+    expect(entity).toContain(': exact');
+  });
+
+  it('stores only the two fields the picker needs', () => {
+    const entry = swiftBlock(catalog, 'struct KiloSessionCatalogEntry:');
+    expect(entry.match(/\blet \w+: String/g)).toHaveLength(2);
+    expect(entry).toContain('let id: String');
+    expect(entry).toContain('let title: String');
+  });
+
+  it('keeps the catalog to the same bound the collector applies', () => {
+    expect(catalog).toContain('static let maxEntries = 50');
+    expect(collectorSource).toContain('const SESSION_CATALOG_MAX_ENTRIES = 50;');
+    expect(collectorSource).toContain('.slice(0, SESSION_CATALOG_MAX_ENTRIES)');
+  });
+
+  it('names the functions and the entries key the JS bridge uses', () => {
+    // One name per call, spelled the same on both sides: the JS wrapper is the
+    // only caller, and a rename on either side has to fail here rather than at
+    // run time on a device.
+    for (const name of [
+      'replaceSessionCatalog',
+      'clearSessionCatalog',
+      'setSessionCatalogLock',
+      'setSessionCatalogVisible',
+      'setVisibleSession',
+    ]) {
+      expect(module, `${name} is not exported`).toContain(`func ${name}(`);
+      expect(jsBridgeSource, `${name} is not called`).toContain(`${name}?:`);
+    }
+    expect(catalog).toContain('"kilo-app-actions-session-catalog"');
+  });
+
+  it('keeps every title out of the answers the lock covers', () => {
+    // The entity queries answer Siri and Shortcuts from a launch the lock
+    // surface never draws on, so the store decides: this process starts closed,
+    // opens when the app says it is unlocked, and closes again once the app has
+    // been in the background past the interval the lock allows. Nothing is
+    // wiped on those edges — the account boundaries own that — because a run
+    // the system starts still has to resolve the session a saved shortcut
+    // names.
+    expect(catalog).toContain('guard defaults.bool(forKey: lockEnabledKey)');
+    expect(catalog).toContain('guard visibility.isVisible else');
+    expect(catalog).toContain('UIApplication.didEnterBackgroundNotification');
+    expect(catalog).toContain('UIApplication.didBecomeActiveNotification');
+    expect(catalog).toContain('static func setVisible(');
+    expect(module).toContain('func setSessionCatalogVisible(visible: Bool)');
+    // The switch and the interval arrive together, and turning the lock off
+    // drops the window with them.
+    expect(module).toContain('func setSessionCatalogLock(enabled: Bool, intervalMs: Double)');
+    expect(catalog).toContain('defaults.removeObject(forKey: backgroundedAtKey)');
+    // Visibility is this process's, never the stored one: a persisted `true`
+    // would open the window a fresh launch has to keep closed.
+    expect(catalog).not.toContain('set(visible, forKey:');
+
+    const mountSource = readFileSync(
+      fileURLToPath(new URL('../../src/lib/system-search-index-mount.tsx', import.meta.url)),
+      'utf8'
+    );
+    // The mount hides and shows, and never wipes, on the lock's edges.
+    expect(mountSource).toContain("setSessionCatalogVisibleBestEffort(status === 'unlocked')");
+    expect(mountSource).toContain('setSessionCatalogLockBestEffort(enabled, BACKGROUND_LOCK_MS)');
+    expect(mountSource).not.toContain('clearSessionCatalogBestEffort');
+    // The interval has one source: the lock provider the app itself applies.
+    const lockSource = readFileSync(
+      fileURLToPath(new URL('../../src/lib/app-unlock-context.tsx', import.meta.url)),
+      'utf8'
+    );
+    expect(lockSource).toContain('export const BACKGROUND_LOCK_MS');
+  });
+
+  it('keeps the entity inside the deployment target the app builds for', () => {
+    // The app target builds for a floor below iOS 18, so the entity cannot
+    // declare a `@Property`: its synthesized `init()` needs a newer runtime and
+    // the whole target fails to compile.
+    expect(entity).not.toContain('@Property');
+    expect(entity).toContain('let id: String');
+    expect(entity).toContain('let title: String');
+    // A stored session is rebuilt by its identifier, so the query has to answer
+    // for identifiers as well as for titles.
+    expect(entity).toContain('func entities(for identifiers: [String])');
+    expect(entity).toContain('func suggestedEntities()');
+    expect(entity).toContain('func entities(matching string: String)');
+    // The identity lookup goes to the identifier resolver, so a run a person
+    // already configured still resolves while the lock withholds the list.
+    expect(entity).toContain('KiloSessionCatalogStore.entries(forIdentifiers: identifiers)');
+    expect(entity).not.toContain('let wanted = Set(identifiers)');
+    // Listing and spoken matching stay behind the lock.
+    expect(entity).toContain(
+      'KiloSessionCatalogStore.entries().map(KiloSessionEntity.init(entry:))'
+    );
+    // The resolver hands back the session without its title while withheld.
+    expect(catalog).toContain('static func entries(forIdentifiers identifiers: [String])');
+    expect(catalog).toContain('let withheld = isWithheld()');
+    expect(catalog).toContain('KiloSessionCatalogEntry(id: $0.id, title: "")');
+  });
+
+  it('guards the on-screen cue behind the iOS 18.2 runtime', () => {
+    // `NSUserActivity.appEntityIdentifier` starts at iOS 18.2. The app's floor
+    // is 16.4, so the publisher must return without touching the property and
+    // every older action keeps running.
+    expect(visible).toContain('guard #available(iOS 18.2, *) else {');
+    expect(visible).toContain('activity.appEntityIdentifier = EntityIdentifier(');
+  });
+
+  it('declares the new intent without a new slug or a new provider entry', () => {
+    const intent = swiftStruct('OpenNamedSessionIntent');
+    expect(intent).toContain('@Parameter(title: "Session")');
+    expect(intent).toContain('var session: KiloSessionEntity');
+    expect(intent).toContain('KiloAppActionTarget.openSession');
+    expect(intent).not.toContain('kiloapp:///');
   });
 });
 
@@ -350,5 +499,140 @@ describe('the app-target Resources phase', () => {
     expect(() => {
       mergeIntoResourcesPhase(project, 'app-target', created);
     }).toThrow(/no Resources phase to extend/);
+  });
+});
+
+// The intents compile in the app target and the pod excludes their directory:
+// a Swift file the plugin does not copy is compiled by neither target and
+// nothing fails. The set is the directory's own, so these checks pin the
+// derivation, both mods that consume it, and the AppDelegate edit.
+
+const INTENTS_PLUGIN = readFileSync(
+  fileURLToPath(new URL('../../plugins/withKiloAppIntents.js', import.meta.url)),
+  'utf8'
+);
+
+/** The directory the app target compiles, relative to the project root. */
+const APP_TARGET_PATH = join('modules', 'kilo-app-actions', 'ios', 'AppIntents');
+
+/** A generated `AppDelegate` in the shape the App Intents plugin edits. */
+const APP_DELEGATE = `import ExpoModulesCore
+import KiloAppActions
+
+@main
+class AppDelegate: ExpoAppDelegate {
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+  ) -> Bool {
+    let delegate = ReactNativeDelegate()
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+}
+`;
+
+/** A generated `AppDelegate` still carrying the declaration this plugin retired. */
+const APP_DELEGATE_WITH_RETIRED_PACKAGE = `import AppIntents
+import ExpoModulesCore
+
+@available(iOS 17.0, *)
+struct KiloAppIntentsPackage: AppIntentsPackage {
+  static var includedPackages: [any AppIntentsPackage.Type] {
+    []
+  }
+}
+
+@main
+class AppDelegate: ExpoAppDelegate {
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+  ) -> Bool {
+    let delegate = ReactNativeDelegate()
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+}
+`;
+
+describe('the app-target source set', () => {
+  it('reads every Swift file in the directory, and nothing else', () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'kilo-app-intents-'));
+    const directory = join(projectRoot, APP_TARGET_PATH);
+    mkdirSync(directory, { recursive: true });
+    for (const name of ['KiloSecond.swift', 'KiloFirst.swift', 'notes.md']) {
+      writeFileSync(join(directory, name), '');
+    }
+
+    expect(sourceFiles(projectRoot)).toEqual(['KiloFirst.swift', 'KiloSecond.swift']);
+  });
+
+  it('holds every Swift file in the intents directory', () => {
+    const onDisk = readdirSync(new URL('ios/AppIntents/', import.meta.url))
+      .filter(name => name.endsWith('.swift'))
+      .sort();
+
+    expect(sourceFiles(fileURLToPath(new URL('../../', import.meta.url)))).toEqual(onDisk);
+  });
+
+  it('compiles that set in both prebuild mods', () => {
+    // A hand-kept list here would skip a new file silently; the copy mod and
+    // the Sources phase mod must both read the directory.
+    expect(INTENTS_PLUGIN).not.toContain('SOURCE_FILES');
+    expect(INTENTS_PLUGIN.match(/sourceFiles\(cfg\.modRequest\.projectRoot\)/g)).toHaveLength(2);
+  });
+
+  it('registers the plugin that compiles them in app.config.ts', () => {
+    expect(configSource).toContain("'./plugins/withKiloAppIntents'");
+  });
+
+  it('keeps the intents out of the pod, which has no bundle for them', () => {
+    const podspec = readSource('KiloAppActions.podspec');
+    expect(podspec).toContain("s.exclude_files = '**/AppIntents/**/*'");
+
+    for (const name of readdirSync(iosModuleDirectory).filter(entry => entry.endsWith('.swift'))) {
+      const source = readSource(name);
+      expect(
+        source,
+        `${name} declares an App Intents type and must live in ios/AppIntents`
+      ).not.toMatch(
+        /: AppIntent \{|: AppEntity \{|: AppShortcutsProvider \{|: (EntityQuery|EntityStringQuery)\b/
+      );
+    }
+  });
+});
+
+describe('the app-target publisher install', () => {
+  it('starts the visible-session publisher before React', () => {
+    const lines = installPublisher(APP_DELEGATE).split('\n');
+    const install = lines.findIndex(line => line.includes('KiloVisibleSessionBridge.install'));
+    const react = lines.findIndex(line => line.includes('let delegate = ReactNativeDelegate()'));
+
+    expect(install).toBeGreaterThanOrEqual(0);
+    expect(install).toBeLessThan(react);
+    expect(lines[install]).toContain('KiloVisibleSession.publish)');
+  });
+
+  it('imports the module internally, so the app target reaches the bridge', () => {
+    const source = installPublisher(APP_DELEGATE);
+
+    expect(source).toContain('internal import KiloAppActions');
+    expect(source).not.toMatch(/^import KiloAppActions$/m);
+  });
+
+  it('is idempotent', () => {
+    const installed = installPublisher(APP_DELEGATE);
+    expect(installPublisher(installed)).toBe(installed);
+  });
+
+  it('drops the retired package declaration and its import together', () => {
+    const installed = installPublisher(APP_DELEGATE_WITH_RETIRED_PACKAGE);
+
+    expect(installed).not.toContain('KiloAppIntentsPackage');
+    expect(installed).not.toMatch(/^import AppIntents$/m);
+    expect(installed).toContain('import ExpoModulesCore');
+  });
+
+  it('fails a prebuild whose AppDelegate has no ReactNativeDelegate initialization', () => {
+    expect(() => installPublisher('class AppDelegate {}\n')).toThrow(/ReactNativeDelegate/);
   });
 });

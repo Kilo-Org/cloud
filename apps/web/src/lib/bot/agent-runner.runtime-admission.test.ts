@@ -63,6 +63,11 @@ jest.mock('@/lib/bot/platforms', () => ({
     }),
   },
 }));
+jest.mock('@/lib/bot/organization-model', () => ({
+  resolveOrganizationBotModel: jest.fn(
+    async ({ storedModelSlug }: { storedModelSlug: string }) => storedModelSlug
+  ),
+}));
 jest.mock('@/lib/bot/request-logging', () => ({
   updateBotRequest: jest.fn(),
   linkBotRequestToSession: jest.fn(),
@@ -78,7 +83,17 @@ jest.mock('@/lib/slack-bot/gitlab-repository-context', () => ({
   formatGitLabRepositoriesForPrompt: () => '',
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  getGitHubIntegrationById: async () => ({ id: 'github-integration' }),
+  getGitHubIntegrationById: async () => ({
+    id: 'github-integration',
+    platform_installation_id: 'installation-1',
+    github_app_type: 'standard',
+  }),
+}));
+jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  assertGitHubInstallationRuntimeAuthorized: jest.fn(async () => undefined),
+}));
+jest.mock('@/lib/integrations/platforms/github/identity-store', () => ({
+  getLinkedGitHubLogin: jest.fn(async () => 'bot-owner-github'),
 }));
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({}));
 jest.mock('@/lib/bot-users/bot-user-service', () => ({}));

@@ -1,5 +1,12 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
-import { createElement, type ElementType, type ReactNode, useEffect, useState } from 'react';
+import {
+  createElement,
+  type ElementType,
+  type ReactNode,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -52,6 +59,34 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
+// The picker closes itself when the owning screen loses focus (a deep link or a
+// tab switch under an open sheet), so the suite drives the blur through this
+// store; every suite mounts focused and stays focused otherwise.
+const pickerFocus = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const subscribe = (notify: () => void) => {
+    listeners.add(notify);
+    return () => {
+      listeners.delete(notify);
+    };
+  };
+  return {
+    focused: true,
+    setFocused(next: boolean) {
+      pickerFocus.focused = next;
+      for (const notify of listeners) {
+        notify();
+      }
+    },
+    subscribe,
+  };
+});
+vi.mock('expo-router', () => ({
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    const focused = useSyncExternalStore(pickerFocus.subscribe, () => pickerFocus.focused);
+    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+  },
+}));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: storage.read,
@@ -242,6 +277,7 @@ beforeEach(() => {
   rerender = undefined;
   platform.OS = 'android';
   appearance.colors = { ...DARK_COLORS };
+  pickerFocus.setFocused(true);
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (key: string, value: string) => {
@@ -293,6 +329,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(texts(ui)).toContain(label);
     expect(picker(ui).props.accessibilityLabel).toBe(label);
     expect(picker(ui).findByType(Text).props.numberOfLines).toBe(1);
+    // Memberships of one workspace share their leading words; the label keeps
+    // its tail, which is the part that names the account.
+    expect(picker(ui).findByType(Text).props.ellipsizeMode).toBe('middle');
     expect(picker(ui).props.accessibilityRole).toBe('button');
     expect(picker(ui).props.accessibilityState).toEqual({ busy: false, disabled: false });
     expect(picker(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);
@@ -346,7 +385,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(opened.map(row => row.label)).toEqual(['Personal', name]);
     expect(opened.map(row => row.selected)).toEqual([false, true]);
     expect(opened.map(row => row.role)).toEqual(['button', 'button']);
-    expect(opened.map(row => row.divider)).toEqual([true, true]);
+    // Rows divide themselves only: the full rule that closes the list belongs
+    // to the dismiss row's area, not to the last account.
+    expect(opened.map(row => row.divider)).toEqual([true, false]);
     expect(opened.map(row => row.check)).toEqual([false, true]);
     expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
   });
@@ -607,6 +648,45 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(texts(ui)).toContain('Personal');
     expect(picker(ui).props.disabled).toBe(true);
     expect(list).not.toHaveBeenCalled();
+  });
+
+  it('closes the open sheet when the screen loses focus, and keeps it on refocus', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await openSheet(ui);
+    expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+
+    // A deep link or a tab switch blurs the owning screen: the sheet must go
+    // with it instead of covering the screen the person was sent to.
+    await act(() => {
+      pickerFocus.setFocused(false);
+    });
+    expect(rows(ui)).toHaveLength(0);
+    expect(texts(ui)).not.toContain('Cancel');
+
+    // Refocusing the screen (the person came back) must not re-present a sheet
+    // nobody asked for.
+    await act(() => {
+      pickerFocus.setFocused(true);
+    });
+    expect(rows(ui)).toHaveLength(0);
+  });
+
+  it('closes the sheet on blur without changing the account', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const onSelectionChange = vi.fn<(organizationId: string | null) => void>();
+    const ui = await mount({ value: 'org-a', onSelectionChange });
+    await waitFor(() => !picker(ui).props.disabled);
+    await openSheet(ui);
+    // Personal plus the listed membership: the sheet really presented.
+    expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+    await act(() => {
+      pickerFocus.setFocused(false);
+    });
+    expect(rows(ui)).toHaveLength(0);
+    expect(onSelectionChange).not.toHaveBeenCalled();
+    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
   });
 
   it('renders the field variant as the stacked form triggers do', async () => {

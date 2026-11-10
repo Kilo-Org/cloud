@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "د نېټیو لرې کنټرول بېلګه",
+    "sessionsEmpty": "تر اوسه هېڅ نېټیو ناسته نشته",
+    "hosts": "آنلاین کوربه‌ګان",
+    "hostsEmpty": "هېڅ آنلاین کوربه نشته",
+    "directory": "کاري پوښۍ",
+    "createSession": "نېټیو ناسته جوړه کړئ",
+    "queueIfOffline": "که کوربه آفلاین وي، لارښوونه په کتار کې واچوئ",
+    "prompt": "لارښوونه یا /command",
+    "localClear": "ځايي لید پاک کړئ",
+    "abort": "روان وار ودروئ",
+    "failed": "د نېټیو لرې کنټرول کړنه ناکامه شوه",
+    "creationUnknown": "د جوړولو پایله نامعلومه ده. له بیا هڅې مخکې ناستې تازه کړئ.",
+    "commandFailed": "د چلوونکي بهیر قومانده ناکامه شوه",
+    "invalidReply": "د چلوونکي بهیر ناسم ځواب",
+    "unsafeCommand": "/compact، /new، /skill، /models، /agents یا /clear وکاروئ (یوازې ځايي).",
+    "status": "اړیکه: {{connection}} · چلوونکی بهیر: {{runner}}",
+    "presenceStatus": "کوربه‌ګان: {{connection}}",
+    "commandStatus": "د قوماندې رسول: {{status}}",
+    "delivered": "ورسول شو",
+    "expired": "مهلت یې تېر شو"
+  },
   "common": {
     "cancel": "لغوه کړئ",
     "done": "بشپړ شو",
@@ -110,6 +132,7 @@
     "newSession": "نوې ناسته",
     "noModelsAvailable": "هېڅ ماډل نشته",
     "notFound": "ونه موندل شو",
+    "online": "آنلاین",
     "open": "{{name}} پرانیزئ",
     "openPullRequest": "پل ریکویسټ پرانیزئ",
     "completed": "بشپړ شوی",
@@ -186,6 +209,7 @@
     "resendCode": "کوډ بیا ولېږئ",
     "termsPrefix": "په دوام ورکولو سره، تاسو زموږ دا موارد منئ: ",
     "terms": "شرایط",
+    "termsInSentence": "شرایط",
     "termsConnector": " او ",
     "termsSuffix": ".",
     "moreSignInOptions": "د ننوتلو نور غوراوي",
@@ -222,6 +246,7 @@
     "confirmDeletion": "ړنګول تایید کړئ",
     "credits": "کریډیټ",
     "failedToLoadBalance": "بیلانس بار نه شو. د بیا هڅې لپاره ټک وکړئ.",
+    "balanceLoadFailed": "بیلانس بار نه شو",
     "hideBalance": "بیلانس پټ کړئ",
     "showBalance": "بیلانس ښکاره کړئ",
     "balanceHidden": "بیلانس پټ دی",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "په دې پل ریکویسټ کې هېڅ فایل نه دی بدل شوی.",
     "fileList": {
       "openNavigator": "د فایلونو نیویګیټر پرانیزئ",
-      "filesViewed": "فایلونه · له {{total}} څخه {{viewed}} لیدل شوي",
       "listed": "(په لړلیک کې)",
       "layout": "ترتیب",
       "unified": "یوځای",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "د GitHub اړیکه ونه کتل شوه.",
-      "checkFailedMessage": "تر هغه چې دا بار نه شي، د ننوتلو حالت نه څرګندېږي.",
+      "checkFailedMessage": "د GitHub سره اړیکه ونه نیول شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
       "checkFailedTitleGitLab": "د GitLab اړیکه ونه کتل شوه.",
       "checkFailedTitleBitbucket": "د Bitbucket اړیکه ونه کتل شوه.",
-      "providerCheckFailedMessage": "تر څو چې دا نه وي بار شوی، د اړیکې حالت شتون نلري.",
+      "providerCheckFailedMessage": "د چمتو کوونکي سره اړیکه ونه نیول شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
       "reconnectTitle": "GitHub بیا ونښلئ",
       "reconnectTitleGitLab": "GitLab بیا ونښلئ",
       "reconnectTitleBitbucket": "Bitbucket بیا ونښلئ",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "د انځور اخیستلو لپاره په امستنو کې کامرې ته د لاسرسي اجازه ورکړئ."
+    },
+    "botStatus": {
+      "offline": "آفلاین"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "د دې کړنې بشپړول ممکن نه وو. مهرباني وکړئ بیا هڅه وکړئ.",
       "actionBlocked": "د دې کړنې بشپړول ممکن نه وو. د بیا هڅې دمخه باید دا ستونزه حل شي.",
       "syncNoRepositories": "هیڅ زېرمتون د همغږۍ په حد کې نه دی. هغه زېرمتونونه وټاکئ چې امنیتي اجنټ یې څاري، بیا همغږي وکړئ.",
+      "syncNoRepositoriesNoManage": "هیڅ زېرمتون د همغږۍ په حد کې نه دی. د سازمان یو مالک، مدیر یا د بلونو مدیر باید زېرمتونونه ونښلوي ترڅو همغږي پیل شي.",
       "syncIntegrationInactive": "د امنیتي اجنټ لپاره GitHub اړیکه فعاله نه ده. د Kilo GitHub اپ بیا وصل کړئ، بیا همغږي وکړئ.",
       "syncMissingPermission": "د Kilo GitHub اپ د زیانمنتیا خبرتیاوې لوستلای نشي. په GitHub کې هغه اجازه ورکړئ، بیا همغږي وکړئ.",
       "configConflict": "د امنیتي اجنټ امستنې بل ځای کې بدلې شوې. وروستي امستنې وګورئ او بیا خوندي کړئ."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "د پیل لپاره لاندې یو پیغام واستوئ.",
       "scrollToBottom": "د پاڼې پای ته ورشئ",
       "emptyTitle": "تر اوسه پیغامونه نشته",
+      "emptyReadOnlyTitle": "په دې ناسته کې پیغامونه نشته",
       "renameAccessibility": "د ناستې نوم بدل کړئ: {{title}}",
       "cloningSession": "د ناستې کاپي جوړېږي",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "د پیل لپاره یو زېرمتون وټاکئ.",
       "enterPromptToStart": "د پیل لپاره یو پرامپټ اضافه کړئ.",
       "enterPromptOrFileToStart": "د پیل لپاره یو پرامپټ یا فایل اضافه کړئ.",
-      "connectProviderToStart": "د پیل لپاره د خدمت چمتو کوونکی ونښلوئ.",
+      "connectProviderToStart": "زېرمتونونه د GitHub، GitLab یا Bitbucket له نښلول شوي حسابه راځي.",
       "promptPlaceholder": "غواړئ پر څه کار وکړئ؟",
       "couldNotLoadModels": "ماډلونه بار نه شول.",
       "prefillRepoAndModelUnavailable": "د اصلي ناستې زېرمتون او ماډل نور د لاسرسي وړ نه دي. لاندې یې غوره کړئ.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "ځواب ودرول شو.",
       "assistantContextOverflow": "خبرې اترې د ماډل لپاره ډېرې اوږدې دي.",
       "assistantProviderError": "چمتو کوونکي تېروتنه راستونه کړه.",
+      "assistantProviderRefused": "چمتو کوونکي دا غوښتنه رد کړه او بیا هڅه نشي کېدای.",
+      "assistantCreditsRefusal": "د Cloud Agent چلولو لپاره کافي کریډیټ نشته.",
       "assistantOutputLimit": "ځواب د ماډل د وتلو حد ته ورسېد.",
       "assistantStructuredOutput": "ځواب له اړین فورمټ سره سمون نه درلود.",
       "assistantFailed": "ځواب ناکام شو."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "چاپېریال چمتو کېږي",
       "preparationComplete": "چمتوالی بشپړ شو",
       "preparationFailed": "چمتوالی ناکام شو",
+      "preparationStageFailed": "ناکام: {{stage}}",
       "setupCommand": "د چمتو کولو امر {{index}}",
       "setupCommandOf": "د چمتو کولو امر {{index}} له {{displayCount}} څخه",
       "stepWorkspaceSetup": "د کار ځای چمتو کول",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "د چمتو کولو امر {{index}} وخت تېر شو",
       "detailColdRestore": "ساړه بیا راوړنه، سناپشاټ پلی شو، بېرته راوړل شوي فایلونه: {{applied}} له {{total}}",
       "detailProgressPercent": "{{percent}}% بشپړ شو",
-      "detailRestoreIncompleteReport": "د ناستې بېرته راوړل بشپړ نه شو، بېرته نه راوړل شوي فایلونه: {{skipped}} له {{total}} ({{reasons}})",
+      "detailRestoreIncompleteFiles": "بېرته نه راوړل شوي فایلونه: {{skipped}} له {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "ورک: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} او {{omitted}} نور",
       "detailReasonPatchFailed": "پېچ پلی نه شو",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "د سیاق د کړکۍ اندازه نه ده معلومه",
-      "tapToViewDetails": "د سیاق د جزیاتو د لیدلو لپاره ټک وکړئ.",
-      "costSuffix": "، لګښت {{cost}}",
-      "tokensWindowUnavailable": "سیاق: {{used}} ټوکنونه، د کړکۍ اندازه نه ده معلومه",
-      "tokensUsage": "سیاق: له {{window}} ټوکنونو څخه {{used}}، {{percentage}} کارول شوي",
+      "tapToViewDetails": " د سیاق د جزیاتو د لیدلو لپاره ټک وکړئ.",
+      "costClause": "، لګښت {{cost}}",
+      "loadingCostSpoken": "لګښت {{cost}}.",
+      "tokensWindowUnavailable": "سیاق: {{used}} ټوکنونه، د کړکۍ اندازه نه ده معلومه{{costClause}}.",
+      "tokensUsage": "سیاق: له {{window}} ټوکنونو څخه {{used}}، {{percentage}} کارول شوي{{costClause}}.",
       "title": "د سیاق کارونه",
       "used": "کارول شوی",
       "provider": "چمتو کوونکی",
       "totalCost": "ټول لګښت",
       "usageReflectsLatest": "د کارونې شمېرې د مرستیال د وروستي بشپړ شوي ځواب پر بنسټ دي.",
-      "usageUnavailable": "د سیاق کارونې نه شته",
+      "usageUnavailable": "د سیاق کارونې نه شته{{costClause}}.",
       "tokenUsage": "د ټوکنونو کارونه",
       "cacheRate": "د کېش کچه",
       "modelsCount": "ماډلونه ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "کریډیټ زیات کړئ",
-    "description": "د کارونې د دوام لپاره کریډیټ زیات کړئ.",
     "billingPage": "د بلونو پاڼه"
   },
   "deviceSessions": {
@@ -2981,7 +3013,7 @@
     "finished": "پای ته ورسېد",
     "followFailed": "دا ناسته تعقیب نه شو کولی.",
     "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
-    "checked": "تایید شوی",
+    "checked": "کتل شوی",
     "lastKnown": "وروستی معلوم حالت",
     "awaitingUpdate": "د تازه کېدو په تمه",
     "nextRun": "راتلونکی چلول",
@@ -2996,10 +3028,10 @@
       "searching": "وېب پلټنه",
       "thinking": "فکر کول"
     },
-    "planOf": "له",
+    "planProgress": "له {{total}} څخه {{done}}",
     "filesChanged": "فایلونه بدل شول",
-    "finishedIn": "بشپړ شو",
-    "noActivityFor": "هیڅ فعالیت نشته",
+    "finishedIn": "په {{duration}} کې بشپړ شو",
+    "noActivityFor": "تر دې دمه هیڅ فعالیت نشته",
     "prOpened": "پل ریکویسټ پرانیستل شو",
     "permissionWants": "چلول غواړي",
     "failure": {
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "دا ماډل د فکر کچه ملاتړ کوي"
     },
-    "creditsRequired": "د دې پیغام د لېږلو لپاره کافي کریډیټ نشته. کریډیټ زیات کړئ او بیا هڅه وکړئ."
+    "creditsRequired": "د دې پیغام د لېږلو لپاره کافي کریډیټ نشته."
   },
   "settingsTools": {
     "confirmTitle": "دا بدلون تایید شي؟"
@@ -3340,8 +3372,8 @@
     "saved": "د لګښت خبرتیاوو تنظیمات خوندي شول",
     "loadError": "د لګښت خبرتیاوې پورته نه شوې.",
     "saveError": "د لګښت خبرتیاوې خوندي نه شوې.",
-    "empty": "د لګښت خبرتیاوې بندې دي. د دې ساحې د بلونو اړیکو ته د خبر ورکولو لپاره یې فعاله کړه.",
-    "noSpend": "تر دې دمه هیڅ لګښت ثبت شوی نه دی",
+    "sendAlerts": "خبرتیاوې ولېږه",
+    "noSpend": "هیڅ لګښت نشته",
     "spend24h": "د تېرو 24 ساعتونو لګښت",
     "multiplierError": "د 1 یا ډېر ضریب ولیکه",
     "permissionDenied": "تاسو د لګښت خبرتیاوو د اداره کولو اجازه نه لرئ.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "د مهالویش شوو راپورونو لپاره هېڅ چوکاټ فعال نه دی",
     "sourceBlocker": "ناسته پاملرنې ته اړتیا لري",
     "sourceMetadata": "د ناستې ثبت شوې مېټاډاټا"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "دا د لټون پایله پرانیستل نه شو"
   }
 }

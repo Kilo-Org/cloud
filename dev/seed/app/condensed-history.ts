@@ -5,7 +5,7 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { and, eq, or } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { isValidEmail } from '../lib/users';
 import {
@@ -16,6 +16,7 @@ import {
   parseSessionIngestServiceStatus,
   type SessionIngestItem,
 } from '../lib/mobile-sheet-fixtures';
+import { seedTokenSigningParams } from '../lib/token-signing';
 
 export const usage = '<email> [--legacy-runtime]';
 
@@ -345,6 +346,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     );
   }
 
+  assertLocalSeedDatabase('app:condensed-history');
   const normalizedEmail = normalizeSeedEmail(email);
   const db = getSeedDb();
   const matches = await db
@@ -381,8 +383,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.userId,
     pepper: user.apiTokenPepper,
     secret,
-    expiresInSeconds: TOKEN_EXPIRES_SECONDS,
-    env: process.env.NODE_ENV ?? 'development',
+    ...seedTokenSigningParams(TOKEN_EXPIRES_SECONDS),
     extra: user.isAdmin ? { isAdmin: true } : undefined,
   });
 

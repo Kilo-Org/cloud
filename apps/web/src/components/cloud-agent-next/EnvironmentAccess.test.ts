@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 import type { EnvironmentResponse, EnvironmentSummary } from '@kilocode/cloud-agent-profile';
 import type * as EnvironmentHooks from '@/hooks/useCloudAgentEnvironments';
+import type * as EnvironmentDialogComponents from './EnvironmentDialog';
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
 Object.assign(globalThis, { React });
@@ -13,6 +14,8 @@ Object.assign(globalThis, { React });
 let mockCanManage = false;
 let mockEnvironment: EnvironmentResponse;
 let mockEnvironments: EnvironmentSummary[];
+let mockDetailError = false;
+let mockDetailEnabled: boolean | undefined;
 
 jest.mock('@/components/ui/dialog', () => {
   const react = jest.requireActual<typeof React>('react');
@@ -63,11 +66,10 @@ jest.mock('sonner', () => ({
 
 jest.mock('@/hooks/useCloudAgentEnvironments', () => ({
   ...jest.requireActual<typeof EnvironmentHooks>('@/hooks/useCloudAgentEnvironments'),
-  useCloudAgentEnvironment: () => ({
-    data: mockEnvironment,
-    isLoading: false,
-    isError: false,
-  }),
+  useCloudAgentEnvironment: (_id: string, options: { enabled?: boolean }) => {
+    mockDetailEnabled = options.enabled;
+    return { data: mockEnvironment, isLoading: false, isError: mockDetailError };
+  },
   useCloudAgentEnvironmentMutations: () => ({
     createEnvironment: { isPending: false, mutateAsync: async () => undefined },
     updateEnvironment: { isPending: false, mutateAsync: async () => undefined },
@@ -155,7 +157,8 @@ jest.mock('./EnvironmentSandboxField', () => {
 jest.mock('./EnvironmentBuildPanel', () => {
   const react = jest.requireActual<typeof React>('react');
   return {
-    EnvironmentBuildPanel: () => react.createElement('div', { 'data-testid': 'build-panel' }),
+    EnvironmentBuildPanel: ({ active }: { active?: boolean }) =>
+      react.createElement('div', { 'data-testid': 'build-panel', 'data-active': String(active) }),
     useEnvironmentBuildControl: () => ({
       isPending: false,
       start: () => undefined,
@@ -184,6 +187,8 @@ const { RepositoryEnvironmentChip } = require('./RepositoryEnvironmentChip') as 
 const { EnvironmentsSection } = require('./settings/EnvironmentsSection') as {
   EnvironmentsSection: React.ComponentType<{ canManage: boolean }>;
 };
+const { EnvironmentDetailPane } =
+  require('./EnvironmentDialog') as typeof EnvironmentDialogComponents;
 
 const environment = {
   id: 'env-1',
@@ -221,6 +226,7 @@ const environmentDetail: EnvironmentResponse = {
     },
   ],
   commands: ['pnpm install'],
+  startCommands: [],
   configurationRevision: environment.configurationRevision,
   sandboxAllocation: environment.sandboxAllocation,
   egressMode: null,
@@ -232,6 +238,8 @@ beforeEach(() => {
   mockCanManage = false;
   mockEnvironment = environmentDetail;
   mockEnvironments = [environment];
+  mockDetailError = false;
+  mockDetailEnabled = undefined;
 });
 
 type LinkedomModule = {
@@ -282,6 +290,7 @@ function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
     navigator: globalThis.navigator,
     requestAnimationFrame: globalThis.requestAnimationFrame,
     cancelAnimationFrame: globalThis.cancelAnimationFrame,
+    getComputedStyle: globalThis.getComputedStyle,
     IS_REACT_ACT_ENVIRONMENT: (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
       .IS_REACT_ACT_ENVIRONMENT,
   };
@@ -303,6 +312,7 @@ function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
     requestAnimationFrame: (callback: FrameRequestCallback) =>
       setTimeout(() => callback(Date.now()), 0),
     cancelAnimationFrame: (id: number) => clearTimeout(id),
+    getComputedStyle: (() => ({ animationName: 'none' })) as unknown as typeof getComputedStyle,
     IS_REACT_ACT_ENVIRONMENT: true,
   });
 
@@ -319,6 +329,7 @@ function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
 
 function mount(element: React.ReactElement): {
   container: HTMLElement;
+  rerender: (element: React.ReactElement) => void;
   cleanup: () => void;
 } {
   const dom = installLinkedomDom();
@@ -330,6 +341,7 @@ function mount(element: React.ReactElement): {
 
   return {
     container: dom.container,
+    rerender: element => act(() => root.render(element)),
     cleanup: () => {
       act(() => {
         root.unmount();
@@ -394,13 +406,19 @@ describe('environment access for members and managers', () => {
       expect(content?.querySelector('[data-testid="delete-environment"]')).toBeNull();
       expect(findButton(content!, 'Close')).toBeDefined();
 
-      clickButton(content!, 'Setup script');
+      clickButton(content!, 'Snapshot build script');
       content = dialogContent(mounted.container);
       const scripts = content?.querySelector('textarea');
       expect(scripts).not.toBeNull();
       expect(scripts?.hasAttribute('readOnly')).toBe(true);
       expect(content?.textContent).not.toContain('Choose file');
-      expect(content?.textContent).toContain('Runs before the agent starts.');
+      expect(content?.textContent).toContain('Runs when a snapshot is built');
+
+      click(content?.querySelector('[aria-label="Back to environment"]'));
+      clickButton(content!, 'Workspace start script');
+      content = dialogContent(mounted.container);
+      expect(content?.querySelector('textarea')?.hasAttribute('readOnly')).toBe(true);
+      expect(content?.textContent).toContain('Runs each time a workspace starts');
 
       click(content?.querySelector('[aria-label="Back to environment"]'));
       clickButton(content!, 'Environment variables');
@@ -437,7 +455,7 @@ describe('environment access for members and managers', () => {
       expect(findButton(content!, 'Cancel')).toBeDefined();
       expect(content?.querySelector('[data-testid="delete-environment"]')).not.toBeNull();
 
-      clickButton(content!, 'Setup script');
+      clickButton(content!, 'Snapshot build script');
       const scripts = dialogContent(mounted.container)?.querySelector('textarea');
       expect(scripts?.hasAttribute('readOnly')).toBe(false);
       expect(dialogContent(mounted.container)?.textContent).toContain('Choose file');
@@ -446,7 +464,7 @@ describe('environment access for members and managers', () => {
     }
   });
 
-  test('a member opens an environment from the settings list', () => {
+  test('a member views an environment inline from the settings list', () => {
     mockCanManage = false;
     const mounted = mount(React.createElement(EnvironmentsSection, { canManage: false }));
     try {
@@ -455,19 +473,13 @@ describe('environment access for members and managers', () => {
         '[aria-label="View environment Kilo Environment"]'
       );
       expect(nameButton).not.toBeNull();
-      expect(dialogContent(mounted.container)).toBeNull();
-
-      click(nameButton);
-      const content = dialogContent(mounted.container);
-      expect(content).not.toBeNull();
-      expect(content?.textContent).toContain(
+      expect(nameButton?.getAttribute('aria-pressed')).toBe('true');
+      expect(mounted.container.textContent).toContain(
         'View only. Organization owners and admins can edit this environment.'
       );
-      expect(content?.textContent).toContain(environment.repoFullName);
-      expect(content?.querySelector('[data-testid="delete-environment"]')).toBeNull();
-
-      clickButton(content!, 'Close');
-      expect(dialogContent(mounted.container)).toBeNull();
+      expect(mounted.container.textContent).toContain(environment.repoFullName);
+      expect(findButton(mounted.container, 'Save environment')).toBeUndefined();
+      expect(mounted.container.querySelector('[data-testid="delete-environment"]')).toBeNull();
     } finally {
       mounted.cleanup();
     }
@@ -501,6 +513,68 @@ test.each([false, true])('V2 membership is editable only for managers: canManage
     } else {
       expect(findButton(mounted.container, 'Save environment')).toBeUndefined();
     }
+  } finally {
+    mounted.cleanup();
+  }
+});
+
+test('a failed detail refetch preserves the edited form and its dirty state', () => {
+  mockEnvironment = {
+    ...environmentDetail,
+    platform: undefined,
+    repoFullName: undefined,
+    gitlabCloneUrl: undefined,
+    bitbucketWorkspaceUuid: undefined,
+    bitbucketRepositoryUuid: undefined,
+    repositories: [
+      { platform: 'github', repoFullName: 'Kilo-Org/cloud' },
+      { platform: 'github', repoFullName: 'Kilo-Org/cli' },
+    ],
+  };
+  const onDirtyChange = jest.fn();
+  const element = React.createElement(EnvironmentDetailPane, {
+    environmentId: environment.id,
+    canManage: true,
+    onSaved: jest.fn(),
+    onDeleted: jest.fn(),
+    onDirtyChange,
+  });
+  const mounted = mount(element);
+  try {
+    click(mounted.container.querySelector('[aria-label="Remove Kilo-Org/cli"]'));
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+    mockDetailError = true;
+    mounted.rerender(React.cloneElement(element));
+    expect(mounted.container.textContent).not.toContain('Could not load this environment.');
+    expect(mounted.container.querySelector('[aria-label="Remove Kilo-Org/cli"]')).toBeNull();
+    expect(findButton(mounted.container, 'Save environment')).toBeDefined();
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+  } finally {
+    mounted.cleanup();
+  }
+});
+
+test('the snapshot tab puts the build controls beside the snapshot build script', () => {
+  const mounted = mount(
+    React.createElement(EnvironmentDetailPane, {
+      environmentId: environment.id,
+      canManage: true,
+      initialPage: 'scripts',
+      active: false,
+      onSaved: jest.fn(),
+      onDeleted: jest.fn(),
+    })
+  );
+  try {
+    expect(mounted.container.textContent).toContain('Snapshot build script');
+    expect(mounted.container.querySelector('[data-testid="build-panel"]')).not.toBeNull();
+    expect(
+      mounted.container.querySelector('[data-testid="build-panel"]')?.getAttribute('data-active')
+    ).toBe('false');
+    expect(mockDetailEnabled).toBe(false);
+    expect(mounted.container.querySelector('[role="tab"][data-state="active"]')?.textContent).toBe(
+      'Snapshot'
+    );
   } finally {
     mounted.cleanup();
   }

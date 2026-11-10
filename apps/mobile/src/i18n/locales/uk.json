@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Демо нативного віддаленого керування",
+    "sessionsEmpty": "Нативних сеансів поки немає",
+    "hosts": "Хости в мережі",
+    "hostsEmpty": "Немає хостів у мережі",
+    "directory": "Робочий каталог",
+    "createSession": "Створити нативний сеанс",
+    "queueIfOffline": "Додати запит у чергу, якщо хост не в мережі",
+    "prompt": "Запит або /command",
+    "localClear": "Очистити локальний перегляд",
+    "abort": "Перервати хід",
+    "failed": "Не вдалося виконати нативну віддалену дію",
+    "creationUnknown": "Результат створення невідомий. Оновіть сеанси перед повторною спробою.",
+    "commandFailed": "Не вдалося виконати команду процесу CLI",
+    "invalidReply": "Некоректна відповідь процесу CLI",
+    "unsafeCommand": "Використовуйте /compact, /new, /skill, /models, /agents або /clear (лише локально).",
+    "status": "З'єднання: {{connection}} · Процес CLI: {{runner}}",
+    "presenceStatus": "Хости: {{connection}}",
+    "commandStatus": "Доставка команди: {{status}}",
+    "delivered": "Доставлено",
+    "expired": "Термін дії минув"
+  },
   "common": {
     "cancel": "Скасувати",
     "done": "Готово",
@@ -110,6 +132,7 @@
     "newSession": "Новий сеанс",
     "noModelsAvailable": "Немає доступних моделей",
     "notFound": "Не знайдено.",
+    "online": "У мережі",
     "open": "Відкрити {{name}}",
     "openPullRequest": "Відкрити запит на злиття",
     "completed": "Завершено",
@@ -186,6 +209,7 @@
     "resendCode": "Надіслати код повторно",
     "termsPrefix": "Продовжуючи, ви погоджуєтеся з нашими ",
     "terms": "Умовами",
+    "termsInSentence": "Умовами",
     "termsConnector": " і ",
     "termsSuffix": ".",
     "moreSignInOptions": "Інші способи входу",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Підтвердити видалення",
     "credits": "Кредити",
     "failedToLoadBalance": "Не вдалося завантажити баланс. Торкніться, щоб повторити.",
+    "balanceLoadFailed": "Не вдалося завантажити баланс",
     "hideBalance": "Приховати баланс",
     "showBalance": "Показати баланс",
     "balanceHidden": "Баланс приховано",
@@ -408,6 +433,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Дозволь доступ до камери в налаштуваннях, щоб зробити фото."
+    },
+    "botStatus": {
+      "offline": "Не в мережі"
     }
   },
   "codeReviewer": {
@@ -1106,6 +1134,7 @@
       "actionFailed": "Не вдалося виконати цю дію. Спробуйте ще раз.",
       "actionBlocked": "Не вдалося виконати цю дію. Спочатку потрібно усунути проблему.",
       "syncNoRepositories": "Жодного репозиторію немає в області синхронізації. Виберіть репозиторії, які відстежує Агент безпеки, а потім синхронізуйте ще раз.",
+      "syncNoRepositoriesNoManage": "Жодного репозиторію немає в області синхронізації. Власник організації, адміністратор або менеджер з оплати повинні підключити репозиторії, перш ніж синхронізація зможе розпочатися.",
       "syncIntegrationInactive": "Підключення GitHub для Агента безпеки неактивне. Повторно підключіть застосунок Kilo для GitHub, а потім синхронізуйте ще раз.",
       "syncMissingPermission": "Застосунок Kilo для GitHub не може читати оповіщення про вразливості. Надайте цей дозвіл у GitHub, а потім синхронізуйте ще раз.",
       "configConflict": "Налаштування Агента безпеки змінено в іншому місці. Перегляньте останні налаштування і збережіть знову."
@@ -1301,6 +1330,7 @@
       "emptyDescription": "Надішліть повідомлення нижче, щоб почати.",
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
+      "emptyReadOnlyTitle": "У цьому сеансі немає повідомлень",
       "renameAccessibility": "Перейменувати сеанс: {{title}}",
       "cloningSession": "Клонування сеансу",
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс.",
@@ -1400,7 +1430,7 @@
       "selectRepositoryToStart": "Виберіть репозиторій, щоб почати.",
       "enterPromptToStart": "Додайте запит, щоб почати.",
       "enterPromptOrFileToStart": "Додайте запит або файл, щоб почати.",
-      "connectProviderToStart": "Підключіть сервіс, щоб почати.",
+      "connectProviderToStart": "Репозиторії беруться з підключеного облікового запису GitHub, GitLab або Bitbucket.",
       "promptPlaceholder": "Над чим хочете попрацювати?",
       "couldNotLoadModels": "Не вдалося завантажити моделі.",
       "prefillRepoAndModelUnavailable": "Репозиторій і модель початкового сеансу більше недоступні. Виберіть інші нижче.",
@@ -1590,6 +1620,8 @@
       "assistantStopped": "Формування відповіді зупинено.",
       "assistantContextOverflow": "Розмова занадто довга для моделі.",
       "assistantProviderError": "Постачальник повернув помилку.",
+      "assistantProviderRefused": "Постачальник відхилив цей запит, і його не можна повторити.",
+      "assistantCreditsRefusal": "Недостатньо кредитів для запуску Cloud Agent.",
       "assistantOutputLimit": "Відповідь досягла ліміту вихідних даних моделі.",
       "assistantStructuredOutput": "Відповідь не відповідає потрібному формату.",
       "assistantFailed": "Не вдалося сформувати відповідь."
@@ -1622,6 +1654,7 @@
       "preparingEnvironment": "Підготовка середовища",
       "preparationComplete": "Підготовку завершено",
       "preparationFailed": "Помилка підготовки",
+      "preparationStageFailed": "Помилка: {{stage}}",
       "setupCommand": "Команда налаштування {{index}}",
       "setupCommandOf": "Команда налаштування {{index}} з {{displayCount}}",
       "stepWorkspaceSetup": "Налаштування робочого простору",
@@ -1660,7 +1693,7 @@
       "detailSetupCommandTimedOut": "Перевищено час очікування команди налаштування {{index}}",
       "detailColdRestore": "Холодне відновлення, знімок застосовано, відновлено файли: {{applied}} з {{total}}",
       "detailProgressPercent": "Виконано {{percent}}%",
-      "detailRestoreIncompleteReport": "Відновлення сесії неповне — не вдалося відновити файли: {{skipped}} з {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Не вдалося відновити файли: {{skipped}} з {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Відсутні: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} і ще {{omitted}}",
       "detailReasonPatchFailed": "патч не застосовано",
@@ -1917,16 +1950,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Розмір контекстного вікна невідомий",
-      "tapToViewDetails": "Торкніться, щоб переглянути відомості про контекст.",
-      "costSuffix": ", вартість {{cost}}",
-      "tokensWindowUnavailable": "Токенів у контексті: {{used}}, розмір вікна невідомий",
-      "tokensUsage": "Контекст: {{used}} із {{window}} токенів, використано {{percentage}}",
+      "tapToViewDetails": " Торкніться, щоб переглянути відомості про контекст.",
+      "costClause": ", вартість {{cost}}",
+      "loadingCostSpoken": "вартість {{cost}}.",
+      "tokensWindowUnavailable": "Токенів у контексті: {{used}}, розмір вікна невідомий{{costClause}}.",
+      "tokensUsage": "Контекст: {{used}} із {{window}} токенів, використано {{percentage}}{{costClause}}.",
       "title": "Використання контексту",
       "used": "Використано",
       "provider": "Постачальник",
       "totalCost": "Загальна вартість",
       "usageReflectsLatest": "Дані про використання наведено станом на останню завершену відповідь асистента.",
-      "usageUnavailable": "Використання контексту недоступне",
+      "usageUnavailable": "Використання контексту недоступне{{costClause}}.",
       "tokenUsage": "Використання токенів",
       "cacheRate": "Частка кешованих токенів",
       "modelsCount": "Моделі ({{displayCount}})",
@@ -2013,7 +2047,6 @@
   },
   "addCredits": {
     "cta": "Поповнити баланс",
-    "description": "Поповніть баланс, щоб продовжити роботу.",
     "billingPage": "сторінка оплати"
   },
   "deviceSessions": {
@@ -2316,10 +2349,10 @@
     },
     "connect": {
       "checkFailedTitle": "Не вдалося перевірити підключення до GitHub.",
-      "checkFailedMessage": "Статус входу стане доступним після завантаження даних.",
+      "checkFailedMessage": "Не вдалося зв'язатися з GitHub. Перевірте з'єднання та спробуйте ще раз.",
       "checkFailedTitleGitLab": "Не вдалося перевірити підключення до GitLab",
       "checkFailedTitleBitbucket": "Не вдалося перевірити підключення до Bitbucket",
-      "providerCheckFailedMessage": "Стан підключення недоступний, доки це завантажиться.",
+      "providerCheckFailedMessage": "Не вдалося зв'язатися з постачальником послуг. Перевірте з'єднання та спробуйте ще раз.",
       "reconnectTitle": "Підключити GitHub знову",
       "reconnectTitleGitLab": "Підключити GitLab знову",
       "reconnectTitleBitbucket": "Підключити Bitbucket знову",
@@ -2469,7 +2502,6 @@
     },
     "fileList": {
       "filesList": "Список файлів",
-      "filesViewed": "Файли · переглянуто {{viewed}} з {{total}}",
       "layout": "Вигляд",
       "listed": "(у списку)",
       "loadingFiles": "Завантаження файлів",
@@ -3100,9 +3132,9 @@
       "searching": "Пошук в інтернеті",
       "thinking": "Обмірковує"
     },
-    "planOf": "з",
+    "planProgress": "{{done}} з {{total}}",
     "filesChanged": "файлів змінено",
-    "finishedIn": "Завершено за",
+    "finishedIn": "Завершено за {{duration}}",
     "noActivityFor": "Немає активності протягом",
     "prOpened": "Пул-реквест відкрито",
     "permissionWants": "Хоче запустити",
@@ -3412,7 +3444,7 @@
     "reasoningEffort": {
       "modelFlag": "Ця модель підтримує рівень міркування"
     },
-    "creditsRequired": "Недостатньо кредитів, щоб надіслати це повідомлення. Поповніть баланс і повторіть спробу."
+    "creditsRequired": "Недостатньо кредитів, щоб надіслати це повідомлення."
   },
   "settingsTools": {
     "confirmTitle": "Підтвердити цю зміну?"
@@ -3446,8 +3478,8 @@
     "saved": "Налаштування сповіщень про витрати збережено",
     "loadError": "Не вдалося завантажити сповіщення про витрати.",
     "saveError": "Не вдалося зберегти сповіщення про витрати.",
-    "empty": "Сповіщення про витрати вимкнено. Увімкніть їх, щоб попереджати контакти для оплати цієї області.",
-    "noSpend": "Витрати ще не зафіксовано",
+    "sendAlerts": "Надсилати сповіщення",
+    "noSpend": "Ще немає витрат",
     "spend24h": "Витрати за останні 24 години",
     "multiplierError": "Введіть множник 1 або більше",
     "permissionDenied": "У вас немає дозволу керувати сповіщеннями про витрати.",
@@ -3873,5 +3905,8 @@
     "noEnabledContexts": "Для запланованих звітів не ввімкнено жодного контексту",
     "sourceBlocker": "Сесія потребує уваги",
     "sourceMetadata": "Зафіксовані метадані сесії"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Не вдалося відкрити цей результат пошуку"
   }
 }

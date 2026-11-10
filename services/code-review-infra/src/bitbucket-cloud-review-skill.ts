@@ -1,5 +1,5 @@
 export const BITBUCKET_CLOUD_REVIEW_SKILL_NAME = 'bitbucket-cloud-review';
-export const BITBUCKET_CLOUD_REVIEW_SKILL_VERSION = '7';
+export const BITBUCKET_CLOUD_REVIEW_SKILL_VERSION = '8';
 
 const rawMarkdown = `---
 name: bitbucket-cloud-review
@@ -62,7 +62,7 @@ Do not add workspace, repository, host, authorization, URL, raw-path, or target 
 
 1. Immediately before publication, re-run bb pr view <PR> and compare its source SHA to the trusted expected head SHA. Stop all subsequent writes on the first mismatch.
 2. Publish current new-side inline comments first with one batch command when any inline findings exist.
-3. Publish or update exactly one top-level summary last. If any summary candidate exists, update the newest candidate identified during reconciliation; otherwise create it.
+3. Publish or update exactly one top-level summary last. If any summary candidate exists, update the newest candidate identified during reconciliation; otherwise create it. The wrapper accepts an update only for a non-deleted, non-inline top-level comment whose body carries the Code Review Summary heading or the legacy marker, and it requires the updated body to carry the Code Review Summary heading; any other target or body fails, so do not retry it.
 4. Rely on the wrapper's immediate pull request re-read before every individual write. It requires OPEN, non-draft, and exact repository/workspace identity, but the agent owns the expected-head comparison.
 5. Replace the visible summary with current unresolved findings only, using the shared Code Review Summary format from the prompt.
 6. Omit model usage and review-guidance footers for now.

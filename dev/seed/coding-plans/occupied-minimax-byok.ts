@@ -2,7 +2,7 @@ import { byok_api_keys } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 import { encryptCredential, requireEncryptionKey } from '../lib/byok';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import type { SeedResult } from '../index';
 
 const PROVIDER_ID = 'minimax';
@@ -43,6 +43,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`Unknown arguments: ${unknownOptions.join(' ')}`);
   }
   const isEnabled = !options.includes('--disabled');
+  assertLocalSeedDatabase('coding-plans:occupied-minimax-byok');
   const db = getSeedDb();
   const [existing] = await db
     .select({ id: byok_api_keys.id })

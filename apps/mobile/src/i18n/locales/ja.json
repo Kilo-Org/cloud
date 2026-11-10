@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "ネイティブリモートデモ",
+    "sessionsEmpty": "ネイティブセッションはまだありません",
+    "hosts": "オンラインのホスト",
+    "hostsEmpty": "オンラインのホストはありません",
+    "directory": "作業ディレクトリ",
+    "createSession": "ネイティブセッションを作成",
+    "queueIfOffline": "ホストがオフラインの場合はプロンプトを順番待ちにする",
+    "prompt": "プロンプトまたは/command",
+    "localClear": "ローカル表示をクリア",
+    "abort": "ターンを中止",
+    "failed": "ネイティブリモート操作に失敗しました",
+    "creationUnknown": "作成結果が不明です。再試行する前にセッションを更新してください。",
+    "commandFailed": "ランナーのコマンドに失敗しました",
+    "invalidReply": "ランナーからの応答が無効です",
+    "unsafeCommand": "/compact、/new、/skill、/models、/agents、または/clear（ローカルのみ）を使用してください。",
+    "status": "接続：{{connection}} · ランナー：{{runner}}",
+    "presenceStatus": "ホスト：{{connection}}",
+    "commandStatus": "コマンドの配信：{{status}}",
+    "delivered": "配信済み",
+    "expired": "期限切れ"
+  },
   "common": {
     "cancel": "キャンセル",
     "done": "完了",
@@ -110,6 +132,7 @@
     "newSession": "新しいセッション",
     "noModelsAvailable": "利用可能なモデルはありません",
     "notFound": "見つかりません。",
+    "online": "オンライン",
     "open": "{{name}}を開く",
     "openPullRequest": "プルリクエストを開く",
     "completed": "完了",
@@ -186,6 +209,7 @@
     "resendCode": "コードを再送信",
     "termsPrefix": "続行すると、",
     "terms": "利用規約",
+    "termsInSentence": "利用規約",
     "termsConnector": "および",
     "termsSuffix": "に同意したことになります。",
     "moreSignInOptions": "その他のサインイン方法",
@@ -222,6 +246,7 @@
     "confirmDeletion": "削除を確定",
     "credits": "クレジット",
     "failedToLoadBalance": "残高を読み込めませんでした。タップして再試行してください。",
+    "balanceLoadFailed": "残高を読み込めませんでした",
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
@@ -408,6 +433,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "写真を撮るには、設定でカメラへのアクセスを許可してください。"
+    },
+    "botStatus": {
+      "offline": "オフライン"
     }
   },
   "codeReviewer": {
@@ -1078,6 +1106,7 @@
       "actionFailed": "この操作を完了できませんでした。もう一度お試しください。",
       "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。",
       "syncNoRepositories": "同期対象にリポジトリがありません。セキュリティエージェントが監視するリポジトリを選択してから、もう一度同期してください。",
+      "syncNoRepositoriesNoManage": "同期対象にリポジトリがありません。同期するには、組織のオーナー、管理者、または請求管理者がリポジトリを接続する必要があります。",
       "syncIntegrationInactive": "セキュリティエージェントの GitHub 接続が有効になっていません。Kilo GitHub App を再接続してから、もう一度同期してください。",
       "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。",
       "configConflict": "セキュリティエージェントの設定が別の場所で変更されました。最新の設定を確認して、もう一度保存してください。"
@@ -1265,6 +1294,7 @@
       "emptyDescription": "下の入力欄からメッセージを送信すると、開始できます。",
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
+      "emptyReadOnlyTitle": "このセッションにメッセージはありません",
       "renameAccessibility": "セッション「{{title}}」の名前を変更",
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
@@ -1364,7 +1394,7 @@
       "selectRepositoryToStart": "開始するにはリポジトリを選択してください。",
       "enterPromptToStart": "開始するにはプロンプトを追加してください。",
       "enterPromptOrFileToStart": "開始するにはプロンプトまたはファイルを追加してください。",
-      "connectProviderToStart": "開始するにはプロバイダーを接続してください。",
+      "connectProviderToStart": "リポジトリは、連携済みのGitHub、GitLab、またはBitbucketアカウントから取得されます。",
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",
       "prefillRepoAndModelUnavailable": "元のセッションのリポジトリとモデルは利用できなくなりました。以下で選択してください。",
@@ -1546,6 +1576,8 @@
       "assistantStopped": "応答の生成が停止しました。",
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
       "assistantProviderError": "プロバイダーがエラーを返しました。",
+      "assistantProviderRefused": "プロバイダーがこのリクエストを拒否したため、再試行できません。",
+      "assistantCreditsRefusal": "Cloud Agentを実行するためのクレジットが不足しています。",
       "assistantOutputLimit": "応答がモデルの出力上限に達しました。",
       "assistantStructuredOutput": "応答が必要な形式に一致しませんでした。",
       "assistantFailed": "応答に失敗しました。"
@@ -1578,6 +1610,7 @@
       "preparingEnvironment": "環境を準備中",
       "preparationComplete": "準備完了",
       "preparationFailed": "準備失敗",
+      "preparationStageFailed": "{{stage}}に失敗しました",
       "setupCommand": "セットアップコマンド {{index}}",
       "setupCommandOf": "セットアップコマンド {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "ワークスペースのセットアップ",
@@ -1616,7 +1649,7 @@
       "detailSetupCommandTimedOut": "セットアップコマンド {{index}} がタイムアウトしました",
       "detailColdRestore": "コールドリストア、スナップショットを適用、{{total}}ファイル中{{applied}}ファイルを復元",
       "detailProgressPercent": "{{percent}}% 完了",
-      "detailRestoreIncompleteReport": "セッションの復元が未完了です：{{total}}ファイル中{{skipped}}ファイルが復元されませんでした（{{reasons}}）。",
+      "detailRestoreIncompleteFiles": "{{total}}ファイル中{{skipped}}ファイルが復元されませんでした（{{reasons}}）。",
       "detailRestoreIncompleteMissing": "不足：{{paths}}",
       "detailRestoreIncompleteMore": "{{listed}}のほか{{omitted}}件",
       "detailReasonPatchFailed": "パッチが適用されなかったため",
@@ -1866,15 +1899,16 @@
     "contextUsage": {
       "windowUnavailable": "コンテキストウィンドウのサイズは不明",
       "tapToViewDetails": "タップするとコンテキストの詳細を表示します。",
-      "costSuffix": "、コスト {{cost}}",
-      "tokensWindowUnavailable": "コンテキストは{{used}}トークン使用、ウィンドウのサイズは不明",
-      "tokensUsage": "コンテキスト {{window}}トークン中{{used}}トークン、{{percentage}}使用",
+      "costClause": "、コスト {{cost}}",
+      "loadingCostSpoken": "コスト {{cost}}。",
+      "tokensWindowUnavailable": "コンテキストは{{used}}トークン使用、ウィンドウのサイズは不明{{costClause}}。",
+      "tokensUsage": "コンテキスト {{window}}トークン中{{used}}トークン、{{percentage}}使用{{costClause}}。",
       "title": "コンテキスト使用量",
       "used": "使用済み",
       "provider": "プロバイダー",
       "totalCost": "合計コスト",
       "usageReflectsLatest": "使用量は直近に完了したアシスタントの応答を反映しています。",
-      "usageUnavailable": "コンテキスト使用状況を利用できません",
+      "usageUnavailable": "コンテキスト使用状況を利用できません{{costClause}}。",
       "tokenUsage": "トークン使用量",
       "cacheRate": "キャッシュ率",
       "modelsCount": "モデル（{{displayCount}}）",
@@ -1955,7 +1989,6 @@
   },
   "addCredits": {
     "cta": "クレジットを追加",
-    "description": "利用を続けるには、クレジットを追加してください。",
     "billingPage": "請求ページ"
   },
   "deviceSessions": {
@@ -2248,10 +2281,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHubとの接続を確認できませんでした。",
-      "checkFailedMessage": "読み込みが完了するまで、サインイン状態を確認できません。",
+      "checkFailedMessage": "GitHubに接続できませんでした。接続を確認して、もう一度お試しください。",
       "checkFailedTitleGitLab": "GitLabとの接続を確認できませんでした。",
       "checkFailedTitleBitbucket": "Bitbucketとの接続を確認できませんでした。",
-      "providerCheckFailedMessage": "読み込みが完了するまで接続状態は利用できません。",
+      "providerCheckFailedMessage": "プロバイダーに接続できませんでした。接続を確認して、もう一度お試しください。",
       "reconnectTitle": "GitHubに再接続",
       "reconnectTitleGitLab": "GitLabに再接続",
       "reconnectTitleBitbucket": "Bitbucketに再接続",
@@ -2395,7 +2428,6 @@
     },
     "fileList": {
       "filesList": "ファイル一覧",
-      "filesViewed": "ファイル · {{total}}件中{{viewed}}件を確認済み",
       "layout": "レイアウト",
       "listed": "（一覧表示）",
       "loadingFiles": "ファイルを読み込み中",
@@ -2996,9 +3028,9 @@
       "searching": "ウェブ検索",
       "thinking": "思考中"
     },
-    "planOf": "/",
+    "planProgress": "{{total}}件中{{done}}件完了",
     "filesChanged": "ファイル変更",
-    "finishedIn": "所要時間",
+    "finishedIn": "所要時間 {{duration}}",
     "noActivityFor": "アクティビティなし",
     "prOpened": "プルリクエストを開きました",
     "permissionWants": "実行を希望",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"
     },
-    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。クレジットを追加して再試行してください。"
+    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。"
   },
   "settingsTools": {
     "confirmTitle": "この変更を確認しますか？"
@@ -3340,8 +3372,8 @@
     "saved": "支出アラートの設定を保存しました",
     "loadError": "支出アラートを読み込めませんでした。",
     "saveError": "支出アラートを保存できませんでした。",
-    "empty": "支出アラートはオフです。このスコープの請求担当者に通知するにはオンにしてください。",
-    "noSpend": "まだ支出が記録されていません",
+    "sendAlerts": "アラートを送信",
+    "noSpend": "まだ支出なし",
     "spend24h": "過去24時間の支出",
     "multiplierError": "1以上の倍率を入力してください",
     "permissionDenied": "支出アラートを管理する権限がありません。",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "スケジュールされたブリーフが有効なコンテキストはありません",
     "sourceBlocker": "セッションに対応が必要",
     "sourceMetadata": "取得したセッションのメタデータ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "この検索結果を開けませんでした"
   }
 }

@@ -7,19 +7,42 @@ import { useTRPC } from '@/lib/trpc/utils';
 
 type PreviewSessionId = `workspace_${string}`;
 
+export function usePreviewServices(
+  cloudAgentSessionId: PreviewSessionId,
+  organizationId: string | undefined
+) {
+  const trpc = useTRPC();
+  const options = {
+    staleTime: 0,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  } as const;
+  const personal = useQuery({
+    ...trpc.cloudAgentNext.listPreviewServices.queryOptions(
+      organizationId ? skipToken : { cloudAgentSessionId }
+    ),
+    ...options,
+  });
+  const organization = useQuery({
+    ...trpc.organizations.cloudAgentNext.listPreviewServices.queryOptions(
+      organizationId ? { cloudAgentSessionId, organizationId } : skipToken
+    ),
+    ...options,
+  });
+  return organizationId ? organization : personal;
+}
+
 /**
  * The session's preview URL with a `{port}` placeholder, or null when the
  * Worker does not serve preview for it. The answer changes only on a Worker
  * deploy, so it is read once per session; it is null while loading.
  */
-export function usePreviewUrlTemplate(
-  cloudAgentSessionId: PreviewSessionId | null,
-  organizationId: string | undefined
-): string | null {
+export function usePreviewUrlTemplate(cloudAgentSessionId: PreviewSessionId | null): string | null {
   const trpc = useTRPC();
   const query = useQuery({
     ...trpc.cloudAgentNext.getPreviewOptions.queryOptions(
-      cloudAgentSessionId ? { cloudAgentSessionId, organizationId } : skipToken
+      cloudAgentSessionId ? { cloudAgentSessionId } : skipToken
     ),
     staleTime: Infinity,
     retry: false,

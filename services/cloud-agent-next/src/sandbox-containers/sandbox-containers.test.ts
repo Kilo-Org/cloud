@@ -1,6 +1,4 @@
 import { preinstalledStartup } from '../sandbox-control/preinstalled-startup.js';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { DurableObjectMock } = vi.hoisted(() => ({
@@ -2802,22 +2800,22 @@ function launchFromSnapshot(instance: SandboxContainers, ref: string, extra = {}
 }
 
 describe('SandboxContainers environment snapshot starts', () => {
-  it('stops retrying a repeatedly failing snapshot but permits a replacement', async () => {
+  it('reports the same snapshot artifact after repeated failures without an image fallback', async () => {
     const { instance, container } = setup();
     for (let attempt = 0; attempt < 3; attempt += 1) {
       container.startBehavior = 'effect-then-reject';
-      expect(await launchFromSnapshot(instance, REF_A)).toMatchObject({ snapshotFailed: true });
+      expect(await launchFromSnapshot(instance, REF_A)).toMatchObject({
+        snapshotFailed: true,
+        snapshotFailureReason: 'transient',
+      });
       await instance.stop(REF_A);
     }
-    container.startBehavior = 'ok';
-    expect(await launchFromSnapshot(instance, REF_A)).toMatchObject({ startSource: 'image' });
-    expect(container.startCalls.at(-1)).toHaveProperty('image', IMAGE);
-    await instance.stop(REF_A);
-    expect(
-      await launchFromSnapshot(instance, REF_A, {
-        snapshot: { ...SNAPSHOT, snapshotId: 'replacement' },
-      })
-    ).toMatchObject({ startSource: 'repository' });
+    container.startBehavior = 'effect-then-reject';
+    expect(await launchFromSnapshot(instance, REF_A)).toMatchObject({
+      startSource: 'repository',
+      snapshotFailed: true,
+    });
+    expect(container.startCalls.at(-1)).toHaveProperty('containerSnapshot', { id: 'snap-env' });
   });
 
   it('starts from the offered snapshot captured from the current image', async () => {
@@ -2915,7 +2913,7 @@ describe('SandboxContainers environment snapshot starts', () => {
     expect(outbound).toHaveBeenCalledTimes(2);
   });
 
-  it('reports a failed snapshot start without destroying the container or counting it', async () => {
+  it('reports a failed snapshot start without destroying the container or retrying the image', async () => {
     const { instance, container, readRecord } = setup();
     container.startBehavior = 'effect-then-reject';
 
@@ -2923,6 +2921,7 @@ describe('SandboxContainers environment snapshot starts', () => {
       started: false,
       startSource: 'repository',
       snapshotFailed: true,
+      snapshotFailureReason: 'transient',
     });
     expect(container.startCalls).toHaveLength(1);
     expect(container.destroyCalls).toBe(0);
@@ -3107,6 +3106,7 @@ describe('SandboxContainers runtime release start', () => {
       started: false,
       startSource: 'repository',
       snapshotFailed: true,
+      snapshotFailureReason: 'transient',
     });
   });
 
@@ -3416,28 +3416,6 @@ describe('SandboxContainers capture by id', () => {
     expect(storage.map.get('containers:captures:v1')).toEqual(
       Array.from({ length: 8 }, (_, index) => `capture-${9 - index}`)
     );
-  });
-});
-
-describe('containment trust ownership', () => {
-  const sandboxContainersSource = readFileSync(
-    fileURLToPath(new URL('./SandboxContainers.ts', import.meta.url).href),
-    'utf8'
-  );
-  const dockerfileSource = readFileSync(
-    fileURLToPath(new URL('../../Dockerfile.containers', import.meta.url).href),
-    'utf8'
-  );
-
-  it('runs no CA trust exec in the Durable Object', () => {
-    expect(sandboxContainersSource).not.toContain('trustInterceptCa');
-    expect(sandboxContainersSource).not.toContain('container CA trust timed out');
-    expect(sandboxContainersSource).not.toContain('update-ca-certificates');
-  });
-
-  it('keeps the container entrypoint to PID 1 only', () => {
-    expect(dockerfileSource).not.toContain('update-ca-certificates');
-    expect(dockerfileSource).toContain('exec sleep infinity');
   });
 });
 

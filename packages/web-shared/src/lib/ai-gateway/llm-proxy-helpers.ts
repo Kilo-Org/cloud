@@ -24,6 +24,7 @@ import type {
   GatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { limitHeaderValue } from '@kilocode/web-shared/lib/ai-gateway/header-limits';
 import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -81,7 +82,8 @@ export function invalidPathResponse() {
     {
       error: 'Invalid path',
       error_type: ProxyErrorType.invalid_path,
-      message: 'This endpoint only accepts the path `/chat/completions`.',
+      message:
+        'This endpoint only accepts the paths `/chat/completions`, `/responses` and `/messages`.',
     },
     { status: 400 }
   );
@@ -561,6 +563,19 @@ export function chatGptReconnectResponse(message: string) {
   );
 }
 
+/**
+ * Returned when the owner's Claude billing connection cannot bill. The request
+ * was refused before any upstream call, and it must not be served on another
+ * payer's allowance. The owner is told what happened and what an admin can do.
+ */
+export function claudeBillingUnavailableResponse(message: string, retryable = false) {
+  const error = `${message} Manage the connection at ${APP_URL}/byok.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: retryable ? 503 : 400, headers: retryable ? { 'Retry-After': '1' } : undefined }
+  );
+}
+
 export function modelDoesNotExistOnOpenRouterResponse(model: string) {
   const error =
     `The requested model '${model}' does not exist. ` +
@@ -835,7 +850,7 @@ export function getOrganizationProviderPrivacy(
 }
 
 export function extractHeaderAndLimitLength(request: NextRequest, name: string) {
-  return request.headers.get(name)?.slice(0, 500)?.trim() || null;
+  return limitHeaderValue(request.headers.get(name));
 }
 
 export function extractFraudAndProjectHeaders(request: NextRequest) {

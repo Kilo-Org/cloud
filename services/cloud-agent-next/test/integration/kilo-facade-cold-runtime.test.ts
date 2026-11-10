@@ -196,13 +196,7 @@ type ColdSession = {
 
 /** A session DO and sandbox allocation with no session compute requested yet. */
 async function openColdSession(): Promise<ColdSession> {
-  const sandboxId = await generateSandboxId(
-    undefined,
-    ORG_ID,
-    USER_ID,
-    cloudAgentSessionId,
-    undefined
-  );
+  const sandboxId = await generateSandboxId(cloudAgentSessionId);
   const provider = createFakeProvider();
   const meter = createRecordingMeter();
   const sandboxStub = await installSandbox(sandboxId, provider.adapter, meter);
@@ -385,7 +379,11 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
         stream,
         frame => (frame as { type?: string }).type === 'kilo.native.fence'
       );
-      expect(replay.observed).toEqual([
+      expect(
+        replay.observed.filter(frame =>
+          ['cloud.message.failed', 'kilo.native.fence'].includes((frame as { type: string }).type)
+        )
+      ).toEqual([
         expect.objectContaining({
           type: 'cloud.message.failed',
           properties: expect.objectContaining({

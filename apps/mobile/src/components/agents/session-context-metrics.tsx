@@ -1,5 +1,7 @@
+import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { cn } from '@/lib/utils';
@@ -29,10 +31,33 @@ type SessionContextMetricsProps = {
    * nothing to open.
    */
   loading?: boolean;
+  /**
+   * Marks a settled session that will never report usage and cannot open any
+   * sheet: an empty stored transcript reports no usage, and its sheet has no
+   * permission settings (read-only sessions cannot auto-approve). The layout
+   * box stays reserved so the header does not shift; the dash value slots
+   * would otherwise read as a permanent placeholder beside the finished
+   * empty state.
+   */
+  onNothingToReport?: boolean;
 };
 
 const RING_SIZE = 28;
 const RING_STROKE = 3;
+
+/**
+ * Full-bleed box over the value row that centres the loading bar in it. The row
+ * is sized by its own text, so its width and height follow the font scale; the
+ * bar takes those instead of a fixed size of its own.
+ */
+const LOADING_BAR_OVERLAY = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+} as const;
 
 const TONE_TEXT_CLASS = {
   destructive: 'text-destructive',
@@ -52,6 +77,7 @@ export function SessionContextMetrics({
   autoApproveAvailable = false,
   onPress,
   loading = false,
+  onNothingToReport = false,
 }: Readonly<SessionContextMetricsProps>) {
   const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages, loading });
   // This pill is the only way into the session's context sheet, which owns the
@@ -63,8 +89,11 @@ export function SessionContextMetrics({
   const pressable = onPress != null;
   // Without an `onPress` this is the unresolved-session placeholder: the layout
   // box keeps its space in every state, and stays invisible while there is
-  // nothing to open.
-  const hidden = !pressable && (loading || (!hasMessages && !autoApproveAvailable));
+  // nothing to open. A settled session that will never report usage and cannot
+  // open the sheet hides the same way, so its dash value slots never paint as a
+  // permanent placeholder.
+  const hidden =
+    !pressable && (loading || (!hasMessages && !autoApproveAvailable) || onNothingToReport);
   const accessibilityLabel = getMetricsAccessibilityLabel({
     info,
     totalCostMicrodollars,
@@ -83,6 +112,44 @@ export function SessionContextMetrics({
   const pillClassName =
     'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
 
+  // The pill's second value slot. `bg-muted-soft` is the one gray that stands
+  // off this pill's own `bg-secondary` fill — the theme's `muted` equals
+  // `secondary` in both palettes — and the slot keeps the cost label's width in
+  // every placeholder state, so the pill never grows a value out of a smaller
+  // pill and never shrinks when a session settles without one.
+  let costSlot: ReactNode = null;
+  if (content.costSlot === 'label' && content.secondary !== null) {
+    costSlot = (
+      <Text
+        numberOfLines={1}
+        className="min-w-0 shrink text-xs tabular-nums text-muted-foreground"
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {isolateLtrBidiText(content.secondary)}
+      </Text>
+    );
+  } else if (content.costSlot === 'unreported' || content.costSlot === 'loading') {
+    costSlot = (
+      <Text
+        numberOfLines={1}
+        className="w-8 text-center text-xs tabular-nums text-muted-foreground"
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {content.secondary}
+      </Text>
+    );
+  }
+
+  // While the session still resolves, the row's two dashes keep their layout and
+  // paint invisible, and one bar covers the row they occupy. A bar of its own
+  // fixed width matched the settled row only at the default font scale; text
+  // metrics scale with the font, so the row the values will take is the correct
+  // extent at any scale. The overlay centres itself in that row instead of
+  // naming a vertical inset, because the row's height scales with the font too.
+  const valueRowLoading = content.costSlot === 'loading';
+
   const body = (
     <>
       <ContextUsageRing
@@ -91,26 +158,34 @@ export function SessionContextMetrics({
         arcFraction={content.arcFraction}
         tone={content.tone}
       />
-      {content.primary != null ? (
-        <View className="min-w-0 shrink flex-row items-baseline gap-1">
-          <Text
-            numberOfLines={1}
+      {content.primary != null || costSlot != null ? (
+        <View className="min-w-0 shrink">
+          <View
             className={cn(
-              'min-w-0 shrink text-xs font-semibold tabular-nums',
-              toneTextClass(content.tone)
+              'min-w-0 shrink flex-row items-baseline gap-1',
+              valueRowLoading && 'opacity-0'
             )}
+            {...(valueRowLoading
+              ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+              : {})}
           >
-            {content.primary}
-          </Text>
-          {content.hasCost && content.secondary ? (
-            <Text
-              numberOfLines={1}
-              className="min-w-0 shrink text-xs tabular-nums text-muted-foreground"
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            >
-              {isolateLtrBidiText(content.secondary)}
-            </Text>
+            {content.primary != null ? (
+              <Text
+                numberOfLines={1}
+                className={cn(
+                  'min-w-0 shrink text-xs font-semibold tabular-nums',
+                  toneTextClass(content.tone)
+                )}
+              >
+                {content.primary}
+              </Text>
+            ) : null}
+            {costSlot}
+          </View>
+          {valueRowLoading ? (
+            <View style={LOADING_BAR_OVERLAY}>
+              <Skeleton className="h-2 w-full rounded-[2px] bg-muted-soft" />
+            </View>
           ) : null}
         </View>
       ) : null}

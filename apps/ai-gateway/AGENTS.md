@@ -26,13 +26,14 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   `apps/web` `maxDuration` and `withRestTiming` usage, with route patterns that
   match this app's paths. Import them as `@kilocode/web-shared/…`; see
   `packages/web-shared/AGENTS.md`.
-- Some handlers still accept the legacy `apps/web` paths, such as the LLM proxy's
-  path validation. Requests only arrive here under `/api/v1`.
+- Requests only arrive here under `/api/v1`. The LLM proxy's path validation
+  accepts only `/api/v1` and rejects the legacy `apps/web` prefixes.
 - `pnpm dev` runs with the web app's environment files. `pnpm dev:start`
   starts it with the web app and points the web app's rewrites at it.
-- The scheduled `deploy-production.yml` and `deploy-staging.yml` deploy this
-  app with the web apps, from the same CI-green commit, after migrations. A
-  release is only recorded as complete once the gateway is live too.
+- The automatic `deploy-production.yml` and `deploy-staging.yml` pipelines
+  deploy this app with the web apps, from the same CI-green commit, after
+  migrations. A release is only recorded as complete once the gateway is live
+  too.
   `redeploy-web.yml` does not touch this app. Crons stay on the web app; do not
   add them to this app's `vercel.mjs`.
 - Server-side Sentry and OpenTelemetry come from

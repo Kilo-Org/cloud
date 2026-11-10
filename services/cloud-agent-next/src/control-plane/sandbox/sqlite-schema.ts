@@ -19,6 +19,8 @@ export const allocation = sqliteTable('allocation', {
   last_activity_at: integer('last_activity_at'),
   create_deadline_at: integer('create_deadline_at'),
   first_connect_deadline_at: integer('first_connect_deadline_at'),
+  /** Create attempts the current preparing episode made; see AllocationState. */
+  create_attempt: integer('create_attempt').notNull().default(0),
   stop_attempt: integer('stop_attempt').notNull(),
   stop_pending: integer('stop_pending', { mode: 'boolean' }).notNull(),
   stop_at: integer('stop_at'),
@@ -49,4 +51,14 @@ export const routes = sqliteTable('routes', {
 export const scopeGrants = sqliteTable('scope_grants', {
   id: text('id').primaryKey(),
   grant: text('grant').notNull(),
+});
+
+export const workspaceDiskSnapshots = sqliteTable('workspace_disk_snapshots', {
+  workspace_id: text('workspace_id').primaryKey(),
+  data: text('data', { mode: 'json' }).notNull(),
+});
+
+export const workspaceDiskAllocation = sqliteTable('workspace_disk_allocation', {
+  id: text('id').primaryKey(),
+  data: text('data', { mode: 'json' }).notNull(),
 });

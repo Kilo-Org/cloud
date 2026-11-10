@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Onyesho la udhibiti wa mbali wa CLI native",
+    "sessionsEmpty": "Bado hakuna vikao vya CLI native",
+    "hosts": "Vizio vilivyo mtandaoni",
+    "hostsEmpty": "Hakuna vizio vilivyo mtandaoni",
+    "directory": "Saraka ya kazi",
+    "createSession": "Unda kikao cha CLI native",
+    "queueIfOffline": "Weka agizo kwenye foleni ikiwa kizio hakiko mtandaoni",
+    "prompt": "Agizo au /command",
+    "localClear": "Futa mwonekano wa ndani tu",
+    "abort": "Katisha zamu",
+    "failed": "Kitendo cha udhibiti wa mbali wa CLI native kimeshindwa",
+    "creationUnknown": "Matokeo ya uundaji hayajulikani. Onyesha upya vikao kabla ya kujaribu tena.",
+    "commandFailed": "Amri ya kiendeshi imeshindwa",
+    "invalidReply": "Jibu la kiendeshi si halali",
+    "unsafeCommand": "Tumia /compact, /new, /skill, /models, /agents au /clear (ndani tu).",
+    "status": "Muunganisho: {{connection}} · Kiendeshi: {{runner}}",
+    "presenceStatus": "Vizio: {{connection}}",
+    "commandStatus": "Uwasilishaji wa amri: {{status}}",
+    "delivered": "Imewasilishwa",
+    "expired": "Muda wake umeisha"
+  },
   "common": {
     "cancel": "Ghairi",
     "done": "Nimemaliza",
@@ -110,6 +132,7 @@
     "newSession": "Kikao kipya",
     "noModelsAvailable": "Hakuna modeli zinazopatikana",
     "notFound": "Haikupatikana.",
+    "online": "Mtandaoni",
     "open": "Fungua {{name}}",
     "openPullRequest": "Fungua ombi la kuunganisha",
     "completed": "Imekamilika",
@@ -186,6 +209,7 @@
     "resendCode": "Tuma msimbo tena",
     "termsPrefix": "Kwa kuendelea unakubali ",
     "terms": "Masharti",
+    "termsInSentence": "Masharti",
     "termsConnector": " na ",
     "termsSuffix": ".",
     "moreSignInOptions": "Machaguo zaidi ya kuingia",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Thibitisha kufuta",
     "credits": "Salio",
     "failedToLoadBalance": "Imeshindikana kupakia salio. Gusa ili ujaribu tena.",
+    "balanceLoadFailed": "Imeshindikana kupakia salio",
     "hideBalance": "Ficha salio",
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Ombi hili la kuunganisha halina mabadiliko ya faili.",
     "fileList": {
       "openNavigator": "Fungua kivinjari cha faili",
-      "filesViewed": "Faili · {{viewed}} kati ya {{total}} zimeangaliwa",
       "listed": "(zimeorodheshwa)",
       "layout": "Mpangilio",
       "unified": "Pamoja",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "Imeshindikana kuangalia muunganisho wa GitHub.",
-      "checkFailedMessage": "Hali ya kuingia haipatikani hadi upakiaji huu ukamilike.",
+      "checkFailedMessage": "Imeshindikana kufikia GitHub. Angalia muunganisho wako kisha ujaribu tena.",
       "checkFailedTitleGitLab": "Imeshindikana kuangalia muunganisho wa GitLab.",
       "checkFailedTitleBitbucket": "Imeshindikana kuangalia muunganisho wa Bitbucket.",
-      "providerCheckFailedMessage": "Hali ya muunganisho haipatikani hadi hii ipakie.",
+      "providerCheckFailedMessage": "Imeshindikana kufikia mtoa huduma. Angalia muunganisho wako kisha ujaribu tena.",
       "reconnectTitle": "Unganisha GitHub tena",
       "reconnectTitleGitLab": "Unganisha GitLab tena",
       "reconnectTitleBitbucket": "Unganisha Bitbucket tena",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Ruhusu matumizi ya kamera kwenye mipangilio ili kupiga picha."
+    },
+    "botStatus": {
+      "offline": "Nje ya mtandao"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Imeshindikana kukamilisha kitendo hiki. Tafadhali jaribu tena.",
       "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza.",
       "syncNoRepositories": "Hakuna hazina zilizo katika wigo wa usawazishaji. Chagua hazina ambazo Wakala wa usalama hufuatilia, kisha usawazishe tena.",
+      "syncNoRepositoriesNoManage": "Hakuna hazina zilizo katika wigo wa usawazishaji. Mmiliki, msimamizi, au msimamizi wa bili wa shirika lazima aunganishe hazina kabla ya kusawazisha.",
       "syncIntegrationInactive": "Muunganisho wa GitHub wa Wakala wa usalama haupo hai. Unganisha tena GitHub App ya Kilo, kisha usawazishe tena.",
       "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena.",
       "configConflict": "Mipangilio ya Wakala wa usalama ilibadilishwa mahali pengine. Pitia mipangilio ya hivi punde na uhifadhi tena."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "Tuma ujumbe hapa chini ili uanze.",
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Bado hakuna ujumbe",
+      "emptyReadOnlyTitle": "Hakuna ujumbe katika kikao hiki",
       "renameAccessibility": "Badilisha jina la kikao: {{title}}",
       "cloningSession": "Inanakili kikao",
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Chagua hazina ili kuanza.",
       "enterPromptToStart": "Ongeza maelekezo ili kuanza.",
       "enterPromptOrFileToStart": "Ongeza maelekezo au faili ili kuanza.",
-      "connectProviderToStart": "Unganisha mtoa huduma ili kuanza.",
+      "connectProviderToStart": "Hazina zinatoka kwenye akaunti ya GitHub, GitLab au Bitbucket ambayo imeunganishwa.",
       "promptPlaceholder": "Ungependa kufanya kazi gani?",
       "couldNotLoadModels": "Imeshindikana kupakia modeli.",
       "prefillRepoAndModelUnavailable": "Hazina na modeli ya kikao cha awali hazipatikani tena. Chagua hazina na modeli hapa chini.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "Jibu lilisimamishwa.",
       "assistantContextOverflow": "Mazungumzo ni marefu mno kwa modeli.",
       "assistantProviderError": "Mtoa huduma alirudisha kosa.",
+      "assistantProviderRefused": "Mtoa huduma alikataa ombi hili na haliwezi kujaribiwa tena.",
+      "assistantCreditsRefusal": "Salio halitoshi kuendesha Cloud Agent.",
       "assistantOutputLimit": "Jibu lilifikisha kikomo cha matokeo ya modeli.",
       "assistantStructuredOutput": "Jibu halikulingana na muundo unaohitajika.",
       "assistantFailed": "Imeshindikana kutoa jibu."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Inatayarisha mazingira",
       "preparationComplete": "Utayarishaji umekamilika",
       "preparationFailed": "Utayarishaji umeshindikana",
+      "preparationStageFailed": "{{stage}}: Imeshindikana",
       "setupCommand": "Amri ya usanidi {{index}}",
       "setupCommandOf": "Amri ya usanidi {{index}} kati ya {{displayCount}}",
       "stepWorkspaceSetup": "Usanidi wa eneo la kazi",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "Amri ya usanidi {{index}} imeisha muda",
       "detailColdRestore": "Urejeshi wa baridi, snapshot imetumika, urejeshi wa faili: {{applied}} kati ya {{total}}",
       "detailProgressPercent": "{{percent}}% imekamilika",
-      "detailRestoreIncompleteReport": "Urejeshi wa kikao haujakamilika — faili bila urejeshi: {{skipped}} kati ya {{total}} ({{reasons}})",
+      "detailRestoreIncompleteFiles": "Faili bila urejeshi: {{skipped}} kati ya {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Zinazokosekana: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} na nyingine {{omitted}}",
       "detailReasonPatchFailed": "patch haikutumika",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Ukubwa wa dirisha la muktadha haupatikani",
-      "tapToViewDetails": "Gusa ili uone maelezo ya muktadha.",
-      "costSuffix": ", gharama {{cost}}",
-      "tokensWindowUnavailable": "Muktadha: tokeni {{used}}, ukubwa wa dirisha haupatikani",
-      "tokensUsage": "Muktadha: tokeni {{used}} kati ya {{window}}, {{percentage}} imetumika",
+      "tapToViewDetails": " Gusa ili uone maelezo ya muktadha.",
+      "costClause": ", gharama {{cost}}",
+      "loadingCostSpoken": "gharama {{cost}}.",
+      "tokensWindowUnavailable": "Muktadha: tokeni {{used}}, ukubwa wa dirisha haupatikani{{costClause}}.",
+      "tokensUsage": "Muktadha: tokeni {{used}} kati ya {{window}}, {{percentage}} imetumika{{costClause}}.",
       "title": "Matumizi ya muktadha",
       "used": "Zilizotumika",
       "provider": "Mtoa huduma",
       "totalCost": "Gharama ya jumla",
       "usageReflectsLatest": "Matumizi yanatokana na jibu la mwisho la msaidizi lililokamilika.",
-      "usageUnavailable": "Matumizi ya muktadha hayapatikani",
+      "usageUnavailable": "Matumizi ya muktadha hayapatikani{{costClause}}.",
       "tokenUsage": "Matumizi ya tokeni",
       "cacheRate": "Kiwango cha hifadhi ya muda",
       "modelsCount": "Modeli ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Ongeza salio",
-    "description": "Ongeza salio ili uendelee kutumia.",
     "billingPage": "ukurasa wa malipo"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Utafutaji wa wavuti",
       "thinking": "Kufikiri kwa kina"
     },
-    "planOf": "kati ya",
+    "planProgress": "{{done}} kati ya {{total}}",
     "filesChanged": "faili zilizobadilishwa",
-    "finishedIn": "Imekamilika kwa",
+    "finishedIn": "Imekamilika kwa {{duration}}",
     "noActivityFor": "Hakuna shughuli kwa",
     "prOpened": "Ombi la kuvuta limefunguliwa",
     "permissionWants": "Inataka kuendesha",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
     },
-    "creditsRequired": "Salio halitoshi kutuma ujumbe huu, ongeza salio kisha ujaribu tena."
+    "creditsRequired": "Salio halitoshi kutuma ujumbe huu."
   },
   "settingsTools": {
     "confirmTitle": "Thibitisha mabadiliko haya?"
@@ -3340,8 +3372,8 @@
     "saved": "Mipangilio ya tahadhari za matumizi imehifadhiwa",
     "loadError": "Tahadhari za matumizi hazikuweza kupakiwa.",
     "saveError": "Tahadhari za matumizi hazikuweza kuhifadhiwa.",
-    "empty": "Tahadhari za matumizi zimezimwa. Ziwasha ili kuwatahadharisha anwani za bili za wigo huu.",
-    "noSpend": "Hakuna matumizi yaliyorekodiwa bado",
+    "sendAlerts": "Tuma tahadhari",
+    "noSpend": "Hakuna matumizi bado",
     "spend24h": "Matumizi katika saa 24 zilizopita",
     "multiplierError": "Weka kizidishi cha 1 au zaidi",
     "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Hakuna miktadha iliyowezeshwa kwa ripoti zilizoratibiwa",
     "sourceBlocker": "Kipindi kinahitaji kushughulikiwa",
     "sourceMetadata": "Metadata za kipindi zilizohifadhiwa"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"
   }
 }

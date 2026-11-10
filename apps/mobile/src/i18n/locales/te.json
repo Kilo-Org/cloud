@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "నేటివ్ రిమోట్ డెమో",
+    "sessionsEmpty": "ఇంకా నేటివ్ సెషన్‌లు లేవు",
+    "hosts": "ఆన్‌లైన్ హోస్ట్‌లు",
+    "hostsEmpty": "ఆన్‌లైన్ హోస్ట్‌లు లేవు",
+    "directory": "వర్కింగ్ డైరెక్టరీ",
+    "createSession": "నేటివ్ సెషన్‌ను సృష్టించండి",
+    "queueIfOffline": "హోస్ట్ ఆఫ్‌లైన్‌లో ఉంటే ప్రాంప్ట్‌ను క్యూలో ఉంచండి",
+    "prompt": "ప్రాంప్ట్ లేదా /command",
+    "localClear": "లోకల్ వీక్షణను క్లియర్ చేయండి",
+    "abort": "టర్న్‌ను ఆపండి",
+    "failed": "నేటివ్ రిమోట్ చర్య విఫలమైంది",
+    "creationUnknown": "సెషన్ సృష్టించబడిందో లేదో తెలియదు. మళ్లీ ప్రయత్నించే ముందు సెషన్‌లను రిఫ్రెష్ చేయండి.",
+    "commandFailed": "రన్నర్ కమాండ్ విఫలమైంది",
+    "invalidReply": "చెల్లని రన్నర్ ప్రతిస్పందన",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents లేదా /clear (లోకల్‌గా మాత్రమే) ఉపయోగించండి.",
+    "status": "కనెక్షన్: {{connection}} · రన్నర్: {{runner}}",
+    "presenceStatus": "హోస్ట్‌లు: {{connection}}",
+    "commandStatus": "కమాండ్ డెలివరీ: {{status}}",
+    "delivered": "చేరింది",
+    "expired": "గడువు ముగిసింది"
+  },
   "common": {
     "cancel": "రద్దు చేయండి",
     "done": "పూర్తయింది",
@@ -110,6 +132,7 @@
     "newSession": "కొత్త సెషన్",
     "noModelsAvailable": "మోడళ్లు అందుబాటులో లేవు",
     "notFound": "దొరకలేదు.",
+    "online": "ఆన్‌లైన్",
     "open": "{{name}}ను తెరవండి",
     "openPullRequest": "పుల్ రిక్వెస్ట్ తెరవండి",
     "completed": "పూర్తయింది",
@@ -186,6 +209,7 @@
     "resendCode": "కోడ్‌ను మళ్లీ పంపండి",
     "termsPrefix": "కొనసాగిస్తే, మీరు అంగీకరించేవి: మా ",
     "terms": "నిబంధనలు",
+    "termsInSentence": "నిబంధనలు",
     "termsConnector": " మరియు ",
     "termsSuffix": ".",
     "moreSignInOptions": "మరిన్ని సైన్ ఇన్ ఎంపికలు",
@@ -222,6 +246,7 @@
     "confirmDeletion": "తొలగింపును నిర్ధారించండి",
     "credits": "క్రెడిట్లు",
     "failedToLoadBalance": "బ్యాలెన్స్‌ను లోడ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి నొక్కండి.",
+    "balanceLoadFailed": "బ్యాలెన్స్‌ను లోడ్ చేయలేకపోయాము",
     "hideBalance": "బ్యాలెన్స్ దాచు",
     "showBalance": "బ్యాలెన్స్ చూపించు",
     "balanceHidden": "బ్యాలెన్స్ దాచబడింది",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "ఈ పుల్ రిక్వెస్ట్‌లో ఏ ఫైల్‌లోనూ మార్పులు లేవు.",
     "fileList": {
       "openNavigator": "ఫైల్ నావిగేటర్‌ను తెరవండి",
-      "filesViewed": "ఫైళ్లు · {{total}}లో {{viewed}} చూశారు",
       "listed": "(జాబితాలో ఉన్నవి)",
       "layout": "లేఅవుట్",
       "unified": "ఏకీకృతం",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
-      "checkFailedMessage": "ఇది లోడ్ అయ్యే వరకు సైన్ ఇన్ స్థితిని తెలుసుకోలేము.",
+      "checkFailedMessage": "GitHub‌ను చేరుకోలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
       "checkFailedTitleGitLab": "GitLab కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
       "checkFailedTitleBitbucket": "Bitbucket కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
-      "providerCheckFailedMessage": "ఇది లోడ్ అయ్యే వరకు కనెక్షన్ స్థితి అందుబాటులో ఉండదు.",
+      "providerCheckFailedMessage": "ప్రొవైడర్‌ను చేరుకోలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
       "reconnectTitle": "GitHubకు మళ్లీ కనెక్షన్",
       "reconnectTitleGitLab": "GitLabకు మళ్లీ కనెక్షన్",
       "reconnectTitleBitbucket": "Bitbucketకు మళ్లీ కనెక్షన్",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "ఫోటో తీయడానికి సెట్టింగ్‌లలో కెమెరా వాడేందుకు అనుమతి ఇవ్వండి."
+    },
+    "botStatus": {
+      "offline": "ఆఫ్‌లైన్"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "ఈ చర్యను పూర్తి చేయలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి.",
       "actionBlocked": "ఈ చర్యను పూర్తి చేయలేకపోయాము. మళ్లీ ప్రయత్నించే ముందు ఈ సమస్యను పరిష్కరించాలి.",
       "syncNoRepositories": "సింక్ పరిధిలో ఎలాంటి రిపాజిటరీలు లేవు. భద్రతా ఏజెంట్ పర్యవేక్షించే రిపాజిటరీలను ఎంచుకుని, ఆపై మళ్లీ సింక్ చేయండి.",
+      "syncNoRepositoriesNoManage": "సింక్ పరిధిలో ఎలాంటి రిపాజిటరీలు లేవు. సింక్ అమలు కావడానికి ముందు సంస్థ యజమాని, నిర్వాహకుడు లేదా బిల్లింగ్ మేనేజర్ రిపాజిటరీలను కనెక్ట్ చేయాలి.",
       "syncIntegrationInactive": "భద్రతా ఏజెంట్ కోసం GitHub కనెక్షన్ యాక్టివ్గా లేదు. Kilo GitHub Appను మళ్లీ కనెక్ట్ చేసి, ఆ తర్వాత మళ్లీ సింక్ చేయండి.",
       "syncMissingPermission": "Kilo GitHub App vulnerability alertsను చదవలేదు. GitHubలో ఆ అనుమతిని ఇవ్వండి, ఆపై మళ్లీ సింక్ చేయండి.",
       "configConflict": "భద్రతా ఏజెంట్ సెట్టింగ్‌లు మరో చోట మార్చబడ్డాయి. తాజా సెట్టింగ్‌లను సమీక్షించి మళ్లీ సేవ్ చేయండి."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "ప్రారంభించడానికి కింద సందేశం పంపండి.",
       "scrollToBottom": "చివరి వరకు స్క్రోల్ చేయండి",
       "emptyTitle": "ఇంకా సందేశాలు లేవు",
+      "emptyReadOnlyTitle": "ఈ సెషన్‌లో సందేశాలు లేవు",
       "renameAccessibility": "{{title}} సెషన్ పేరు మార్చండి",
       "cloningSession": "సెషన్‌ను క్లోన్ చేస్తోంది",
       "couldNotLoadThisSession": "ఈ సెషన్‌ను లోడ్ చేయలేకపోయాము.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "ప్రారంభించడానికి రిపోజిటరీని ఎంచుకోండి.",
       "enterPromptToStart": "ప్రారంభించడానికి ఒక ప్రాంప్ట్‌ను జోడించండి.",
       "enterPromptOrFileToStart": "ప్రారంభించడానికి ఒక ప్రాంప్ట్‌ను లేదా ఫైల్‌ను జోడించండి.",
-      "connectProviderToStart": "ప్రారంభించడానికి ప్రొవైడర్‌ను కనెక్ట్ చేయండి.",
+      "connectProviderToStart": "రిపోజిటరీలు కనెక్ట్ అయిన GitHub, GitLab లేదా Bitbucket ఖాతా నుండి వస్తాయి.",
       "promptPlaceholder": "మీరు దేనిపై పని చేయాలనుకుంటున్నారు?",
       "couldNotLoadModels": "మోడళ్లను లోడ్ చేయలేకపోయాము.",
       "prefillRepoAndModelUnavailable": "అసలు సెషన్‌లోని రిపోజిటరీ, మోడల్ ఇక అందుబాటులో లేవు. కింద మరో రిపోజిటరీని, మోడల్‌ను ఎంచుకోండి.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "ప్రతిస్పందన ఆపివేయబడింది.",
       "assistantContextOverflow": "ఈ సంభాషణ మోడల్ నిర్వహించగల పరిమాణాన్ని మించిపోయింది.",
       "assistantProviderError": "ప్రొవైడర్ లోపాన్ని తిరిగి ఇచ్చింది.",
+      "assistantProviderRefused": "ప్రొవైడర్ ఈ అభ్యర్థనను తిరస్కరించారు; దీన్ని మళ్లీ ప్రయత్నించలేము.",
+      "assistantCreditsRefusal": "Cloud Agentను అమలు చేయడానికి తగినంత క్రెడిట్లు లేవు.",
       "assistantOutputLimit": "ప్రతిస్పందన మోడల్ అవుట్‌పుట్ పరిమితిని చేరుకుంది.",
       "assistantStructuredOutput": "ప్రతిస్పందన అవసరమైన ఫార్మాట్‌కు అనుగుణంగా లేదు.",
       "assistantFailed": "ప్రతిస్పందన విఫలమైంది."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "పని వాతావరణాన్ని సిద్ధం చేస్తోంది",
       "preparationComplete": "సిద్ధత పూర్తయింది",
       "preparationFailed": "సిద్ధత విఫలమైంది",
+      "preparationStageFailed": "{{stage}}: విఫలమైంది",
       "setupCommand": "సెటప్ ఆదేశం {{index}}",
       "setupCommandOf": "మొత్తం {{displayCount}} సెటప్ ఆదేశాలలో {{index}}",
       "stepWorkspaceSetup": "వర్క్‌స్పేస్ సెటప్",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "సెటప్ ఆదేశం {{index}} సమయం ముగిసింది",
       "detailColdRestore": "కోల్డ్ రిస్టోర్, స్నాప్‌షాట్ వర్తించబడింది, రిస్టోర్ అయిన ఫైళ్లు: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% పూర్తయింది",
-      "detailRestoreIncompleteReport": "సెషన్ రిస్టోర్ అసంపూర్ణంగా ఉంది — రిస్టోర్ కాని ఫైళ్లు: {{skipped}} / {{total}} ({{reasons}})",
+      "detailRestoreIncompleteFiles": "రిస్టోర్ కాని ఫైళ్లు: {{skipped}} / {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "లేనివి: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} మరియు {{omitted}} మరిన్ని",
       "detailReasonPatchFailed": "ప్యాచ్ వర్తించబడలేదు",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "సందర్భ పరిమితి అందుబాటులో లేదు",
-      "tapToViewDetails": "సందర్భ వివరాలను చూడటానికి నొక్కండి.",
-      "costSuffix": ", ఖర్చు {{cost}}",
-      "tokensWindowUnavailable": "సందర్భంలో {{used}} టోకెన్లు, పరిమితి అందుబాటులో లేదు",
-      "tokensUsage": "సందర్భంలో {{window}} టోకెన్లకు గాను {{used}} వాడారు, వినియోగం {{percentage}}",
+      "tapToViewDetails": " సందర్భ వివరాలను చూడటానికి నొక్కండి.",
+      "costClause": ", ఖర్చు {{cost}}",
+      "loadingCostSpoken": "ఖర్చు {{cost}}.",
+      "tokensWindowUnavailable": "సందర్భంలో {{used}} టోకెన్లు, పరిమితి అందుబాటులో లేదు{{costClause}}.",
+      "tokensUsage": "సందర్భంలో {{window}} టోకెన్లకు గాను {{used}} వాడారు, వినియోగం {{percentage}}{{costClause}}.",
       "title": "సందర్భ వినియోగం",
       "used": "వాడినవి",
       "provider": "ప్రొవైడర్",
       "totalCost": "మొత్తం ఖర్చు",
       "usageReflectsLatest": "చివరిగా పూర్తయిన సహాయకుడి ప్రతిస్పందన ఆధారంగా ఈ వినియోగాన్ని చూపిస్తున్నాము.",
-      "usageUnavailable": "సందర్భ వినియోగం అందుబాటులో లేదు",
+      "usageUnavailable": "సందర్భ వినియోగం అందుబాటులో లేదు{{costClause}}.",
       "tokenUsage": "టోకెన్ వినియోగం",
       "cacheRate": "కాష్ రేటు",
       "modelsCount": "మోడళ్లు ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "క్రెడిట్లను జోడించండి",
-    "description": "వినియోగం కొనసాగడానికి క్రెడిట్లను జోడించండి.",
     "billingPage": "బిల్లింగ్ పేజీ"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "వెబ్ శోధన",
       "thinking": "ఆలోచించడం"
     },
-    "planOf": "లో",
+    "planProgress": "{{total}} లో {{done}}",
     "filesChanged": "ఫైళ్లు మారాయి",
-    "finishedIn": "పూర్తయింది",
+    "finishedIn": "{{duration}} లో పూర్తయింది",
     "noActivityFor": "కార్యాచరణ లేదు",
     "prOpened": "పుల్ రిక్వెస్ట్ తెరవబడింది",
     "permissionWants": "అమలు చేయాలనుకుంటోంది",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "ఈ మోడల్ ఆలోచనా స్థాయికి మద్దతు ఇస్తుంది"
     },
-    "creditsRequired": "ఈ సందేశాన్ని పంపడానికి తగినంత క్రెడిట్లు లేవు. క్రెడిట్లను జోడించి మళ్లీ ప్రయత్నించండి."
+    "creditsRequired": "ఈ సందేశాన్ని పంపడానికి తగినంత క్రెడిట్లు లేవు."
   },
   "settingsTools": {
     "confirmTitle": "ఈ మార్పును నిర్ధారించాలా?"
@@ -3340,8 +3372,8 @@
     "saved": "ఖర్చు హెచ్చరిక సెట్టింగ్‌లు సేవ్ చేయబడ్డాయి",
     "loadError": "ఖర్చు హెచ్చరికలు లోడ్ కాలేదు.",
     "saveError": "ఖర్చు హెచ్చరికలు సేవ్ కాలేదు.",
-    "empty": "ఖర్చు హెచ్చరికలు ఆఫ్‌లో ఉన్నాయి. ఈ పరిధి బిల్లింగ్ పరిచయాలను హెచ్చరించడానికి వాటిని ఆన్ చేయండి.",
-    "noSpend": "ఇంకా ఖర్చు నమోదు కాలేదు",
+    "sendAlerts": "హెచ్చరికలు పంపండి",
+    "noSpend": "ఇంకా ఖర్చు లేదు",
     "spend24h": "గత 24 గంటల ఖర్చు",
     "multiplierError": "1 లేదా అంతకంటే ఎక్కువ గుణకాన్ని నమోదు చేయండి",
     "permissionDenied": "ఖర్చు హెచ్చరికలను నిర్వహించడానికి మీకు అనుమతి లేదు.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "షెడ్యూల్ చేసిన బ్రీఫింగ్‌ల కోసం ఏ సందర్భాలూ ప్రారంభించబడలేదు",
     "sourceBlocker": "సెషన్‌పై శ్రద్ధ అవసరం",
     "sourceMetadata": "సంగ్రహించిన సెషన్ మెటాడేటా"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ఈ శోధన ఫలితాన్ని తెరవలేకపోయాము"
   }
 }

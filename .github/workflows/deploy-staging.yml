@@ -1,8 +1,14 @@
 name: Deploy Web to Staging
 
 on:
+  # Same trigger as the production pipeline: a completed main CI run starts the
+  # lookup, the hourly poll is the catch-up path, and dispatch stays manual.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   schedule:
-    - cron: '7,27,47 * * * *'
+    - cron: '7 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -15,14 +21,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Only a successful CI run may start an automatic deploy; the poll and the
+  # dispatch pass the same guard unchanged. Every later job depends on this one,
+  # so a CI completion that must not deploy skips the whole run.
   check-changes:
+    # Guard: this workflow_dispatch is reachable from a fork. Only the
+    # canonical repo may run it, and only a successful CI completion may start
+    # an automatic deploy.
+    if: >-
+      github.repository == 'Kilo-Org/cloud' &&
+      (github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success')
     uses: ./.github/workflows/check-deployment-changes.yml
     with:
       workflow_file: deploy-staging.yml
 
-  check-staging-db-startup:
+  # One checkout and one install gate both database checks: the startup probe
+  # runs first, so an unreachable database fails here before the migrations try
+  # the same connection.
+  db-gate:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: this workflow_dispatch is reachable from a fork, and it deploys
+    # the web app to staging using repo secrets. Only the canonical repo may
+    # run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: staging
@@ -47,48 +69,22 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      # The probe imports @kilocode/db and the migrate step runs drizzle-kit from
+      # that package, so the database workspace and the root project are enough.
+      # Widen this filter when a step in this job imports another workspace.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo
 
       - name: Check staging DB startup path
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
-
-  run-migrations:
-    needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
-    environment: staging
-
-    env:
-      DATABASE_CA: ${{ secrets.DATABASE_CA }}
-      POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-
-    steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
-          ref: ${{ needs.check-changes.outputs.target_sha }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate
 
   deploy-app:
-    needs: [check-changes, check-staging-db-startup, run-migrations]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    needs: [check-changes, db-gate]
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
@@ -98,8 +94,9 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   deploy-ai-gateway:
-    needs: [check-changes, check-staging-db-startup, run-migrations]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    needs: [check-changes, db-gate]
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
@@ -109,8 +106,10 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
 
   deploy-workers:
-    needs: [check-changes, check-staging-db-startup, run-migrations, deploy-app, deploy-ai-gateway]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    needs: [check-changes, db-gate, deploy-app, deploy-ai-gateway]
+    # Guard: this workflow_dispatch is reachable from a fork, and the reusable
+    # workflow inherits repo secrets. Only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/deploy-workers.yml
     with:
       target_environment: staging
@@ -119,21 +118,13 @@ jobs:
     secrets: inherit
 
   record-deployment:
-    needs:
-      [
-        check-changes,
-        check-staging-db-startup,
-        run-migrations,
-        deploy-app,
-        deploy-ai-gateway,
-        deploy-workers,
-      ]
+    needs: [check-changes, db-gate, deploy-app, deploy-ai-gateway, deploy-workers]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
-        needs.check-staging-db-startup.result == 'success' &&
-        needs.run-migrations.result == 'success' &&
+        needs.db-gate.result == 'success' &&
         needs.deploy-app.result == 'success' &&
         needs.deploy-ai-gateway.result == 'success' &&
         needs.deploy-workers.result == 'success'

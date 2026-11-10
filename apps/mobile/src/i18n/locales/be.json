@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Дэма натыўнага дыстанцыйнага кіравання",
+    "sessionsEmpty": "Натыўных сеансаў пакуль няма",
+    "hosts": "Хосты ў сетцы",
+    "hostsEmpty": "Няма хостаў у сетцы",
+    "directory": "Працоўны каталог",
+    "createSession": "Стварыць натыўны сеанс",
+    "queueIfOffline": "Дадаваць запыт у чаргу, калі хост па-за сеткай",
+    "prompt": "Запыт або /command",
+    "localClear": "Ачысціць лакальны выгляд",
+    "abort": "Перапыніць ход",
+    "failed": "Не ўдалося выканаць дзеянне натыўнага дыстанцыйнага кіравання",
+    "creationUnknown": "Вынік стварэння невядомы. Абнавіце спіс сеансаў перад паўторнай спробай.",
+    "commandFailed": "Не ўдалося выканаць каманду працэсу CLI",
+    "invalidReply": "Некарэктны адказ працэсу CLI",
+    "unsafeCommand": "Выкарыстоўвайце /compact, /new, /skill, /models, /agents або /clear (толькі лакальна).",
+    "status": "Злучэнне: {{connection}} · Працэс CLI: {{runner}}",
+    "presenceStatus": "Хосты: {{connection}}",
+    "commandStatus": "Дастаўка каманды: {{status}}",
+    "delivered": "Дастаўлена",
+    "expired": "Тэрмін дзеяння скончыўся"
+  },
   "common": {
     "cancel": "Адмяніць",
     "done": "Гатова",
@@ -110,6 +132,7 @@
     "newSession": "Новы сеанс",
     "noModelsAvailable": "Няма даступных мадэляў",
     "notFound": "Нічога не знойдзена.",
+    "online": "У сетцы",
     "open": "Адкрыць {{name}}",
     "openPullRequest": "Адкрыць запыт на зліццё",
     "completed": "Завершана",
@@ -186,6 +209,7 @@
     "resendCode": "Даслаць код яшчэ раз",
     "termsPrefix": "Працягваючы, вы згаджаецеся з нашымі ",
     "terms": "Умовамі",
+    "termsInSentence": "Умовамі",
     "termsConnector": " і ",
     "termsSuffix": ".",
     "moreSignInOptions": "Іншыя спосабы ўваходу",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Пацвердзіць выдаленне",
     "credits": "Крэдыты",
     "failedToLoadBalance": "Не ўдалося загрузіць баланс. Націсніце, каб паўтарыць спробу.",
+    "balanceLoadFailed": "Не ўдалося загрузіць баланс",
     "hideBalance": "Схаваць баланс",
     "showBalance": "Паказаць баланс",
     "balanceHidden": "Баланс схаваны",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "У гэтым запыце на зліццё няма змен у файлах.",
     "fileList": {
       "openNavigator": "Адкрыць навігатар файлаў",
-      "filesViewed": "Файлы · прагледжана {{viewed}} з {{total}}",
       "listed": "(са спіса)",
       "layout": "Выгляд",
       "unified": "Аб'яднаны",
@@ -702,10 +726,10 @@
     },
     "connect": {
       "checkFailedTitle": "Не атрымалася праверыць падключэнне да GitHub.",
-      "checkFailedMessage": "Стан уваходу недаступны, пакуль даныя не загрузяцца.",
+      "checkFailedMessage": "Не атрымалася звязацца з GitHub. Правер падключэнне і паспрабуй яшчэ раз.",
       "checkFailedTitleGitLab": "Не ўдалося праверыць падключэнне да GitLab",
       "checkFailedTitleBitbucket": "Не ўдалося праверыць падключэнне да Bitbucket",
-      "providerCheckFailedMessage": "Стан падключэння недаступны, пакуль гэта не загрузіцца.",
+      "providerCheckFailedMessage": "Не атрымалася звязацца з правайдэрам. Правер падключэнне і паспрабуй яшчэ раз.",
       "reconnectTitle": "Падключыць GitHub зноў",
       "reconnectTitleGitLab": "Падключыць GitLab зноў",
       "reconnectTitleBitbucket": "Падключыць Bitbucket зноў",
@@ -989,6 +1013,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Каб зрабіць фота, дазволь доступ да камеры ў наладах."
+    },
+    "botStatus": {
+      "offline": "Не ў сетцы"
     }
   },
   "codeReviewer": {
@@ -1687,6 +1714,7 @@
       "actionFailed": "Не ўдалося выканаць гэта дзеянне. Паспрабуйце яшчэ раз.",
       "actionBlocked": "Не ўдалося выканаць гэта дзеянне. Праблему трэба вырашыць, перш чым паўтараць спробу.",
       "syncNoRepositories": "У межах сінхранізацыі няма ніводнага рэпазітарыя. Выберыце рэпазітарыі, якія адсочвае «Агент бяспекі», потым сінхранізуйце зноў.",
+      "syncNoRepositoriesNoManage": "У межах сінхранізацыі няма ніводнага рэпазітарыя. Уладальнік, адміністратар або кіраўнік плацяжоў арганізацыі павінен падключыць рэпазітарыі, перш чым можна будзе сінхранізаваць.",
       "syncIntegrationInactive": "Злучэнне GitHub для «Агента бяспекі» не актыўнае. Падключыце Kilo GitHub App зноў, потым сінхранізуйце яшчэ раз.",
       "syncMissingPermission": "Kilo GitHub App не можа чытаць vulnerability alerts. Дайце гэты дазвол у GitHub і паўтарыце сінхранізацыю.",
       "configConflict": "Налады Агента бяспекі зменены ў іншым месцы. Праверце апошнія налады і захавайце зноў."
@@ -1882,6 +1910,7 @@
       "emptyDescription": "Адпраўце паведамленне ніжэй, каб пачаць.",
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
+      "emptyReadOnlyTitle": "У гэтым сеансе няма паведамленняў",
       "renameAccessibility": "Перайменаваць сеанс: {{title}}",
       "cloningSession": "Кланаванне сеанса",
       "couldNotLoadThisSession": "Не ўдалося загрузіць гэты сеанс.",
@@ -1981,7 +2010,7 @@
       "selectRepositoryToStart": "Выберыце рэпазіторый, каб пачаць.",
       "enterPromptToStart": "Дадайце запыт, каб пачаць.",
       "enterPromptOrFileToStart": "Дадайце запыт ці файл, каб пачаць.",
-      "connectProviderToStart": "Падключыце платформу, каб пачаць.",
+      "connectProviderToStart": "Рэпазіторыі бяруцца з падключанага ўліковага запісу GitHub, GitLab або Bitbucket.",
       "promptPlaceholder": "Над чым будзем працаваць?",
       "couldNotLoadModels": "Не ўдалося загрузіць мадэлі.",
       "prefillRepoAndModelUnavailable": "Рэпазіторый і мадэль зыходнага сеанса больш недаступныя. Выберыце іншыя ніжэй.",
@@ -2171,6 +2200,8 @@
       "assistantStopped": "Стварэнне адказу спынена.",
       "assistantContextOverflow": "Размова занадта доўгая для мадэлі.",
       "assistantProviderError": "Пастаўшчык вярнуў памылку.",
+      "assistantProviderRefused": "Пастаўшчык адхіліў гэты запыт, і яго нельга паўтарыць.",
+      "assistantCreditsRefusal": "Недастаткова крэдытаў для запуску Cloud Agent.",
       "assistantOutputLimit": "Адказ дасягнуў максімальнай даўжыні вываду мадэлі.",
       "assistantStructuredOutput": "Адказ не адпавядае патрабаванаму фармату.",
       "assistantFailed": "Не ўдалося стварыць адказ."
@@ -2203,6 +2234,7 @@
       "preparingEnvironment": "Падрыхтоўка асяроддзя",
       "preparationComplete": "Падрыхтоўка завершана",
       "preparationFailed": "Памылка падрыхтоўкі",
+      "preparationStageFailed": "{{stage}}: памылка",
       "setupCommand": "Каманда налады {{index}}",
       "setupCommandOf": "Каманда налады {{index}} з {{displayCount}}",
       "stepWorkspaceSetup": "Налада працоўнай прасторы",
@@ -2241,7 +2273,7 @@
       "detailSetupCommandTimedOut": "Каманда налады {{index}} перавысіла час выканання",
       "detailColdRestore": "Халоднае аднаўленне, здымак ужыты, адноўленыя файлы: {{applied}} з {{total}}",
       "detailProgressPercent": "{{percent}}% выканана",
-      "detailRestoreIncompleteReport": "Аднаўленне сеансу няпоўнае — не адноўленыя файлы: {{skipped}} з {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Не адноўленыя файлы: {{skipped}} з {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Адсутнічае: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} і яшчэ {{omitted}}",
       "detailReasonPatchFailed": "патч не ўжыўся",
@@ -2498,16 +2530,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Памер кантэкстнага акна невядомы",
-      "tapToViewDetails": "Націсніце, каб убачыць падрабязнасці кантэксту.",
-      "costSuffix": ", кошт {{cost}}",
-      "tokensWindowUnavailable": "Токенаў у кантэксце: {{used}}, памер кантэкстнага акна невядомы",
-      "tokensUsage": "Токенаў у кантэксце: {{used}} з {{window}}, выкарыстана {{percentage}}",
+      "tapToViewDetails": " Націсніце, каб убачыць падрабязнасці кантэксту.",
+      "costClause": ", кошт {{cost}}",
+      "loadingCostSpoken": "кошт {{cost}}.",
+      "tokensWindowUnavailable": "Токенаў у кантэксце: {{used}}, памер кантэкстнага акна невядомы{{costClause}}.",
+      "tokensUsage": "Токенаў у кантэксце: {{used}} з {{window}}, выкарыстана {{percentage}}{{costClause}}.",
       "title": "Выкарыстанне кантэксту",
       "used": "Выкарыстана",
       "provider": "Пастаўшчык",
       "totalCost": "Агульны кошт",
       "usageReflectsLatest": "Паказчыкі выкарыстання адпавядаюць апошняму завершанаму адказу памочніка.",
-      "usageUnavailable": "Выкарыстанне кантэксту недаступнае",
+      "usageUnavailable": "Выкарыстанне кантэксту недаступнае{{costClause}}.",
       "tokenUsage": "Выкарыстанне токенаў",
       "cacheRate": "Доля кэшаваных токенаў",
       "modelsCount": "Мадэлі ({{displayCount}})",
@@ -2594,7 +2627,6 @@
   },
   "addCredits": {
     "cta": "Папоўніць баланс",
-    "description": "Папоўніце баланс, каб працягнуць карыстанне.",
     "billingPage": "старонка аплаты"
   },
   "deviceSessions": {
@@ -3100,9 +3132,9 @@
       "searching": "Вэб-пошук",
       "thinking": "Абдумванне"
     },
-    "planOf": "з",
+    "planProgress": "{{done}} з {{total}}",
     "filesChanged": "файлаў зменена",
-    "finishedIn": "Завершана за",
+    "finishedIn": "Завершана за {{duration}}",
     "noActivityFor": "Няма актыўнасці за",
     "prOpened": "Запыт на зліццё адкрыты",
     "permissionWants": "Хоча запусціць",
@@ -3412,7 +3444,7 @@
     "reasoningEffort": {
       "modelFlag": "Гэтая мадэль падтрымлівае ўзровень разважанняў"
     },
-    "creditsRequired": "Недастаткова крэдытаў для адпраўкі гэтага паведамлення. Папоўніце баланс і паспрабуйце зноў."
+    "creditsRequired": "Недастаткова крэдытаў для адпраўкі гэтага паведамлення."
   },
   "settingsTools": {
     "confirmTitle": "Пацвердзіць гэта змяненне?"
@@ -3446,8 +3478,8 @@
     "saved": "Налады апавяшчэнняў аб выдатаках захаваны",
     "loadError": "Не ўдалося загрузіць апавяшчэнні аб выдатаках.",
     "saveError": "Не ўдалося захаваць апавяшчэнні аб выдатаках.",
-    "empty": "Апавяшчэнні аб выдатаках выключаны. Уключыце іх, каб папярэджваць кантакты па аплаце гэтай сферы.",
-    "noSpend": "Выдаткі яшчэ не зафіксаваны",
+    "sendAlerts": "Дасылаць апавяшчэнні",
+    "noSpend": "Пакуль няма выдаткаў",
     "spend24h": "Выдаткі за апошнія 24 гадзіны",
     "multiplierError": "Увядзіце множнік 1 або больш",
     "permissionDenied": "У вас няма дазволу кіраваць апавяшчэннямі аб выдатаках.",
@@ -3873,5 +3905,8 @@
     "noEnabledContexts": "Няма ўключаных кантэкстаў для запланаваных зводак",
     "sourceBlocker": "Сеанс патрабуе ўвагі",
     "sourceMetadata": "Зафіксаваныя метаданыя сеанса"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Не атрымалася адкрыць гэты вынік пошуку"
   }
 }

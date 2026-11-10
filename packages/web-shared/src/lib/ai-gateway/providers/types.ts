@@ -3,6 +3,7 @@ import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/pro
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OpenAiChatGptOwner } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import {
   ReasoningDetailsTransform,
   type CustomLlmAwsBedrockCredentials,
@@ -18,6 +19,7 @@ export const ProviderTypeSchema = z.enum([
   'mistral',
   'vercel',
   'openai-chatgpt',
+  'claude-billing',
   'custom',
   'custom-public',
   'dev-tools',
@@ -72,6 +74,14 @@ export type Provider = {
    * for the request.
    */
   chatGptOwner?: OpenAiChatGptOwner;
+  /**
+   * The Claude billing connection that serves this provider. Set only on the
+   * Claude billing route; it names whose Claude organization pays.
+   */
+  claudeBillingOwner?: ClaudeBillingOwner;
+  /** Anthropic's user profile for `claudeBillingOwner`; every billed request names it. */
+  claudeBillingUserProfileId?: string;
+  claudeBillingConnectedAt?: string;
   apiUrl: string;
   apiUrlOverrides: ProviderApiUrlOverrides;
   disableUrlSuffix: boolean;

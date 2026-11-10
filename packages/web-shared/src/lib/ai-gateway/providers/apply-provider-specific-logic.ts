@@ -67,6 +67,7 @@ import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gatew
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
+import { removeWhitespaceOnlyMessages } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 import {
   addReflectionReasoningPlaceholders,
   isReflectionModel,
@@ -364,6 +365,7 @@ export async function applyProviderSpecificLogic(
 
   if (requestToMutate.kind === 'messages') {
     repairMessagesTools(requestToMutate.body);
+    removeWhitespaceOnlyMessages(requestToMutate.body);
   }
 
   if (requestToMutate.kind === 'responses') {

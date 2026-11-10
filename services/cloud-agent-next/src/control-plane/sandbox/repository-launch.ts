@@ -1,24 +1,20 @@
 import type { StartupMode } from '../../sandbox-control/startup-selection.js';
 import type { ProviderStartSource } from '../../sandbox-control/provider.js';
-import type { ControlPlaneWorkspaceFailureSubtype } from '../../shared/control-plane-protocol.js';
 
 const LAUNCH_KEY = 'repository_launch';
 
-export type RepositoryPreparationFailure = {
-  sessionId: string;
-  attemptId: string;
-  subtype?: ControlPlaneWorkspaceFailureSubtype;
-};
-
+/**
+ * Durable diagnostic and confirmation of how the current allocation started.
+ * It never decides the next startup source: a workspace tail descriptor, an
+ * environment that requires a build, or the base image do that on every launch.
+ */
 export type RepositoryLaunchRecord = {
   allocationId: string;
   /** Legacy records used the preinstalled runtime. */
   startupMode?: StartupMode;
   /** Absent in the placeholder written before `launch` reports the source. */
   startSource?: ProviderStartSource;
-  skipRepository?: true;
   confirmed: boolean;
-  preparationFailures?: RepositoryPreparationFailure[];
 };
 
 export async function readRepositoryLaunch(
@@ -34,17 +30,14 @@ export async function recordRepositoryLaunch(
   await storage.put(LAUNCH_KEY, record);
 }
 
-/** A pending image fallback must remain snapshot-free if its launch never reports a source. */
 export async function beginRepositoryLaunch(
   storage: Pick<DurableObjectStorage, 'put'>,
   allocationId: string,
-  skipRepository: boolean,
   startupMode: StartupMode = 'preinstalled'
 ): Promise<void> {
   await recordRepositoryLaunch(storage, {
     allocationId,
     startupMode,
-    ...(skipRepository ? { skipRepository: true } : {}),
     confirmed: false,
   });
 }

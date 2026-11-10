@@ -11,8 +11,9 @@ import {
 } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 import { ArrowDown, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,6 +24,9 @@ import { useCloudAgent, useManager } from './CloudAgentProvider';
 import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
+import { ParentSessionLink } from './ParentSessionLink';
+import { worktreeParentQueryOptions } from './worktree-parent-query';
+import { sessionResumeHref } from '@/lib/cloud-agent/session-resume-target';
 import {
   getWorkspaceControlSession,
   getWorktreeBranch,
@@ -40,10 +44,11 @@ import {
   ensureSelectedCustomOption,
   filterSessionCustomModeOptions,
   modeControlValue,
-  normalizeAlias,
+  resolveSendSelection,
   type CustomModeOption,
 } from './session-config';
 import { useCombinedProfiles, useProfiles, useProfile } from '@/hooks/useCloudAgentProfiles';
+import { useCloudAgentEnvironment } from '@/hooks/useCloudAgentEnvironments';
 import {
   formatSessionTotalCost,
   getSessionCostBreakdown,
@@ -65,6 +70,10 @@ import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
 import { isNoOpCompletedPreparationAttempt } from './preparation-summary';
 import { PreparationDrawer } from './PreparationDrawer';
+import { WorkspaceSnapshotRecovery } from './WorkspaceSnapshotRecovery';
+import { EnvironmentBuildRecovery } from './EnvironmentBuildRecovery';
+import { environmentBuildRecoveryOffered } from './environment-build-recovery';
+import { workspaceSnapshotRecoveryOffered } from './workspace-snapshot-recovery';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
@@ -120,6 +129,7 @@ import type { KnownModel } from './known-models';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
 import { useCliSessionPresence } from '@/hooks/useCliSessionPresence';
+import { useCollapseToolsPreference } from './collapse-tools-preference';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
 import { cn } from '@/lib/utils';
@@ -205,6 +215,17 @@ export default function CloudChatPage({
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
+  const { data: parentSession } = useQuery(
+    worktreeParentQueryOptions({
+      trpc,
+      client: trpcClient,
+      userId: currentUserId,
+      worktreeId: selectedWorktreeId,
+      organizationId: organizationId ?? null,
+    })
+  );
+  const parentSessionHref = parentSession ? sessionResumeHref(parentSession, null) : undefined;
   const { mutateAsync: personalUploadUrl } = useMutation(
     trpc.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
@@ -280,6 +301,7 @@ export default function CloudChatPage({
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
   const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
   const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
@@ -358,6 +380,10 @@ export default function CloudChatPage({
     storedChat?.branch ??
     getWorktreeBranch(selectedWorktreeId, worktreeChats) ??
     undefined;
+  const { data: environment } = useCloudAgentEnvironment(
+    isCurrentSession ? (fetchedSessionData?.environmentId ?? null) : null,
+    { organizationId }
+  );
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
   // A local chat shows the settings it copied from its source until its own load.
@@ -397,6 +423,51 @@ export default function CloudChatPage({
     deletingSessionIds,
   });
   const workspaceCloudSessionId = workspaceControlSession?.cloudAgentSessionId ?? sessionId;
+  const workspaceSnapshotRecovery = useQuery({
+    ...(organizationId
+      ? trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.queryOptions({
+          sessionId: workspaceCloudSessionId ?? '',
+          organizationId,
+        })
+      : trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.queryOptions({
+          sessionId: workspaceCloudSessionId ?? '',
+        })),
+    enabled: Boolean(workspaceCloudSessionId) && cloudStatus?.type === 'error',
+    staleTime: 0,
+    retry: false,
+  });
+  const removeWorkspaceSnapshot = useMutation({
+    mutationFn: async () => {
+      if (!workspaceCloudSessionId) throw new Error('Session is not ready');
+      if (organizationId) {
+        return await trpcClient.organizations.cloudAgentNext.removeWorkspaceSnapshot.mutate({
+          sessionId: workspaceCloudSessionId,
+          organizationId,
+        });
+      }
+      return await trpcClient.cloudAgentNext.removeWorkspaceSnapshot.mutate({
+        sessionId: workspaceCloudSessionId,
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries(
+        organizationId
+          ? trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.pathFilter()
+          : trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.pathFilter()
+      );
+    },
+  });
+  const workspaceSnapshotRecoveryState = workspaceSnapshotRecoveryOffered({
+    cloudStatus,
+    recovery: workspaceSnapshotRecovery.data,
+    recoveryIsFresh: workspaceSnapshotRecovery.isSuccess && !workspaceSnapshotRecovery.isFetching,
+    isReadOnly,
+  });
+  const environmentBuildRecoveryId = environmentBuildRecoveryOffered({
+    cloudStatus,
+    attempts: preparationAttempts,
+    environmentId: isCurrentSession ? fetchedSessionData?.environmentId : null,
+  });
   const currentSessionCanOpenChanges =
     sessionIdFromParams !== null &&
     isCurrentSession &&
@@ -518,6 +589,7 @@ export default function CloudChatPage({
     remoteModelState,
     observedModel,
     remoteModelOverride,
+    cloudAgentModelOverride,
     gatewayModelId: composerSettings?.model,
     gatewayVariant: composerSettings?.variant,
     // A chat listed under this route belongs to its organization, so its models load at once.
@@ -553,6 +625,7 @@ export default function CloudChatPage({
   const { availableCommands } = useSlashCommandSets();
 
   const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
+  const { collapseTools } = useCollapseToolsPreference();
 
   const prevActivityRef = useRef<string | null>(null);
   useEffect(() => {
@@ -614,8 +687,8 @@ export default function CloudChatPage({
   const newChatComposer = composerSettings
     ? {
         mode: composerSettings.mode,
-        model: composerSettings.model,
-        variant: composerSettings.variant ?? null,
+        model: sessionModels.selectedValue ?? composerSettings.model,
+        variant: sessionModels.selectedVariant ?? null,
       }
     : null;
   const handleCreateWorktreeChat = useCallback(() => {
@@ -639,26 +712,14 @@ export default function CloudChatPage({
       // produces no output, so the resume keeps the position instead of being
       // abandoned at the bottom.
       const resumeStateAtSend = captureSendPosition();
-      const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
-        a => a.slug === sessionConfig?.mode
-      );
-      const agentModelOverrideForSend = selectedRuntimeAgentForSend?.model?.trim() || undefined;
-      // An agent's variant only applies when it also pins a model — variants
-      // are model-specific (validated at write time in AgentConfigSchema). When
-      // an agent pins a model, its variant (if any) wins; otherwise the
-      // user-selected session variant applies.
-      const agentVariantOverrideForSend = agentModelOverrideForSend
-        ? selectedRuntimeAgentForSend?.variant?.trim() || undefined
-        : undefined;
+      const selection = resolveSendSelection(sessionConfig);
       const acceptedPromise = manager.send({
         payload: {
           type: 'prompt',
           prompt,
-          mode: normalizeAlias(sessionConfig?.mode) || 'code',
-          model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
-          variant: agentModelOverrideForSend
-            ? agentVariantOverrideForSend
-            : (sessionConfig?.variant ?? undefined),
+          mode: selection.mode,
+          model: sessionModels.selectedValue ?? selection.model,
+          variant: sessionModels.selectedVariant,
         },
         attachments: supportsAttachments ? attachments : undefined,
       });
@@ -683,6 +744,8 @@ export default function CloudChatPage({
       manager,
       scheduleScrollToBottom,
       sessionConfig,
+      sessionModels.selectedValue,
+      sessionModels.selectedVariant,
       supportsAttachments,
       captureSendPosition,
       followAcceptedSend,
@@ -696,8 +759,16 @@ export default function CloudChatPage({
       // or the effect re-pauses follow and cancels the scroll for this
       // command's output. A refused command leaves the resume in place.
       const resumeStateAtSend = captureSendPosition();
+      const selection = resolveSendSelection(sessionConfig);
       const acceptedPromise = manager.send({
-        payload: { type: 'command', command, arguments: args },
+        payload: {
+          type: 'command',
+          command,
+          arguments: args,
+          mode: selection.mode,
+          ...(selection.model ? { model: selection.model } : {}),
+          ...(selection.variant ? { variant: selection.variant } : {}),
+        },
         attachments: supportsAttachments ? attachments : undefined,
       });
       // Pins the tail when the list already follows; a no-op under a resume.
@@ -712,7 +783,14 @@ export default function CloudChatPage({
       followAcceptedSend(resumeStateAtSend);
       return true;
     },
-    [manager, scheduleScrollToBottom, supportsAttachments, captureSendPosition, followAcceptedSend]
+    [
+      manager,
+      scheduleScrollToBottom,
+      sessionConfig,
+      supportsAttachments,
+      captureSendPosition,
+      followAcceptedSend,
+    ]
   );
 
   const handleStopExecution = useCallback(() => {
@@ -1209,9 +1287,10 @@ export default function CloudChatPage({
       const newModelVariants =
         modelOptions.find(candidate => candidate.id === model)?.variants ?? [];
       const validVariant =
-        sessionConfig.variant && newModelVariants.includes(sessionConfig.variant)
-          ? sessionConfig.variant
+        sessionModels.selectedVariant && newModelVariants.includes(sessionModels.selectedVariant)
+          ? sessionModels.selectedVariant
           : newModelVariants[0];
+      manager.setCloudAgentModelOverride({ model, variant: validVariant });
       setSessionConfig({ ...sessionConfig, model, variant: validVariant });
     },
     [
@@ -1231,7 +1310,9 @@ export default function CloudChatPage({
         manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
         return;
       }
-      if (sessionConfig) setSessionConfig({ ...sessionConfig, variant });
+      if (!sessionConfig || !sessionModels.selectedValue) return;
+      manager.setCloudAgentModelOverride({ model: sessionModels.selectedValue, variant });
+      setSessionConfig({ ...sessionConfig, model: sessionModels.selectedValue, variant });
     },
     [
       activeSessionType,
@@ -1262,11 +1343,7 @@ export default function CloudChatPage({
 
   const showChatInterface =
     Boolean(selectedWorktreeId) || Boolean(sessionConfig) || Boolean(sessionIdFromParams);
-  const currentModelOption = modelOptions.find(model =>
-    activeSessionType === 'remote'
-      ? model.id === sessionModels.selectedValue
-      : model.id === sessionConfig?.model
-  );
+  const currentModelOption = modelOptions.find(model => model.id === displayModel);
   const modelDisplayName = currentModelOption?.name
     ? formatShortModelDisplayName(currentModelOption.name)
     : undefined;
@@ -1359,6 +1436,7 @@ export default function CloudChatPage({
   const sessionActions = (
     <ChatHeader
       currentUserId={currentUserId}
+      parentSessionHref={parentSessionHref}
       cloudAgentSessionId={workspaceCloudSessionId ?? 'Starting session…'}
       changesCloudAgentSessionId={changesCloudSessionId ?? undefined}
       worktreeId={selectedWorktreeId ?? undefined}
@@ -1382,7 +1460,7 @@ export default function CloudChatPage({
             : (sessionBranch ?? undefined)
       }
       gitUrl={workspaceControlSession ? undefined : fetchedSessionData?.gitUrl}
-      model={workspaceControlSession?.model ?? sessionConfig?.model}
+      model={workspaceControlSession?.model ?? displayModel}
       modelDisplayName={workspaceControlSession ? undefined : modelDisplayName}
       getSessionCostBreakdown={
         !workspaceControlSession && isCurrentSession && fetchedSessionData
@@ -1449,6 +1527,11 @@ export default function CloudChatPage({
         >
           <div className="flex h-full min-w-0 w-full flex-col overflow-hidden">
             <SetPageTitle
+              subtitle={
+                parentSession && parentSessionHref ? (
+                  <ParentSessionLink href={parentSessionHref} title={parentSession.title} />
+                ) : null
+              }
               title={
                 !sessionIdFromParams && selectedWorktreeId
                   ? 'Worktree'
@@ -1652,6 +1735,7 @@ export default function CloudChatPage({
                                   <PreviewLinksContext.Provider value={preview.links}>
                                     <CloudThread
                                       active={chatTabActive}
+                                      collapseTools={collapseTools}
                                       getChildMessages={getChildMessages}
                                       onOpenChildSession={handleOpenTopLevelChildSession}
                                       onOpenPreparationDetails={handleOpenPreparationDetails}
@@ -1832,6 +1916,24 @@ export default function CloudChatPage({
                                     role="alert"
                                   >
                                     <SessionStatusIndicator indicator={statusIndicator} />
+                                    {environmentBuildRecoveryId !== null && (
+                                      <EnvironmentBuildRecovery
+                                        environmentId={environmentBuildRecoveryId}
+                                        organizationId={organizationId}
+                                      />
+                                    )}
+                                    {workspaceSnapshotRecoveryState !== null && (
+                                      <WorkspaceSnapshotRecovery
+                                        capturedAt={workspaceSnapshotRecoveryState.capturedAt}
+                                        isRemoving={removeWorkspaceSnapshot.isPending}
+                                        onRemove={async () => {
+                                          await removeWorkspaceSnapshot.mutateAsync();
+                                          toast.success(
+                                            'Workspace snapshot removed. Your next start will use the environment snapshot or base image.'
+                                          );
+                                        }}
+                                      />
+                                    )}
                                   </div>
                                 )}
                               <ComposerContextLine
@@ -1842,6 +1944,7 @@ export default function CloudChatPage({
                                 worktreeId={selectedWorktreeId ?? undefined}
                                 repository={composerRepository}
                                 branch={composerBranch}
+                                environmentName={environment?.name}
                                 contextTokens={contextUsage?.contextTokens}
                                 contextWindow={contextWindow}
                               />

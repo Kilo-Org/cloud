@@ -209,6 +209,17 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), setParams: vi.fn() }),
 }));
 
+// The on-screen entity publisher reaches the app-action bridge, which imports
+// the root `expo` entry and does not parse under the node test environment.
+vi.mock('@/lib/app-actions/native-bridge', () => ({
+  setNativeVisibleSession: vi.fn(() => Promise.resolve()),
+}));
+// The publisher reads the privacy lock's status; outside a provider it would
+// throw, and the status is not the subject of these assertions.
+vi.mock('@/lib/app-unlock-context', () => ({
+  useAppUnlock: () => ({ status: 'unlocked' }),
+}));
+
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
 // Android Fabric alive (KILO-APP-25); its own mechanics are covered in
 // src/lib/navigation/stack-safe-replace.mounted.test.tsx. Here it stands in for

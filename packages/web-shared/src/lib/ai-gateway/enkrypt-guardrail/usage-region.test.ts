@@ -36,6 +36,7 @@ async function usageRecordForNewOrganization() {
     organizationId: organization.id,
     kiloUserId: user.id,
     sessionId: 'ses_guardrail',
+    microdollarUsageId: randomUUID(),
     apiKind: 'messages' as const,
     decision: 'blocked' as const,
     creditsCost: 7,
@@ -94,9 +95,11 @@ describe('recordEnkryptUsage region routing', () => {
       'content-type': 'application/json',
       'x-internal-api-key': 'test-internal-secret',
     });
+    expect(JSON.parse(String(init?.body))).not.toHaveProperty('guardrail');
     const body = EnkryptUsageWriteSchema.parse(JSON.parse(String(init?.body)));
     expect(body).toEqual({
       ...usageRecord,
+      guardrail: 'input',
       id: expect.any(String),
       occurredAt: expect.any(String),
     });
@@ -161,6 +164,7 @@ describe('recordEnkryptUsage region routing', () => {
     const rows = await ledgerRows(usageRecord.organizationId);
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(handedOff.id);
+    expect(rows[0].microdollar_usage_id).toBe(usageRecord.microdollarUsageId);
     expect(new Date(rows[0].created_at).toISOString()).toBe(handedOff.occurredAt);
     expect(await microdollarsUsed(usageRecord.organizationId)).toBe(
       7 * MICRODOLLARS_PER_ENKRYPT_CREDIT

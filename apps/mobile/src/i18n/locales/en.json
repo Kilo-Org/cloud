@@ -66,6 +66,28 @@
     "sourceBlocker": "Session needs attention",
     "sourceMetadata": "Captured session metadata"
   },
+  "nativeRemote": {
+    "title": "Native remote demo",
+    "sessionsEmpty": "No native sessions yet",
+    "hosts": "Online hosts",
+    "hostsEmpty": "No online hosts",
+    "directory": "Launch directory",
+    "createSession": "Create native session",
+    "queueIfOffline": "Queue prompt if host is offline",
+    "prompt": "Prompt or /command",
+    "localClear": "Clear local view",
+    "abort": "Abort turn",
+    "failed": "Native remote action failed",
+    "creationUnknown": "Creation outcome unknown. Refresh sessions before retrying.",
+    "commandFailed": "Runner command failed",
+    "invalidReply": "Invalid runner reply",
+    "unsafeCommand": "Use /compact, /new, /skill, /models, /agents or /clear (local only).",
+    "status": "Connection: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Command delivery: {{status}}",
+    "delivered": "Delivered",
+    "expired": "Expired"
+  },
   "common": {
     "cancel": "Cancel",
     "done": "Done",
@@ -178,6 +200,7 @@
     "newSession": "New session",
     "noModelsAvailable": "No models available",
     "notFound": "Not found",
+    "online": "Online",
     "open": "Open {{name}}",
     "openPullRequest": "Open pull request",
     "completed": "Completed",
@@ -253,6 +276,7 @@
     "resendCode": "Resend code",
     "termsPrefix": "By continuing you agree to our ",
     "terms": "Terms",
+    "termsInSentence": "Terms of Use",
     "termsConnector": " and ",
     "termsSuffix": ".",
     "moreSignInOptions": "More sign-in options",
@@ -289,6 +313,7 @@
     "confirmDeletion": "Confirm deletion",
     "credits": "Credits",
     "failedToLoadBalance": "Failed to load balance. Tap to retry.",
+    "balanceLoadFailed": "Couldn't load balance",
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
@@ -373,7 +398,6 @@
     "noFilesChangedDescription": "This pull request has no file changes.",
     "fileList": {
       "openNavigator": "Open file navigator",
-      "filesViewed": "Files · {{viewed}} of {{total}} viewed",
       "listed": "(listed)",
       "layout": "Layout",
       "unified": "Unified",
@@ -739,10 +763,10 @@
     },
     "connect": {
       "checkFailedTitle": "Could not check GitHub connection",
-      "checkFailedMessage": "Sign-in status is unavailable until this loads.",
+      "checkFailedMessage": "Could not reach GitHub. Check your connection and try again.",
       "checkFailedTitleGitLab": "Could not check GitLab connection",
       "checkFailedTitleBitbucket": "Could not check Bitbucket connection",
-      "providerCheckFailedMessage": "Connection status is unavailable until this loads.",
+      "providerCheckFailedMessage": "Could not reach the provider. Check your connection and try again.",
       "reconnectTitle": "Reconnect GitHub",
       "reconnectTitleGitLab": "Reconnect GitLab",
       "reconnectTitleBitbucket": "Reconnect Bitbucket",
@@ -1014,6 +1038,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Allow camera access in Settings to take a photo."
+    },
+    "botStatus": {
+      "offline": "Offline"
     }
   },
   "codeReviewer": {
@@ -1682,6 +1709,7 @@
       "settleFailed": "The action completed, but we could not record the result. Please try again.",
       "replayFailed": "This action did not complete. Please try again.",
       "syncNoRepositories": "No repositories are in the sync scope. Choose the repositories Security Agent monitors, then sync again.",
+      "syncNoRepositoriesNoManage": "No repositories are in the sync scope. An organization owner, admin, or billing manager must connect repositories before it can sync.",
       "syncIntegrationInactive": "The GitHub connection for Security Agent is not active. Reconnect the Kilo GitHub App, then sync again.",
       "syncMissingPermission": "The Kilo GitHub App cannot read vulnerability alerts. Grant that permission in GitHub, then sync again.",
       "configConflict": "Security Agent settings changed elsewhere. Review the latest settings and save again.",
@@ -1871,6 +1899,7 @@
       "emptyDescription": "Send a message below to get started.",
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
+      "emptyReadOnlyTitle": "No messages in this session",
       "renameAccessibility": "Rename session: {{title}}",
       "cloningSession": "Cloning session",
       "couldNotLoadThisSession": "Couldn't load this session",
@@ -1970,7 +1999,7 @@
       "selectRepositoryToStart": "Select a repository to start.",
       "enterPromptToStart": "Add a prompt to start.",
       "enterPromptOrFileToStart": "Add a prompt or a file to start.",
-      "connectProviderToStart": "Connect a provider to start.",
+      "connectProviderToStart": "Repositories come from a connected GitHub, GitLab, or Bitbucket account.",
       "promptPlaceholder": "What would you like to work on?",
       "couldNotLoadModels": "Couldn't load models",
       "prefillRepoAndModelUnavailable": "The original session's repository and model are no longer available. Pick them below.",
@@ -2154,7 +2183,7 @@
       "failedToRender": "Failed to render content"
     },
     "messageFailure": {
-      "deliveryTitle": "Failed to deliver",
+      "deliveryTitle": "Message not sent",
       "deliveryInterrupted": "You stopped this message.",
       "deliveryExhausted": "We could not deliver this message after several attempts.",
       "deliveryExecution": "The agent could not run this message.",
@@ -2163,6 +2192,8 @@
       "assistantStopped": "The response was stopped.",
       "assistantContextOverflow": "The conversation is too long for the model.",
       "assistantProviderError": "The provider returned an error.",
+      "assistantProviderRefused": "The provider refused this request and it cannot be retried.",
+      "assistantCreditsRefusal": "Not enough credits to run Cloud Agent.",
       "assistantOutputLimit": "The response reached the model's output limit.",
       "assistantStructuredOutput": "The response did not match the required format.",
       "assistantFailed": "The response failed."
@@ -2203,6 +2234,7 @@
       "preparingEnvironment": "Preparing environment",
       "preparationComplete": "Preparation complete",
       "preparationFailed": "Preparation failed",
+      "preparationStageFailed": "{{stage}} failed",
       "setupCommand": "Setup command {{index}}",
       "setupCommandOf": "Setup command {{index}} of {{displayCount}}",
       "stepWorkspaceSetup": "Workspace setup",
@@ -2241,7 +2273,7 @@
       "detailSetupCommandTimedOut": "Setup command {{index}} timed out",
       "detailColdRestore": "Cold restore, snapshot applied, {{applied}} of {{total}} files restored",
       "detailProgressPercent": "{{percent}}% complete",
-      "detailRestoreIncompleteReport": "Session restore incomplete: {{skipped}} of {{total}} files were not restored ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{skipped}} of {{total}} files were not restored ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Missing: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} and {{omitted}} more",
       "detailReasonPatchFailed": "the patch did not apply",
@@ -2497,16 +2529,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Context-window size unavailable",
-      "tapToViewDetails": "Tap to view context details.",
-      "costSuffix": ", cost {{cost}}",
-      "tokensWindowUnavailable": "Context {{used}} tokens, window unavailable",
-      "tokensUsage": "Context {{used}} of {{window}} tokens, {{percentage}} used",
+      "tapToViewDetails": " Tap to view context details.",
+      "costClause": ", cost {{cost}}",
+      "loadingCostSpoken": "Cost so far {{cost}}.",
+      "tokensWindowUnavailable": "Context {{used}} tokens, window unavailable{{costClause}}.",
+      "tokensUsage": "Context {{used}} of {{window}} tokens, {{percentage}} used{{costClause}}.",
       "title": "Context usage",
       "used": "Used",
       "provider": "Provider",
       "totalCost": "Total cost",
       "usageReflectsLatest": "Usage reflects the latest completed assistant response.",
-      "usageUnavailable": "Context usage unavailable",
+      "usageUnavailable": "Context usage unavailable{{costClause}}.",
       "tokenUsage": "Token usage",
       "cacheRate": "Cache rate",
       "modelsCount_one": "Model ({{displayCount}})",
@@ -2561,7 +2594,6 @@
   },
   "addCredits": {
     "cta": "Add credits",
-    "description": "Add credits to keep usage running.",
     "billingPage": "billing page"
   },
   "deviceSessions": {
@@ -3063,9 +3095,9 @@
       "searching": "Web search",
       "thinking": "Thinking it through"
     },
-    "planOf": "of",
+    "planProgress": "{{done}} of {{total}}",
     "filesChanged": "files changed",
-    "finishedIn": "Finished in",
+    "finishedIn": "Finished in {{duration}}",
     "noActivityFor": "No activity for",
     "prOpened": "Pull request opened",
     "permissionWants": "Wants to run",
@@ -3373,7 +3405,7 @@
       "signInA11y": "Sign in to this server: {{name}}",
       "signInFailed": "Couldn't sign in to {{name}}. Try again."
     },
-    "creditsRequired": "Not enough credits to send this message. Add credits and try again."
+    "creditsRequired": "Not enough credits to send this message."
   },
   "settingsTools": {
     "confirmTitle": "Confirm this change?"
@@ -3407,8 +3439,8 @@
     "saved": "Spend alert settings saved",
     "loadError": "Couldn't load spend alerts.",
     "saveError": "Couldn't save spend alerts.",
-    "empty": "Spend alerts are off. Turn them on to alert this scope's billing contacts.",
-    "noSpend": "No spend recorded yet",
+    "sendAlerts": "Send alerts",
+    "noSpend": "None yet",
     "spend24h": "Spend in the last 24 hours",
     "multiplierError": "Enter a multiplier of 1 or more",
     "permissionDenied": "You don't have permission to manage spend alerts.",
@@ -3747,5 +3779,8 @@
       "title": "Save to list",
       "saved": "Saved to {{list}}"
     }
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Could not open this search result"
   }
 }

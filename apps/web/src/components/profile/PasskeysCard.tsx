@@ -20,6 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
+import { StepUpSignInAgainButton } from '@/components/admin/step-up/StepUpSignInAgainButton';
 
 /** The one route that mints registration options and verifies the attestation. */
 const REGISTER_ROUTE = '/api/auth/passkey/register';
@@ -31,8 +32,10 @@ const REGISTER_ROUTE = '/api/auth/passkey/register';
  *   a fresh attempt is a new ceremony rather than a retry of this one.
  * - `failed`: the request or the verification failed. Nothing was stored, and
  *   the "Add a passkey" control is a working retry.
+ * - `reauth_required`: an admin enrollment needs a fresh sign-in or a live
+ *   step-up proof. Retrying the same session cannot succeed.
  */
-export type PasskeyRegistrationFailure = 'cancelled' | 'failed';
+export type PasskeyRegistrationFailure = 'cancelled' | 'failed' | 'reauth_required';
 
 export class PasskeyRegistrationError extends Error {
   readonly failure: PasskeyRegistrationFailure;
@@ -60,6 +63,10 @@ export async function registerNewPasskey(): Promise<void> {
       body: JSON.stringify({ action: 'options' }),
     });
     if (!optionsResponse.ok) {
+      const body = (await optionsResponse.json().catch(() => ({}))) as { error?: unknown };
+      if (optionsResponse.status === 401 && body.error === 'REAUTH_REQUIRED') {
+        throw new PasskeyRegistrationError('reauth_required');
+      }
       throw new PasskeyRegistrationError('failed');
     }
 
@@ -89,6 +96,10 @@ export async function registerNewPasskey(): Promise<void> {
       }),
     });
     if (!verifyResponse.ok) {
+      const body = (await verifyResponse.json().catch(() => ({}))) as { error?: unknown };
+      if (verifyResponse.status === 401 && body.error === 'REAUTH_REQUIRED') {
+        throw new PasskeyRegistrationError('reauth_required');
+      }
       throw new PasskeyRegistrationError('failed');
     }
   } catch (error) {
@@ -204,7 +215,9 @@ export function PasskeysCard() {
       ? 'Could not add a passkey. Try again.'
       : addFailure === 'cancelled'
         ? 'Passkey creation was cancelled. No passkey was added.'
-        : null;
+        : addFailure === 'reauth_required'
+          ? 'Sign in again before adding a passkey to an admin account. Signing out signs you out of every browser.'
+          : null;
 
   return (
     <Card className="h-full w-full rounded-xl shadow-sm">
@@ -323,6 +336,8 @@ export function PasskeysCard() {
               {addFailureMessage}
             </p>
           )}
+
+          {addFailure === 'reauth_required' ? <StepUpSignInAgainButton /> : null}
 
           {removeFailure && (
             <p role="alert" className="text-muted-foreground text-sm leading-relaxed">

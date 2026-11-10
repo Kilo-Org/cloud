@@ -211,7 +211,7 @@ describe('runtime authorization', () => {
     }
   );
 
-  it('sets a fixed resource-specific delegation deadline independently of control expiry', async () => {
+  it('sets a fixed delegation deadline independently of control expiry', async () => {
     vi.useFakeTimers();
     const now = new Date('2026-01-01T00:00:00.000Z');
     vi.setSystemTime(now);
@@ -225,19 +225,8 @@ describe('runtime authorization', () => {
       adapters: adapters(),
       now,
     });
-    const gastown = await createRuntimeAuthorization({
-      token: (await admission({ audience: 'gastown', expiresInSeconds: 60 })).token,
-      secret,
-      connectionString: 'postgres://unused',
-      resourceKind: 'gastown',
-      resourceId: 'town',
-      organizationId: 'org',
-      adapters: adapters(),
-      now,
-    });
 
     expect(cloudAgent.authorization.delegationExpiresAt).toBe('2026-01-02T00:00:00.000Z');
-    expect(gastown.authorization.delegationExpiresAt).toBe('2026-01-31T00:00:00.000Z');
     expect(decodeJwt(cloudAgent.token).exp).toBe(Date.UTC(2026, 0, 1, 1) / 1000);
   });
 
@@ -338,7 +327,7 @@ describe('runtime authorization', () => {
     await expect(
       createRuntimeAuthorization({
         ...common,
-        token: (await admission({ audience: 'gastown' })).token,
+        token: (await admission({ audience: 'kilo-gateway' })).token,
       })
     ).rejects.toThrow();
     const expiring = await admission({ expiresInSeconds: 60 });
@@ -462,26 +451,26 @@ describe('runtime authorization', () => {
 
   it('seals only the exact intended runtime record', async () => {
     const result = await createRuntimeAuthorization({
-      token: (await admission({ audience: 'gastown' })).token,
+      token: (await admission()).token,
       secret,
       connectionString: 'postgres://unused',
-      resourceKind: 'gastown',
-      resourceId: 'town',
+      resourceKind: 'cloud-agent-next',
+      resourceId: 'session',
       organizationId: 'org',
       adapters: adapters(),
     });
     const sealed = await sealRuntimeAuthorization(result.authorization, secret);
     await expect(
       unsealRuntimeAuthorization(sealed, secret, {
-        resourceKind: 'gastown',
-        resourceId: 'town',
+        resourceKind: 'cloud-agent-next',
+        resourceId: 'session',
         userId: 'user',
         organizationId: 'org',
       })
     ).resolves.toEqual(result.authorization);
     await expect(
       unsealRuntimeAuthorization(sealed, secret, {
-        resourceKind: 'gastown',
+        resourceKind: 'cloud-agent-next',
         resourceId: 'other',
         userId: 'user',
         organizationId: 'org',
@@ -489,8 +478,8 @@ describe('runtime authorization', () => {
     ).rejects.toThrow();
     await expect(
       unsealRuntimeAuthorization(`${sealed}x`, secret, {
-        resourceKind: 'gastown',
-        resourceId: 'town',
+        resourceKind: 'cloud-agent-next',
+        resourceId: 'session',
         userId: 'user',
         organizationId: 'org',
       })

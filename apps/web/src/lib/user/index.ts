@@ -1,3 +1,4 @@
+import { deleteStepUpRowsForUser } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { createStripeCustomer, deleteStripeCustomer } from '@kilocode/web-shared/lib/stripe-client';
 import { randomUUID } from 'crypto';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
@@ -7,8 +8,10 @@ import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { clearOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { deletePersonalClaudeProfile } from '@/lib/claude-billing/delete';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
+import { lockGitHubIdentityWrites } from '@kilocode/db/github-identity';
 import {
   createSoftDeletedBlockedReason,
   isSoftDeletedBlockedReason,
@@ -46,9 +49,6 @@ import {
   organization_audit_logs,
   organization_recommendation_dismissals,
   magic_link_tokens,
-  passkey_credentials,
-  passkey_challenges,
-  passkey_sign_in_tickets,
   device_auth_requests,
   device_sessions,
   native_attested_keys,
@@ -59,6 +59,7 @@ import {
   platform_access_token_credentials,
   byok_api_keys,
   openai_chatgpt_connections,
+  claude_billing_connections,
   agent_configs,
   agent_environment_profiles,
   cloud_agent_sandbox_allocation_settings,
@@ -146,6 +147,7 @@ import {
   type SignupStepUpMethod,
 } from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
+import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
@@ -164,8 +166,10 @@ import { getDeliveredEmailAddress, normalizeEmail } from '@kilocode/web-shared/l
 import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
+import { recordWatchwoodSignupShadow, type WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { getDomain } from 'tldts';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
+import { deleteUserPasskeys } from '@/lib/user/session-revocation';
 import {
   deleteAllOwnedByUserIdPages,
   OWNED_BY_USER_DELETE_PAGE_SIZE,
@@ -250,6 +254,30 @@ export type CreateOrUpdateUserArgs = {
   display_name?: string | null;
 };
 
+/** Options for callers that are not interactive signups. */
+export type CreateOrUpdateUserOptions = {
+  /**
+   * Skips Bouncer signup admission. Only for machine-initiated provisioning
+   * that has no end user behind it, where admission cannot work and does not
+   * apply: it needs a forwarded client IP (`getSignupIp` reads
+   * `x-forwarded-for`) and `signupRequestSchema` requires one, so a request
+   * without an end user always fails closed with `SIGNUP-UNAVAILABLE`. Even
+   * given an IP, Bouncer counts admissions per canonical IP, so one server
+   * source would exhaust the quota for every tenant after a few accounts.
+   *
+   * Admission exists to rate-limit self-service signup abuse. A caller setting
+   * this must already be authorized and non-public, and must be acting on an
+   * identity an administrator deliberately connected. Every other protection —
+   * email dedup, the deletion fence, Stripe provisioning and its compensating
+   * delete, and the email-signup-disabled check — still runs.
+   *
+   * The only caller is SCIM directory-sync provisioning, behind
+   * `INTERNAL_API_SECRET` (`apps/web/src/lib/scim/directory-sync.ts`). Do not
+   * set it on any path a user can reach.
+   */
+  skipSignupAdmission?: boolean;
+};
+
 /** A user settlement error other than a signup step-up, which carries its methods. */
 type UserSettlementError = Exclude<AuthErrorType, 'SIGNUP-STEP-UP'>;
 
@@ -274,6 +302,7 @@ export type CreateOrUpdateUserTrackingContext = {
   anonymousId?: string | null;
   locale?: string | null;
   countryCode?: string | null;
+  watchwood?: WatchwoodSignupAssessment;
 };
 
 export type DeferredSignInEvent = {
@@ -484,6 +513,43 @@ async function recordSignupImpactTracking(args: {
   }
 }
 
+/**
+ * Provider types whose every `user_auth_provider` writer stores an address the
+ * credential verified: Google (the browser profile asserts `email_verified`,
+ * the native token verifier refuses without it), Anaconda (its profile parser
+ * requires `email_verified: true`), and email (a consumed magic link or code
+ * delivered to that address).
+ *
+ * Apple is excluded because the browser path stores the ID token's address
+ * without checking `email_verified`, which Apple leaves false for some Work &
+ * School accounts. WorkOS is excluded because directory sync provisions a new
+ * address without a domain check, so its rows can carry an address nobody
+ * verified.
+ */
+const VERIFIED_ADDRESS_PROVIDERS: Partial<Record<AuthProviderId, true>> = {
+  google: true,
+  anaconda: true,
+  email: true,
+};
+
+/**
+ * Whether the account holds a sign-in method that verified its primary
+ * address. An explicitly linked method verifies only its own address, so a row
+ * for a different address does not count. The comparison ignores case only:
+ * `normalizeEmail` strips `+` aliases, which can name a different mailbox.
+ */
+function hasVerifiedPrimaryAddress(
+  primaryEmail: string,
+  providers: readonly Pick<UserAuthProvider, 'provider' | 'email'>[]
+): boolean {
+  const primary = getDeliveredEmailAddress(primaryEmail);
+  return providers.some(
+    p =>
+      VERIFIED_ADDRESS_PROVIDERS[p.provider] === true &&
+      getDeliveredEmailAddress(p.email) === primary
+  );
+}
+
 export async function createOrUpdateUser(
   args: CreateOrUpdateUserArgs,
   turnstile_guid: UUID | undefined,
@@ -492,7 +558,8 @@ export async function createOrUpdateUser(
   affiliateTrackingId?: string | null,
   trackingContext?: CreateOrUpdateUserTrackingContext,
   deferSignInAnalytics?: boolean,
-  verifyNewAccountAdmission?: () => Promise<boolean>
+  verifyNewAccountAdmission?: () => Promise<boolean>,
+  options: CreateOrUpdateUserOptions = {}
 ): Promise<CreateOrUpdateUserResult> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
@@ -543,10 +610,26 @@ export async function createOrUpdateUser(
     // ownership of the email (consumed magic-link/code, or a provider-asserted
     // email_verified claim). Proof authorizes the link; without proof the
     // sign-in keeps the DIFFERENT-OAUTH refusal below.
-    const shouldRelinkWorkOS =
-      args.provider === 'workos' && hasThisProvider && autoLinkToExistingUser;
+    //
+    // Linking into an existing account also requires that the account holds a
+    // method that verified its primary address (`hasVerifiedPrimaryAddress`).
+    // An account with no provider row predates provider rows or follows an
+    // admin reset, and the email auto-link is its only way in, so it counts.
+    // Sign-in through the account's own provider resolves by provider identity
+    // above and never reaches this requirement.
+    //
+    // WorkOS SSO settlement keeps its existing behavior: an SSO-required hosted
+    // domain is the only path into the account, and its authority-gated callback
+    // proves the organization controls it, so it always resolves (relaying a
+    // stale profile ID when one is stored).
+    const accountHasVerifiedPrimaryAddress =
+      existingProviders.length === 0 ||
+      hasVerifiedPrimaryAddress(userByEmail.google_user_email, existingProviders);
+    const workosSettles = args.provider === 'workos' && autoLinkToExistingUser;
     const shouldLink =
-      (!hasThisProvider && (onlyHasFakeLogin || autoLinkToExistingUser)) || shouldRelinkWorkOS;
+      workosSettles ||
+      (!hasThisProvider &&
+        (onlyHasFakeLogin || (autoLinkToExistingUser && accountHasVerifiedPrimaryAddress)));
 
     if (shouldLink) {
       let linkedUser = userByEmail;
@@ -636,12 +719,38 @@ export async function createOrUpdateUser(
           new_hosted_domain: args.hosted_domain,
         },
       });
+      // Record the sign-ins the primary-address requirement held back, so they
+      // are distinguishable from every other different-account refusal. A
+      // refusal from the provider already on the account is not this
+      // requirement's outcome, so it stays out.
+      const skippedByPrimaryAddress =
+        !hasThisProvider &&
+        !workosSettles &&
+        autoLinkToExistingUser &&
+        !onlyHasFakeLogin &&
+        !accountHasVerifiedPrimaryAddress;
+      if (skippedByPrimaryAddress) {
+        posthogClient.capture({
+          distinctId: userByEmail.google_user_email,
+          event: 'auto_link_skipped_unverified_primary_address',
+          properties: {
+            existing_provider_count: existingProviders.length,
+            existing_providers: existingProviders.map(p => p.provider),
+            new_provider: args.provider,
+          },
+        });
+      }
       return failureResult('DIFFERENT-OAUTH');
     }
   }
 
   const normalizedEmail = normalizeEmail(args.google_user_email);
   const operationId = signupOperationId(normalizedEmail);
+  recordWatchwoodSignupShadow({
+    operationId,
+    provider: args.provider,
+    assessment: trackingContext?.watchwood,
+  });
 
   // Never fall through to the insert: its dedup misses legacy rows with a NULL
   // normalized_email that findUserByNormalizedEmail matches case-insensitively.
@@ -668,7 +777,7 @@ export async function createOrUpdateUser(
     return failureResult('ADMISSION_REQUIRED');
   }
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
-  if (!IS_DEVELOPMENT) {
+  if (!IS_DEVELOPMENT && !options.skipSignupAdmission) {
     // Subdomains of one registrable domain share Bouncer's domain counter.
     const emailHost = normalizedEmail.slice(normalizedEmail.lastIndexOf('@') + 1);
     const verdict = bouncerIp
@@ -708,6 +817,13 @@ export async function createOrUpdateUser(
         methods: knownSignupStepUpMethods(verdict.methods),
       } satisfies SignupStepUpFailure;
     }
+  }
+  if (options.skipSignupAdmission) {
+    // A skipped security gate must be auditable, not silent.
+    console.info('[auth] Signup admission skipped for a trusted machine path', {
+      operationId,
+      method: args.provider,
+    });
   }
   const newUserId = turnstile_guid ?? randomUUID();
 
@@ -1048,7 +1164,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   platform_integrations cascade below. Organization-owned Slack credentials are
  *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
- *   the person's own openai_chatgpt_connections rows, agent_configs, webhook_events,
+ *   the person's own openai_chatgpt_connections rows, their personal
+ *   claude_billing_connections row, agent_configs, webhook_events,
  *   code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles, cloud_agent_environments,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
@@ -1086,6 +1203,8 @@ export async function anonymizeCloudUserData(
   tx: DrizzleTransaction,
   userId: string
 ): Promise<void> {
+  // GitHub identity writers take this lock before the user row. Keep the same order.
+  await lockGitHubIdentityWrites(tx, userId);
   const [user] = await tx
     .select()
     .from(kilocode_users)
@@ -1192,6 +1311,11 @@ export async function anonymizeCloudUserData(
     })
     .where(eq(kilocode_users.id, userId));
 
+  await revokeOpenSupportGrants(tx, {
+    actorKiloUserId: userId,
+    reason: 'actor account soft-deleted',
+  });
+
   // ── 2. Hard-delete PII tables ────────────────────────────────────────
   await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
   await tx.execute(sql`
@@ -1270,22 +1394,12 @@ export async function anonymizeCloudUserData(
   await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
   await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
   // Passkey credentials are PII: the credential id, public key and user-facing
-  // label identify the user's device. Drop any challenge still open for a
-  // ceremony so a deleted account cannot complete a pending registration or
-  // authentication. Usernameless challenges (kilo_user_id IS NULL) are not
-  // attributable to this user; the device-auth cleanup cron removes them once
-  // they expire.
-  await tx.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, userId));
-  await tx
-    .delete(passkey_challenges)
-    .where(
-      and(eq(passkey_challenges.kilo_user_id, userId), isNull(passkey_challenges.consumed_at))
-    );
-  // A sign-in ticket is a live proof that a passkey assertion verified, so it
-  // is deleted with the credentials it was minted for rather than left to
-  // expire. Consumed tickets are removed too: their `kilo_user_id` still names
-  // the deleted account.
-  await tx.delete(passkey_sign_in_tickets).where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
+  // label identify the user's device. Consumed sign-in tickets are removed too:
+  // their `kilo_user_id` still names the deleted account.
+  await deleteUserPasskeys(tx, userId);
+  // Step-up challenges and proofs are PII and session-bound; a deleted account
+  // must not leave either behind.
+  await deleteStepUpRowsForUser(tx, userId);
 
   // Remove from organizations
   await tx
@@ -1543,6 +1657,11 @@ export async function anonymizeCloudUserData(
         eq(openai_chatgpt_connections.is_shared_services, true)
       )
     );
+  // Organization rows belong to the organization; `created_by` is an audit
+  // reference like the shared-services ChatGPT row's.
+  await tx
+    .delete(claude_billing_connections)
+    .where(eq(claude_billing_connections.kilo_user_id, userId));
   await tx
     .delete(coding_plan_availability_intents)
     .where(eq(coding_plan_availability_intents.user_id, userId));
@@ -2032,6 +2151,7 @@ export async function softDeleteUser(userId: string) {
   if (!user) return;
 
   await assertUserCanBeSoftDeleted(userId);
+  await deletePersonalClaudeProfile(userId);
 
   let cursor: UsagePromptPrefixCursor | null = null;
   while (true) {
@@ -2285,6 +2405,8 @@ export function inferRowlessAuthProviders(
       return ['discord'];
     case hosted_domain_specials.openai:
       return ['openai'];
+    case hosted_domain_specials.claude:
+      return ['claude'];
     case hosted_domain_specials.email:
       return ['email'];
     default:

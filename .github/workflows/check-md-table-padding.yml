@@ -6,9 +6,20 @@ on:
       - 'script/check-md-table-padding.ts'
       - '.github/workflows/check-md-table-padding.yml'
   workflow_dispatch:
+
+# Cancel in-progress runs when a new commit is pushed to the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
     name: Check markdown table padding
+    # Guard: a manual dispatch from a fork would otherwise run this check
+    # against the fork's own files. For pull_request events github.repository is
+    # already the base repo, so the guard is a no-op there and only blocks the
+    # fork-triggerable path.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

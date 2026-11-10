@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "เดโมรีโมตเนทีฟ",
+    "sessionsEmpty": "ยังไม่มีเซสชันเนทีฟ",
+    "hosts": "โฮสต์ที่ออนไลน์",
+    "hostsEmpty": "ไม่มีโฮสต์ที่ออนไลน์",
+    "directory": "ไดเรกทอรีทำงาน",
+    "createSession": "สร้างเซสชันเนทีฟ",
+    "queueIfOffline": "เพิ่มพรอมต์เข้าคิวหากโฮสต์ออฟไลน์",
+    "prompt": "พรอมต์หรือ /command",
+    "localClear": "ล้างมุมมองในเครื่อง",
+    "abort": "ยกเลิกเทิร์น",
+    "failed": "ดำเนินการรีโมตเนทีฟไม่สำเร็จ",
+    "creationUnknown": "ไม่ทราบผลการสร้าง โปรดรีเฟรชเซสชันก่อนลองอีกครั้ง",
+    "commandFailed": "คำสั่งรันเนอร์ไม่สำเร็จ",
+    "invalidReply": "การตอบกลับจากรันเนอร์ไม่ถูกต้อง",
+    "unsafeCommand": "ใช้ /compact, /new, /skill, /models, /agents หรือ /clear (เฉพาะในเครื่อง)",
+    "status": "การเชื่อมต่อ: {{connection}} · รันเนอร์: {{runner}}",
+    "presenceStatus": "โฮสต์: {{connection}}",
+    "commandStatus": "การส่งคำสั่ง: {{status}}",
+    "delivered": "ส่งถึงแล้ว",
+    "expired": "หมดอายุแล้ว"
+  },
   "common": {
     "cancel": "ยกเลิก",
     "done": "เสร็จสิ้น",
@@ -110,6 +132,7 @@
     "newSession": "เซสชันใหม่",
     "noModelsAvailable": "ไม่มีโมเดลที่ใช้งานได้",
     "notFound": "ไม่พบข้อมูล",
+    "online": "ออนไลน์",
     "open": "เปิด {{name}}",
     "openPullRequest": "เปิด PR",
     "completed": "เสร็จสิ้น",
@@ -186,6 +209,7 @@
     "resendCode": "ส่งรหัสอีกครั้ง",
     "termsPrefix": "การดำเนินการต่อแสดงว่าคุณยอมรับ",
     "terms": "ข้อกำหนด",
+    "termsInSentence": "ข้อกำหนด",
     "termsConnector": "และ",
     "termsSuffix": ".",
     "moreSignInOptions": "ตัวเลือกการลงชื่อเข้าใช้เพิ่มเติม",
@@ -222,6 +246,7 @@
     "confirmDeletion": "ยืนยันการลบ",
     "credits": "เครดิต",
     "failedToLoadBalance": "โหลดยอดคงเหลือไม่สำเร็จ แตะเพื่อลองอีกครั้ง",
+    "balanceLoadFailed": "โหลดยอดคงเหลือไม่สำเร็จ",
     "hideBalance": "ซ่อนยอดคงเหลือ",
     "showBalance": "แสดงยอดคงเหลือ",
     "balanceHidden": "ยอดคงเหลือถูกซ่อน",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "PR นี้ไม่มีการเปลี่ยนแปลงไฟล์",
     "fileList": {
       "openNavigator": "เปิดแถบนำทางไฟล์",
-      "filesViewed": "ไฟล์ · ดูแล้ว {{viewed}} จาก {{total}} ไฟล์",
       "listed": "(ในรายการ)",
       "layout": "เค้าโครง",
       "unified": "แบบรวม",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "ไม่สามารถตรวจสอบการเชื่อมต่อ GitHub ได้",
-      "checkFailedMessage": "ยังตรวจสอบสถานะการเข้าสู่ระบบไม่ได้จนกว่าจะโหลดข้อมูลเสร็จ",
+      "checkFailedMessage": "ไม่สามารถเข้าถึง GitHub ได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
       "checkFailedTitleGitLab": "ไม่สามารถตรวจสอบการเชื่อมต่อ GitLab ได้",
       "checkFailedTitleBitbucket": "ไม่สามารถตรวจสอบการเชื่อมต่อ Bitbucket ได้",
-      "providerCheckFailedMessage": "สถานะการเชื่อมต่อไม่พร้อมใช้งานจนกว่าจะโหลดเสร็จ",
+      "providerCheckFailedMessage": "ไม่สามารถเข้าถึงผู้ให้บริการได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
       "reconnectTitle": "เชื่อมต่อ GitHub ใหม่",
       "reconnectTitleGitLab": "เชื่อมต่อ GitLab ใหม่",
       "reconnectTitleBitbucket": "เชื่อมต่อ Bitbucket ใหม่",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "อนุญาตให้ใช้กล้องในการตั้งค่าเพื่อถ่ายภาพ"
+    },
+    "botStatus": {
+      "offline": "ออฟไลน์"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ กรุณาลองอีกครั้ง",
       "actionBlocked": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ ต้องแก้ไขปัญหาก่อนจึงจะลองใหม่ได้",
       "syncNoRepositories": "ไม่มีรีโพซิทอรีใดอยู่ในขอบเขตการซิงค์ โปรดเลือก repositories ที่เอเจนต์ความปลอดภัยตรวจสอบ แล้วซิงค์อีกครั้ง",
+      "syncNoRepositoriesNoManage": "ไม่มีรีโพซิทอรีใดอยู่ในขอบเขตการซิงค์ เจ้าขององค์กร ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินต้องเชื่อมต่อรีโพซิทอรีก่อนจึงจะซิงค์ได้",
       "syncIntegrationInactive": "การเชื่อมต่อ GitHub สำหรับเอเจนต์ความปลอดภัยยังไม่เปิดใช้งาน เชื่อมต่อ Kilo GitHub App ใหม่อีกครั้ง แล้วซิงค์อีกครั้ง",
       "syncMissingPermission": "Kilo GitHub App อ่าน vulnerability alerts ไม่ได้ ให้สิทธิ์นั้นใน GitHub แล้วซิงก์อีกครั้ง",
       "configConflict": "การตั้งค่าของเอเจนต์ความปลอดภัยถูกเปลี่ยนที่อื่น ตรวจสอบการตั้งค่าล่าสุดแล้วบันทึกอีกครั้ง"
@@ -1804,6 +1832,7 @@
       "emptyDescription": "ส่งข้อความด้านล่างเพื่อเริ่มต้น",
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
+      "emptyReadOnlyTitle": "ไม่มีข้อความในเซสชันนี้",
       "renameAccessibility": "เปลี่ยนชื่อเซสชัน: {{title}}",
       "cloningSession": "กำลังคัดลอกเซสชัน",
       "couldNotLoadThisSession": "ไม่สามารถโหลดเซสชันนี้ได้",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "เลือกคลังโค้ดเพื่อเริ่มต้น",
       "enterPromptToStart": "เพิ่มพรอมป์ตเพื่อเริ่มต้น",
       "enterPromptOrFileToStart": "เพิ่มพรอมป์ตหรือไฟล์เพื่อเริ่มต้น",
-      "connectProviderToStart": "เชื่อมต่อผู้ให้บริการเพื่อเริ่มต้น",
+      "connectProviderToStart": "คลังโค้ดจะมาจากบัญชี GitHub, GitLab หรือ Bitbucket ที่เชื่อมต่ออยู่",
       "promptPlaceholder": "อยากทำงานอะไร?",
       "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",
       "prefillRepoAndModelUnavailable": "คลังโค้ดและโมเดลของเซสชันเดิมใช้ไม่ได้แล้ว เลือกคลังโค้ดและโมเดลใหม่ด้านล่าง",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "หยุดสร้างคำตอบแล้ว",
       "assistantContextOverflow": "การสนทนายาวเกินไปสำหรับโมเดล",
       "assistantProviderError": "ผู้ให้บริการส่งกลับข้อผิดพลาด",
+      "assistantProviderRefused": "ผู้ให้บริการปฏิเสธคำขอนี้และไม่สามารถลองใหม่ได้",
+      "assistantCreditsRefusal": "เครดิตไม่เพียงพอที่จะใช้ Cloud Agent",
       "assistantOutputLimit": "คำตอบเข้าถึงขีดจำกัดผลลัพธ์ของโมเดล",
       "assistantStructuredOutput": "คำตอบไม่ตรงกับรูปแบบที่กำหนด",
       "assistantFailed": "สร้างคำตอบไม่สำเร็จ"
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "กำลังเตรียมสภาพแวดล้อม",
       "preparationComplete": "เตรียมพร้อมแล้ว",
       "preparationFailed": "เตรียมการไม่สำเร็จ",
+      "preparationStageFailed": "{{stage}} ไม่สำเร็จ",
       "setupCommand": "คำสั่งตั้งค่า {{index}}",
       "setupCommandOf": "คำสั่งตั้งค่า {{index}} จาก {{displayCount}}",
       "stepWorkspaceSetup": "ตั้งค่าพื้นที่ทำงาน",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "คำสั่งตั้งค่า {{index}} หมดเวลา",
       "detailColdRestore": "กู้คืนแบบเย็น ใช้สแนปช็อตแล้ว กู้คืนไฟล์ {{applied}} จาก {{total}} ไฟล์",
       "detailProgressPercent": "เสร็จแล้ว {{percent}}%",
-      "detailRestoreIncompleteReport": "กู้คืนเซสชันไม่สมบูรณ์: ไม่ได้กู้คืนไฟล์ {{skipped}} จาก {{total}} ไฟล์ ({{reasons}})",
+      "detailRestoreIncompleteFiles": "ไม่ได้กู้คืนไฟล์ {{skipped}} จาก {{total}} ไฟล์ ({{reasons}})",
       "detailRestoreIncompleteMissing": "ไฟล์ที่หายไป: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} และอีก {{omitted}} รายการ",
       "detailReasonPatchFailed": "แพตช์ไม่ถูก apply",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "ไม่ทราบความจุบริบท",
-      "tapToViewDetails": "แตะเพื่อดูรายละเอียดบริบท",
-      "costSuffix": ", ค่าใช้จ่าย {{cost}}",
-      "tokensWindowUnavailable": "ใช้บริบท {{used}} โทเคน ไม่ทราบความจุบริบท",
-      "tokensUsage": "ใช้บริบท {{used}} จาก {{window}} โทเคน คิดเป็น {{percentage}}",
+      "tapToViewDetails": " แตะเพื่อดูรายละเอียดบริบท",
+      "costClause": ", ค่าใช้จ่าย {{cost}}",
+      "loadingCostSpoken": "ค่าใช้จ่าย {{cost}}",
+      "tokensWindowUnavailable": "ใช้บริบท {{used}} โทเคน ไม่ทราบความจุบริบท{{costClause}}",
+      "tokensUsage": "ใช้บริบท {{used}} จาก {{window}} โทเคน คิดเป็น {{percentage}}{{costClause}}",
       "title": "การใช้บริบท",
       "used": "ใช้แล้ว",
       "provider": "ผู้ให้บริการ",
       "totalCost": "ค่าใช้จ่ายรวม",
       "usageReflectsLatest": "ข้อมูลการใช้งานอ้างอิงจากคำตอบล่าสุดที่ผู้ช่วยสร้างเสร็จแล้ว",
-      "usageUnavailable": "ไม่สามารถดูการใช้บริบทได้",
+      "usageUnavailable": "ไม่สามารถดูการใช้บริบทได้{{costClause}}",
       "tokenUsage": "การใช้โทเคน",
       "cacheRate": "อัตราแคช",
       "modelsCount": "โมเดล ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "เติมเครดิต",
-    "description": "เติมเครดิตเพื่อใช้งานต่อ",
     "billingPage": "หน้าการเรียกเก็บเงิน"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "ค้นหาเว็บ",
       "thinking": "กำลังคิดทบทวน"
     },
-    "planOf": "จาก",
+    "planProgress": "{{done}} จาก {{total}}",
     "filesChanged": "ไฟล์ที่เปลี่ยนแปลง",
-    "finishedIn": "เสร็จใน",
+    "finishedIn": "เสร็จใน {{duration}}",
     "noActivityFor": "ไม่มีกิจกรรมเป็นเวลา",
     "prOpened": "เปิดพูลรีเควสต์แล้ว",
     "permissionWants": "ต้องการรัน",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "โมเดลนี้รองรับระดับการใช้เหตุผล"
     },
-    "creditsRequired": "เครดิตไม่เพียงพอในการส่งข้อความนี้ เติมเครดิตแล้วลองอีกครั้ง"
+    "creditsRequired": "เครดิตไม่เพียงพอในการส่งข้อความนี้"
   },
   "settingsTools": {
     "confirmTitle": "ยืนยันการเปลี่ยนแปลงนี้หรือไม่"
@@ -3340,8 +3372,8 @@
     "saved": "บันทึกการตั้งค่าการแจ้งเตือนการใช้จ่ายแล้ว",
     "loadError": "ไม่สามารถโหลดการแจ้งเตือนการใช้จ่ายได้",
     "saveError": "ไม่สามารถบันทึกการแจ้งเตือนการใช้จ่ายได้",
-    "empty": "การแจ้งเตือนการใช้จ่ายปิดอยู่ เปิดใช้งานเพื่อแจ้งเตือนผู้ติดต่อด้านการเรียกเก็บเงินของขอบเขตนี้",
-    "noSpend": "ยังไม่มีการบันทึกการใช้จ่าย",
+    "sendAlerts": "ส่งการแจ้งเตือนการใช้จ่าย",
+    "noSpend": "ยังไม่มีการใช้จ่าย",
     "spend24h": "การใช้จ่ายใน 24 ชั่วโมงที่ผ่านมา",
     "multiplierError": "ป้อนตัวคูณ 1 หรือมากกว่า",
     "permissionDenied": "คุณไม่มีสิทธิ์จัดการการแจ้งเตือนการใช้จ่าย",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "ไม่มีบริบทที่เปิดใช้รายงานตามกำหนดการ",
     "sourceBlocker": "เซสชันต้องได้รับการดูแล",
     "sourceMetadata": "เมทาดาทาของเซสชันที่บันทึกไว้"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ไม่สามารถเปิดผลการค้นหานี้ได้"
   }
 }

@@ -5,7 +5,6 @@ import {
   type EnvironmentBuildResult,
 } from '../../../src/shared/environment-build-protocol.js';
 import {
-  SETUP_COMMAND_HARD_TIMEOUT_MS,
   SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
   createRepositoryPreparation,
 } from '../control-plane/repository-preparation.js';
@@ -67,10 +66,11 @@ async function main(): Promise<void> {
     return idleUntilStopped();
   }
 
+  const { deadlineAt } = input;
   const controller = new AbortController();
   const deadline = setTimeout(
     () => controller.abort(new Error('build deadline')),
-    Math.max(0, input.deadlineAt - Date.now())
+    Math.max(0, deadlineAt - Date.now())
   );
   const reporter = createBuildReporter({
     client,
@@ -88,7 +88,9 @@ async function main(): Promise<void> {
         inheritEnv: false,
         ...(signal ? { signal } : {}),
         inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
-        hardTimeoutMs: SETUP_COMMAND_HARD_TIMEOUT_MS,
+        // A build installs and warms what sessions later reuse, so a setup
+        // command may use the rest of the build deadline.
+        hardTimeoutMs: Math.max(1, deadlineAt - Date.now()),
         ...(onOutput ? { onOutput } : {}),
       }),
     sleep: (ms, signal) =>

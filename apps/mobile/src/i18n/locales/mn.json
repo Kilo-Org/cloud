@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Native алсын демо",
+    "sessionsEmpty": "Native сесс хараахан алга",
+    "hosts": "Онлайн хостууд",
+    "hostsEmpty": "Онлайн хост алга",
+    "directory": "Ажлын хавтас",
+    "createSession": "Native сесс үүсгэх",
+    "queueIfOffline": "Хост офлайн бол промптыг дараалалд оруулах",
+    "prompt": "Промпт эсвэл /command",
+    "localClear": "Локал харагдацыг цэвэрлэх",
+    "abort": "Ээлжийг зогсоох",
+    "failed": "Native алсын үйлдэл амжилтгүй боллоо",
+    "creationUnknown": "Үүсгэлтийн үр дүн тодорхойгүй. Дахин оролдохоосоо өмнө сессүүдийг сэргээнэ үү.",
+    "commandFailed": "Ажиллуулагчийн команд амжилтгүй боллоо",
+    "invalidReply": "Ажиллуулагчийн хариу буруу байна",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents эсвэл /clear (зөвхөн локалаар) ашиглана уу.",
+    "status": "Холболт: {{connection}} · Ажиллуулагч: {{runner}}",
+    "presenceStatus": "Хостууд: {{connection}}",
+    "commandStatus": "Командын хүргэлт: {{status}}",
+    "delivered": "Хүргэгдсэн",
+    "expired": "Хугацаа нь дууссан"
+  },
   "common": {
     "cancel": "Цуцлах",
     "done": "Болсон",
@@ -110,6 +132,7 @@
     "newSession": "Шинэ сесс",
     "noModelsAvailable": "Ашиглах боломжтой загвар алга",
     "notFound": "Олдсонгүй.",
+    "online": "Онлайн",
     "open": "{{name}}-г нээх",
     "openPullRequest": "Нэгтгэх хүсэлт нээх",
     "completed": "Дууссан",
@@ -186,6 +209,7 @@
     "resendCode": "Кодыг дахин илгээх",
     "termsPrefix": "Үргэлжлүүлснээр та манай дараах баримт бичгийг зөвшөөрнө: ",
     "terms": "Үйлчилгээний нөхцөл",
+    "termsInSentence": "Үйлчилгээний нөхцөл",
     "termsConnector": " болон ",
     "termsSuffix": ".",
     "moreSignInOptions": "Нэвтрэх бусад сонголтууд",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Устгахыг баталгаажуулах",
     "credits": "Кредит",
     "failedToLoadBalance": "Үлдэгдлийг ачаалж чадсангүй. Дахин оролдохын тулд товшино уу.",
+    "balanceLoadFailed": "Үлдэгдлийг ачаалж чадсангүй",
     "hideBalance": "Үлдэгдэл нуух",
     "showBalance": "Үлдэгдэл харуулах",
     "balanceHidden": "Үлдэгдэл нуугдсан",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Энэ нэгтгэх хүсэлтэд файлын өөрчлөлт байхгүй.",
     "fileList": {
       "openNavigator": "Файлын жагсаалтыг нээх",
-      "filesViewed": "Файлууд · Үзсэн: {{viewed}} / {{total}}",
       "listed": "(жагсаасан)",
       "layout": "Харагдац",
       "unified": "Нэгдсэн",
@@ -672,10 +696,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub холболтыг шалгаж чадсангүй.",
-      "checkFailedMessage": "Энэ мэдээллийг ачаалж дуустал нэвтэрсэн эсэхийг харуулах боломжгүй.",
+      "checkFailedMessage": "GitHub-д холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
       "checkFailedTitleGitLab": "GitLab холболтыг шалгаж чадсангүй.",
       "checkFailedTitleBitbucket": "Bitbucket холболтыг шалгаж чадсангүй.",
-      "providerCheckFailedMessage": "Ачаалагдах хүртэл холболтын төлөв харагдахгүй.",
+      "providerCheckFailedMessage": "Үйлчилгээ үзүүлэгчтэй холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
       "reconnectTitle": "GitHub-ыг дахин холбох",
       "reconnectTitleGitLab": "GitLab-ыг дахин холбох",
       "reconnectTitleBitbucket": "Bitbucket-ыг дахин холбох",
@@ -947,6 +971,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Зураг авахын тулд тохиргооноос камер ашиглах эрхийг зөвшөөрнө үү."
+    },
+    "botStatus": {
+      "offline": "Офлайн"
     }
   },
   "codeReviewer": {
@@ -1617,6 +1644,7 @@
       "actionFailed": "Энэ үйлдлийг дуусгаж чадсангүй. Дахин оролдоно уу.",
       "actionBlocked": "Энэ үйлдлийг дуусгаж чадсангүй. Асуудлыг эхэлж шийдвэрлэх шаардлагатай.",
       "syncNoRepositories": "Синхрончлолын хүрээнд нэг ч репозитор байхгүй. Аюулгүй байдлын агентын хянадаг репозиторуудыг сонгоод, дахин синхрончлоорой.",
+      "syncNoRepositoriesNoManage": "Синхрончлолын хүрээнд нэг ч репозитор байхгүй. Синхрончлол ажиллахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежер репозиторуудыг холбох ёстой.",
       "syncIntegrationInactive": "«Аюулгүй байдлын агент»-ын GitHub холболт идэвхтэй биш байна. Kilo GitHub App-ыг дахин холбож, дараа нь дахин синхрончлоорой.",
       "syncMissingPermission": "Kilo GitHub App нь vulnerability alerts-г уншиж чадахгүй байна. GitHub дээр тухайн зөвшөөрлийг олгоод, дахин синк хийнэ үү.",
       "configConflict": "Аюулгүй байдлын агентын тохиргоо өөр газар өөрчлөгдсөн. Хамгийн сүүлийн тохиргоог шалгаад дахин хадгална уу."
@@ -1804,6 +1832,7 @@
       "emptyDescription": "Эхлэхийн тулд доор мессеж илгээнэ үү.",
       "scrollToBottom": "Хамгийн доош гүйлгэх",
       "emptyTitle": "Мессеж хараахан алга",
+      "emptyReadOnlyTitle": "Энэ сессид мессеж байхгүй",
       "renameAccessibility": "Сессийн нэрийг өөрчлөх: {{title}}",
       "cloningSession": "Сессийг хуулбарлаж байна",
       "couldNotLoadThisSession": "Энэ сессийг ачаалж чадсангүй.",
@@ -1903,7 +1932,7 @@
       "selectRepositoryToStart": "Эхлэхийн тулд кодын сангаа сонгоно уу.",
       "enterPromptToStart": "Эхлэхийн тулд заавар нэмнэ үү.",
       "enterPromptOrFileToStart": "Эхлэхийн тулд заавар эсвэл файл нэмнэ үү.",
-      "connectProviderToStart": "Эхлэхийн тулд үйлчилгээ үзүүлэгчийг холбоно уу.",
+      "connectProviderToStart": "Кодын сан нь холбогдсон GitHub, GitLab эсвэл Bitbucket бүртгэлээс ирдэг.",
       "promptPlaceholder": "Юун дээр ажиллах вэ?",
       "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",
       "prefillRepoAndModelUnavailable": "Анхны сессийн кодын сан болон загварыг ашиглах боломжгүй болсон. Доороос өөр кодын сан, загвар сонгоно уу.",
@@ -2085,6 +2114,8 @@
       "assistantStopped": "Хариулт үүсгэхийг зогсоосон.",
       "assistantContextOverflow": "Харилцан яриа загварын боловсруулах хэмжээнээс хэтэрсэн байна.",
       "assistantProviderError": "Үйлчилгээ үзүүлэгч алдаа буцаалаа.",
+      "assistantProviderRefused": "Үйлчилгээ үзүүлэгч энэ хүсэлтийг татгалзсан тул дахин оролдох боломжгүй.",
+      "assistantCreditsRefusal": "Cloud Agent ажиллуулахад кредит хүрэлцэхгүй байна.",
       "assistantOutputLimit": "Хариулт загварын гаргах хэмжээний хязгаарт хүрлээ.",
       "assistantStructuredOutput": "Хариулт шаардлагатай форматад нийцсэнгүй.",
       "assistantFailed": "Хариулт үүсгэж чадсангүй."
@@ -2117,6 +2148,7 @@
       "preparingEnvironment": "Орчныг бэлдэж байна",
       "preparationComplete": "Бэлтгэл дууссан",
       "preparationFailed": "Бэлтгэл амжилтгүй болсон",
+      "preparationStageFailed": "{{stage}} амжилтгүй боллоо",
       "setupCommand": "Бэлтгэх команд {{index}}",
       "setupCommandOf": "Бэлтгэх команд {{index}} / {{displayCount}}",
       "stepWorkspaceSetup": "Ажлын талбарын тохируулга",
@@ -2155,7 +2187,7 @@
       "detailSetupCommandTimedOut": "Бэлтгэх команд {{index}} хугацаанаас хэтэрлээ",
       "detailColdRestore": "Хүйтэн сэргээлт, Snapshot ашиглагдлаа, {{total}} файлаас {{applied}} нь сэргээгдлээ",
       "detailProgressPercent": "{{percent}}% дууссан",
-      "detailRestoreIncompleteReport": "Session сэргээлт бүрэн дуусаагүй: {{total}} файлаас {{skipped}} нь сэргээгдээгүй ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "{{total}} файлаас {{skipped}} нь сэргээгдээгүй ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Байхгүй: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} болон {{omitted}} нэмэлт",
       "detailReasonPatchFailed": "патч оруулагдсангүй",
@@ -2404,16 +2436,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Контекстийн багтаамж тодорхойгүй",
-      "tapToViewDetails": "Контекстийн дэлгэрэнгүйг харахын тулд товшино уу.",
-      "costSuffix": ", зардал {{cost}}",
-      "tokensWindowUnavailable": "Контекст: {{used}} токен, багтаамж тодорхойгүй",
-      "tokensUsage": "Контекст: {{window}} токеноос {{used}} токен буюу {{percentage}} ашигласан",
+      "tapToViewDetails": " Контекстийн дэлгэрэнгүйг харахын тулд товшино уу.",
+      "costClause": ", зардал {{cost}}",
+      "loadingCostSpoken": "зардал {{cost}}.",
+      "tokensWindowUnavailable": "Контекст: {{used}} токен, багтаамж тодорхойгүй{{costClause}}.",
+      "tokensUsage": "Контекст: {{window}} токеноос {{used}} токен буюу {{percentage}} ашигласан{{costClause}}.",
       "title": "Контекстийн ашиглалт",
       "used": "Ашигласан",
       "provider": "Үйлчилгээ үзүүлэгч",
       "totalCost": "Нийт зардал",
       "usageReflectsLatest": "Ашиглалтын мэдээлэл нь туслахын хамгийн сүүлд бүрэн үүсгэсэн хариултыг тусгана.",
-      "usageUnavailable": "Контекст ашиглалт боломжгүй",
+      "usageUnavailable": "Контекст ашиглалт боломжгүй{{costClause}}.",
       "tokenUsage": "Токены ашиглалт",
       "cacheRate": "Кэшийн хувь",
       "modelsCount": "Загварууд ({{displayCount}})",
@@ -2494,7 +2527,6 @@
   },
   "addCredits": {
     "cta": "Кредит нэмэх",
-    "description": "Үргэлжлүүлэн ашиглахын тулд кредит нэмнэ үү.",
     "billingPage": "төлбөрийн хуудас"
   },
   "deviceSessions": {
@@ -2996,9 +3028,9 @@
       "searching": "Веб хайлт",
       "thinking": "Бодож байна"
     },
-    "planOf": "ийн",
+    "planProgress": "{{done}} / {{total}}",
     "filesChanged": "файл өөрчлөгдсөн",
-    "finishedIn": "Дууссан",
+    "finishedIn": "{{duration}} хугацаанд дууссан",
     "noActivityFor": "Үйл ажиллагаагүй",
     "prOpened": "Татах хүсэлт нээгдсэн",
     "permissionWants": "Ажиллуулахыг хүсэж байна",
@@ -3306,7 +3338,7 @@
     "reasoningEffort": {
       "modelFlag": "Энэ загвар бодох түвшинг дэмждэг"
     },
-    "creditsRequired": "Энэ мессежийг илгээхэд хангалттай кредит байхгүй. Кредит нэмээд дахин оролдоно уу."
+    "creditsRequired": "Энэ мессежийг илгээхэд хангалттай кредит байхгүй."
   },
   "settingsTools": {
     "confirmTitle": "Энэ өөрчлөлтийг баталгаажуулах уу?"
@@ -3340,8 +3372,8 @@
     "saved": "Зарцуулалтын анхааруулгын тохиргоо хадгалагдлаа",
     "loadError": "Зарцуулалтын анхааруулгыг ачаалж чадсангүй.",
     "saveError": "Зарцуулалтын анхааруулгыг хадгалж чадсангүй.",
-    "empty": "Зарцуулалтын анхааруулга унтарсан байна. Энэ хүрээний төлбөрийн хаягуудад мэдэгдэхийн тулд асаа.",
-    "noSpend": "Одоогоор зарцуулалт бүртгэгдээгүй",
+    "sendAlerts": "Анхааруулга илгээх",
+    "noSpend": "Зарцуулалт хараахан алга",
     "spend24h": "Сүүлийн 24 цагийн зарцуулалт",
     "multiplierError": "1 буюу түүнээс их үржүүлэгч оруул",
     "permissionDenied": "Зарцуулалтын анхааруулгыг удирдах эрх танд байхгүй.",
@@ -3747,5 +3779,8 @@
     "noEnabledContexts": "Товлосон тоймд идэвхжүүлсэн орчин алга",
     "sourceBlocker": "Сессэд анхаарал хандуулах шаардлагатай",
     "sourceMetadata": "Хадгалсан сессийн мета өгөгдөл"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Энэ хайлтын үр дүнг нээж чадсангүй"
   }
 }

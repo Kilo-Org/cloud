@@ -40,7 +40,7 @@ describe('ActiveSessionsLiveSync — a scope with no server outcome yet', () => 
     // A socket-only cache never counts as a server result.
     expect(
       getActiveSessionsQueryMetadata(qc.getQueryCache().find({ queryKey: QUERY_KEY }))
-    ).toEqual({ acceptedRevision: 0, terminalError: null });
+    ).toEqual({ acceptedRevision: 0, acceptedSessionIds: new Set(), terminalError: null });
     sync.scheduleRefresh('manual');
     await sync.getFetchQueue();
     expect(qc.__hasPendingFetch()).toBe(true);

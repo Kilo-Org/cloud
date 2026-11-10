@@ -10,7 +10,6 @@ import type {
   ControlPlaneSessionRegistration,
   SandboxSessionV2,
 } from '../../src/control-plane/session/session-do.js';
-import { events } from '../../src/control-plane/session/sqlite-schema.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -305,7 +304,7 @@ async function setupGeneratedTitleSession(
 ): Promise<GeneratedTitleSession> {
   const sessionId = newSessionId();
   const kiloId = kiloSessionId();
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+  const sandboxId = await generateSandboxId(sessionId);
   const stub = sessions.getByName(sessionId);
   const peer = new FakeSandboxPeer();
   await runInDurableObject(stub, instance => {
@@ -334,7 +333,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     'retains audit policy %j after eviction and rejects changed or contradictory registration replays',
     async ({ egressMode, egressAudit }) => {
       const sessionId = newSessionId();
-      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const sandboxId = await generateSandboxId(sessionId);
       let stub = sessions.getByName(sessionId);
       const registered = metadata({
         sessionId,
@@ -385,7 +384,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     'retains registration policy after eviction and rejects changed replays %j',
     async ({ egressAllowlist }) => {
       const sessionId = newSessionId();
-      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const sandboxId = await generateSandboxId(sessionId);
       let stub = sessions.getByName(sessionId);
       const registered = metadata({
         sessionId,
@@ -469,7 +468,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
 
   it('rejects a changed initial-create egress policy', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = sessions.getByName(sessionId);
     await runInDurableObject(stub, instance => {
       instance.sandboxPeerFor = () => new FakeSandboxPeer();
@@ -546,7 +545,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
 
   it('accepts explicit unrestricted on a non-container provider and equivalent omitted replays', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = sessions.getByName(sessionId);
     const registered = metadata({
       sessionId,
@@ -577,7 +576,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     const kiloId = kiloSessionId();
     // A deliberately different sandbox id than the DO would derive for this
     // session: proves the DO records the given selection and never re-derives (H2).
-    const providedSandboxId = await generateSandboxId('*', ORG_ID, USER_ID, 'other_session');
+    const providedSandboxId = await generateSandboxId('other_session');
     const provider = createFakeProvider();
     const sandboxStub = await installSandbox(providedSandboxId, provider.adapter);
 
@@ -658,7 +657,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     const siblingId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
     const identityPath = getWorktreeWorkspacePath(ORG_ID, USER_ID, worktreeId);
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const sandboxStub = await installSandbox(sandboxId, provider.adapter);
 
@@ -705,8 +704,8 @@ describe('SandboxSessionV2 worker RPC surface', () => {
 
   it('replays a repeated sibling register and rejects a changed intent (N3)', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
-    const otherSandboxId = await generateSandboxId('*', ORG_ID, USER_ID, `${sessionId}_other`);
+    const sandboxId = await generateSandboxId(sessionId);
+    const otherSandboxId = await generateSandboxId(`${sessionId}_other`);
     const secret = 'test-nextauth-secret';
     const seal = await sealFor(sessionId, secret);
     const storedDirectory = getWorktreeWorkspacePath(
@@ -774,7 +773,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
 
   it('replays a repeated create and rejects a different initial messageId', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     await installSandbox(sandboxId, provider.adapter);
     const sessionStub = sessions.getByName(sessionId);
@@ -812,7 +811,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       metadata: metadata({
         sessionId: newSessionId(),
         kiloSessionId: kiloSessionId(),
-        sandboxId: await generateSandboxId('*', ORG_ID, USER_ID, 'input'),
+        sandboxId: await generateSandboxId('input'),
       }),
       message: promptPayload(messageId()),
     } as never);
@@ -826,7 +825,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
 
   it('rejects a selection that disagrees with the metadata provider (N2)', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const sessionStub = sessions.getByName(sessionId);
 
     await expect(
@@ -864,7 +863,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
 
   it('rejects stored metadata that fails validation (Low)', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const sessionStub = sessions.getByName(sessionId);
     // A prompt payload accepts a loose messageId, but the metadata
     // `initialMessage.id` pattern does not: the stored-metadata validation must
@@ -885,7 +884,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
 
   it('stores a runtime authorization seal and resolves unknown handles to null (H4)', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const secret = 'test-nextauth-secret';
     const seal = await sealFor(sessionId, secret);
 
@@ -919,66 +918,6 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     await expect(
       sessionStub.resolveRuntimeCredentialProxyGrant('not-a-handle')
     ).resolves.toBeNull();
-  });
-
-  it('reads the latest assistant message for the session Kilo session', async () => {
-    const sessionId = newSessionId();
-    const kiloId = kiloSessionId();
-    const otherKiloId = kiloSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
-    const sessionStub = sessions.getByName(sessionId);
-    await runInDurableObject(sessionStub, instance => {
-      instance.sandboxPeerFor = () => new FakeSandboxPeer();
-    });
-    await sessionStub.registerSessionFromMetadata({
-      metadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
-      sandboxSelection: { provider: 'cloudflare-containers' },
-    });
-
-    const assistant = (id: string, sessionID: string) =>
-      JSON.stringify({
-        event: 'message.updated',
-        properties: { info: { id, role: 'assistant', sessionID } },
-      });
-    await runInDurableObject(sessionStub, async (_instance, state) => {
-      const db = drizzle(state.storage, { logger: false });
-      await db.insert(events).values([
-        {
-          execution_id: 'exec_1',
-          session_id: sessionId,
-          stream_event_type: 'kilocode',
-          payload: assistant('msg_1', kiloId),
-          timestamp: 1,
-          entity_id: 'message/msg_1',
-        },
-        {
-          execution_id: 'exec_1',
-          session_id: sessionId,
-          stream_event_type: 'kilocode',
-          payload: assistant('msg_other', otherKiloId),
-          timestamp: 2,
-          entity_id: 'message/msg_other',
-        },
-        {
-          execution_id: 'exec_1',
-          session_id: sessionId,
-          stream_event_type: 'kilocode',
-          payload: assistant('msg_2', kiloId),
-          timestamp: 3,
-          entity_id: 'message/msg_2',
-        },
-      ]);
-    });
-
-    await expect(sessionStub.getLatestAssistantMessage()).resolves.toMatchObject({
-      info: { id: 'msg_2', role: 'assistant' },
-      parts: [],
-    });
-  });
-
-  it('returns null for the latest assistant message when the session is unregistered', async () => {
-    const sessionStub = sessions.getByName(newSessionId());
-    await expect(sessionStub.getLatestAssistantMessage()).resolves.toBeNull();
   });
 });
 

@@ -157,13 +157,7 @@ function startWrapperPump(wrapper: FakeWrapper): () => void {
 }
 
 async function startReadySession(): Promise<ActiveSession> {
-  const sandboxId = await generateSandboxId(
-    undefined,
-    ORG_ID,
-    USER_ID,
-    cloudAgentSessionId,
-    undefined
-  );
+  const sandboxId = await generateSandboxId(cloudAgentSessionId);
   const provider = createFakeProvider();
   await installSandbox(sandboxId, provider.adapter);
 
@@ -208,13 +202,7 @@ async function startReadySession(): Promise<ActiveSession> {
 }
 
 async function startPreparationFailureSession(): Promise<ActiveSession> {
-  const sandboxId = await generateSandboxId(
-    undefined,
-    ORG_ID,
-    USER_ID,
-    cloudAgentSessionId,
-    undefined
-  );
+  const sandboxId = await generateSandboxId(cloudAgentSessionId);
   const provider = createFakeProvider();
   await installSandbox(sandboxId, provider.adapter);
 
@@ -565,7 +553,7 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
             metadata: { request: 'fixture-request' },
           },
         };
-        const withError = (error: unknown): ControlPlaneEvent[] => [
+        const withError = (error: unknown, partError: unknown = error): ControlPlaneEvent[] => [
           {
             type: 'message.updated',
             properties: {
@@ -589,7 +577,7 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
                 type: 'retry',
                 attempt: 2,
                 time: { created: 1 },
-                error,
+                error: partError,
               },
             },
           },
@@ -607,7 +595,14 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
         );
         const replay = await readAttach(await attach());
         await replay.reader.cancel();
-        const expected = withError('Assistant request was rate limited').map(event => ({
+        const expected = withError('Assistant request was rate limited', {
+          name: 'APIError',
+          data: {
+            message: 'Assistant request was rate limited',
+            statusCode: 429,
+            isRetryable: true,
+          },
+        }).map(event => ({
           ...event,
           properties: expect.objectContaining(event.properties),
         }));
@@ -944,7 +939,11 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
       for (let index = 0; index < 64; index++) {
         const frame = await reader.next();
         observed.push(frame);
-        if (isFrame(frame, 'cloud.status')) cloudStatusFrame = frame;
+        if (
+          isFrame(frame, 'cloud.status') &&
+          (frame.properties as { cloudStatus?: { type?: string } }).cloudStatus?.type === 'error'
+        )
+          cloudStatusFrame = frame;
         const preparation =
           isFrame(frame, 'preparing') &&
           (frame.properties as { preparation?: Record<string, unknown> }).preparation;

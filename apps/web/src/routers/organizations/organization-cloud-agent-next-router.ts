@@ -56,6 +56,8 @@ import {
   baseGetSessionNextOutputSchema,
   baseGetEgressAuditNextSchema,
   baseGetEgressAuditNextOutputSchema,
+  baseGetSessionMessagesPageNextSchema,
+  baseGetSessionMessagesPageNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
@@ -75,6 +77,8 @@ import {
   baseCloseTerminalNextOutputSchema,
   baseCreatePreviewNextSchema,
   baseCreatePreviewNextOutputSchema,
+  baseListPreviewServicesNextSchema,
+  baseListPreviewServicesNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from '../cloud-agent-next-schemas';
@@ -220,6 +224,10 @@ const ListChildSessionsInput = baseListChildSessionsNextSchema.extend({
   organizationId: z.uuid(),
 });
 
+const GetSessionMessagesPageInput = baseGetSessionMessagesPageNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
 const GetPendingInteractionsInput = baseGetPendingInteractionsNextSchema.extend({
   organizationId: z.uuid(),
 });
@@ -241,6 +249,10 @@ const CreateTerminalInput = baseCreateTerminalNextSchema.extend({
 });
 
 const CreatePreviewInput = baseCreatePreviewNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const ListPreviewServicesInput = baseListPreviewServicesNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -558,21 +570,14 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         ctx.headersList,
         input.organizationId
       );
-      // Prompt turns carry their own model; command turns run the session's
-      // stored model, so resolve it to apply the same free/BYOK eligibility
-      // to every follow-up that queues a model-using turn. If the worker
-      // can't return the session model, fall back to the balance-checked
-      // client (the safe default) rather than failing the mutation on a
-      // read-side error.
-      let modelId: string | undefined;
-      if (input.payload.type === 'prompt') {
-        modelId = input.payload.model;
-      } else {
+      let modelId = input.payload.model;
+      if (modelId === undefined) {
         try {
           modelId = (
             await createCloudAgentNextClient(authToken).getSession(input.cloudAgentSessionId)
           ).model;
         } catch {
+          // A failed fallback read must not bypass balance checks.
           modelId = undefined;
         }
       }
@@ -783,6 +788,25 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
     }),
 
+  listPreviewServices: organizationMemberProcedure
+    .input(ListPreviewServicesInput)
+    .output(baseListPreviewServicesNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return await createCloudAgentNextClient(authToken).listPreviewServices({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+    }),
+
   refreshTerminalTicket: organizationMemberMutationProcedure
     .input(RefreshTerminalTicketInput)
     .output(baseRefreshTerminalTicketNextOutputSchema)
@@ -916,6 +940,46 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     }),
 
   /**
+   * The capture time of the session's workspace snapshot, or null when the
+   * workspace has none (organization context).
+   */
+  getWorkspaceSnapshotRecovery: organizationMemberProcedure
+    .input(z.object({ sessionId: z.string().min(1), organizationId: z.uuid() }).strict())
+    .output(
+      z.union([z.object({ capturedAt: z.number().int().nonnegative().nullable() }), z.null()])
+    )
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      );
+      return await client.getWorkspaceSnapshotRecovery(input.sessionId);
+    }),
+
+  /**
+   * Remove the session's workspace snapshot on explicit user action
+   * (organization context).
+   */
+  removeWorkspaceSnapshot: organizationMemberMutationProcedure
+    .input(z.object({ sessionId: z.string().min(1), organizationId: z.uuid() }).strict())
+    .output(z.object({ success: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      );
+      return await client.removeWorkspaceSnapshot(input.sessionId);
+    }),
+
+  /**
    * Cancel one queued (not yet accepted) message by id. Never interrupts the
    * active run; a missing id or the accepted current message returns
    * `{ dropped: false }`.
@@ -1033,6 +1097,28 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
    * Get session state from cloud-agent-next DO (organization context).
    * Returns sanitized session info (no secrets).
    */
+  getSessionMessagesPage: organizationMemberProcedure
+    .input(GetSessionMessagesPageInput)
+    .output(baseGetSessionMessagesPageNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return createCloudAgentNextClient(authToken).getSessionMessagesPage({
+        sessionId: input.sessionId,
+        kiloSessionId: input.kiloSessionId,
+        cursor: input.cursor,
+        limit: input.limit,
+      });
+    }),
+
   getSession: organizationMemberProcedure
     .input(GetSessionInput)
     .output(baseGetSessionNextOutputSchema)

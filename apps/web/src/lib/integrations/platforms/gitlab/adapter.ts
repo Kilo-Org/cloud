@@ -469,6 +469,12 @@ export type GitLabProject = {
   archived: boolean;
   marked_for_deletion_on?: string | null;
   marked_for_deletion_at?: string | null;
+  /**
+   * Access the requesting credential holds on the project, as reported by the
+   * instance. The value is provider input with no shape guarantee, so a caller
+   * that reads it validates it before use.
+   */
+  permissions?: unknown;
 };
 
 function isActiveGitLabProject(project: GitLabProject): boolean {
@@ -1853,6 +1859,19 @@ export async function addReactionToMR(
   });
 }
 
+/**
+ * A non-ok HTTP response from the GitLab single-project read. The status is the
+ * only provider detail a caller can act on; the response body is never
+ * included, so a message built from this error cannot leak a token or a
+ * project path.
+ */
+export class GitLabProjectFetchError extends Error {
+  constructor(readonly status: number) {
+    super(`GitLab project fetch failed: ${status}`);
+    this.name = 'GitLabProjectFetchError';
+  }
+}
+
 export async function getGitLabProject(
   accessToken: string,
   projectPath: string,
@@ -1872,7 +1891,7 @@ export async function getGitLabProject(
   if (!response.ok) {
     const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab project fetch failed:', { status: response.status, bodyExcerpt });
-    throw new Error(`GitLab project fetch failed: ${response.status}`);
+    throw new GitLabProjectFetchError(response.status);
   }
 
   return (await response.json()) as GitLabProject;
@@ -2429,13 +2448,17 @@ export async function rotateProjectAccessToken(
  * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
  * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
+ * `signal` carries a caller's deadline, so a settlement that has spent its
+ * budget does not keep one revocation open for the per-request timeout.
+ *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#revoke-a-project-access-token
  */
 export async function revokeProjectAccessToken(
   accessToken: string,
   projectId: string | number,
   tokenId: number,
-  instanceUrl: string = DEFAULT_GITLAB_URL
+  instanceUrl: string = DEFAULT_GITLAB_URL,
+  signal?: AbortSignal
 ): Promise<void> {
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
@@ -2447,6 +2470,7 @@ export async function revokeProjectAccessToken(
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      ...(signal === undefined ? {} : { signal }),
     }
   );
 

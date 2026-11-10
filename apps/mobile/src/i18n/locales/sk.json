@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Ukážka natívneho vzdialeného ovládania",
+    "sessionsEmpty": "Zatiaľ žiadne natívne relácie",
+    "hosts": "Hostitelia online",
+    "hostsEmpty": "Žiadni hostitelia online",
+    "directory": "Pracovný adresár",
+    "createSession": "Vytvoriť natívnu reláciu",
+    "queueIfOffline": "Zaradiť zadanie do poradia, ak je hostiteľ offline",
+    "prompt": "Zadanie alebo /command",
+    "localClear": "Vymazať lokálne zobrazenie",
+    "abort": "Prerušiť ťah",
+    "failed": "Natívna vzdialená akcia zlyhala",
+    "creationUnknown": "Výsledok vytvorenia nie je známy. Pred ďalším pokusom obnovte zoznam relácií.",
+    "commandFailed": "Príkaz pre proces CLI zlyhal",
+    "invalidReply": "Neplatná odpoveď procesu CLI",
+    "unsafeCommand": "Použite /compact, /new, /skill, /models, /agents alebo /clear (iba lokálne).",
+    "status": "Pripojenie: {{connection}} · Proces CLI: {{runner}}",
+    "presenceStatus": "Hostitelia: {{connection}}",
+    "commandStatus": "Doručenie príkazu: {{status}}",
+    "delivered": "Doručené",
+    "expired": "Platnosť vypršala"
+  },
   "common": {
     "cancel": "Zrušiť",
     "done": "Hotovo",
@@ -110,6 +132,7 @@
     "newSession": "Nová relácia",
     "noModelsAvailable": "Žiadne dostupné modely",
     "notFound": "Nenájdené",
+    "online": "Pripojené",
     "open": "Otvoriť {{name}}",
     "openPullRequest": "Otvoriť PR",
     "completed": "Dokončené",
@@ -186,6 +209,7 @@
     "resendCode": "Odoslať kód znova",
     "termsPrefix": "Pokračovaním súhlasíte s našimi ",
     "terms": "Podmienkami",
+    "termsInSentence": "Podmienkami",
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ďalšie možnosti prihlásenia",
@@ -222,6 +246,7 @@
     "confirmDeletion": "Potvrdiť odstránenie",
     "credits": "Kredity",
     "failedToLoadBalance": "Zostatok sa nepodarilo načítať. Klepnutím to skús znova.",
+    "balanceLoadFailed": "Zostatok sa nepodarilo načítať",
     "hideBalance": "Skryť zostatok",
     "showBalance": "Zobraziť zostatok",
     "balanceHidden": "Zostatok je skrytý",
@@ -306,7 +331,6 @@
     "noFilesChangedDescription": "Táto žiadosť o zlúčenie neobsahuje žiadne zmeny súborov.",
     "fileList": {
       "openNavigator": "Otvoriť zoznam súborov",
-      "filesViewed": "Súbory · prezreté: {{viewed}} z {{total}}",
       "listed": "(v zozname)",
       "layout": "Rozloženie",
       "unified": "Spoločné",
@@ -702,10 +726,10 @@
     },
     "connect": {
       "checkFailedTitle": "Pripojenie k službe GitHub sa nepodarilo skontrolovať.",
-      "checkFailedMessage": "Stav prihlásenia bude dostupný až po načítaní údajov.",
+      "checkFailedMessage": "Nepodarilo sa spojiť s GitHubom. Skontroluj pripojenie a skús to znova.",
       "checkFailedTitleGitLab": "Pripojenie k službe GitLab sa nepodarilo skontrolovať.",
       "checkFailedTitleBitbucket": "Pripojenie k službe Bitbucket sa nepodarilo skontrolovať.",
-      "providerCheckFailedMessage": "Stav pripojenia bude dostupný po načítaní.",
+      "providerCheckFailedMessage": "Nepodarilo sa spojiť s poskytovateľom. Skontroluj pripojenie a skús to znova.",
       "reconnectTitle": "Opätovné pripojenie k službe GitHub",
       "reconnectTitleGitLab": "Opätovné pripojenie k službe GitLab",
       "reconnectTitleBitbucket": "Opätovné pripojenie k službe Bitbucket",
@@ -989,6 +1013,9 @@
     },
     "attachmentPicker": {
       "cameraAccessMessage": "Ak chceš fotiť, povoľ v nastaveniach prístup k fotoaparátu."
+    },
+    "botStatus": {
+      "offline": "Odpojený"
     }
   },
   "codeReviewer": {
@@ -1687,6 +1714,7 @@
       "actionFailed": "Túto akciu sa nepodarilo dokončiť. Skúste to znova.",
       "actionBlocked": "Túto akciu sa nepodarilo dokončiť. Problém je potrebné najprv vyriešiť.",
       "syncNoRepositories": "V rozsahu synchronizácie nie sú žiadne repozitáre. Vyberte repozitáre, ktoré Bezpečnostný agent monitoruje, a potom znova synchronizujte.",
+      "syncNoRepositoriesNoManage": "V rozsahu synchronizácie nie sú žiadne repozitáre. Vlastník organizácie, správca alebo správca fakturácie musí pripojiť repozitáre, aby bolo možné synchronizovať.",
       "syncIntegrationInactive": "Pripojenie GitHub pre Bezpečnostného agenta nie je aktívne. Znovu pripojte Kilo GitHub App a potom znova synchronizujte.",
       "syncMissingPermission": "Aplikácia Kilo na GitHube nemôže čítať upozornenia na zraniteľnosti. Udeľte toto povolenie na GitHube a potom znova synchronizujte.",
       "configConflict": "Nastavenia bezpečnostného agenta sa zmenili inde. Skontrolujte najnovšie nastavenia a znova uložte."
@@ -1882,6 +1910,7 @@
       "emptyDescription": "Začni odoslaním správy v poli nižšie.",
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",
+      "emptyReadOnlyTitle": "Žiadne správy v tejto relácii",
       "renameAccessibility": "Premenovať reláciu: {{title}}",
       "cloningSession": "Klonuje sa relácia",
       "couldNotLoadThisSession": "Túto reláciu sa nepodarilo načítať.",
@@ -1981,7 +2010,7 @@
       "selectRepositoryToStart": "Vyberte repozitár, aby ste mohli začať.",
       "enterPromptToStart": "Pridajte prompt, aby ste mohli začať.",
       "enterPromptOrFileToStart": "Pridajte prompt alebo súbor, aby ste mohli začať.",
-      "connectProviderToStart": "Pripojte poskytovateľa, aby ste mohli začať.",
+      "connectProviderToStart": "Repozitáre pochádzajú z pripojeného účtu GitHub, GitLab alebo Bitbucket.",
       "promptPlaceholder": "Na čom chceš pracovať?",
       "couldNotLoadModels": "Modely sa nepodarilo načítať.",
       "prefillRepoAndModelUnavailable": "Repozitár a model pôvodnej relácie už nie sú dostupné. Nižšie vyber nové.",
@@ -2171,6 +2200,8 @@
       "assistantStopped": "Generovanie odpovede sa zastavilo.",
       "assistantContextOverflow": "Konverzácia je pre model príliš dlhá.",
       "assistantProviderError": "Poskytovateľ vrátil chybu.",
+      "assistantProviderRefused": "Poskytovateľ túto požiadavku odmietol a nemožno ju zopakovať.",
+      "assistantCreditsRefusal": "Na spustenie služby Cloud Agent nemáš dosť kreditov.",
       "assistantOutputLimit": "Odpoveď dosiahla limit výstupu modelu.",
       "assistantStructuredOutput": "Odpoveď nezodpovedala požadovanému formátu.",
       "assistantFailed": "Odpoveď sa nepodarilo vytvoriť."
@@ -2203,6 +2234,7 @@
       "preparingEnvironment": "Pripravuje sa prostredie",
       "preparationComplete": "Príprava dokončená",
       "preparationFailed": "Príprava zlyhala",
+      "preparationStageFailed": "Zlyhanie: {{stage}}",
       "setupCommand": "Príkaz na prípravu prostredia {{index}}",
       "setupCommandOf": "Príkaz na prípravu prostredia {{index}} z {{displayCount}}",
       "stepWorkspaceSetup": "Nastavenie pracovného priestoru",
@@ -2241,7 +2273,7 @@
       "detailSetupCommandTimedOut": "Príkazu na prípravu prostredia {{index}} vypršal časový limit",
       "detailColdRestore": "Studené obnovenie, snímka bola použitá, obnovené súbory: {{applied}} z {{total}}",
       "detailProgressPercent": "Dokončené na {{percent}} %",
-      "detailRestoreIncompleteReport": "Obnovenie relácie je neúplné, neobnovené súbory: {{skipped}} z {{total}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "Neobnovené súbory: {{skipped}} z {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Chýba: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} a ďalších {{omitted}}",
       "detailReasonPatchFailed": "záplata sa nepoužila",
@@ -2498,16 +2530,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Veľkosť kontextového okna nie je k dispozícii",
-      "tapToViewDetails": "Klepnutím zobrazíš podrobnosti kontextu.",
-      "costSuffix": ", náklady {{cost}}",
-      "tokensWindowUnavailable": "Kontext: počet tokenov {{used}}, veľkosť okna nie je dostupná",
-      "tokensUsage": "Kontext: {{used}} z {{window}} tokenov, využitie {{percentage}}",
+      "tapToViewDetails": " Klepnutím zobrazíš podrobnosti kontextu.",
+      "costClause": ", náklady {{cost}}",
+      "loadingCostSpoken": "cena {{cost}}.",
+      "tokensWindowUnavailable": "Kontext: počet tokenov {{used}}, veľkosť okna nie je dostupná{{costClause}}.",
+      "tokensUsage": "Kontext: {{used}} z {{window}} tokenov, využitie {{percentage}}{{costClause}}.",
       "title": "Využitie kontextu",
       "used": "Použité",
       "provider": "Poskytovateľ",
       "totalCost": "Celkové náklady",
       "usageReflectsLatest": "Údaje o využití zodpovedajú poslednej dokončenej odpovedi asistenta.",
-      "usageUnavailable": "Využitie kontextu nie je k dispozícii",
+      "usageUnavailable": "Využitie kontextu nie je k dispozícii{{costClause}}.",
       "tokenUsage": "Využitie tokenov",
       "cacheRate": "Podiel využitia vyrovnávacej pamäte",
       "modelsCount": "Modely ({{displayCount}})",
@@ -2594,7 +2627,6 @@
   },
   "addCredits": {
     "cta": "Doplniť kredity",
-    "description": "Doplň kredity, aby si mohol pokračovať v používaní.",
     "billingPage": "stránka fakturácie"
   },
   "deviceSessions": {
@@ -3100,9 +3132,9 @@
       "searching": "Webové vyhľadávanie",
       "thinking": "Premýšľanie"
     },
-    "planOf": "z",
+    "planProgress": "{{done}} z {{total}}",
     "filesChanged": "zmenených súborov",
-    "finishedIn": "Dokončené za",
+    "finishedIn": "Dokončené za {{duration}}",
     "noActivityFor": "Žiadna aktivita už",
     "prOpened": "Pull request otvorený",
     "permissionWants": "Chce spustiť",
@@ -3412,7 +3444,7 @@
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
     },
-    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov. Dopĺňte kredity a skúste to znova."
+    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov."
   },
   "settingsTools": {
     "confirmTitle": "Potvrdiť túto zmenu?"
@@ -3446,8 +3478,8 @@
     "saved": "Nastavenia upozornení na výdavky boli uložené",
     "loadError": "Upozornenia na výdavky sa nepodarilo načítať.",
     "saveError": "Upozornenia na výdavky sa nepodarilo uložiť.",
-    "empty": "Upozornenia na výdavky sú vypnuté. Zapni ich, aby si upozornil fakturačné kontakty tohto rozsahu.",
-    "noSpend": "Zatiaľ nie sú zaznamenané žiadne výdavky",
+    "sendAlerts": "Posielať upozornenia",
+    "noSpend": "Zatiaľ žiadne výdavky",
     "spend24h": "Výdavky za posledných 24 hodín",
     "multiplierError": "Zadaj násobiteľ 1 alebo väčší",
     "permissionDenied": "Nemáš povolenie spravovať upozornenia na výdavky.",
@@ -3873,5 +3905,8 @@
     "noEnabledContexts": "Pre naplánované prehľady nie sú povolené žiadne kontexty",
     "sourceBlocker": "Relácia si vyžaduje pozornosť",
     "sourceMetadata": "Zachytené metadáta relácie"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nepodarilo sa otvoriť tento výsledok vyhľadávania"
   }
 }

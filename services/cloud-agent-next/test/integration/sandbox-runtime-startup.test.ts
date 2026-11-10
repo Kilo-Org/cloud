@@ -43,10 +43,12 @@ const scopedEnv = {
   NATIVE_RUNTIME_IMAGE: 'runtime-free',
 };
 const SCOPED_SANDBOX = `sbx-${'1'.repeat(48)}`;
-const SCOPED_FALLBACK_SANDBOX = `sbx-${'2'.repeat(48)}`;
 const EXCLUDED_SANDBOX = `sbx-${'3'.repeat(48)}`;
 const NON_WEB_SANDBOX = `sbx-${'4'.repeat(48)}`;
 const ABSENT_PLATFORM_SANDBOX = `sbx-${'5'.repeat(48)}`;
+const KILO2_SANDBOX = `sbx-${'6'.repeat(48)}`;
+const LEGACY_KILO2_SANDBOX = `sbx-${'7'.repeat(48)}`;
+const UNLISTED_KILO2_SANDBOX = `sbx-${'8'.repeat(48)}`;
 const descriptor = JSON.stringify({
   format: 1,
   bootstrap: 1,
@@ -66,6 +68,19 @@ const descriptor = JSON.stringify({
     ['control', 'usr/local/bin/wrapper', 0o755, 1, 'b'.repeat(64)],
   ],
 });
+const kilo2Env = {
+  NATIVE_RUNTIME_IMAGE: 'runtime-free',
+  RUNTIME_KILO2_ORG_IDS: TARGET_ORG,
+  RUNTIME_RELEASE_DESCRIPTOR_KILO2: JSON.stringify({
+    ...JSON.parse(descriptor),
+    cliVersion: 'kilo2 v0.0.0-v2-13',
+    cliExecutable: 'package/bin/kilo2',
+    inventory: [
+      ['cli', 'package/bin/kilo2', 0o755, 1, 'a'.repeat(64)],
+      ['control', 'usr/local/bin/wrapper', 0o755, 1, 'b'.repeat(64)],
+    ],
+  }),
+};
 
 it('loads a hash-selected descriptor through a real R2 binding before rendering startup', async () => {
   const bytes = new TextEncoder().encode(descriptor);
@@ -97,9 +112,7 @@ it('loads a hash-selected descriptor through a real R2 binding before rendering 
   }
 });
 
-function fakeProvider(
-  options: { holdFirst?: boolean; holdSecond?: boolean; snapshotFailed?: boolean } = {}
-) {
+function fakeProvider(options: { holdFirst?: boolean; snapshotFailed?: boolean } = {}) {
   const launches: {
     env: Record<string, string>;
     command: ProviderStartupCommand;
@@ -116,7 +129,7 @@ function fakeProvider(
     async launch(_ref, startup, launchOptions) {
       const index = launches.length;
       launches.push({ ...startup, options: launchOptions });
-      if ((index === 0 && options.holdFirst) || (index === 1 && options.holdSecond))
+      if (index === 0 && options.holdFirst)
         await new Promise<void>(resolve => {
           releases[index] = resolve;
         });
@@ -190,10 +203,11 @@ async function setup(
 }
 type PrepareOptions = {
   orgId?: string;
+  billingOrigin?: string;
   createdOnPlatform?: string;
   sandboxKind?: 'isolated' | 'isolated-standard' | 'code-review' | 'shared';
 };
-async function prepare(h: Harness, options: PrepareOptions = {}) {
+async function requestPrepare(h: Harness, options: PrepareOptions = {}) {
   await h.stub.prepare({
     spec: {
       sessionId: SESSION,
@@ -210,6 +224,7 @@ async function prepare(h: Harness, options: PrepareOptions = {}) {
       ...(options.createdOnPlatform === undefined
         ? {}
         : { createdOnPlatform: options.createdOnPlatform }),
+      ...(options.billingOrigin === undefined ? {} : { billingOrigin: options.billingOrigin }),
       repository: { type: 'github', repo: 'acme/widgets' },
       scopeId: SESSION,
     },
@@ -218,6 +233,9 @@ async function prepare(h: Harness, options: PrepareOptions = {}) {
       ...(options.sandboxKind === undefined ? {} : { sandboxKind: options.sandboxKind }),
     },
   });
+}
+async function prepare(h: Harness, options: PrepareOptions = {}) {
+  await requestPrepare(h, options);
   await waitFor(() => expect(h.provider.launches.length > 0).toBe(true));
 }
 async function report(h: Harness, index: number, code: StartupFailureCode) {
@@ -287,26 +305,6 @@ describe('downloaded startup in the allocation owner', () => {
     await release(h, 0);
     expect(h.provider.launches.length).toBe(1);
     expect((await record(h))?.startupMode).toBe('downloaded');
-  });
-  it('rotates the credential before the one baseline image fallback when provider failure wins', async () => {
-    const h = await setup('sbx__runtime_provider_first', {
-      snapshotFailed: true,
-      holdSecond: true,
-    });
-    await prepare(h);
-    await waitFor(() => expect(h.provider.launches.length).toBe(2));
-    expect(h.provider.launches[1]?.options?.snapshot).toBeUndefined();
-    expect(h.provider.launches[0]?.command === h.provider.launches[1]?.command).toBe(true);
-    expect(await report(h, 0, 'artifact_invalid')).toBe(false);
-    expect(await report(h, 1, 'artifact_invalid')).toBe(true);
-    await release(h, 1);
-    await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('stopped'));
-    expect(h.provider.launches.length).toBe(2);
-    expect(
-      h.peer
-        .routeUpdatesFor(SESSION)
-        .some(x => x.state === 'failed' && x.reason === 'runtime_artifact_invalid')
-    ).toBe(true);
   });
   it.each([true, false])(
     'keeps base incompatibility retryable when creating=%s',
@@ -443,20 +441,162 @@ describe('downloaded startup in the allocation owner', () => {
       expect(startup.options?.nativeImage).toBe('runtime-free');
     }
   );
-  it('retains the scoped selection through the snapshot-to-image fallback', async () => {
-    const h = await setup(SCOPED_FALLBACK_SANDBOX, { snapshotFailed: true }, scopedEnv);
-    await prepare(h, {
+  describe('runtime harness', () => {
+    const harnessOf = (h: Harness, index: number) =>
+      h.provider.launches[index]?.command.argv[2]
+        ?.split('\n')
+        .findLast(line => line.startsWith('exec '))
+        ?.match(/KILO_RUNTIME_HARNESS='([a-z0-9]+)'/)?.[1];
+    const isolatedTarget = {
       orgId: TARGET_ORG,
-      createdOnPlatform: 'cloud-agent-web',
+      billingOrigin: 'cloud-agent-web',
       sandboxKind: 'isolated',
+      createdOnPlatform: 'cloud-agent-web',
+    } as const;
+    async function recreate(h: Harness, envChange: Record<string, string>) {
+      await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('starting'));
+      await runInDurableObject(h.stub, instance => {
+        Object.assign(instance.env, envChange);
+      });
+      expect(await report(h, 0, 'base_incompatible')).toBe(true);
+      await waitFor(() => expect(h.provider.launches.length).toBe(2));
+      expect(h.provider.launches[1]?.env.CONTROL_PLANE_ALLOCATION_ID).not.toBe(
+        h.provider.launches[0]?.env.CONTROL_PLANE_ALLOCATION_ID
+      );
+    }
+
+    it('keeps a listed organization sandbox on v2 after the organization leaves the list', async () => {
+      const h = await setup(KILO2_SANDBOX, {}, kilo2Env);
+      await prepare(h, isolatedTarget);
+      expect(harnessOf(h, 0)).toBe('kilo2');
+      await recreate(h, { RUNTIME_KILO2_ORG_IDS: OTHER_ORG });
+      expect(harnessOf(h, 1)).toBe('kilo2');
     });
-    await waitFor(() => expect(h.provider.launches.length).toBe(2));
-    const [first, fallback] = h.provider.launches;
-    expect(first?.options?.nativeImage).toBe('runtime-free');
-    expect(fallback?.options?.nativeImage).toBe('runtime-free');
-    expect(fallback?.options?.snapshot).toBeUndefined();
-    expect(fallback?.command).toEqual(first?.command);
-    expect((await record(h))?.startupMode).toBe('downloaded');
+    it('attributes a v2 run to kilo2 before its wrapper connects', async () => {
+      const h = await setup(KILO2_SANDBOX, {}, kilo2Env);
+      h.provider.adapter.describeRuntime = ref => ({
+        provider: 'cloudflare-containers',
+        sandboxId: KILO2_SANDBOX,
+        instanceId: ref.slice('mem_'.length),
+      });
+      await prepare(h, isolatedTarget);
+      await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('starting'));
+      // A startup failure keeps the container of the last update before the wrapper connects.
+      const container = expect.objectContaining({ runtimeHarness: 'kilo2' });
+      await waitFor(() =>
+        expect(h.peer.routeUpdatesFor(SESSION).at(-1)).toEqual(
+          expect.objectContaining({ state: 'preparing', container })
+        )
+      );
+      expect((await h.stub.status({ sessionId: SESSION })).view).toEqual(
+        expect.objectContaining({ container })
+      );
+    });
+    it.each(['cloud-agent', 'code-review', 'desktop', 'agent-manager', 'slack', undefined])(
+      'starts v1 when a client claims web but the trusted origin is %s',
+      async billingOrigin => {
+        const h = await setup(KILO2_SANDBOX, {}, kilo2Env);
+        await prepare(h, { ...isolatedTarget, billingOrigin });
+        expect(harnessOf(h, 0)).toBe('kilo');
+        await runInDurableObject(h.stub, async (_instance, state) => {
+          expect(await state.storage.get('runtime_harness')).toBe('kilo');
+        });
+      }
+    );
+    it('keeps an unlisted organization sandbox on v1 after the organization joins the list', async () => {
+      const h = await setup(
+        UNLISTED_KILO2_SANDBOX,
+        {},
+        { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: OTHER_ORG }
+      );
+      await prepare(h, isolatedTarget);
+      expect(harnessOf(h, 0)).toBe('kilo');
+      await recreate(h, { RUNTIME_KILO2_ORG_IDS: TARGET_ORG });
+      expect(harnessOf(h, 1)).toBe('kilo');
+    });
+    it('keeps a sandbox that allocated before the harness record on v1', async () => {
+      const h = await setup(LEGACY_KILO2_SANDBOX, {}, kilo2Env);
+      await runInDurableObject(h.stub, (_instance, state) =>
+        state.storage.put('wrapper_credential_hash', 'a'.repeat(64))
+      );
+      await prepare(h, isolatedTarget);
+      expect(harnessOf(h, 0)).toBe('kilo');
+    });
+    it.each([
+      { name: 'missing v2 descriptor', RUNTIME_RELEASE_DESCRIPTOR_KILO2: '' },
+      { name: 'wrong release harness', RUNTIME_RELEASE_DESCRIPTOR_KILO2: descriptor },
+    ])(
+      'does not pin v2 after preflight rejects $name',
+      async ({ RUNTIME_RELEASE_DESCRIPTOR_KILO2 }) => {
+        const h = await setup(KILO2_SANDBOX, {}, { ...kilo2Env, RUNTIME_RELEASE_DESCRIPTOR_KILO2 });
+        await requestPrepare(h, isolatedTarget);
+        await waitFor(() =>
+          expect(h.peer.routeUpdatesFor(SESSION)).toContainEqual(
+            expect.objectContaining({ state: 'failed', reason: 'invalid_configuration' })
+          )
+        );
+        expect(h.provider.calls.create).toBe(0);
+        await runInDurableObject(h.stub, async (instance, state) => {
+          expect(await state.storage.get('runtime_harness')).toBeUndefined();
+          expect(await state.storage.get('wrapper_credential_hash')).toBeUndefined();
+          instance.env.RUNTIME_KILO2_ORG_IDS = '';
+          instance.env.RUNTIME_RELEASE_DESCRIPTOR_KILO2 = '';
+        });
+        await prepare(h, isolatedTarget);
+        expect(harnessOf(h, 0)).toBe('kilo');
+        await runInDurableObject(h.stub, async (_instance, state) => {
+          expect(await state.storage.get('runtime_harness')).toBe('kilo');
+        });
+      }
+    );
+    it('can select v2 after the first v1 attempt fails preflight', async () => {
+      const h = await setup(
+        KILO2_SANDBOX,
+        {},
+        {
+          ...kilo2Env,
+          RUNTIME_KILO2_ORG_IDS: '',
+          RUNTIME_RELEASE_DESCRIPTOR: '',
+        }
+      );
+      await requestPrepare(h, isolatedTarget);
+      await waitFor(() =>
+        expect(h.peer.routeUpdatesFor(SESSION)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'invalid_configuration' })
+        )
+      );
+      expect(h.provider.calls.create).toBe(0);
+      await runInDurableObject(h.stub, instance => {
+        instance.env.RUNTIME_RELEASE_DESCRIPTOR = descriptor;
+        instance.env.RUNTIME_KILO2_ORG_IDS = TARGET_ORG;
+      });
+      await prepare(h, isolatedTarget);
+      expect(harnessOf(h, 0)).toBe('kilo2');
+    });
+    it.each([
+      {
+        name: 'removed v2 release',
+        env: { RUNTIME_KILO2_ORG_IDS: '', RUNTIME_RELEASE_DESCRIPTOR_KILO2: '' },
+        startupMode: 'downloaded',
+      },
+      {
+        name: 'preinstalled mode',
+        env: { RUNTIME_STARTUP_MODE: 'preinstalled', NATIVE_RUNTIME_IMAGE: 'all-in-one' },
+        startupMode: 'preinstalled',
+      },
+      {
+        name: 'narrowed downloaded scope',
+        env: { RUNTIME_INTERACTIVE_ORG_IDS: OTHER_ORG },
+        startupMode: 'preinstalled',
+      },
+    ])('starts a new v1 sandbox after rollback to $name', async rollback => {
+      const h = await setup(KILO2_SANDBOX, {}, { ...kilo2Env, ...rollback.env });
+      await prepare(h, isolatedTarget);
+      await waitFor(async () => expect((await record(h))?.startupMode).toBe(rollback.startupMode));
+      await runInDurableObject(h.stub, async (_instance, state) => {
+        expect(await state.storage.get('runtime_harness')).toBe('kilo');
+      });
+    });
   });
   it('keeps a live allocation mode and deadlines across deployment configuration changes and reconstruction', async () => {
     const h = await setup('sbx__runtime_existing');

@@ -71,6 +71,35 @@ export const EnkryptGuardrailReportSchema = z.object({
 
 export type EnkryptGuardrailReport = z.infer<typeof EnkryptGuardrailReportSchema>;
 
+/**
+ * What the output guardrail did for one response. Holds settings, sizes, timings, and outcomes
+ * only, never response text or Enkrypt's messages. Output scans never use the verdict cache.
+ */
+export const EnkryptOutputGuardrailReportSchema = z.object({
+  settings: GuardrailSettingsSchema,
+  /** Whether a blocking detector held the response back until it was scanned. */
+  held_back: z.boolean(),
+  /** Upstream response bytes read before the decision, or null when not held back. */
+  held_bytes: z.number().nullable(),
+  /** From the guardrail's first read until the upstream response ended, so mostly generation. */
+  held_ms: z.number().nullable(),
+  upstream_read_failed: z.boolean(),
+  /** Length of the scanned response text, or null when the response was not read. */
+  output_characters: z.number().nullable(),
+  /** Why Enkrypt was not asked. A blocking guardrail then withholds the response. */
+  not_scanned_reason: z
+    .enum(['invalid_config', 'output_too_large', 'held_output_too_large'])
+    .nullable(),
+  /** The verdict the response acted on; `skip` when no blocking detector gated it. */
+  verdict: z.enum(['skip', 'allow', 'block', 'unavailable']),
+  unavailable_reason: z.enum(['transient', 'timeout', 'failed']).nullable(),
+  /** How long the held-back response waited for the verdict after the upstream response ended. */
+  added_latency_ms: z.number().nullable(),
+  scans: z.array(EnkryptScanReportSchema),
+});
+
+export type EnkryptOutputGuardrailReport = z.infer<typeof EnkryptOutputGuardrailReportSchema>;
+
 function detectorSettings(
   detectors: EnkryptDetectRequestDetectors,
   blocking: readonly string[]

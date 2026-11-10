@@ -15,6 +15,7 @@ import { SessionDetailContent } from '@/components/agents/session-detail-content
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SessionComposerSkeleton,
+  SessionReadOnlyFooterPlaceholder,
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-skeleton';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
@@ -24,15 +25,14 @@ import { useIdentityConfirmation } from '@/components/agents/user-web-connection
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
-import { NewSessionRoute } from '@/components/agents/new-session-route';
 import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
-import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
-import { isPlausibleKiloSessionId } from '@/lib/session-id-shape';
+import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
+import { isAddressableStoredSessionId } from '@/lib/session-id-shape';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
 import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
@@ -196,14 +196,17 @@ export default function SessionDetailScreen() {
         owner.generation,
         owner.userId,
       ]),
-      // A param that cannot be a real session id never starts a metadata read:
-      // the composer fallback below renders instead, so the doomed id can never
-      // fire the read even when the route was opened without an organization.
+      // A param the store cannot address as a session id never starts a
+      // metadata read: the permanent not-found state below renders instead, so
+      // a malformed param cannot fire the read even when the route was opened
+      // without an organization. The rule accepts every id shape the store can
+      // hold, not only the canonical one, because an older stored session is
+      // addressed by the id it was created with.
       enabled:
         isAuthenticatedOwner(owner) &&
         routeOrganizationId === undefined &&
         sessionId !== null &&
-        isPlausibleKiloSessionId(sessionId),
+        isAddressableStoredSessionId(sessionId),
     }
     // The route renders the session's own subtree; no suspense boundary.
   );
@@ -245,25 +248,29 @@ export default function SessionDetailScreen() {
     return <InvalidRouteState backTo={'/(app)' as Href} />;
   }
 
-  if (!isPlausibleKiloSessionId(sessionId)) {
-    // The param can only be a real Kilo session id when it matches the
-    // server-side shape (`ses_` + 26 chars, `sessionIdSchema`); a malformed or
-    // hand-built deep link can deliver a segment that can never resolve to a
-    // session (an all-zeros UUID was observed in the wild), and mounting it
-    // here would land on the permanent "Not found" screen. Such an id renders
-    // the New-session screen instead — the composer the user asked for — with
-    // the route's organization context carried through, exactly as
-    // `agent-chat/new` renders it: the same component, so the composer waits
-    // for the account scope there too.
-    return <NewSessionRoute />;
-  }
+  // A param outside every id shape the store can address can never resolve, so
+  // it takes the permanent not-found state below without starting a read or a
+  // skeleton. This is only reachable from a hand-built destination: a link that
+  // names a session is filtered before it is followed
+  // (`deep-link-destination.ts`), and a stored row always carries an id the
+  // store issued.
+  const addressable = isAddressableStoredSessionId(sessionId);
+
+  // The remote-spawn params mark the opens the spawn itself created for a
+  // writer (`kilo remote`, and the clone onto its live CLI). Every other open
+  // here has no metadata row yet (this window implies `sessionQuery` has no
+  // data) and no resolved kind, so its bottom slot reserves the read-only
+  // footer's shape — the bar and the continue control a stored session ends in
+  // — rather than painting a composer the session may not get.
+  const isPendingWritable = spawned === '1' || cloned === '1';
 
   if (
     !identityFailed &&
+    addressable &&
     (identityPending ||
       (metadataPhase === 'loading' && displayedProviderKey.current !== providerKey))
   ) {
-    // The composer placeholder holds its own height: nothing may shift when
+    // The bottom placeholder holds its own height: nothing may shift when
     // the query resolves. Route title hints are not bound to an account.
     // The loading header reserves the loaded header's context pill (the loaded
     // right cluster is that pill plus an optional PR badge) so the swap cannot
@@ -292,7 +299,7 @@ export default function SessionDetailScreen() {
           className="pb-1"
         />
         <SessionSkeletonMessages sessionId={sessionId} />
-        <SessionComposerSkeleton />
+        {isPendingWritable ? <SessionComposerSkeleton /> : <SessionReadOnlyFooterPlaceholder />}
       </View>
     );
   }
@@ -320,16 +327,26 @@ export default function SessionDetailScreen() {
   // background-refetch denial never blanks a rendered session.
   if (
     identityFailed ||
+    !addressable ||
     (routeOrganizationId === undefined &&
       sessionQuery.isError &&
       metadataAccessDenied &&
       sessionRendered.current !== rawSessionId)
   ) {
     // An identity failure stays retriable. An authoritative metadata denial
-    // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) can't be recovered by retrying, so
-    // it shows a permanent state with no Retry. Both get Back and Copy.
+    // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) and an id the store cannot address
+    // can't be recovered by retrying, so they show a permanent state with no
+    // Retry. All of them get Back and Copy.
     displayedProviderKey.current = null;
-    const errorCode = identityFailed ? undefined : sessionQuery.error?.data?.code;
+    // An identity failure owns its own copy. An id the store cannot address
+    // never reached a read, so it answers the same denial a missing session
+    // does.
+    let errorCode = sessionQuery.error?.data?.code;
+    if (identityFailed) {
+      errorCode = undefined;
+    } else if (!addressable) {
+      errorCode = 'NOT_FOUND';
+    }
     const notFound = errorCode === 'NOT_FOUND';
     const unauthorized = errorCode === 'UNAUTHORIZED' || errorCode === 'FORBIDDEN';
     let title = t(
@@ -390,7 +407,7 @@ export default function SessionDetailScreen() {
                   // POP_TO reuses the `(tabs)` route under this screen and
                   // truncates every `agent-chat` route above it, so a composer
                   // still on the stack under a missing session is gone with it.
-                  router.dismissTo(AGENTS_SESSIONS_HREF);
+                  router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
                 }}
               >
                 <Text>{t('agentChat.session.backToSessions')}</Text>

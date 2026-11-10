@@ -82,10 +82,10 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
   mistral: 'Mistral AI',
   moonshotai: 'Moonshot AI',
   nebius: 'Nebius Token Factory',
-  novita: 'Novita',
+  novita: 'Novita AI',
   perplexity: 'Perplexity',
   vertex: 'Google Vertex AI',
-  xai: 'SpaceXAI',
+  xai: 'SpaceXSI',
   xiaomi: 'Xiaomi (pay as you go)',
   zai: 'Z.ai (pay as you go)',
 } satisfies Record<VercelUserByokInferenceProviderId, string>;
@@ -639,7 +639,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     );
     setPendingFocus({ keyId: movedId, index: target, direction });
     reorderMutation.mutate(
-      { keyIds: reordered },
+      { ...listQueryInput, keyIds: reordered },
       {
         // The rollback can disable the focused button, so focus follows the key back.
         onError: () =>
@@ -709,8 +709,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   // it never appears here with edit, toggle, test or delete controls.
   const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
   const listedKeyIds = listedKeys?.map(key => key.id) ?? [];
-  // Organization keys keep their default order; only personal keys can be prioritized.
-  const canReorder = !organizationId && listedKeyIds.length > 1;
+  const canReorder = listedKeyIds.length > 1;
 
   // A key in catalog mode serves catalog ids instead of the provider's prefixed ids.
   const getProviderModels = (providerId: string, serveCatalogModels = false): string[] => {
@@ -745,6 +744,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
               serve its model, skipping disabled keys and keys whose provider does not offer it. A
               connected ChatGPT subscription serves eligible OpenAI requests first, unless a key
               using Kilo catalog model IDs is ranked above the key that would otherwise serve.
+              {organizationId ? ' This key order applies to all organization members.' : ''}
             </p>
           ) : null}
           <div aria-live="polite" className="sr-only">

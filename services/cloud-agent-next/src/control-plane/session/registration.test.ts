@@ -387,7 +387,7 @@ describe('migrated origin permissions', () => {
         webfetch: 'deny',
         websearch: 'deny',
         codesearch: 'deny',
-        bash: { git: 'allow' },
+        bash: { git: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny' },
       });
       expect(spec.permission?.bash).toMatchObject(
         createdOnPlatform === 'security-remediation'

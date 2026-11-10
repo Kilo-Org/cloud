@@ -35,7 +35,69 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # dorny/paths-filter has no built-in retry: one dropped connection to
+      # api.github.com ("other side closed" while listing the PR's changed
+      # files) fails the step and, with it, every check that needs this job.
+      # The first attempt is allowed to fail so the retry below absorbs
+      # transient resets; a persistent failure still fails the job.
+      - name: Detect resource-manifest changes
+        id: filter_resources
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            resources:
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+      - name: Detect resource-manifest changes (retry)
+        id: filter_resources_retry
+        if: steps.filter_resources.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            resources:
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+
+      # dorny/paths-filter answers from the pull request's own diff (its
+      # merge-base), while scripts/affected-workspaces.mjs diffs the base tip.
+      # On a branch that is behind main the two disagree about a manifest main
+      # changed after the branch point: only the detector's diff names it, and
+      # its run then calls scripts/changed-dependencies.mjs, which imports
+      # js-yaml. This check diffs the detector's own base for that run. The
+      # manifest list comes from the detector, so the set stays in one place.
+      - name: Detect resource-manifest changes against the detector base
+        id: resources_base
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
+        run: |
+          manifests=$(node -e 'import("./scripts/affected-workspaces.mjs").then(module => console.log([...module.DEPENDENCY_MANIFESTS].join("\n")))' 2>/dev/null || true)
+          if [ -z "$manifests" ]; then
+            # An unreadable detector list cannot prove the diff is clean, so
+            # keep the install rather than risk a run without js-yaml.
+            echo "manifests=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          manifests_changed=false
+          # A base that is not a commit in the checkout selects every
+          # workspace, and that selection parses no manifest.
+          if [ -n "$BASE_SHA" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            while IFS= read -r file; do
+              if grep -qxF "$file" <<< "$manifests"; then
+                manifests_changed=true
+                break
+              fi
+            done < <(git diff --name-only "$BASE_SHA" HEAD)
+          fi
+          echo "manifests=$manifests_changed" >> "$GITHUB_OUTPUT"
+
+      # The detection steps in this job read the repository, not node_modules:
+      # only scripts/changed-dependencies.mjs imports a package (js-yaml), and
+      # the detector calls it only for a resource manifest. A skip without
+      # js-yaml fails the detector, and scripts/changed-workspaces.sh then
+      # selects every workspace with tests, so a wrong skip cannot drop a check.
       - name: Install root dependencies
+        if: steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true' || steps.resources_base.outputs.manifests == 'true'
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Detect explicit changes

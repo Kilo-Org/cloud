@@ -21,7 +21,13 @@ import { load } from 'js-yaml';
 import { DEPENDENCY_MANIFESTS } from './affected-workspaces.mjs';
 
 const workflows = Object.fromEntries(
-  ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
+  [
+    'ci.yml',
+    'extension-ci.yml',
+    'kilo-app-ci.yml',
+    'mobile-native-build.yml',
+    'explorer-ios-release.yml',
+  ].map(file => [
     file,
     load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')),
   ])
@@ -1174,6 +1180,91 @@ test('the changes job installs the root project only for a resource manifest', (
   assert.ok(
     steps.indexOf(install) > steps.indexOf(local),
     'the install reads an answer the check wrote'
+  );
+});
+
+// The extension changes job is the serialized prelude of every extension CI
+// run: `verify`, `build-firefox` and `e2e-chrome` all need it, so an install it
+// does not need costs every run. It reads the repository for the same reason as
+// the ci.yml job above, over the same detector set, so it carries the same gate
+// and the two expressions must stay one gate rather than diverge.
+test('the extension changes job installs the root project only for a resource manifest', () => {
+  const steps = workflows['extension-ci.yml'].jobs.changes.steps;
+  const filter = steps.find(step => step.id === 'filter_resources');
+  const retry = steps.find(step => step.id === 'filter_resources_retry');
+  assert.ok(filter, 'extension-ci changes: the resource-manifest filter is missing');
+  assert.ok(retry, 'extension-ci changes: the resource-manifest filter retry is missing');
+  for (const step of [filter, retry]) {
+    assert.deepEqual(
+      load(step.with.filters).resources,
+      [...DEPENDENCY_MANIFESTS],
+      'the filter matches the detector set exactly'
+    );
+  }
+  assert.equal(
+    filter['continue-on-error'],
+    true,
+    'the first attempt tolerates a transient failure'
+  );
+  assert.equal(
+    retry.if,
+    "steps.filter_resources.outcome == 'failure'",
+    'the retry runs only after a failed first attempt'
+  );
+  assert.equal(
+    retry.with.filters,
+    filter.with.filters,
+    'the retry evaluates the same paths as the attempt it replaces'
+  );
+  assert.equal(
+    retry['continue-on-error'],
+    undefined,
+    'a persistent filter failure fails the job instead of installing nothing'
+  );
+
+  const base = steps.find(step => step.id === 'resources_base');
+  assert.ok(base, 'extension-ci changes: the detector-base manifest check is missing');
+  const ciBase = ciJobs.changes.steps.find(step => step.id === 'resources_base');
+  assert.equal(
+    base.env.BASE_SHA,
+    ciBase.env.BASE_SHA,
+    'both changes jobs diff the base their detector diffs'
+  );
+  assert.match(base.run, /DEPENDENCY_MANIFESTS/);
+  assert.doesNotMatch(
+    base.run,
+    /pnpm-(lock|workspace)\.yaml/,
+    'the manifest set stays in scripts/affected-workspaces.mjs'
+  );
+  assert.match(
+    base.run,
+    /if \[ -z "\$manifests" \]; then[\s\S]*echo "manifests=true"/,
+    'an unreadable detector list keeps the install instead of risking a detector without js-yaml'
+  );
+
+  const install = steps.find(step => step.name === 'Install root dependencies');
+  assert.equal(
+    install.run,
+    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts',
+    'the gate removes the install from the run, never changes what it installs'
+  );
+  assert.equal(
+    install.if,
+    ciJobs.changes.steps.find(step => step.name === 'Install root dependencies').if,
+    'the extension and the shared changes job gate the install on the same answers'
+  );
+  assert.ok(
+    steps.indexOf(install) > steps.indexOf(retry) && steps.indexOf(install) > steps.indexOf(base),
+    'the install reads answers both detections already wrote'
+  );
+  assert.ok(
+    steps.indexOf(install) < steps.indexOf(steps.find(step => step.id === 'workspaces')),
+    'the detector that may need js-yaml runs after the install it can ask for'
+  );
+  assert.equal(
+    workflows['extension-ci.yml'].jobs.changes.outputs.extension,
+    "${{ steps.filter.outputs.extension == 'true' || steps.workspaces.outputs.extension == 'true' }}",
+    'the gate leaves the job output that the three downstream jobs read'
   );
 });
 

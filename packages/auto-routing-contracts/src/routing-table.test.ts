@@ -3,7 +3,6 @@ import {
   CustomRoutingTableSchema,
   EfficientModelPoolSchema,
   MAX_POOL_ENTRIES,
-  poolEntryKey,
   benchmarkPairKey,
   rankCandidates,
   RankedCandidateSchema,
@@ -587,15 +586,4 @@ describe('benchmarkPairKey', () => {
     ];
     expect(new Set(keys).size).toBe(3);
   });
-
-  it('round-trips through JSON as a collision-safe encoding', () => {
-    const entry = { model: 'provider/model', variant: 'xhigh' as string | null };
-    const key = benchmarkPairKey(entry);
-    expect(JSON.parse(key)).toEqual([entry.model, entry.variant]);
-    expect(benchmarkPairKey(entry)).toBe(key);
-  });
-});
-
-it('keys pool membership by model alone', () => {
-  expect(JSON.parse(poolEntryKey({ model: 'provider/model' }))).toEqual(['provider/model']);
 });

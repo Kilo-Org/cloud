@@ -17,7 +17,6 @@ import {
   getResolvedLanguage,
   type LanguagePreference,
 } from '@/lib/hooks/use-language-preference';
-import { scopeToFocusedRoute } from '@/lib/design-gate/route-scope';
 import { createSampler } from '@/lib/design-gate/sampler';
 
 /**
@@ -107,19 +106,10 @@ export function createDesignGateApi(source: ProbeSource): DesignGateApi {
   };
   const snapshot = (): ProbeDump => {
     const document = source.document();
-    const env = environment(source);
-    if (document === null) {
-      return { version: 1, env, nodes: [] };
-    }
-    // The focused route's own tree only: a mounted background tab is painted
-    // behind this screen and keeps re-laying itself out, which would decide the
-    // cell's settle and layout findings for a surface nobody sees.
-    const segments = env.screen.split('/');
-    const focusedRoute = segments.findLast(segment => segment !== '') ?? null;
     return {
       version: 1,
-      env,
-      nodes: scopeToFocusedRoute(collect(document), focusedRoute),
+      env: environment(source),
+      nodes: document === null ? [] : collect(document),
     };
   };
   const sampler = createSampler(snapshot);

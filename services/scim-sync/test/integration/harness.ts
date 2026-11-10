@@ -20,6 +20,12 @@ export type RecordedCall = {
   body: unknown;
   apiKey: string | null;
   /**
+   * `x-vercel-protection-bypass`, or null when the call omitted it. Staging's
+   * origin sits behind Vercel Deployment Protection and production's does
+   * not, so whether this header is present is itself behaviour.
+   */
+  protectionBypass: string | null;
+  /**
    * The redirect mode the caller asked for; `'follow'` when it asked for
    * nothing, which is the platform default. Recorded because following a
    * redirect would hand `x-internal-api-key` to the redirect's origin.
@@ -141,6 +147,7 @@ export function harness(options: {
       path: url.pathname,
       body,
       apiKey: headers.get('x-internal-api-key'),
+      protectionBypass: headers.get('x-vercel-protection-bypass'),
       redirect,
     };
     calls.push(call);
@@ -175,6 +182,7 @@ export function harness(options: {
         path: `${followed.host}${followed.pathname}`,
         body,
         apiKey: headers.get('x-internal-api-key'),
+        protectionBypass: headers.get('x-vercel-protection-bypass'),
         redirect,
       });
       return Response.json(reply.body);
@@ -276,15 +284,21 @@ export function directoryEvent(
 }
 
 /**
- * An activation the SDK deserializes with `domains` absent, which is what the
- * Events API sends for a directory with none: the SDK copies the field through
- * without defaulting it, so the dispatcher's `data.domains.map(...)` throws a
- * `TypeError` rather than failing a schema check.
+ * An activation for a directory that has no domains.
  */
 export function activationWithoutDomains(id: string): unknown {
   const event = directoryEvent(id) as { data: Record<string, unknown> };
   const { domains: _dropped, ...data } = event.data;
   return { ...event, data };
+}
+
+/**
+ * An activation for tests that need a payload the dispatcher cannot build a
+ * request from.
+ */
+export function activationWithNonListDomains(id: string): unknown {
+  const event = directoryEvent(id) as { data: Record<string, unknown> };
+  return { ...event, data: { ...event.data, domains: { domain: 'acme.test' } } };
 }
 
 export function groupEvent(id: string, event = 'dsync.group.created'): unknown {

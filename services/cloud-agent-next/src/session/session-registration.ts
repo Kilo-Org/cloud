@@ -312,6 +312,7 @@ type SessionCreationLedgerHooks = {
 export type LedgerSessionCreateResult = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
+  worktreeId?: CloudAgentWorktreeId;
   messageId?: string;
   delivery?: 'sent' | 'queued';
   replayed?: boolean;
@@ -561,6 +562,22 @@ function deriveCanonicalRepositoryUrl(repository: SessionRepositoryRequest): str
 }
 
 /**
+ * Stacked-workspace fields written on the worktree's first session-ingest
+ * ownership row. Later rows for the same worktree never overwrite them.
+ */
+function stackedOwnershipFields(
+  input: SessionRegistrationInput
+): Pick<CreateSessionForCloudAgentParams, 'parentWorktreeId' | 'baseBranch' | 'baseSha'> {
+  return {
+    ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
+    ...(input.repository?.baseBranch === undefined
+      ? {}
+      : { baseBranch: input.repository.baseBranch }),
+    ...(input.repository?.baseSha === undefined ? {} : { baseSha: input.repository.baseSha }),
+  };
+}
+
+/**
  * The one complete Session Ingest ownership request for a create. Fresh
  * allocation and both resume windows call this so every window sends the same
  * fields (clone source, title, organization, platform, git URL, resolved
@@ -589,6 +606,7 @@ function ownershipRequestForCreate(
     createdOnPlatform: input.options?.createdOnPlatform ?? 'cloud-agent',
     title: input.ownershipTitle ?? `New session - ${new Date().toISOString()}`,
     gitUrl: deriveCanonicalRepositoryUrl(input.repository),
+    ...stackedOwnershipFields(input),
     profileId: input.profile?.resolvedProfileId,
     // Always present (undefined when there is no clone), matching the previous
     // ingest request shape.
@@ -1415,6 +1433,7 @@ function buildSessionRegistrationCommand(
       isPolicyBearingAuthToken(ctx.authToken) &&
       ctx.botId === undefined,
     parentCloudAgentSessionId: input.parentCloudAgentSessionId,
+    ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
     identity: {
       sessionId: allocation.cloudAgentSessionId,
       userId: ctx.userId,
@@ -1720,6 +1739,7 @@ async function registerAndAdmitInitialTurn(
   const result: StartedSessionResult = {
     cloudAgentSessionId: allocation.cloudAgentSessionId,
     kiloSessionId: allocation.kiloSessionId,
+    ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
     sandboxId: allocation.sandboxId,
     sandboxProvider: allocation.sandboxProvider,
     ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
@@ -2045,6 +2065,7 @@ export async function sessionCreateIntentFingerprint(
   return sha256Hex(
     canonicalJson({
       parentCloudAgentSessionId: input.parentCloudAgentSessionId,
+      ...stackedOwnershipFields(input),
       initialTurn,
       // Undefined for creates without a proposed ID, so their fingerprint is unchanged.
       kiloSessionId: input.options?.kiloSessionId,
@@ -2374,15 +2395,24 @@ async function replaySettledCreate(
 /** Canonical session IDs recorded by the create's progress write, when present. */
 function canonicalSessionIds(
   row: OperationLedgerRow
-): { cloudAgentSessionId: string; kiloSessionId: string } | undefined {
+):
+  | Pick<LedgerSessionCreateResult, 'cloudAgentSessionId' | 'kiloSessionId' | 'worktreeId'>
+  | undefined {
   const canonical = row.canonical_result ?? {};
-  return typeof canonical.cloudAgentSessionId === 'string' &&
-    typeof canonical.kiloSessionId === 'string'
-    ? {
-        cloudAgentSessionId: canonical.cloudAgentSessionId,
-        kiloSessionId: canonical.kiloSessionId,
-      }
+  if (
+    typeof canonical.cloudAgentSessionId !== 'string' ||
+    typeof canonical.kiloSessionId !== 'string'
+  ) {
+    return undefined;
+  }
+  const worktreeId = isControlSession(canonical.cloudAgentSessionId)
+    ? recordedChildWorktreeId(row, canonical.cloudAgentSessionId)
     : undefined;
+  return {
+    cloudAgentSessionId: canonical.cloudAgentSessionId,
+    kiloSessionId: canonical.kiloSessionId,
+    ...(worktreeId === undefined ? {} : { worktreeId }),
+  };
 }
 
 function canonicalInitialMessage(
@@ -2485,6 +2515,7 @@ async function executeLedgerCreate(
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,
+    ...(result.worktreeId === undefined ? {} : { worktreeId: result.worktreeId }),
     ...(options.includeInitialMessage
       ? {
           messageId: result.admission.messageId,
@@ -2709,6 +2740,7 @@ async function resumeAllocatedSession(
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,
+    ...(result.worktreeId === undefined ? {} : { worktreeId: result.worktreeId }),
     ...(options.includeInitialMessage
       ? {
           messageId: result.admission.messageId,

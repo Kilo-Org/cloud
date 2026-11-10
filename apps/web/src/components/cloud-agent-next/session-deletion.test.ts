@@ -158,6 +158,7 @@ function makeSession(session_id: string): ApiSession {
     parent_session_id: null,
     created_at: '2026-08-26T12:00:00.000Z',
     updated_at: '2026-08-26T12:00:00.000Z',
+    last_activity_at: '2026-08-26T12:00:00.000Z',
     version: 2,
     status: 'busy',
     status_updated_at: null,
@@ -200,7 +201,6 @@ function createFixture() {
   });
   const worktreeParentKey = [[...parentKey[0], 'owner'], parentKey[1]];
   const sessions = ['ses_a', 'ses_b', 'ses_c'].map(makeSession);
-  const persisted = new Set(sessions.map(session => session.session_id));
   const seedSessions = (rows: ApiSession[]) => {
     store.set(dbSessionsAtom, rows.map(apiSessionToDbSession));
     for (const key of listKeys) {
@@ -226,6 +226,13 @@ function createFixture() {
       'worktree_12345678-1234-4234-9234-123456789abc': {
         name: null,
         defaultTitle: sessions[0].title,
+        branch: null,
+        folderId: null,
+        sidebarPosition: null,
+        parentWorktreeId: null,
+        baseBranch: null,
+        baseSha: null,
+        createdAt: '2026-08-26T12:00:00.000Z',
         prSession: null,
         sessions: sessions.map(session => ({
           sessionId: session.session_id,
@@ -250,15 +257,11 @@ function createFixture() {
     queryClient,
     trpc,
     setDbSessions: update => store.set(dbSessionsAtom, update),
-    deleteSessionFromStore: async sessionId => {
-      persisted.delete(sessionId);
-    },
   } satisfies Omit<Parameters<typeof removeDeletedSession>[0], 'sessionId'>;
   return {
     context,
     store,
     sessions,
-    persisted,
     listKeys,
     searchKeys,
     activeKey,
@@ -357,24 +360,13 @@ describe('session deletion conflicts', () => {
 });
 
 describe('session deletion', () => {
-  it('removes confirmed rows from all caches before persistence finishes, preserving metadata and unrelated data', async () => {
-    const { context, persisted, listKeys, searchKeys } = fixture;
-    const persistence = Promise.withResolvers<void>();
-    const started = Promise.withResolvers<void>();
+  it('removes confirmed rows from all caches, preserving metadata and unrelated data', async () => {
+    const { context, listKeys, searchKeys } = fixture;
     const unrelated = context.queryClient.getQueryData(['unrelated']);
-    const deletion = removeDeletedSession({
-      ...context,
-      sessionId: 'ses_a',
-      deleteSessionFromStore: async sessionId => {
-        started.resolve();
-        await persistence.promise;
-        persisted.delete(sessionId);
-      },
-    });
-    await started.promise;
+
+    await removeDeletedSession({ ...context, sessionId: 'ses_a' });
 
     expectCachedSessions(['ses_b', 'ses_c']);
-    expect(persisted.has('ses_a')).toBe(true);
     for (const key of listKeys) {
       expect(context.queryClient.getQueryData(key)?.nextCursor).toBe('next-page');
     }
@@ -386,19 +378,14 @@ describe('session deletion', () => {
       });
     }
     expect(context.queryClient.getQueryData(['unrelated'])).toBe(unrelated);
-
-    persistence.resolve();
-    await deletion;
-    expect([...persisted]).toEqual(['ses_b', 'ses_c']);
   });
 
   it('removes every returned deleted id', async () => {
-    const { context, persisted } = fixture;
+    const { context } = fixture;
 
     await removeDeletedSessions({ ...context, sessionIds: ['ses_a', 'ses_c'] });
 
     expectCachedSessions(['ses_b']);
-    expect([...persisted]).toEqual(['ses_b']);
   });
 
   it('cancels stale list, search and active-session responses so they cannot restore a deleted row', async () => {
@@ -428,7 +415,7 @@ describe('session deletion', () => {
   });
 
   it('keeps overlapping deletions independent without losing newer rows or live updates', async () => {
-    const { context, sessions, seedSessions, store, persisted } = fixture;
+    const { context, sessions, seedSessions, store } = fixture;
     const deletions = Promise.all(
       ['ses_a', 'ses_b'].map(sessionId => removeDeletedSession({ ...context, sessionId }))
     );
@@ -442,7 +429,6 @@ describe('session deletion', () => {
 
     expectCachedSessions(['ses_c', 'ses_new']);
     expect(store.get(dbSessionsAtom)[0].title).toBe('New live title');
-    expect([...persisted]).toEqual(['ses_c']);
   });
 
   it('reconciles queries without rolling back current data or another successful deletion', async () => {
@@ -483,22 +469,6 @@ describe('session deletion', () => {
       expect(context.queryClient.getQueryState(key)?.isInvalidated).toBe(true);
     });
     expect(context.queryClient.getQueryState(['unrelated'])?.isInvalidated).toBe(false);
-  });
-
-  it('does not undo a confirmed deletion when local persistence fails', async () => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    await expect(
-      removeDeletedSession({
-        ...fixture.context,
-        sessionId: 'ses_a',
-        deleteSessionFromStore: async () => {
-          throw new Error('IndexedDB unavailable');
-        },
-      })
-    ).resolves.toBeUndefined();
-
-    expectCachedSessions(['ses_b', 'ses_c']);
-    expect(fixture.persisted.has('ses_a')).toBe(true);
   });
 });
 

@@ -263,7 +263,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     selectedOrgId == null ? (
       <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
         <AddCreditsButton
-          className="h-auto min-h-11 max-w-full py-2"
+          className="h-auto max-w-full py-2"
           onPress={() => {
             router.push('/(app)/credits' as Href);
           }}

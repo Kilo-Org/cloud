@@ -18,10 +18,16 @@ import { fileURLToPath } from 'node:url';
 
 import { load } from 'js-yaml';
 
-import { DEPENDENCY_MANIFESTS } from './affected-workspaces.mjs';
+import { DEPENDENCY_INPUTS } from './affected-workspaces.mjs';
 
 const workflows = Object.fromEntries(
-  ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
+  [
+    'ci.yml',
+    'extension-ci.yml',
+    'kilo-app-ci.yml',
+    'mobile-native-build.yml',
+    'explorer-ios-release.yml',
+  ].map(file => [
     file,
     load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')),
   ])
@@ -50,6 +56,89 @@ const kiloAppJobs = workflows['kilo-app-ci.yml'].jobs;
 const pnpmCleanup = fileURLToPath(
   new URL('../.github/actions/pnpm-store/cleanup/cleanup.cjs', import.meta.url)
 );
+
+// A required status check matches by context name and app, so two workflows
+// publishing one required name let either workflow's pass satisfy the ruleset.
+// The main-tests ruleset (12440145) requires these contexts. The mobile three
+// are required as well because ci.yml excludes apps/mobile from its lint and
+// workspace-test rows: without them a mobile-only PR could pass the ruleset on
+// skipped ci.yml rows. The mobile workflow mirrors work ci.yml also runs, so
+// those jobs carry a `mobile-` prefix and only the mobile workflow publishes
+// them. `i18n-leftover` and `check-unused` have no other publisher, so a rename
+// there would leave a required check unreported.
+const requiredContexts = [
+  'test',
+  'build',
+  'typecheck',
+  'format-check',
+  'catalog (PR)',
+  'i18n-leftover',
+  'check-unused',
+  'lint',
+  'mobile-typecheck',
+  'mobile-lint',
+  'mobile-test-result',
+];
+
+function publishingJobs(workflow) {
+  return Object.entries(workflow.jobs ?? {}).map(([id, job]) => ({
+    id,
+    name: typeof job?.name === 'string' ? job.name : id,
+  }));
+}
+
+test('each required check name is published by exactly one pull-request workflow', () => {
+  const directory = new URL('../.github/workflows/', import.meta.url);
+  const publishers = new Map(requiredContexts.map(name => [name, []]));
+  for (const file of readdirSync(directory)
+    .filter(name => /\.ya?ml$/.test(name))
+    .sort()) {
+    const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
+    const triggers = workflow.on ?? {};
+    // A workflow without these triggers never reports a check on a PR or a
+    // merge-queue entry, so its job names cannot satisfy the ruleset there.
+    if (!('pull_request' in triggers) && !('merge_group' in triggers)) continue;
+    for (const { id, name } of publishingJobs(workflow)) {
+      publishers.get(name)?.push(`${file}:${id}`);
+    }
+  }
+  for (const [name, found] of publishers) {
+    assert.equal(
+      found.length,
+      1,
+      `required context ${name} must have one publisher, found ${found.join(', ') || 'none'}`
+    );
+  }
+  // The names ci.yml owns are the ones the mobile workflow used to duplicate.
+  assert.equal(publishers.get('test')[0], 'ci.yml:test');
+  assert.equal(publishers.get('typecheck')[0], 'ci.yml:typecheck');
+  assert.equal(publishers.get('lint')[0], 'ci.yml:lint');
+  // A required context whose name is prefixed must come from the mobile
+  // workflow: no other workflow may publish one.
+  for (const [name, found] of publishers) {
+    if (name.startsWith('mobile-')) {
+      assert.deepEqual(
+        found,
+        [`kilo-app-ci.yml:${name}`],
+        `${name} belongs to the mobile workflow`
+      );
+    }
+  }
+  // These two required contexts exist only in the mobile workflow, so they keep
+  // their unprefixed names and must not move to ci.yml or another workflow.
+  assert.deepEqual(publishers.get('i18n-leftover'), ['kilo-app-ci.yml:i18n-leftover']);
+  assert.deepEqual(publishers.get('check-unused'), ['kilo-app-ci.yml:check-unused']);
+});
+
+test('the mobile workflow publishes no colliding required check name', () => {
+  const ids = Object.keys(workflows['kilo-app-ci.yml'].jobs);
+  for (const name of ['mobile-typecheck', 'mobile-lint', 'mobile-test-result']) {
+    assert.ok(ids.includes(name), `the mobile workflow publishes ${name}`);
+  }
+  for (const name of ['typecheck', 'lint', 'test']) {
+    assert.ok(!ids.includes(name), `the mobile workflow must not publish ${name}`);
+  }
+});
 
 test('dependency cache keeps only the content store on the mounted filesystem', t => {
   const action = load(
@@ -251,7 +340,11 @@ test('every Chromium install skips apt and restores the browser cache first', ()
   }
   assert.deepEqual(
     installs,
-    ['ci.yml:mobile-diagram-host', 'extension-ci.yml:e2e-chrome', 'setup-smoke.yml:setup-smoke'],
+    [
+      'ci.yml:mobile-diagram-host',
+      'extension-ci.yml:e2e-chrome-shard',
+      'setup-smoke.yml:setup-smoke',
+    ],
     'every Chromium install in a live workflow is covered'
   );
 });
@@ -510,8 +603,8 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
   // both producers. The unused-export check and the shards import only the
   // harness SDK build, so a declaration miss must not delay them.
   for (const [name, producers] of [
-    ['typecheck', [harnessProducer, trpcProducer]],
-    ['lint', [harnessProducer, trpcProducer]],
+    ['mobile-typecheck', [harnessProducer, trpcProducer]],
+    ['mobile-lint', [harnessProducer, trpcProducer]],
     ['check-unused', [harnessProducer]],
     ['mobile-test', [harnessProducer]],
   ]) {
@@ -569,8 +662,8 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
   // passes, so the aggregator must carry each producer's failure.
   for (const requiredProducer of [harnessProducer, trpcProducer]) {
     assert.ok(
-      [jobs.test.needs].flat().includes(requiredProducer),
-      `the required test job fails with a failed ${requiredProducer}`
+      [jobs['mobile-test-result'].needs].flat().includes(requiredProducer),
+      `the mobile-test-result aggregator fails with a failed ${requiredProducer}`
     );
   }
 });
@@ -705,8 +798,8 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   assert.equal(upload.with['if-no-files-found'], 'error', 'an empty build must fail');
 
   for (const [name, run] of [
-    ['typecheck', 'Typecheck'],
-    ['lint', 'Lint'],
+    ['mobile-typecheck', 'Typecheck'],
+    ['mobile-lint', 'Lint'],
   ]) {
     const job = jobs[name];
     assert.ok([job.needs ?? []].flat().includes(trpcProducer), `${name} waits for the producer`);
@@ -744,14 +837,16 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   // A failed declaration build leaves the checks skipped, and a skipped
   // required check passes, so the aggregator must carry the failure.
   assert.ok(
-    [jobs.test.needs].flat().includes(trpcProducer),
-    'the required test job fails with the declaration build'
+    [jobs['mobile-test-result'].needs].flat().includes(trpcProducer),
+    'the mobile-test-result aggregator fails with the declaration build'
   );
 });
 
-// Both workflows run the same declaration action, so both must install the same
-// closure. The action's program is the whole input: a wider install links
-// workspaces the build never reads, and a narrower one breaks the build.
+// Every producer that builds the declarations for other jobs must install the
+// same closure. The action's program is the whole input: a wider install links
+// workspaces the build never reads, and a narrower one breaks the build. The
+// jobs that build and then use the tree in one job install the whole workspace,
+// so they are not producers and this test does not cover them.
 test('kilo-app CI installs the closure the declaration action needs', () => {
   const install = (file, job) =>
     workflows[file].jobs[job].steps.find(step =>
@@ -763,11 +858,99 @@ test('kilo-app CI installs the closure the declaration action needs', () => {
     /^pnpm install --frozen-lockfile --filter '@kilocode\/trpc\.\.\.' --filter 'web\.\.\.' --filter kilocode-monorepo$/,
     'the producer installs the declaration closure, not the whole workspace'
   );
+  for (const [file, job] of [
+    ['ci.yml', 'trpc-declarations'],
+    ['mobile-native-build.yml', trpcProducer],
+  ]) {
+    assert.equal(
+      producerInstall,
+      install(file, job),
+      `${file}'s ${job} builds the same declarations, so it installs the same closure`
+    );
+  }
+});
+
+// mobile-native-build needs the same producer for the same reason: both
+// platform jobs start together after the gate, so running the action in each
+// made a cache miss compile the declaration program twice and race both jobs to
+// save the one key. `prepare-trpc` builds it once, and both platform jobs
+// download the tree, as they already do for the harness SDK.
+test('mobile-native-build builds the tRPC declarations once and both platform jobs download them', () => {
+  const jobs = workflows['mobile-native-build.yml'].jobs;
+  const actionUsers = Object.entries(jobs)
+    .filter(([, job]) => (job.steps ?? []).some(step => step.uses === trpcAction))
+    .map(([name]) => name);
+  assert.deepEqual(actionUsers, [trpcProducer], 'only the producer builds the declarations');
+
+  const producer = jobs[trpcProducer];
+  assert.equal(producer.needs, 'gate', 'the producer waits for the gate it is skipped by');
   assert.equal(
-    producerInstall,
-    install('ci.yml', 'trpc-declarations'),
-    'the two workflow jobs that build these declarations install the same closure'
+    producer.if,
+    "needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'",
+    'a run with every platform published must not pay a build for nobody'
   );
+  const producerSteps = producer.steps;
+  const installIndex = producerSteps.findIndex(step =>
+    /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+  );
+  const actionIndex = producerSteps.findIndex(step => step.uses === trpcAction);
+  assert.ok(installIndex >= 0 && actionIndex > installIndex, 'the producer builds after install');
+  const uploads = producerSteps
+    .map((step, index) => ({ step, index }))
+    .filter(
+      ({ step }) =>
+        step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === trpcArtifact
+    );
+  assert.equal(uploads.length, 1, 'the producer uploads the declarations exactly once');
+  assert.ok(uploads[0].index > actionIndex, 'the producer uploads what it built');
+  const upload = uploads[0].step;
+  assert.match(upload.uses, /^actions\/upload-artifact@[0-9a-f]{40}$/, 'immutable upload pin');
+  assert.equal(upload.with.path, trpcDist, 'the artifact root is the dist directory');
+  assert.equal(upload.with['retention-days'], 1);
+  assert.equal(upload.with['if-no-files-found'], 'error', 'an empty build must fail');
+
+  for (const name of ['ios', 'android']) {
+    const job = jobs[name];
+    assert.ok(
+      [job.needs ?? []].flat().includes(trpcProducer),
+      `${name} waits for the build it downloads`
+    );
+    const steps = job.steps;
+    assert.deepEqual(
+      steps.filter(step => step.uses === trpcAction).map(step => step.name),
+      [],
+      `${name} never builds the declarations itself`
+    );
+    const downloads = steps
+      .map((step, index) => ({ step, index }))
+      .filter(
+        ({ step }) =>
+          step.uses?.startsWith('actions/download-artifact@') && step.with?.name === trpcArtifact
+      );
+    assert.equal(downloads.length, 1, `${name} downloads the declarations once`);
+    assert.match(
+      downloads[0].step.uses,
+      /^actions\/download-artifact@[0-9a-f]{40}$/,
+      'immutable download pin'
+    );
+    assert.equal(
+      downloads[0].step.with.path,
+      trpcDist,
+      `${name} restores it where the build writes`
+    );
+    const jobInstall = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    assert.ok(
+      jobInstall >= 0 && downloads[0].index > jobInstall,
+      `${name} downloads the declarations after install`
+    );
+    assert.equal(
+      downloads[0].step.if,
+      "steps.published.outputs.published != 'true'",
+      `${name} still skips its whole build when another run published`
+    );
+  }
 });
 
 // The tRPC action gets the same guard as the harness SDK build action: a hit
@@ -801,6 +984,25 @@ test('the tRPC declarations action rebuilds a hit that misses an entry point', (
   const rebuild = "steps.restored.outputs.usable != 'true'";
   assert.equal(build.if, rebuild, 'the build gates on the check, not the raw cache hit');
   assert.doesNotMatch(build.if, /cache-hit/, 'the raw cache hit no longer gates the build');
+});
+
+test('the tRPC declarations action shares one dist entry across runner operating systems', () => {
+  const action = load(
+    readFileSync(
+      new URL('../.github/actions/trpc-declarations/action.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  const steps = action.runs.steps;
+  const key = steps.find(step => step.name === 'Hash tRPC declaration inputs');
+  const cache = steps.find(step => step.name === 'Restore tRPC declarations');
+  assert.equal(key.run, 'node scripts/trpc-declaration-key.mjs >> "$GITHUB_OUTPUT"');
+  assert.equal(cache.with.path, 'packages/trpc/dist');
+  // The dist is a TypeScript declaration emit and actions/cache derives the same
+  // version on Linux and macOS, so an OS prefix would only split one build into a
+  // family per runner and leave the macOS jobs unable to hit an ubuntu save.
+  assert.equal(cache.with.key, 'trpc-declarations-${{ steps.key.outputs.key }}');
+  assert.equal(cache.with['restore-keys'], undefined, 'a partial restore would serve stale dist');
 });
 
 test('the harness SDK action shares one dist entry across runner operating systems', () => {
@@ -1099,13 +1301,14 @@ test('the matrix step decides from the document the affected step published', ()
 
 // The gating job reads the repository, not node_modules: only
 // scripts/changed-dependencies.mjs imports a package (js-yaml), and the detector
-// calls it only for a resource manifest. The install therefore follows a filter
-// over exactly that set; a manifest the detector gained without the filter
-// would run the detector without js-yaml.
-test('the changes job installs the root project only for a resource manifest', () => {
+// calls it only for a dependency input: a manifest, or a patch the closures
+// carry. The install therefore follows a filter over exactly that set; an input
+// the detector gained without the filter would run the detector without
+// js-yaml.
+test('the changes job installs the root project only for a dependency input', () => {
   const steps = ciJobs.changes.steps;
   const filter = steps.find(step => step.id === 'filter_resources');
-  assert.ok(filter, 'changes: the resource-manifest filter is missing');
+  assert.ok(filter, 'changes: the dependency-input filter is missing');
   assert.deepEqual(
     Object.keys(load(filter.with.filters)),
     ['resources'],
@@ -1113,8 +1316,8 @@ test('the changes job installs the root project only for a resource manifest', (
   );
   assert.deepEqual(
     load(filter.with.filters).resources,
-    [...DEPENDENCY_MANIFESTS],
-    'the filter matches the detector set exactly'
+    DEPENDENCY_INPUTS,
+    'the filter matches the detector inputs exactly, in the glob syntax it reports'
   );
   const install = steps.find(step => step.name === 'Install root dependencies');
   assert.equal(
@@ -1129,32 +1332,119 @@ test('the changes job installs the root project only for a resource manifest', (
   );
   // dorny/paths-filter answers from the pull request's merge-base diff and
   // scripts/affected-workspaces.mjs diffs the base tip, so on a branch that is
-  // behind main their manifest answers can disagree and only the detector's
-  // diff saves the run. The check step must reuse the detector's base, read the
-  // manifest set from it (never hardcode it), and land before the install.
+  // behind main their answers can disagree and only the detector's diff saves
+  // the run. The check step must reuse the detector's base, ask the detector
+  // which inputs those are (never hardcode them), and land before the install.
   const affected = steps.find(step => step.id === 'affected');
   const local = steps.find(step => step.id === 'resources_base');
-  assert.ok(local, 'changes: the detector-base manifest check is missing');
+  assert.ok(local, 'changes: the detector-base dependency-input check is missing');
   assert.equal(
     local.env.BASE_SHA,
     affected.env.BASE_SHA,
     'the check diffs the base the detector diffs, or the answers can drift'
   );
-  assert.match(local.run, /DEPENDENCY_MANIFESTS/);
+  assert.match(local.run, /module\.isDependencyInput/);
   assert.doesNotMatch(
     local.run,
-    /pnpm-(lock|workspace)\.yaml/,
-    'the manifest set stays in scripts/affected-workspaces.mjs'
+    /pnpm-(lock|workspace)\.yaml|patches\//,
+    'the input set stays in scripts/affected-workspaces.mjs'
   );
-  assert.match(local.run, /echo "manifests=\$manifests_changed"/);
+  assert.match(local.run, /echo "manifests=\$answer"/);
   assert.match(
     local.run,
-    /if \[ -z "\$manifests" \]; then[\s\S]*echo "manifests=true"/,
-    'an unreadable detector list keeps the install instead of risking a detector without js-yaml'
+    /if \[ "\$answer" != true \] && \[ "\$answer" != false \]; then[\s\S]*answer=true/,
+    'an unreadable detector keeps the install instead of risking a detector without js-yaml'
   );
   assert.ok(
     steps.indexOf(install) > steps.indexOf(local),
     'the install reads an answer the check wrote'
+  );
+});
+
+// The extension changes job is the serialized prelude of every extension CI
+// run: `verify`, `build-firefox` and `e2e-chrome` all need it, so an install it
+// does not need costs every run. It reads the repository for the same reason as
+// the ci.yml job above, over the same detector set, so it carries one gate:
+// these assertions compare the two step definitions, and a new detector input
+// added to one gate without the other fails here.
+test('the extension changes job carries the shared dependency-input install gate', () => {
+  const steps = workflows['extension-ci.yml'].jobs.changes.steps;
+  const shared = ciJobs.changes.steps;
+  const sharedStep = id => shared.find(step => step.id === id);
+  const step = id => steps.find(candidate => candidate.id === id);
+
+  const filter = step('filter_resources');
+  const retry = step('filter_resources_retry');
+  const base = step('resources_base');
+  assert.ok(filter, 'extension-ci changes: the dependency-input filter is missing');
+  assert.ok(retry, 'extension-ci changes: the dependency-input filter retry is missing');
+  assert.ok(base, 'extension-ci changes: the detector-base dependency-input check is missing');
+
+  assert.equal(
+    filter.with.filters,
+    sharedStep('filter_resources').with.filters,
+    'both changes jobs filter the same dependency inputs'
+  );
+  assert.equal(
+    filter['continue-on-error'],
+    sharedStep('filter_resources')['continue-on-error'],
+    'the first attempt tolerates a transient failure'
+  );
+  assert.equal(
+    retry.if,
+    sharedStep('filter_resources_retry').if,
+    'the retry runs only after a failed first attempt'
+  );
+  assert.equal(
+    retry.with.filters,
+    filter.with.filters,
+    'the retry evaluates the same paths as the attempt it replaces'
+  );
+  assert.equal(
+    retry['continue-on-error'],
+    sharedStep('filter_resources_retry')['continue-on-error'],
+    'the retry shares the shared changes job retry contract'
+  );
+  assert.equal(
+    retry['continue-on-error'],
+    undefined,
+    'a persistent filter failure fails the job instead of installing nothing'
+  );
+  assert.equal(
+    base.env.BASE_SHA,
+    sharedStep('resources_base').env.BASE_SHA,
+    'both changes jobs diff the base their detector diffs'
+  );
+  assert.equal(
+    base.run,
+    sharedStep('resources_base').run,
+    'one detector-base check serves both jobs, so the input set stays in one place'
+  );
+
+  const install = steps.find(candidate => candidate.name === 'Install root dependencies');
+  const sharedInstall = shared.find(candidate => candidate.name === 'Install root dependencies');
+  assert.equal(
+    install.run,
+    sharedInstall.run,
+    'the gate removes the install from the run, never changes what it installs'
+  );
+  assert.equal(
+    install.if,
+    sharedInstall.if,
+    'the extension and the shared changes job gate the install on the same answers'
+  );
+  assert.ok(
+    steps.indexOf(install) > steps.indexOf(retry) && steps.indexOf(install) > steps.indexOf(base),
+    'the install reads answers both detections already wrote'
+  );
+  assert.ok(
+    steps.indexOf(install) < steps.indexOf(step('workspaces')),
+    'the detector that may need js-yaml runs after the install it can ask for'
+  );
+  assert.equal(
+    workflows['extension-ci.yml'].jobs.changes.outputs.extension,
+    "${{ steps.filter.outputs.extension == 'true' || steps.workspaces.outputs.extension == 'true' }}",
+    'the gate leaves the job output that the three downstream jobs read'
   );
 });
 
@@ -1176,25 +1466,76 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
 });
 
+// The account database job runs the root `drizzle` script, which executes
+// drizzle-kit inside packages/db, and one session-sync suite whose workspace
+// imports are @kilocode/db and @kilocode/worker-utils, both declared by the
+// service. The install names those closures, and packages/db stays listed
+// because the migrate step resolves drizzle-kit there. A step that starts
+// reading another workspace widens the filter; it does not restore the full
+// install.
+const sessionSyncPostgresInstall =
+  "pnpm install --frozen-lockfile --filter 'cloudflare-session-sync...' --filter '@kilocode/db...' --filter kilocode-monorepo";
+
+test('the session-sync Postgres job installs the closure its steps read', () => {
+  const job = ciJobs['session-sync-postgres'];
+  const installs = job.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    [sessionSyncPostgresInstall],
+    'one install links the session-sync closure, the database closure and the root project'
+  );
+  const run = job.steps.find(step => step.name === 'Run session-sync account database tests');
+  assert.equal(
+    run.run,
+    'NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-sync test:postgres',
+    'the migrate and suite commands are unchanged'
+  );
+});
+
+// The wiring job reads the root project and executes Wrangler's real config
+// parser from the usage-ingest closure, so one frozen install selects both. A
+// second install step would resolve and link the same lockfile again on the
+// same runner.
+const wiringInstall =
+  'pnpm install --frozen-lockfile --ignore-scripts --filter cloudflare-usage-ingest --filter kilocode-monorepo';
+
+test('the ci-wiring job installs its closure in one pass', () => {
+  const steps = ciJobs['ci-wiring'].steps;
+  const installs = steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    [wiringInstall],
+    'one install links the root project and the usage-ingest closure'
+  );
+  const installIndex = steps.indexOf(installs[0]);
+  const relay = steps.findIndex(step =>
+    /scripts\/deployment-workflows\.test\.mjs/.test(step.run ?? '')
+  );
+  assert.ok(
+    relay > installIndex,
+    'the relay regression runs after the install that links Wrangler'
+  );
+});
+
 // The measured per-job install share of wall time keeps a narrowing above one
-// tenth of the job it saves: the mobile-test shards, `lint` and `check-unused`
-// clear that bar, and `typecheck`'s sample run does not, so it keeps the whole
-// workspace for now. When a measurement moves a job over the bar, name it here;
-// a step that starts importing another workspace widens its job's filter, and
-// no job restores the full install to hide an undeclared import. Dependency
-// postinstalls stay enabled across these jobs.
+// tenth of the job it saves: the mobile-test shards, `mobile-lint` and
+// `check-unused` clear that bar, and `mobile-typecheck`'s sample run does not,
+// so it keeps the whole workspace for now. When a measurement moves a job over
+// the bar, name it here; a step that starts importing another workspace widens
+// its job's filter, and no job restores the full install to hide an undeclared
+// import. Dependency postinstalls stay enabled across these jobs.
 const appClosureInstall =
   "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
 
 test('the kilo-app CI consumers install the app closure', () => {
   // The producer jobs keep their own wider (or whole-workspace) closures, and
-  // `typecheck` keeps the whole workspace until its measured saving clears the
-  // bar; every other install in this workflow is the app's.
+  // `mobile-typecheck` keeps the whole workspace until its measured saving
+  // clears the bar; every other install in this workflow is the app's.
   const consumerJobs = Object.entries(kiloAppJobs)
     .filter(
       ([name, job]) =>
         !name.startsWith('prepare') &&
-        name !== 'typecheck' &&
+        name !== 'mobile-typecheck' &&
         (job.steps ?? []).some(step => /^pnpm install --frozen-lockfile\b/.test(step.run ?? ''))
     )
     .map(([name]) => name);
@@ -1208,7 +1549,7 @@ test('the kilo-app CI consumers install the app closure', () => {
   }
   assert.deepEqual(
     consumerJobs,
-    ['lint', 'check-unused', 'mobile-test'],
+    ['mobile-lint', 'check-unused', 'mobile-test'],
     'the app closure covers the measured consumer installs and leaves the others alone'
   );
 });

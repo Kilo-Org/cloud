@@ -22,7 +22,11 @@ import type { ExecResult, ProcessOptions, ProcessOutputStream, ProcessSpawn } fr
 import type { Harness as HarnessClient } from './harness.js';
 import { createKiloHarness } from './kilo-harness.js';
 import * as processUtils from '../utils.js';
-import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
+import {
+  createPreparationManager,
+  stackedBaseMismatchError,
+  type PrepareRuntimePort,
+} from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
 import { directoryHome } from './workspace-home.js';
 
@@ -1757,6 +1761,113 @@ describe('createPreparationManager', () => {
       '--track',
       'origin/feature',
     ]);
+  });
+
+  it('creates a stacked branch from the exact base SHA with --no-track', async () => {
+    const harness = createHarness();
+    const baseSha = 'a'.repeat(40);
+    harness.setGit(args => {
+      if (args[0] === 'show-ref') {
+        return args[3]?.startsWith('refs/remotes/origin/feat/parent') ? result(0) : result(1);
+      }
+      return result(0);
+    });
+    const spec = routeSpec({
+      git: { url: 'https://github.com/acme/repo.git' },
+      branch: 'kilo/stacked',
+      branchMode: 'working',
+      baseBranch: 'feat/parent',
+      baseSha,
+    });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.gitCalls).toContainEqual(['fetch', '--no-tags', 'origin', 'feat/parent']);
+    expect(harness.gitCalls).toContainEqual([
+      'merge-base',
+      '--is-ancestor',
+      baseSha,
+      'refs/remotes/origin/feat/parent',
+    ]);
+    expect(harness.gitCalls).toContainEqual([
+      'checkout',
+      '--progress',
+      '-b',
+      'kilo/stacked',
+      '--no-track',
+      baseSha,
+    ]);
+    // Never track the parent: otherwise auto-commit pushes to the base branch.
+    expect(harness.gitCalls).not.toContainEqual([
+      'checkout',
+      '--progress',
+      '-b',
+      'kilo/stacked',
+      '--track',
+      'origin/feat/parent',
+    ]);
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
+  });
+
+  it('fails non-retryably when the stacked base branch has not been pushed', async () => {
+    const harness = createHarness();
+    harness.setGit(args => {
+      if (args[0] === 'show-ref') return result(1);
+      if (args[0] === 'fetch') return result(128, "fatal: couldn't find remote ref feat/parent");
+      return result(0);
+    });
+    const spec = routeSpec({
+      git: { url: 'https://github.com/acme/repo.git' },
+      branch: 'kilo/stacked',
+      branchMode: 'working',
+      baseBranch: 'feat/parent',
+      baseSha: 'a'.repeat(40),
+    });
+
+    await harness.manager.prepare(spec);
+
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      step: 'checkout',
+      subtype: 'base_branch_missing',
+    });
+  });
+
+  it('fails retryably when the recorded base SHA left the base branch', async () => {
+    const harness = createHarness();
+    harness.setGit(args => {
+      if (args[0] === 'show-ref') {
+        return args[3]?.startsWith('refs/remotes/origin/feat/parent') ? result(0) : result(1);
+      }
+      if (args[0] === 'merge-base') return result(1);
+      return result(0);
+    });
+    const spec = routeSpec({
+      git: { url: 'https://github.com/acme/repo.git' },
+      branch: 'kilo/stacked',
+      branchMode: 'working',
+      baseBranch: 'feat/parent',
+      baseSha: 'a'.repeat(40),
+    });
+
+    await harness.manager.prepare(spec);
+
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      step: 'checkout',
+      subtype: 'base_branch_changed',
+    });
+  });
+
+  it('classifies a rebuilt stacked workspace with a rewritten base as terminal stale', () => {
+    expect(stackedBaseMismatchError('feat/parent', true)).toMatchObject({
+      subtype: 'base_branch_stale',
+      retryable: false,
+    });
+    expect(stackedBaseMismatchError('feat/parent', false)).toMatchObject({
+      subtype: 'base_branch_changed',
+      retryable: true,
+    });
   });
 
   it('fetches a synthetic review ref through the review-ref path', async () => {

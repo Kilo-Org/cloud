@@ -47,6 +47,24 @@ export type AppCallContext = {
   origin: string;
   /** `INTERNAL_API_SECRET`, sent as `x-internal-api-key`. */
   apiKey: string;
+  /**
+   * Vercel's automation bypass for the origin, sent as
+   * `x-vercel-protection-bypass` when set.
+   *
+   * Staging needs it and production does not: `staging-app.kilo.ai` has
+   * Deployment Protection enabled, so Vercel's edge answers every request
+   * with its own 401 — `{"error":{"message":"Protected deployment"}}` and a
+   * redirect to Vercel SSO — before Next.js runs, and no
+   * `x-internal-api-key` can clear that. `app.kilo.ai` is unprotected and
+   * answers the app's own `{"error":"Unauthorized"}`, so it needs nothing.
+   *
+   * Optional, and absent means the header is omitted rather than sent empty:
+   * production binds no such secret, and an empty value would be a rejected
+   * bypass rather than no bypass. Mirrors
+   * `packages/worker-utils/src/usage-writer-client.ts`, which reaches the
+   * same origin from `usage-ingest` for the same reason.
+   */
+  protectionBypass?: string;
 };
 
 type CallInit = {
@@ -114,6 +132,11 @@ export async function callApp(ctx: AppCallContext, init: CallInit): Promise<Atte
       method: init.method,
       headers: {
         'x-internal-api-key': ctx.apiKey,
+        // Only when configured: an empty value is a *rejected* bypass rather
+        // than no bypass, and the unprotected origin needs none.
+        ...(ctx.protectionBypass === undefined || ctx.protectionBypass === ''
+          ? {}
+          : { 'x-vercel-protection-bypass': ctx.protectionBypass }),
         ...(init.body === undefined ? {} : { 'content-type': 'application/json' }),
       },
       ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),

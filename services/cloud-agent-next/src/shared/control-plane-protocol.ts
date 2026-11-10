@@ -22,6 +22,7 @@ import {
 } from './sandbox-control-protocol.js';
 import { sessionGitSummaryPayloadSchema, worktreeRecoverySchema } from './worktree-changes-wire.js';
 import { PreviewServicesScanSchema } from './preview-services.js';
+import { controlPlaneWorktreeGitFrameSchema } from './worktree-git-operations.js';
 
 const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
 
@@ -248,6 +249,9 @@ export const CONTROL_PLANE_WORKSPACE_FAILURE_SUBTYPES = [
   'git_pack_corrupt',
   'git_checkout_conflict',
   'git_branch_missing',
+  'base_branch_changed',
+  'base_branch_missing',
+  'base_branch_stale',
   'sandbox_storage_full',
   'kilo_import_timeout',
   'kilo_import_failed',
@@ -403,6 +407,13 @@ const routeSpecObjectSchema = z
       .optional(),
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
+    /** Stacked workspace base: create the working branch from origin/<baseBranch>. */
+    baseBranch: z.string().min(1).max(256).optional(),
+    /** The exact commit the working branch starts from, resolved by the web router. */
+    baseSha: z
+      .string()
+      .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+      .optional(),
     worktreeRecovery: worktreeRecoverySchema.optional(),
     workspaceSnapshot: z
       .object({
@@ -1056,6 +1067,7 @@ const controlPlaneHelloFrameSchema = z
      * workspace and reports failures non-fatally.
      */
     startCommands: z.literal(true).optional(),
+    worktreeGit: z.literal(true).optional(),
   })
   .strict();
 
@@ -1250,6 +1262,13 @@ export const controlPlaneControlResultSchema = z.discriminatedUnion('ok', [
  * only the wrapper's reply, not provider work; not a spec timer.
  */
 export const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Bound on one worktree.git (Sync/Restack) request: 120s fetch + 120s rebase +
+ * 120s push, plus overhead. These operations force-push with a lease, so a
+ * timeout is ambiguous and must not be retried blind.
+ */
+export const CONTROL_PLANE_WORKTREE_GIT_TIMEOUT_MS = 450_000;
 
 /** Worktree-change request (snapshot = full files, summary = summary only). */
 export const controlPlaneWorktreeCaptureInputSchema = z
@@ -1576,6 +1595,7 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneEventsDroppedFrameSchema,
   controlPlaneWorktreeSnapshotFrameSchema,
   controlPlaneWorktreeSummaryFrameSchema,
+  controlPlaneWorktreeGitFrameSchema,
   controlPlaneWorktreePrepareDeletionFrameSchema,
   controlPlaneWorktreeDeleteFrameSchema,
   controlPlaneWorktreeResultFrameSchema,
@@ -1651,6 +1671,7 @@ export type ControlPlaneWorktreeSnapshotFrame = z.infer<
 export type ControlPlaneWorktreeSummaryFrame = z.infer<
   typeof controlPlaneWorktreeSummaryFrameSchema
 >;
+export type ControlPlaneWorktreeGitFrame = z.infer<typeof controlPlaneWorktreeGitFrameSchema>;
 export type ControlPlaneWorktreeResultFrame = z.infer<typeof controlPlaneWorktreeResultFrameSchema>;
 export type ControlPlaneWorktreeDeletionPayload = z.infer<
   typeof controlPlaneWorktreeDeletionPayloadSchema

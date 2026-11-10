@@ -31,6 +31,7 @@ import {
   handlePullRequest,
   upsertCliSessionPullRequestsFromWebhook,
   upsertCliSessionPullRequestReviewFromWebhook,
+  linkStackedPullRequestsFromWebhook,
 } from '@/lib/integrations/platforms/github/webhook-handlers';
 import { PLATFORM, GITHUB_EVENT, GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { handleGitHubReviewCommentReply } from '@/lib/code-reviews/review-memory/github-feedback';
@@ -736,6 +737,14 @@ export async function handleGitHubWebhook(
         after(async () => {
           if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
           await upsertCliSessionPullRequestsFromWebhook(parseResult.data, upsertOwner);
+          // Link a verified layer's PR to its verified parent's stack. Best
+          // effort and gated by the stacked-workspaces flag inside the helper.
+          await linkStackedPullRequestsFromWebhook({
+            payload: parseResult.data,
+            owner: upsertOwner,
+            installationId: integration.platform_installation_id,
+            appType: integration.github_app_type ?? 'standard',
+          });
         });
       }
 

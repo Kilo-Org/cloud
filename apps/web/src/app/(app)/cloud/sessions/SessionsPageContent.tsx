@@ -25,7 +25,7 @@ import {
 import { SetPageTitle } from '@/components/SetPageTitle';
 import type { SessionsListItem } from '@/components/cloud-agent/SessionsList';
 import { SessionsList } from '@/components/cloud-agent/SessionsList';
-import { extractRepoFromGitUrl } from '@/components/cloud-agent/store/db-session-atoms';
+import { extractRepoFromGitUrl } from '@/components/cloud-agent-next/utils/git-utils';
 import {
   Dialog,
   DialogContent,

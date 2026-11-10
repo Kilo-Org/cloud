@@ -30,16 +30,13 @@ import { CloudAgentSettingsButton } from './settings/CloudAgentSettingsButton';
 import {
   dbSessionToStoredSession,
   deriveForegroundSessionStatus,
+  groupSidebarWorkspaces,
   mergeWorktreeChatSessions,
   useSidebarSessions,
   type SidebarWorktreeDetails,
 } from './hooks/useSidebarSessions';
 import { useActiveSessions } from './hooks/useActiveSessions';
-import {
-  apiSessionToDbSession,
-  dbSessionsAtom,
-  deleteSessionFromStoreAtom,
-} from './store/db-session-atoms';
+import { apiSessionToDbSession, dbSessionsAtom } from './store/db-session-atoms';
 import {
   getDeletionErrorMessage,
   getWorktreeDeletionRedirect,
@@ -362,15 +359,14 @@ function CloudSidebarLayoutContent({
     [platformFilter]
   );
 
-  const folderWorktreeIds = useMemo(
-    () => workspaceFolders.folders.flatMap(folder => folder.worktreeIds),
-    [workspaceFolders.folders]
-  );
   const {
     sessions: listedSessions,
     cachedSessions: listedCachedSessions,
     worktreeDetails,
     loadingWorktreeIds,
+    workspaceRows,
+    workspaceOrder,
+    workspaceRowsTruncated,
     isLoading: isLoadingSessions,
     refetchSessions,
     renameSessionLocally,
@@ -380,7 +376,6 @@ function CloudSidebarLayoutContent({
     searchQuery,
     createdOnPlatform,
     gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
-    folderWorktreeIds,
   });
   // Chats this client created show from the first frame, until the server lists
   // them. They follow the sidebar's filters, as the server's list does.
@@ -419,6 +414,10 @@ function CloudSidebarLayoutContent({
         ? loadingWorktreeIds
         : loadingWorktreeIds.filter(id => !(id in sidebarWorktreeDetails) || id in worktreeDetails),
     [loadingWorktreeIds, sidebarWorktreeDetails, worktreeDetails]
+  );
+  const sidebarWorkspaceGroups = useMemo(
+    () => groupSidebarWorkspaces(sessions, sidebarWorktreeDetails, workspaceRows),
+    [sessions, sidebarWorktreeDetails, workspaceRows]
   );
   const sidebarWorkspaceFolders = {
     ...workspaceFolders,
@@ -603,7 +602,6 @@ function CloudSidebarLayoutContent({
   }, [recentReposData?.repositories]);
   const queryClient = useQueryClient();
   const setDbSessions = useSetAtom(dbSessionsAtom);
-  const deleteSessionFromStore = useSetAtom(deleteSessionFromStoreAtom);
 
   const { mutateAsync: renameCliSessionV2 } = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions()
@@ -970,6 +968,7 @@ function CloudSidebarLayoutContent({
         queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeParent.pathFilter()),
         queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter()),
         queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter()),
+        queryClient.invalidateQueries(trpc.cliSessionsV2.listWorkspaces.pathFilter()),
       ]);
     },
     [organizationId, queryClient, renameWorktree, trpc]
@@ -999,7 +998,6 @@ function CloudSidebarLayoutContent({
           queryClient,
           trpc,
           setDbSessions,
-          deleteSessionFromStore,
         });
         navigateAfterWorkspaceDeletion(worktreeId, deletedSessionIds);
         await invalidateSessionQueries({ queryClient, trpc });
@@ -1022,7 +1020,6 @@ function CloudSidebarLayoutContent({
       }
     })();
   }, [
-    deleteSessionFromStore,
     deleteWorktree,
     deletingSessionWorktreeIds,
     deletingWorktreeIds,
@@ -1037,6 +1034,13 @@ function CloudSidebarLayoutContent({
   const deletingWorktreeIdList = useMemo(
     () => [...new Set([...deletingWorktreeIds, ...deletingSessionWorktreeIds])],
     [deletingSessionWorktreeIds, deletingWorktreeIds]
+  );
+  const stackedChildCount = useMemo(
+    () =>
+      worktreePendingDeletion
+        ? workspaceRows.filter(row => row.parentWorktreeId === worktreePendingDeletion).length
+        : 0,
+    [workspaceRows, worktreePendingDeletion]
   );
   const toggleMobileSidebar = useCallback(() => setMobileSheetOpen(prev => !prev), []);
   const sidebarContext = useMemo(
@@ -1106,6 +1110,9 @@ function CloudSidebarLayoutContent({
               onRenameSession={handleRenameSession}
               worktreeDetails={sidebarWorktreeDetails}
               loadingWorktreeIds={sidebarLoadingWorktreeIds}
+              workspaceGroups={sidebarWorkspaceGroups}
+              workspaceOrder={workspaceOrder}
+              workspaceRowsTruncated={workspaceRowsTruncated}
               isLoading={isLoadingSessions}
               onRenameWorktree={handleRenameWorktree}
               onDeleteWorktree={setWorktreePendingDeletion}
@@ -1146,6 +1153,9 @@ function CloudSidebarLayoutContent({
             onRenameSession={handleRenameSession}
             worktreeDetails={sidebarWorktreeDetails}
             loadingWorktreeIds={sidebarLoadingWorktreeIds}
+            workspaceGroups={sidebarWorkspaceGroups}
+            workspaceOrder={workspaceOrder}
+            workspaceRowsTruncated={workspaceRowsTruncated}
             isLoading={isLoadingSessions}
             onRenameWorktree={handleRenameWorktree}
             onDeleteWorktree={setWorktreePendingDeletion}
@@ -1193,6 +1203,9 @@ function CloudSidebarLayoutContent({
             <AlertDialogDescription>
               This permanently deletes every chat and the worktree’s files, stops its running work,
               and cleans up its sandbox resources. Other worktrees are not affected.
+              {stackedChildCount > 0
+                ? ` ${stackedChildCount} stacked ${stackedChildCount === 1 ? 'workspace is' : 'workspaces are'} based on this branch. Deleting this workspace does not delete its branch.`
+                : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

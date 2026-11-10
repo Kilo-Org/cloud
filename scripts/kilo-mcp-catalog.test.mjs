@@ -14,21 +14,75 @@ const prJobName = 'catalog-pr';
 const mergeJobName = 'catalog-merge';
 const dumpCommand = 'pnpm --filter web script src/scripts/mcp-catalog/dump.ts';
 const skillCommand = 'pnpm --filter web script src/scripts/mcp-catalog/skill.ts';
+const wiringCommand = 'node --test scripts/kilo-mcp-catalog.test.mjs';
+// One install pass serves both the wiring check and the dump: the root project
+// the check reads, the web closure the dump parses, and `cloud-agent-next`,
+// whose schemas the dump imports by relative path. A second pass would resolve
+// and link the same lockfile again over the same store.
+const installCommand =
+  "pnpm install --frozen-lockfile --filter 'web...' --filter cloud-agent-next --filter kilocode-monorepo";
 const skillPath = '.kilo/skills/kilo-mcp/SKILL.md';
 const embedCommand = 'node services/kilo-mcp/scripts/embed-catalog.ts upsert';
-// A stalled registry request must not hold the runner until the job timeout, so
-// the install bounds the whole loop with a time budget and retries an early
-// failure with whatever budget is left. A single attempt keeps whatever budget
-// remains, so a slow but moving download is not killed mid-transfer.
+// A cold install downloads large platform packages, so each job resolves the
+// version it will install, restores that version's tree from a cache keyed on
+// it, and takes the registry path only on a miss, a version mismatch, or a tree
+// the binary cannot start from. A stalled registry request must not hold the
+// runner until the job timeout, so the miss path bounds the whole install with a
+// time budget and retries an early failure with whatever budget is left.
+const kiloVersionCommand = [
+  'set -euo pipefail',
+  'deadline=$((SECONDS + 60))',
+  'for attempt in 1 2 3; do',
+  '  remaining=$((deadline - SECONDS))',
+  '  if [ "$remaining" -le 0 ]; then',
+  '    break',
+  '  fi',
+  '  if version="$(timeout --signal=TERM --kill-after=10 "$remaining" npm view @kilocode/cli version)"; then',
+  '    echo "version=$version" >> "$GITHUB_OUTPUT"',
+  '    exit 0',
+  '  fi',
+  '  if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then',
+  '    echo "::warning::Resolving the Kilo CLI version did not finish; retrying"',
+  '    sleep $((attempt * 5))',
+  '  fi',
+  'done',
+  'echo "::error::Could not resolve the Kilo CLI version from the registry"',
+  'exit 1',
+  '',
+].join('\n');
+const kiloCachePath = '${{ runner.temp }}/kilo-cli';
+const kiloCacheKey =
+  '${{ runner.os }}-${{ runner.arch }}-kilo-cli-${{ steps.kilo_cli_version.outputs.version }}';
 const kiloInstallCommand = [
   'set -euo pipefail',
+  'echo "$KILO_CLI_PREFIX/bin" >> "$GITHUB_PATH"',
+  '',
+  'manifest="$KILO_CLI_PREFIX/lib/node_modules/@kilocode/cli/package.json"',
+  'installed=$(node -p "require(\'$manifest\').version" 2>/dev/null || true)',
+  '',
+  '# A miss, a tree of another version, or a tree the binary cannot start',
+  '# from takes the registry path.',
+  'if [ "$CACHE_HIT" = "true" ] && [ "$installed" = "$KILO_CLI_VERSION" ] \\',
+  '  && "$KILO_CLI_PREFIX/bin/kilo" --version > /dev/null 2>&1; then',
+  '  echo "Restored @kilocode/cli@$installed from the cache"',
+  '  "$KILO_CLI_PREFIX/bin/kilo" --version',
+  '  exit 0',
+  'fi',
+  '',
+  'rm -rf "$KILO_CLI_PREFIX"',
   'deadline=$((SECONDS + 720))',
   'for attempt in 1 2 3; do',
   '  remaining=$((deadline - SECONDS))',
   '  if [ "$remaining" -le 0 ]; then',
   '    break',
   '  fi',
-  '  if timeout --signal=TERM --kill-after=20 "$remaining" npm install -g @kilocode/cli; then',
+  '  if timeout --signal=TERM --kill-after=20 "$remaining" npm install --global --prefix "$KILO_CLI_PREFIX" "@kilocode/cli@$KILO_CLI_VERSION" --no-audit --no-fund; then',
+  '    installed=$(node -p "require(\'$manifest\').version")',
+  '    if [ "$installed" != "$KILO_CLI_VERSION" ]; then',
+  '      echo "::error::Installed @kilocode/cli@$installed but resolved version $KILO_CLI_VERSION"',
+  '      exit 1',
+  '    fi',
+  '    "$KILO_CLI_PREFIX/bin/kilo" --version',
   '    exit 0',
   '  fi',
   '  if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then',
@@ -84,6 +138,93 @@ function findStep(job, predicate, what) {
   const step = job.steps.find(predicate);
   assert.ok(step, `${job.name ?? 'job'}: ${what} must exist`);
   return step;
+}
+
+/**
+ * The dump shells out to `kilo run`, so both catalog jobs need the published
+ * CLI. Each one resolves the version it installs, restores that version's tree
+ * from a cache keyed on it, and reaches the registry only on a miss, a version
+ * mismatch, or a tree the binary cannot start from.
+ */
+function assertKiloCliSteps(job, gate, jobName) {
+  const resolve = findStep(
+    job,
+    step => step.run === kiloVersionCommand,
+    'resolves the Kilo CLI version it installs'
+  );
+  assert.equal(
+    resolve.id,
+    'kilo_cli_version',
+    `${jobName}: the resolved version feeds the cache key`
+  );
+  assert.equal(
+    resolve.if,
+    gate,
+    `${jobName}: version resolution is gated on catalog-relevant changes`
+  );
+  assert.equal(
+    resolve['timeout-minutes'],
+    2,
+    `${jobName}: version resolution must be bounded, or a stalled registry request holds the runner`
+  );
+
+  const restore = findStep(
+    job,
+    step => step.uses === 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7',
+    'restores the cached Kilo CLI tree'
+  );
+  assert.equal(
+    restore.id,
+    'kilo_cli_cache',
+    `${jobName}: the restore exposes its hit to the install`
+  );
+  assert.equal(
+    restore.if,
+    gate,
+    `${jobName}: the cache restore is gated on catalog-relevant changes`
+  );
+  assert.equal(
+    restore['continue-on-error'],
+    true,
+    `${jobName}: a cache failure must never fail the job`
+  );
+  assert.equal(restore.with?.path, kiloCachePath, `${jobName}: the cache holds the install prefix`);
+  assert.equal(
+    restore.with?.key,
+    kiloCacheKey,
+    `${jobName}: the cache key must name the resolved version, or a hit is a tree of another release`
+  );
+
+  const install = findStep(
+    job,
+    step => step.run === kiloInstallCommand,
+    'installs the Kilo CLI the dump shells out to'
+  );
+  assert.equal(install.if, gate, `${jobName}: the install is gated on catalog-relevant changes`);
+  assert.equal(
+    install.env?.CACHE_HIT,
+    '${{ steps.kilo_cli_cache.outputs.cache-hit }}',
+    `${jobName}: the install must read the cache hit, or the restored tree is never trusted`
+  );
+  assert.equal(
+    install.env?.KILO_CLI_VERSION,
+    '${{ steps.kilo_cli_version.outputs.version }}',
+    `${jobName}: the install must pin the version the cache key names`
+  );
+
+  const resolveIndex = job.steps.indexOf(resolve);
+  const restoreIndex = job.steps.indexOf(restore);
+  const installIndex = job.steps.indexOf(install);
+  assert.ok(
+    resolveIndex < restoreIndex && restoreIndex < installIndex,
+    `${jobName}: the version, then its cache entry, then the install`
+  );
+  assert.ok(
+    installIndex < job.steps.findIndex(step => step.run === dumpCommand),
+    `${jobName}: the CLI must be installed before the dump shells out to it`
+  );
+
+  return install;
 }
 
 /** The `grep -Eq '…'` pattern a change-detection step runs. */
@@ -275,10 +416,35 @@ function validate(workflow) {
     /MCP_CATALOG_KILO_AUTH|KILO_AUTH_CONTENT/,
     'PR dump must not use the personal CLI credential'
   );
-  findStep(
-    pr,
-    step => step.run === kiloInstallCommand,
-    'PR job installs the Kilo CLI the dump shells out to'
+  assertKiloCliSteps(pr, changeGate, 'PR job');
+
+  // One install pass covers the wiring check and the dump. Splitting it back
+  // into a root-only pass and a wider pass resolves and links the same
+  // lockfile twice in one job.
+  const prInstalls = pr.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.equal(
+    prInstalls.length,
+    1,
+    `${prJobName}: one lockfile install pass, not ${prInstalls.length}`
+  );
+  assert.equal(
+    prInstalls[0].run,
+    installCommand,
+    `${prJobName}: the install selects the root project, the web closure and cloud-agent-next in one pass`
+  );
+  assert.equal(
+    prInstalls[0].if,
+    changeGate,
+    `${prJobName}: the install is gated on catalog changes`
+  );
+  const prWiring = findStep(pr, step => step.run === wiringCommand, 'catalog wiring check step');
+  assert.ok(
+    pr.steps.indexOf(prInstalls[0]) < pr.steps.indexOf(prWiring),
+    `${prJobName}: the install must come before the wiring check it serves`
+  );
+  assert.ok(
+    pr.steps.indexOf(prInstalls[0]) < pr.steps.indexOf(prDump),
+    `${prJobName}: the install must come before the dump it serves`
   );
 
   // The PR job regenerates the skill from the catalog.json the dump just
@@ -412,11 +578,7 @@ function validate(workflow) {
     /MCP_CATALOG_KILO_AUTH|KILO_AUTH_CONTENT/,
     'merge dump must not use the personal CLI credential'
   );
-  findStep(
-    merge,
-    step => step.run === kiloInstallCommand,
-    'merge job installs the Kilo CLI the dump shells out to'
-  );
+  assertKiloCliSteps(merge, mergeChangeGate, 'merge job');
   const mergeSkill = findStep(
     merge,
     step => step.run === skillCommand,
@@ -583,6 +745,45 @@ for (const [name, defect] of [
   [
     'Kilo CLI install removed from the merge job',
     workflow => dropStep(workflow, mergeJobName, step => step.run === kiloInstallCommand),
+  ],
+  [
+    'Kilo CLI cache removed from the merge job',
+    workflow =>
+      dropStep(workflow, mergeJobName, step => (step.uses ?? '').startsWith('actions/cache@')),
+  ],
+  [
+    'Kilo CLI version resolution may stall the job',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.id === 'kilo_cli_version');
+      delete step['timeout-minutes'];
+    },
+  ],
+  [
+    'Kilo CLI cache key without the resolved version',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item =>
+        (item.uses ?? '').startsWith('actions/cache@')
+      );
+      step.with.key = '${{ runner.os }}-${{ runner.arch }}-kilo-cli';
+    },
+  ],
+  [
+    'Kilo CLI cache restore may fail the job',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item =>
+        (item.uses ?? '').startsWith('actions/cache@')
+      );
+      delete step['continue-on-error'];
+    },
+  ],
+  [
+    'Kilo CLI cache restored before the version is resolved',
+    workflow => {
+      const steps = workflow.jobs[prJobName].steps;
+      const restoreIndex = steps.findIndex(item => (item.uses ?? '').startsWith('actions/cache@'));
+      const [restore] = steps.splice(restoreIndex, 1);
+      steps.unshift(restore);
+    },
   ],
   [
     'embed script referenced from a PR step',
@@ -804,6 +1005,22 @@ for (const [name, defect] of [
       const dumpIndex = steps.findIndex(step => step.run === dumpCommand);
       steps.splice(steps.indexOf(skill), 1);
       steps.splice(dumpIndex, 0, skill);
+    },
+  ],
+  [
+    'second lockfile install pass added',
+    workflow =>
+      addStep(workflow, prJobName, {
+        name: 'Install root dependencies',
+        if: changeGate,
+        run: 'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts',
+      }),
+  ],
+  [
+    'install narrowed to the root project',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.run === installCommand);
+      step.run = 'pnpm --filter kilocode-monorepo install --frozen-lockfile';
     },
   ],
 ]) {

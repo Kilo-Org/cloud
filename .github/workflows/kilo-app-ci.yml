@@ -1,18 +1,27 @@
 name: kilo-app CI
 
-# The mobile suite jobs are required checks on main, so this workflow runs on
-# every PR and every main push (no path filters) and the `mobile-changes` job
-# gates the suite work. An unrelated PR or push still reports the suite checks
-# as skipped (a skipped job satisfies a required check) instead of leaving them
-# "Expected". A push that starts a release is inside the detection below, so its
-# run always executes the suite, and that release consumes this run's conclusion
-# for the commit. The hourly schedule and a manual run of main stand on the tip
-# of main and reuse that commit's push run as well, but only a run that passed
-# and whose shard job proves the suite executed. The release calls the suite
-# through `workflow_call` for any reuse it cannot prove: no run for the commit, a
-# run that ended without a pass (including one the cancel-in-progress group above
-# cancels when a later push lands on main), a run still in flight, and a run for
-# a commit that touched no app path and so skipped the suite.
+# The mobile suite runs on every PR and every main push (no path filters), and
+# the `mobile-changes` job gates the work. An unrelated PR or push still reports
+# the suite checks as skipped (a skipped job satisfies a required check) instead
+# of leaving them "Expected". A push that starts a release is inside the
+# detection below, so its run always executes the suite, and that release
+# consumes this run's conclusion for the commit. The hourly schedule and a
+# manual run of main stand on the tip of main and reuse that commit's push run
+# as well, but only a run that passed and whose shard job proves the suite
+# executed. The release calls the suite through `workflow_call` for any reuse it
+# cannot prove: no run for the commit, a run that ended without a pass
+# (including one the cancel-in-progress group above cancels when a later push
+# lands on main), a run still in flight, and a run for a commit that touched no
+# app path and so skipped the suite.
+#
+# Check names must stay unique across workflows: the `main-tests` ruleset
+# matches a required context by name and app, so two workflows publishing the
+# same name let the wrong workflow's pass satisfy it. The mobile jobs that
+# mirror a required context owned by ci.yml therefore carry a `mobile-` prefix
+# (`mobile-typecheck`, `mobile-lint`, `mobile-test-result`). `i18n-leftover` and
+# `check-unused` keep their unprefixed names: this workflow is their only
+# publisher, so a rename would leave those required contexts unreported.
+# `scripts/typecheck-ci.test.mjs` pins both rules.
 #
 # The app's formatting is gated by the repo-wide `format-check` job in ci.yml:
 # `oxfmt --list-different .` covers apps/mobile on every PR, merge-queue entry
@@ -33,10 +42,11 @@ permissions:
   contents: read
 
 jobs:
-  # Always runs: the required suite checks must report on every PR and every
-  # main push. The detection step diffs against the PR's base sha or, on a main
-  # push, `github.event.before`; when neither is available (a release's
-  # schedule or manual call), the suite runs (a release must validate).
+  # Always runs: `i18n-leftover` and `check-unused` are required contexts and
+  # must report on every PR and every main push. The detection step diffs against
+  # the PR's base sha or, on a main push, `github.event.before`; when neither is
+  # available (a release's schedule or manual call), the suite runs (a release
+  # must validate).
   mobile-changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
@@ -57,9 +67,13 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      # The suite jobs always report (required checks); only the suite's own
-      # paths justify the heavy work. The patterns are pinned by
-      # scripts/stacked-ci.test.mjs, which ci.yml's `ci-wiring` job runs.
+      # The suite jobs always report: `i18n-leftover` and `check-unused` are
+      # required contexts published only here, so every PR must receive them;
+      # only the suite's own paths justify the heavy work. The patterns are pinned
+      # by scripts/stacked-ci.test.mjs, which ci.yml's `ci-wiring` job runs.
+      # tools/oxlint is detected on its own, because the app's oxlint configs
+      # load those plugins: a change there must run the app's own lint and i18n
+      # checks, and the workspace selection treats those paths as lint-only.
       # A lockfile change matches the patterns first, so the detector below
       # never parses the lockfile and needs no installed dependencies.
       - name: Detect mobile-relevant changes
@@ -78,6 +92,10 @@ jobs:
             base="${{ github.event.before }}"
           fi
           if ! git rev-parse --verify "${base}^{commit}" > /dev/null 2>&1; then
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" HEAD | grep -Eq '^tools/oxlint/'; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -101,8 +119,8 @@ jobs:
   # a cache miss pay the typia compile once per job, because the shards start
   # together and actions/cache saves at the end of a job, so no job can hit
   # another's save. The action still runs here, so its cache serves a later run
-  # with the same inputs, and the required `test` job needs this one, so a
-  # failed build fails the gate instead of leaving the suites skipped.
+  # with the same inputs, and the `mobile-test-result` aggregator needs this
+  # one, so a failed build fails the gate instead of leaving the suites skipped.
   #
   # One tRPC declaration build per run, for the same reason: typecheck and lint
   # both need packages/trpc/dist, they start together, and both used to run the
@@ -113,9 +131,10 @@ jobs:
   # The two producers are separate jobs, not two steps of one job, because
   # neither build reads the other's output: one job made every consumer wait for
   # both in sequence, so a declaration miss delayed the shards that never open
-  # packages/trpc/dist. `typecheck` and `lint` read both trees and wait for both
-  # producers; `check-unused` and the four `mobile-test` shards import only the
-  # harness SDK build, so they wait for `prepare-harness-sdk` alone.
+  # packages/trpc/dist. `mobile-typecheck` and `mobile-lint` read both trees and
+  # wait for both producers; `check-unused` and the four `mobile-test` shards
+  # import only the harness SDK build, so they wait for `prepare-harness-sdk`
+  # alone.
   prepare-harness-sdk:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.mobile == 'true'
@@ -192,7 +211,7 @@ jobs:
           # A cache hit that restored nothing must fail here, not in a consumer.
           if-no-files-found: error
 
-  typecheck:
+  mobile-typecheck:
     needs: [mobile-changes, prepare-harness-sdk, prepare-trpc]
     if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
@@ -234,7 +253,7 @@ jobs:
       - name: Read Expo config
         run: pnpm --filter kilo-app exec expo config --type public > /dev/null
 
-  lint:
+  mobile-lint:
     needs: [mobile-changes, prepare-harness-sdk, prepare-trpc]
     if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
@@ -274,6 +293,9 @@ jobs:
       - name: Lint
         run: pnpm --filter kilo-app run lint
 
+  # Required check `i18n-leftover` on main, so this job keeps its name: it is
+  # the only workflow that publishes that context, and a rename would leave a
+  # required check unreported. Uniqueness is about colliding names, not this.
   i18n-leftover:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.mobile == 'true'
@@ -294,9 +316,10 @@ jobs:
           node-version-file: '.nvmrc'
 
       # No step here reads types or built output, so only the workspaces the
-      # tools come from are installed: the root one carries oxlint, and the
-      # app one carries react-native-css, whose compiler the class checker
-      # probes. The i18n oxlint config is not type-aware.
+      # tools come from are installed: the root one carries oxlint and the
+      # parser the audits read the tree with, and the app one carries
+      # react-native-css, whose compiler the class checker probes. The i18n
+      # oxlint config is not type-aware.
       - name: Install dependencies
         run: pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts
 
@@ -311,6 +334,8 @@ jobs:
 
   # The unused-export check reads the harness SDK build only, so it starts when
   # that producer finishes instead of waiting for the declaration build.
+  # Required check `check-unused` on main, so this job keeps its name for the
+  # same reason as `i18n-leftover`: no other workflow publishes it.
   check-unused:
     needs: [mobile-changes, prepare-harness-sdk]
     if: needs.mobile-changes.outputs.mobile == 'true'
@@ -345,8 +370,10 @@ jobs:
       - name: Check unused exports
         run: pnpm --filter kilo-app run check:unused
 
-  # Four shards run the mobile Vitest suite in parallel; the `test` job below
-  # reports the combined result under the required check name.
+  # Four shards run the mobile Vitest suite in parallel; the `mobile-test-result`
+  # job below reports the combined result under that check name. The name is
+  # prefixed because ci.yml publishes the required `test` context and two
+  # publishers of one required name would mask each other's failure.
   #
   # The shard's `Test` step is CPU-bound and the jobs start together, so against
   # a ~15 s fixed setup (checkout, install, artifact download) that does not
@@ -400,11 +427,11 @@ jobs:
       - name: Test
         run: pnpm --filter kilo-app run test --shard=${{ matrix.shard }}/4
 
-  # Required check. Skipped shards (no mobile change) pass; a failed or
-  # cancelled shard fails this job. It needs both producers for the same reason:
-  # a failed producer only skips the jobs that consume it, and a skipped check
-  # passes, so this job carries that failure to the gate.
-  test:
+  # Skipped shards (no mobile change) pass; a failed or cancelled shard fails
+  # this job. It needs both producers for the same reason: a failed producer
+  # only skips the jobs that consume it, and a skipped check passes, so this job
+  # carries that failure to the gate.
+  mobile-test-result:
     needs: [mobile-changes, prepare-harness-sdk, prepare-trpc, mobile-test]
     if: ${{ !cancelled() }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

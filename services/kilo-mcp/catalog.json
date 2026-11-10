@@ -5399,7 +5399,8 @@
           "type": "string",
           "enum": [
             "created_at",
-            "updated_at"
+            "updated_at",
+            "activity"
           ]
         },
         "includeChildren": {
@@ -5489,6 +5490,99 @@
       "fetchreviewdecision"
     ],
     "searchBlob": "cliSessionsV2.list List the current user's CLI/agent sessions with pagination, filtering by organization, worktree, git URL, platform, shared/public status, version, or recent updates. clisessionsv2 list cursor limit orderby includechildren sharedonly createdonplatform organizationid worktreeid giturl updatedsince version fetchreviewdecision cursor limit orderBy includeChildren sharedOnly createdOnPlatform organizationId worktreeId gitUrl updatedSince version fetchReviewDecision"
+  },
+  "cliSessionsV2.listWorkspaces": {
+    "path": "cliSessionsV2.listWorkspaces",
+    "kind": "query",
+    "summary": "Lists the user's cloud agent workspaces (worktree sessions), with search, sorting, pagination, and pull request status. Use it to browse or filter saved workspaces by organization, platform, or git URL.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdOnPlatform": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          ]
+        },
+        "gitUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "minItems": 1,
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "sortMode": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "created",
+            "activity"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "search": {
+          "type": "string",
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "listworkspaces",
+      "organizationid",
+      "createdonplatform",
+      "giturl",
+      "sortmode",
+      "limit",
+      "cursor",
+      "search"
+    ],
+    "searchBlob": "cliSessionsV2.listWorkspaces Lists the user's cloud agent workspaces (worktree sessions), with search, sorting, pagination, and pull request status. Use it to browse or filter saved workspaces by organization, platform, or git URL. clisessionsv2 listworkspaces organizationid createdonplatform giturl sortmode limit cursor search organizationId createdOnPlatform gitUrl sortMode limit cursor search"
   },
   "cliSessionsV2.pauseWatchPr": {
     "path": "cliSessionsV2.pauseWatchPr",
@@ -5757,7 +5851,8 @@
           "type": "string",
           "enum": [
             "created_at",
-            "updated_at"
+            "updated_at",
+            "activity"
           ]
         },
         "createdOnPlatform": {
@@ -6613,6 +6708,31 @@
       "limit"
     ],
     "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit sessionId kiloSessionId cursor limit"
+  },
+  "cloudAgentNext.getStackedWorkspaceSource": {
+    "path": "cloudAgentNext.getStackedWorkspaceSource",
+    "kind": "query",
+    "summary": "Look up an existing workspace's branch, repository, and PR details so it can be used as the parent for creating a stacked workspace. Returns read-only source info, including whether the branch has been pushed and which provider/integration it belongs to.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "worktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "worktreeId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "getstackedworkspacesource",
+      "worktreeid"
+    ],
+    "searchBlob": "cloudAgentNext.getStackedWorkspaceSource Look up an existing workspace's branch, repository, and PR details so it can be used as the parent for creating a stacked workspace. Returns read-only source info, including whether the branch has been pushed and which provider/integration it belongs to. cloudagentnext getstackedworkspacesource worktreeid worktreeId"
   },
   "cloudAgentNext.getWorkspaceSnapshotRecovery": {
     "path": "cloudAgentNext.getWorkspaceSnapshotRecovery",
@@ -7602,6 +7722,15 @@
             "upstreamBranch": {
               "type": "string"
             },
+            "baseBranch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "stackOnWorktreeId": {
+              "type": "string",
+              "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
             "autoCommit": {
               "type": "boolean"
             },
@@ -8256,6 +8385,15 @@
             "upstreamBranch": {
               "type": "string"
             },
+            "baseBranch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "stackOnWorktreeId": {
+              "type": "string",
+              "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
             "autoCommit": {
               "type": "boolean"
             },
@@ -8328,11 +8466,13 @@
       "runtimeskills",
       "runtimeagents",
       "upstreambranch",
+      "basebranch",
+      "stackonworktreeid",
       "autocommit",
       "attachments",
       "devcontainer"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant requestedenvironment requireenvironmentchoice profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant requestedEnvironment requireEnvironmentChoice profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant requestedenvironment requireenvironmentchoice profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch basebranch stackonworktreeid autocommit attachments devcontainer egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant requestedEnvironment requireEnvironmentChoice profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch baseBranch stackOnWorktreeId autoCommit attachments devcontainer"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -8494,6 +8634,31 @@
     ],
     "searchBlob": "cloudAgentNext.resizeTerminal Change the size of a cloud agent terminal window. cloudagentnext resizeterminal cloudagentsessionid ptyid cols rows cloudAgentSessionId ptyId cols rows"
   },
+  "cloudAgentNext.restackWorktreeBranch": {
+    "path": "cloudAgentNext.restackWorktreeBranch",
+    "kind": "mutation",
+    "summary": "Move a workspace branch onto a new base branch, for example after the parent branch's pull request is merged or the parent branch changes. Reapplies the workspace's commits on the new base and retargets the pull request.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "restackworktreebranch",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.restackWorktreeBranch Move a workspace branch onto a new base branch, for example after the parent branch's pull request is merged or the parent branch changes. Reapplies the workspace's commits on the new base and retargets the pull request. cloudagentnext restackworktreebranch cloudagentsessionid cloudAgentSessionId"
+  },
   "cloudAgentNext.sendMessage": {
     "path": "cloudAgentNext.sendMessage",
     "kind": "mutation",
@@ -8631,6 +8796,31 @@
       "attachments"
     ],
     "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
+  },
+  "cloudAgentNext.syncWorktreeBranch": {
+    "path": "cloudAgentNext.syncWorktreeBranch",
+    "kind": "mutation",
+    "summary": "Update a workspace branch with the latest changes from its upstream or base branch, bringing remote commits into the current workspace. Use to pull in base-branch progress without changing which branch the workspace is based on.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "syncworktreebranch",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.syncWorktreeBranch Update a workspace branch with the latest changes from its upstream or base branch, bringing remote commits into the current workspace. Use to pull in base-branch progress without changing which branch the workspace is based on. cloudagentnext syncworktreebranch cloudagentsessionid cloudAgentSessionId"
   },
   "cloudAgentNextFailures.exportSessionDiagnostics": {
     "path": "cloudAgentNextFailures.exportSessionDiagnostics",
@@ -8852,6 +9042,17 @@
     ],
     "searchBlob": "cloudAgentSettings.get Get the Cloud Agent settings for the user or organization, including the context sandbox allocation, per-repository profile allocations, and which sandbox options are available. cloudagentsettings get organizationid organizationId"
   },
+  "cloudAgentSettings.getWorkspaceOrder": {
+    "path": "cloudAgentSettings.getWorkspaceOrder",
+    "kind": "query",
+    "summary": "Fetch the saved workspace ordering for the Cloud Agent sidebar, returning the default order if none has been saved.",
+    "inputSchema": {},
+    "tags": [
+      "cloudagentsettings",
+      "getworkspaceorder"
+    ],
+    "searchBlob": "cloudAgentSettings.getWorkspaceOrder Fetch the saved workspace ordering for the Cloud Agent sidebar, returning the default order if none has been saved. cloudagentsettings getworkspaceorder"
+  },
   "cloudAgentSettings.removeRepositorySettings": {
     "path": "cloudAgentSettings.removeRepositorySettings",
     "kind": "mutation",
@@ -9064,6 +9265,34 @@
       "allocation"
     ],
     "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
+  },
+  "cloudAgentSettings.setWorkspaceOrder": {
+    "path": "cloudAgentSettings.setWorkspaceOrder",
+    "kind": "mutation",
+    "summary": "Save or update the custom workspace ordering for the Cloud Agent sidebar.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceOrder": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "created",
+            "activity"
+          ]
+        }
+      },
+      "required": [
+        "workspaceOrder"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setworkspaceorder",
+      "workspaceorder"
+    ],
+    "searchBlob": "cloudAgentSettings.setWorkspaceOrder Save or update the custom workspace ordering for the Cloud Agent sidebar. cloudagentsettings setworkspaceorder workspaceorder workspaceOrder"
   },
   "cloudEnvironments.build": {
     "path": "cloudEnvironments.build",
@@ -18135,6 +18364,56 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit organizationId sessionId kiloSessionId cursor limit"
   },
+  "organizations.cloudAgentNext.getStackedWorkspaceSource": {
+    "path": "organizations.cloudAgentNext.getStackedWorkspaceSource",
+    "kind": "query",
+    "summary": "Look up an existing workspace to stack a new workspace on top of it, returning its repository, branch, pull request number, and whether its branch has been pushed. Use this to preview the parent source before starting a stacked Cloud Agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "worktreeId": {
+              "type": "string",
+              "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "worktreeId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getstackedworkspacesource",
+      "organizationid",
+      "worktreeid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getStackedWorkspaceSource Look up an existing workspace to stack a new workspace on top of it, returning its repository, branch, pull request number, and whether its branch has been pushed. Use this to preview the parent source before starting a stacked Cloud Agent session. organizations cloudagentnext getstackedworkspacesource organizationid worktreeid organizationId worktreeId"
+  },
   "organizations.cloudAgentNext.getWorkspaceSnapshotRecovery": {
     "path": "organizations.cloudAgentNext.getWorkspaceSnapshotRecovery",
     "kind": "query",
@@ -19379,6 +19658,15 @@
                 "upstreamBranch": {
                   "type": "string"
                 },
+                "baseBranch": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "stackOnWorktreeId": {
+                  "type": "string",
+                  "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
                 "autoCommit": {
                   "type": "boolean"
                 },
@@ -20039,6 +20327,15 @@
                 "upstreamBranch": {
                   "type": "string"
                 },
+                "baseBranch": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "stackOnWorktreeId": {
+                  "type": "string",
+                  "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
                 "autoCommit": {
                   "type": "boolean"
                 },
@@ -20116,11 +20413,13 @@
       "runtimeskills",
       "runtimeagents",
       "upstreambranch",
+      "basebranch",
+      "stackonworktreeid",
       "autocommit",
       "attachments",
       "devcontainer"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant requestedenvironment requireenvironmentchoice profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer organizationId egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant requestedEnvironment requireEnvironmentChoice profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant requestedenvironment requireenvironmentchoice profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch basebranch stackonworktreeid autocommit attachments devcontainer organizationId egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant requestedEnvironment requireEnvironmentChoice profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch baseBranch stackOnWorktreeId autoCommit attachments devcontainer"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",
@@ -20339,6 +20638,56 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.resizeTerminal Resize a cloud agent terminal to new column and row dimensions. Use to fit the terminal to the window. organizations cloudagentnext resizeterminal organizationid cloudagentsessionid ptyid cols rows organizationId cloudAgentSessionId ptyId cols rows"
   },
+  "organizations.cloudAgentNext.restackWorktreeBranch": {
+    "path": "organizations.cloudAgentNext.restackWorktreeBranch",
+    "kind": "mutation",
+    "summary": "Rebase a Cloud Agent workspace branch onto its current or a new base branch, such as the parent workspace's branch, then update the recorded base and retarget the pull request. Use this to bring a stacked workspace up to date with its parent.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "restackworktreebranch",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.restackWorktreeBranch Rebase a Cloud Agent workspace branch onto its current or a new base branch, such as the parent workspace's branch, then update the recorded base and retarget the pull request. Use this to bring a stacked workspace up to date with its parent. organizations cloudagentnext restackworktreebranch organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+  },
   "organizations.cloudAgentNext.sendMessage": {
     "path": "organizations.cloudAgentNext.sendMessage",
     "kind": "mutation",
@@ -20484,6 +20833,56 @@
       "attachments"
     ],
     "searchBlob": "organizations.cloudAgentNext.sendMessage Send a prompt or command to a running cloud agent session. Use to continue the conversation with the agent. organizations cloudagentnext sendmessage organizationid cloudagentsessionid payload expectedworktreeid autocommit messageid attachments organizationId cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
+  },
+  "organizations.cloudAgentNext.syncWorktreeBranch": {
+    "path": "organizations.cloudAgentNext.syncWorktreeBranch",
+    "kind": "mutation",
+    "summary": "Sync an existing Cloud Agent workspace branch with its upstream or base, adopting the current base and pulling in remote changes without rebasing it onto a new parent. Use this when a branch needs to be reconciled with the published branch or was retargeted remotely.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "syncworktreebranch",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.syncWorktreeBranch Sync an existing Cloud Agent workspace branch with its upstream or base, adopting the current base and pulling in remote changes without rebasing it onto a new parent. Use this when a branch needs to be reconciled with the published branch or was retargeted remotely. organizations cloudagentnext syncworktreebranch organizationid cloudagentsessionid organizationId cloudAgentSessionId"
   },
   "organizations.create": {
     "path": "organizations.create",
@@ -37790,6 +38189,29 @@
             "blue",
             "purple"
           ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "smart"
+          ]
+        },
+        "smartPreset": {
+          "type": "string",
+          "enum": [
+            "needs_you",
+            "in_review",
+            "done"
+          ]
+        },
+        "sortMode": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "created",
+            "activity"
+          ]
         }
       },
       "required": [
@@ -37803,9 +38225,12 @@
       "create",
       "organizationid",
       "name",
-      "color"
+      "color",
+      "kind",
+      "smartpreset",
+      "sortmode"
     ],
-    "searchBlob": "workspaceFolders.create Create a new workspace folder to organize worktrees, with a name and color. workspacefolders create organizationid name color organizationId name color"
+    "searchBlob": "workspaceFolders.create Create a new workspace folder to organize worktrees, with a name and color. workspacefolders create organizationid name color kind smartpreset sortmode organizationId name color kind smartPreset sortMode"
   },
   "workspaceFolders.delete": {
     "path": "workspaceFolders.delete",
@@ -37969,6 +38394,18 @@
         "cloudAgentSessionId": {
           "type": "string",
           "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -37983,9 +38420,10 @@
       "organizationid",
       "worktreeid",
       "folderid",
-      "cloudagentsessionid"
+      "cloudagentsessionid",
+      "position"
     ],
-    "searchBlob": "workspaceFolders.moveWorktree Move a worktree into a workspace folder, or remove it from its folder. workspacefolders moveworktree organizationid worktreeid folderid cloudagentsessionid organizationId worktreeId folderId cloudAgentSessionId"
+    "searchBlob": "workspaceFolders.moveWorktree Move a worktree into a workspace folder, or remove it from its folder. workspacefolders moveworktree organizationid worktreeid folderid cloudagentsessionid position organizationId worktreeId folderId cloudAgentSessionId position"
   },
   "workspaceFolders.reorder": {
     "path": "workspaceFolders.reorder",
@@ -38071,6 +38509,14 @@
             "blue",
             "purple"
           ]
+        },
+        "sortMode": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "created",
+            "activity"
+          ]
         }
       },
       "required": [
@@ -38084,8 +38530,9 @@
       "organizationid",
       "folderid",
       "name",
-      "color"
+      "color",
+      "sortmode"
     ],
-    "searchBlob": "workspaceFolders.update Rename a workspace folder or change its color. workspacefolders update organizationid folderid name color organizationId folderId name color"
+    "searchBlob": "workspaceFolders.update Rename a workspace folder or change its color. workspacefolders update organizationid folderid name color sortmode organizationId folderId name color sortMode"
   }
 }

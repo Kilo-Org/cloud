@@ -287,10 +287,6 @@ function ClaudeBillingCardContent({
   const hasConnection =
     statusQuery.data !== undefined && statusQuery.data.state !== 'not_connected';
   if (!launched && !hasConnection) return null;
-  // Inherited access (a parent organization's admin, a Kilo admin) cannot hold
-  // a member link, so there is nothing for that viewer to see or do.
-  const cannotHoldMemberLink = scope === 'member' && statusQuery.data?.canManage === false;
-  if (cannotHoldMemberLink && !hasConnection) return null;
   return (
     <ClaudeBillingCardView
       status={statusQuery.data}

@@ -1166,15 +1166,15 @@ export function ChatSidebar({
 
   const workspaceGroupsInContainer = useCallback(
     (folderId: string | null): SidebarWorkspaceGroup[] => {
-      if (folderId === null) return phase4Ungrouped;
+      if (folderId === null) return workspaceDestinations.unfiled;
       const folder = workspaceFolders?.folders.find(candidate => candidate.id === folderId);
-      if (!folder) return phase4Ungrouped;
+      if (!folder) return workspaceDestinations.unfiled;
       if (folder.kind === 'smart' && folder.smartPreset) {
         return workspaceDestinations.smart.get(folder.smartPreset) ?? [];
       }
       return workspaceDestinations.manual.get(folder.id) ?? [];
     },
-    [phase4Ungrouped, workspaceDestinations, workspaceFolders?.folders]
+    [workspaceDestinations, workspaceFolders?.folders]
   );
 
   const rowDropPlacement = useCallback((event: DragEvent<HTMLDivElement>): 'before' | 'after' => {

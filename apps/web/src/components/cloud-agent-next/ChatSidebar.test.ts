@@ -1545,6 +1545,60 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     expect((position as string) > 'a2').toBe(true);
   });
 
+  it('includes aged-out workspaces when initializing Ungrouped positions', () => {
+    const folders = workspaceFolders();
+    renderSidebar({
+      workspaceFolders: folders,
+      workspaceGroups: [
+        phase4Group(0, null),
+        phase4Group(1, null),
+        phase4Group(2, 'a1', { createdAt: new Date(2026, 0, 1).toISOString() }),
+      ],
+    });
+
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    expect(rows).toHaveLength(2);
+    const sourceTitle = rows[0]?.querySelector('button span');
+    if (!rows[0] || !rows[1] || !sourceTitle) throw new Error('Rows missing');
+
+    dragRows(sourceTitle, rows[1], 35);
+
+    expect(folders.initializeWorktreePositions).toHaveBeenCalledTimes(1);
+    expect(folders.initializeWorktreePositions).toHaveBeenCalledWith(
+      ['worktree_drag_1', 'worktree_drag_0', 'worktree_drag_2'],
+      null
+    );
+    expect(folders.moveWorktree).not.toHaveBeenCalled();
+  });
+
+  it('uses aged-out neighbors when reordering positioned Ungrouped workspaces', () => {
+    const folders = workspaceFolders();
+    renderSidebar({
+      workspaceFolders: folders,
+      workspaceGroups: [
+        phase4Group(0, 'a1'),
+        phase4Group(1, 'a2'),
+        phase4Group(2, 'a3', { createdAt: new Date(2026, 0, 1).toISOString() }),
+      ],
+    });
+
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    expect(rows).toHaveLength(2);
+    const sourceTitle = rows[0]?.querySelector('button span');
+    if (!rows[0] || !rows[1] || !sourceTitle) throw new Error('Rows missing');
+
+    dragRows(sourceTitle, rows[1], 35);
+
+    expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+    expect(folders.moveWorktree).toHaveBeenCalledTimes(1);
+    const [worktreeId, folderId, position] = folders.moveWorktree.mock.calls[0] ?? [];
+    expect(worktreeId).toBe('worktree_drag_0');
+    expect(folderId).toBeNull();
+    if (typeof position !== 'string') throw new Error('Position missing');
+    expect(position > 'a2').toBe(true);
+    expect(position < 'a3').toBe(true);
+  });
+
   it('places before the first row when dropped on its top half', () => {
     const folders = workspaceFolders();
     renderSidebar({

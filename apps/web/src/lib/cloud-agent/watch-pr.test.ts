@@ -130,6 +130,7 @@ const prListCommits = jest.fn();
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(readWorkspacePullRequest).mockReset().mockResolvedValue(null);
   jest.mocked(assertGitHubInstallationRuntimeAuthorized).mockResolvedValue(undefined);
   jest.mocked(db.query.platform_integrations.findMany).mockResolvedValue([]);
   jest.mocked(ensureOrganizationAccess).mockResolvedValue('member');
@@ -506,6 +507,41 @@ describe('manual PR recheck and resume', () => {
     mockWatchTransaction(current);
     await recheckWatchPr(ctx, { watchId: watch.id, generation: 1 });
     expect(db.query.agent_environment_profiles.findFirst).not.toHaveBeenCalled();
+  });
+  it("rechecks a watch on the chat's own PR while another workspace PR wins the badge", async () => {
+    jest.mocked(readWorkspacePullRequest).mockResolvedValue({
+      prUrl: 'https://github.com/kilo/widgets/pull/99',
+      prNumber: 99,
+      gitUrl: 'https://github.com/kilo/widgets',
+      gitBranch: 'other',
+    });
+    mockWatchTransaction(watch, { ...watch, generation: 2 });
+    await expect(recheckWatchPr(ctx, { watchId: watch.id, generation: 1 })).resolves.toMatchObject({
+      generation: 2,
+    });
+    expect(readWorkspacePullRequest).not.toHaveBeenCalled();
+    expect(prGet).toHaveBeenCalledWith(expect.objectContaining({ pull_number: 12 }));
+  });
+  it('rechecks a watch on the workspace PR for a chat without a link of its own', async () => {
+    jest.mocked(db.query.cli_sessions_v2.findFirst).mockResolvedValue({
+      ...session,
+      platform: null,
+      pr_url: null,
+      pr_number: null,
+      pr_head_ref: null,
+      pr_head_sha: null,
+      pr_link_verified_at: null,
+    });
+    jest.mocked(readWorkspacePullRequest).mockResolvedValueOnce({
+      prUrl: 'https://github.com/kilo/widgets/pull/12',
+      prNumber: 12,
+      gitUrl: 'https://github.com/kilo/widgets',
+      gitBranch: 'repair',
+    });
+    mockWatchTransaction(watch, { ...watch, generation: 2 });
+    await expect(recheckWatchPr(ctx, { watchId: watch.id, generation: 1 })).resolves.toMatchObject({
+      generation: 2,
+    });
   });
   it('does not require a saved profile to resume an observation-only watch', async () => {
     const paused = {

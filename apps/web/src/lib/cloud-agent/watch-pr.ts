@@ -86,15 +86,33 @@ async function ownedSession(ctx: WatchContext, sessionId: string) {
   });
   if (!session) throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   if (session.organization_id) await ensureOrganizationAccess(ctx, session.organization_id);
-  return withWorkspacePullRequest(session);
+  return session;
 }
 
 /**
- * A chat in a Cloud Agent workspace watches the workspace's PR (a PR on the
- * branch the workspace has checked out) even without a link of its own. The
- * PR is presented as the session's link, reported on the workspace branch, so
- * `verifySource` still checks it against GitHub before any watch starts.
+ * The session as a Watch PR source: the PR its badge shows. A chat in a Cloud
+ * Agent workspace watches the workspace's PR (a PR on the branch the workspace
+ * has checked out) even without a link of its own. That PR is presented as the
+ * session's link, reported on the workspace branch, so `verifySource` still
+ * checks it against GitHub before any watch starts. Use only for watch source
+ * checks; the result is not the stored session row.
  */
+async function ownedWatchSource(ctx: WatchContext, sessionId: string) {
+  return withWorkspacePullRequest(await ownedSession(ctx, sessionId));
+}
+
+/**
+ * The source session of an existing watch, presenting the watched PR: the
+ * session's own link when it names that PR, else the workspace PR when it
+ * does. A different PR winning the badge later must not orphan the watch.
+ */
+async function ownedWatchSourceFor(ctx: WatchContext, watch: CloudAgentPrWatch) {
+  const session = await ownedSession(ctx, watch.source_session_id);
+  if (session.pr_number === watch.pr_number) return session;
+  const workspace = await withWorkspacePullRequest(session);
+  return workspace.pr_number === watch.pr_number ? workspace : session;
+}
+
 async function withWorkspacePullRequest(session: CliSessionV2): Promise<CliSessionV2> {
   if (!session.cloud_agent_worktree_id) return session;
   const workspacePr = await readWorkspacePullRequest(session);
@@ -333,7 +351,7 @@ export async function getPrWatchOptions(
   ctx: WatchContext,
   input: z.infer<typeof watchPrQuerySchema>
 ) {
-  const session = await ownedSession(ctx, input.sessionId);
+  const session = await ownedWatchSource(ctx, input.sessionId);
   assertExpectedPr(session, input);
   const integrationOptions: {
     integrationId: string;
@@ -438,7 +456,7 @@ export function assertWatchPrExpiry(expiresAt: string, now = Date.now()) {
 
 export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof watchPrEnableSchema>) {
   assertWatchPrExpiry(input.expiresAt);
-  const session = await ownedSession(ctx, input.sessionId);
+  const session = await ownedWatchSource(ctx, input.sessionId);
   assertExpectedPr(session, input);
   const { source, integration, appType, pr } = await verifySource(
     ctx,
@@ -589,7 +607,7 @@ async function settleUnavailableWatch(watch: CloudAgentPrWatch) {
 }
 
 export async function getWatchPr(ctx: WatchContext, input: z.infer<typeof watchPrQuerySchema>) {
-  const session = await ownedSession(ctx, input.sessionId);
+  const session = await ownedWatchSource(ctx, input.sessionId);
   assertExpectedPr(session, input);
   let source: ReturnType<typeof assertWatchPrSource>;
   try {
@@ -666,7 +684,7 @@ export async function changeWatchPr(
         code: 'PRECONDITION_FAILED',
         message: 'Only paused watches can resume',
       });
-    const session = await ownedSession(ctx, watch.source_session_id);
+    const session = await ownedWatchSourceFor(ctx, watch);
     if (
       session.cloud_agent_worktree_id !== watch.worktree_id ||
       session.organization_id !== watch.organization_id
@@ -733,7 +751,7 @@ export async function recheckWatchPr(
       code: 'PRECONDITION_FAILED',
       message: 'Finished watches cannot be rechecked',
     });
-  const session = await ownedSession(ctx, watch.source_session_id);
+  const session = await ownedWatchSourceFor(ctx, watch);
   if (
     session.cloud_agent_worktree_id !== watch.worktree_id ||
     session.organization_id !== watch.organization_id

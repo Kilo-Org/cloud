@@ -78,6 +78,8 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   // "Start fresh" irreversibly discards a workspace's changes behind an in-app confirmation.
   'cloudAgentNext.removeWorkspaceSnapshot': true,
   'organizations.cloudAgentNext.removeWorkspaceSnapshot': true,
+  // Sharing a personal Claude payer binds the user's paid Claude org to an organization scope.
+  'claudeBilling.sharePersonal': true,
 };
 
 /**

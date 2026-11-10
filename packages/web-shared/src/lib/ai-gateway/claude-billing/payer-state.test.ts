@@ -2,10 +2,10 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/drizzle'),
   isUSRegion: () => true,
 }));
-jest.mock('./store', () => ({ getClaudeBillingConnection: jest.fn() }));
+jest.mock('./store', () => ({ getGrantedClaudeBillingConnection: jest.fn() }));
 
 import { afterEach, describe, expect, it } from '@jest/globals';
-import { getClaudeBillingConnection } from './store';
+import { getGrantedClaudeBillingConnection } from './store';
 import { getAuthoritativeClaudeBillingState } from './payer-state';
 
 const owner = { kind: 'personal', kiloUserId: 'owner' } as const;
@@ -39,7 +39,7 @@ describe('Cross-region Claude payer state', () => {
       );
     expect(await getAuthoritativeClaudeBillingState(owner)).toMatchObject({ status: 'connected' });
     expect(await getAuthoritativeClaudeBillingState(owner)).toMatchObject({ status: 'removed' });
-    expect(getClaudeBillingConnection).not.toHaveBeenCalled();
+    expect(getGrantedClaudeBillingConnection).not.toHaveBeenCalled();
   });
 
   it('keeps authoritative absence distinct from unavailable state', async () => {

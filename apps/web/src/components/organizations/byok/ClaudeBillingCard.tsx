@@ -43,7 +43,7 @@ const SCOPE_COPY: Record<
   shared_services: {
     title: 'Claude billing for shared services',
     description:
-      'Link a Claude organization so Kilo shared services in this organization, such as code review, bill it instead of Kilo credits. It is not any member’s own connection.',
+      'Link a Claude organization so Kilo shared services in this organization, such as code review, bill it instead of Kilo credits. Members’ own requests keep their separate billing choices.',
     manageNote: ' Only an owner or admin of this Kilo organization can link it.',
     removeNote:
       'Removing this link stops shared services from billing it. Members’ own links are unchanged.',
@@ -60,7 +60,7 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope) {
     case 'declined':
       return 'Linking did not complete. An owner, admin, or billing admin of your Claude organization must approve it.';
     case 'already_linked':
-      return 'This Claude organization is already linked in Kilo, for another person, organization, or account. Remove that link first.';
+      return 'This Claude organization is already linked in Kilo. Use an existing link you control, or ask its owner to share it.';
     case 'forbidden':
       if (scope === 'shared_services') {
         return 'Only a Kilo organization owner or admin with access to this feature can link it.';
@@ -95,9 +95,11 @@ export type ClaudeBillingCardViewProps = {
   scope?: ClaudeBillingScope;
   outcome?: string | null;
   onConnect?: () => void;
+  onShare?: () => void;
   onRemove?: () => void;
   onRetry?: () => void;
   connecting?: boolean;
+  sharing?: boolean;
   removing?: boolean;
   error?: string | null;
 };
@@ -107,9 +109,11 @@ export function ClaudeBillingCardView({
   scope = 'personal',
   outcome,
   onConnect,
+  onShare,
   onRemove,
   onRetry,
   connecting,
+  sharing,
   removing,
   error,
 }: ClaudeBillingCardViewProps) {
@@ -175,14 +179,14 @@ export function ClaudeBillingCardView({
             >
               Set a spend limit or unlink in Claude Console
             </a>
-            {status.canManage && (onConnect || connected) ? (
+            {status.canManage && (onConnect || onShare || connected) ? (
               <div className="flex flex-wrap items-center gap-2">
                 {onConnect ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={connecting || removing}
+                    disabled={connecting || sharing || removing}
                     onClick={onConnect}
                     className="h-auto min-h-10 whitespace-normal text-left"
                   >
@@ -194,12 +198,25 @@ export function ClaudeBillingCardView({
                         : 'Link your Claude organization'}
                   </Button>
                 ) : null}
+                {onShare ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={connecting || sharing || removing}
+                    onClick={onShare}
+                    className="h-auto min-h-10 whitespace-normal text-left"
+                  >
+                    <ClaudeLogo />
+                    {sharing ? 'Using your personal Claude link…' : 'Use your personal Claude link'}
+                  </Button>
+                ) : null}
                 {connected ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    disabled={connecting || removing}
+                    disabled={connecting || sharing || removing}
                     onClick={onRemove}
                   >
                     {removing ? 'Removing…' : 'Remove from Kilo'}
@@ -254,6 +271,16 @@ function ClaudeBillingCardContent({
   };
   const statusQuery = useQuery(trpc.claudeBilling.status.queryOptions(input));
   const flagEnabled = useFeatureFlagEnabled(CLAUDE_PLATFORM_OAUTH_FLAG);
+  const shareMutation = useMutation(
+    trpc.claudeBilling.sharePersonal.mutationOptions({
+      onSuccess: () => {
+        setOutcome('connected');
+        return queryClient.invalidateQueries({
+          queryKey: trpc.claudeBilling.status.queryKey(input),
+        });
+      },
+    })
+  );
   const removeMutation = useMutation(
     trpc.claudeBilling.remove.mutationOptions({
       onSuccess: () => {
@@ -264,9 +291,13 @@ function ClaudeBillingCardContent({
       },
     })
   );
-  const failureCode = statusQuery.error?.data?.code ?? removeMutation.error?.data?.code;
+  const shareFailureCode = shareMutation.error?.data?.code;
+  const failureCode =
+    statusQuery.error?.data?.code ?? shareFailureCode ?? removeMutation.error?.data?.code;
   const needsSignIn = failureCode === 'UNAUTHORIZED';
   const needsAdmin = failureCode === 'FORBIDDEN';
+  const nonRetryableShareError =
+    shareFailureCode === 'CONFLICT' || shareFailureCode === 'PRECONDITION_FAILED';
   // Before launch the card appears only for an owner who already has a
   // connection, so they can still see its state and remove it.
   const launched = flagEnabled === true;
@@ -279,6 +310,7 @@ function ClaudeBillingCardContent({
       scope={scope}
       outcome={outcome}
       connecting={connecting}
+      sharing={shareMutation.isPending}
       removing={removeMutation.isPending}
       error={
         needsSignIn
@@ -287,17 +319,24 @@ function ClaudeBillingCardContent({
             ? scope === 'shared_services'
               ? 'An organization owner or admin must manage Claude shared services.'
               : 'Only a member of this organization can manage this link.'
-            : statusQuery.isError
-              ? 'We could not load your Claude link.'
-              : removeMutation.isError
-                ? 'We could not remove your Claude link. Try again.'
-                : null
+            : shareFailureCode === 'CONFLICT'
+              ? 'This scope already has a Claude link. Remove it from Kilo first to use your personal link.'
+              : shareFailureCode === 'PRECONDITION_FAILED'
+                ? 'Link your personal Claude organization first, then share it here.'
+                : statusQuery.isError
+                  ? 'We could not load your Claude link.'
+                  : shareMutation.isError
+                    ? 'We could not share your personal Claude link. Try again.'
+                    : removeMutation.isError
+                      ? 'We could not remove your Claude link. Try again.'
+                      : null
       }
       onRetry={
-        needsSignIn || needsAdmin
+        needsSignIn || needsAdmin || nonRetryableShareError
           ? undefined
           : () => {
-              if (removeMutation.isError && !statusQuery.isError) removeMutation.mutate(input);
+              if (shareMutation.isError && !statusQuery.isError) shareMutation.mutate(input);
+              else if (removeMutation.isError && !statusQuery.isError) removeMutation.mutate(input);
               else void statusQuery.refetch();
             }
       }
@@ -314,7 +353,18 @@ function ClaudeBillingCardContent({
             }
           : undefined
       }
-      onRemove={() => removeMutation.mutate(input)}
+      onShare={
+        launched && statusQuery.data?.canSharePersonal
+          ? () => {
+              removeMutation.reset();
+              shareMutation.mutate(input);
+            }
+          : undefined
+      }
+      onRemove={() => {
+        shareMutation.reset();
+        removeMutation.mutate(input);
+      }}
     />
   );
 }

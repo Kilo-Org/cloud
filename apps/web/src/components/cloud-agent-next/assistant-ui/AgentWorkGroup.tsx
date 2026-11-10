@@ -24,10 +24,10 @@ export function AgentWorkGroup({
             aria-hidden
           />
         )}
-        <span className="text-muted-foreground min-w-0 flex-1 text-sm">
-          <span className="block">{summary}</span>
+        <span className="text-muted-foreground flex min-w-0 flex-1 items-baseline gap-2 text-sm">
+          <span className="max-w-full shrink-0 truncate">{summary}</span>
           {activity && (
-            <span className="mt-1 block truncate font-mono text-xs" title={activity}>
+            <span className="min-w-0 truncate font-mono text-xs" title={activity}>
               {activity}
             </span>
           )}

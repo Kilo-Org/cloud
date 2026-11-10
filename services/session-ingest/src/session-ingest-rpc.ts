@@ -123,7 +123,6 @@ import {
   isWorktreeSessionDeleting,
   WORKTREE_DELETING,
 } from './services/worktree-deletion';
-import { inheritWorktreePullRequestLink } from './services/worktree-pr-link';
 import {
   assertHostedWorkspaceSessionDeletable as checkHostedWorkspaceSessionDeletable,
   deleteHostedWorkspaceSessionRows,
@@ -515,12 +514,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
         })
         .returning();
-      if (created) {
-        return {
-          existingRow: undefined,
-          persistedRow: await inheritWorktreePullRequestLink(tx, created),
-        };
-      }
+      if (created) return { existingRow: undefined, persistedRow: created };
 
       const [existing] = await tx
         .select()

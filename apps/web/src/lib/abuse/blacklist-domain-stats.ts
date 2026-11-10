@@ -9,7 +9,7 @@ export const BLACKLIST_STATS_ROW_LIMIT = 200;
 export type EmailHostCount = {
   email_host: string | null;
   // False when the address holds no '@', which starts the entry walk one label
-  // lower, exactly as isEmailBlacklistedByDomain reads it.
+  // lower, exactly as emailDomainSuffixes reads it.
   has_local_part: boolean;
   count: number;
 };
@@ -25,7 +25,7 @@ const hasLocalPartSql = sql<boolean>`${atSignCountSql} > 0`;
 
 // The host part of the account email, lowercased. This is the text after the
 // last '@', and the whole address when it holds none, because that is the host
-// isEmailBlacklistedByDomain reads from a sign-in email. Blacklist entries
+// emailDomainSuffixes reads from a sign-in email. Blacklist entries
 // match this host on label boundaries, so an entry below the registrable domain
 // still reports the accounts it stops.
 const emailHostSql = sql<string>`lower(split_part(${kilocode_users.google_user_email}, '@', ${atSignCountSql} + 1))`;

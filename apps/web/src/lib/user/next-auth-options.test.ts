@@ -18,7 +18,6 @@ jest.mock('@/lib/user', () => ({
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   ...jest.requireActual<typeof userServerModule>('@kilocode/web-shared/lib/user/server'),
   getUserFromSession: jest.fn(),
-  isEmailBlacklistedByDomainAsync: jest.fn(),
   isBlockedTLD: jest.fn(),
 }));
 jest.mock('@/lib/account-linking-session', () => ({
@@ -639,7 +638,6 @@ describe('WorkOS sign-in callback', () => {
     jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(watchwood);
     jest.mocked(processSSOUserLogin).mockResolvedValue(true);
     jest.mocked(userLib.findAndSyncExistingUser).mockResolvedValue(null);
-    jest.mocked(userServer.isEmailBlacklistedByDomainAsync).mockResolvedValue(false);
     jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
   });
 

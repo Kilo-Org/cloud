@@ -4,10 +4,8 @@ import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
-import {
-  isEmailBlacklistedByDomainAsync,
-  isBlockedTLD,
-} from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/server';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
@@ -105,7 +103,7 @@ export type DomainSignInEligibility =
 export async function checkDomainSignInEligibility(
   email: string
 ): Promise<DomainSignInEligibility> {
-  if (await isEmailBlacklistedByDomainAsync(email)) {
+  if (await isEmailBlacklisted(email)) {
     return { ok: false, status: 403, errorCode: 'BLOCKED' };
   }
 
@@ -165,7 +163,7 @@ export async function isNewAccountEligibleForMagicLink(email: string): Promise<b
     return false;
   }
 
-  if (await isEmailBlacklistedByDomainAsync(email)) {
+  if (await isEmailBlacklisted(email)) {
     return false;
   }
 

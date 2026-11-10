@@ -51,6 +51,7 @@ const UPSERT_ACTIONS: ReadonlySet<string> = new Set([
   GITHUB_ACTION.CLOSED,
   GITHUB_ACTION.READY_FOR_REVIEW,
   GITHUB_ACTION.CONVERTED_TO_DRAFT,
+  GITHUB_ACTION.STACKED,
 ]);
 
 // Actions that can change the review decision (push auto-dismisses reviews,
@@ -75,6 +76,25 @@ function tenantPredicateForOwner(owner: WebhookInstallationOwner) {
   return owner.kind === 'organization'
     ? eq(cli_sessions_v2.organization_id, owner.organizationId)
     : and(isNull(cli_sessions_v2.organization_id), eq(cli_sessions_v2.kilo_user_id, owner.userId));
+}
+
+/**
+ * Stack membership from a pull request webhook. The `stacked` action carries
+ * it at the payload top level; other lifecycle events put it on
+ * `pull_request`. An absent or null stack means the PR is not in a stack, so
+ * the cache columns are cleared rather than left stale.
+ */
+function webhookStack(payload: PullRequestPayload): {
+  number: number | null;
+  position: number | null;
+  size: number | null;
+} {
+  const stack = payload.stack ?? payload.pull_request.stack ?? null;
+  return {
+    number: stack?.number ?? null,
+    position: stack?.position ?? null,
+    size: stack?.size ?? null,
+  };
 }
 
 /**
@@ -186,13 +206,19 @@ export async function markSessionsVerifyingPullRequest(
   if (linking.length === 0) return { kind: 'no_session' };
 
   // Re-apply the gate and pin each checked `pr_url` so a link changed after the
-  // read is never marked verified.
-  const marked = await db
+  // read is never marked verified. Only rows that are not verified yet are
+  // written: re-stamping an already verified link on every push or merge bumps
+  // `updated_at` and moves the workspace in the sidebar even though no real
+  // activity happened. A link change resets the column to null, so a newly
+  // reported link is still marked on its first delivery.
+  await db
     .update(cli_sessions_v2)
     .set({ pr_link_verified_at: sql`now()` })
-    .where(and(candidatePredicate, or(...linking)))
-    .returning({ session_id: cli_sessions_v2.session_id });
-  return marked.length > 0 ? { kind: 'session' } : { kind: 'no_session' };
+    .where(and(candidatePredicate, isNull(cli_sessions_v2.pr_link_verified_at), or(...linking)));
+  // A candidate that was already verified still counts as a verified session:
+  // the cache upsert must run for its updates, and callers only need to know
+  // whether any session verifiably links this PR.
+  return { kind: 'session' };
 }
 
 /**
@@ -335,6 +361,8 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         ? { owned_by_organization_id: owner.organizationId, owned_by_user_id: null }
         : { owned_by_organization_id: null, owned_by_user_id: owner.userId };
 
+    const stack = webhookStack(payload);
+
     // Identity is the PR, never the branch: the partial unique indexes are
     // keyed on `(git_url, pr_number, owner)`.
     const conflictTarget =
@@ -364,6 +392,10 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         pr_title: pull_request.title,
         pr_head_sha: pull_request.head.sha,
         pr_observations: observations,
+        pr_base_ref: pull_request.base.ref,
+        stack_number: stack.number,
+        stack_position: stack.position,
+        stack_size: stack.size,
         pr_review_decision: null,
         review_decision_pending: true,
         review_decision_fetching_at: null,
@@ -379,6 +411,10 @@ export async function upsertCliSessionPullRequestsFromWebhook(
           pr_title: sql`excluded.pr_title`,
           pr_head_sha: sql`excluded.pr_head_sha`,
           pr_observations: observationsSet,
+          pr_base_ref: sql`excluded.pr_base_ref`,
+          stack_number: sql`excluded.stack_number`,
+          stack_position: sql`excluded.stack_position`,
+          stack_size: sql`excluded.stack_size`,
           review_decision_pending: reviewDecisionPendingSet,
           pr_last_synced_at: sql`now()`,
           updated_at: sql`now()`,

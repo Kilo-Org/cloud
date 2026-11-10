@@ -143,7 +143,7 @@ export function worktreeChangesContext(
     // A V2 route compares each repository with its own base, which the wrapper chooses.
     baseRef: isMultiRepositoryEnvironment(metadata.environment)
       ? undefined
-      : worktreeChangesBaseRef(repository.upstreamBranch),
+      : worktreeChangesBaseRef(repository.baseBranch),
     ...(roots === undefined ? {} : { roots }),
   };
 }
@@ -313,11 +313,17 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
         captured = reported.capture;
         repositories = reported.repositories;
       }
+      const fallback = captured.summary.comparison.baseRefFallback;
+      const comparisonBaseMatches =
+        context.baseRef === undefined ||
+        captured.summary.comparison.baseRef === context.baseRef ||
+        (fallback?.requested === context.baseRef &&
+          captured.summary.comparison.baseRef === fallback.used);
       if (
         captured.summary.revision !== requestedRevision ||
         new Set(captured.summary.files.map(worktreeFileIdentity)).size !==
           captured.summary.files.length ||
-        (context.baseRef !== undefined && captured.summary.comparison.baseRef !== context.baseRef)
+        !comparisonBaseMatches
       ) {
         return { status: 'failed', snapshot };
       }

@@ -6564,6 +6564,9 @@ export const cloud_agent_workspace_folders = pgTable(
     name: text().notNull(),
     color: text().$type<WorkspaceFolderColor>().notNull().default(WorkspaceFolderColor.Default),
     position: integer().notNull(),
+    kind: text().$type<'manual' | 'smart'>().notNull().default('manual'),
+    smart_preset: text().$type<'needs_you' | 'in_review' | 'done'>(),
+    sort_mode: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6583,6 +6586,19 @@ export const cloud_agent_workspace_folders = pgTable(
       sql`char_length(btrim(${table.name})) BETWEEN 1 AND 200 AND ${table.name} = btrim(${table.name})`
     ),
     check('cloud_agent_workspace_folders_position_check', sql`${table.position} >= 0`),
+    check('cloud_agent_workspace_folders_kind_check', sql`${table.kind} IN ('manual', 'smart')`),
+    check(
+      'cloud_agent_workspace_folders_smart_preset_check',
+      sql`(${table.kind} = 'manual' AND ${table.smart_preset} IS NULL) OR (${table.kind} = 'smart' AND ${table.smart_preset} IS NOT NULL AND ${table.smart_preset} IN ('needs_you', 'in_review', 'done'))`
+    ),
+    check(
+      'cloud_agent_workspace_folders_sort_mode_check',
+      sql`${table.sort_mode} IN ('manual', 'created', 'activity')`
+    ),
+    uniqueIndex('UQ_cloud_agent_workspace_folders_smart_preset')
+      .on(table.kilo_user_id, sql`coalesce(${table.organization_id}::text, '')`, table.smart_preset)
+      .where(sql`${table.kind} = 'smart'`)
+      .concurrently(),
   ]
 );
 
@@ -6595,6 +6611,12 @@ export const cloud_agent_worktrees = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'restrict' }),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
     folder_id: uuid().references(() => cloud_agent_workspace_folders.id, { onDelete: 'set null' }),
+    parent_worktree_id: text().references((): AnyPgColumn => cloud_agent_worktrees.worktree_id, {
+      onDelete: 'set null',
+    }),
+    base_branch: text(),
+    base_sha: text(),
+    sidebar_position: text(),
     name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -6618,6 +6640,10 @@ export const cloud_agent_worktrees = pgTable(
     index('IDX_cloud_agent_worktrees_folder_id')
       .on(table.folder_id)
       .where(isNotNull(table.folder_id)),
+    index('IDX_cloud_agent_worktrees_parent_worktree_id')
+      .on(table.parent_worktree_id)
+      .where(isNotNull(table.parent_worktree_id))
+      .concurrently(),
     check(
       'cloud_agent_worktrees_deletion_check',
       sql`${table.deletion_completed_at} IS NULL OR (${table.deletion_started_at} IS NOT NULL AND ${table.name} IS NULL AND ${table.deletion_manifest} IS NULL AND ${table.runtime_locations} = '[]'::jsonb)`
@@ -6707,6 +6733,9 @@ export const cli_sessions_v2 = pgTable(
       .where(isNotNull(table.cloud_agent_session_id)),
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    index('IDX_cli_sessions_v2_user_activity')
+      .on(table.kilo_user_id, sql`coalesce(${table.last_activity_at}, ${table.created_at})`)
+      .concurrently(),
     index('IDX_cli_sessions_v2_briefing_activity')
       .on(
         table.kilo_user_id,
@@ -7268,6 +7297,10 @@ export const github_branch_pull_requests = pgTable(
     pr_head_sha: text(),
     pr_observations: jsonb().$type<unknown>(),
     pr_review_decision: text(),
+    pr_base_ref: text(),
+    stack_number: integer(),
+    stack_position: integer(),
+    stack_size: integer(),
     review_decision_pending: boolean().notNull().default(false),
     review_decision_fetching_at: timestamp({ withTimezone: true, mode: 'string' }),
     pr_last_synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -8896,11 +8929,42 @@ export type CloudAgentSandboxAllocationSetting =
 export type NewCloudAgentSandboxAllocationSetting =
   typeof cloud_agent_sandbox_allocation_settings.$inferInsert;
 
-// ============ CLOUD AGENT BUILT-IN AGENT SETTINGS ============
-// User-scoped model and visibility overrides for the CLI's built-in agents
-// (for example `explore`, `compaction`, `plan`, and `debug`). These apply to
-// every Cloud Agent session the user starts, independent of a profile.
+// ============ CLOUD AGENT USER SETTINGS ============
+// One row per user. These personal settings apply to every Cloud Agent session
+// and sidebar of the user, in the personal account and in every organization.
 
+// Map of built-in agent slug (for example `explore`, `compaction`, `plan`) to an
+// override. See BuiltinAgentSettingsSchema in `@kilocode/cloud-agent-profile`.
+export type CloudAgentBuiltinAgentOverrides = Record<
+  string,
+  { model?: string | null; variant?: string; disable?: boolean }
+>;
+
+export const cloud_agent_user_settings = pgTable(
+  'cloud_agent_user_settings',
+  {
+    kilo_user_id: text()
+      .primaryKey()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    workspace_order: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
+    builtin_agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'cloud_agent_user_settings_workspace_order_check',
+      sql`${table.workspace_order} IN ('manual', 'created', 'activity')`
+    ),
+  ]
+);
+
+// Replaced by cloud_agent_user_settings.builtin_agents, which migration 0345
+// copied from this table. Code in this repository no longer reads it. Drop it
+// after the deployed web app and cloud-agent-next Worker stop reading it.
 export const cloud_agent_builtin_agent_settings = pgTable(
   'cloud_agent_builtin_agent_settings',
   {
@@ -8911,13 +8975,7 @@ export const cloud_agent_builtin_agent_settings = pgTable(
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    // Map of built-in agent slug → override. Only model, variant, and disable
-    // are meaningful here; see BuiltinAgentSettingsSchema in
-    // `@kilocode/cloud-agent-profile`.
-    agents: jsonb()
-      .$type<Record<string, { model?: string | null; variant?: string; disable?: boolean }>>()
-      .notNull()
-      .default({}),
+    agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -8926,10 +8984,6 @@ export const cloud_agent_builtin_agent_settings = pgTable(
   },
   table => [uniqueIndex('UQ_cloud_agent_builtin_agent_settings_user').on(table.user_id)]
 );
-
-export type CloudAgentBuiltinAgentSetting = typeof cloud_agent_builtin_agent_settings.$inferSelect;
-export type NewCloudAgentBuiltinAgentSetting =
-  typeof cloud_agent_builtin_agent_settings.$inferInsert;
 
 // ============ AGENT ENVIRONMENT PROFILE MCP SERVERS ============
 // MCP servers configured on an environment profile. Materialized into the

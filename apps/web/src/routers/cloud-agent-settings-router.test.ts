@@ -6,8 +6,8 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_environment_profile_repo_bindings,
   agent_environment_profiles,
-  cloud_agent_builtin_agent_settings,
   cloud_agent_sandbox_allocation_settings,
+  cloud_agent_user_settings,
   type Organization,
   type User,
 } from '@kilocode/db/schema';
@@ -87,8 +87,8 @@ describe('cloud-agent-settings router', () => {
   afterEach(async () => {
     const userIds = [ownerUser.id, memberUser.id, otherUser.id];
     await db
-      .delete(cloud_agent_builtin_agent_settings)
-      .where(inArray(cloud_agent_builtin_agent_settings.user_id, userIds));
+      .delete(cloud_agent_user_settings)
+      .where(inArray(cloud_agent_user_settings.kilo_user_id, userIds));
     await db
       .delete(cloud_agent_sandbox_allocation_settings)
       .where(

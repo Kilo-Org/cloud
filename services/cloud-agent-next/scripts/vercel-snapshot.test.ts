@@ -219,6 +219,7 @@ describe('Vercel snapshot operator pure logic', () => {
       `install bun ${RUNTIME_DISTRIBUTION.bun}`,
       `install glab ${RUNTIME_DISTRIBUTION.glab}`,
       `install gh ${RUNTIME_DISTRIBUTION.gh}`,
+      `install gh-stack ${RUNTIME_DISTRIBUTION.ghStack}`,
       `install pnpm ${RUNTIME_DISTRIBUTION.pnpm}`,
       `install kilo ${RUNTIME_TOOLCHAIN.kilo.version}`,
       'verify runtime pins',
@@ -233,6 +234,9 @@ describe('Vercel snapshot operator pure logic', () => {
       expect(step.script).not.toContain('| bash');
       expect(step.script).not.toContain('bash -s');
     }
+    const ghStack = steps.find(step => step.label.startsWith('install gh-stack '));
+    expect(ghStack?.script).toContain('sha256sum -c -');
+    expect(steps.at(-1)?.script).toContain(`= '${RUNTIME_DISTRIBUTION.ghStackSha256}'`);
     expect(steps.at(-1)?.script).toContain(`= '${RUNTIME_DISTRIBUTION.gh}'`);
     expect(steps.at(-1)?.script).toContain(`in v${RUNTIME_DISTRIBUTION.nodeMajor}.*`);
   });

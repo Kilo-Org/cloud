@@ -18,14 +18,20 @@ import {
   eventRowMatchesSidebarFilters,
   eventRowToDbSession,
   getRunningSessionSortTime,
+  getDbSessionActivityTime,
   getSidebarRunOutcomeAfterStatus,
   getSidebarSessionStatus,
   getSidebarWorktreeActivity,
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
   getSidebarWorktreeRefetchInterval,
+  getStoredSessionActivityTime,
   groupSidebarSessions,
   groupSidebarSessionsByDate,
+  groupSidebarWorkspaces,
+  mergeWorkspaceRowDetails,
+  workspaceRowToSidebarDetails,
+  type SidebarWorkspaceListRow,
   mergeWorktreeChatSessions,
   nextPrLinkVerification,
   PR_LINK_ATTEMPT_HISTORY_LIMIT,
@@ -152,6 +158,10 @@ Object.assign(globalThis, { React });
 
 let mockRenderOpenMenus = false;
 
+jest.mock('../hooks/useStackedWorkspaceSource', () => ({
+  useStackedWorkspaceSource: () => ({ source: undefined, isPending: false }),
+}));
+
 jest.mock('next/navigation', () => ({
   usePathname: () => '/cloud/chat',
   useRouter: () => ({ push: jest.fn() }),
@@ -209,6 +219,7 @@ function makeDbSession(sessionId: string, updatedAt: string): DbSessionV2 {
     parent_session_id: null,
     created_at: new Date('2026-01-01T00:00:00.000Z'),
     updated_at: new Date(updatedAt),
+    last_activity_at: new Date(updatedAt),
     version: 2,
     status: 'idle',
     status_updated_at: null,
@@ -245,6 +256,9 @@ describe('mergeSidebarFolderSessions', () => {
         id: '33333333-3333-4333-8333-333333333333',
         name: 'Saved',
         color: 'default',
+        kind: 'manual',
+        smartPreset: null,
+        sortMode: 'manual',
         worktreeIds: folder.flatMap(session => (session.worktreeId ? [session.worktreeId] : [])),
       },
     ]);
@@ -1738,6 +1752,13 @@ describe('useSidebarSessions live update helpers', () => {
         worktree_shared: {
           name: 'Named worktree',
           defaultTitle: null,
+          branch: null,
+          folderId: null,
+          sidebarPosition: null,
+          parentWorktreeId: null,
+          baseBranch: null,
+          baseSha: null,
+          createdAt: '2026-01-03T12:00:00.000Z',
           prSession: null,
           sessions: [
             {
@@ -2057,9 +2078,8 @@ describe('ChatSidebar worktree controls', () => {
       true
     );
 
-    expect(html.includes('Worktree actions for')).toBe(
-      capabilities.create || capabilities.rename || capabilities.remove
-    );
+    expect(html).toContain('Worktree actions for');
+    expect(html).toContain('New stacked workspace');
     expect(html.includes('New chat')).toBe(capabilities.create);
     expect(html.includes('Rename worktree')).toBe(capabilities.rename);
     expect(html.includes('Delete worktree')).toBe(capabilities.remove);
@@ -2254,5 +2274,149 @@ describe('ChatSidebar worktree controls', () => {
     expect(html).not.toContain('Rename worktree');
     expect(html).not.toContain('Delete worktree');
     expect(deletedSessions).toEqual([standalone.sessionId]);
+  });
+});
+
+describe('S0 activity fallback', () => {
+  it('falls back to the creation time, not the update time, when activity is absent', () => {
+    const session = makeStoredSession('ses_idle', '2026-01-09T00:00:00.000Z', {
+      createdAt: '2026-01-02T00:00:00.000Z',
+      lastActivityAt: null,
+    });
+    expect(getStoredSessionActivityTime(session)).toBe(
+      new Date('2026-01-02T00:00:00.000Z').getTime()
+    );
+  });
+
+  it('falls back to created_at for database rows', () => {
+    const session = makeDbSession('ses_idle', '2026-01-09T00:00:00.000Z');
+    expect(
+      getDbSessionActivityTime({
+        ...session,
+        created_at: new Date('2026-01-02T00:00:00.000Z'),
+        last_activity_at: null,
+      })
+    ).toBe(new Date('2026-01-02T00:00:00.000Z').getTime());
+  });
+});
+
+function makeWorkspaceRow(
+  worktreeId: string,
+  overrides: Record<string, unknown> = {}
+): SidebarWorkspaceListRow {
+  return {
+    worktreeId,
+    name: worktreeId,
+    defaultTitle: null,
+    branch: `branch/${worktreeId}`,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    lastActivityAt: '2026-01-02T00:00:00.000Z',
+    folderId: null,
+    sidebarPosition: null,
+    parentWorktreeId: null,
+    baseBranch: null,
+    pr: null,
+    status: {
+      kind: null,
+      sessionStatus: null,
+      statusUpdatedAt: null,
+      latestRunStatus: null,
+      latestRunFailureKind: null,
+      latestRunTerminalAt: null,
+    },
+    chatCount: 0,
+    latestSessionId: `ses_${worktreeId}`,
+    gitUrl: 'https://github.com/kilo/repo',
+    ...overrides,
+  } as unknown as SidebarWorkspaceListRow;
+}
+
+describe('workspace rows independent of the chat list', () => {
+  it('keeps an old open workspace visible and openable through its latest session', () => {
+    const row = makeWorkspaceRow('worktree_old', { name: 'Old workspace' });
+    const [group] = groupSidebarWorkspaces([], mergeWorkspaceRowDetails({}, [row]), [row]);
+
+    expect(group).toMatchObject({
+      type: 'worktree',
+      worktreeId: 'worktree_old',
+      latestSession: { sessionId: 'ses_worktree_old', repository: 'kilo/repo' },
+      details: { name: 'Old workspace' },
+    });
+  });
+
+  it('does not duplicate a worktree that still has a chat in the list', () => {
+    const row = makeWorkspaceRow('worktree_shared');
+    const session = makeStoredSession('ses_visible', '2026-01-03T00:00:00.000Z', {
+      worktreeId: 'worktree_shared',
+    });
+    const groups = groupSidebarWorkspaces([session], mergeWorkspaceRowDetails({}, [row]), [row]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ worktreeId: 'worktree_shared' });
+    expect(groups[0]?.sessions).toHaveLength(1);
+    expect(groups[0]?.latestSession.sessionId).toBe('ses_visible');
+  });
+
+  it('renders stacked children once under their root', () => {
+    const root = makeWorkspaceRow('worktree_root', { branch: 'feature/base' });
+    const child = makeWorkspaceRow('worktree_child', {
+      branch: 'feature/child',
+      parentWorktreeId: 'worktree_root',
+      baseBranch: 'feature/base',
+    });
+    const details = mergeWorkspaceRowDetails({}, [root, child]);
+    const groups = groupSidebarWorkspaces([], details, [root, child]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.worktreeId).toBe('worktree_root');
+    expect(groups[0]?.stackLayers?.map(layer => layer.worktreeId)).toEqual(['worktree_child']);
+  });
+
+  it('merges row metadata without replacing chat-derived sessions', () => {
+    const session = makeStoredSession('ses_visible', '2026-01-03T00:00:00.000Z', {
+      worktreeId: 'worktree_shared',
+    });
+    const merged = mergeWorkspaceRowDetails(
+      {
+        worktree_shared: {
+          name: 'Chat-derived name',
+          defaultTitle: null,
+          prSession: null,
+          sessions: [session],
+        },
+      },
+      [makeWorkspaceRow('worktree_shared', { name: 'Row name', folderId: 'folder-1' })]
+    );
+
+    expect(merged.worktree_shared).toMatchObject({
+      name: 'Chat-derived name',
+      folderId: 'folder-1',
+      sessions: [session],
+    });
+  });
+
+  it('builds a detail row with a PR session for an old workspace', () => {
+    const row = makeWorkspaceRow('worktree_old', {
+      pr: {
+        url: 'https://github.com/kilo/repo/pull/7',
+        number: 7,
+        state: 'open',
+        title: 'Stacked change',
+        headSha: null,
+        baseRef: null,
+        stackNumber: null,
+        stackPosition: null,
+        stackSize: null,
+        lastSyncedAt: '2026-01-02T00:00:00.000Z',
+        reviewDecision: null,
+        reviewDecisionPending: false,
+        platform: 'github',
+      },
+    });
+    const details = workspaceRowToSidebarDetails(row);
+    expect(details.prSession).toMatchObject({
+      sessionId: 'ses_worktree_old',
+      associatedPr: { number: 7, state: 'open' },
+    });
   });
 });

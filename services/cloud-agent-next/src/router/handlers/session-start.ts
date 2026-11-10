@@ -65,7 +65,11 @@ function startInputToSessionCreateRequest(
   input: z.infer<typeof StartSessionInput>
 ): SessionCreateRequest {
   const profile = input.profile;
-  const repository = repositoryInputToSessionRepository(input.repository);
+  const repository = {
+    ...repositoryInputToSessionRepository(input.repository),
+    ...(input.baseBranch === undefined ? {} : { baseBranch: input.baseBranch }),
+    ...(input.baseSha === undefined ? {} : { baseSha: input.baseSha }),
+  };
 
   return {
     initialTurn: {
@@ -76,6 +80,7 @@ function startInputToSessionCreateRequest(
     },
     agent: input.agent,
     repository,
+    ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
     ...(input.runtime ? { runtime: input.runtime } : {}),
     profile: profileInputToSessionProfile(profile),
     finalization: input.finalization,

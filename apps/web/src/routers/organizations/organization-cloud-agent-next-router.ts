@@ -39,6 +39,13 @@ import {
   repositoryFullNameSchema,
 } from '@/lib/cloud-agent/provider-branch-listing';
 import {
+  assertSuppliedRepositoryMatchesParent,
+  resolveStackedWorkspacePreparation,
+  resolveStackedWorkspaceSource,
+  type StackedWorkspaceRepository,
+} from '@/lib/cloud-agent/stacked-workspace-preparation';
+import { runWorktreeBranchOperation } from '@/lib/cloud-agent/worktree-branch-operations';
+import {
   organizationPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
   baseCreateWorktreeChatNextSchema,
@@ -62,6 +69,12 @@ import {
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
   baseGetPendingInteractionsNextOutputSchema,
+  baseGetStackedWorkspaceSourceNextSchema,
+  baseStackedWorkspaceSourceNextOutputSchema,
+  baseSyncWorktreeBranchNextSchema,
+  baseSyncWorktreeBranchNextOutputSchema,
+  baseRestackWorktreeBranchNextSchema,
+  baseRestackWorktreeBranchNextOutputSchema,
   baseWorktreeChangesNextSchema,
   baseWorktreeFileNextSchema,
   baseAnswerQuestionNextSchema,
@@ -244,6 +257,18 @@ const WorktreeFileInput = baseWorktreeFileNextSchema.extend({
   organizationId: z.uuid(),
 });
 
+const StackedWorkspaceSourceInput = baseGetStackedWorkspaceSourceNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const SyncWorktreeBranchInput = baseSyncWorktreeBranchNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const RestackWorktreeBranchInput = baseRestackWorktreeBranchNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
 const CreateTerminalInput = baseCreateTerminalNextSchema.extend({
   organizationId: z.uuid(),
 });
@@ -359,10 +384,23 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         githubIntegrationId,
         bitbucketRepo,
         publicRepoUrl,
+        baseBranch,
+        stackOnWorktreeId,
         organizationId,
         attachments,
         ...restInput
       } = input;
+
+      const stackedParent =
+        stackOnWorktreeId === undefined
+          ? undefined
+          : await resolveStackedWorkspaceSource({
+              db,
+              client,
+              userId: ctx.user.id,
+              organizationId,
+              worktreeId: stackOnWorktreeId,
+            });
 
       // Profile resolution happens inside cloud-agent-next. Tokens are resolved
       // there as well via GIT_TOKEN_SERVICE. We forward profileId + inline
@@ -375,8 +413,50 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         bitbucketWorkspaceUuid?: string;
         bitbucketRepositoryUuid?: string;
       };
+      let repository: StackedWorkspaceRepository | undefined;
 
-      if (gitlabProject) {
+      if (stackedParent) {
+        assertSuppliedRepositoryMatchesParent({
+          supplied: {
+            githubRepo,
+            githubIntegrationId,
+            gitlabProject,
+            publicRepoUrl,
+            bitbucketRepo,
+          },
+          parent: stackedParent,
+        });
+        const parent = stackedParent.repository;
+        repository = parent;
+        if (parent.platform === 'github') {
+          gitParams = {
+            githubRepo: parent.fullName,
+            githubIntegrationId: parent.githubIntegrationId,
+            platform: PLATFORM.GITHUB,
+          };
+        } else if (parent.platform === 'gitlab') {
+          gitParams = { gitUrl: parent.canonicalUrl, platform: PLATFORM.GITLAB };
+        } else if (parent.platform === 'bitbucket') {
+          const bitbucket = stackedParent.source.providerInput.bitbucketRepo;
+          if (!bitbucket) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'That workspace has no Bitbucket repository identity to copy.',
+            });
+          }
+          gitParams = {
+            gitUrl: parent.canonicalUrl,
+            platform: PLATFORM.BITBUCKET,
+            bitbucketWorkspaceUuid: bitbucket.workspaceUuid,
+            bitbucketRepositoryUuid: bitbucket.repositoryUuid,
+          };
+        } else {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'That workspace has no provider branch to stack on.',
+          });
+        }
+      } else if (gitlabProject) {
         let projectAvailable: boolean;
         try {
           projectAvailable = await validateGitLabRepoAccessForOrganization(
@@ -408,12 +488,18 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
+        repository = { platform: 'gitlab', fullName: gitlabProject, canonicalUrl: gitUrl };
       } else if (bitbucketRepo) {
         gitParams = {
           gitUrl: `https://bitbucket.org/${bitbucketRepo.fullName}.git`,
           platform: PLATFORM.BITBUCKET,
           bitbucketWorkspaceUuid: bitbucketRepo.workspaceUuid,
           bitbucketRepositoryUuid: bitbucketRepo.repositoryUuid,
+        };
+        repository = {
+          platform: 'bitbucket',
+          fullName: bitbucketRepo.fullName,
+          canonicalUrl: `https://bitbucket.org/${bitbucketRepo.fullName}.git`,
         };
       } else if (publicRepoUrl) {
         if (!isPublicRepoUrlEnabled()) {
@@ -423,6 +509,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           });
         }
         gitParams = { gitUrl: publicRepoUrl };
+        repository = { platform: 'git', fullName: publicRepoUrl, canonicalUrl: publicRepoUrl };
       } else {
         // The runtime's repository preflight runs only when the request names
         // the integration that owns the repository, so resolve it for the
@@ -442,7 +529,29 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           githubIntegrationId: resolvedIntegrationId ?? undefined,
           platform: PLATFORM.GITHUB,
         };
+        if (githubRepo) {
+          repository = {
+            platform: 'github',
+            fullName: githubRepo,
+            canonicalUrl: `https://github.com/${githubRepo}`,
+            ...(resolvedIntegrationId ? { githubIntegrationId: resolvedIntegrationId } : {}),
+          };
+        }
       }
+
+      // Every provider read that can refuse the create runs before attachment
+      // rows are linked, so a refusal never strands uploaded objects.
+      const stackedFields = await resolveStackedWorkspacePreparation({
+        db,
+        client,
+        userId: ctx.user.id,
+        organizationId,
+        ...(stackOnWorktreeId !== undefined ? { stackOnWorktreeId } : {}),
+        ...(baseBranch !== undefined ? { baseBranch } : {}),
+        ...(input.upstreamBranch !== undefined ? { upstreamBranch: input.upstreamBranch } : {}),
+        ...(repository ? { repository } : {}),
+        ...(stackedParent ? { parent: stackedParent } : {}),
+      });
 
       let linkedObjectKeys: string[] = [];
       try {
@@ -459,6 +568,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
+          ...stackedFields,
           attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
@@ -727,6 +837,66 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         path: input.path,
         scope: input.scope,
         expectedRevision: input.expectedRevision,
+      });
+    }),
+
+  getStackedWorkspaceSource: organizationMemberProcedure
+    .input(StackedWorkspaceSourceInput)
+    .output(baseStackedWorkspaceSourceNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      const parent = await resolveStackedWorkspaceSource({
+        db,
+        client,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        worktreeId: input.worktreeId,
+      });
+      return parent.source;
+    }),
+
+  syncWorktreeBranch: organizationMemberMutationProcedure
+    .input(SyncWorktreeBranchInput)
+    .output(baseSyncWorktreeBranchNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await runWorktreeBranchOperation({
+        db,
+        client,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        operation: 'sync',
+      });
+    }),
+
+  restackWorktreeBranch: organizationMemberMutationProcedure
+    .input(RestackWorktreeBranchInput)
+    .output(baseRestackWorktreeBranchNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await runWorktreeBranchOperation({
+        db,
+        client,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        operation: 'restack',
       });
     }),
 

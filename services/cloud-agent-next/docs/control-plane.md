@@ -1504,6 +1504,61 @@ Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `hear
 `session.outcome`, `events_dropped`, terminal control requests, worktree-change requests,
 worktree-deletion requests (`worktree.prepareDeletion`, `worktree.delete`; both answer with
 `worktree.result`). Terminal bytes use the existing wrapper-to-Session-DO terminal socket.
+`worktree.git` is the one new worktree frame: the Session DO forwards one Sync or Restack request
+and the wrapper answers with the same `worktree.result` envelope. Its request payload and result
+are the shared `worktreeBranchOperation*` schemas; the result discriminates
+`changed`/`unchanged`/`conflict`/`refused`. A successful request has a 450-second reply bound
+(120s fetch + 120s rebase + 120s push plus overhead), not the 30-second capture bound.
+The wrapper advertises `worktreeGit: true` in its hello. A running older wrapper remains
+usable for turns and Changes but receives no git-operation frame; Sync and Restack fail
+immediately with `wrapper_upgrade_required` until that sandbox restarts on the updated runtime.
+
+### Stacked workspaces
+
+A stacked workspace records a base branch and the exact parent tip it was created from, plus the
+parent worktree. The flat `prepareSession` input and the grouped `start` input accept `baseBranch`,
+`baseSha` and `parentWorktreeId`; they are validated at the boundary and stored as grouped
+`SessionMetadata` v2 (`repository.baseBranch`, `repository.baseSha`, `workspace.parentWorktreeId`).
+The first session-ingest ownership row for the worktree records the same three values and later
+sibling registrations leave them untouched. A sibling chat inherits them; a transcript fork does
+not (a clone create never passes them).
+
+When the wrapper creates the working branch and no local or remote branch exists, it fetches
+`origin/<baseBranch>` and checks `baseSha` is an ancestor of it before running
+`git checkout --no-track -b <branch> <baseSha>`. It never tracks the parent branch, so auto-commit
+pushes only the workspace's own branch. The appended system instruction names
+`--base <baseBranch>` and forbids pushing any other branch. A missing base branch fails
+non-retryable (`base_branch_missing`); a base that moved between resolution and fetch fails
+`base_branch_changed` (retryable); a rebuilt workspace whose recorded base is no longer an ancestor
+fails `base_branch_stale` (non-retryable, because a retry cannot re-resolve it). Restoring a
+workspace that has a pushed branch ignores `baseSha` and checks out the pushed branch.
+
+Changes compares against `repository.baseBranch` (the default branch when absent), not
+`repository.upstreamBranch`, so a session with only an upstream branch is no longer diffed against
+itself. When the requested base ref no longer exists the wrapper falls back to the default branch
+and reports `comparison.baseRefFallback`; the request itself is unchanged, so old live wrappers
+still accept the strict `worktree.summary` payload.
+
+`syncWorktreeBranch` and `restackWorktreeBranch` are session-addressed Worker mutations:
+`{ cloudAgentSessionId, baseBranch?, upstreamSha? }`. The target
+worktree, branch, directory and sandbox are derived from the session, and only a browser workspace
+session with its own sandbox is eligible. An idle sandbox is woken through the ordinary
+`session.prepare` path with no synthetic turn; preparation is bounded at 90 seconds and returns a
+bounded failure. The wrapper owns the active-turn, dirty-tree and directory locks and answers
+`refused`; the DO never forces a rewrite over a running turn. Neither the Worker nor the Session DO
+retries an ambiguous transport timeout: the operation may have force-pushed, so the caller gets
+`operation_outcome_unknown` and must inspect the branch rather than retry blind.
+
+A completed (`changed` or `unchanged`) result persists its effective `baseBranch`/`baseSha` into the
+Session DO's grouped metadata and registration route. Sync preserves the recorded fork boundary
+when a merge-base against a retargeted base would regress it; this prevents replaying an old
+parent's commits after a squash merge. A result whose fields are null retains the recorded base.
+If Restack first needs to reconcile the remote, it returns a Sync result and does not claim or
+persist the requested Restack base. The caller must restack that layer before advancing the stack.
+The web router writes effective values to Postgres only after a completed operation. It then
+propagates them to other root chats in the worktree through the idempotent `adoptWorktreeBase`
+mutation, which checks `expectedWorktreeId` and never wakes a sandbox. Sibling adoption failures
+are logged without hiding the completed operation. `conflict`/`refused`/timeout never change the base.
 
 ### Startup mode rollout
 

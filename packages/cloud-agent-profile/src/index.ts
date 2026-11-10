@@ -241,11 +241,7 @@ export {
   type BuiltinAgentOverride,
   type BuiltinAgentSettings,
 } from './builtin-agents';
-export {
-  getBuiltinAgentSettings,
-  setBuiltinAgentSettings,
-  clearBuiltinAgentSettings,
-} from './builtin-agent-settings-service';
+export { getBuiltinAgentSettings, setBuiltinAgentSettings } from './builtin-agent-settings-service';
 
 // Local config import (preview diff + selective upsert)
 export {

@@ -9,7 +9,9 @@ type DialogProps = {
   initialSection?: string;
   organizationId?: string;
   onOpenChange?: (open: boolean) => void;
-  onSectionChange?: (section: 'general' | 'profiles' | 'environments' | 'compute') => void;
+  onSectionChange?: (
+    section: 'general' | 'profiles' | 'environments' | 'compute' | 'sidebar'
+  ) => void;
 };
 
 let mockSearchParams = new URLSearchParams();
@@ -66,6 +68,7 @@ describe('CloudAgentSettingsButton deep links', () => {
     ['?settings=', 'general'],
     ['?settings=general', 'general'],
     ['?settings=environments', 'environments'],
+    ['?settings=sidebar', 'sidebar'],
   ] as const)('opens %s on the %s section', (search, section) => {
     setSearchParams(search);
 

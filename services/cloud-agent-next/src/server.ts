@@ -847,8 +847,9 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
       await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
     } catch (error) {
       // One session's failed close (an unreachable Durable Object, or a release
-      // that could not finish) must not stop the others. The membership gate on
-      // grant issuance still refuses that session's next grant.
+      // that could not finish) must not stop the others. Every later grant is
+      // issued only on a current membership, so authority ends at the next
+      // issuance: until then the session keeps the grant it already holds.
       logger
         .withFields({
           cloudAgentSessionId: sessionId,

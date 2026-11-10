@@ -202,6 +202,16 @@ describe('organization group deletion with an input guardrail', () => {
     return organization.settings;
   }
 
+  async function settingsChangeMessages(organizationId: string) {
+    const rows = await db
+      .select({ action: organization_audit_logs.action, message: organization_audit_logs.message })
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organizationId));
+    return rows
+      .filter(row => row.action === 'organization.settings.change')
+      .map(row => row.message);
+  }
+
   async function groupExists(groupId: string) {
     const rows = await db
       .select({ id: organization_groups.id })
@@ -288,6 +298,9 @@ describe('organization group deletion with an input guardrail', () => {
         input_guardrail: { ...before.enkrypt?.input_guardrail, group_id: null },
       },
     });
+    expect(await settingsChangeMessages(organizationId)).toEqual([
+      `Updated AI guardrails: input guardrails now apply to all members because group "Limited" (${groupIds.limited}) was deleted`,
+    ]);
   });
 
   it('deletes another group without changing an active input guardrail', async () => {
@@ -302,6 +315,7 @@ describe('organization group deletion with an input guardrail', () => {
     expect(await groupExists(groupIds.other)).toBe(false);
     expect(await groupExists(groupIds.limited)).toBe(true);
     expect(await readSettings(organizationId)).toEqual(settingsBefore);
+    expect(await settingsChangeMessages(organizationId)).toEqual([]);
   });
 
   it('deletes a group when the input guardrail applies to every member', async () => {

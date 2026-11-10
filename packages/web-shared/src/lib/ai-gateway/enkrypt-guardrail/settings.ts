@@ -1,4 +1,4 @@
-import type * as z from 'zod';
+import * as z from 'zod';
 import {
   ENKRYPT_DETECTOR_IDS,
   EnkryptInputDetectorsSchema,
@@ -120,13 +120,17 @@ export function resolveEnkryptInputGuardrail(
 
 /**
  * The organization group the input guardrail is limited to, or null when it applies to every
- * member. Only meaningful while `resolveEnkryptInputGuardrail` returns a guardrail.
+ * member. Only meaningful while `resolveEnkryptInputGuardrail` returns a guardrail. A stored value
+ * that is not a group ID cannot name a group, so the guardrail applies to every member instead of
+ * to nobody.
  */
 export function enkryptInputGuardrailGroupId(
   settings: OrganizationSettings | undefined
 ): string | null {
   const parsed = EnkryptInputGuardrailSettingsSchema.safeParse(settings?.enkrypt?.input_guardrail);
-  return (parsed.success && parsed.data.group_id) || null;
+  if (!parsed.success) return null;
+  const groupId = z.uuid().safeParse(parsed.data.group_id);
+  return groupId.success ? groupId.data : null;
 }
 
 /** Whether the input guardrail applies to a member who belongs to `memberGroupIds`. */

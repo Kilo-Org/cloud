@@ -20,6 +20,7 @@ import {
   storableEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import {
+  enkryptInputGuardrailGroupId,
   readStoredEnkryptDetectors,
   readStoredEnkryptOutputDetectors,
   type StoredEnkryptDetectors,
@@ -161,7 +162,7 @@ function savedInputGuardrail(organizationId: string, settings: OrganizationSetti
   const stored = readStoredEnkryptDetectors(organizationId, saved.data.detectors);
   return {
     enabled: saved.data.enabled,
-    group_id: saved.data.group_id ?? null,
+    group_id: enkryptInputGuardrailGroupId(settings),
     detectors: savedDetectors(saved.data.enabled, stored),
     invalid_saved_detectors: stored.status === 'invalid',
   };

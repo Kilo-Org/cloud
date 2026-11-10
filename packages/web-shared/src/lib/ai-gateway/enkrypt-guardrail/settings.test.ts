@@ -204,6 +204,10 @@ describe('enkryptInputGuardrailGroupId', () => {
       { enkrypt: { input_guardrail: { enabled: true, group_id: '' } } },
     ],
     [
+      'a guardrail with a group that is not a UUID',
+      { enkrypt: { input_guardrail: { enabled: true, group_id: 'engineering' } } },
+    ],
+    [
       'an invalid guardrail',
       {
         enkrypt: { input_guardrail: { enabled: 'yes', group_id: groupId } },

@@ -710,7 +710,8 @@ export async function setOrganizationMemberGroups(params: {
 async function releaseEnkryptInputGuardrailGroup(
   tx: DrizzleTransaction,
   organizationId: string,
-  groupId: string
+  group: Pick<OrganizationGroup, 'id' | 'name'>,
+  actor: OrganizationGroupActor
 ) {
   const [organization] = await tx
     .select({ settings: organizations.settings })
@@ -719,7 +720,7 @@ async function releaseEnkryptInputGuardrailGroup(
     .for('update');
   const settings = organization?.settings;
   const inputGuardrail = settings?.enkrypt?.input_guardrail;
-  if (!inputGuardrail || enkryptInputGuardrailGroupId(settings) !== groupId) return;
+  if (!inputGuardrail || enkryptInputGuardrailGroupId(settings) !== group.id) return;
   if (resolveEnkryptInputGuardrail(organizationId, settings) !== null) {
     throw new TRPCError({
       code: 'CONFLICT',
@@ -736,6 +737,13 @@ async function releaseEnkryptInputGuardrailGroup(
       }),
     })
     .where(eq(organizations.id, organizationId));
+  await createAuditLog({
+    action: 'organization.settings.change',
+    ...actorAudit(actor),
+    message: `Updated AI guardrails: input guardrails now apply to all members because group "${group.name}" (${group.id}) was deleted`,
+    organization_id: organizationId,
+    tx,
+  });
 }
 
 export async function deleteOrganizationGroup(params: {
@@ -748,7 +756,7 @@ export async function deleteOrganizationGroup(params: {
     params.actor.id,
     async ({ tx }) => {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
-      await releaseEnkryptInputGuardrailGroup(tx, params.organizationId, group.id);
+      await releaseEnkryptInputGuardrailGroup(tx, params.organizationId, group, params.actor);
       await tx
         .delete(organization_groups)
         .where(

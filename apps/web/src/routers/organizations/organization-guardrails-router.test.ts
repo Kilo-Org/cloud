@@ -780,6 +780,26 @@ describe('organization guardrails router', () => {
       ).resolves.toMatchObject({ group_id: null, groups: [group] });
     });
 
+    it('reads a stored group that is not a UUID as every member, before and after a save', async () => {
+      const malformed = await createTestOrganization(
+        'Malformed Group Guardrails Org',
+        owner.id,
+        0,
+        { kilo_encrypt: true, enkrypt: { input_guardrail: { enabled: false, group_id: '' } } },
+        false
+      );
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.guardrails.get({ organizationId: malformed.id })
+      ).resolves.toMatchObject({ group_id: null });
+      const { output: _output, group_id: _groupId, ...withoutGroup } = savedConfig();
+      await expect(
+        caller.organizations.guardrails.update({ organizationId: malformed.id, ...withoutGroup })
+      ).resolves.toMatchObject({ group_id: null });
+      expect(await latestAuditMessage(malformed.id)).toContain('applies to: all members;');
+    });
+
     it('rejects a group_id that is not a UUID', async () => {
       const caller = await createCallerForUser(owner.id);
 

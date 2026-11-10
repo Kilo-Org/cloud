@@ -1288,50 +1288,53 @@ describe('server runtime credential proxy', () => {
     vi.unstubAllGlobals();
   });
 
-  it('forwards the organization model catalog with a kilo-api attestation', async () => {
-    const env = createEnv();
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: 'https://api.kilo.ai:backing-token',
-        organizationId: 'org_proxy',
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
-    const upstream = vi.fn(async (request: Request) => {
-      expect(request.method).toBe('GET');
-      expect(request.url).toBe('https://api.kilo.ai/api/gateway/organizations/org_proxy/models');
-      await expect(
-        verifyRuntimeProxyAttestation({
-          value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
-          secret,
-          audience: 'kilo-api',
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-          bearer: 'https://api.kilo.ai:backing-token',
-        })
-      ).resolves.toBe(true);
-      return new Response('{}', { headers: { 'content-type': 'application/json' } });
-    });
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const response = await fetchWorker(
-        new Request(
-          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/organizations/org_proxy/models',
-          { headers: { Authorization: `Bearer ${await handle()}` } }
-        ),
-        env
-      );
-      expect(response.status).toBe(200);
-      expect(upstream).toHaveBeenCalledOnce();
-    } finally {
-      vi.unstubAllGlobals();
+  it.each(['organizations', 'api/organizations'])(
+    'forwards the %s model catalog with a kilo-api attestation',
+    async organizationPath => {
+      const env = createEnv();
+      env.SANDBOX_SESSION.get.mockReturnValue({
+        resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+          token: 'https://api.kilo.ai:backing-token',
+          organizationId: 'org_proxy',
+          runtimeAuthorization: {
+            userId: 'usr_proxy',
+            authorizationId: '11111111-1111-4111-8111-111111111111',
+            resourceId: 'workspace_proxy',
+          },
+        }),
+      });
+      const upstream = vi.fn(async (request: Request) => {
+        expect(request.method).toBe('GET');
+        expect(request.url).toBe('https://api.kilo.ai/api/gateway/organizations/org_proxy/models');
+        await expect(
+          verifyRuntimeProxyAttestation({
+            value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+            secret,
+            audience: 'kilo-api',
+            userId: 'usr_proxy',
+            authorizationId: '11111111-1111-4111-8111-111111111111',
+            resourceId: 'workspace_proxy',
+            bearer: 'https://api.kilo.ai:backing-token',
+          })
+        ).resolves.toBe(true);
+        return new Response('{}', { headers: { 'content-type': 'application/json' } });
+      });
+      vi.stubGlobal('fetch', upstream);
+      try {
+        const response = await fetchWorker(
+          new Request(
+            `https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/${organizationPath}/org_proxy/models`,
+            { headers: { Authorization: `Bearer ${await handle()}` } }
+          ),
+          env
+        );
+        expect(response.status).toBe(200);
+        expect(upstream).toHaveBeenCalledOnce();
+      } finally {
+        vi.unstubAllGlobals();
+      }
     }
-  });
+  );
 
   it('forwards allowlisted Exa requests with a kilo-gateway attestation', async () => {
     const env = createEnv();

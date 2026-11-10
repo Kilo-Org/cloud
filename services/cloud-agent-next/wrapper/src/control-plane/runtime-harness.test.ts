@@ -59,6 +59,26 @@ describe('runtime harness selection', () => {
     }
   );
 
+  it('preserves the projected organization through the v2 config adapter', () => {
+    const result = kilo2RuntimeEnvironment({
+      KILOCODE_ORGANIZATION_ID: 'org-session',
+      KILO_CONFIG_CONTENT: JSON.stringify({
+        provider: {
+          kilo: {
+            options: {
+              baseURL: 'https://worker.example/api/openrouter',
+              kilocodeOrganizationId: 'org-session',
+            },
+          },
+        },
+      }),
+    });
+    expect(result.KILOCODE_ORGANIZATION_ID).toBe('org-session');
+    expect(
+      JSON.parse(result.KILO_CONFIG_CONTENT).provider.kilo.options.kilocodeOrganizationId
+    ).toBe('org-session');
+  });
+
   it('keeps heartbeat comments and frames split across transport chunks', async () => {
     const chunks = [': heart', 'beat\n\nda', 'ta: {"type":"server.connected"}\n\n'];
     const body = new ReadableStream<Uint8Array>({

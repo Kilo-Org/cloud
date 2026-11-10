@@ -105,6 +105,8 @@ mode/capacity and any later processing/drain ownership; receipt mode is not an
 accounting rollback once processing has been enabled separately.
 
 Update log queue-field filters and GraphQL/queue backlog/DLQ IDs for the selected
-pair; distinguish global/EU during transition and restore global targets on rollback.
+pair, including o11y's `DEAD_LETTER_QUEUE_NAME` (see the
+[dead-letter alert](README.md#dead-letter-alert)); distinguish global/EU during
+transition and restore global targets on rollback.
 EU jurisdiction restricts queue data location, not Worker placement or measured
 latency. See [Cloudflare's jurisdiction contract](https://developers.cloudflare.com/queues/configuration/data-location/).

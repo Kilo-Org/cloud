@@ -406,7 +406,8 @@ and does not establish aggregate database capacity for larger settings.
 Persistent failures still reach the configured DLQ after the finite retry budget;
 a DLQ is a recovery queue, not proof the payload is poison. DLQ retention is
 enforced at Cloudflare's maximum of 14 days (1209600 seconds); see
-[Retention](#retention). Before guard rollout, verify alerting, replay ownership,
+[Retention](#retention). Before guard rollout, confirm the
+[dead-letter alert](#dead-letter-alert) is deployed, and confirm replay ownership
 and a controlled stable-ID reconciliation/replay procedure. A safe rollback must
 **not lower retries back to 3 while higher-attempt messages remain outstanding**,
 because their next failure could immediately dead-letter them. Preserve stable IDs
@@ -540,6 +541,65 @@ this first-test source, which keeps middleware unchanged.
 For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
 timeout 0 and the pre-trial cap 200 for the same single queue. Preserve the current writer
 route, retry delay/budget and per-message dispositions.
+
+## Dead-letter alert
+
+The alert covers every usage kind on the queue, LLM and Enkrypt alike.
+
+### What it watches
+
+The o11y Worker's every-minute cron (`services/o11y/src/alerting/`) reads the
+realtime backlog of the production DLQ, `usage-ingest-processing-dlq-eu`. The DLQ
+has no consumer, so its backlog is exactly the dead-lettered messages still
+retained, and it only grows when a message dead-letters. That backlog is the
+authoritative signal.
+
+o11y finds the queue by exact name on each run (`DEAD_LETTER_QUEUE_NAME` in
+`services/o11y/src/alerting/dead-letter-queue.ts`), then calls the Queues metrics
+API, using its existing `O11Y_CF_CONTAINERS_API_TOKEN` with Queues Read. A test in
+this service fails if that name drifts from `dead_letter_queue` in
+`wrangler.jsonc`. On an EU/global routing rollback, change both. Staging's DLQ is
+not watched.
+
+It pages when the backlog rises above the lowest backlog seen since the last
+alert: the first dead letter, more dead letters, or new ones after a replay or
+expiry. A page repeats at most once per 15-minute page cooldown, and an unchanged
+or shrinking backlog never pages. A lookup or API failure fails that run, which is
+reported like other o11y evaluation errors, without blocking the other alerts.
+
+The consumer also logs one `usage_ingest_final_attempt_failed` line at
+`console.error` when delivery 21 (above `max_retries` 20) is not acknowledged and
+is retried, which dead-letters it. Earlier failed deliveries and acknowledged
+deliveries log nothing. It is a triage aid in Workers Logs, not the alert: it
+gives the usage IDs to reconcile, but logs can be dropped and a killed invocation
+dead-letters without it.
+
+| Field | Value |
+|---|---|
+| `queue` | Source queue name |
+| `usage_kind` | `llm`, `enkrypt_usage`, or `unknown` for another `kind` tag |
+| `usage_id` | Usage ID, only when the message body validates |
+| `queue_message_id`, `delivery_attempts` | Queue message identity |
+| `reason` | Categorical processing reason, or `unexpected_error` |
+
+### Where it goes
+
+The alert has severity `page` (`DEAD_LETTER_QUEUE_SEVERITY`), so o11y posts it to
+the `O11Y_SLACK_WEBHOOK_PAGE` webhook, the same on-call channel as o11y's other
+page alerts. The channel is set where that webhook was created, not in this repo.
+Changing the severity to `ticket` would route it to `O11Y_SLACK_WEBHOOK_TICKET`
+(#o11y-alerts) instead.
+
+It goes live with the next o11y deployment; no operator step or new credential is
+needed. If the DLQ already holds messages then, the first run pages once.
+
+### Who receives it
+
+The on-call engineer in that channel, who hands it to the DLQ replay owner:
+**`<replay owner, to be named>`**. On a page, find the usage IDs from
+`usage_ingest_final_attempt_failed` in Workers Logs for `usage-ingest`, reconcile
+by stable usage ID, and replay only as described under [Queue policy](#queue-policy),
+within the DLQ's retention.
 
 ## Deploy
 

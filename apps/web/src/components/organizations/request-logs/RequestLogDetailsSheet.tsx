@@ -14,7 +14,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { RootRouter } from '@/routers/root-router';
-import { DetailGrid, DetailSection, yesNo } from './detail-primitives';
+import { apiKindLabel } from '@/lib/api-kind-labels';
+import { DetailGrid, DetailSection, yesNo, type DetailItem } from './detail-primitives';
 import { EnkryptOutputReportSection, EnkryptReportSection } from './EnkryptReportSection';
 import {
   formatCount,
@@ -27,7 +28,7 @@ import { gatewayName } from './routing-labels';
 
 type RequestLogsOutputs = inferRouterOutputs<RootRouter>['organizations']['requestLogs'];
 export type RequestLogRow = RequestLogsOutputs['list'][number];
-type RequestLogDetails = RequestLogsOutputs['getDetails'];
+export type RequestLogDetails = RequestLogsOutputs['getDetails'];
 
 const METADATA_MESSAGES = {
   'not-found': 'No routing details were recorded for this request.',
@@ -39,23 +40,26 @@ export function userLabel(user: RequestLogRow['user']): string {
   return user.name || user.email || user.id;
 }
 
-function RequestSummary({ row, details }: { row: RequestLogRow; details?: RequestLogDetails }) {
+export function RequestSummary({
+  row,
+  details,
+}: {
+  row: RequestLogRow;
+  details?: RequestLogDetails;
+}) {
   const request = details?.request;
+  const requestedModel = request?.requested_model ?? row.model;
   return (
     <DetailSection title="Request">
       <DetailGrid
         items={[
-          {
-            label: 'Requested model',
-            value: request?.requested_model ?? row.model ?? '—',
-            mono: true,
-          },
-          { label: 'Auto model', value: request?.auto_model ?? '—', mono: true },
-          { label: 'Served model', value: request?.model ?? '—', mono: true },
+          copyableItem('Requested model', requestedModel),
+          copyableItem('Auto model', request?.auto_model),
+          copyableItem('Served model', request?.model),
           { label: 'Provider', value: row.provider ?? '—' },
           {
             label: 'Gateway',
-            value: request?.provider ? gatewayName(request.provider) : '—',
+            value: (request?.provider ? gatewayName(request.provider) : null) ?? '—',
           },
           { label: 'Cost', value: formatMicrodollarsAsUsd(row.cost_microdollars) },
           { label: 'BYOK', value: yesNo(row.is_user_byok) },
@@ -71,22 +75,26 @@ function RequestSummary({ row, details }: { row: RequestLogRow; details?: Reques
           { label: 'Status code', value: request?.status_code ?? '—' },
           { label: 'Finish reason', value: request?.finish_reason ?? '—' },
           { label: 'Error', value: row.has_error ? 'Yes' : 'No' },
-          { label: 'API', value: request?.api_kind ?? '—', mono: true },
+          { label: 'API', value: request?.api_kind ? apiKindLabel(request.api_kind) : '—' },
           { label: 'Streamed', value: yesNo(request?.streamed ?? null) },
           { label: 'Requested region', value: request?.inference_region ?? 'Global' },
           { label: 'Feature', value: row.feature ?? '—' },
           { label: 'Project', value: row.project_id ?? '—' },
           { label: 'Editor', value: request?.editor_name ?? '—' },
           { label: 'Mode', value: request?.mode ?? '—' },
-          { label: 'Session', value: request?.session_id ?? '—', mono: true },
-          { label: 'Request ID', value: row.id, mono: true },
+          copyableItem('Session', request?.session_id),
+          copyableItem('Request ID', row.id),
         ]}
       />
     </DetailSection>
   );
 }
 
-function RoutingSections({ metadata }: { metadata: RequestLogDetails['metadata'] }) {
+function copyableItem(label: string, value: string | null | undefined): DetailItem {
+  return value ? { label, value, mono: true, copyValue: value } : { label, value: '—', mono: true };
+}
+
+export function RoutingSections({ metadata }: { metadata: RequestLogDetails['metadata'] }) {
   if (metadata.status !== 'available') {
     return (
       <DetailSection title="Provider selection">

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { CopyButton } from '@/components/shared/CopyButton';
 import { cn } from '@/lib/utils';
 import type { StepTone } from './routing-labels';
 
@@ -22,16 +23,33 @@ export function DetailSection({
   );
 }
 
-export type DetailItem = { label: string; value: ReactNode; mono?: boolean };
+/** `copyValue` adds a copy button and a tooltip with the full value, for values that truncate. */
+export type DetailItem = { label: string; value: ReactNode; mono?: boolean; copyValue?: string };
 
 export function DetailGrid({ items }: { items: DetailItem[] }) {
   return (
     <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
       {items.map(item => (
-        <div key={item.label} className="flex min-w-0 flex-col gap-0.5">
+        <div key={item.label} className="group flex min-w-0 flex-col gap-0.5">
           <dt className="text-muted-foreground text-xs">{item.label}</dt>
-          <dd className={cn('truncate text-sm', item.mono && 'font-mono text-xs leading-5')}>
-            {item.value}
+          <dd className="flex min-w-0 items-center gap-1">
+            <span
+              className={cn(
+                'text-sm',
+                item.copyValue ? 'truncate' : 'min-w-0 break-words',
+                item.mono && 'font-mono text-xs leading-5'
+              )}
+              title={item.copyValue}
+            >
+              {item.value}
+            </span>
+            {item.copyValue && (
+              <CopyButton
+                text={item.copyValue}
+                label={item.label.toLowerCase()}
+                className="shrink-0 p-0.5 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100 [&_svg]:size-3.5"
+              />
+            )}
           </dd>
         </div>
       ))}

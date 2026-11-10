@@ -169,17 +169,19 @@ const buttonLabelClasses = Object.fromEntries(
 ) as Record<ButtonVariant, string>;
 
 /**
- * The muted pair a disabled (not busy) primary control paints: its fill and the
- * label ink that reads on it. Light keeps the palette's disabled primary, whose
- * white label clears 4.5:1. Dark takes the inactive-control surface and
- * `--ink2` instead: dark's `--primary-disabled` is a light neutral (5.1:1 above
- * the near-black page) that outshines every other element like an enabled
- * control, and no fill that stays dim can carry its near-black label. The dark
- * pair measures 6.5:1 for the label; a caller that paints its own mark on this
- * fill takes `useMutedDisabledInk` from `@/lib/hooks/use-theme-colors`.
+ * The pair a disabled (not busy) primary action paints: its fill and the label
+ * ink that reads on it. The fill is `--primary-disabled-action` in both themes.
+ * Light keeps the palette's disabled primary, white label at 5.4:1. Dark takes
+ * a dim neutral that still stands off the near-black page (2.6:1) and carries
+ * `--foreground` at 6.4:1, because there the palette's `--primary-disabled`
+ * (5.3:1 above the page) outshines every other element like an enabled control
+ * and the inactive icon surface (`--control-idle`, 1.7:1) leaves a full-width
+ * plate without presence. `--primary-disabled` itself stays with the shared
+ * Switch's disabled on-track. A caller that paints its own mark on this fill
+ * takes `useMutedDisabledInk` from `@/lib/hooks/use-theme-colors`.
  */
-const MUTED_DISABLED_FILL_CLASS = 'bg-primary-disabled dark:bg-control-idle';
-const MUTED_DISABLED_LABEL_CLASS = 'dark:text-ink2';
+const MUTED_DISABLED_FILL_CLASS = 'bg-primary-disabled-action';
+const MUTED_DISABLED_LABEL_CLASS = 'dark:text-foreground';
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {

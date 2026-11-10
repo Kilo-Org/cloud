@@ -19,10 +19,15 @@ import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { blacklisted_domains, kilocode_users } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
-import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
+import { sql, count, isNotNull, desc, min, max, eq } from 'drizzle-orm';
 import * as z from 'zod';
 import { createHash } from 'node:crypto';
-import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
+import {
+  backfillBlockBlacklistedDomainsBatch,
+  countUnblockableDomainUsers,
+  unblockBlacklistedDomainUsersBatch,
+} from '@/lib/abuse/block-blacklisted-domains';
+import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   BLACKLIST_STATS_ROW_LIMIT,
   computeBlacklistStats,
@@ -37,6 +42,16 @@ const SuspiciousDomainsInputSchema = z
 
 const AdminBlacklistDomainsInputSchema = BlacklistDomainsInputSchema.extend({
   expected_version: z.string().length(64),
+});
+
+const RemoveDomainInputSchema = z.object({
+  domain: z.string().trim().min(1),
+  expected_version: z.string().length(64),
+  unblockUsers: z.boolean().default(false),
+});
+
+const RemoveDomainPreviewInputSchema = z.object({
+  domain: z.string().trim().min(1),
 });
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -74,6 +89,18 @@ async function deleteLegacyBlacklist() {
   } catch (error) {
     captureException(error, { tags: { source: 'blacklist_domains_legacy_cleanup' } });
   }
+}
+
+function findRemainingBlacklistMatch(
+  domain: string,
+  remainingDomains: ReadonlySet<string>
+): string | null {
+  const labels = domain.toLowerCase().split('.');
+  for (let i = 0; i < labels.length; i++) {
+    const candidate = labels.slice(i).join('.');
+    if (remainingDomains.has(candidate)) return candidate;
+  }
+  return null;
 }
 
 export const adminBlacklistDomainsRouter = createTRPCRouter({
@@ -165,6 +192,144 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     }
 
     return { ...settings, domains: normalizedDomains, backfill };
+  }),
+
+  removeDomainPreview: adminProcedure
+    .input(RemoveDomainPreviewInputSchema)
+    .query(async ({ input }) => {
+      const domain = input.domain.toLowerCase().trim();
+      const domains = await listBlacklistedDomains(db);
+      const remainingDomains = domains.filter(entry => entry !== domain);
+      const stillBlacklistedBy = findRemainingBlacklistMatch(domain, new Set(remainingDomains));
+      const counts = await countUnblockableDomainUsers({ domain, remainingDomains });
+      return {
+        domain,
+        onBlacklist: domains.includes(domain),
+        stillBlacklistedBy,
+        unblockable: counts.unblockable,
+        keptBlocked: counts.keptBlocked,
+      };
+    }),
+
+  removeDomain: adminProcedure.input(RemoveDomainInputSchema).mutation(async ({ input, ctx }) => {
+    const domain = input.domain.toLowerCase().trim();
+
+    let saved;
+    try {
+      saved = await db.transaction(async tx => {
+        await lockBlacklist(tx, 'EXCLUSIVE');
+        const previous = await readConfig(tx);
+        if (previous.version !== input.expected_version) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Blacklist changed. Reload the complete list before saving.',
+          });
+        }
+
+        const removed = previous.domains.includes(domain);
+        const remainingDomains = removed
+          ? previous.domains.filter(entry => entry !== domain)
+          : previous.domains;
+
+        if (input.unblockUsers) {
+          const stillBlacklistedBy = findRemainingBlacklistMatch(domain, new Set(remainingDomains));
+          if (stillBlacklistedBy !== null) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: `${domain} is still covered by the "${stillBlacklistedBy}" entry. Remove that entry first.`,
+            });
+          }
+        }
+
+        if (!removed) {
+          return { settings: previous.settings, remainingDomains, removed };
+        }
+
+        const settings: BlacklistDomainsSettings = {
+          blocked_signup_tlds: normalizeSignupTlds(
+            previous.settings.blocked_signup_tlds ?? envFallbackSignupTlds
+          ),
+          updated_at: new Date().toISOString(),
+          updated_by: ctx.user.id,
+          updated_by_email: ctx.user.google_user_email,
+        };
+        await tx.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, domain));
+        await redisClient.set(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY, JSON.stringify(settings));
+        return { settings, remainingDomains, removed };
+      });
+    } catch (error) {
+      if (
+        error instanceof TRPCError &&
+        (error.code === 'CONFLICT' || error.code === 'BAD_REQUEST')
+      ) {
+        throw error;
+      }
+      captureException(error, { tags: { source: 'blacklist_domains_remove' } });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Removing the domain failed. Reload the list before retrying.',
+        cause: error,
+      });
+    }
+
+    if (saved.removed) {
+      clearEmailBlacklistCache();
+      await deleteLegacyBlacklist();
+    }
+
+    const unblock = {
+      requested: input.unblockUsers,
+      unblocked: 0,
+      keptBlocked: 0,
+      remaining: false,
+      failed: false,
+    };
+    if (input.unblockUsers) {
+      try {
+        const remainingDomains = await listBlacklistedDomains(db);
+        const result = await unblockBlacklistedDomainUsersBatch({
+          domain,
+          remainingDomains,
+          positiveBalanceOnly: true,
+        });
+        unblock.unblocked = result.processed;
+        unblock.keptBlocked = result.keptBlocked;
+        unblock.remaining = result.remaining;
+      } catch (error) {
+        captureException(error, { tags: { source: 'blacklist_domains_auto_unblock' } });
+        unblock.failed = true;
+      }
+    }
+
+    if (saved.removed) {
+      await recordAdminAction(ctx, {
+        action: 'blacklist.domain.remove',
+        target: null,
+        message: `Removed ${domain} from the blacklist`,
+        metadata: { domain, removed: true },
+      });
+    }
+    if (input.unblockUsers) {
+      await recordAdminAction(ctx, {
+        action: 'blacklist.domain.unblock',
+        target: null,
+        message: `Unblocked ${unblock.unblocked} users for ${domain} and kept ${unblock.keptBlocked} blocked`,
+        metadata: {
+          domain,
+          unblocked: unblock.unblocked,
+          keptBlocked: unblock.keptBlocked,
+          remaining: unblock.remaining,
+          failed: unblock.failed,
+        },
+      });
+    }
+
+    return {
+      ...saved.settings,
+      domains: saved.remainingDomains,
+      removed: saved.removed,
+      unblock,
+    };
   }),
 
   stats: adminProcedure.query(async () => {

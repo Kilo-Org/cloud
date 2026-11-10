@@ -42,6 +42,7 @@ import {
   isEmailBlacklisted,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import type { User } from '@kilocode/db/schema';
+import { setAdminActionSinkForTest, type AdminActionEvent } from '@/lib/admin/admin-action-audit';
 
 type BackfillBatch = (params: {
   actorId: string;
@@ -118,9 +119,12 @@ async function waitForBlockedLock(waitingMode: 'ShareLock' | 'ExclusiveLock'): P
 }
 
 let admin: User;
+let auditEvents: AdminActionEvent[];
 
 beforeEach(async () => {
   await cleanupDbForTest();
+  auditEvents = [];
+  setAdminActionSinkForTest(event => auditEvents.push(event));
   clearEmailBlacklistCache();
   redisValues.clear();
   mockedRedisGet.mockReset();
@@ -1242,4 +1246,414 @@ describe('admin.blacklistDomains.get', () => {
       expect(mockedBackfill).not.toHaveBeenCalled();
     }
   );
+});
+
+describe('admin.blacklistDomains.removeDomainPreview', () => {
+  it('splits matching domain-blocked accounts by positive balance', async () => {
+    await insertBlacklistedDomains(['mailinator.com']);
+    await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+      microdollars_used: 40,
+    });
+    await insertTestUser({
+      google_user_email: 'b@evil.mailinator.com',
+      email_domain: 'evil.mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+      microdollars_used: 100,
+    });
+    await insertTestUser({
+      google_user_email: 'c@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'manual',
+      total_microdollars_acquired: 100,
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const preview = await caller.admin.blacklistDomains.removeDomainPreview({
+      domain: ' MAILINATOR.COM ',
+    });
+
+    expect(preview).toEqual({
+      domain: 'mailinator.com',
+      onBlacklist: true,
+      stillBlacklistedBy: null,
+      unblockable: 1,
+      keptBlocked: 1,
+    });
+  });
+
+  it('reports the remaining entry that still covers the domain', async () => {
+    await insertBlacklistedDomains(['mailinator.com', 'sub.mailinator.com']);
+    await insertTestUser({
+      google_user_email: 'a@sub.mailinator.com',
+      email_domain: 'sub.mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const preview = await caller.admin.blacklistDomains.removeDomainPreview({
+      domain: 'sub.mailinator.com',
+    });
+
+    expect(preview).toEqual({
+      domain: 'sub.mailinator.com',
+      onBlacklist: true,
+      stillBlacklistedBy: 'mailinator.com',
+      unblockable: 0,
+      keptBlocked: 0,
+    });
+  });
+});
+
+describe('admin.blacklistDomains.removeDomain', () => {
+  it('removes the domain without unblocking by default', async () => {
+    await insertBlacklistedDomains(['mailinator.com']);
+    const user = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+      api_token_pepper: 'rotated-pepper',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    const result = await caller.admin.blacklistDomains.removeDomain({
+      domain: ' MAILINATOR.COM ',
+      expected_version: version,
+    });
+
+    expect(result).toEqual({
+      domains: [],
+      blocked_signup_tlds: ['shop', 'top'],
+      updated_at: expect.any(String),
+      updated_by: admin.id,
+      updated_by_email: admin.google_user_email,
+      removed: true,
+      unblock: {
+        requested: false,
+        unblocked: 0,
+        keptBlocked: 0,
+        remaining: false,
+        failed: false,
+      },
+    });
+    expect(await tableDomains()).toEqual([]);
+    const [row] = await db
+      .select({
+        blocked_reason: kilocode_users.blocked_reason,
+        api_token_pepper: kilocode_users.api_token_pepper,
+      })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(row).toEqual({
+      blocked_reason: 'domainblocked',
+      api_token_pepper: 'rotated-pepper',
+    });
+    expect(auditEvents.map(event => event.action)).toEqual(['blacklist.domain.remove']);
+    expect(auditEvents[0].metadata).toEqual({ domain: 'mailinator.com', removed: true });
+  });
+
+  it('removes the domain and unblocks only positive-balance domain blocks', async () => {
+    await insertBlacklistedDomains(['mailinator.com']);
+    const target = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      blocked_at: '2026-01-01T00:00:00.000Z',
+      blocked_by_kilo_user_id: 'blocking-admin',
+      api_token_pepper: 'rotated-pepper',
+      total_microdollars_acquired: 100,
+      microdollars_used: 40,
+    });
+    const subdomain = await insertTestUser({
+      google_user_email: 'b@evil.mailinator.com',
+      email_domain: 'evil.mailinator.com',
+      blocked_reason: 'domainblocked',
+      api_token_pepper: 'subdomain-pepper',
+      total_microdollars_acquired: 50,
+    });
+    const zeroBalance = await insertTestUser({
+      google_user_email: 'c@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+      microdollars_used: 100,
+    });
+    const negativeBalance = await insertTestUser({
+      google_user_email: 'd@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 50,
+      microdollars_used: 150,
+    });
+    const manual = await insertTestUser({
+      google_user_email: 'e@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'manual',
+      total_microdollars_acquired: 100,
+    });
+    const adminAccount = await insertTestUser({
+      google_user_email: 'f@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      is_admin: true,
+      total_microdollars_acquired: 100,
+    });
+
+    await expect(isEmailBlacklisted('someone@mailinator.com')).resolves.toBe(true);
+
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    const result = await caller.admin.blacklistDomains.removeDomain({
+      domain: ' MAILINATOR.COM ',
+      expected_version: version,
+      unblockUsers: true,
+    });
+
+    expect(result.domains).toEqual([]);
+    expect(result.removed).toBe(true);
+    expect(result.unblock).toEqual({
+      requested: true,
+      unblocked: 2,
+      keptBlocked: 2,
+      remaining: false,
+      failed: false,
+    });
+    await expect(isEmailBlacklisted('someone@mailinator.com')).resolves.toBe(false);
+
+    const rows = await db
+      .select({
+        id: kilocode_users.id,
+        blocked_reason: kilocode_users.blocked_reason,
+        blocked_at: kilocode_users.blocked_at,
+        blocked_by_kilo_user_id: kilocode_users.blocked_by_kilo_user_id,
+        api_token_pepper: kilocode_users.api_token_pepper,
+      })
+      .from(kilocode_users)
+      .where(
+        inArray(kilocode_users.id, [
+          target.id,
+          subdomain.id,
+          zeroBalance.id,
+          negativeBalance.id,
+          manual.id,
+          adminAccount.id,
+        ])
+      );
+    const byId = new Map(rows.map(row => [row.id, row]));
+
+    expect(byId.get(target.id)).toMatchObject({
+      blocked_reason: null,
+      blocked_at: null,
+      blocked_by_kilo_user_id: null,
+      api_token_pepper: 'rotated-pepper',
+    });
+    expect(byId.get(subdomain.id)).toMatchObject({
+      blocked_reason: null,
+      api_token_pepper: 'subdomain-pepper',
+    });
+    expect(byId.get(zeroBalance.id)?.blocked_reason).toBe('domainblocked');
+    expect(byId.get(negativeBalance.id)?.blocked_reason).toBe('domainblocked');
+    expect(byId.get(manual.id)?.blocked_reason).toBe('manual');
+    expect(byId.get(adminAccount.id)?.blocked_reason).toBe('domainblocked');
+
+    expect(auditEvents.map(event => event.action)).toEqual([
+      'blacklist.domain.remove',
+      'blacklist.domain.unblock',
+    ]);
+    expect(auditEvents[1].metadata).toEqual({
+      domain: 'mailinator.com',
+      unblocked: 2,
+      keptBlocked: 2,
+      remaining: false,
+      failed: false,
+    });
+  });
+
+  it('allows removal while a parent entry remains and leaves blocks in place', async () => {
+    await insertBlacklistedDomains(['mailinator.com', 'sub.mailinator.com']);
+    const user = await insertTestUser({
+      google_user_email: 'a@sub.mailinator.com',
+      email_domain: 'sub.mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    const result = await caller.admin.blacklistDomains.removeDomain({
+      domain: 'sub.mailinator.com',
+      expected_version: version,
+    });
+
+    expect(result.domains).toEqual(['mailinator.com']);
+    expect(result.removed).toBe(true);
+    expect(result.unblock.unblocked).toBe(0);
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(row.blocked_reason).toBe('domainblocked');
+    expect(auditEvents.map(event => event.action)).toEqual(['blacklist.domain.remove']);
+  });
+
+  it('refuses to unblock while a remaining entry still covers the domain', async () => {
+    await insertBlacklistedDomains(['mailinator.com', 'sub.mailinator.com']);
+    const user = await insertTestUser({
+      google_user_email: 'a@sub.mailinator.com',
+      email_domain: 'sub.mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+
+    await expect(
+      caller.admin.blacklistDomains.removeDomain({
+        domain: 'sub.mailinator.com',
+        expected_version: version,
+        unblockUsers: true,
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message:
+        'sub.mailinator.com is still covered by the "mailinator.com" entry. Remove that entry first.',
+    });
+
+    expect(await tableDomains()).toEqual(['mailinator.com', 'sub.mailinator.com']);
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(row.blocked_reason).toBe('domainblocked');
+    expect(auditEvents).toEqual([]);
+  });
+
+  it('rejects a stale version without removing or unblocking', async () => {
+    await insertBlacklistedDomains(['mailinator.com']);
+    const user = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+    });
+    const caller = await createCallerForUser(admin.id);
+    const loaded = await caller.admin.blacklistDomains.get();
+    await insertBlacklistedDomains(['spam.org']);
+
+    await expect(
+      caller.admin.blacklistDomains.removeDomain({
+        domain: 'mailinator.com',
+        expected_version: loaded.version,
+        unblockUsers: true,
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: conflictMessage });
+
+    expect(await tableDomains()).toEqual(['mailinator.com', 'spam.org']);
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(row.blocked_reason).toBe('domainblocked');
+    expect(auditEvents).toEqual([]);
+  });
+
+  it('unblocks an already removed domain without rewriting the list', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+    });
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    mockedRedisSet.mockClear();
+
+    const result = await caller.admin.blacklistDomains.removeDomain({
+      domain: 'mailinator.com',
+      expected_version: version,
+      unblockUsers: true,
+    });
+
+    expect(result.removed).toBe(false);
+    expect(result.unblock).toEqual({
+      requested: true,
+      unblocked: 1,
+      keptBlocked: 0,
+      remaining: false,
+      failed: false,
+    });
+    expect(mockedRedisSet).not.toHaveBeenCalled();
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(row.blocked_reason).toBeNull();
+    expect(auditEvents.map(event => event.action)).toEqual(['blacklist.domain.unblock']);
+  });
+
+  it('leaves the list removed and reports failure when unblocking fails', async () => {
+    await insertBlacklistedDomains(['mailinator.com']);
+    const user = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'domainblocked',
+      total_microdollars_acquired: 100,
+    });
+    const caller = await createCallerForUser(admin.id);
+    const { version } = await caller.admin.blacklistDomains.get();
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION public.fail_unblock() RETURNS trigger AS $$
+      BEGIN
+        RAISE EXCEPTION 'forced unblock failure';
+      END;
+      $$ LANGUAGE plpgsql;
+      CREATE TRIGGER fail_unblock
+        BEFORE UPDATE OF blocked_reason ON public.kilocode_users
+        FOR EACH STATEMENT EXECUTE FUNCTION public.fail_unblock();
+    `);
+    try {
+      const result = await caller.admin.blacklistDomains.removeDomain({
+        domain: 'mailinator.com',
+        expected_version: version,
+        unblockUsers: true,
+      });
+
+      expect(result.domains).toEqual([]);
+      expect(result.removed).toBe(true);
+      expect(result.unblock).toEqual({
+        requested: true,
+        unblocked: 0,
+        keptBlocked: 0,
+        remaining: false,
+        failed: true,
+      });
+      expect(auditEvents.map(event => event.action)).toEqual([
+        'blacklist.domain.remove',
+        'blacklist.domain.unblock',
+      ]);
+      expect(auditEvents[1].metadata).toEqual(
+        expect.objectContaining({ domain: 'mailinator.com', failed: true })
+      );
+    } finally {
+      await db.execute(sql`
+        DROP TRIGGER fail_unblock ON public.kilocode_users;
+        DROP FUNCTION public.fail_unblock();
+      `);
+    }
+
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(row.blocked_reason).toBe('domainblocked');
+    expect(await tableDomains()).toEqual([]);
+  });
 });

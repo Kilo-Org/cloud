@@ -5659,6 +5659,7 @@ export const ModelStatsBenchmarksSchema = z
         terminalBenchHard: z.number().optional(),
         lcr: z.number().optional(),
         ifBench: z.number().optional(),
+        timeToFirstTokenSeconds: z.number().optional(),
         lastUpdated: z.string().optional(),
       })
       .optional(),

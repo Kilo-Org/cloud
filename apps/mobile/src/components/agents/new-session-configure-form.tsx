@@ -39,7 +39,7 @@ import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 import { keyboardAvoidingViewProps } from '@/lib/keyboard-avoiding-view-props';
-import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
+import { KEYBOARD_FOOTER_GAP, keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
 /**
@@ -85,14 +85,6 @@ type NewSessionProfileOverrideProps = {
  * flush against the frame's top edge.
  */
 const ADVANCED_CONFIG_REVEAL_GAP = 16;
-
-/**
- * The gap the pinned footer keeps between the Start control and the software
- * keyboard. The keyboard covers the home indicator, so the closed-state inset
- * collapses to this breathing room instead of a second navigation-bar
- * reservation.
- */
-const KEYBOARD_FOOTER_GAP = 16;
 
 /**
  * THE new-session screen body — one screen for every entry point (cloud,

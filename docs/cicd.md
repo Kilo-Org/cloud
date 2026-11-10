@@ -4,7 +4,7 @@ The `main-tests` ruleset (id 12440145) requires these status checks on `main`,
 each pinned to the GitHub Actions app (integration id 15368):
 
 | Context | Published by |
-| --- | --- |
+|---|---|
 | `test` | `ci.yml` job `test` |
 | `build` | `ci.yml` job `build` |
 | `typecheck` | `ci.yml` job `typecheck` |

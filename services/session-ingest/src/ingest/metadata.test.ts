@@ -617,6 +617,60 @@ describe('applyMetadataChanges', () => {
     } as never);
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
+  it.each([null, 'workspace_other'])(
+    'rejects a Cloud Agent status update for a different runtime owner (%s)',
+    async cloudAgentSessionId => {
+      const db = createApplyMetadataDb({ cloudAgentSessionId });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'busy']]),
+        undefined,
+        'workspace_expected'
+      );
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    }
+  );
+
+  it('publishes the scoped Cloud Agent status through the existing user notification channel after commit', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionId: 'workspace_expected',
+      initialStatus: 'idle',
+      beforeCommit: async () => {
+        expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+      },
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'busy'],
+        ['statusOccurredAt', '2026-11-09T12:00:00.000Z'],
+        ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+      ]),
+      undefined,
+      'workspace_expected'
+    );
+    expect(db.updateSets).toEqual([
+      {
+        status: 'busy',
+        status_updated_at: '2026-11-09T12:00:00.000Z',
+        status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+      },
+    ]);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({ type: 'session.status.updated' }),
+      undefined
+    );
+  });
+
   it('projects blocker clearing at source time without inventing history from the projection', async () => {
     const db = createApplyMetadataDb({ initialStatus: 'question' });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);

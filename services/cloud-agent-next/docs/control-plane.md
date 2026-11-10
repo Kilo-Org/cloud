@@ -1771,6 +1771,31 @@ Reports carry `failureStage` and `failureCode` from the closed pairs in
 the new reasons. The `session_message_committed` diagnostic keeps its name and fields so the
 failure monitors keep working.
 
+The session list remains a PostgreSQL read (`cli_sessions_v2`), including for Kilo v2,
+whose transcript lives in the Session DO rather than the old ingestion pipeline.
+The Session DO projects its existing message, native status, pending interaction,
+and route state into `busy`, `retry`, `question`, `permission`, `idle`, or `failed`.
+It publishes changes through the `SESSION_INGEST.publishCloudAgentSessionStatus`
+service binding. While work continues to produce events, busy/retry summaries
+also refresh at most once per minute so the sidebar's 20-minute stale-status
+cutoff does not hide a long-running background chat. Same-status refreshes update
+SQL recency without emitting another status notification; idle sessions do not refresh.
+There is no refresh-only alarm: a silent runtime must not gain synthetic liveness
+from the sidebar projection. Execution supervision and its failure deadlines are unchanged.
+Ingest checks the user and immutable Cloud Agent session owner
+under the row lock, applies the existing `status_transition_id` ordering, and
+broadcasts `session.status.updated` through the existing UserConnectionDO. A browser
+still uses one user-level WebSocket for the whole sidebar, not one per session.
+
+Publication has one durable, coalescing latest-status obligation per Session DO.
+Its monotonic ULID cursor survives eviction and clock rollback. Each RPC has a
+5-second deadline and failed publication retries on the shared alarm after 30
+seconds, even when execution has ended. It never delays admission, answers, or
+terminal outcomes. Duplicate or older updates cannot overwrite newer SQL state;
+deleted sessions are never recreated. Notifications remain best effort, with the
+existing list reconciliation and reconnect fetch repairing missed notifications.
+Deploy session-ingest before cloud-agent-next; no database migration is needed.
+
 | Reason | Stage / code |
 |---|---|
 | `preparation_timeout` | `pre_dispatch` / `wrapper_start_failed` |

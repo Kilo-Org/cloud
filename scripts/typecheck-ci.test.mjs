@@ -749,7 +749,7 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   );
 });
 
-// Both workflows run the same declaration action, so both must install the same
+// Every workflow that runs the declaration action must install the same
 // closure. The action's program is the whole input: a wider install links
 // workspaces the build never reads, and a narrower one breaks the build.
 test('kilo-app CI installs the closure the declaration action needs', () => {
@@ -763,11 +763,99 @@ test('kilo-app CI installs the closure the declaration action needs', () => {
     /^pnpm install --frozen-lockfile --filter '@kilocode\/trpc\.\.\.' --filter 'web\.\.\.' --filter kilocode-monorepo$/,
     'the producer installs the declaration closure, not the whole workspace'
   );
+  for (const [file, job] of [
+    ['ci.yml', 'trpc-declarations'],
+    ['mobile-native-build.yml', trpcProducer],
+  ]) {
+    assert.equal(
+      producerInstall,
+      install(file, job),
+      `${file}'s ${job} builds the same declarations, so it installs the same closure`
+    );
+  }
+});
+
+// mobile-native-build needs the same producer for the same reason: both
+// platform jobs start together after the gate, so running the action in each
+// made a cache miss compile the declaration program twice and race both jobs to
+// save the one key. `prepare-trpc` builds it once, and both platform jobs
+// download the tree, as they already do for the harness SDK.
+test('mobile-native-build builds the tRPC declarations once and both platform jobs download them', () => {
+  const jobs = workflows['mobile-native-build.yml'].jobs;
+  const actionUsers = Object.entries(jobs)
+    .filter(([, job]) => (job.steps ?? []).some(step => step.uses === trpcAction))
+    .map(([name]) => name);
+  assert.deepEqual(actionUsers, [trpcProducer], 'only the producer builds the declarations');
+
+  const producer = jobs[trpcProducer];
+  assert.equal(producer.needs, 'gate', 'the producer waits for the gate it is skipped by');
   assert.equal(
-    producerInstall,
-    install('ci.yml', 'trpc-declarations'),
-    'the two workflow jobs that build these declarations install the same closure'
+    producer.if,
+    "needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'",
+    'a run with every platform published must not pay a build for nobody'
   );
+  const producerSteps = producer.steps;
+  const installIndex = producerSteps.findIndex(step =>
+    /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+  );
+  const actionIndex = producerSteps.findIndex(step => step.uses === trpcAction);
+  assert.ok(installIndex >= 0 && actionIndex > installIndex, 'the producer builds after install');
+  const uploads = producerSteps
+    .map((step, index) => ({ step, index }))
+    .filter(
+      ({ step }) =>
+        step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === trpcArtifact
+    );
+  assert.equal(uploads.length, 1, 'the producer uploads the declarations exactly once');
+  assert.ok(uploads[0].index > actionIndex, 'the producer uploads what it built');
+  const upload = uploads[0].step;
+  assert.match(upload.uses, /^actions\/upload-artifact@[0-9a-f]{40}$/, 'immutable upload pin');
+  assert.equal(upload.with.path, trpcDist, 'the artifact root is the dist directory');
+  assert.equal(upload.with['retention-days'], 1);
+  assert.equal(upload.with['if-no-files-found'], 'error', 'an empty build must fail');
+
+  for (const name of ['ios', 'android']) {
+    const job = jobs[name];
+    assert.ok(
+      [job.needs ?? []].flat().includes(trpcProducer),
+      `${name} waits for the build it downloads`
+    );
+    const steps = job.steps;
+    assert.deepEqual(
+      steps.filter(step => step.uses === trpcAction).map(step => step.name),
+      [],
+      `${name} never builds the declarations itself`
+    );
+    const downloads = steps
+      .map((step, index) => ({ step, index }))
+      .filter(
+        ({ step }) =>
+          step.uses?.startsWith('actions/download-artifact@') && step.with?.name === trpcArtifact
+      );
+    assert.equal(downloads.length, 1, `${name} downloads the declarations once`);
+    assert.match(
+      downloads[0].step.uses,
+      /^actions\/download-artifact@[0-9a-f]{40}$/,
+      'immutable download pin'
+    );
+    assert.equal(
+      downloads[0].step.with.path,
+      trpcDist,
+      `${name} restores it where the build writes`
+    );
+    const jobInstall = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    assert.ok(
+      jobInstall >= 0 && downloads[0].index > jobInstall,
+      `${name} downloads the declarations after install`
+    );
+    assert.equal(
+      downloads[0].step.if,
+      "steps.published.outputs.published != 'true'",
+      `${name} still skips its whole build when another run published`
+    );
+  }
 });
 
 // The tRPC action gets the same guard as the harness SDK build action: a hit

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { CopyButton } from '@/components/shared/CopyButton';
 import { cn } from '@/lib/utils';
+import { ABSENT } from './format';
 import type { StepTone } from './routing-labels';
 
 export function DetailSection({
@@ -79,7 +80,10 @@ export function ToneBadge({ tone, children }: { tone: StepTone; children: ReactN
   );
 }
 
+/** For table cells; `font-sans` keeps the dash identical inside monospace cells. */
+export const ABSENT_CELL = <span className="text-muted-foreground font-sans">{ABSENT}</span>;
+
 export function yesNo(value: boolean | null): string {
-  if (value === null) return '—';
+  if (value === null) return ABSENT;
   return value ? 'Yes' : 'No';
 }

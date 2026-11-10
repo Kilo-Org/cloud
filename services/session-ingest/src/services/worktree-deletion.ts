@@ -180,6 +180,10 @@ export async function registerCloudAgentWorktree(
           : {}),
         ...(params.baseBranch !== undefined ? { base_branch: params.baseBranch } : {}),
         ...(params.baseSha !== undefined ? { base_sha: params.baseSha } : {}),
+        // Match legacy checkout reports: the base branch is not the workspace's work.
+        ...(params.gitUrl && params.gitBranch && params.gitBranch !== params.baseBranch
+          ? { git_url: normalizeGitUrl(params.gitUrl), git_branch: params.gitBranch }
+          : {}),
       })
       .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
     const row = await lockWorktree(tx, {

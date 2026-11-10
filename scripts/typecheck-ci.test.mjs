@@ -1515,12 +1515,29 @@ test('a lint-plugin change runs the plugin suite without the web gates', () => {
     /needs\.changes\.outputs\.oxlint_plugins == 'true'/,
     'test-scripts keeps the one check that reads those paths'
   );
+  // The root script chain decides what test-scripts runs: a run that starts the
+  // job without the plugin entry would report a plugin-only change unexercised.
+  const rootScripts = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+  ).scripts;
+  assert.match(
+    rootScripts['test:scripts'],
+    /test:oxlint-plugins/,
+    'test-scripts reaches the plugin suite'
+  );
+  assert.match(
+    rootScripts['test:oxlint-plugins'],
+    /tools\/oxlint\//,
+    'the plugin suite runs the plugin tests'
+  );
   for (const job of ['web-test', 'build', 'dependency-cycle-check']) {
+    const condition = ciJobs[job].if;
     assert.match(
-      ciJobs[job].if,
+      condition,
       /needs\.changes\.outputs\.kilocode_backend == 'true'/,
       `${job}: gated on the shared filter alone, which names no plugin path`
     );
+    assert.doesNotMatch(condition, /oxlint_plugins/, `${job}: the plugin output starts no web job`);
   }
 });
 

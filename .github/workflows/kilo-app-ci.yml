@@ -316,9 +316,10 @@ jobs:
           node-version-file: '.nvmrc'
 
       # No step here reads types or built output, so only the workspaces the
-      # tools come from are installed: the root one carries oxlint, and the
-      # app one carries react-native-css, whose compiler the class checker
-      # probes. The i18n oxlint config is not type-aware.
+      # tools come from are installed: the root one carries oxlint and the
+      # parser the audits read the tree with, and the app one carries
+      # react-native-css, whose compiler the class checker probes. The i18n
+      # oxlint config is not type-aware.
       - name: Install dependencies
         run: pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts
 

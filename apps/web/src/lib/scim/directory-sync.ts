@@ -637,13 +637,20 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
   if (policy.status === 'required' && emailDomain === policy.domain) return;
 
   // Otherwise the address is allowed only by a DNS-verified organization
-  // domain. Without `external_org_id` there is nothing to ask WorkOS about;
-  // the binding is written when the directory is activated, so its absence is
-  // the same not-yet-activated case as a missing organization.
+  // domain, and without `external_org_id` there is nothing to ask WorkOS
+  // about.
+  //
+  // Terminal, not retryable: the organization is already bound to this
+  // directory, and `upsertDirectoryOrganization` returns an already-bound
+  // owner as-is without repairing a missing `external_org_id`, so no later
+  // event supplies one. Reporting `directory_not_found` would borrow the
+  // not-yet-activated meaning and make the Worker hold the one shared cursor
+  // for its full conflict budget before parking — an hour of every other
+  // tenant's events waiting on a condition that cannot clear.
   if (owner.externalOrgId === null) {
     return refuse(
-      'directory_not_found',
-      `organization ${owner.id} carries no WorkOS organization id yet`
+      'domain_not_captured',
+      `organization ${owner.id} carries no WorkOS organization id, so no domain can be verified`
     );
   }
 

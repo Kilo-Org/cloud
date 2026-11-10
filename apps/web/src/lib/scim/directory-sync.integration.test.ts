@@ -519,6 +519,33 @@ describe('upsertDirectoryUser', () => {
     expect(row.external_id).toBe(externalId);
   });
 
+  test('parks rather than retries when the organization carries no WorkOS id', async () => {
+    // The organization is already bound to the directory, and the activation
+    // upsert returns an already-bound owner without repairing a missing
+    // `external_org_id`, so no later event supplies one. Reporting this as
+    // `directory_not_found` would make the Worker hold the one shared cursor
+    // for its full conflict budget before parking.
+    const organizationId = await seedOrganization();
+    await db
+      .update(organizations)
+      .set({ external_org_id: null })
+      .where(eq(organizations.id, organizationId));
+
+    const failure = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(DirectorySyncConflictError);
+    // Terminal, so the event parks at once and an operator sees the reason.
+    expect((failure as DirectorySyncConflictError).code).toBe('domain_not_captured');
+    expect(failure instanceof Error ? failure.message : '').toContain('no WorkOS organization id');
+    // And WorkOS was never asked, since there is nothing to ask about.
+    expect(verifiedDomains.listDnsVerifiedDomains).not.toHaveBeenCalled();
+  });
+
   test('refuses a domain WorkOS verified by hand rather than through DNS', async () => {
     await seedOrganizationWithDomain(`primary-${suffix}.test`);
     // `listDnsVerifiedDomains` filters on `verificationStrategy === 'dns'`, so

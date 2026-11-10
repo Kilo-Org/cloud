@@ -21,6 +21,7 @@ import {
   readPendingLinkSecret,
 } from '@/lib/auth/pending-link';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import { isSameOrigin } from '@/lib/auth/same-origin';
 
 const bodySchema = z.object({
   code: z.string().regex(/^\d{6}$/),
@@ -38,6 +39,9 @@ async function attemptsLeft(challengeId: string | null): Promise<number | undefi
 }
 
 export const POST = withRestTiming('/api/auth/pending-link/verify', async (request: Request) => {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: 'INVALID_ORIGIN' }, { status: 403 });
+  }
   const body: unknown = await request.json().catch(() => undefined);
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {

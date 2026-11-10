@@ -54,10 +54,14 @@ function pendingRow(challengeId: string | null) {
   } as never;
 }
 
-function verifyRequest() {
-  return new Request('http://localhost:3000/api/auth/pending-link/verify', {
+const requestUrl = 'http://localhost:3000/api/auth/pending-link/verify';
+const appOrigin = new URL(requestUrl).origin;
+const appHost = new URL(requestUrl).host;
+
+function verifyRequest(headers: Record<string, string> = {}) {
+  return new Request(requestUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Origin: appOrigin, Host: appHost, ...headers },
     body: JSON.stringify({ code: '123456' }),
   });
 }
@@ -97,5 +101,14 @@ describe('POST /api/auth/pending-link/verify', () => {
     expect(response.status).toBe(200);
     expect(mockReserve).toHaveBeenCalledWith('user@example.com', '123456', 'challenge-1');
     expect(await response.json()).toMatchObject({ token: 'magic-1' });
+  });
+
+  it('refuses a foreign Origin before reading the link', async () => {
+    const response = await POST(verifyRequest({ Origin: 'https://evil.example' }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'INVALID_ORIGIN' });
+    expect(mockReadSecret).not.toHaveBeenCalled();
+    expect(mockReserve).not.toHaveBeenCalled();
   });
 });

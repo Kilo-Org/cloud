@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
+import { isSameOrigin } from '@/lib/auth/same-origin';
 import {
   clearPendingLinkCookie,
   completePendingLink,
@@ -54,23 +55,6 @@ export const GET = withRestTiming('/api/auth/pending-link/complete', async () =>
   }
   return redirectTo(`${pendingLinkPageUrl}?confirm=1`);
 });
-
-/**
- * Whether the POST came from a page on the origin that served it. The Origin
- * header carries its own scheme and host, so this compares it to the request's
- * forwarded host rather than a configured URL: the dev server binds 0.0.0.0
- * and a local browser may use 127.0.0.1, which a configured origin rejects.
- */
-function isSameOrigin(request: Request): boolean {
-  const origin = request.headers.get('origin');
-  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
-  if (!origin || !host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
 
 export const POST = withRestTiming('/api/auth/pending-link/complete', async (request: Request) => {
   if (!isSameOrigin(request)) {

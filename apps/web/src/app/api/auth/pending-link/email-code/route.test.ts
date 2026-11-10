@@ -49,9 +49,14 @@ const liveRow = {
   email_code_allowed: true,
 } as never;
 
-function codeRequest() {
-  return new Request('http://localhost:3000/api/auth/pending-link/email-code', {
+const requestUrl = 'http://localhost:3000/api/auth/pending-link/email-code';
+const appOrigin = new URL(requestUrl).origin;
+const appHost = new URL(requestUrl).host;
+
+function codeRequest(headers: Record<string, string> = {}) {
+  return new Request(requestUrl, {
     method: 'POST',
+    headers: { Origin: appOrigin, Host: appHost, ...headers },
   });
 }
 
@@ -100,5 +105,14 @@ describe('POST /api/auth/pending-link/email-code', () => {
 
     expect(response.status).toBe(502);
     expect(mockRelease).toHaveBeenCalledWith('secret-1');
+  });
+
+  it('refuses a foreign Origin before reading the link', async () => {
+    const response = await POST(codeRequest({ Origin: 'https://evil.example' }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'INVALID_ORIGIN' });
+    expect(mockReadSecret).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });

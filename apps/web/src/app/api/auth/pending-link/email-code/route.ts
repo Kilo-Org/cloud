@@ -16,10 +16,14 @@ import {
   setPendingLinkEmailChallenge,
 } from '@/lib/auth/pending-link';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import { isSameOrigin } from '@/lib/auth/same-origin';
 
 export const POST = withRestTiming(
   '/api/auth/pending-link/email-code',
   async (request: Request) => {
+    if (!isSameOrigin(request)) {
+      return NextResponse.json({ error: 'INVALID_ORIGIN' }, { status: 403 });
+    }
     const secret = await readPendingLinkSecret();
     const row = secret ? await getPendingLinkBySecret(secret) : null;
     if (!secret || !row) {

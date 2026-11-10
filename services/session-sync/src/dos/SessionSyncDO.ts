@@ -1,6 +1,6 @@
 import { sha256Hex } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
-import { sql } from 'drizzle-orm';
+import { getTableName, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -8,6 +8,7 @@ import { z } from 'zod';
 import migrations from '../../drizzle/migrations';
 import type { Env } from '../env';
 import { DataRateLimit } from '../data-rate-limit';
+import { session as sessionTable } from '../db/sqlite-schema';
 import { toHex } from '../hex';
 import { isOverloaded, overloaded } from '../overload';
 import {
@@ -136,6 +137,7 @@ export class SessionSyncDO extends DurableObject<Env> {
     | undefined;
   private dataRateLimit = new DataRateLimit();
   private initialized: Promise<void> | undefined;
+  private schemaReady = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -149,8 +151,10 @@ export class SessionSyncDO extends DurableObject<Env> {
 
   /** Whether this object already holds the session schema. */
   private hasStoredSchema(): boolean {
+    if (this.schemaReady) return true;
+    const name = getTableName(sessionTable);
     return (
-      this.db.all(sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session'`)
+      this.db.all(sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ${name}`)
         .length > 0
     );
   }
@@ -159,6 +163,7 @@ export class SessionSyncDO extends DurableObject<Env> {
   private async initialize(): Promise<void> {
     this.initialized ??= phase(this.env, 'syncInitialize', 'initialize', async () => {
       await migrate(this.db, migrations);
+      this.schemaReady = true;
       this.purgeRetryAt = (await this.ctx.storage.get<number>('purgeRetryAt')) ?? 0;
       this.relayUsed = (await this.ctx.storage.get<boolean>('relayUsed')) ?? false;
       this.relayPurged = (await this.ctx.storage.get<boolean>('relayPurged')) ?? false;

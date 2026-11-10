@@ -2450,7 +2450,7 @@
       "discardWithUploadsMessage": "Tvoj upit i sve prenesene datoteke koje nisu priložene poslanim porukama bit će izbrisani.",
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušaj ponovno.",
       "remoteHint": "Za pokretanje na tvom računalu pokreni Kilo tamo i ostavi ga da radi.",
-      "continueFrom": "Nastavlja se sesija „{{title}}“.",
+      "continueFrom": "Nastavlja se sesija „{{title}}”.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",
       "importFailed": "Uvoz ove sesije nije uspio.",

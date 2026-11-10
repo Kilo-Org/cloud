@@ -2408,7 +2408,7 @@
       "discardWithUploadsMessage": "Kërkesa jote dhe skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
       "discardFailed": "Nuk u fshi drafti. Provo përsëri.",
       "remoteHint": "Për ta ekzekutuar në kompjuterin tënd, nis Kilo aty dhe lëre të funksionojë.",
-      "continueFrom": "Po vazhdon seanca “{{title}}”.",
+      "continueFrom": "Po vazhdon seanca «{{title}}».",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
       "importFailed": "Nuk u arrit të importohej kjo seancë.",

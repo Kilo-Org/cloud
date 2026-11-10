@@ -6,6 +6,7 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { parseRepoReference } from '@/lib/integrations/platforms/github/pr-link-identity';
 import type { PullRequestReviewPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import {
+  hasCloudAgentWorkspaceOnBranch,
   markSessionsVerifyingPullRequest,
   type WebhookInstallationOwner,
 } from './upsert-cli-session-pull-requests';
@@ -13,7 +14,8 @@ import {
 /**
  * Side-effect: when a pull_request_review webhook arrives and at least one
  * cli_sessions_v2 row verifiably links this PR (same repo, same PR number, plus
- * the session's own head evidence), flip `review_decision_pending = true` on the
+ * the session's own head evidence) or a Cloud Agent workspace has its branch
+ * checked out, flip `review_decision_pending = true` on the
  * existing `github_branch_pull_requests` cache row keyed by PR identity
  * `(git_url, PR number, tenant)`.
  *
@@ -61,8 +63,11 @@ export async function upsertCliSessionPullRequestReviewFromWebhook(
       owner
     );
 
-    if (gateResult.kind === 'no_session') {
-      logExceptInTest('pull_request_review upsert: no verifying session, skipping', {
+    if (
+      gateResult.kind === 'no_session' &&
+      !(await hasCloudAgentWorkspaceOnBranch({ gitUrl, headRef: branch }, owner))
+    ) {
+      logExceptInTest('pull_request_review upsert: no verifying session or workspace, skipping', {
         pr_number: pull_request.number,
         repo: repository.full_name,
         branch,

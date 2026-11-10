@@ -43,7 +43,6 @@ jest.mock('@/routers/cli-sessions-v2-router', () => {
   return {
     associatedPrSchema: z.object({}).passthrough(),
     formatAssociatedPr: () => null,
-    sessionPrJoinPredicate: undefined,
   };
 });
 

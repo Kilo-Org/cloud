@@ -805,7 +805,6 @@ describe('Sign-in verification address', () => {
       .mockImplementation(
         jest.requireActual<typeof userModule>('@/lib/user').findAndSyncExistingUser
       );
-    jest.mocked(userServer.isEmailBlacklistedByDomainAsync).mockResolvedValue(false);
     jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
 
     const profile = {

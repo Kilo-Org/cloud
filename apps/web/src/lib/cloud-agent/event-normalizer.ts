@@ -18,31 +18,12 @@ export type V1Event = {
 };
 
 /**
- * Error codes for WebSocket protocol errors.
- * These match the WS_* codes owned by cloud-agent-next/src/websocket/types.ts.
+ * Error codes for WebSocket protocol errors and the error envelope.
+ * Canonical definitions live in `@kilocode/session-ingest-contracts` so the
+ * Worker, the web app, and the cloud-agent SDK stay in lockstep.
  */
-export type StreamErrorCode =
-  | 'WS_PROTOCOL_ERROR'
-  | 'WS_AUTH_ERROR'
-  | 'WS_SESSION_NOT_FOUND'
-  | 'WS_EXECUTION_NOT_FOUND'
-  | 'WS_DUPLICATE_CONNECTION'
-  | 'WS_INTERNAL_ERROR';
-
-const STREAM_ERROR_CODES: ReadonlySet<string> = new Set<StreamErrorCode>([
-  'WS_PROTOCOL_ERROR',
-  'WS_AUTH_ERROR',
-  'WS_SESSION_NOT_FOUND',
-  'WS_EXECUTION_NOT_FOUND',
-  'WS_DUPLICATE_CONNECTION',
-  'WS_INTERNAL_ERROR',
-]);
-
-export type StreamError = {
-  type: 'error';
-  code: StreamErrorCode;
-  message: string;
-};
+export { isStreamError } from '@kilocode/session-ingest-contracts';
+export type { StreamError, StreamErrorCode } from '@kilocode/session-ingest-contracts';
 
 export function isValidV2Event(event: unknown): event is V2Event {
   if (typeof event !== 'object' || event === null) {
@@ -60,21 +41,6 @@ export function isValidV2Event(event: unknown): event is V2Event {
     'timestamp' in event &&
     typeof event.timestamp === 'string' &&
     'data' in event
-  );
-}
-
-export function isStreamError(data: unknown): data is StreamError {
-  if (typeof data !== 'object' || data === null) {
-    return false;
-  }
-  return (
-    'type' in data &&
-    data.type === 'error' &&
-    'code' in data &&
-    typeof data.code === 'string' &&
-    STREAM_ERROR_CODES.has(data.code) &&
-    'message' in data &&
-    typeof data.message === 'string'
   );
 }
 

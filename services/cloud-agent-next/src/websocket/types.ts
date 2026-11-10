@@ -76,23 +76,13 @@ export type IngestEvent = {
   data: unknown;
 };
 
-/** Error codes for WebSocket protocol errors */
-export type StreamErrorCode =
-  | 'WS_PROTOCOL_ERROR' // Invalid message format
-  | 'WS_AUTH_ERROR' // Authentication failed
-  | 'WS_SESSION_NOT_FOUND' // Session doesn't exist
-  | 'WS_EXECUTION_NOT_FOUND' // Execution doesn't exist
-  | 'WS_DUPLICATE_CONNECTION' // Ingest connection already exists for execution
-  | 'WS_INTERNAL_ERROR'; // Internal server error
-
 /**
- * Error message envelope sent to clients when an error occurs.
+ * WebSocket protocol error codes and the error envelope sent to clients when an
+ * error occurs. These are the wire source of truth, owned by
+ * `@kilocode/session-ingest-contracts` so the Worker (producer) and the web app
+ * and cloud-agent SDK (consumers) stay in lockstep.
  */
-export type StreamError = {
-  type: 'error';
-  code: StreamErrorCode;
-  message: string;
-};
+export type { StreamErrorCode, StreamError } from '@kilocode/session-ingest-contracts';
 
 /**
  * Filter options for the /stream endpoint.

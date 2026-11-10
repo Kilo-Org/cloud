@@ -12,30 +12,8 @@ export const cloudWorktreeChangesReadyDataSchema = z
   .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
   .strict();
 
-export const streamErrorSchema = z.object({
-  type: z.literal('error'),
-  code: z.enum([
-    'WS_PROTOCOL_ERROR',
-    'WS_AUTH_ERROR',
-    'WS_SESSION_NOT_FOUND',
-    'WS_EXECUTION_NOT_FOUND',
-    'WS_DUPLICATE_CONNECTION',
-    'WS_INTERNAL_ERROR',
-  ]),
-  message: z.string(),
-});
-export type StreamError = z.infer<typeof streamErrorSchema>;
-
-/**
- * Error code of a WebSocket protocol error. These match the WS_* codes from
- * cloud-agent-next/src/websocket/types.ts, as the schema's enum does.
- */
-export type StreamErrorCode = StreamError['code'];
-
-/** Whether an untrusted WebSocket frame carries a stream error. */
-export function isStreamError(data: unknown): data is StreamError {
-  return streamErrorSchema.safeParse(data).success;
-}
+export { streamErrorSchema, isStreamError } from '@kilocode/session-ingest-contracts';
+export type { StreamError, StreamErrorCode } from '@kilocode/session-ingest-contracts';
 
 const KNOWN_SESSION_STATUS_TYPES = [
   'busy',

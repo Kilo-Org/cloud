@@ -1417,14 +1417,10 @@ export default function CloudChatPage({
 
   const preview = usePreviewController({
     selectedWorktreeId,
-    routeReady:
-      sessionIdFromParams !== null && fetchedSessionData?.kiloSessionId === sessionIdFromParams
-        ? fetchedSessionData?.routeReady
-        : undefined,
-    sessionIdFromParams,
     sessionId: workspaceCloudSessionId,
-    worktreeChats,
-    canOpenTerminal,
+    canOpenPreview: selectedWorktreeId
+      ? worktreeChats.some(chat => Boolean(chat.cloudAgentSessionId))
+      : canOpenTerminal,
     organizationId,
   });
 

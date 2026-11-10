@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import React, { act, createElement, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, skipToken } from '@tanstack/react-query';
+import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import type { PreviewPortDialog as PreviewPortDialogComponent } from './PreviewPortDialog';
 
 type PreviewResult = {
@@ -10,14 +11,16 @@ type PreviewResult = {
   status: 'running' | 'not_running' | 'not_ready' | 'unsupported';
 };
 
-type CreatePreviewInput = {
-  cloudAgentSessionId: string;
+type CreatePreviewInput = ({ cloudAgentSessionId: string } | { worktreeId: string }) & {
   port: number;
   path?: string;
   organizationId?: string;
 };
 
 const sessionId = 'workspace_00000000-0000-4000-8000-000000000001' as const;
+const worktreeId = 'worktree_00000000-0000-4000-8000-000000000001' as const;
+const sessionTarget = { cloudAgentSessionId: sessionId } satisfies PreviewTarget;
+const worktreeTarget = { worktreeId } satisfies PreviewTarget;
 
 const mockPersonalList = jest.fn<() => Promise<PreviewResult>>();
 const mockOrganizationList = jest.fn<() => Promise<PreviewResult>>();
@@ -162,22 +165,30 @@ describe('PreviewPortDialog', () => {
   let mockWindowOpen: jest.Mock;
   let onOpenChange: jest.Mock<(open: boolean) => void>;
 
-  function Harness({ open, organizationId }: { open: boolean; organizationId?: string }) {
+  function Harness({
+    open,
+    target,
+    organizationId,
+  }: {
+    open: boolean;
+    target: PreviewTarget;
+    organizationId?: string;
+  }) {
     return createElement(PreviewPortDialog, {
       open,
       onOpenChange,
-      cloudAgentSessionId: sessionId,
+      target,
       organizationId,
     });
   }
 
-  function render(open: boolean, organizationId?: string) {
+  function render(open: boolean, organizationId?: string, target: PreviewTarget = sessionTarget) {
     act(() =>
       root.render(
         createElement(
           QueryClientProvider,
           { client: queryClient },
-          createElement(Harness, { open, organizationId })
+          createElement(Harness, { open, target, organizationId })
         )
       )
     );
@@ -553,6 +564,29 @@ describe('PreviewPortDialog', () => {
     });
     expect(mockCreatePersonal).not.toHaveBeenCalled();
     expect(popup.location.href).toBe('https://preview.test/organization');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('discovers and opens a worktree target', async () => {
+    mockPersonalList.mockResolvedValue(running([{ name: 'Vite', port: 5173 }]));
+
+    render(true, undefined, worktreeTarget);
+    await settle();
+
+    expect(mockTrpc.cloudAgentNext.listPreviewServices.queryOptions).toHaveBeenCalledWith(
+      worktreeTarget
+    );
+    expect(buttonByLabel('Open Vite on port 5173')).toBeDefined();
+
+    click(buttonByLabel('Open Vite on port 5173'));
+    await settle();
+
+    expect(mockCreatePersonal.mock.calls[0]?.[0]).toEqual({
+      worktreeId,
+      port: 5173,
+      path: undefined,
+    });
+    expect(mockCreateOrganization).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

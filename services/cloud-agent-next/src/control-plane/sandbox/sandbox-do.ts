@@ -386,7 +386,12 @@ import {
   writeRuntimeIdentity,
 } from './runtime-identity.js';
 import { createSandboxNotificationDispatcher, type SandboxNotification } from './notifications.js';
-import { resolvePreviewTarget, type PreviewTargetResult } from './preview-target.js';
+import {
+  hasPreviewWorkspaceBinding,
+  resolvePreviewTarget,
+  type PreviewSandboxScope,
+  type PreviewTargetResult,
+} from './preview-target.js';
 import {
   SandboxRuntimeVersionSchema,
   type SandboxStatusSnapshot,
@@ -1830,19 +1835,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
-   * Off-queue read the Session DO uses to resolve one preview's provider
-   * coordinates. It never enqueues, so a preview never waits behind the control
-   * operation queue. The allocation and route are two separate reads, not one
-   * snapshot. A target that changes before the upstream fetch is fenced
-   * downstream: SandboxContainers checks `allocationRef` and state, and the
-   * remaining race is an accepted residual (control-plane.md, Preview).
+   * Scope records prove workspace ownership, not execution readiness. Physical
+   * fetches fence the allocation ref and running state after this passive read.
    */
-  async previewTarget(sessionId: string): Promise<PreviewTargetResult> {
+  async previewTarget(scope: PreviewSandboxScope): Promise<PreviewTargetResult> {
     await this.initialized;
+    if (
+      (await this.requireOwner()) !== scope.ownerId ||
+      !hasPreviewWorkspaceBinding(await listRoutes(this.db), scope)
+    ) {
+      return { status: 'not_running' };
+    }
     const allocation = await this.readAllocation();
-    const route = await readRoute(this.db, sessionId);
     return resolvePreviewTarget({
-      routeState: route?.state ?? null,
       allocationKind: allocation.kind,
       providerRef: allocation.providerRef,
       provider: this.currentProvider(),
@@ -1851,15 +1856,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
-   * Session DO -> Sandbox DO live preview discovery. Route/allocation state is
-   * read off the operation queue first, so a stopped sandbox returns
+   * Session DO -> Sandbox DO live preview discovery. Workspace scope binding and
+   * allocation state are read passively first, so a stopped sandbox returns
    * `not_running` and a preparing one `not_ready` without any provider call or
    * wake. Only a bound wrapper socket is asked to scan; its reply is awaited
    * outside the queue like every other control request.
    */
-  async previewServices(sessionId: string): Promise<ListPreviewServicesOutput> {
+  async previewServices(scope: PreviewSandboxScope): Promise<ListPreviewServicesOutput> {
     await this.initialized;
-    const target = await this.previewTarget(sessionId);
+    const target = await this.previewTarget(scope);
     if (target.status === 'unsupported_provider') {
       return { services: [], status: 'unsupported' };
     }

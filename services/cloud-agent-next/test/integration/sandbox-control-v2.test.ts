@@ -3363,9 +3363,96 @@ describe('SandboxControlV2 prepare frame secrets', () => {
 });
 
 describe('SandboxControlV2 previewTarget', () => {
+  const PREVIEW_OWNER = 'preview-owner';
+  const PREVIEW_ORG = 'org-preview';
+  const PREVIEW_WORKSPACE = 'worktree_11111111-1111-4111-8111-111111111111';
+  const PREVIEW_SESSION = 'workspace_22222222-2222-4222-8222-222222222222';
+  const PREVIEW_SIBLING = 'workspace_33333333-3333-4333-8333-333333333333';
+
+  type PreviewScope = Parameters<SandboxControlV2['previewTarget']>[0];
+  type PreviewRouteState = 'preparing' | 'ready' | 'failed';
+  type PreviewRouteSeed = {
+    sessionId: string;
+    state: PreviewRouteState;
+    scopeId?: string;
+    orgId?: string;
+    workspaceId?: string;
+  };
+
+  function previewScope(overrides: Partial<PreviewScope> = {}): PreviewScope {
+    return {
+      ownerId: PREVIEW_OWNER,
+      organizationId: null,
+      scopeId: PREVIEW_WORKSPACE,
+      ...overrides,
+    };
+  }
+
+  async function seedPreviewRoutes(
+    stub: DurableObjectStub<SandboxControlV2>,
+    routes: PreviewRouteSeed[]
+  ): Promise<void> {
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.put('control_plane_owner', PREVIEW_OWNER);
+      const db = drizzle(state.storage, { logger: false });
+      for (const route of routes) {
+        const spec = {
+          sessionId: route.sessionId,
+          kiloSessionId: `kilo-${route.sessionId}`,
+          directory: `/workspace/${route.sessionId}`,
+          attemptId: `${route.sessionId}-a1`,
+        };
+        const source = {
+          userId: PREVIEW_OWNER,
+          kiloSessionId: spec.kiloSessionId,
+          kiloToken: 'preview-token',
+          ...(route.orgId === undefined ? {} : { orgId: route.orgId }),
+          ...(route.scopeId === undefined ? {} : { scopeId: route.scopeId }),
+          ...(route.workspaceId === undefined ? {} : { workspaceId: route.workspaceId }),
+        };
+        const row = {
+          session_id: route.sessionId,
+          spec: JSON.stringify(spec),
+          credential_source: JSON.stringify(source),
+          state: route.state,
+          attempt_id: spec.attemptId,
+          attempt_deadline_at: route.state === 'preparing' ? Date.now() + MINUTE : null,
+          reason: route.state === 'failed' ? 'preparation_timeout' : null,
+          updated_at: Date.now(),
+        };
+        await db
+          .insert(routesTable)
+          .values(row)
+          .onConflictDoUpdate({ target: routesTable.session_id, set: row });
+      }
+    });
+  }
+
+  function readPreviewRoute(stub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
+    return runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+      return rows[0] ?? null;
+    });
+  }
+
+  async function setPreviewAllocation(
+    stub: DurableObjectStub<SandboxControlV2>,
+    allocation: { state: 'connected' | 'stopped'; providerRef: string | null }
+  ): Promise<void> {
+    await runInDurableObject(stub, async (_instance, storage) => {
+      const db = drizzle(storage.storage, { logger: false });
+      await db
+        .update(allocationTable)
+        .set({ state: allocation.state, provider_ref: allocation.providerRef })
+        .where(eq(allocationTable.id, 'current'));
+    });
+  }
+
   it('answers an unrouted session as not_running and never enqueues', async () => {
     const stub = sandboxNamespace.getByName(`${SANDBOX_ID}__preview`);
-    const observed = await runInDurableObject(stub, async instance => {
+    const observed = await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put('control_plane_owner', PREVIEW_OWNER);
       const target = instance as unknown as {
         enqueue: (task: () => Promise<unknown>) => Promise<unknown>;
       };
@@ -3375,16 +3462,97 @@ describe('SandboxControlV2 previewTarget', () => {
         enqueueCalls += 1;
         return original(task);
       };
-      const result = await instance.previewTarget('workspace_preview_unrouted');
+      const result = await instance.previewTarget(previewScope());
       return { result, enqueueCalls };
     });
     expect(observed.result).toEqual({ status: 'not_running' });
     expect(observed.enqueueCalls).toBe(0);
   });
 
+  it('resolves a connected container preview by workspace scope across absent, failed and preparing routes', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await connectAndHello(provider, stub);
+
+    // A sibling route proves the workspace scope; the viewed chat has no route.
+    await seedPreviewRoutes(stub, [
+      { sessionId: PREVIEW_SIBLING, state: 'failed', scopeId: PREVIEW_WORKSPACE },
+    ]);
+    expect(await readPreviewRoute(stub, PREVIEW_SESSION)).toBeNull();
+    await expect(stub.previewTarget(previewScope())).resolves.toMatchObject({
+      status: 'ok',
+      coordinates: { provider: 'cloudflare-containers', logicalSandboxId: SANDBOX_ID },
+    });
+
+    // The viewed chat's own route is failed, then preparing. Route state is
+    // never readiness: the same connected allocation stays resolvable.
+    await seedPreviewRoutes(stub, [
+      { sessionId: PREVIEW_SESSION, state: 'failed', scopeId: PREVIEW_WORKSPACE },
+    ]);
+    const failed = await readPreviewRoute(stub, PREVIEW_SESSION);
+    await expect(stub.previewTarget(previewScope())).resolves.toMatchObject({ status: 'ok' });
+
+    await seedPreviewRoutes(stub, [
+      { sessionId: PREVIEW_SESSION, state: 'preparing', scopeId: PREVIEW_WORKSPACE },
+    ]);
+    await expect(stub.previewTarget(previewScope())).resolves.toMatchObject({ status: 'ok' });
+
+    expect(provider.createCalls).toBe(1);
+    expect(await readPreviewRoute(stub, PREVIEW_SIBLING)).toMatchObject({ state: 'failed' });
+    expect(failed).toMatchObject({ state: 'failed' });
+  });
+
+  it('denies a foreign owner, organization or workspace and reports stopped or missing refs', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await connectAndHello(provider, stub);
+    await seedPreviewRoutes(stub, [
+      {
+        sessionId: PREVIEW_SESSION,
+        state: 'failed',
+        scopeId: PREVIEW_WORKSPACE,
+        orgId: PREVIEW_ORG,
+        workspaceId: PREVIEW_WORKSPACE,
+      },
+    ]);
+    const seeded = await readPreviewRoute(stub, PREVIEW_SESSION);
+
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: PREVIEW_ORG }))
+    ).resolves.toMatchObject({ status: 'ok' });
+    await expect(
+      stub.previewTarget(previewScope({ ownerId: 'other-owner', organizationId: PREVIEW_ORG }))
+    ).resolves.toEqual({ status: 'not_running' });
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: 'other-org' }))
+    ).resolves.toEqual({ status: 'not_running' });
+    await expect(
+      stub.previewTarget(
+        previewScope({
+          scopeId: 'worktree_99999999-9999-4999-8999-999999999999',
+        })
+      )
+    ).resolves.toEqual({ status: 'not_running' });
+
+    await setPreviewAllocation(stub, { state: 'connected', providerRef: null });
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: PREVIEW_ORG }))
+    ).resolves.toEqual({ status: 'not_running' });
+
+    await setPreviewAllocation(stub, { state: 'stopped', providerRef: 'stopped-ref' });
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: PREVIEW_ORG }))
+    ).resolves.toEqual({ status: 'not_running' });
+
+    // The passive read never prepares a route or starts another allocation.
+    expect(provider.createCalls).toBe(1);
+    expect(await readPreviewRoute(stub, PREVIEW_SESSION)).toEqual(seeded);
+  });
+
   it('answers an unrouted preview service inquiry as not_running and never enqueues', async () => {
     const stub = sandboxNamespace.getByName(`${SANDBOX_ID}__preview_services`);
-    const observed = await runInDurableObject(stub, async instance => {
+    const observed = await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put('control_plane_owner', PREVIEW_OWNER);
       const target = instance as unknown as {
         enqueue: (task: () => Promise<unknown>) => Promise<unknown>;
       };
@@ -3394,7 +3562,7 @@ describe('SandboxControlV2 previewTarget', () => {
         enqueueCalls += 1;
         return original(task);
       };
-      const result = await instance.previewServices('workspace_preview_unrouted');
+      const result = await instance.previewServices(previewScope());
       return { result, enqueueCalls };
     });
     expect(observed.result).toEqual({ services: [], status: 'not_running' });

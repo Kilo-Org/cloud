@@ -17,6 +17,7 @@ import { byocVercelOwnerFields } from '../byoc/vercel-owner.js';
  */
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
+import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
 import {
@@ -1038,6 +1039,7 @@ async function allocateNewSession(
       await recordOperationProgress(ledger.db, ledger.rowId, {
         cloudAgentSessionId,
         kiloSessionId,
+        generatedBranch,
         ...(initialTurn ? { initialMessageId: initialTurn.messageId } : {}),
         [SESSION_CREATE_WORKTREE_ENABLED_KEY]: worktreeId !== undefined,
         [SESSION_CREATE_FINALIZATION_VERSION_KEY]: ledger.finalizationVersion,
@@ -1396,7 +1398,11 @@ async function rebuildRecordedSessionAllocation(
     throw creationInProgressError();
   }
   const normalizedBinding = parsedBinding.data;
-  const generatedBranch = `kilo/${await generateBranchSlugFromSeed(worktreeId ?? cloudAgentSessionId)}`;
+  const recordedBranch = z.string().min(1).optional().safeParse(canonical.generatedBranch);
+  if (!recordedBranch.success) throw creationInProgressError();
+  const generatedBranch =
+    recordedBranch.data ??
+    `kilo/${await generateBranchSlugFromSeed(worktreeId ?? cloudAgentSessionId)}`;
 
   return {
     cloudAgentSessionId,

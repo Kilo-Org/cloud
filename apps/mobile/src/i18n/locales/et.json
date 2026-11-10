@@ -2577,7 +2577,21 @@
       "thought": "Mõttekäik",
       "showDetails": "Kuva üksikasjad",
       "pending": "Ootel…",
-      "running": "Käimas…"
+      "running": "Käimas…",
+      "field": {
+        "filePath": "Faili tee",
+        "path": "Tee",
+        "offset": "Nihe",
+        "limit": "Ülempiir",
+        "pattern": "Muster",
+        "include": "Kaasatavad failid",
+        "patchText": "Paranduse tekst",
+        "query": "Päring",
+        "prompt": "Viip",
+        "header": "Pealkiri",
+        "question": "Küsimus",
+        "options": "Valikud"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Sisu kuvamine ebaõnnestus."

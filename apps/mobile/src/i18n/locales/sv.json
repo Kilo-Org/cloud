@@ -2577,7 +2577,21 @@
       "thought": "Resonemang",
       "showDetails": "Visa detaljer",
       "pending": "Väntar…",
-      "running": "Körs…"
+      "running": "Körs…",
+      "field": {
+        "filePath": "Filsökväg",
+        "path": "Sökväg",
+        "offset": "Förskjutning",
+        "limit": "Gräns",
+        "pattern": "Mönster",
+        "include": "Inkludering",
+        "patchText": "Patchtext",
+        "query": "Sökfråga",
+        "prompt": "Instruktion",
+        "header": "Rubrik",
+        "question": "Fråga",
+        "options": "Alternativ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Det gick inte att visa innehållet."

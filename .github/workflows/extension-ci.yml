@@ -20,6 +20,14 @@ jobs:
     timeout-minutes: 5
     outputs:
       extension: ${{ steps.filter.outputs.extension == 'true' || steps.workspaces.outputs.extension == 'true' }}
+      # What the Chrome e2e shards read. The bundle holds the extension, the two
+      # workspace packages it imports at run time and the install inputs; the
+      # web sources reach it as declarations only, which `verify` typechecks.
+      # The workspace answer is not part of this gate: the affected detector
+      # selects the extension for a web-source change as well, because the tRPC
+      # declaration program reads the web routers, and that selection would
+      # start the shards for an input the bundle cannot observe.
+      extension_e2e: ${{ steps.filter.outputs.extension_e2e == 'true' }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b
         with:
@@ -125,6 +133,22 @@ jobs:
               - '.prettierignore'
               - 'tools/oxlint/**'
               - 'apps/web/src/**'
+            # The inputs the Chrome bundle is built from: the extension and the
+            # workspace sources its build resolves, plus what the install reads.
+            # Listed beside `extension` rather than derived from it, because a
+            # path filter matches a changed-file list, never another filter.
+            extension_e2e:
+              - 'apps/extension/**'
+              - '.github/workflows/extension-ci.yml'
+              - 'packages/cloud-agent-sdk/**'
+              - 'packages/session-ingest-contracts/**'
+              - 'package.json'
+              - '.nvmrc'
+              - '.npmrc'
+              - '.pnpmfile.cjs'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'patches/**'
 
       - name: Detect affected workspaces
         id: workspaces
@@ -191,9 +215,13 @@ jobs:
   #
   # Firefox Selenium e2e (`e2e:firefox`) is intentionally not run here: it
   # relies on geckodriver tab detection that is unreliable headless.
+  #
+  # The gate is the shard's own input list, not the `extension` output: a change
+  # under the web sources runs `verify` for its declarations and leaves these two
+  # runners free, because the bundle this job builds resolves no web source.
   e2e-chrome-shard:
     needs: changes
-    if: needs.changes.outputs.extension == 'true'
+    if: needs.changes.outputs.extension_e2e == 'true'
     name: e2e-chrome (${{ matrix.shard }}/2)
     strategy:
       fail-fast: false

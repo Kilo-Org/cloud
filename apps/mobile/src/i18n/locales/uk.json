@@ -2089,7 +2089,21 @@
       "thought": "Міркування",
       "showDetails": "Показати відомості",
       "pending": "Очікування…",
-      "running": "Виконання…"
+      "running": "Виконання…",
+      "field": {
+        "filePath": "Шлях до файлу",
+        "path": "Шлях",
+        "offset": "Зсув",
+        "limit": "Обмеження",
+        "pattern": "Шаблон",
+        "include": "Включення",
+        "patchText": "Текст виправлення",
+        "query": "Запит",
+        "prompt": "Підказка",
+        "header": "Заголовок",
+        "question": "Питання",
+        "options": "Варіанти"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не вдалося відобразити вміст."

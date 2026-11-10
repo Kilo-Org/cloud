@@ -2669,7 +2669,21 @@
       "thought": "Úvaha",
       "showDetails": "Zobrazit podrobnosti",
       "pending": "Čeká…",
-      "running": "Běží…"
+      "running": "Běží…",
+      "field": {
+        "filePath": "Souborová cesta",
+        "path": "Cesta",
+        "offset": "Posun",
+        "limit": "Limit",
+        "pattern": "Vzor",
+        "include": "Zahrnutí",
+        "patchText": "Text záplaty",
+        "query": "Dotaz",
+        "prompt": "Pokyn",
+        "header": "Nadpis",
+        "question": "Otázka",
+        "options": "Možnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Obsah se nepodařilo zobrazit."

@@ -2039,7 +2039,21 @@
       "thought": "思考內容",
       "showDetails": "顯示詳細資料",
       "pending": "待處理…",
-      "running": "執行中…"
+      "running": "執行中…",
+      "field": {
+        "filePath": "檔案路徑",
+        "path": "路徑",
+        "offset": "偏移",
+        "limit": "上限",
+        "pattern": "模式",
+        "include": "包含",
+        "patchText": "修補文字",
+        "query": "查詢",
+        "prompt": "提示詞",
+        "header": "標題",
+        "question": "問題",
+        "options": "選項"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "無法顯示內容。"

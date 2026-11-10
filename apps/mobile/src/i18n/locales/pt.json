@@ -2629,7 +2629,21 @@
       "thought": "Raciocínio",
       "showDetails": "Mostrar detalhes",
       "pending": "Pendente…",
-      "running": "Em execução…"
+      "running": "Em execução…",
+      "field": {
+        "filePath": "Caminho do ficheiro",
+        "path": "Caminho",
+        "offset": "Deslocamento",
+        "limit": "Limite",
+        "pattern": "Padrão",
+        "include": "Incluir",
+        "patchText": "Texto da alteração",
+        "query": "Consulta",
+        "prompt": "Instrução",
+        "header": "Título",
+        "question": "Pergunta",
+        "options": "Opções"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Não foi possível apresentar o conteúdo."

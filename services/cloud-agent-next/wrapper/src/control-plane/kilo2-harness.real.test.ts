@@ -12,6 +12,12 @@ import { createKilo2Api } from './kilo2-api.js';
 import { createKilo2Reads } from './kilo2-reads.js';
 import type { HarnessActivityEvent } from './harness-activity.js';
 import type { KiloServer } from '../kilo-server-auth.js';
+import {
+  createRuntimeProfileMaterializer,
+  withRuntimeProfileEnvironment,
+} from './runtime-profile.js';
+import { buildWorktreeKiloEnvironment } from '../control/worktree-runtime.js';
+import { buildCloudAgentRules } from '../../../src/shared/cloud-agent-rules.js';
 
 const binary = process.env.KILO2_BINARY;
 const suite = binary ? describe : describe.skip;
@@ -23,6 +29,19 @@ suite('real Kilo v2 harness', () => {
       throw new Error('Run this suite with KILO_RUNTIME_HARNESS=kilo2');
     const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-harness-')));
     const directory = path.join(root, 'workspace');
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(path.join(directory, 'AGENTS.md'), 'SYNTHETIC_REPOSITORY_INSTRUCTION');
+    await createRuntimeProfileMaterializer().materialize(root, {
+      runtimeInstructions: [
+        { name: 'disabled-proof', content: 'SYNTHETIC_DISABLED_PROFILE_INSTRUCTION' },
+      ],
+    });
+    const profile = {
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
+    };
+    await createRuntimeProfileMaterializer().materialize(root, profile);
     const events: KiloFeedEvent[] = [];
     const activity: HarnessActivityEvent[] = [];
     const requests: string[] = [];
@@ -248,6 +267,11 @@ suite('real Kilo v2 harness', () => {
         expect(runtime.sessionState(sessionId)).toBeUndefined();
       }
       await prompt('remember amber-history-marker', `${startupFailureNote}\n\n${callbackContext}`);
+      expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
+      expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
+      expect(requests.at(-1)).not.toContain('SYNTHETIC_DISABLED_PROFILE_INSTRUCTION');
+      const builtIn = buildCloudAgentRules({});
+      expect(requests.at(-1)?.split(JSON.stringify(builtIn).slice(1, -1))).toHaveLength(2);
       expect(requests.at(-1)).toContain('workspace_callback-marker');
       expect(requests.at(-1)).toContain(startupFailureNote);
       expect(
@@ -270,6 +294,8 @@ suite('real Kilo v2 harness', () => {
         onRestore() {},
       });
       await prompt('recall the earlier marker', callbackContext);
+      expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
+      expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
       expect(requests.at(-1)).toContain('amber-history-marker');
       expect(requests.at(-1)).toContain('workspace_callback-marker');
       // V2 preserves the original prompt prefix and supersedes changed context in-band.
@@ -305,6 +331,8 @@ suite('real Kilo v2 harness', () => {
       expect(restored).toBe(true);
       expect(historyReads).toEqual([undefined, undefined]);
       await prompt('recall the marker after native database replacement', callbackContext);
+      expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
+      expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
       expect(requests.at(-1)).toContain('amber-history-marker');
       expect(requests.at(-1)).toContain('workspace_callback-marker');
       mode = 'tool';
@@ -422,4 +450,139 @@ suite('real Kilo v2 harness', () => {
       await fs.rm(root, { recursive: true, force: true });
     }
   }, 120_000);
+
+  it('delivers enabled profile instructions through the production v1-shaped config and KILO_CONFIG', async () => {
+    if (!binary) throw new Error('KILO2_BINARY is required');
+    if (process.env.KILO_RUNTIME_HARNESS !== 'kilo2')
+      throw new Error('Run this suite with KILO_RUNTIME_HARNESS=kilo2');
+    const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-profile-')));
+    const directory = path.join(root, 'workspace');
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(path.join(directory, 'AGENTS.md'), 'SYNTHETIC_REPOSITORY_INSTRUCTION');
+    const materializer = createRuntimeProfileMaterializer();
+    await materializer.materialize(root, {
+      runtimeInstructions: [
+        { name: 'disabled-proof', content: 'SYNTHETIC_DISABLED_PROFILE_INSTRUCTION' },
+      ],
+    });
+    materializer.release(root);
+    const profile = {
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
+      kiloCommands: [{ name: 'profile-command', template: 'Run the profile command' }],
+    };
+    await materializer.materialize(root, profile);
+    const requests: string[] = [];
+    const fake = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(request) {
+        if (new URL(request.url).pathname.endsWith('/models'))
+          return Response.json({
+            data: [
+              {
+                id: 'fake-deterministic',
+                name: 'Local contract',
+                context_length: 128000,
+                max_completion_tokens: 4096,
+                isFree: true,
+                pricing: { prompt: '0', completion: '0' },
+                opencode: { ai_sdk_provider: 'openai-compatible' },
+              },
+            ],
+          });
+        if (!new URL(request.url).pathname.endsWith('/chat/completions')) return Response.json({});
+        requests.push(await request.text());
+        const chunk = (delta: unknown, reason: string | null) =>
+          `data: ${JSON.stringify({
+            id: 'local',
+            object: 'chat.completion.chunk',
+            created: 1,
+            model: 'fake-deterministic',
+            choices: [{ index: 0, delta, finish_reason: reason }],
+          })}\n\n`;
+        return new Response(
+          chunk({ role: 'assistant', content: 'done' }, null) +
+            chunk({}, 'stop') +
+            'data: [DONE]\n\n',
+          { headers: { 'content-type': 'text/event-stream' } }
+        );
+      },
+    });
+    const env: Record<string, string> = {
+      ...withRuntimeProfileEnvironment(
+        buildWorktreeKiloEnvironment(
+          directory,
+          root,
+          {
+            scopeId: 'local-scope',
+            token: 'local-test',
+            targets: {
+              backendBaseUrl: fake.url.origin,
+              providerBaseUrl: `${fake.url.origin}/api/openrouter`,
+              sessionIngestBaseUrl: fake.url.origin,
+            },
+          },
+          {},
+          { PATH: `${path.dirname(binary)}:${process.env.PATH ?? ''}` }
+        ),
+        profile
+      ),
+      KILO_DISABLE_MODELS_FETCH: '1',
+      KILO_DISABLE_FFF: '1',
+    };
+    expect(env.KILO_CONFIG).toBe(path.join(root, '.config', 'kilo', 'profile.json'));
+    expect(Object.keys(JSON.parse(env.KILO_CONFIG_CONTENT))).toContain('permission');
+    const events: KiloFeedEvent[] = [];
+    const runtime = createKiloRuntime({
+      directory,
+      env,
+      timers: CONTROL_PLANE_TIMERS,
+      pidfileDirectory: path.join(root, 'pids'),
+      log: message => {
+        if (process.env.KILO2_TEST_LOG) console.error(message);
+      },
+      onEvent: event => events.push(event),
+      onHarnessActivity() {},
+      openFeed(source, callbacks) {
+        return createKilo2EventFeed({ source, ...callbacks });
+      },
+    });
+    const signal = AbortSignal.timeout(60_000);
+    const sessionId = `ses_${'b'.repeat(26)}`;
+    try {
+      const harness = await runtime.ensure();
+      await harness.open({
+        sessionId,
+        directory,
+        env,
+        signal,
+        restoreFiles: false,
+        onRestore() {},
+      });
+      await harness.submit({
+        sessionId,
+        directory,
+        messageId: createMessageId(),
+        prompt: 'confirm profile instructions',
+        model: 'fake-deterministic',
+        signal,
+      });
+      const deadline = Date.now() + 20_000;
+      const turnClose = () => events.find(event => event.type === 'session.turn.close');
+      while (!turnClose()) {
+        if (Date.now() > deadline) throw new Error('Timed out: profile instruction turn');
+        await Bun.sleep(50);
+      }
+      expect(turnClose()?.properties.reason).toBe('completed');
+      expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
+      expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
+      expect(requests.at(-1)).not.toContain('SYNTHETIC_DISABLED_PROFILE_INSTRUCTION');
+    } finally {
+      await runtime.shutdown();
+      await fake.stop(true);
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  }, 90_000);
 });

@@ -74,7 +74,7 @@ describe('SidebarUserFooter export entry shared by personal and organization sid
     expect(html).not.toContain('Request data export');
     expect(html).toContain('Request data deletion');
     expect(html).toContain('Connected Accounts');
-    expect(html).toContain('Install');
+    expect(html).not.toContain('Install');
     expect(html).toContain('Sign out');
   });
 

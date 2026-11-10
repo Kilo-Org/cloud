@@ -105,6 +105,7 @@ const ASSISTANT_REASON_REASONS = {
   structured_output: 'assistant_structured_output',
   insufficient_credits: 'billing',
   model_unavailable: 'model_not_found',
+  model_catalog_unavailable: 'assistant_failed',
   unknown: 'assistant_failed',
 } as const satisfies Record<CloudAgentAssistantFailureReason, CodeReviewTerminalReason>;
 

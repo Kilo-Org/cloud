@@ -1,5 +1,6 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { shareClaudeBillingConnection } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import {
   payment_methods,
   kilocode_users,
@@ -125,6 +126,7 @@ import {
   coding_plan_subscriptions,
   byok_api_keys,
   openai_chatgpt_connections,
+  claude_billing_connection_grants,
   claude_billing_connections,
   operation_ledgers,
   analytics_event_outbox,
@@ -2771,6 +2773,61 @@ describe('User', () => {
         .where(eq(claude_billing_connections.organization_id, organization.id));
       expect(organizationRows).toHaveLength(1);
       expect(organizationRows[0]?.kilo_user_id).toBeNull();
+    });
+
+    it("promotes a deleted user's personal payer when shared services still use it", async () => {
+      const user = await insertTestUser({
+        google_user_email: `claude-billing-shared-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Claude billing shared cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      const [payer] = await db
+        .insert(claude_billing_connections)
+        .values({
+          kilo_user_id: user.id,
+          user_profile_id: `uprof_${randomUUID()}`,
+          connection_id: 'ocon_shared_personal',
+          status: 'connected',
+          connected_at: new Date().toISOString(),
+          created_by: user.id,
+        })
+        .returning();
+      if (!payer) throw new Error('Missing payer fixture');
+      await shareClaudeBillingConnection(
+        { kind: 'personal', kiloUserId: user.id },
+        { kind: 'shared_services', organizationId: organization.id },
+        user.id
+      );
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(claude_billing_connection_grants)
+          .where(eq(claude_billing_connection_grants.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(claude_billing_connections)
+          .where(eq(claude_billing_connections.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      const organizationRows = await db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.organization_id, organization.id));
+      expect(organizationRows).toEqual([
+        expect.objectContaining({
+          id: payer.id,
+          kilo_user_id: null,
+          organization_id: organization.id,
+          status: 'connected',
+        }),
+      ]);
     });
 
     it("keeps the organization's shared-services row when the connector is deleted", async () => {

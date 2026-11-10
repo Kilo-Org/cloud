@@ -39,17 +39,18 @@ function catalogRow() {
     pr_last_synced_at: timestamp as string | null,
     pr_review_decision: 'approved' as string | null,
     review_decision_pending: false,
+    pr_from_workspace: false as boolean | null,
   };
 }
 
 function database(rows = [catalogRow()]) {
   const limit = vi.fn().mockResolvedValue(rows);
   const where = vi.fn().mockReturnValue({ limit });
-  const leftJoin = vi.fn().mockReturnValue({ where });
-  const from = vi.fn().mockReturnValue({ leftJoin });
+  const leftJoinLateral = vi.fn().mockReturnValue({ where });
+  const from = vi.fn().mockReturnValue({ leftJoinLateral });
   const select = vi.fn().mockReturnValue({ from });
   const db = { select } as unknown as WorkerDb;
-  return { db, select, leftJoin, where, limit };
+  return { db, select, leftJoinLateral, where, limit };
 }
 
 function setup(createdOnPlatform: string | undefined = 'slack', id = sessionId) {
@@ -258,16 +259,34 @@ describe('getSessionAuxiliaryMetadata', () => {
     expect(query.params).toEqual([userId, kiloSessionId, sessionId, ...(orgId ? [orgId] : [])]);
     expect(query.sql).toContain('"cli_sessions_v2"."organization_id"');
     expect(query.sql).toContain(orgId === null ? 'is null' : '= $4');
-    const join = new PgDialect().sqlToQuery(mock.leftJoin.mock.calls[0][1] as SQL).sql;
+    const lateral = mock.leftJoinLateral.mock.calls[0][0] as { _: { sql: SQL } };
+    const join = new PgDialect().sqlToQuery(lateral._.sql).sql;
     expect(join).toContain(
       '"github_branch_pull_requests"."pr_number" = "cli_sessions_v2"."pr_number"'
+    );
+    expect(join).toContain(
+      '"cloud_agent_worktrees"."worktree_id" = "cli_sessions_v2"."cloud_agent_worktree_id"'
     );
     expect(join).toContain('"owned_by_organization_id" = "cli_sessions_v2"."organization_id"');
     expect(join).toContain('"owned_by_user_id" = "cli_sessions_v2"."kilo_user_id"');
     expect(join).toContain('"cli_sessions_v2"."organization_id" is null');
     expect(join).toContain('"cli_sessions_v2"."pr_link_verified_at" is not null');
-    expect(join).not.toContain('git_branch');
     expect(mock.limit).toHaveBeenCalledWith(1);
+  });
+
+  it("shows the workspace's PR without a link of the session's own", async () => {
+    const row = catalogRow();
+    row.session.pr_url = null;
+    row.session.pr_link_verified_at = null;
+    row.session.platform = null;
+    row.pr_from_workspace = true;
+    const result = await getSessionAuxiliaryMetadata(database([row]).db, input);
+    expect(result?.associatedPr).toMatchObject({
+      url: row.pr_url,
+      number: 7,
+      state: 'open',
+      platform: 'github',
+    });
   });
 
   it.each(['pr_url', 'pr_link_verified_at'] as const)(

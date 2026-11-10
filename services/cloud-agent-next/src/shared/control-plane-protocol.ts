@@ -4,6 +4,7 @@ import {
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
   RuntimeKiloCommandsSchema,
+  RuntimeInstructionsSchema,
 } from './runtime-profile.js';
 import type {
   CloudAgentAssistantFailureReason,
@@ -236,6 +237,7 @@ export const CONTROL_PLANE_ASSISTANT_FAILURE_REASONS = [
   'output_limit',
   'content_filter',
   'structured_output',
+  'model_catalog_unavailable',
   'unknown',
 ] as const satisfies readonly CloudAgentAssistantFailureReason[];
 export type ControlPlaneAssistantFailureReason =
@@ -386,6 +388,12 @@ export const controlPlaneWorkspaceRootSchema = z
     branch: z.string().min(1).max(256),
     /** The branch is the session's generated one: create it when the remote has none. */
     branchMode: z.literal('working').optional(),
+    /** Stacked workspace base of the launch repository; other roots never carry one. */
+    baseBranch: z.string().min(1).max(256).optional(),
+    baseSha: z
+      .string()
+      .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+      .optional(),
   })
   .strict();
 export type ControlPlaneWorkspaceRoot = z.infer<typeof controlPlaneWorkspaceRootSchema>;
@@ -470,6 +478,7 @@ const routeSpecObjectSchema = z
      */
     environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
+    runtimeInstructions: RuntimeInstructionsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
@@ -525,6 +534,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     startCommands: true,
     environmentSetupCommandCount: true,
     runtimeSkills: true,
+    runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
     kiloCommands: true,
@@ -541,6 +551,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     startCommands: true,
     environmentSetupCommandCount: true,
     runtimeSkills: true,
+    runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
     kiloCommands: true,

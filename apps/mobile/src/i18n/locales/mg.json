@@ -2583,7 +2583,21 @@
       "thought": "Eritreritra",
       "showDetails": "Asehoy ny antsipiriany",
       "pending": "Miandry…",
-      "running": "Mandeha…"
+      "running": "Mandeha…",
+      "field": {
+        "filePath": "Lalan-drakitra",
+        "path": "Lalana",
+        "offset": "Fanombohana",
+        "limit": "Fetra",
+        "pattern": "Lamina",
+        "include": "Fampidirana",
+        "patchText": "Lahatsoratra fanovana",
+        "query": "Fikarohana",
+        "prompt": "Toromarika",
+        "header": "Lohateny",
+        "question": "Fanontaniana",
+        "options": "Safidy"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Tsy nahomby ny fampisehoana ny votoaty."

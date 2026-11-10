@@ -2039,7 +2039,21 @@
       "thought": "Düşünce",
       "showDetails": "Ayrıntıları göster",
       "pending": "Bekliyor…",
-      "running": "Çalışıyor…"
+      "running": "Çalışıyor…",
+      "field": {
+        "filePath": "Dosya yolu",
+        "path": "Yol",
+        "offset": "Başlangıç",
+        "limit": "Sınır",
+        "pattern": "Desen",
+        "include": "Dosya filtresi",
+        "patchText": "Yama metni",
+        "query": "Sorgu",
+        "prompt": "İstem",
+        "header": "Başlık",
+        "question": "Soru",
+        "options": "Seçenekler"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "İçerik görüntülenemedi."

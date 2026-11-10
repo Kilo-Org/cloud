@@ -2583,7 +2583,21 @@
       "thought": "চিন্তাভাবনা",
       "showDetails": "বিস্তারিত দেখান",
       "pending": "অপেক্ষমাণ…",
-      "running": "চলছে…"
+      "running": "চলছে…",
+      "field": {
+        "filePath": "ফাইল পাথ",
+        "path": "পাথ",
+        "offset": "অফসেট",
+        "limit": "সীমা",
+        "pattern": "প্যাটার্ন",
+        "include": "অন্তর্ভুক্তি",
+        "patchText": "প্যাচ পাঠ্য",
+        "query": "অনুসন্ধান",
+        "prompt": "নির্দেশনা",
+        "header": "শিরোনাম",
+        "question": "প্রশ্ন",
+        "options": "বিকল্প"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "বিষয়বস্তু দেখানো যায়নি।"

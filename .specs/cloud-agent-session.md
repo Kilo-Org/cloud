@@ -299,8 +299,8 @@ repository.
 
 ### Workspace tail snapshots
 
-1. `WORKSPACE_SNAPSHOT_ORG_IDS` and `WORKSPACE_SNAPSHOT_USER_IDS` MUST use explicit
-   enrolled IDs. Empty or unset is off. `*` MUST NOT enable snapshots.
+1. `WORKSPACE_SNAPSHOT_IDS` MUST accept a comma-separated allowlist of user or organization
+   IDs. Matching either MUST enroll the owner. Empty or unset is off; `*` MUST enroll everyone.
 2. Only a trusted registered `worktree_*` workspace MAY capture or restore a tail
    snapshot. Standalone sessions MUST NOT capture or restore one.
 3. A snapshot MUST belong to one workspace, user, organization, sandbox binding,
@@ -428,6 +428,20 @@ repository.
 1. The user MUST be able to open a terminal on the environment as a tab beside
    the chat, and close it. A read-only session MUST NOT offer terminals.
 2. A pull request the session opened MUST be visible with its current state.
+   In a worktree, a same-repository pull request on the branch the worktree has
+   checked out belongs to the worktree: every chat in it MUST show that pull
+   request without any chat reporting it, an open or draft pull request MUST win
+   over a closed or merged one, and it MUST only match within the worktree's
+   personal or organization scope. Outside worktrees a branch name alone MUST
+   NOT link a pull request.
+   The first workspace registration MUST record its canonical repository and
+   working branch without requiring a CLI metadata report. A generated branch
+   MUST remain stable across registration retries and takeovers; an explicitly
+   selected upstream branch MUST take precedence. Registration MUST NOT record
+   the base branch as the workspace's working branch or overwrite a previously
+   registered checkout. A later registration MUST fill the repository and working
+   branch when both stored fields are absent. Legacy CLI checkout reports MAY
+   still update it.
 3. Open workspace tabs — the workspace terminal and file tabs, their order, and
    the active tab — MUST survive refresh and navigation between worktrees, and
    MUST remain scoped to the current user and personal or organization context.
@@ -786,6 +800,11 @@ The following use SHOULD and are not enforced today:
      load the `AGENTS.md` or skills of each repository.
 
 ## Changelog
+
+### 2026-11-10 -- Worktree pull requests
+
+- A pull request on a worktree's checked-out branch now belongs to the worktree
+  and shows on every chat in it, without the agent reporting a link.
 
 ### 2026-11-04 -- Environment start commands
 

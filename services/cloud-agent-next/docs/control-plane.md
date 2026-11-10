@@ -639,8 +639,9 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
 
 Workspace snapshots are private full-disk checkpoints for trusted registered `worktree_*`
 workspaces. `workspace_*` identifies a Cloud Agent session, not the workspace.
-`WORKSPACE_SNAPSHOT_ORG_IDS` and `WORKSPACE_SNAPSHOT_USER_IDS` are explicit allowlists;
-empty or unset disables the feature, and `*` does not enroll owners.
+`WORKSPACE_SNAPSHOT_IDS` is a comma-separated allowlist of user or organization IDs;
+matching either enrolls the owner. `*` enrolls everyone; empty or unset enrolls no owners.
+Production sets it to `*` to enable snapshots for everyone eligible below.
 Standalone sessions never capture or restore tail snapshots.
 
 `src/control-plane/sandbox/workspace-snapshot.ts` owns identity, publication and selection.
@@ -729,6 +730,16 @@ keep environment snapshots and existing history/worktree recovery.
    `workspace_setup_failed`. Worktree chats inherit their source chat's profile, environment, and
    secrets and share its directory runtime and HOME. Separate worktree directories retain separate
    runtimes; read-only Bitbucket reviews carry no profile secrets, like the withheld MCP snapshot.
+- A wrapper that accepts profile instructions advertises `x-kilo-runtime-instructions: 1` on the
+  WebSocket upgrade. The Sandbox DO retains this capability in the socket attachment across
+  hibernation and omits `runtimeInstructions` from both `session.prepare` and `session.attach` for
+  older wrappers, whose strict schemas reject the field. Stored workspace instructions are unchanged.
+- Profile instruction cleanup removes only files tracked in `$HOME/.kilocode/profile-instructions.json`.
+  Invalid entries are skipped individually without losing ownership of valid entries. Restored HOMEs
+  from wrappers predating this manifest retain untracked rules, including stale profile rules: their
+  filenames cannot distinguish them from setup/user-created rules, so cleanup does not infer ownership.
+  A missing or malformed JSON manifest likewise cannot establish ownership. Re-materializing an enabled
+  profile rule tracks it for subsequent cleanup.
 
 - Connect, send `hello` (`wrapperId`, `allocationId`, protocol version), wait for `welcome` or
   `shutdown`. On `shutdown`, permanently close the connection and exit with code 0, even when the
@@ -757,11 +768,16 @@ keep environment snapshots and existing history/worktree recovery.
 
 The route `directory` is the working directory (cwd): where Kilo starts and setup runs. The frame's
 optional `roots` list the git roots, one for each repository of a V2 environment
-(`{ directory, repoFullName, git: { url, platform }, branch, branchMode? }`, no credential). Every
-root is the route directory or a path under it. A frame without `roots` (every V1 route, and any
-frame from an older Worker) has one root at `directory`. With one root the cwd is that root. With
-several, the cwd is `/workspace`, which is not itself a git root: it is never emptied, stamped or
-checked out. Setup runs there and can write into it.
+(`{ directory, repoFullName, git: { url, platform }, branch, branchMode?, baseBranch?, baseSha? }`,
+no credential). Every root is the route directory or a path under it. A frame without `roots`
+(every V1 route, and any frame from an older Worker) has one root at `directory`. With one root the
+cwd is that root. With several, the cwd is `/workspace`, which is not itself a git root: it is never
+emptied, stamped or checked out. Setup runs there and can write into it.
+
+With `roots`, checkout uses each root's own `branch`, `branchMode`, `baseBranch` and `baseSha`,
+never inheriting those fields from the route. Only the launch repository's root carries the stacked
+base; other roots keep their configured branches without that base. Without `roots`, checkout uses
+the route-level branch and base fields for the single root at `directory`.
 
 The wrapper owns the step timeouts and retries. Clone, checkout, restore and stamp run once for
 each root, in order. The clone and restore bounds are totals for the whole preparation, not for each
@@ -1543,6 +1559,12 @@ parent worktree. The flat `prepareSession` input and the grouped `start` input a
 The first session-ingest ownership row for the worktree records the same three values and later
 sibling registrations leave them untouched. A sibling chat inherits them; a transcript fork does
 not (a clone create never passes them).
+
+The Sandbox DO forwards the stored `baseBranch` and `baseSha` in `session.prepare`. For a V2
+environment workspace, registration also puts them only on the launch repository's entry in
+`roots`; the wrapper uses each root's fields rather than copying the route-level base to every
+repository. This applies even to a single-repository V2 environment. A route without `roots` uses
+the route-level base for its single checkout.
 
 When the wrapper creates the working branch and no local or remote branch exists, it fetches
 `origin/<baseBranch>` and checks `baseSha` is an ancestor of it before running

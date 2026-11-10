@@ -2577,7 +2577,21 @@
       "thought": "Gedagte",
       "showDetails": "Wys besonderhede",
       "pending": "Hangende…",
-      "running": "Besig…"
+      "running": "Besig…",
+      "field": {
+        "filePath": "Lêerpad",
+        "path": "Pad",
+        "offset": "Afset",
+        "limit": "Limiet",
+        "pattern": "Patroon",
+        "include": "Insluiting",
+        "patchText": "Wysigingsteks",
+        "query": "Soektog",
+        "prompt": "Aanwysing",
+        "header": "Opskrif",
+        "question": "Vraag",
+        "options": "Keuses"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Die inhoud kon nie vertoon word nie."

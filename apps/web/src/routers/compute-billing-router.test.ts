@@ -103,9 +103,10 @@ describe('customer compute billing PostgreSQL queries', () => {
       hourlyUsd: null,
       available: false,
     });
-    expect(formatComputePrice(0.09)).toBe('$0.09/hour');
+    expect(formatComputePrice(0.09)).toBe('~$0.09/hr');
+    expect(formatComputePrice(1.20312)).toBe('~$1.20/hr');
     expect(formatComputePrice(null)).toBe('Price unavailable');
-    expect(formatComputePrice(0.00000001)).toBe('<$0.000001/hour');
+    expect(formatComputePrice(0.00000001)).toBe('<$0.01/hr');
   });
 
   it('reports exact amounts and durations by day or session, retaining shared and unlinked charges', async () => {

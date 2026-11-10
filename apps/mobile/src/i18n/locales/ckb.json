@@ -2577,7 +2577,21 @@
       "thought": "بیرکردنەوە",
       "showDetails": "نیشاندانی وردەکارییەکان",
       "pending": "لە چاوەڕوانیدا…",
-      "running": "لە جێبەجێکردندایە…"
+      "running": "لە جێبەجێکردندایە…",
+      "field": {
+        "filePath": "ڕێڕەوی فایل",
+        "path": "ڕێڕەو",
+        "offset": "خاڵی دەستپێک",
+        "limit": "سنوور",
+        "pattern": "شێواز",
+        "include": "لەخۆگرتن",
+        "patchText": "دەقی چاکسازی",
+        "query": "گەڕان",
+        "prompt": "ڕێنمایی",
+        "header": "سەرنووس",
+        "question": "پرسیار",
+        "options": "بژاردەکان"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "نەتوانرا ناوەڕۆکەکە نیشان بدرێت."

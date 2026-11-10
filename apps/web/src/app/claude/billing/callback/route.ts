@@ -10,7 +10,7 @@ import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { claude_billing_connections } from '@kilocode/db/schema';
 import {
-  claudeBillingOwnerWhere,
+  activateClaudeBillingGrant,
   type ClaudeBillingOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { consumeClaudeBillingPending } from '@/lib/claude-billing/pending';
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
 
   try {
     await db.transaction(async tx => {
-      const saved = await tx
+      const [saved] = await tx
         .update(claude_billing_connections)
         .set({
           connection_id: connectionId,
@@ -122,12 +122,12 @@ export async function GET(request: NextRequest) {
         .where(
           and(
             eq(claude_billing_connections.user_profile_id, pending.userProfileId),
-            eq(claude_billing_connections.updated_at, pending.connectionVersion),
-            claudeBillingOwnerWhere(owner)
+            eq(claude_billing_connections.updated_at, pending.connectionVersion)
           )
         )
         .returning({ id: claude_billing_connections.id });
-      if (saved.length !== 1) throw new Error('Claude connection disappeared during approval');
+      if (!saved) throw new Error('Claude connection disappeared during approval');
+      await activateClaudeBillingGrant(owner, saved.id, session.id, tx);
       // A personal link replaces the person's stored Anthropic API key: they no
       // longer share one, and Kilo never uses a dormant key it did not need. An
       // organization key stays, because it still serves that organization's

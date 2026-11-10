@@ -10,7 +10,6 @@ import {
   Cloud,
   Coins,
   CreditCard,
-  Download,
   Key,
   List,
   MessageSquare,
@@ -196,14 +195,6 @@ const accountItems: SidebarStoryItem[] = [
   },
 ];
 
-const startItems: SidebarStoryItem[] = [
-  {
-    title: 'Install',
-    icon: Download,
-    url: '/install',
-  },
-];
-
 const kiloClawEntryItems: SidebarStoryItem[] = [
   {
     title: 'KiloClaw',
@@ -228,7 +219,6 @@ const allUrls = [
   ...kiloClawItems,
   ...cloudItems,
   ...accountItems,
-  ...startItems,
 ].flatMap(item => (typeof item === 'string' ? [item] : item.url ? [item.url] : []));
 
 function StoryOrganizationSwitcher() {
@@ -310,7 +300,6 @@ function PersonalSidebar({ menu }: { menu: 'main' | 'kiloClaw' }) {
             <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
             <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
             <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
-            <SidebarMenuList label="Start" items={startItems} allUrls={allUrls} />
           </>
         )}
       </SidebarContent>

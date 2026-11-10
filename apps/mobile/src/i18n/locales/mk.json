@@ -2577,7 +2577,21 @@
       "thought": "Мисла",
       "showDetails": "Прикажи ги деталите",
       "pending": "Се чека…",
-      "running": "Во тек…"
+      "running": "Во тек…",
+      "field": {
+        "filePath": "Датотечна патека",
+        "path": "Патека",
+        "offset": "Отстапување",
+        "limit": "Ограничување",
+        "pattern": "Шаблон",
+        "include": "Вклучување",
+        "patchText": "Текст на закрпа",
+        "query": "Барање",
+        "prompt": "Упатство",
+        "header": "Наслов",
+        "question": "Прашање",
+        "options": "Опции"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не успеа прикажувањето на содржината."

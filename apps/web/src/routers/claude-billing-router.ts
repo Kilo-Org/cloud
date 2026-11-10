@@ -1,18 +1,20 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { claude_billing_connections, type ClaudeBillingConnectionRow } from '@kilocode/db/schema';
+import { type ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import {
   CLAUDE_BILLING_PROVIDER_ID,
   CLAUDE_BILLING_PROVIDER_NAME,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 import {
-  claudeBillingOwnerWhere,
-  getClaudeBillingConnection,
+  ClaudeBillingShareError,
+  getGrantedClaudeBillingConnection,
+  removeClaudeBillingGrant,
+  shareClaudeBillingConnection,
+  type ClaudeBillingOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
-import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import {
   baseProcedure,
   createTRPCRouter,
@@ -44,6 +46,8 @@ export const ClaudeBillingStatusSchema = z.object({
   providerName: z.literal(CLAUDE_BILLING_PROVIDER_NAME),
   /** Whether the signed-in person may start or remove the connection. */
   canManage: z.boolean(),
+  /** Whether this scope can use the person's connected personal payer. */
+  canSharePersonal: z.boolean(),
 });
 
 export type ClaudeBillingStatus = z.infer<typeof ClaudeBillingStatusSchema>;
@@ -52,9 +56,15 @@ async function resolveOwner(
   ctx: TRPCContext,
   organizationId: string | undefined,
   scope: 'shared_services' | undefined
-): Promise<{ owner: ClaudeBillingOwner; canManage: boolean }> {
+): Promise<{
+  userId: string;
+  userEmail: string | null;
+  owner: ClaudeBillingOwner;
+  canManage: boolean;
+}> {
   if (!ctx.user) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'User not authenticated' });
   const userId = ctx.user.id;
+  const userEmail = ctx.user.google_user_email;
   if (!organizationId) {
     if (scope === 'shared_services') {
       throw new TRPCError({
@@ -62,27 +72,36 @@ async function resolveOwner(
         message: 'A shared-services connection needs an organization.',
       });
     }
-    return { owner: { kind: 'personal', kiloUserId: userId }, canManage: true };
+    return { userId, userEmail, owner: { kind: 'personal', kiloUserId: userId }, canManage: true };
   }
   const role = await ensureOrganizationAccess(ctx, organizationId);
   if (scope === 'shared_services') {
     return {
+      userId,
+      userEmail,
       owner: { kind: 'shared_services', organizationId },
       canManage: canManageOrganization(role),
     };
   }
   return {
+    userId,
+    userEmail,
     owner: { kind: 'member', kiloUserId: userId, organizationId },
     // A member connection needs a direct membership, which inherited access is not.
     canManage: await isClaudeBillingOrganizationMember(userId, organizationId),
   };
 }
 
-function statusOf(row: ClaudeBillingConnectionRow | null, canManage: boolean): ClaudeBillingStatus {
+function statusOf(
+  row: ClaudeBillingConnectionRow | null,
+  canManage: boolean,
+  canSharePersonal = false
+): ClaudeBillingStatus {
   const base = {
     providerId: CLAUDE_BILLING_PROVIDER_ID,
     providerName: CLAUDE_BILLING_PROVIDER_NAME,
     canManage,
+    canSharePersonal,
     connectedAt: row?.connected_at ? new Date(row.connected_at).toISOString() : null,
     lastRefusalCode: row?.last_refusal_code ?? null,
   } as const;
@@ -98,13 +117,94 @@ function statusOf(row: ClaudeBillingConnectionRow | null, canManage: boolean): C
   }
 }
 
+async function maySharePersonal(
+  userId: string,
+  owner: ClaudeBillingOwner,
+  canManage: boolean,
+  current: ClaudeBillingConnectionRow | null
+): Promise<boolean> {
+  if (owner.kind === 'personal' || !canManage) return false;
+  if (
+    current &&
+    current.status !== ClaudeBillingConnectionStatus.Removed &&
+    current.status !== ClaudeBillingConnectionStatus.Pending
+  ) {
+    return false;
+  }
+  const personal = await getGrantedClaudeBillingConnection({
+    kind: 'personal',
+    kiloUserId: userId,
+  });
+  return personal?.status === ClaudeBillingConnectionStatus.Connected;
+}
+
 export const claudeBillingRouter = createTRPCRouter({
   status: baseProcedure
     .input(ClaudeBillingOwnerInputSchema)
     .output(ClaudeBillingStatusSchema)
     .query(async ({ ctx, input }): Promise<ClaudeBillingStatus> => {
-      const { owner, canManage } = await resolveOwner(ctx, input.organizationId, input.scope);
-      return statusOf(await getClaudeBillingConnection(owner), canManage);
+      const { userId, owner, canManage } = await resolveOwner(
+        ctx,
+        input.organizationId,
+        input.scope
+      );
+      const current = await getGrantedClaudeBillingConnection(owner);
+      return statusOf(
+        current,
+        canManage,
+        await maySharePersonal(userId, owner, canManage, current)
+      );
+    }),
+
+  sharePersonal: baseProcedure
+    .input(ClaudeBillingOwnerInputSchema)
+    .output(ClaudeBillingStatusSchema)
+    .mutation(async ({ ctx, input }): Promise<ClaudeBillingStatus> => {
+      const { userId, userEmail, owner, canManage } = await resolveOwner(
+        ctx,
+        input.organizationId,
+        input.scope
+      );
+      if (ctx.authViaToken || ctx.credential !== 'session') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Share your personal Claude link from the Kilo web app.',
+        });
+      }
+      if (owner.kind === 'personal') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Select an organization scope to share your personal Claude link.',
+        });
+      }
+      if (!canManage || !(await isClaudePlatformOAuthEnabled(userEmail))) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message:
+            owner.kind === 'shared_services'
+              ? 'Only an organization owner or admin with access to this feature can link it.'
+              : 'Only a direct member of this organization with access to this feature can link it.',
+        });
+      }
+      try {
+        const shared = await shareClaudeBillingConnection(
+          { kind: 'personal', kiloUserId: userId },
+          owner,
+          userId
+        );
+        return statusOf(shared, canManage, false);
+      } catch (error) {
+        if (error instanceof ClaudeBillingShareError) {
+          throw new TRPCError({
+            code: error.reason === 'target_connected' ? 'CONFLICT' : 'PRECONDITION_FAILED',
+            message:
+              error.reason === 'target_connected'
+                ? 'This scope already has a Claude link. Remove it from Kilo first.'
+                : 'Link your personal Claude organization first.',
+          });
+        }
+        throw error;
+      }
     }),
 
   remove: baseProcedure
@@ -121,18 +221,7 @@ export const claudeBillingRouter = createTRPCRouter({
               : 'Only a direct member of this organization can manage their own link.',
         });
       }
-      // The profile stays: Anthropic allows one per customer organization, and a
-      // reconnect reuses it. The connection stops billing from now on.
-      await db
-        .update(claude_billing_connections)
-        .set({
-          status: ClaudeBillingConnectionStatus.Removed,
-          connection_id: null,
-          connected_at: null,
-          last_refusal_code: null,
-          last_refusal_at: null,
-        })
-        .where(claudeBillingOwnerWhere(owner));
-      return statusOf(await getClaudeBillingConnection(owner), canManage);
+      await removeClaudeBillingGrant(owner);
+      return statusOf(await getGrantedClaudeBillingConnection(owner), canManage);
     }),
 });

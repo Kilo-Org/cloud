@@ -2577,7 +2577,21 @@
       "thought": "Tunani",
       "showDetails": "Nuna cikakkun bayanai",
       "pending": "Yana jira…",
-      "running": "Yana gudana…"
+      "running": "Yana gudana…",
+      "field": {
+        "filePath": "Hanyar fayil",
+        "path": "Hanya",
+        "offset": "Matsayi",
+        "limit": "Iyaka",
+        "pattern": "Tsari",
+        "include": "Haɗawa",
+        "patchText": "Rubutun gyara",
+        "query": "Bincike",
+        "prompt": "Umarni",
+        "header": "Kanun",
+        "question": "Tambaya",
+        "options": "Zaɓuɓɓuka"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "An kasa nuna abubuwan da ke ciki."

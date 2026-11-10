@@ -134,17 +134,22 @@ export const NEUTRAL_TINT = {
  * title is the row's primary content, so the origin, the agent type and the
  * repository beside it must not compete with it — a saturated label and strip
  * would make such a row look more important than the one above it. It takes
- * the theme's muted ink (`text-muted-foreground` over `bg-muted-soft`) instead
- * of a ramp hue.
+ * the theme's muted ink (`text-muted-foreground`) over the strip token, whose
+ * dark step is set to stay legible on the near-black page (see `global.css`).
  */
 export const PLACEHOLDER_TINT = {
-  hueClass: 'bg-muted-soft',
+  hueClass: 'bg-session-strip',
   hueTextClass: 'text-muted-foreground',
   hueBorderClass: 'border-border',
   tileBgClass: 'bg-muted-soft',
   tileBorderClass: 'border-border',
   hueThemeKey: 'mutedForeground',
 } as const satisfies Tint;
+
+/** True for the tint that names the row's context instead of an agent. */
+export function isPlaceholderTint(tint: Tint): boolean {
+  return tint === PLACEHOLDER_TINT;
+}
 
 /**
  * Fixed tint for eyebrow labels that name a state, a type or the row's

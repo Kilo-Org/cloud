@@ -2577,7 +2577,21 @@
       "thought": "მსჯელობა",
       "showDetails": "დეტალების ჩვენება",
       "pending": "მოლოდინში…",
-      "running": "მიმდინარეობს…"
+      "running": "მიმდინარეობს…",
+      "field": {
+        "filePath": "ფაილის გზა",
+        "path": "გზა",
+        "offset": "გადახრა",
+        "limit": "შეზღუდვა",
+        "pattern": "ნიმუში",
+        "include": "ჩართვა",
+        "patchText": "შესწორების ტექსტი",
+        "query": "მოთხოვნა",
+        "prompt": "მითითება",
+        "header": "სათაური",
+        "question": "კითხვა",
+        "options": "ვარიანტები"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "შიგთავსის ჩვენება ვერ მოხერხდა."

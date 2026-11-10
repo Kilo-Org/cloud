@@ -2577,7 +2577,21 @@
       "thought": "Fikrad",
       "showDetails": "Muuji faahfaahinta",
       "pending": "Waa la sugayaa…",
-      "running": "Way socotaa…"
+      "running": "Way socotaa…",
+      "field": {
+        "filePath": "Wadada faylka",
+        "path": "Wadada",
+        "offset": "Bilowga",
+        "limit": "Xadka",
+        "pattern": "Qaabka",
+        "include": "Ku darid",
+        "patchText": "Qoraalka hagaajinta",
+        "query": "Raadin",
+        "prompt": "Tilmaam",
+        "header": "Cinwaan",
+        "question": "Su'aal",
+        "options": "Xulashooyin"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nuxurka lama soo bandhigi karin."

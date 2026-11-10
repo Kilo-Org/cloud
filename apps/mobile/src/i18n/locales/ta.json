@@ -2577,7 +2577,21 @@
       "thought": "சிந்தனை",
       "showDetails": "விவரங்களைக் காட்டவும்",
       "pending": "நிலுவையில்…",
-      "running": "இயங்குகிறது…"
+      "running": "இயங்குகிறது…",
+      "field": {
+        "filePath": "கோப்பு பாதை",
+        "path": "பாதை",
+        "offset": "இடப்பெயர்ச்சி",
+        "limit": "வரம்பு",
+        "pattern": "வடிவம்",
+        "include": "சேர்க்கை",
+        "patchText": "திருத்த உரை",
+        "query": "வினவல்",
+        "prompt": "தூண்டுதல்",
+        "header": "தலைப்பு",
+        "question": "கேள்வி",
+        "options": "விருப்பங்கள்"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "உள்ளடக்கத்தைக் காட்ட முடியவில்லை."

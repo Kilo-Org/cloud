@@ -870,6 +870,26 @@ test('kilo-app CI installs the closure the declaration action needs', () => {
   }
 });
 
+// Both harness SDK producers run the same action and no other step that reads
+// a workspace, so both install the same closure. The package has no workspace
+// dependency; the root project supplies the `tsgo` binary the action's key
+// script runs, so it stays in the filter.
+const harnessProducerInstall =
+  "pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo";
+
+test('both harness SDK producers install the harness SDK closure', () => {
+  for (const file of ['kilo-app-ci.yml', 'mobile-native-build.yml']) {
+    const install = workflows[file].jobs[harnessProducer].steps.find(
+      step => step.name === 'Install dependencies'
+    );
+    assert.equal(
+      install.run,
+      harnessProducerInstall,
+      `${file}'s ${harnessProducer} installs the harness SDK closure, not the whole workspace`
+    );
+  }
+});
+
 // mobile-native-build needs the same producer for the same reason: both
 // platform jobs start together after the gate, so running the action in each
 // made a cache miss compile the declaration program twice and race both jobs to
@@ -1466,6 +1486,148 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
 });
 
+// The plugin files reach one check only: test-scripts runs
+// `test:oxlint-plugins` over them. The web Jest suite, the web build and the
+// cycle check read none of them, so the plugin path has its own filter pair and
+// the shared filter that gates those three names no plugin file. A plugin path
+// back in the shared filter would start four web-test shards, the production
+// build and the cycle check for a change none of them reads.
+const oxlintPluginPath = 'tools/oxlint/anti-slop/rules/no-runtime-typeof.ts';
+const webBackendPath = 'apps/web/src/routers/active-sessions-router.ts';
+
+test('a lint-plugin change runs the plugin suite without the web gates', () => {
+  const filtersOf = id => {
+    const step = ciJobs.changes.steps.find(candidate => candidate.id === id);
+    assert.ok(step, `changes: the ${id} step is missing`);
+    return load(step.with.filters);
+  };
+  const matches = (patterns, path) => patterns.some(pattern => posix.matchesGlob(path, pattern));
+
+  const backend = filtersOf('filter').kilocode_backend;
+  assert.deepEqual(
+    filtersOf('filter_retry').kilocode_backend,
+    backend,
+    'the shared retry keeps the filters of the attempt it replaces'
+  );
+  assert.equal(
+    matches(backend, webBackendPath),
+    true,
+    'a backend path still matches the shared filter'
+  );
+  assert.equal(matches(backend, oxlintPluginPath), false, 'the shared filter names no plugin path');
+
+  const plugins = filtersOf('filter_oxlint').oxlint_plugins;
+  assert.deepEqual(
+    filtersOf('filter_oxlint_retry').oxlint_plugins,
+    plugins,
+    'the plugin retry keeps the filters of the attempt it replaces'
+  );
+  assert.equal(matches(plugins, oxlintPluginPath), true, 'the plugin pair detects a plugin change');
+  assert.equal(matches(plugins, webBackendPath), false, 'the plugin pair detects nothing else');
+  assert.equal(
+    ciJobs.changes.outputs.oxlint_plugins,
+    '${{ steps.filter_oxlint.outputs.oxlint_plugins || steps.filter_oxlint_retry.outputs.oxlint_plugins }}',
+    'the plugin output falls back to its retry attempt'
+  );
+
+  assert.match(
+    ciJobs['test-scripts'].if,
+    /needs\.changes\.outputs\.oxlint_plugins == 'true'/,
+    'test-scripts keeps the one check that reads those paths'
+  );
+  // The root script chain decides what test-scripts runs: a run that starts the
+  // job without the plugin entry would report a plugin-only change unexercised.
+  const rootScripts = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+  ).scripts;
+  assert.match(
+    rootScripts['test:scripts'],
+    /test:oxlint-plugins/,
+    'test-scripts reaches the plugin suite'
+  );
+  assert.match(
+    rootScripts['test:oxlint-plugins'],
+    /tools\/oxlint\//,
+    'the plugin suite runs the plugin tests'
+  );
+  for (const job of ['web-test', 'build', 'dependency-cycle-check']) {
+    const condition = ciJobs[job].if;
+    assert.match(
+      condition,
+      /needs\.changes\.outputs\.kilocode_backend == 'true'/,
+      `${job}: gated on the shared filter alone, which names no plugin path`
+    );
+    assert.doesNotMatch(condition, /oxlint_plugins/, `${job}: the plugin output starts no web job`);
+  }
+});
+
+// A Chrome e2e shard installs the workspace, builds one bundle and drives one
+// Playwright suite against it. The bundle resolves the extension, the two
+// workspace packages it imports at run time and the inputs its install reads;
+// the web sources reach the extension as declarations only, which `verify`
+// typechecks. So the shard gate reads its own filter output: the affected
+// detector selects the extension for a web-source change too, because the tRPC
+// declaration program reads the web routers, and a workspace answer in this gate
+// would reserve both shards for an input the bundle cannot observe.
+test('the Chrome e2e shards start only for the inputs their bundle reads', () => {
+  const jobs = workflows['extension-ci.yml'].jobs;
+  const changes = jobs.changes;
+  const filter = load(changes.steps.find(step => step.id === 'filter').with.filters);
+  const matches = (patterns, path) => patterns.some(pattern => posix.matchesGlob(path, pattern));
+
+  assert.deepEqual(
+    filter.extension_e2e,
+    [
+      'apps/extension/**',
+      '.github/workflows/extension-ci.yml',
+      'packages/cloud-agent-sdk/**',
+      'packages/session-ingest-contracts/**',
+      'package.json',
+      '.nvmrc',
+      '.npmrc',
+      '.pnpmfile.cjs',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
+      'patches/**',
+    ],
+    'the shard filter names the trees and install inputs the bundle build reads'
+  );
+  for (const path of [
+    'apps/extension/src/shared/auth.ts',
+    'packages/cloud-agent-sdk/src/session.ts',
+    'packages/session-ingest-contracts/src/index.ts',
+    'pnpm-lock.yaml',
+    'patches/some.patch',
+  ]) {
+    assert.equal(matches(filter.extension_e2e, path), true, `a shard input: ${path}`);
+  }
+  for (const path of [webBackendPath, '.oxlintrc.json', 'apps/mobile/src/app/index.tsx']) {
+    assert.equal(matches(filter.extension_e2e, path), false, `not a shard input: ${path}`);
+  }
+
+  assert.equal(
+    changes.outputs.extension_e2e,
+    "${{ steps.filter.outputs.extension_e2e == 'true' }}",
+    'the shard output reads the filter alone, because the detector answers for the web sources too'
+  );
+  assert.equal(
+    jobs['e2e-chrome-shard'].if,
+    "needs.changes.outputs.extension_e2e == 'true'",
+    'the shards start only for their own inputs'
+  );
+  assert.equal(
+    jobs.verify.if,
+    "needs.changes.outputs.extension == 'true'",
+    'the job that typechecks the web declarations keeps the wider output'
+  );
+  assert.deepEqual(
+    jobs['e2e-chrome'].needs,
+    ['changes', 'e2e-chrome-shard'],
+    'the aggregator still publishes the required context'
+  );
+  assert.equal(jobs['e2e-chrome'].if, '${{ !cancelled() }}');
+});
+
 // The account database job runs the root `drizzle` script, which executes
 // drizzle-kit inside packages/db, and one session-sync suite whose workspace
 // imports are @kilocode/db and @kilocode/worker-utils, both declared by the
@@ -1528,9 +1690,9 @@ const appClosureInstall =
   "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
 
 test('the kilo-app CI consumers install the app closure', () => {
-  // The producer jobs keep their own wider (or whole-workspace) closures, and
-  // `mobile-typecheck` keeps the whole workspace until its measured saving
-  // clears the bar; every other install in this workflow is the app's.
+  // The producer jobs install their own build closure, and `mobile-typecheck`
+  // keeps the whole workspace until its measured saving clears the bar; every
+  // other install in this workflow is the app's.
   const consumerJobs = Object.entries(kiloAppJobs)
     .filter(
       ([name, job]) =>

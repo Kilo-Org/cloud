@@ -2064,7 +2064,21 @@
       "thought": "מחשבה",
       "showDetails": "הצגת פרטים",
       "pending": "ממתין…",
-      "running": "פועל…"
+      "running": "פועל…",
+      "field": {
+        "filePath": "נתיב קובץ",
+        "path": "נתיב",
+        "offset": "היסט",
+        "limit": "מגבלה",
+        "pattern": "תבנית",
+        "include": "הכללה",
+        "patchText": "טקסט טלאי",
+        "query": "שאילתה",
+        "prompt": "הנחיה",
+        "header": "כותרת",
+        "question": "שאלה",
+        "options": "אפשרויות"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "לא ניתן היה להציג את התוכן."

@@ -2577,7 +2577,21 @@
       "thought": "विचार",
       "showDetails": "तपशील दाखवा",
       "pending": "प्रलंबित…",
-      "running": "चालू आहे…"
+      "running": "चालू आहे…",
+      "field": {
+        "filePath": "फाइल मार्ग",
+        "path": "मार्ग",
+        "offset": "ऑफसेट",
+        "limit": "मर्यादा",
+        "pattern": "नमुना",
+        "include": "समावेश",
+        "patchText": "पॅच मजकूर",
+        "query": "क्वेरी",
+        "prompt": "प्रॉम्प्ट",
+        "header": "शीर्षक",
+        "question": "प्रश्न",
+        "options": "पर्याय"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "मजकूर किंवा इतर सामग्री दाखवता आली नाही."

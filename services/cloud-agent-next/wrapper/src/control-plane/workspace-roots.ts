@@ -58,8 +58,15 @@ export function prepareRoots(
   spec: ControlPlaneRouteSpec,
   credentials: ControlPlaneSessionCredentialsPayload | undefined
 ): PrepareRoot[] {
-  // Each root has its own branch; the route's belong to the launch repository.
-  const { roots, branch: _branch, branchMode: _branchMode, ...route } = spec;
+  // Each root has its own branch and base; the route's belong to the launch repository.
+  const {
+    roots,
+    branch: _branch,
+    branchMode: _branchMode,
+    baseBranch: _baseBranch,
+    baseSha: _baseSha,
+    ...route
+  } = spec;
   if (roots === undefined) {
     return [
       {
@@ -82,6 +89,8 @@ export function prepareRoots(
         directory: root.directory,
         branch: root.branch,
         ...(root.branchMode ? { branchMode: root.branchMode } : {}),
+        ...(root.baseBranch ? { baseBranch: root.baseBranch } : {}),
+        ...(root.baseSha ? { baseSha: root.baseSha } : {}),
         git: {
           url: root.git.url,
           platform: root.git.platform,

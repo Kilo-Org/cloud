@@ -2577,7 +2577,21 @@
       "thought": "Ræsonnement",
       "showDetails": "Vis oplysninger",
       "pending": "Afventer…",
-      "running": "Kører…"
+      "running": "Kører…",
+      "field": {
+        "filePath": "Filsti",
+        "path": "Sti",
+        "offset": "Offset",
+        "limit": "Grænse",
+        "pattern": "Mønster",
+        "include": "Medtag",
+        "patchText": "Rettelsestekst",
+        "query": "Forespørgsel",
+        "prompt": "Instruktion",
+        "header": "Overskrift",
+        "question": "Spørgsmål",
+        "options": "Valgmuligheder"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Kunne ikke vise indholdet."

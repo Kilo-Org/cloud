@@ -122,6 +122,11 @@ const nextConfig = {
         permanent: false,
       },
       {
+        source: '/install',
+        destination: 'https://kilo.ai/install',
+        permanent: true,
+      },
+      {
         source: '/learn',
         destination: '/',
         permanent: true,

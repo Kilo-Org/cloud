@@ -69,7 +69,8 @@ const mockGetClaudeBillingConnection = jest.fn();
 const mockResolveClaudeBillingModel = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/store', () => ({
-  getClaudeBillingConnection: (...args: unknown[]) => mockGetClaudeBillingConnection(...args),
+  getGrantedClaudeBillingConnection: (...args: unknown[]) =>
+    mockGetClaudeBillingConnection(...args),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/routing', () => ({
   resolveClaudeBillingModel: (...args: unknown[]) => mockResolveClaudeBillingModel(...args),

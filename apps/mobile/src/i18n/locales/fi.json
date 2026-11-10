@@ -2577,7 +2577,21 @@
       "thought": "Päättely",
       "showDetails": "Näytä tiedot",
       "pending": "Odotetaan…",
-      "running": "Käynnissä…"
+      "running": "Käynnissä…",
+      "field": {
+        "filePath": "Tiedostopolku",
+        "path": "Polku",
+        "offset": "Siirtymä",
+        "limit": "Yläraja",
+        "pattern": "Kuvio",
+        "include": "Sisällytettävät",
+        "patchText": "Korjausteksti",
+        "query": "Hakukysely",
+        "prompt": "Kehote",
+        "header": "Otsikko",
+        "question": "Kysymys",
+        "options": "Vaihtoehdot"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Sisällön näyttäminen epäonnistui."

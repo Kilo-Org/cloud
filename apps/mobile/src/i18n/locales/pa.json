@@ -2583,7 +2583,21 @@
       "thought": "ਸੋਚ",
       "showDetails": "ਵੇਰਵੇ ਦਿਖਾਓ",
       "pending": "ਉਡੀਕ ਵਿੱਚ…",
-      "running": "ਚੱਲ ਰਿਹਾ ਹੈ…"
+      "running": "ਚੱਲ ਰਿਹਾ ਹੈ…",
+      "field": {
+        "filePath": "ਫਾਈਲ ਮਾਰਗ",
+        "path": "ਮਾਰਗ",
+        "offset": "ਆਫਸੈੱਟ",
+        "limit": "ਸੀਮਾ",
+        "pattern": "ਪੈਟਰਨ",
+        "include": "ਸ਼ਾਮਲ",
+        "patchText": "ਪੈਚ ਲਿਖਤ",
+        "query": "ਕਿਊਰੀ",
+        "prompt": "ਨਿਰਦੇਸ਼",
+        "header": "ਸਿਰਲੇਖ",
+        "question": "ਸਵਾਲ",
+        "options": "ਵਿਕਲਪ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ਸਮੱਗਰੀ ਨਹੀਂ ਦਿਖਾਈ ਜਾ ਸਕੀ।"

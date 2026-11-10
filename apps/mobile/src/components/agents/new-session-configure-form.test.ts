@@ -101,17 +101,6 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insetsState,
 }));
 
-// The pinned footer interpolates its bottom inset on the keyboard progress, so
-// the form reaches Reanimated's worklets entry, which this plain Node project
-// cannot resolve. The style itself is not under test here: a host node keeps
-// the footer findable and leaves its layout to the device runs.
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'AnimatedView' },
-  Extrapolation: { CLAMP: 'clamp' },
-  interpolate: (value: number) => value,
-  useAnimatedStyle: () => ({}),
-}));
-
 // ── sub-components ─────────────────────────────────────────────────
 vi.mock('@/components/agents/new-session-prompt', () => ({
   NewSessionPrompt: 'NewSessionPrompt',

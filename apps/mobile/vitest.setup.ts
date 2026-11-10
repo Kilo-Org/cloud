@@ -63,10 +63,6 @@ vi.mock('react-native-keyboard-controller', () => ({
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   KeyboardChatScrollView: 'KeyboardChatScrollView',
   useWindowDimensions: () => ({ width: 400, height: 800 }),
-  // The animated keyboard progress a surface interpolates its own insets on.
-  // A shared value's `value` is all the app's animated styles read, so a plain
-  // object stands in; a test that drives the keyboard mocks this hook itself.
-  useReanimatedKeyboardAnimation: () => ({ progress: { value: 0 } }),
   useKeyboardState: (selector?: (state: KeyboardStateSnapshot) => unknown) => {
     const snapshot: KeyboardStateSnapshot = {
       height: 0,

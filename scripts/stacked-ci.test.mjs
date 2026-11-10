@@ -5,28 +5,11 @@ import test from 'node:test';
 
 import { load } from 'js-yaml';
 
+import { wiringCommand } from './ci-wiring-suites.mjs';
+
 const rootPath = '.github/workflows/ci.yml';
 const mobilePath = '.github/workflows/kilo-app-ci.yml';
 const checkPath = 'scripts/stacked-ci.test.mjs';
-// ci-wiring runs the wiring suites in one `node --test` invocation. The exact
-// command is pinned here, so splitting the suite back into per-file steps, or
-// dropping or reordering a suite, fails this validation.
-const wiringSuites = [
-  checkPath,
-  'scripts/changed-dependencies.test.mjs',
-  'scripts/build-key-inputs.test.mjs',
-  'scripts/ttsc-plugin-key.test.mjs',
-  'scripts/affected-workspaces.test.mjs',
-  'scripts/changed-workspaces.test.mjs',
-  'scripts/changes-filter-retry.test.mjs',
-  'scripts/typecheck-ci.test.mjs',
-  'scripts/deployment-workflows.test.mjs',
-  'scripts/main-workflow-failure.test.mjs',
-  'scripts/production-deploy-failure.test.mjs',
-  'scripts/meta-janitor-approve.test.mjs',
-  'scripts/mobile-sbom-workflow.test.mjs',
-];
-const command = `node --test ${wiringSuites.join(' ')}`;
 // The path families the mobile change-detection grep must recognise. The PR
 // admission and the `push` trigger carry no filter, so this grep is the only
 // thing that gates the suite; a dropped or mistyped family silently reports
@@ -90,7 +73,9 @@ function validateCheck(workflow, jobName) {
   );
   assert.equal(job['continue-on-error'], undefined, `${jobName}: check failure must fail the job`);
   const steps = job.steps;
-  const checks = steps.filter(step => step.run === command);
+  // One step runs the shared suite command verbatim, so splitting the suite
+  // back into per-file steps, or dropping or reordering a suite, fails here.
+  const checks = steps.filter(step => step.run === wiringCommand);
   assert.equal(checks.length, 1, `${jobName}: run the check exactly once`);
   const step = checks[0];
   assert.equal(step.if, undefined, `${jobName}: check step must be unconditional`);
@@ -205,7 +190,7 @@ for (const [index, jobName] of [[0, 'ci-wiring']]) {
     test(`${jobName} rejects a ${defect} check`, () => {
       const workflows = readWorkflows();
       const job = workflows[index].jobs[jobName];
-      const checkIndex = job.steps.findIndex(step => step.run === command);
+      const checkIndex = job.steps.findIndex(step => step.run === wiringCommand);
       const check = job.steps[checkIndex];
       if (defect === 'missing') job.steps.splice(checkIndex, 1);
       if (defect === 'conditional-step') check.if = 'false';

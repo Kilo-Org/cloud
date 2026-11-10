@@ -173,6 +173,7 @@ import {
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { testByokEnvelope } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
 import {
   insertTestUser,
@@ -7844,7 +7845,7 @@ describe('User', () => {
         .values({
           kilo_user_id: user.id,
           provider_id: 'minimax',
-          encrypted_api_key: encrypted,
+          encrypted_api_key_envelope: testByokEnvelope('test-key-for-gdpr'),
           management_source: 'coding_plan',
           created_by: user.id,
         })

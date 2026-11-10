@@ -34,9 +34,9 @@ const CreatedDataKeySchema = z.object({
 
 const RetrievedDataKeySchema = z.object({ data_key: z.string().min(1) });
 
-export function getByokKmsClientConfig(): ByokKmsClientConfig | null {
+export function getByokKmsClientConfig(): ByokKmsClientConfig {
   const url = getEnvVariable('BYOK_KMS_SERVICE_URL');
-  if (!url) return null;
+  if (!url) throw new Error('BYOK_KMS_SERVICE_URL is required');
 
   const token = getEnvVariable('BYOK_KMS_SERVICE_TOKEN');
   if (!token)
@@ -142,9 +142,8 @@ export async function createByokDataKey({
 }: {
   context: ByokKmsContext;
   actorUserId: string;
-}): Promise<ByokDataKey | null> {
+}): Promise<ByokDataKey> {
   const config = getByokKmsClientConfig();
-  if (!config) return null;
 
   return CreatedDataKeySchema.parse(
     await sendToKms(config, `${config.url}/data-key`, {
@@ -174,9 +173,9 @@ export async function encryptByokForStorage({
   apiKey: string;
   context: ByokKmsContext;
   actorUserId: string;
-}): Promise<BYOKApiKeyEnvelope | null> {
+}): Promise<BYOKApiKeyEnvelope> {
   const dataKey = await createByokDataKey({ context, actorUserId });
-  return dataKey ? encryptByokWithDataKey(apiKey, dataKey) : null;
+  return encryptByokWithDataKey(apiKey, dataKey);
 }
 
 export async function decryptByokEnvelope(
@@ -184,9 +183,6 @@ export async function decryptByokEnvelope(
   context: ByokKmsContext
 ): Promise<string> {
   const config = getByokKmsClientConfig();
-  if (!config) {
-    throw new Error('BYOK_KMS_SERVICE_URL is required to decrypt an envelope-encrypted BYOK key');
-  }
 
   // The KMS request is always sent, in parallel with the cache read, so every decrypt reaches the
   // service. A cache hit does not wait for it and ignores its result; a miss uses it.

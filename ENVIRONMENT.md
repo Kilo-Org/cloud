@@ -361,7 +361,7 @@ admission responses within the same slot and deadline.
 ### Encryption & Secrets
 
 - `BYOK_ENCRYPTION_KEY` - Base64 encryption key for Bring-Your-Own-Key encryption of sensitive app data. `[SECRET]`
-- `BYOK_KMS_SERVICE_URL` - Base URL of the BYOK KMS envelope service. Unset disables envelope writes and reads fall back to the legacy column. `[SERVER]`
+- `BYOK_KMS_SERVICE_URL` - Base URL of the BYOK KMS envelope service. Required to create, update, or decrypt a BYOK key. `[SERVER]`
 - `BYOK_KMS_SERVICE_TOKEN` - Bearer token for the BYOK KMS service; required when `BYOK_KMS_SERVICE_URL` is set. `[SECRET]`
 - `USER_DELETION_AUDIT_HMAC_KEY` - Base64 32-byte HMAC key for user-deletion email hashes and audit subjects. `[SECRET]`
 - `USER_DELETION_ENCRYPTION_KEY` - Base64 32-byte AES key for user-deletion effect checkpoints and provider credentials. `[SECRET]`

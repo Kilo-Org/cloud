@@ -28,9 +28,10 @@ jobs:
       # on a transient GitHub API failure (it sets no outputs when it fails).
       kilocode_backend: ${{ steps.filter.outputs.kilocode_backend || steps.filter_retry.outputs.kilocode_backend }}
       cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next || steps.filter_retry.outputs.cloud_agent_next }}
-      # harness-sdk is detected by its own step pair below: the shared pair's
-      # filter set is pinned byte-for-byte by scripts/changes-filter-retry.test.mjs
-      # and must stay exactly as origin/main wrote it.
+      # harness-sdk is detected by its own step pair below: one pair states one
+      # subject, so a job that reads that subject reads its output alone.
+      # scripts/changes-filter-retry.test.mjs requires an attempt to carry
+      # byte-identical filters to its retry and to publish this fallback.
       harness_sdk: ${{ steps.filter_harness.outputs.harness_sdk || steps.filter_harness_retry.outputs.harness_sdk }}
       ai_gateway: ${{ steps.filter.outputs.ai_gateway || steps.filter_retry.outputs.ai_gateway }}
       # Detected by its own step pair for the same reason as harness_sdk.
@@ -41,6 +42,11 @@ jobs:
       session_sync: ${{ steps.filter_session_sync.outputs.session_sync || steps.filter_session_sync_retry.outputs.session_sync }}
       # Every input the ci-wiring job reads, also its own pair.
       wiring: ${{ steps.filter_wiring.outputs.wiring || steps.filter_wiring_retry.outputs.wiring }}
+      # The oxlint plugins. test-scripts reaches their own suite through
+      # test:oxlint-plugins; the web Jest suite, the web build and the cycle
+      # check read no plugin file, so this output stays out of the shared
+      # filter that gates them.
+      oxlint_plugins: ${{ steps.filter_oxlint.outputs.oxlint_plugins || steps.filter_oxlint_retry.outputs.oxlint_plugins }}
       # The dependency inputs the detector parses with a dependency
       # (DEPENDENCY_INPUTS in scripts/affected-workspaces.mjs). Gates the
       # root install below; its own pair.
@@ -169,7 +175,6 @@ jobs:
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
               - 'services/session-ingest/**'
-              - 'tools/oxlint/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -214,7 +219,6 @@ jobs:
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
               - 'services/session-ingest/**'
-              - 'tools/oxlint/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -377,6 +381,26 @@ jobs:
               - '.gitignore'
               - '.nvmrc'
               - '.npmrc'
+      # The lint plugins are their own subject: only test-scripts reads them,
+      # through test:oxlint-plugins, so the shared filter above no longer lists
+      # them and the web-test, build and dependency-cycle-check jobs stop
+      # starting for a plugin-only diff.
+      - name: Detect oxlint plugin changes
+        id: filter_oxlint
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            oxlint_plugins:
+              - 'tools/oxlint/**'
+      - name: Detect oxlint plugin changes (retry)
+        id: filter_oxlint_retry
+        if: steps.filter_oxlint.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            oxlint_plugins:
+              - 'tools/oxlint/**'
       # A pull request and a main push both check only the workspaces their own
       # diff can affect: the pull request the branch's base, the push the commit
       # main moved from. The merge queue passes no base, so it still checks
@@ -941,7 +965,9 @@ jobs:
 
   test-scripts:
     needs: changes
-    if: needs.changes.outputs.kilocode_backend == 'true' || contains(fromJSON(needs.changes.outputs.affected).packages, 'container-usage-meter')
+    # test:scripts is the only job that runs the plugin suite, so a plugin-only
+    # change starts it through oxlint_plugins while the web gates stay skipped.
+    if: needs.changes.outputs.kilocode_backend == 'true' || needs.changes.outputs.oxlint_plugins == 'true' || contains(fromJSON(needs.changes.outputs.affected).packages, 'container-usage-meter')
     # The Postgres regressions ran on the large runner in the job this one
     # replaces. The builder cleanup test drives two claims against the same
     # rows, so keep the runner it was written for.

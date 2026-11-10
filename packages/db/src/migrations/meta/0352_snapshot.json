@@ -1,5 +1,5 @@
 {
-  "id": "89e645af-80c0-49d9-9ba4-da5ac1e3ab60",
+  "id": "2b2de2cd-7330-43fb-b815-907285430837",
   "prevId": "9b76b01d-fab1-4f72-84f0-858fdde64a80",
   "version": "7",
   "dialect": "postgresql",
@@ -4261,6 +4261,21 @@
         }
       },
       "indexes": {
+        "IDX_claude_billing_grants_payer_connection_id": {
+          "name": "IDX_claude_billing_grants_payer_connection_id",
+          "columns": [
+            {
+              "expression": "payer_connection_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "UQ_claude_billing_grants_personal": {
           "name": "UQ_claude_billing_grants_personal",
           "columns": [
@@ -4461,7 +4476,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"claude_billing_connections\".\"organization_id\" IS NULL",
+          "where": "\"claude_billing_connections\".\"organization_id\" IS NULL AND \"claude_billing_connections\".\"status\" <> 'removed'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -4483,7 +4498,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL",
+          "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL AND \"claude_billing_connections\".\"status\" <> 'removed'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -4499,7 +4514,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL AND \"claude_billing_connections\".\"kilo_user_id\" IS NULL",
+          "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL AND \"claude_billing_connections\".\"kilo_user_id\" IS NULL AND \"claude_billing_connections\".\"status\" <> 'removed'",
           "concurrently": false,
           "method": "btree",
           "with": {}

@@ -29,11 +29,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import {
-  claude_billing_connection_grants,
-  claude_billing_connections,
-  byok_api_keys,
-} from '@kilocode/db/schema';
+import { claude_billing_connections, byok_api_keys } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
@@ -41,11 +37,7 @@ import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/cla
 import { consumeClaudeBillingPending, saveClaudeBillingPending } from './pending';
 import { canManageClaudeBillingOrganization, isClaudeBillingOrganizationMember } from './access';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
-import {
-  exchangeClaudeBillingCode,
-  ClaudeBillingExchangeError,
-  pushClaudeAuthorizationRequest,
-} from './protocol';
+import { exchangeClaudeBillingCode, ClaudeBillingExchangeError } from './protocol';
 import { GET } from '@/app/claude/billing/callback/route';
 import { GET as connect } from '@/app/claude/billing/connect/route';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -336,39 +328,47 @@ describe('Claude billing callback', () => {
     });
   });
 
-  it('shares the connected personal payer with an organization without OAuth', async () => {
+  it('does not undo a scope removal during approval when another scope shares the payer', async () => {
     const user = await insertTestUser();
-    const org = await createTestOrganization('Claude shared payer', user.id, 0);
+    const org = await createTestOrganization('Claude shared concurrent remove', user.id, 0);
     const [payer] = await db
       .insert(claude_billing_connections)
       .values({
         kilo_user_id: user.id,
         user_profile_id: `uprof_${user.id}`,
-        connection_id: 'ocon_personal',
+        connection_id: 'ocon_shared',
         status: 'connected',
         connected_at: new Date().toISOString(),
         created_by: user.id,
       })
       .returning();
     if (!payer) throw new Error('Missing payer fixture');
+    const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
+    const member: ClaudeBillingOwner = {
+      kind: 'member',
+      kiloUserId: user.id,
+      organizationId: org.id,
+    };
+    await shareClaudeBillingConnection(personal, member, user.id);
     jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
-    jest.mocked(consumeClaudeBillingPending).mockResolvedValue(null);
-    jest.mocked(pushClaudeAuthorizationRequest).mockClear();
+    jest.mocked(saveClaudeBillingPending).mockClear();
 
-    const response = await connect(
-      new NextRequest(
-        `http://localhost/claude/billing/connect?owner=${org.id}&source=personal&return=%2Fbyok`
-      )
+    await connect(
+      new NextRequest('http://localhost/claude/billing/connect?owner=personal&return=%2Fbyok')
     );
+    const savedPending = jest.mocked(saveClaudeBillingPending).mock.calls[0]?.[0];
+    if (!savedPending) throw new Error('Missing saved pending fixture');
 
-    expect(response.headers.get('location')).toContain('claude_billing=connected');
-    expect(pushClaudeAuthorizationRequest).not.toHaveBeenCalled();
-    const grants = await db
-      .select()
-      .from(claude_billing_connection_grants)
-      .where(eq(claude_billing_connection_grants.payer_connection_id, payer.id));
-    expect(grants).toHaveLength(2);
-    expect(grants.map(grant => grant.organization_id).sort()).toEqual([null, org.id].sort());
+    await removeClaudeBillingGrant(personal);
+    jest.mocked(consumeClaudeBillingPending).mockResolvedValueOnce(savedPending);
+    const response = await callback(`state=${savedPending.state}&code=one-use-code`);
+
+    expect(response.headers.get('location')).toContain('claude_billing=failed');
+    await expect(getGrantedClaudeBillingConnection(personal)).resolves.toBeNull();
+    await expect(getGrantedClaudeBillingConnection(member)).resolves.toMatchObject({
+      id: payer.id,
+      status: 'connected',
+    });
   });
 
   it('keeps a removed scope inactive when a reconnect is cancelled and activates on approval', async () => {

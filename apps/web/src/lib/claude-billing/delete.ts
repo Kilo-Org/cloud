@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import { and, eq, isNull, ne, notExists, or } from 'drizzle-orm';
+import { and, eq, exists, isNull, ne, notExists, or } from 'drizzle-orm';
 import { claude_billing_connection_grants, claude_billing_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -32,7 +32,23 @@ export async function deleteUserClaudeProfiles(userId: string): Promise<void> {
     .from(claude_billing_connections)
     .where(
       and(
-        eq(claude_billing_connections.kilo_user_id, userId),
+        or(
+          eq(claude_billing_connections.kilo_user_id, userId),
+          exists(
+            db
+              .select({ id: claude_billing_connection_grants.id })
+              .from(claude_billing_connection_grants)
+              .where(
+                and(
+                  eq(
+                    claude_billing_connection_grants.payer_connection_id,
+                    claude_billing_connections.id
+                  ),
+                  eq(claude_billing_connection_grants.kilo_user_id, userId)
+                )
+              )
+          )
+        ),
         notExists(
           db
             .select({ id: claude_billing_connection_grants.id })

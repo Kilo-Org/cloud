@@ -7,11 +7,14 @@ import {
   CLAUDE_BILLING_PROVIDER_NAME,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 import {
+  ClaudeBillingShareError,
   getGrantedClaudeBillingConnection,
   removeClaudeBillingGrant,
+  shareClaudeBillingConnection,
+  type ClaudeBillingOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
-import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import {
   baseProcedure,
   createTRPCRouter,
@@ -53,9 +56,15 @@ async function resolveOwner(
   ctx: TRPCContext,
   organizationId: string | undefined,
   scope: 'shared_services' | undefined
-): Promise<{ owner: ClaudeBillingOwner; canManage: boolean }> {
+): Promise<{
+  userId: string;
+  userEmail: string | null;
+  owner: ClaudeBillingOwner;
+  canManage: boolean;
+}> {
   if (!ctx.user) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'User not authenticated' });
   const userId = ctx.user.id;
+  const userEmail = ctx.user.google_user_email;
   if (!organizationId) {
     if (scope === 'shared_services') {
       throw new TRPCError({
@@ -63,16 +72,20 @@ async function resolveOwner(
         message: 'A shared-services connection needs an organization.',
       });
     }
-    return { owner: { kind: 'personal', kiloUserId: userId }, canManage: true };
+    return { userId, userEmail, owner: { kind: 'personal', kiloUserId: userId }, canManage: true };
   }
   const role = await ensureOrganizationAccess(ctx, organizationId);
   if (scope === 'shared_services') {
     return {
+      userId,
+      userEmail,
       owner: { kind: 'shared_services', organizationId },
       canManage: canManageOrganization(role),
     };
   }
   return {
+    userId,
+    userEmail,
     owner: { kind: 'member', kiloUserId: userId, organizationId },
     // A member connection needs a direct membership, which inherited access is not.
     canManage: await isClaudeBillingOrganizationMember(userId, organizationId),
@@ -130,15 +143,62 @@ export const claudeBillingRouter = createTRPCRouter({
     .input(ClaudeBillingOwnerInputSchema)
     .output(ClaudeBillingStatusSchema)
     .query(async ({ ctx, input }): Promise<ClaudeBillingStatus> => {
-      const { owner, canManage } = await resolveOwner(ctx, input.organizationId, input.scope);
-      if (!ctx.user)
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'User not authenticated' });
+      const { userId, owner, canManage } = await resolveOwner(
+        ctx,
+        input.organizationId,
+        input.scope
+      );
       const current = await getGrantedClaudeBillingConnection(owner);
       return statusOf(
         current,
         canManage,
-        await maySharePersonal(ctx.user.id, owner, canManage, current)
+        await maySharePersonal(userId, owner, canManage, current)
       );
+    }),
+
+  sharePersonal: baseProcedure
+    .input(ClaudeBillingOwnerInputSchema)
+    .output(ClaudeBillingStatusSchema)
+    .mutation(async ({ ctx, input }): Promise<ClaudeBillingStatus> => {
+      const { userId, userEmail, owner, canManage } = await resolveOwner(
+        ctx,
+        input.organizationId,
+        input.scope
+      );
+      if (owner.kind === 'personal') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Select an organization scope to share your personal Claude link.',
+        });
+      }
+      if (!canManage || !(await isClaudePlatformOAuthEnabled(userEmail))) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message:
+            owner.kind === 'shared_services'
+              ? 'Only an organization owner or admin with access to this feature can link it.'
+              : 'Only a direct member of this organization with access to this feature can link it.',
+        });
+      }
+      try {
+        const shared = await shareClaudeBillingConnection(
+          { kind: 'personal', kiloUserId: userId },
+          owner,
+          userId
+        );
+        return statusOf(shared, canManage, false);
+      } catch (error) {
+        if (error instanceof ClaudeBillingShareError) {
+          throw new TRPCError({
+            code: error.reason === 'target_connected' ? 'CONFLICT' : 'PRECONDITION_FAILED',
+            message:
+              error.reason === 'target_connected'
+                ? 'This scope already has a Claude link. Remove it from Kilo first.'
+                : 'Link your personal Claude organization first.',
+          });
+        }
+        throw error;
+      }
     }),
 
   remove: baseProcedure

@@ -265,13 +265,22 @@ function ClaudeBillingCardContent({
     router.replace(`${window.location.pathname}${query ? `?${query}` : ''}`, { scroll: false });
   }, [outcomeParam, router, searchParams]);
   const [connecting, setConnecting] = useState(false);
-  const [sharing, setSharing] = useState(false);
   const input = {
     organizationId,
     ...(scope === 'shared_services' ? { scope: 'shared_services' as const } : {}),
   };
   const statusQuery = useQuery(trpc.claudeBilling.status.queryOptions(input));
   const flagEnabled = useFeatureFlagEnabled(CLAUDE_PLATFORM_OAUTH_FLAG);
+  const shareMutation = useMutation(
+    trpc.claudeBilling.sharePersonal.mutationOptions({
+      onSuccess: () => {
+        setOutcome('connected');
+        return queryClient.invalidateQueries({
+          queryKey: trpc.claudeBilling.status.queryKey(input),
+        });
+      },
+    })
+  );
   const removeMutation = useMutation(
     trpc.claudeBilling.remove.mutationOptions({
       onSuccess: () => {
@@ -282,9 +291,13 @@ function ClaudeBillingCardContent({
       },
     })
   );
-  const failureCode = statusQuery.error?.data?.code ?? removeMutation.error?.data?.code;
+  const shareFailureCode = shareMutation.error?.data?.code;
+  const failureCode =
+    statusQuery.error?.data?.code ?? shareFailureCode ?? removeMutation.error?.data?.code;
   const needsSignIn = failureCode === 'UNAUTHORIZED';
   const needsAdmin = failureCode === 'FORBIDDEN';
+  const nonRetryableShareError =
+    shareFailureCode === 'CONFLICT' || shareFailureCode === 'PRECONDITION_FAILED';
   // Before launch the card appears only for an owner who already has a
   // connection, so they can still see its state and remove it.
   const launched = flagEnabled === true;
@@ -297,7 +310,7 @@ function ClaudeBillingCardContent({
       scope={scope}
       outcome={outcome}
       connecting={connecting}
-      sharing={sharing}
+      sharing={shareMutation.isPending}
       removing={removeMutation.isPending}
       error={
         needsSignIn
@@ -306,17 +319,24 @@ function ClaudeBillingCardContent({
             ? scope === 'shared_services'
               ? 'An organization owner or admin must manage Claude shared services.'
               : 'Only a member of this organization can manage this link.'
-            : statusQuery.isError
-              ? 'We could not load your Claude link.'
-              : removeMutation.isError
-                ? 'We could not remove your Claude link. Try again.'
-                : null
+            : shareFailureCode === 'CONFLICT'
+              ? 'This scope already has a Claude link. Remove it from Kilo first to use your personal link.'
+              : shareFailureCode === 'PRECONDITION_FAILED'
+                ? 'Link your personal Claude organization first, then share it here.'
+                : statusQuery.isError
+                  ? 'We could not load your Claude link.'
+                  : shareMutation.isError
+                    ? 'We could not share your personal Claude link. Try again.'
+                    : removeMutation.isError
+                      ? 'We could not remove your Claude link. Try again.'
+                      : null
       }
       onRetry={
-        needsSignIn || needsAdmin
+        needsSignIn || needsAdmin || nonRetryableShareError
           ? undefined
           : () => {
-              if (removeMutation.isError && !statusQuery.isError) removeMutation.mutate(input);
+              if (shareMutation.isError && !statusQuery.isError) shareMutation.mutate(input);
+              else if (removeMutation.isError && !statusQuery.isError) removeMutation.mutate(input);
               else void statusQuery.refetch();
             }
       }
@@ -336,18 +356,15 @@ function ClaudeBillingCardContent({
       onShare={
         launched && statusQuery.data?.canSharePersonal
           ? () => {
-              setSharing(true);
-              const query = new URLSearchParams({
-                owner: organizationId ?? 'personal',
-                source: 'personal',
-                return: window.location.pathname,
-              });
-              if (scope === 'shared_services') query.set('scope', 'shared_services');
-              window.location.assign(`/claude/billing/connect?${query}`);
+              removeMutation.reset();
+              shareMutation.mutate(input);
             }
           : undefined
       }
-      onRemove={() => removeMutation.mutate(input)}
+      onRemove={() => {
+        shareMutation.reset();
+        removeMutation.mutate(input);
+      }}
     />
   );
 }

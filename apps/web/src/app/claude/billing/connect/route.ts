@@ -6,9 +6,7 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
-  ClaudeBillingShareError,
   getClaudeBillingConnectionIncludingRemoved,
-  shareClaudeBillingConnection,
   type ClaudeBillingOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ensureClaudeBillingProfile } from '@/lib/claude-billing/profile';
@@ -80,23 +78,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    if (request.nextUrl.searchParams.get('source') === 'personal') {
-      if (owner.kind === 'personal') return outcomeRedirect(returnPath, owner, 'failed');
-      try {
-        await shareClaudeBillingConnection(
-          { kind: 'personal', kiloUserId: session.id },
-          owner,
-          session.id
-        );
-        return outcomeRedirect(returnPath, owner, 'connected');
-      } catch (error) {
-        if (error instanceof ClaudeBillingShareError && error.reason === 'target_connected') {
-          return outcomeRedirect(returnPath, owner, 'already_linked');
-        }
-        throw error;
-      }
-    }
-
     const userProfileId = await ensureClaudeBillingProfile(owner, session.id);
     const connection = await getClaudeBillingConnectionIncludingRemoved(owner);
     if (!connection) return outcomeRedirect(returnPath, owner, 'failed');

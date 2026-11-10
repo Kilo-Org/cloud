@@ -10,6 +10,7 @@ import { claude_billing_connections } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   getClaudeBillingConnection,
+  removeClaudeBillingGrant,
   shareClaudeBillingConnection,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
@@ -56,6 +57,26 @@ describe('Personal Claude profile erasure', () => {
     expect(
       await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
     ).toMatchObject({ status: 'connected' });
+  });
+
+  it('deletes the profile after both the personal grant and shared-services grant are removed', async () => {
+    const user = await connectedUser();
+    const organization = await createTestOrganization('Claude full removal erasure', user.id, 0);
+    const personal = { kind: 'personal' as const, kiloUserId: user.id };
+    const shared = { kind: 'shared_services' as const, organizationId: organization.id };
+    await shareClaudeBillingConnection(personal, shared, user.id);
+    await removeClaudeBillingGrant(personal);
+    await removeClaudeBillingGrant(shared);
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    await deleteUserClaudeProfiles(user.id);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(`uprof_${user.id}`);
   });
 
   it.each([200, 404])('accepts deletion or authoritative absence (%s)', async status => {

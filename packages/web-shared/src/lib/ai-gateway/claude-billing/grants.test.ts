@@ -10,6 +10,7 @@ import {
   getClaudeBillingConnectionIncludingRemoved,
   getGrantedClaudeBillingConnection,
   removeClaudeBillingGrant,
+  removeUserClaudeBillingGrants,
   shareClaudeBillingConnection,
   type ClaudeBillingOwner,
 } from './store';
@@ -139,16 +140,20 @@ describe('Claude billing grants', () => {
     });
   });
 
-  it('promotes over a previously removed target row and preserves member identity', async () => {
+  it('preserves a removed target profile row across grant removal and user erasure', async () => {
     const user = await insertTestUser();
-    const organization = await createTestOrganization('Claude promoted', user.id, 0);
-    await db.insert(claude_billing_connections).values({
-      kilo_user_id: null,
-      organization_id: organization.id,
-      user_profile_id: `uprof_old_${crypto.randomUUID()}`,
-      status: 'removed',
-      created_by: user.id,
-    });
+    const organization = await createTestOrganization('Claude preserved removed', user.id, 0);
+    const [removedTarget] = await db
+      .insert(claude_billing_connections)
+      .values({
+        kilo_user_id: null,
+        organization_id: organization.id,
+        user_profile_id: `uprof_old_${crypto.randomUUID()}`,
+        status: 'removed',
+        created_by: user.id,
+      })
+      .returning();
+    if (!removedTarget) throw new Error('Missing removed target fixture');
     const payer = await connectedPayer(user.id);
     const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
     const shared: ClaudeBillingOwner = {
@@ -164,16 +169,22 @@ describe('Claude billing grants', () => {
     await shareClaudeBillingConnection(personal, shared, user.id);
     await shareClaudeBillingConnection(personal, member, user.id);
     await removeClaudeBillingGrant(personal);
-
-    await expect(getGrantedClaudeBillingConnection(shared)).resolves.toMatchObject({
-      id: payer.id,
-      kilo_user_id: null,
-      organization_id: organization.id,
-    });
     await expect(getGrantedClaudeBillingConnection(member)).resolves.toMatchObject({
       id: payer.id,
       kilo_user_id: user.id,
       organization_id: organization.id,
     });
+
+    await removeUserClaudeBillingGrants(user.id, db);
+    await expect(getGrantedClaudeBillingConnection(shared)).resolves.toMatchObject({
+      id: payer.id,
+      kilo_user_id: null,
+      organization_id: organization.id,
+    });
+    const retainedOldRows = await db
+      .select()
+      .from(claude_billing_connections)
+      .where(eq(claude_billing_connections.id, removedTarget.id));
+    expect(retainedOldRows).toHaveLength(1);
   });
 });

@@ -7626,10 +7626,10 @@ export type OpenAiChatGptConnectionRow = typeof openai_chatgpt_connections.$infe
  * customer's Claude organization. No credential is stored: Kilo's operator
  * service account sends the requests, and the user profile ID names who pays.
  *
- * The owner columns identify the initial Kilo scope while the previous release
- * overlaps with grant-aware routing. Additional scopes use
- * `claude_billing_connection_grants`; removing the initial scope promotes
- * another grant into these columns.
+ * The owner columns record the scope that created the payer, reassigned to a
+ * remaining active scope only if that creator's account is erased while another
+ * scope still uses the payer. Active billing scopes are resolved through
+ * `claude_billing_connection_grants`.
  *
  * Anthropic allows one user profile per customer organization for each OAuth
  * app, so `user_profile_id` is unique and kept after a removal: a reconnect
@@ -7667,13 +7667,15 @@ export const claude_billing_connections = pgTable(
     unique('UQ_claude_billing_connections_user_profile_id').on(table.user_profile_id),
     uniqueIndex('UQ_claude_billing_connections_personal')
       .on(table.kilo_user_id)
-      .where(sql`${table.organization_id} IS NULL`),
+      .where(sql`${table.organization_id} IS NULL AND ${table.status} <> 'removed'`),
     uniqueIndex('UQ_claude_billing_connections_org_member')
       .on(table.kilo_user_id, table.organization_id)
-      .where(sql`${table.organization_id} IS NOT NULL`),
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.status} <> 'removed'`),
     uniqueIndex('UQ_claude_billing_connections_shared_services')
       .on(table.organization_id)
-      .where(sql`${table.organization_id} IS NOT NULL AND ${table.kilo_user_id} IS NULL`),
+      .where(
+        sql`${table.organization_id} IS NOT NULL AND ${table.kilo_user_id} IS NULL AND ${table.status} <> 'removed'`
+      ),
     enumCheck(
       'claude_billing_connections_status_check',
       table.status,
@@ -7707,6 +7709,7 @@ export const claude_billing_connection_grants = pgTable(
     removed_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
+    index('IDX_claude_billing_grants_payer_connection_id').on(table.payer_connection_id),
     uniqueIndex('UQ_claude_billing_grants_personal')
       .on(table.kilo_user_id)
       .where(sql`${table.organization_id} IS NULL`),

@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, isNull, ne, notExists, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import {
   claude_billing_connection_grants,
   claude_billing_connections,
@@ -61,6 +61,10 @@ export async function getClaudeBillingConnection(
     .select()
     .from(claude_billing_connections)
     .where(claudeBillingOwnerWhere(owner))
+    .orderBy(
+      sql`${claude_billing_connections.status} = 'removed'`,
+      asc(claude_billing_connections.created_at)
+    )
     .limit(1);
   return row ?? null;
 }
@@ -202,6 +206,21 @@ export async function insertClaudeBillingProfile(
     .where(eq(claude_billing_connections.user_profile_id, userProfileId))
     .limit(1);
   if (!row) throw new Error('Claude billing connection row is missing after insert');
+  if (!isInitialOwner(row, owner)) {
+    const [existingGrant] = await onDb
+      .select({ id: claude_billing_connection_grants.id })
+      .from(claude_billing_connection_grants)
+      .where(
+        and(
+          claudeBillingGrantOwnerWhere(owner),
+          eq(claude_billing_connection_grants.payer_connection_id, row.id)
+        )
+      )
+      .limit(1);
+    if (!existingGrant) {
+      throw new Error('Claude user profile belongs to another scope');
+    }
+  }
   await upsertClaudeBillingGrant(owner, row.id, createdBy, onDb);
   return row;
 }
@@ -290,57 +309,11 @@ function isInitialOwner(row: ClaudeBillingConnectionRow, owner: ClaudeBillingOwn
   }
 }
 
-function ownerFromColumns(row: {
-  kilo_user_id: string | null;
-  organization_id: string | null;
-}): ClaudeBillingOwner | null {
-  if (row.kilo_user_id && row.organization_id) {
-    return { kind: 'member', kiloUserId: row.kilo_user_id, organizationId: row.organization_id };
-  }
-  if (row.kilo_user_id) {
-    return { kind: 'personal', kiloUserId: row.kilo_user_id };
-  }
-  if (row.organization_id) {
-    return { kind: 'shared_services', organizationId: row.organization_id };
-  }
-  return null;
-}
-
-async function promoteClaudeBillingPayerOwner(
+async function reassignErasedUserPayerOwner(
   tx: DrizzleTransaction,
   payerConnectionId: string,
   remaining: { kilo_user_id: string | null; organization_id: string | null }
 ): Promise<void> {
-  const nextOwner = ownerFromColumns(remaining);
-  if (!nextOwner) return;
-  await tx.delete(claude_billing_connections).where(
-    and(
-      ne(claude_billing_connections.id, payerConnectionId),
-      claudeBillingOwnerWhere(nextOwner),
-      notExists(
-        tx
-          .select({ id: claude_billing_connection_grants.id })
-          .from(claude_billing_connection_grants)
-          .where(
-            and(
-              eq(
-                claude_billing_connection_grants.payer_connection_id,
-                claude_billing_connections.id
-              ),
-              isNull(claude_billing_connection_grants.removed_at)
-            )
-          )
-      )
-    )
-  );
-  const [occupant] = await tx
-    .select({ id: claude_billing_connections.id })
-    .from(claude_billing_connections)
-    .where(
-      and(ne(claude_billing_connections.id, payerConnectionId), claudeBillingOwnerWhere(nextOwner))
-    )
-    .limit(1);
-  if (occupant) return;
   await tx
     .update(claude_billing_connections)
     .set({
@@ -397,14 +370,10 @@ export async function removeClaudeBillingGrant(
         .where(eq(claude_billing_connections.id, connection.id));
       return;
     }
-    const [payerRow] = await tx
-      .select()
-      .from(claude_billing_connections)
-      .where(eq(claude_billing_connections.id, connection.id))
-      .limit(1);
-    if (payerRow && isInitialOwner(payerRow, owner)) {
-      await promoteClaudeBillingPayerOwner(tx, connection.id, remaining);
-    }
+    await tx
+      .update(claude_billing_connections)
+      .set({ updated_at: sql`clock_timestamp()` })
+      .where(eq(claude_billing_connections.id, connection.id));
   });
 }
 
@@ -460,7 +429,7 @@ export async function removeUserClaudeBillingGrants(
           .where(eq(claude_billing_connections.id, payerId))
           .limit(1);
         if (payerRow?.kilo_user_id === userId) {
-          await promoteClaudeBillingPayerOwner(tx, payerId, remaining);
+          await reassignErasedUserPayerOwner(tx, payerId, remaining);
         }
       }
     }

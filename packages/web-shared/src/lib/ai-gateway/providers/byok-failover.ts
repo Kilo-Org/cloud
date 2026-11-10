@@ -55,7 +55,10 @@ export async function sendUpstreamAttemptWithByokFailover(
     if (status === null || input.signal?.aborted) break;
     // All attempts share one upstream budget, so the invocation still ends within the route's
     // maxDuration with time left for usage accounting.
-    const remainingBudgetMs = UPSTREAM_DURATION_BUDGET_MS - (performance.now() - startedAt);
+    // Node's AbortSignal.timeout throws for a fractional delay.
+    const remainingBudgetMs = Math.floor(
+      UPSTREAM_DURATION_BUDGET_MS - (performance.now() - startedAt)
+    );
     if (remainingBudgetMs < MIN_FAILOVER_BUDGET_MS) break;
     const next = await nextByokFailover();
     if (!next) break;

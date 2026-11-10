@@ -68,7 +68,7 @@ describe('sendUpstreamAttemptWithByokFailover upstream budget', () => {
       byokFailovers: [{ providerId: 'anthropic' as const, resolve: async () => failover }],
     };
     mockedSendUpstreamAttempt.mockImplementationOnce(async () => {
-      now += 120_000;
+      now += 120_000.4;
       return failedAttempt(503);
     });
     mockedSendUpstreamAttempt.mockResolvedValueOnce(failedAttempt(500));
@@ -83,7 +83,7 @@ describe('sendUpstreamAttemptWithByokFailover upstream budget', () => {
     expect(mockedSendUpstreamAttempt).toHaveBeenCalledTimes(2);
     expect(mockedSendUpstreamAttempt.mock.calls[0]?.[0].upstreamDurationBudgetMs).toBeUndefined();
     expect(mockedSendUpstreamAttempt.mock.calls[1]?.[0].upstreamDurationBudgetMs).toBe(
-      UPSTREAM_DURATION_BUDGET_MS - 120_000
+      UPSTREAM_DURATION_BUDGET_MS - 120_001
     );
   });
 

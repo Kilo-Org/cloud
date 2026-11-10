@@ -167,6 +167,11 @@ export async function registerCloudAgentWorktree(
 ): Promise<void> {
   if (!params.cloudAgentWorktreeId) return;
   const worktreeId = params.cloudAgentWorktreeId;
+  // Match legacy checkout reports: the base branch is not the workspace's work.
+  const checkout =
+    params.gitUrl && params.gitBranch && params.gitBranch !== params.baseBranch
+      ? { git_url: normalizeGitUrl(params.gitUrl), git_branch: params.gitBranch }
+      : undefined;
   await db.transaction(async tx => {
     await assertStackParent(tx, params, worktreeId);
     await tx
@@ -180,6 +185,7 @@ export async function registerCloudAgentWorktree(
           : {}),
         ...(params.baseBranch !== undefined ? { base_branch: params.baseBranch } : {}),
         ...(params.baseSha !== undefined ? { base_sha: params.baseSha } : {}),
+        ...checkout,
       })
       .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
     const row = await lockWorktree(tx, {
@@ -188,6 +194,12 @@ export async function registerCloudAgentWorktree(
       organizationId: params.organizationId,
     });
     if (row.deletion_started_at !== null) throw new Error(WORKTREE_DELETING);
+    if (checkout && row.git_url === null && row.git_branch === null) {
+      await tx
+        .update(cloud_agent_worktrees)
+        .set(checkout)
+        .where(eq(cloud_agent_worktrees.worktree_id, worktreeId));
+    }
     if (params.cloudAgentWorktreeLocation) {
       const current = locations(row);
       const incoming = params.cloudAgentWorktreeLocation;

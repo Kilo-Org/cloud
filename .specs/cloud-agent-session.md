@@ -434,6 +434,14 @@ repository.
    over a closed or merged one, and it MUST only match within the worktree's
    personal or organization scope. Outside worktrees a branch name alone MUST
    NOT link a pull request.
+   The first workspace registration MUST record its canonical repository and
+   working branch without requiring a CLI metadata report. A generated branch
+   MUST remain stable across registration retries and takeovers; an explicitly
+   selected upstream branch MUST take precedence. Registration MUST NOT record
+   the base branch as the workspace's working branch or overwrite a previously
+   registered checkout. A later registration MUST fill the repository and working
+   branch when both stored fields are absent. Legacy CLI checkout reports MAY
+   still update it.
 3. Open workspace tabs — the workspace terminal and file tabs, their order, and
    the active tab — MUST survive refresh and navigation between worktrees, and
    MUST remain scoped to the current user and personal or organization context.

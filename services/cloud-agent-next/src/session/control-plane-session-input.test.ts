@@ -124,6 +124,7 @@ describe('buildControlPlaneCreateInput', () => {
     const input = await buildControlPlaneCreateInput({
       env: {} as Env,
       command: {
+        generatedBranch: 'kilo/eager-hub-j9o',
         identity: {
           sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
           userId: 'usr_1',
@@ -168,6 +169,7 @@ describe('buildControlPlaneCreateInput', () => {
     'persists and selects the same policy for start and registration: %j',
     async ({ egressMode, egressAllowlist, egressAudit }) => {
       const command = {
+        generatedBranch: 'kilo/eager-hub-j9o',
         identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
         auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: MODERN_KILO_TOKEN },
         message: {
@@ -224,6 +226,7 @@ describe('buildControlPlaneCreateInput', () => {
       await expect(
         buildControlPlaneCreateInput({
           command: {
+            generatedBranch: 'kilo/eager-hub-j9o',
             identity: {
               sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
               userId: 'usr_1',
@@ -256,6 +259,7 @@ describe('buildControlPlaneCreateInput', () => {
     const sandboxId = `sbx-${'a'.repeat(48)}` as const;
     const input = await buildControlPlaneCreateInput({
       command: {
+        generatedBranch: 'kilo/eager-hub-j9o',
         identity: {
           sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
           userId: 'usr_1',
@@ -294,6 +298,7 @@ describe('buildControlPlaneCreateInput', () => {
     await expect(
       buildControlPlaneCreateInput({
         command: {
+          generatedBranch: 'kilo/eager-hub-j9o',
           identity: {
             sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
             userId: 'usr_1',
@@ -324,6 +329,7 @@ describe('buildControlPlaneCreateInput', () => {
     async (allocation, instance) => {
       const input = await buildControlPlaneCreateInput({
         command: {
+          generatedBranch: 'kilo/eager-hub-j9o',
           identity: {
             sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
             userId: 'usr_1',
@@ -357,6 +363,7 @@ describe('buildControlPlaneCreateInput', () => {
   it('pins code review on Cloudflare Containers to the code-review instance size', async () => {
     const input = await buildControlPlaneCreateInput({
       command: {
+        generatedBranch: 'kilo/eager-hub-j9o',
         identity: {
           sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
           userId: 'usr_1',
@@ -386,6 +393,7 @@ describe('buildControlPlaneCreateInput', () => {
   it('keeps the full model in stored metadata while dispatching the stripped id', async () => {
     const input = await buildControlPlaneCreateInput({
       command: {
+        generatedBranch: 'kilo/eager-hub-j9o',
         identity: {
           sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
           userId: 'usr_1',

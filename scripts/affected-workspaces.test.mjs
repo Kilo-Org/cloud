@@ -158,8 +158,10 @@ test('an action no table attributes stays global', () => {
   }
   // A global path in the same diff keeps the whole selection full.
   assert.equal(
-    select(['.github/actions/trpc-declarations/action.yml', '.github/actions/pnpm-store/action.yml'])
-      .full,
+    select([
+      '.github/actions/trpc-declarations/action.yml',
+      '.github/actions/pnpm-store/action.yml',
+    ]).full,
     true
   );
 });

@@ -1561,6 +1561,73 @@ test('a lint-plugin change runs the plugin suite without the web gates', () => {
   }
 });
 
+// A Chrome e2e shard installs the workspace, builds one bundle and drives one
+// Playwright suite against it. The bundle resolves the extension, the two
+// workspace packages it imports at run time and the inputs its install reads;
+// the web sources reach the extension as declarations only, which `verify`
+// typechecks. So the shard gate reads its own filter output: the affected
+// detector selects the extension for a web-source change too, because the tRPC
+// declaration program reads the web routers, and a workspace answer in this gate
+// would reserve both shards for an input the bundle cannot observe.
+test('the Chrome e2e shards start only for the inputs their bundle reads', () => {
+  const jobs = workflows['extension-ci.yml'].jobs;
+  const changes = jobs.changes;
+  const filter = load(changes.steps.find(step => step.id === 'filter').with.filters);
+  const matches = (patterns, path) => patterns.some(pattern => posix.matchesGlob(path, pattern));
+
+  assert.deepEqual(
+    filter.extension_e2e,
+    [
+      'apps/extension/**',
+      '.github/workflows/extension-ci.yml',
+      'packages/cloud-agent-sdk/**',
+      'packages/session-ingest-contracts/**',
+      'package.json',
+      '.nvmrc',
+      '.npmrc',
+      '.pnpmfile.cjs',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
+      'patches/**',
+    ],
+    'the shard filter names the trees and install inputs the bundle build reads'
+  );
+  for (const path of [
+    'apps/extension/src/shared/auth.ts',
+    'packages/cloud-agent-sdk/src/session.ts',
+    'packages/session-ingest-contracts/src/index.ts',
+    'pnpm-lock.yaml',
+    'patches/some.patch',
+  ]) {
+    assert.equal(matches(filter.extension_e2e, path), true, `a shard input: ${path}`);
+  }
+  for (const path of [webBackendPath, '.oxlintrc.json', 'apps/mobile/src/app/index.tsx']) {
+    assert.equal(matches(filter.extension_e2e, path), false, `not a shard input: ${path}`);
+  }
+
+  assert.equal(
+    changes.outputs.extension_e2e,
+    "${{ steps.filter.outputs.extension_e2e == 'true' }}",
+    'the shard output reads the filter alone, because the detector answers for the web sources too'
+  );
+  assert.equal(
+    jobs['e2e-chrome-shard'].if,
+    "needs.changes.outputs.extension_e2e == 'true'",
+    'the shards start only for their own inputs'
+  );
+  assert.equal(
+    jobs.verify.if,
+    "needs.changes.outputs.extension == 'true'",
+    'the job that typechecks the web declarations keeps the wider output'
+  );
+  assert.deepEqual(
+    jobs['e2e-chrome'].needs,
+    ['changes', 'e2e-chrome-shard'],
+    'the aggregator still publishes the required context'
+  );
+  assert.equal(jobs['e2e-chrome'].if, '${{ !cancelled() }}');
+});
+
 // The account database job runs the root `drizzle` script, which executes
 // drizzle-kit inside packages/db, and one session-sync suite whose workspace
 // imports are @kilocode/db and @kilocode/worker-utils, both declared by the

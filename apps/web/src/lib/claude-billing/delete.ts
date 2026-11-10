@@ -1,7 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
-import { claude_billing_connections } from '@kilocode/db/schema';
+import { and, eq, isNull, ne, notExists, or } from 'drizzle-orm';
+import { claude_billing_connection_grants, claude_billing_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getClaudeOperatorToken,
@@ -19,9 +19,9 @@ export class ClaudeProfileDeletionError extends Error {
 }
 
 /**
- * Deletes the Anthropic user profiles behind every connection the person owns:
- * their personal account and their own connections in each organization. A
- * shared-services connection belongs to the organization, so its profile stays.
+ * Deletes the Anthropic user profiles behind connections the person created
+ * when no other Kilo scope still uses them. A payer shared with another person
+ * or shared services keeps its profile.
  */
 export async function deleteUserClaudeProfiles(userId: string): Promise<void> {
   const rows = await db
@@ -30,7 +30,29 @@ export async function deleteUserClaudeProfiles(userId: string): Promise<void> {
       user_profile_id: claude_billing_connections.user_profile_id,
     })
     .from(claude_billing_connections)
-    .where(eq(claude_billing_connections.kilo_user_id, userId));
+    .where(
+      and(
+        eq(claude_billing_connections.kilo_user_id, userId),
+        notExists(
+          db
+            .select({ id: claude_billing_connection_grants.id })
+            .from(claude_billing_connection_grants)
+            .where(
+              and(
+                eq(
+                  claude_billing_connection_grants.payer_connection_id,
+                  claude_billing_connections.id
+                ),
+                isNull(claude_billing_connection_grants.removed_at),
+                or(
+                  isNull(claude_billing_connection_grants.kilo_user_id),
+                  ne(claude_billing_connection_grants.kilo_user_id, userId)
+                )
+              )
+            )
+        )
+      )
+    );
   if (rows.length === 0) return;
   if (!isClaudeOperatorConfigured()) throw new ClaudeProfileDeletionError(false);
 

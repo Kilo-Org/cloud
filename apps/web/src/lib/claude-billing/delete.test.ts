@@ -8,7 +8,10 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { claude_billing_connections } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { getClaudeBillingConnection } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import {
+  getClaudeBillingConnection,
+  shareClaudeBillingConnection,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import { ClaudeProfileDeletionError, deleteUserClaudeProfiles } from './delete';
 
@@ -35,6 +38,24 @@ describe('Personal Claude profile erasure', () => {
     const fetchMock = jest.spyOn(globalThis, 'fetch');
     await deleteUserClaudeProfiles(user.id);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps a payer that shared services still use', async () => {
+    const user = await connectedUser();
+    const organization = await createTestOrganization('Claude shared erasure', user.id, 0);
+    await shareClaudeBillingConnection(
+      { kind: 'personal', kiloUserId: user.id },
+      { kind: 'shared_services', organizationId: organization.id },
+      user.id
+    );
+    const fetchMock = jest.spyOn(globalThis, 'fetch');
+
+    await deleteUserClaudeProfiles(user.id);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ status: 'connected' });
   });
 
   it.each([200, 404])('accepts deletion or authoritative absence (%s)', async status => {

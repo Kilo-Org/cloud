@@ -7622,17 +7622,14 @@ export const openai_chatgpt_connections = pgTable(
 export type OpenAiChatGptConnectionRow = typeof openai_chatgpt_connections.$inferSelect;
 
 /**
- * A Claude billing connection: one Kilo owner linked through its Anthropic
- * user profile to a customer's Claude organization, so the Claude requests the
- * owner makes bill that organization. No credential is stored: Kilo's operator
+ * A Claude payer connection linked through its Anthropic user profile to a
+ * customer's Claude organization. No credential is stored: Kilo's operator
  * service account sends the requests, and the user profile ID names who pays.
  *
- * The set columns name the owner:
- * - `kilo_user_id` only: the person's personal account.
- * - `kilo_user_id` and `organization_id`: the person's own requests in that
- *   organization.
- * - `organization_id` only: the organization's shared services, such as code
- *   review. `created_by` records the person who connected it.
+ * The owner columns identify the initial Kilo scope while the previous release
+ * overlaps with grant-aware routing. Additional scopes use
+ * `claude_billing_connection_grants`; removing the initial scope promotes
+ * another grant into these columns.
  *
  * Anthropic allows one user profile per customer organization for each OAuth
  * app, so `user_profile_id` is unique and kept after a removal: a reconnect
@@ -7690,6 +7687,43 @@ export const claude_billing_connections = pgTable(
 );
 
 export type ClaudeBillingConnectionRow = typeof claude_billing_connections.$inferSelect;
+
+/**
+ * Authorizes one Kilo billing scope to use a Claude payer connection. Multiple
+ * scopes can share a payer only through these explicit grants.
+ */
+export const claude_billing_connection_grants = pgTable(
+  'claude_billing_connection_grants',
+  {
+    id: idPrimaryKeyColumn,
+    payer_connection_id: uuid()
+      .notNull()
+      .references(() => claude_billing_connections.id, { onDelete: 'cascade' }),
+    kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    created_by: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    /** Kept after removal so a reconnect reuses this payer's Anthropic profile. */
+    removed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    uniqueIndex('UQ_claude_billing_grants_personal')
+      .on(table.kilo_user_id)
+      .where(sql`${table.organization_id} IS NULL`),
+    uniqueIndex('UQ_claude_billing_grants_org_member')
+      .on(table.kilo_user_id, table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL`),
+    uniqueIndex('UQ_claude_billing_grants_shared_services')
+      .on(table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.kilo_user_id} IS NULL`),
+    check(
+      'claude_billing_grants_owner_check',
+      sql`${table.kilo_user_id} IS NOT NULL OR ${table.organization_id} IS NOT NULL`
+    ),
+  ]
+);
+
+export type ClaudeBillingConnectionGrantRow = typeof claude_billing_connection_grants.$inferSelect;
 
 // Security Reviews - Phase 1
 export const security_findings = pgTable(

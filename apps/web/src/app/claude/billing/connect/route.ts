@@ -6,7 +6,9 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
-  getClaudeBillingConnection,
+  ClaudeBillingShareError,
+  getClaudeBillingConnectionIncludingRemoved,
+  shareClaudeBillingConnection,
   type ClaudeBillingOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ensureClaudeBillingProfile } from '@/lib/claude-billing/profile';
@@ -23,7 +25,7 @@ import {
 } from '@/lib/claude-billing/access';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
-function failureRedirect(
+function outcomeRedirect(
   returnPath: string,
   owner: Pick<ClaudeBillingOwner, 'kind'>,
   outcome: string
@@ -70,17 +72,34 @@ export async function GET(request: NextRequest) {
       request.nextUrl.searchParams.get('scope') === 'shared_services'
         ? 'shared_services'
         : 'member';
-    return failureRedirect(returnPath, { kind: requestedKind }, 'forbidden');
+    return outcomeRedirect(returnPath, { kind: requestedKind }, 'forbidden');
   }
   const user = await findUserById(session.id);
   if (!(await isClaudePlatformOAuthEnabled(user?.google_user_email))) {
-    return failureRedirect(returnPath, owner, 'forbidden');
+    return outcomeRedirect(returnPath, owner, 'forbidden');
   }
 
   try {
+    if (request.nextUrl.searchParams.get('source') === 'personal') {
+      if (owner.kind === 'personal') return outcomeRedirect(returnPath, owner, 'failed');
+      try {
+        await shareClaudeBillingConnection(
+          { kind: 'personal', kiloUserId: session.id },
+          owner,
+          session.id
+        );
+        return outcomeRedirect(returnPath, owner, 'connected');
+      } catch (error) {
+        if (error instanceof ClaudeBillingShareError && error.reason === 'target_connected') {
+          return outcomeRedirect(returnPath, owner, 'already_linked');
+        }
+        throw error;
+      }
+    }
+
     const userProfileId = await ensureClaudeBillingProfile(owner, session.id);
-    const connection = await getClaudeBillingConnection(owner);
-    if (!connection) return failureRedirect(returnPath, owner, 'failed');
+    const connection = await getClaudeBillingConnectionIncludingRemoved(owner);
+    if (!connection) return outcomeRedirect(returnPath, owner, 'failed');
     const state = randomBytes(32).toString('base64url');
     const codeVerifier = randomBytes(64).toString('base64url');
     const authorizeUrl = await pushClaudeAuthorizationRequest({
@@ -108,6 +127,6 @@ export async function GET(request: NextRequest) {
           ? String(error.status)
           : 'none',
     });
-    return failureRedirect(returnPath, owner, 'failed');
+    return outcomeRedirect(returnPath, owner, 'failed');
   }
 }

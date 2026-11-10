@@ -1,4 +1,4 @@
-jest.mock('./store', () => ({ getClaudeBillingConnection: jest.fn() }));
+jest.mock('./store', () => ({ getGrantedClaudeBillingConnection: jest.fn() }));
 jest.mock('./operator', () => ({
   getClaudeOperatorToken: jest.fn(),
   isClaudeOperatorConfigured: jest.fn(),
@@ -17,7 +17,7 @@ jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { getClaudeBillingConnection } from './store';
+import { getGrantedClaudeBillingConnection } from './store';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 import { checkClaudeBilling } from './routing';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
@@ -49,7 +49,7 @@ const SHARED_ROW: ClaudeBillingConnectionRow = {
 };
 
 beforeEach(() => {
-  jest.mocked(getClaudeBillingConnection).mockReset().mockResolvedValue(row);
+  jest.mocked(getGrantedClaudeBillingConnection).mockReset().mockResolvedValue(row);
   jest.mocked(getClaudeOperatorToken).mockReset().mockResolvedValue('operator-token');
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(true);
   jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
@@ -130,24 +130,24 @@ describe('Claude customer-billed routing', () => {
       });
       expect(getClaudeOperatorToken).not.toHaveBeenCalled();
       expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('requester@kilocode.ai');
-      expect(jest.mocked(getClaudeBillingConnection).mock.invocationCallOrder[0]).toBeLessThan(
-        jest.mocked(isClaudePlatformOAuthEnabled).mock.invocationCallOrder[0] ?? 0
-      );
+      expect(
+        jest.mocked(getGrantedClaudeBillingConnection).mock.invocationCallOrder[0]
+      ).toBeLessThan(jest.mocked(isClaudePlatformOAuthEnabled).mock.invocationCallOrder[0] ?? 0);
     }
   );
 
   it('preserves normal routing for an owner without a connection when the flag is off', async () => {
     jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
-    jest.mocked(getClaudeBillingConnection).mockResolvedValue(null);
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(null);
     expect(await checkClaudeBilling(input())).toBeNull();
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
     expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
   });
 
   it('does not serve an organization request from a personal connection', async () => {
-    jest.mocked(getClaudeBillingConnection).mockResolvedValue(null);
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(null);
     expect(await checkClaudeBilling({ ...input(), organizationId: 'organization' })).toBeNull();
-    expect(getClaudeBillingConnection).toHaveBeenCalledWith(
+    expect(getGrantedClaudeBillingConnection).toHaveBeenCalledWith(
       { kind: 'member', kiloUserId: 'user', organizationId: 'organization' },
       expect.anything()
     );
@@ -160,7 +160,7 @@ describe('Claude customer-billed routing', () => {
     const result = await checkClaudeBilling({ ...input(), organizationId: 'organization' });
     expect(result?.kind).toBe(enabled ? 'provider' : 'unavailable');
     expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('requester@kilocode.ai');
-    expect(getClaudeBillingConnection).toHaveBeenCalledWith(
+    expect(getGrantedClaudeBillingConnection).toHaveBeenCalledWith(
       { kind: 'member', kiloUserId: 'user', organizationId: 'organization' },
       expect.anything()
     );
@@ -168,7 +168,7 @@ describe('Claude customer-billed routing', () => {
   });
 
   it('serves a service run from the shared-services connection first', async () => {
-    jest.mocked(getClaudeBillingConnection).mockImplementation(async owner => {
+    jest.mocked(getGrantedClaudeBillingConnection).mockImplementation(async owner => {
       if (owner.kind === 'shared_services') return SHARED_ROW;
       return null;
     });
@@ -179,13 +179,17 @@ describe('Claude customer-billed routing', () => {
     });
     expect(result?.kind).toBe('provider');
     if (result?.kind !== 'provider') throw new Error('Expected shared-services provider');
-    expect(getClaudeBillingConnection).toHaveBeenNthCalledWith(1, sharedOwner(), expect.anything());
+    expect(getGrantedClaudeBillingConnection).toHaveBeenNthCalledWith(
+      1,
+      sharedOwner(),
+      expect.anything()
+    );
     expect(result.provider.claudeBillingUserProfileId).toBe('uprof_shared');
   });
 
   it('gates the shared-services connection on the person who connected it', async () => {
     jest
-      .mocked(getClaudeBillingConnection)
+      .mocked(getGrantedClaudeBillingConnection)
       .mockImplementation(async owner => (owner.kind === 'shared_services' ? SHARED_ROW : null));
     const result = await checkClaudeBilling({
       ...input(),
@@ -200,7 +204,7 @@ describe('Claude customer-billed routing', () => {
 
   it('fails a shared-services request whose connector is no longer eligible', async () => {
     jest
-      .mocked(getClaudeBillingConnection)
+      .mocked(getGrantedClaudeBillingConnection)
       .mockImplementation(async owner => (owner.kind === 'shared_services' ? SHARED_ROW : null));
     jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
     expect(
@@ -215,7 +219,7 @@ describe('Claude customer-billed routing', () => {
 
   it('falls back to the caller connection when the organization has no shared one', async () => {
     jest
-      .mocked(getClaudeBillingConnection)
+      .mocked(getGrantedClaudeBillingConnection)
       .mockImplementation(async owner =>
         owner.kind === 'member' ? { ...row, kilo_user_id: 'user' } : null
       );
@@ -225,7 +229,7 @@ describe('Claude customer-billed routing', () => {
       botId: 'reviewer',
     });
     expect(result?.kind).toBe('provider');
-    expect(getClaudeBillingConnection).toHaveBeenNthCalledWith(
+    expect(getGrantedClaudeBillingConnection).toHaveBeenNthCalledWith(
       2,
       {
         kind: 'member',
@@ -237,7 +241,7 @@ describe('Claude customer-billed routing', () => {
   });
 
   it('never falls back to the member connection when the shared one cannot bill', async () => {
-    jest.mocked(getClaudeBillingConnection).mockImplementation(async owner => {
+    jest.mocked(getGrantedClaudeBillingConnection).mockImplementation(async owner => {
       if (owner.kind === 'shared_services') return { ...SHARED_ROW, status: 'billing_unavailable' };
       return row;
     });
@@ -247,14 +251,14 @@ describe('Claude customer-billed routing', () => {
       botId: 'reviewer',
     });
     expect(result).toMatchObject({ kind: 'unavailable' });
-    expect(getClaudeBillingConnection).toHaveBeenCalledTimes(1);
+    expect(getGrantedClaudeBillingConnection).toHaveBeenCalledTimes(1);
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
   it('ignores a bot id without an organization', async () => {
     const result = await checkClaudeBilling({ ...input(), botId: 'reviewer' });
     expect(result?.kind).toBe('provider');
-    expect(getClaudeBillingConnection).toHaveBeenCalledWith(
+    expect(getGrantedClaudeBillingConnection).toHaveBeenCalledWith(
       { kind: 'personal', kiloUserId: 'user' },
       expect.anything()
     );
@@ -266,7 +270,7 @@ describe('Claude customer-billed routing', () => {
       expect(
         await checkClaudeBilling({ ...input(), organizationId, requesterEmail: null })
       ).toMatchObject({ kind: 'unavailable' });
-      expect(getClaudeBillingConnection).toHaveBeenCalled();
+      expect(getGrantedClaudeBillingConnection).toHaveBeenCalled();
       expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
       expect(getClaudeOperatorToken).not.toHaveBeenCalled();
     }
@@ -285,7 +289,7 @@ describe('Claude customer-billed routing', () => {
   });
 
   it.each(['pending', 'removed'] as const)('keeps normal routing for %s owners', async status => {
-    jest.mocked(getClaudeBillingConnection).mockResolvedValue({ ...row, status });
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue({ ...row, status });
     expect(await checkClaudeBilling(input())).toBeNull();
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
@@ -298,7 +302,7 @@ describe('Claude customer-billed routing', () => {
 
   it('keeps a failed payer lookup retryable without selecting another payer', async () => {
     jest
-      .mocked(getClaudeBillingConnection)
+      .mocked(getGrantedClaudeBillingConnection)
       .mockRejectedValueOnce(new Error('database unavailable'));
     expect(await checkClaudeBilling(input())).toMatchObject({
       kind: 'unavailable',
@@ -329,7 +333,7 @@ describe('Claude customer-billed routing', () => {
 
   it('fails locally without fetching an operator token after a terminal refusal', async () => {
     jest
-      .mocked(getClaudeBillingConnection)
+      .mocked(getGrantedClaudeBillingConnection)
       .mockResolvedValue({ ...row, status: 'billing_unavailable' });
     expect(await checkClaudeBilling(input())).toMatchObject({ kind: 'unavailable' });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
@@ -350,6 +354,6 @@ describe('Claude customer-billed routing', () => {
 
   it('keeps unrelated models on their existing route', async () => {
     expect(await checkClaudeBilling({ ...input(), requestedModel: 'openai/gpt-model' })).toBeNull();
-    expect(getClaudeBillingConnection).not.toHaveBeenCalled();
+    expect(getGrantedClaudeBillingConnection).not.toHaveBeenCalled();
   });
 });

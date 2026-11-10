@@ -43,7 +43,7 @@ const SCOPE_COPY: Record<
   shared_services: {
     title: 'Claude billing for shared services',
     description:
-      'Link a Claude organization so Kilo shared services in this organization, such as code review, bill it instead of Kilo credits. It is not any member’s own connection.',
+      'Link a Claude organization so Kilo shared services in this organization, such as code review, bill it instead of Kilo credits. Members’ own requests keep their separate billing choices.',
     manageNote: ' Only an owner or admin of this Kilo organization can link it.',
     removeNote:
       'Removing this link stops shared services from billing it. Members’ own links are unchanged.',
@@ -60,7 +60,7 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope) {
     case 'declined':
       return 'Linking did not complete. An owner, admin, or billing admin of your Claude organization must approve it.';
     case 'already_linked':
-      return 'This Claude organization is already linked in Kilo, for another person, organization, or account. Remove that link first.';
+      return 'This Claude organization is already linked in Kilo. Use an existing link you control, or ask its owner to share it.';
     case 'forbidden':
       if (scope === 'shared_services') {
         return 'Only a Kilo organization owner or admin with access to this feature can link it.';
@@ -95,9 +95,11 @@ export type ClaudeBillingCardViewProps = {
   scope?: ClaudeBillingScope;
   outcome?: string | null;
   onConnect?: () => void;
+  onShare?: () => void;
   onRemove?: () => void;
   onRetry?: () => void;
   connecting?: boolean;
+  sharing?: boolean;
   removing?: boolean;
   error?: string | null;
 };
@@ -107,9 +109,11 @@ export function ClaudeBillingCardView({
   scope = 'personal',
   outcome,
   onConnect,
+  onShare,
   onRemove,
   onRetry,
   connecting,
+  sharing,
   removing,
   error,
 }: ClaudeBillingCardViewProps) {
@@ -175,14 +179,14 @@ export function ClaudeBillingCardView({
             >
               Set a spend limit or unlink in Claude Console
             </a>
-            {status.canManage && (onConnect || connected) ? (
+            {status.canManage && (onConnect || onShare || connected) ? (
               <div className="flex flex-wrap items-center gap-2">
                 {onConnect ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={connecting || removing}
+                    disabled={connecting || sharing || removing}
                     onClick={onConnect}
                     className="h-auto min-h-10 whitespace-normal text-left"
                   >
@@ -194,12 +198,25 @@ export function ClaudeBillingCardView({
                         : 'Link your Claude organization'}
                   </Button>
                 ) : null}
+                {onShare ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={connecting || sharing || removing}
+                    onClick={onShare}
+                    className="h-auto min-h-10 whitespace-normal text-left"
+                  >
+                    <ClaudeLogo />
+                    {sharing ? 'Using your personal Claude link…' : 'Use your personal Claude link'}
+                  </Button>
+                ) : null}
                 {connected ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    disabled={connecting || removing}
+                    disabled={connecting || sharing || removing}
                     onClick={onRemove}
                   >
                     {removing ? 'Removing…' : 'Remove from Kilo'}
@@ -248,6 +265,7 @@ function ClaudeBillingCardContent({
     router.replace(`${window.location.pathname}${query ? `?${query}` : ''}`, { scroll: false });
   }, [outcomeParam, router, searchParams]);
   const [connecting, setConnecting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const input = {
     organizationId,
     ...(scope === 'shared_services' ? { scope: 'shared_services' as const } : {}),
@@ -279,6 +297,7 @@ function ClaudeBillingCardContent({
       scope={scope}
       outcome={outcome}
       connecting={connecting}
+      sharing={sharing}
       removing={removeMutation.isPending}
       error={
         needsSignIn
@@ -307,6 +326,20 @@ function ClaudeBillingCardContent({
               setConnecting(true);
               const query = new URLSearchParams({
                 owner: scope === 'personal' ? 'personal' : (organizationId ?? 'personal'),
+                return: window.location.pathname,
+              });
+              if (scope === 'shared_services') query.set('scope', 'shared_services');
+              window.location.assign(`/claude/billing/connect?${query}`);
+            }
+          : undefined
+      }
+      onShare={
+        launched && statusQuery.data?.canSharePersonal
+          ? () => {
+              setSharing(true);
+              const query = new URLSearchParams({
+                owner: organizationId ?? 'personal',
+                source: 'personal',
                 return: window.location.pathname,
               });
               if (scope === 'shared_services') query.set('scope', 'shared_services');

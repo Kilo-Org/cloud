@@ -749,7 +749,7 @@ export function TriggerForm({
                   value={githubRepo}
                   onValueChange={repository => {
                     setGithubRepo(repository);
-                    setEnvironmentId(null);
+                    if (repository !== githubRepo) setEnvironmentId(null);
                     onRepositoryChange?.(repository);
                   }}
                   isLoading={isLoadingRepositories}

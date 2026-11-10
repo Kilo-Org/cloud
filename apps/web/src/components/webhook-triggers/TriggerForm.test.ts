@@ -12,8 +12,7 @@ import type * as EnvironmentHooks from '@/hooks/useCloudAgentEnvironments';
 import type { TriggerForm as TriggerFormComponent, TriggerFormProps } from './TriggerForm';
 
 const environmentsRefetch = jest.fn();
-const mockUseCloudAgentEnvironments =
-  jest.fn<ReturnType<typeof EnvironmentHooks.useCloudAgentEnvironments>>();
+const mockUseCloudAgentEnvironments = jest.fn<typeof EnvironmentHooks.useCloudAgentEnvironments>();
 
 jest.mock('@/hooks/useCloudAgentEnvironments', () => {
   const actual = jest.requireActual<typeof EnvironmentHooks>('@/hooks/useCloudAgentEnvironments');
@@ -169,16 +168,27 @@ jest.mock('@/components/cloud-agent/RepoProfileBindingsDialog', () => ({
 }));
 jest.mock('@/components/shared/RepositoryCombobox', () => ({
   RepositoryCombobox: ({
+    value,
     onValueChange,
     disabled,
   }: {
+    value: string;
     onValueChange: (value: string) => void;
     disabled?: boolean;
   }) =>
     createElement(
-      'button',
-      { type: 'button', disabled, onClick: () => onValueChange('kilo/other') },
-      'select-repository'
+      'div',
+      {},
+      createElement(
+        'button',
+        { type: 'button', disabled, onClick: () => onValueChange(value) },
+        'reselect-repository'
+      ),
+      createElement(
+        'button',
+        { type: 'button', disabled, onClick: () => onValueChange('kilo/other') },
+        'select-repository'
+      )
     ),
 }));
 jest.mock('@/components/shared/ModeCombobox', () => ({
@@ -1340,6 +1350,25 @@ describe('TriggerForm environments', () => {
     expect(mounted.onSubmit).toHaveBeenLastCalledWith(
       expect.objectContaining({ environmentId: null })
     );
+  });
+
+  it('preserves the selected environment when the current repository is reselected', async () => {
+    mockUseCloudAgentEnvironments.mockReturnValue(
+      environmentsResult({ data: [githubEnvironment()] })
+    );
+    const mounted = render({ mode: 'create' });
+
+    selectEnvironment(mounted.container, environmentId);
+    click(mounted.container, 'reselect-repository');
+    expect(
+      mounted.container
+        .querySelector('[data-select-id="environmentId"]')
+        ?.getAttribute('data-container-allocation')
+    ).toBe(environmentId);
+
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ environmentId }));
   });
 
   it('clears the selected environment when the repository changes', async () => {

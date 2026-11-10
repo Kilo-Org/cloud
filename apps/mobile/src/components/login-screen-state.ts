@@ -32,15 +32,26 @@ const FORM_GAP = 12;
 const PRIMARY_ACTION_MIN_HEIGHT = 44;
 
 /**
- * The space the login scroller keeps below a focused field, before it has
- * measured the form: the primary action under the field and the form gap on
- * each side of it, sized for the system text scale because the action's box
- * grows with its label. Once the form mounts, its own measured height replaces
- * this floor, so a refusal line that wraps in a long catalog, or any other
- * content below the field, is covered without a fixed guess.
+ * The space the login scroller keeps between a focused field and the keyboard:
+ * the block under the field (the refusal and the primary action, whose height
+ * the form reports because a refusal wraps) and one form gap on each side of
+ * it. Before the form has reported a height, the action's own box stands in,
+ * sized for the system text scale because the action grows with its label. Only
+ * content below the field counts, so a long provider block above it never lifts
+ * the field.
  */
-export function resolveKeyboardFieldActionOffset(fontScale: number): number {
-  return Math.ceil(PRIMARY_ACTION_MIN_HEIGHT * fontScale) + FORM_GAP * 2;
+export function resolveFieldActionReserve({
+  fontScale,
+  belowFieldHeight,
+}: {
+  fontScale: number;
+  belowFieldHeight: number;
+}): number {
+  const below = Math.max(
+    Math.ceil(PRIMARY_ACTION_MIN_HEIGHT * fontScale),
+    Math.ceil(belowFieldHeight)
+  );
+  return below + FORM_GAP * 2;
 }
 
 /**

@@ -25,7 +25,7 @@ import { LoginScreen } from './login-screen';
 import {
   errorMessage,
   resolveBottomChromePadding,
-  resolveKeyboardFieldActionOffset,
+  resolveFieldActionReserve,
 } from './login-screen-state';
 
 // ── Hoisted mocks for the mounted globe tests ──────────────────────────────
@@ -301,16 +301,21 @@ describe('login-screen bottom chrome padding', () => {
 });
 
 describe('login-screen keyboard field action reserve', () => {
-  it('floors the reserve at the action and the form gaps around it', () => {
-    // One action box and a form gap on each side; the form's measured height
-    // replaces this as soon as the form lays out.
-    expect(resolveKeyboardFieldActionOffset(1)).toBe(68);
+  it('floors the reserve at the action and the form gaps when nothing reported a height', () => {
+    // One action box and a form gap on each side.
+    expect(resolveFieldActionReserve({ fontScale: 1, belowFieldHeight: 0 })).toBe(68);
+  });
+
+  it('covers a measured block under the field, such as a wrapped refusal', () => {
+    // A two-line refusal above the action is taller than the action alone, and
+    // the reserve follows it instead of a fixed count of lines.
+    expect(resolveFieldActionReserve({ fontScale: 1, belowFieldHeight: 92 })).toBe(116);
   });
 
   it('grows with the system text scale', () => {
     // The action's label is text; the gaps are fixed lengths.
-    expect(resolveKeyboardFieldActionOffset(1.5)).toBe(90);
-    expect(resolveKeyboardFieldActionOffset(2)).toBe(112);
+    expect(resolveFieldActionReserve({ fontScale: 1.5, belowFieldHeight: 0 })).toBe(90);
+    expect(resolveFieldActionReserve({ fontScale: 2, belowFieldHeight: 0 })).toBe(112);
   });
 });
 
@@ -409,7 +414,9 @@ describe('login-screen language globe', () => {
     // renders below it, and can scroll that far because the keyboard spacer
     // participates in layout.
     const scroller = findByType(renderer.root, 'KeyboardAwareScrollView')[0];
-    expect(scroller?.props.bottomOffset).toBe(resolveKeyboardFieldActionOffset(1));
+    expect(scroller?.props.bottomOffset).toBe(
+      resolveFieldActionReserve({ fontScale: 1, belowFieldHeight: 0 })
+    );
     expect(scroller?.props.mode).toBe('layout');
 
     renderer.unmount();

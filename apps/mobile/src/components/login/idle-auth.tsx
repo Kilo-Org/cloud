@@ -42,6 +42,7 @@ export function IdleAuth({
   pendingLinkRefused = false,
   onPendingLink,
   onClearPendingLink,
+  onBelowFieldHeightChange,
 }: Readonly<{
   start: (mode: 'signin' | 'sso', ssoEmail?: string, pendingLinkToken?: string) => Promise<void>;
   initialEmail?: string;
@@ -57,6 +58,8 @@ export function IdleAuth({
   /** Without it a `DIFFERENT-OAUTH` refusal stays a toast, as before pending links existed. */
   onPendingLink?: (offer: PendingLinkOffer) => void;
   onClearPendingLink?: () => void;
+  /** Reports what the code step renders below its field, for the shell's keyboard reserve. */
+  onBelowFieldHeightChange?: (height: number) => void;
 }>) {
   const {
     busy,
@@ -275,6 +278,7 @@ export function IdleAuth({
           clearPendingLinkFailure();
           setView('main');
         }}
+        onBelowFieldHeightChange={onBelowFieldHeightChange}
       />
     );
   }

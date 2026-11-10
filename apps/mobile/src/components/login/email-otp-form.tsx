@@ -54,6 +54,7 @@ export function EmailOtpForm({
   onCodeChange,
   onResend,
   onBack,
+  onBelowFieldHeightChange,
 }: Readonly<{
   email: string;
   busy: BusyAction;
@@ -64,6 +65,12 @@ export function EmailOtpForm({
   onCodeChange?: () => void;
   onResend: () => void;
   onBack: () => void;
+  /**
+   * Reports the height of everything below the code field, so the login shell
+   * can keep that much of the form clear of the keyboard. A refusal can wrap,
+   * so the height is measured instead of assumed.
+   */
+  onBelowFieldHeightChange?: (height: number) => void;
 }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -111,27 +118,37 @@ export function EmailOtpForm({
         }}
         accessibilityLabel={formFieldA11y({ label: t('login.signInCodeField'), required: true })}
       />
-      {error ? (
-        <Text className="text-center text-sm text-destructive" accessibilityLiveRegion="polite">
-          {error}
-        </Text>
-      ) : null}
-      <Button
-        size="lg"
-        className="flex-row gap-2"
-        disabled={!hasCompleteCode || authBusy}
-        loading={busy === 'otp-verify'}
-        onPress={() => {
-          if (canSubmitEmailCode(codeRef.current, busy)) {
-            onVerify(codeRef.current);
-          }
+      {/* The refusal and the action it belongs to, as one block: a refusal
+          wraps in some catalogs, so the shell reads this block's measured height
+          instead of assuming the action sits one row below the field. */}
+      <View
+        className="gap-3"
+        onLayout={event => {
+          onBelowFieldHeightChange?.(event.nativeEvent.layout.height);
         }}
-        accessibilityLabel={t('login.verifyCode')}
       >
-        <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
-          {t('login.verifyCode')}
-        </Text>
-      </Button>
+        {error ? (
+          <Text className="text-center text-sm text-destructive" accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        ) : null}
+        <Button
+          size="lg"
+          className="flex-row gap-2"
+          disabled={!hasCompleteCode || authBusy}
+          loading={busy === 'otp-verify'}
+          onPress={() => {
+            if (canSubmitEmailCode(codeRef.current, busy)) {
+              onVerify(codeRef.current);
+            }
+          }}
+          accessibilityLabel={t('login.verifyCode')}
+        >
+          <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+            {t('login.verifyCode')}
+          </Text>
+        </Button>
+      </View>
       <Button
         variant="outline"
         className="flex-row gap-2"

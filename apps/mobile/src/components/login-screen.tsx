@@ -16,7 +16,7 @@ import { IdleAuth } from '@/components/login/idle-auth';
 import {
   errorMessage,
   resolveBottomChromePadding,
-  resolveKeyboardFieldActionOffset,
+  resolveFieldActionReserve,
 } from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
@@ -69,15 +69,13 @@ export function LoginScreen() {
   const insets = useScreenInsets();
   const { t } = useTranslation();
   const fontScale = useLiveFontScale();
-  // The space the keyboard reveal keeps below a focused field is the form's own
-  // measured height, so a refusal that wraps in a long catalog, or any other
-  // content below the field, is covered without a fixed guess. The action and
-  // gap floor covers the first frame, before the form has measured itself.
-  const [formHeight, setFormHeight] = useState(0);
-  const fieldActionReserve = Math.max(
-    resolveKeyboardFieldActionOffset(fontScale),
-    Math.ceil(formHeight)
-  );
+  // The space the keyboard reveal keeps below a focused field is the height of
+  // what the form renders under that field, reported by the form itself: a
+  // refusal that wraps in a long catalog is measured instead of assumed. The
+  // action-and-gaps floor covers the first frame, before anything reported a
+  // height, and the provider rows above the field never count.
+  const [belowFieldHeight, setBelowFieldHeight] = useState(0);
+  const fieldActionReserve = resolveFieldActionReserve({ fontScale, belowFieldHeight });
   const [persistFailed, setPersistFailed] = useState(false);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
@@ -318,14 +316,8 @@ export function LoginScreen() {
         {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2
             iOS logout→login remounts washed out at ~50% alpha for 3+ minutes,
             recovering only on relaunch — so these branches render without
-            animation; status swaps are instant. The block reports its height so
-            the keyboard reserve covers whatever it renders below the field. */}
-        <View
-          className="w-full max-w-sm gap-3"
-          onLayout={event => {
-            setFormHeight(event.nativeEvent.layout.height);
-          }}
-        >
+            animation; status swaps are instant. */}
+        <View className="w-full max-w-sm gap-3">
           {/* A terminal device-auth error keeps the idle form on screen so the
               user can retry. The banner is a sibling above one IdleAuth at one
               JSX slot, so clearing the error when a new attempt starts does not
@@ -350,6 +342,7 @@ export function LoginScreen() {
               initialEmail={draft?.email ?? ''}
               initialSsoRecovery={draft?.ssoRecovery ?? null}
               onBusyChange={setAuthFormBusy}
+              onBelowFieldHeightChange={setBelowFieldHeight}
               onSignInStart={clearError}
               pendingLink={pendingLink}
               pendingLinkRefused={

@@ -195,6 +195,9 @@ describe('workspaceFolders persistence and validation', () => {
       id: expect.any(String),
       name: 'Release work',
       color: 'purple',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
       worktreeIds: [],
     });
     expect(await callerFor().list({ organizationId: null })).toEqual({
@@ -207,6 +210,116 @@ describe('workspaceFolders persistence and validation', () => {
     const folder = await callerFor().create({ organizationId: null, name: 'Palette', color });
     expect(folder.color).toBe(color);
     expect((await callerFor().list({ organizationId: null })).folders).toEqual([folder]);
+  });
+
+  it('creates one smart folder per preset and rejects manual preset conflicts', async () => {
+    const smart = await callerFor().create({
+      organizationId: null,
+      name: 'Needs you',
+      color: 'orange',
+      kind: 'smart',
+      smartPreset: 'needs_you',
+      sortMode: 'activity',
+    });
+
+    expect(smart).toEqual({
+      id: expect.any(String),
+      name: 'Needs you',
+      color: 'orange',
+      kind: 'smart',
+      smartPreset: 'needs_you',
+      sortMode: 'activity',
+      worktreeIds: [],
+    });
+    expect((await callerFor().list({ organizationId: null })).folders).toEqual([smart]);
+
+    await expect(
+      callerFor().create({
+        organizationId: null,
+        name: 'Another needs you',
+        color: 'red',
+        kind: 'smart',
+        smartPreset: 'needs_you',
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    await expect(
+      callerFor().create({
+        organizationId: null,
+        name: 'Missing preset',
+        color: 'default',
+        kind: 'smart',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(
+      callerFor().create({
+        organizationId: null,
+        name: 'Manual with preset',
+        color: 'default',
+        kind: 'manual',
+        smartPreset: 'done',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('updates sort mode and treats smart folders as read-only destinations', async () => {
+    const manual = await createFolder(null, 'Manual');
+    const smart = await callerFor().create({
+      organizationId: null,
+      name: 'Done',
+      color: 'green',
+      kind: 'smart',
+      smartPreset: 'done',
+      sortMode: 'created',
+    });
+
+    await callerFor().update({
+      organizationId: null,
+      folderId: manual.id,
+      sortMode: 'activity',
+    });
+    expect((await callerFor().list({ organizationId: null })).folders).toEqual([
+      { ...manual, sortMode: 'activity' },
+      smart,
+    ]);
+
+    await expect(
+      callerFor().moveWorktree({
+        organizationId: null,
+        worktreeId: WORKTREE_ID,
+        folderId: smart.id,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(await readWorktree()).toBeUndefined();
+  });
+
+  it('writes a fractional sidebar position only when supplied and clears it on null', async () => {
+    await insertWorktree();
+    const folder = await createFolder(null, 'Manual');
+    const caller = callerFor();
+
+    await caller.moveWorktree({
+      organizationId: null,
+      worktreeId: WORKTREE_ID,
+      folderId: folder.id,
+      position: 'a0',
+    });
+    expect((await readWorktree())?.sidebar_position).toBe('a0');
+
+    await caller.moveWorktree({
+      organizationId: null,
+      worktreeId: WORKTREE_ID,
+      folderId: folder.id,
+    });
+    expect((await readWorktree())?.sidebar_position).toBe('a0');
+
+    await caller.moveWorktree({
+      organizationId: null,
+      worktreeId: WORKTREE_ID,
+      folderId: null,
+      position: null,
+    });
+    expect((await readWorktree())?.sidebar_position).toBeNull();
   });
 
   it('updates only supplied fields and preserves order and worktree membership', async () => {

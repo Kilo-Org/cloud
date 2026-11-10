@@ -5,23 +5,47 @@ import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { db, type DrizzleTransaction, type readDb } from '@kilocode/web-shared/lib/drizzle';
 
 /**
- * Who a Claude billing connection belongs to: a personal account or a whole
- * organization. An organization's requests use only the organization's
- * connection, and a personal request uses only the person's.
+ * Who a Claude billing connection belongs to: the person's personal account,
+ * the person's own requests in one organization, or the organization's shared
+ * services. A request uses only the connection of the owner it runs for.
  */
 export type ClaudeBillingOwner =
   | { kind: 'personal'; kiloUserId: string }
-  | { kind: 'organization'; organizationId: string };
+  | { kind: 'member'; kiloUserId: string; organizationId: string }
+  | { kind: 'shared_services'; organizationId: string };
 
 type Database = typeof db | typeof readDb | DrizzleTransaction;
 
-function ownerCondition(owner: ClaudeBillingOwner) {
-  return owner.kind === 'organization'
-    ? eq(claude_billing_connections.organization_id, owner.organizationId)
-    : and(
+export function claudeBillingOwnerWhere(owner: ClaudeBillingOwner) {
+  switch (owner.kind) {
+    case 'personal':
+      return and(
         eq(claude_billing_connections.kilo_user_id, owner.kiloUserId),
         isNull(claude_billing_connections.organization_id)
       );
+    case 'member':
+      return and(
+        eq(claude_billing_connections.kilo_user_id, owner.kiloUserId),
+        eq(claude_billing_connections.organization_id, owner.organizationId)
+      );
+    case 'shared_services':
+      return and(
+        eq(claude_billing_connections.organization_id, owner.organizationId),
+        isNull(claude_billing_connections.kilo_user_id)
+      );
+  }
+}
+
+/** Stable identity for per-owner locks. */
+export function claudeBillingOwnerKey(owner: ClaudeBillingOwner): string {
+  switch (owner.kind) {
+    case 'personal':
+      return `user:${owner.kiloUserId}`;
+    case 'member':
+      return `member:${owner.organizationId}:${owner.kiloUserId}`;
+    case 'shared_services':
+      return `org:${owner.organizationId}`;
+  }
 }
 
 export async function getClaudeBillingConnection(
@@ -31,7 +55,7 @@ export async function getClaudeBillingConnection(
   const [row] = await fromDb
     .select()
     .from(claude_billing_connections)
-    .where(ownerCondition(owner))
+    .where(claudeBillingOwnerWhere(owner))
     .limit(1);
   return row ?? null;
 }
@@ -46,9 +70,8 @@ export async function insertClaudeBillingProfile(
   await onDb
     .insert(claude_billing_connections)
     .values({
-      ...(owner.kind === 'organization'
-        ? { organization_id: owner.organizationId }
-        : { kilo_user_id: owner.kiloUserId }),
+      kilo_user_id: owner.kind === 'shared_services' ? null : owner.kiloUserId,
+      organization_id: owner.kind === 'personal' ? null : owner.organizationId,
       user_profile_id: userProfileId,
       created_by: createdBy,
     })

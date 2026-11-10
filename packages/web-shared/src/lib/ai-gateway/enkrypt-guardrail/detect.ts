@@ -25,7 +25,7 @@ export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
  * upstream request, so this is the most latency an enabled organization's request can gain. It also
  * bounds the deferred work of a log-only scan, which the request does not wait for.
  */
-export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 30_000;
+export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 5_000;
 
 const MAX_ATTEMPTS = 2;
 const MAX_ERROR_BODY_BYTES = 64 * 1024;
@@ -34,9 +34,8 @@ const ERROR_BODY_TIMEOUT_MS = 1_000;
 /**
  * A larger request is not sent to Enkrypt. It is never truncated: the model would still read the
  * unscanned remainder, which is where an injected instruction in a large file read would sit.
- * The limit is about 1M tokens of code, which tokenizes at roughly 3 characters per token.
  */
-export const ENKRYPT_MAX_SCAN_CHARACTERS = 3_000_000;
+export const ENKRYPT_MAX_SCAN_CHARACTERS = 250_000;
 
 const MAX_BLOCK_MESSAGE_LENGTH = 500;
 

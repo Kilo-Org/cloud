@@ -2731,7 +2731,7 @@ describe('User', () => {
       ).toHaveLength(0);
     });
 
-    it("removes the deleted user's personal Claude billing connection and keeps the organization's", async () => {
+    it("removes the deleted user's own Claude billing connections and keeps the organization's shared one", async () => {
       const user = await insertTestUser({
         google_user_email: `claude-billing-cleanup-${randomUUID()}@example.com`,
       });
@@ -2743,6 +2743,13 @@ describe('User', () => {
       await db.insert(claude_billing_connections).values([
         { kilo_user_id: user.id, user_profile_id: `uprof_${randomUUID()}`, created_by: user.id },
         {
+          kilo_user_id: user.id,
+          organization_id: organization.id,
+          user_profile_id: `uprof_${randomUUID()}`,
+          created_by: user.id,
+        },
+        {
+          kilo_user_id: null,
           organization_id: organization.id,
           user_profile_id: `uprof_${randomUUID()}`,
           created_by: user.id,
@@ -2757,12 +2764,12 @@ describe('User', () => {
           .from(claude_billing_connections)
           .where(eq(claude_billing_connections.kilo_user_id, user.id))
       ).toHaveLength(0);
-      expect(
-        await db
-          .select()
-          .from(claude_billing_connections)
-          .where(eq(claude_billing_connections.organization_id, organization.id))
-      ).toHaveLength(1);
+      const organizationRows = await db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.organization_id, organization.id));
+      expect(organizationRows).toHaveLength(1);
+      expect(organizationRows[0]?.kilo_user_id).toBeNull();
     });
 
     it("keeps the organization's shared-services row when the connector is deleted", async () => {

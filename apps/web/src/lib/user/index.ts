@@ -8,7 +8,7 @@ import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { clearOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
-import { deletePersonalClaudeProfile } from '@/lib/claude-billing/delete';
+import { deleteUserClaudeProfiles } from '@/lib/claude-billing/delete';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import { lockGitHubIdentityWrites } from '@kilocode/db/github-identity';
@@ -1243,7 +1243,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   the person's own openai_chatgpt_connections rows, their personal
- *   claude_billing_connections row, agent_configs, webhook_events,
+ *   claude_billing_connections rows, agent_configs, webhook_events,
  *   code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles, cloud_agent_environments,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
@@ -1737,7 +1737,8 @@ export async function anonymizeCloudUserData(
       )
     );
   // Organization rows belong to the organization; `created_by` is an audit
-  // reference like the shared-services ChatGPT row's.
+  // reference like the shared-services ChatGPT row's. This removes the person's
+  // personal connection and their own connections in each organization.
   await tx
     .delete(claude_billing_connections)
     .where(eq(claude_billing_connections.kilo_user_id, userId));
@@ -2230,7 +2231,7 @@ export async function softDeleteUser(userId: string) {
   if (!user) return;
 
   await assertUserCanBeSoftDeleted(userId);
-  await deletePersonalClaudeProfile(userId);
+  await deleteUserClaudeProfiles(userId);
 
   let cursor: UsagePromptPrefixCursor | null = null;
   while (true) {

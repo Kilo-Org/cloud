@@ -41,8 +41,8 @@ jobs:
       session_sync: ${{ steps.filter_session_sync.outputs.session_sync || steps.filter_session_sync_retry.outputs.session_sync }}
       # Every input the ci-wiring job reads, also its own pair.
       wiring: ${{ steps.filter_wiring.outputs.wiring || steps.filter_wiring_retry.outputs.wiring }}
-      # The resource manifests the detector parses with a dependency
-      # (DEPENDENCY_MANIFESTS in scripts/affected-workspaces.mjs). Gates the
+      # The dependency inputs the detector parses with a dependency
+      # (DEPENDENCY_INPUTS in scripts/affected-workspaces.mjs). Gates the
       # root install below; its own pair.
       resources: ${{ steps.filter_resources.outputs.resources || steps.filter_resources_retry.outputs.resources }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
@@ -70,7 +70,7 @@ jobs:
       # files) fails the step and, with it, every check that needs this job.
       # The first attempt is allowed to fail so the retry below absorbs
       # transient resets; a persistent failure still fails the job.
-      - name: Detect resource-manifest changes
+      - name: Detect dependency-input changes
         id: filter_resources
         continue-on-error: true
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
@@ -79,7 +79,8 @@ jobs:
             resources:
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
-      - name: Detect resource-manifest changes (retry)
+              - 'patches/**'
+      - name: Detect dependency-input changes (retry)
         id: filter_resources_retry
         if: steps.filter_resources.outcome == 'failure'
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
@@ -88,38 +89,40 @@ jobs:
             resources:
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
+              - 'patches/**'
 
       # dorny/paths-filter answers from the pull request's own diff (its
       # merge-base), while scripts/affected-workspaces.mjs diffs the base tip.
-      # On a branch that is behind main the two disagree about a manifest main
-      # changed after the branch point: only the detector's diff names it, and
-      # its run then calls scripts/changed-dependencies.mjs, which imports
-      # js-yaml. This check diffs the detector's own base for that run. The
-      # manifest list comes from the detector, so the set stays in one place.
-      - name: Detect resource-manifest changes against the detector base
+      # On a branch that is behind main the two disagree about a dependency
+      # input main changed after the branch point: only the detector's diff
+      # names it, and its run then calls scripts/changed-dependencies.mjs, which
+      # imports js-yaml. This check diffs the detector's own base for that run.
+      # The input set comes from the detector, so it stays in one place.
+      - name: Detect dependency-input changes against the detector base
         id: resources_base
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
         run: |
-          manifests=$(node -e 'import("./scripts/affected-workspaces.mjs").then(module => console.log([...module.DEPENDENCY_MANIFESTS].join("\n")))' 2>/dev/null || true)
-          if [ -z "$manifests" ]; then
-            # An unreadable detector list cannot prove the diff is clean, so
-            # keep the install rather than risk a run without js-yaml.
-            echo "manifests=true" >> "$GITHUB_OUTPUT"
+          # A base that is not a commit in the checkout selects every
+          # workspace, and that selection parses no dependency.
+          if [ -z "$BASE_SHA" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "manifests=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          manifests_changed=false
-          # A base that is not a commit in the checkout selects every
-          # workspace, and that selection parses no manifest.
-          if [ -n "$BASE_SHA" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            while IFS= read -r file; do
-              if grep -qxF "$file" <<< "$manifests"; then
-                manifests_changed=true
-                break
-              fi
-            done < <(git diff --name-only "$BASE_SHA" HEAD)
+          # The input set is asked of the detector, never listed here.
+          answer=$(git diff --name-only "$BASE_SHA" HEAD | node -e '
+            const read = require("node:fs").readFileSync;
+            import("./scripts/affected-workspaces.mjs").then(module => {
+              const files = read(0, "utf8").split("\n").filter(Boolean);
+              console.log(files.some(module.isDependencyInput));
+            });
+          ' 2>/dev/null || true)
+          if [ "$answer" != true ] && [ "$answer" != false ]; then
+            # An unreadable detector cannot prove the diff is clean, so keep the
+            # install rather than risk a run without js-yaml.
+            answer=true
           fi
-          echo "manifests=$manifests_changed" >> "$GITHUB_OUTPUT"
+          echo "manifests=$answer" >> "$GITHUB_OUTPUT"
 
       # scripts/changed-dependencies.mjs parses a resource manifest with
       # js-yaml when the diff touches one, so the root install runs only on
@@ -938,7 +941,7 @@ jobs:
 
   test-scripts:
     needs: changes
-    if: needs.changes.outputs.kilocode_backend == 'true'
+    if: needs.changes.outputs.kilocode_backend == 'true' || contains(fromJSON(needs.changes.outputs.affected).packages, 'container-usage-meter')
     # The Postgres regressions ran on the large runner in the job this one
     # replaces. The builder cleanup test drives two claims against the same
     # rows, so keep the runner it was written for.
@@ -1117,9 +1120,12 @@ jobs:
           # one dependency graph. The lockfile digest keeps its own segment, so
           # the prefix restore-key below still matches this key when only a
           # source file changed, which also reaches the sha-keyed entries left
-          # by earlier runs. The source globs stay inside the app tree, so none
-          # of them walks node_modules.
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**/*', 'apps/web/*.mjs', 'apps/web/*.ts', 'apps/web/*.tsx', 'apps/web/*.json', 'apps/web/.env', 'apps/web/.env.test') }}
+          # by earlier runs. The app compiles its workspace dependencies from
+          # the TypeScript sources their exports point at, so every package
+          # source tree and manifest is a build input too. None of the globs
+          # walks node_modules: pnpm puts it beside src, and each package
+          # manifest is one file.
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**/*', 'apps/web/*.mjs', 'apps/web/*.ts', 'apps/web/*.tsx', 'apps/web/*.json', 'apps/web/.env', 'apps/web/.env.test', 'packages/*/src/**/*', 'packages/*/package.json') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
 
@@ -1172,8 +1178,10 @@ jobs:
           # Same input-keyed scheme as the web build cache: the lockfile digest
           # is its own segment so the prefix restore-key below still matches.
           # The job copies apps/web/.env and apps/web/.env.test into the app
-          # before building, so those files are build inputs here too.
-          key: ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/ai-gateway/src/**/*', 'apps/ai-gateway/*.mjs', 'apps/ai-gateway/*.json', 'apps/web/.env', 'apps/web/.env.test') }}
+          # before building, so those files are build inputs here too. Like the
+          # web build, this one compiles the workspace packages from their own
+          # sources, so each package tree and manifest is an input as well.
+          key: ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/ai-gateway/src/**/*', 'apps/ai-gateway/*.mjs', 'apps/ai-gateway/*.json', 'apps/web/.env', 'apps/web/.env.test', 'packages/*/src/**/*', 'packages/*/package.json') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-
 
@@ -1463,8 +1471,14 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the session-sync closure, the database closure the root `drizzle`
+      # script executes in packages/db, and the root project are installed:
+      # every step below runs `pnpm drizzle` or `pnpm --filter
+      # cloudflare-session-sync`, and its suite imports @kilocode/db and
+      # @kilocode/worker-utils, both declared. Widen the filter when a step
+      # here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'cloudflare-session-sync...' --filter '@kilocode/db...' --filter kilocode-monorepo
 
       # The exchange suite reads the real account tables. Avoid the Jest worker
       # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.

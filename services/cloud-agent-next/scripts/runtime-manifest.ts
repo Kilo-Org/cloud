@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { shellQuote } from '../src/kilo/utils.js';
 import {
   CONTROL_PLANE_SUPERVISOR,
+  GH_STACK_INSTALL_PATH,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
   RUNTIME_REQUIRED_BINARIES,
@@ -174,6 +175,7 @@ export function runtimeManifestArtifacts(
 export function runtimeVerificationScript(artifacts: readonly RuntimeArtifact[]): string {
   const pins = [
     toolchainVerificationScript(['bun', 'pnpm', 'gh', 'glab', 'rg', 'kilo']),
+    `test "$(sha256sum ${shellQuote(GH_STACK_INSTALL_PATH)} | cut -d' ' -f1)" = ${shellQuote(RUNTIME_DISTRIBUTION.ghStackSha256)}`,
     `case "$(node --version)" in v${RUNTIME_DISTRIBUTION.nodeMajor}.*) ;; *) echo "unexpected node" >&2; exit 1 ;; esac`,
   ];
   const presence = RUNTIME_REQUIRED_BINARIES.map(binary => `command -v ${binary} >/dev/null`);

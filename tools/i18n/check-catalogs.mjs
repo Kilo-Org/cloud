@@ -15,10 +15,11 @@
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
-const ROOT = new URL('../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const LANGUAGES_FILE = join(ROOT, 'apps/mobile/src/i18n/languages.ts');
 const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src')];
 const CATALOGS = [

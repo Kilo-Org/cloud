@@ -9,7 +9,7 @@ import {
   type CloudAgentNextHealthFilters,
   type CloudAgentFailureResponsibilityFilter,
 } from '@/app/admin/api/cloud-agent-next/hooks';
-import { CopyButton } from '@/components/admin/CopyButton';
+import { CopyButton } from '@/components/shared/CopyButton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';

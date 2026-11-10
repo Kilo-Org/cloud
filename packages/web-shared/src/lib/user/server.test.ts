@@ -32,13 +32,6 @@ jest.mock('next/navigation', () => ({
   redirect: (url: string) => mockRedirect(url),
 }));
 
-const mockGetBlacklistedDomains = jest.fn<Promise<string[]>, []>();
-
-jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
-  ...jest.requireActual('@kilocode/web-shared/lib/blacklist-domains-config'),
-  getBlacklistedDomains: () => mockGetBlacklistedDomains(),
-}));
-
 import { afterEach, beforeEach, describe, test, expect } from '@jest/globals';
 import { isEmailBlacklistedByDomain } from '@kilocode/worker-utils/account-access';
 import {
@@ -57,7 +50,13 @@ import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { device_sessions, kilocode_users, organizations } from '@kilocode/db/schema';
+import {
+  blacklisted_domains,
+  device_sessions,
+  kilocode_users,
+  organizations,
+} from '@kilocode/db/schema';
+import { clearEmailBlacklistCache } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -86,7 +85,7 @@ beforeEach(() => {
   mockHeaders.mockReset();
   mockGetServerSession.mockReset();
   mockRedirect.mockClear();
-  mockGetBlacklistedDomains.mockReset().mockResolvedValue([]);
+  clearEmailBlacklistCache();
   resetDeviceSessionCacheForTest();
 });
 
@@ -680,24 +679,50 @@ describe('getUserFromAuth', () => {
   });
 
   test('returns the authorization response for a refused email domain', async () => {
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
     const user = await insertTestUser({
-      google_user_email: `blacklisted-domain-${crypto.randomUUID()}@blocked.example`,
+      google_user_email: `blacklisted-domain@mail.${blockedDomain}`,
       api_token_pepper: 'blacklisted-domain-pepper',
     });
-    mockGetBlacklistedDomains.mockResolvedValue(['blocked.example']);
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
       new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
     );
 
-    const result = await getUserFromAuth({ adminOnly: false });
+    try {
+      const result = await getUserFromAuth({ adminOnly: false });
 
-    expect(result.user).toBeNull();
-    expect(result.authFailedResponse?.status).toBe(403);
-    await expect(result.authFailedResponse?.json()).resolves.toEqual({
-      success: false,
-      error: 'Access denied (R0)',
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      await expect(result.authFailedResponse?.json()).resolves.toEqual({
+        success: false,
+        error: 'Access denied (R0)',
+      });
+      expect(result.authorizationRefused).toBe(true);
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
+  });
+
+  test('authorizes a user whose email domain only shares a raw suffix with a refused domain', async () => {
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
+    const user = await insertTestUser({
+      google_user_email: `allowed@not${blockedDomain}`,
+      api_token_pepper: 'allowed-domain-pepper',
     });
-    expect(result.authorizationRefused).toBe(true);
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    try {
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.authFailedResponse).toBeNull();
+      expect(result.user?.id).toBe(user.id);
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
   });
 
   test('rejects a token whose organization context was soft-deleted', async () => {

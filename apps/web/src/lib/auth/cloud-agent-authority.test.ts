@@ -68,7 +68,7 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
   ORGANIZATION_ID_HEADER: 'X-KiloCode-OrganizationId',
 }));
 jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
-  getBlacklistedDomains: async () => [],
+  isEmailBlacklisted: async () => false,
 }));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: jest.fn(),
@@ -130,6 +130,7 @@ const launch = {
   mode: 'code',
   prompt: 'Launch the child',
   autoInitiate: true,
+  operationKey: '33333333-3333-4333-8333-333333333333',
 };
 function scopedClaims(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {

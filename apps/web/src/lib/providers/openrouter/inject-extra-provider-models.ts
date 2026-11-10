@@ -11,7 +11,8 @@ import type {
   OpenRouterModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { Endpoint, StoredModel } from '@kilocode/db/schema-types';
+import type { Endpoint } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 
 type ProviderModelData = Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
@@ -51,7 +52,7 @@ function toVercelEndpointModel(
 }
 
 export function injectExtraProviderModels(
-  vercelModels: Record<string, StoredModel>,
+  vercelModels: Record<string, GatewayModelWithEndpoints>,
   providerModelData: ProviderModelData,
   vercelModelIdOverrides: VercelModelIdOverrides
 ) {
@@ -135,7 +136,7 @@ function createVercelOnlyProvider(providerId: string): OpenRouterProvider {
  * treated as training on and retaining prompts.
  */
 export function injectVercelOnlyProviders(
-  vercelModels: Record<string, StoredModel>,
+  vercelModels: Record<string, GatewayModelWithEndpoints>,
   providerModelData: ProviderModelData,
   vercelModelIdOverrides: VercelModelIdOverrides
 ) {

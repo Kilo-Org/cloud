@@ -121,14 +121,27 @@ const scopedPrepareSessionSchema = z
       .regex(/^[a-zA-Z]+$/)
       .optional(),
     upstreamBranch: z.string().min(1).max(500).optional(),
+    stackOnWorktreeId: cloudAgentWorktreeIdSchema
+      .describe(
+        "Stack on a direct child's pushed worktree in the same repository. Use the worktreeId from spawn_session or list_child_sessions. Omit upstreamBranch."
+      )
+      .optional(),
     autoCommit: z.boolean().optional(),
     autoInitiate: z.literal(true),
-    operationKey: z.uuid().optional(),
+    operationKey: z
+      .uuid()
+      .optional()
+      .describe('Use a fresh UUID for each child workspace. Reuse it only for the same launch.'),
     callbackTarget: ParentCallbackTargetSchema.optional(),
     requestedEnvironment: requestedEnvironmentSchema.optional(),
-    organizationId: z.string().min(1).optional(),
   })
-  .strict();
+  .strict()
+  // Callers add organizationId with extend(). Zod refuses to overwrite a key on a
+  // refined object, so the base shape must not declare it.
+  .refine(input => input.stackOnWorktreeId === undefined || input.upstreamBranch === undefined, {
+    message: 'A stacked workspace cannot use an upstream branch',
+    path: ['upstreamBranch'],
+  });
 
 const childSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 const childMessageIdSchema = z.string().regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);

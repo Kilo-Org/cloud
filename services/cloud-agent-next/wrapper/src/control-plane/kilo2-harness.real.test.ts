@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { z } from 'zod';
 import { createMessageId } from '../../../src/shared/message-id.js';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import { createKiloRuntime } from './kilo-runtime.js';
@@ -213,6 +214,16 @@ suite('real Kilo v2 harness', () => {
       const callbackContext = '<cloud-agent-context session-id="workspace_callback-marker" />';
       const startupFailureNote =
         'Some startup commands failed during session preparation. The session started anyway.';
+      const latestContextUpdate = () =>
+        z
+          .object({ messages: z.array(z.object({ content: z.string().nullish() })) })
+          .parse(JSON.parse(requests.at(-1) ?? '{}'))
+          .messages.filter(
+            message =>
+              message.content?.startsWith('<system-update>') &&
+              message.content.includes('cloud-agent-context')
+          )
+          .at(-1)?.content;
       async function prompt(text: string, context?: string) {
         const start = events.length;
         await harness.submit({
@@ -261,7 +272,10 @@ suite('real Kilo v2 harness', () => {
       await prompt('recall the earlier marker', callbackContext);
       expect(requests.at(-1)).toContain('amber-history-marker');
       expect(requests.at(-1)).toContain('workspace_callback-marker');
-      expect(requests.at(-1)).not.toContain(startupFailureNote);
+      // V2 preserves the original prompt prefix and supersedes changed context in-band.
+      expect(latestContextUpdate()).toContain('supersedes the previous value');
+      expect(latestContextUpdate()).toContain('workspace_callback-marker');
+      expect(latestContextUpdate()).not.toContain(startupFailureNote);
       const history = await nativeMessages();
       expect(history.filter(message => message.type === 'user')).toHaveLength(2);
       expect(
@@ -317,7 +331,8 @@ suite('real Kilo v2 harness', () => {
         })
       ).toBe(true);
       await toolTurn;
-      expect(requests.at(-1)).not.toContain('workspace_callback-marker');
+      expect(latestContextUpdate()).toBeDefined();
+      expect(latestContextUpdate()).not.toContain('workspace_callback-marker');
       expect(
         (await nativeMessages()).some(message =>
           (message.content ?? []).some(

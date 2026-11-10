@@ -22,6 +22,7 @@ import {
 } from './session-cost-breakdown';
 import type { SessionModelUsage, SessionTokenUsage } from './session-token-usage';
 import { formatModelRefName, formatShortModelName } from '@/lib/format-model-name';
+import { SessionComputeRate } from './SessionComputeRate';
 
 type SessionInfoDialogProps = {
   open: boolean;
@@ -95,6 +96,7 @@ export function SessionInfoDialog({
             <DialogDescription>Recorded model cost in USD and token usage.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {open && <SessionComputeRate />}
             {showTotalCost && (
               <dl className="bg-muted/30 grid gap-2 rounded-lg border p-4">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">

@@ -396,7 +396,9 @@ describe('environment snapshot launch', () => {
     expect(
       provider.launchOptions.every(options => options?.snapshot?.snapshotId === 'snap-env')
     ).toBe(true);
-    expect(environmentSnapshotDetails(peer).at(-1)).toContain('Rebuild the environment');
+    expect(environmentSnapshotDetails(peer).at(-1)).toBe(
+      'Environment snapshot is unavailable. Rebuild the environment.'
+    );
     expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed');
   });
 
@@ -472,8 +474,7 @@ describe('environment snapshot launch', () => {
         state: 'preparing',
         attemptId: expect.any(String),
         step: 'environment_snapshot',
-        detail:
-          'Using environment snapshot; environment settings have changed; cached files may retain earlier values; a replacement build was started',
+        detail: 'Using environment snapshot',
         snapshotCapturedAt: 1,
       })
     );
@@ -528,7 +529,7 @@ describe('environment snapshot launch', () => {
 
     expect(provider.launchEnvs).toHaveLength(0);
     expect(environmentSnapshotDetails(peer)).toContain(
-      'The environment is building. Build 77777777-7777-4777-8777-777777777777.'
+      'Environment is building. Retry when it finishes.'
     );
   });
 
@@ -540,6 +541,9 @@ describe('environment snapshot launch', () => {
     await stub.prepare(prepareInput(BUILD));
     await waitForFailed(peer);
     expect(provider.launchEnvs).toHaveLength(0);
+    expect(environmentSnapshotDetails(peer)).toContain(
+      'Environment snapshot is temporarily unavailable. Try again.'
+    );
   });
 
   it.each([
@@ -547,13 +551,13 @@ describe('environment snapshot launch', () => {
       name: 'retired shared sandbox path',
       directory: '/workspace/org/user/sessions/s1',
       snapshots: true,
-      detail: 'This session uses a retired sandbox type',
+      detail: 'This session cannot use the environment snapshot. Start a new session.',
     },
     {
       name: 'provider without snapshots',
       directory: ISOLATED_DIRECTORY,
       snapshots: false,
-      detail: 'This sandbox provider does not support environment snapshots yet',
+      detail: 'Environment snapshots are not supported for this session.',
     },
   ])(
     'fails at once without an image start or a build link when no environment snapshot can serve it: $name',
@@ -573,7 +577,7 @@ describe('environment snapshot launch', () => {
             ? [update.detail]
             : []
         );
-      expect(sandboxDetails.some(detail => detail.startsWith(scenario.detail))).toBe(true);
+      expect(sandboxDetails).toContain(scenario.detail);
     }
   );
 

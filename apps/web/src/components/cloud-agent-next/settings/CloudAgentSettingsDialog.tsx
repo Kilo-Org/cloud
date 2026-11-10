@@ -1,7 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { Boxes, Cpu, FolderCog, Lock, SlidersHorizontal } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import {
+  Boxes,
+  Building2,
+  Cpu,
+  FolderCog,
+  LayoutList,
+  Lock,
+  Palette,
+  SlidersHorizontal,
+  User,
+  type LucideIcon,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,14 +27,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProfilesManager } from '@/components/cloud-agent/profile-editor/ProfilesManager';
 import { useCloudAgentSettings } from '@/hooks/useCloudAgentSettings';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 import { BuiltinAgentsSection } from './BuiltinAgentsSection';
 import { DefaultSandboxSection } from './DefaultSandboxSection';
 import { EnvironmentsSection } from './EnvironmentsSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
+import { SidebarSettingsSection } from './SidebarSettingsSection';
 import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
 
-export type SettingsSection = 'general' | 'profiles' | 'environments' | 'compute';
+export type SettingsSection =
+  | 'general'
+  | 'profiles'
+  | 'environments'
+  | 'compute'
+  | 'sidebar'
+  | 'preferences';
 
 type CloudAgentSettingsDialogProps = {
   organizationId?: string;
@@ -93,7 +112,11 @@ function CloudAgentSettings({
             {organizationId ? 'Organization workspace' : 'Personal workspace'}
           </Badge>
         </div>
-        {organizationId && settings && !settings.canManage ? (
+        {organizationId &&
+        settings &&
+        !settings.canManage &&
+        activeSection !== 'sidebar' &&
+        activeSection !== 'preferences' ? (
           <DialogDescription className="mt-1 flex items-center gap-1.5">
             <Lock className="size-3.5 shrink-0" aria-hidden />
             Organization settings are view only. Your personal preferences remain editable.
@@ -112,6 +135,8 @@ function CloudAgentSettings({
             value === 'general' ||
             value === 'profiles' ||
             value === 'environments' ||
+            value === 'sidebar' ||
+            value === 'preferences' ||
             (value === 'compute' && settings?.canManage)
           ) {
             if (value === 'environments') setEnvironmentsVisited(true);
@@ -125,6 +150,9 @@ function CloudAgentSettings({
           aria-label="Settings sections"
           className="h-auto min-w-0 shrink-0 justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-3 md:w-44 md:flex-col md:justify-start md:overflow-visible md:border-r md:border-b-0"
         >
+          <NavGroupLabel icon={organizationId ? Building2 : FolderCog}>
+            {organizationId ? 'Organization' : 'Workspace'}
+          </NavGroupLabel>
           <TabsTrigger
             value="general"
             className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
@@ -155,62 +183,74 @@ function CloudAgentSettings({
               Compute
             </TabsTrigger>
           )}
+          <div aria-hidden className="bg-border mx-1 w-px shrink-0 self-stretch md:hidden" />
+          <NavGroupLabel icon={User} className="md:mt-3">
+            You
+          </NavGroupLabel>
+          <TabsTrigger
+            value="preferences"
+            className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
+          >
+            <Palette className="size-4 shrink-0" aria-hidden />
+            Preferences
+          </TabsTrigger>
+          <TabsTrigger
+            value="sidebar"
+            className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
+          >
+            <LayoutList className="size-4 shrink-0" aria-hidden />
+            Sidebar
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent
           value="general"
           className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
         >
-          <div className="flex flex-col gap-8">
+          {settings ? (
+            <section aria-labelledby="session-defaults-heading" className="flex flex-col gap-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 id="session-defaults-heading" className="text-base font-medium">
+                  {organizationId ? 'Organization settings' : 'Session defaults'}
+                </h3>
+                <Badge variant="secondary">{organizationId ? 'All members' : 'New sessions'}</Badge>
+              </div>
+              <DefaultSandboxSection organizationId={organizationId} settings={settings} />
+              <RepositoryOverridesSection
+                organizationId={organizationId}
+                settings={settings}
+                onManageProfiles={() => changeSection('profiles')}
+              />
+            </section>
+          ) : settingsQuery.isError ? (
+            <LoadError onRetry={() => void settingsQuery.refetch()} />
+          ) : (
+            <LoadingSkeleton />
+          )}
+        </TabsContent>
+        <TabsContent
+          value="preferences"
+          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+        >
+          <section aria-labelledby="personal-preferences-heading" className="flex flex-col gap-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 id="personal-preferences-heading" className="text-base font-medium">
+                Preferences
+              </h3>
+              <Badge variant="secondary">
+                <User aria-hidden />
+                Only you
+              </Badge>
+            </div>
+            <TranscriptPreferencesSection />
             {settings ? (
-              <section aria-labelledby="session-defaults-heading" className="flex flex-col gap-6">
-                <div className="flex flex-col gap-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 id="session-defaults-heading" className="text-base font-medium">
-                      {organizationId ? 'Organization settings' : 'Session defaults'}
-                    </h3>
-                    {organizationId && <Badge variant="secondary">All members</Badge>}
-                  </div>
-                  <p className="text-muted-foreground text-xs">
-                    {organizationId
-                      ? 'Applies to new sessions for everyone in this organization. Only owners and admins can make changes.'
-                      : 'Applies to new sessions in your personal workspace.'}
-                  </p>
-                </div>
-                <DefaultSandboxSection organizationId={organizationId} settings={settings} />
-                <RepositoryOverridesSection
-                  organizationId={organizationId}
-                  settings={settings}
-                  onManageProfiles={() => changeSection('profiles')}
-                />
-              </section>
+              <BuiltinAgentsSection organizationId={organizationId} settings={settings} />
             ) : settingsQuery.isError ? (
               <LoadError onRetry={() => void settingsQuery.refetch()} />
             ) : (
               <LoadingSkeleton />
             )}
-            <section
-              aria-labelledby="personal-preferences-heading"
-              className="flex flex-col gap-6 border-t pt-6"
-            >
-              <div className="flex flex-col gap-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 id="personal-preferences-heading" className="text-base font-medium">
-                    Personal preferences
-                  </h3>
-                  <Badge variant="secondary">Only you</Badge>
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Applies to you across personal and organization chats. Does not change settings
-                  for other members.
-                </p>
-              </div>
-              <TranscriptPreferencesSection />
-              {settings && (
-                <BuiltinAgentsSection organizationId={organizationId} settings={settings} />
-              )}
-            </section>
-          </div>
+          </section>
         </TabsContent>
         <TabsContent
           value="environments"
@@ -237,6 +277,12 @@ function CloudAgentSettings({
           />
         </TabsContent>
         <TabsContent
+          value="sidebar"
+          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+        >
+          <SidebarSettingsSection organizationId={organizationId} />
+        </TabsContent>
+        <TabsContent
           value="compute"
           className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
         >
@@ -250,6 +296,29 @@ function CloudAgentSettings({
         </TabsContent>
       </Tabs>
     </>
+  );
+}
+
+function NavGroupLabel({
+  icon: Icon,
+  className,
+  children,
+}: {
+  icon: LucideIcon;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        'text-muted-foreground hidden items-center gap-1.5 px-2 pt-1 pb-1.5 text-[11px] font-medium tracking-wide uppercase md:flex md:w-full',
+        className
+      )}
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      {children}
+    </div>
   );
 }
 

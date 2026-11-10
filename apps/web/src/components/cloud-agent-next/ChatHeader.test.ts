@@ -6,6 +6,7 @@ import type { SessionModelUsage, SessionTokenUsage } from './session-token-usage
 
 jest.mock('./ShareSessionDialog', () => ({ ShareSessionDialog: () => null }));
 jest.mock('./SessionFailureHistory', () => ({ SessionFailureHistory: () => null }));
+jest.mock('./SessionComputeRate', () => ({ SessionComputeRate: () => null }));
 
 jest.mock('@/components/ui/dialog', () => {
   const react = jest.requireActual<typeof React>('react');

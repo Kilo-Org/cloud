@@ -293,18 +293,21 @@ describe('detector metadata', () => {
 
 describe('blockingEnkryptDetectorIds', () => {
   it('blocks only on enabled configurable detectors set to block', () => {
-    expect(blockingEnkryptDetectorIds(createKiloDefaultEnkryptInputDetectors())).toEqual([
-      'injection_attack',
-    ]);
     expect(blockingEnkryptDetectorIds(allEnabled())).toEqual([
       'injection_attack',
       'policy_violation',
     ]);
   });
 
+  it('logs prompt injection without blocking for Kilo Default', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+
+    expect(enabledEnkryptDetectorIds(detectors)).toEqual(['injection_attack']);
+    expect(blockingEnkryptDetectorIds(detectors)).toEqual([]);
+  });
+
   it('only logs configurable detectors set to log only', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.injection_attack.action = 'log';
     detectors.policy_violation = { ...allEnabled().policy_violation, action: 'log' };
 
     expect(enabledEnkryptDetectorIds(detectors)).toEqual(['injection_attack', 'policy_violation']);

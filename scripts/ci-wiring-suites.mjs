@@ -1,7 +1,8 @@
 // The `ci-wiring` job runs these suites in one `node --test` invocation. The
 // list and the command live here so every suite that pins that job reads one
-// definition: adding, removing, or reordering a suite is a single edit, and
-// the assertions cannot disagree about what the job must run.
+// definition, and their assertions cannot disagree about what the job must
+// run. A suite added to, removed from, or reordered in this list belongs in
+// the job's step in the same change.
 export const wiringSuites = [
   'scripts/stacked-ci.test.mjs',
   'scripts/changed-dependencies.test.mjs',

@@ -298,4 +298,33 @@ describe('GET /cloud-agent-fork/review-md', () => {
     expectErrorRedirect(response, 'invalid_conversion_request');
     expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
   });
+
+  it('refuses an opaque Origin even when Sec-Fetch-Site reports this origin', async () => {
+    const response = await getRoute(
+      makeRequest({
+        platform: 'github',
+        repo: 'owner/repo',
+        secFetchSite: 'same-origin',
+        origin: 'null',
+        host: 'kilo.test',
+      })
+    );
+
+    expectErrorRedirect(response, 'invalid_conversion_request');
+    expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('refuses an Origin when the request names no addressed host', async () => {
+    const response = await getRoute(
+      makeRequest({
+        platform: 'github',
+        repo: 'owner/repo',
+        secFetchSite: 'same-origin',
+        origin: 'https://kilo.test',
+      })
+    );
+
+    expectErrorRedirect(response, 'invalid_conversion_request');
+    expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
+  });
 });

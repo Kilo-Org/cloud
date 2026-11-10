@@ -149,10 +149,7 @@ describe('EmailOtpForm destination layout', () => {
     const displayedEmail = `${email.slice(0, 24)}…${email.slice(-23)}`;
     const text = destination(mounted.root, displayedEmail).props.children as string;
     expect(text.replaceAll('\n', '')).toBe(
-      withoutAddressGaps(
-        i18n.t('login.enterCodeSentTo', { email: displayedEmail }),
-        displayedEmail
-      )
+      withoutAddressGaps(i18n.t('login.enterCodeSentTo', { email: displayedEmail }), displayedEmail)
     );
     expect(text).not.toContain(email);
     const node = destination(mounted.root, displayedEmail);

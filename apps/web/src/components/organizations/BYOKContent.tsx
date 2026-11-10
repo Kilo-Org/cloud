@@ -11,6 +11,7 @@ import { OpenAiChatGptCard, OpenAiChatGptCardView } from './byok/OpenAiChatGptCa
 import {
   canManageSharedServices,
   ChatGptSharedServicesCard,
+  ChatGptSharedServicesCardView,
 } from '@/components/chatgpt/ChatGptSharedServicesCard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
@@ -86,8 +87,10 @@ export function BYOKContent({
                 title="Shared services"
                 description="Used by Kilo shared services in this organization, such as code review. Only owners and admins can manage these."
               >
-                {chatGptEnabled === true && canManageSharedServices(currentRole) ? (
+                {!canManageSharedServices(currentRole) ? null : chatGptEnabled === true ? (
                   <ChatGptSharedServicesCard organizationId={organizationId} />
+                ) : chatGptEnabled === undefined ? (
+                  <ChatGptSharedServicesCardView status={undefined} />
                 ) : null}
                 <ClaudeBillingCard organizationId={organizationId} scope="shared_services" />
               </ConnectionSection>

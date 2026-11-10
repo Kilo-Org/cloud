@@ -2192,6 +2192,23 @@ describe('cliSessionsV2 Cloud Agent workspace PR', () => {
     expect(details.worktrees[WORKTREE_ID].prSession?.associatedPr).toMatchObject({ number: 42 });
   });
 
+  it('shows the workspace PR in runtime state without a link verification key', async () => {
+    await insertWorkspace();
+    await insertPr(42);
+    mockGetRuntimeSession.mockResolvedValueOnce({
+      sessionId: WORKSPACE_ID,
+      userId: USER_ID,
+      execution: null,
+      timestamp: 1,
+      version: 1,
+    });
+
+    const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+    expect(result.associatedPr).toMatchObject({ number: 42, state: 'open', title: 'PR 42' });
+    expect(result.prLinkVerificationKey).toBeUndefined();
+  });
+
   it('prefers the open PR on the branch over an older merged one', async () => {
     await insertWorkspace();
     await insertPr(41, { pr_state: 'merged' });

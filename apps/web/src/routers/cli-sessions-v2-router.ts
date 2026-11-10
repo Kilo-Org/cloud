@@ -1238,7 +1238,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         )
         .orderBy(
           asc(cli_sessions_v2.cloud_agent_worktree_id),
-          desc(sessionAssociatedPr.pr_from_workspace),
+          sql`${sessionAssociatedPr.pr_from_workspace} DESC NULLS LAST`,
           desc(cli_sessions_v2.updated_at),
           asc(cli_sessions_v2.session_id)
         ),
@@ -2609,7 +2609,8 @@ export const cliSessionsV2Router = createTRPCRouter({
         latest_run_failure_kind: row.latest_run_failure_kind,
         latest_run_terminal_at: row.latest_run_terminal_at,
         runtimeState,
-        prLinkVerificationKey: getPrLinkVerificationKey(session),
+        prLinkVerificationKey:
+          row.pr_from_workspace === true ? undefined : getPrLinkVerificationKey(session),
         associatedPr: formatAssociatedPr(
           {
             platform: session.platform,
@@ -2629,6 +2630,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             pr_last_synced_at: row.pr_last_synced_at,
             pr_review_decision: row.pr_review_decision,
             review_decision_pending: row.review_decision_pending,
+            pr_from_workspace: row.pr_from_workspace,
           }
         ),
       };

@@ -27,6 +27,7 @@ Useful Worker-log landmarks include:
 - `Wrapper ingest WebSocket accepted`
 - `Client stream WebSocket accepted for setup`
 - `Session message terminalized`
+- `Runtime credential proxy request failed` (`logTag: runtime_proxy_request_failed`): one record per failed Kilo credential-proxy request. `rejectionStage: route` with `pathShape` means the facade has no allowlist entry for that path and answered 404 without an upstream call.
 
 ## Worker Logs
 

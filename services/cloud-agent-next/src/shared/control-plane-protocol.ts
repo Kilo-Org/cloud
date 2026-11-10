@@ -236,6 +236,7 @@ export const CONTROL_PLANE_ASSISTANT_FAILURE_REASONS = [
   'output_limit',
   'content_filter',
   'structured_output',
+  'model_catalog_unavailable',
   'unknown',
 ] as const satisfies readonly CloudAgentAssistantFailureReason[];
 export type ControlPlaneAssistantFailureReason =

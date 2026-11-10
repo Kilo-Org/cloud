@@ -2039,7 +2039,21 @@
       "thought": "Gedankengang",
       "showDetails": "Details anzeigen",
       "pending": "Ausstehend…",
-      "running": "Wird ausgeführt…"
+      "running": "Wird ausgeführt…",
+      "field": {
+        "filePath": "Dateipfad",
+        "path": "Pfad",
+        "offset": "Startzeile",
+        "limit": "Maximalanzahl",
+        "pattern": "Muster",
+        "include": "Dateifilter",
+        "patchText": "Änderungstext",
+        "query": "Suchanfrage",
+        "prompt": "Anweisung",
+        "header": "Überschrift",
+        "question": "Frage",
+        "options": "Optionen"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Der Inhalt konnte nicht angezeigt werden."

@@ -2577,7 +2577,21 @@
       "thought": "Fikr",
       "showDetails": "Tafsilotlarni ko'rsatish",
       "pending": "Kutilmoqda…",
-      "running": "Bajarilmoqda…"
+      "running": "Bajarilmoqda…",
+      "field": {
+        "filePath": "Fayl yo'li",
+        "path": "Yo'l",
+        "offset": "Boshlanish",
+        "limit": "Chegara",
+        "pattern": "Shablon",
+        "include": "Kiritish",
+        "patchText": "Yamaq matni",
+        "query": "So'rov",
+        "prompt": "Ko'rsatma",
+        "header": "Sarlavha",
+        "question": "Savol",
+        "options": "Variantlar"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Mazmunni ko'rsatib bo'lmadi."

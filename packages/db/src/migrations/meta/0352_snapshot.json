@@ -1,5 +1,5 @@
 {
-  "id": "2b2de2cd-7330-43fb-b815-907285430837",
+  "id": "d903a12a-7060-4cf1-a376-4d752713957b",
   "prevId": "9b76b01d-fab1-4f72-84f0-858fdde64a80",
   "version": "7",
   "dialect": "postgresql",
@@ -4211,178 +4211,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.claude_billing_connection_grants": {
-      "name": "claude_billing_connection_grants",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "payer_connection_id": {
-          "name": "payer_connection_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "removed_at": {
-          "name": "removed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "IDX_claude_billing_grants_payer_connection_id": {
-          "name": "IDX_claude_billing_grants_payer_connection_id",
-          "columns": [
-            {
-              "expression": "payer_connection_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_claude_billing_grants_personal": {
-          "name": "UQ_claude_billing_grants_personal",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"claude_billing_connection_grants\".\"organization_id\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_claude_billing_grants_org_member": {
-          "name": "UQ_claude_billing_grants_org_member",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"claude_billing_connection_grants\".\"organization_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_claude_billing_grants_shared_services": {
-          "name": "UQ_claude_billing_grants_shared_services",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"claude_billing_connection_grants\".\"organization_id\" IS NOT NULL AND \"claude_billing_connection_grants\".\"kilo_user_id\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "claude_billing_connection_grants_payer_connection_id_claude_billing_connections_id_fk": {
-          "name": "claude_billing_connection_grants_payer_connection_id_claude_billing_connections_id_fk",
-          "tableFrom": "claude_billing_connection_grants",
-          "tableTo": "claude_billing_connections",
-          "columnsFrom": [
-            "payer_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "claude_billing_connection_grants_kilo_user_id_kilocode_users_id_fk": {
-          "name": "claude_billing_connection_grants_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "claude_billing_connection_grants",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "claude_billing_connection_grants_organization_id_organizations_id_fk": {
-          "name": "claude_billing_connection_grants_organization_id_organizations_id_fk",
-          "tableFrom": "claude_billing_connection_grants",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "claude_billing_grants_owner_check": {
-          "name": "claude_billing_grants_owner_check",
-          "value": "\"claude_billing_connection_grants\".\"kilo_user_id\" IS NOT NULL OR \"claude_billing_connection_grants\".\"organization_id\" IS NOT NULL"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.claude_billing_connections": {
       "name": "claude_billing_connections",
       "schema": "",
@@ -4476,7 +4304,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"claude_billing_connections\".\"organization_id\" IS NULL AND \"claude_billing_connections\".\"status\" <> 'removed'",
+          "where": "\"claude_billing_connections\".\"organization_id\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -4498,7 +4326,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL AND \"claude_billing_connections\".\"status\" <> 'removed'",
+          "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -4514,7 +4342,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL AND \"claude_billing_connections\".\"kilo_user_id\" IS NULL AND \"claude_billing_connections\".\"status\" <> 'removed'",
+          "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL AND \"claude_billing_connections\".\"kilo_user_id\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -8920,6 +8748,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "git_url": {
+          "name": "git_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "git_branch": {
+          "name": "git_branch",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "sidebar_position": {
           "name": "sidebar_position",
           "type": "text",
@@ -9029,6 +8869,28 @@
           ],
           "isUnique": false,
           "where": "\"cloud_agent_worktrees\".\"parent_worktree_id\" is not null",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_worktrees_git_url_branch": {
+          "name": "IDX_cloud_agent_worktrees_git_url_branch",
+          "columns": [
+            {
+              "expression": "git_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "git_branch",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cloud_agent_worktrees\".\"git_branch\" is not null",
           "concurrently": true,
           "method": "btree",
           "with": {}
@@ -14651,6 +14513,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_github_branch_prs_url_branch": {
+          "name": "IDX_github_branch_prs_url_branch",
+          "columns": [
+            {
+              "expression": "git_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "git_branch",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"github_branch_pull_requests\".\"pr_number\" is not null",
           "concurrently": true,
           "method": "btree",
           "with": {}

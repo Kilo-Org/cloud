@@ -2715,7 +2715,21 @@
       "thought": "Ħsieb",
       "showDetails": "Uri d-dettalji",
       "pending": "Pendenti…",
-      "running": "Qed jaħdem…"
+      "running": "Qed jaħdem…",
+      "field": {
+        "filePath": "Mogħdija tal-fajl",
+        "path": "Mogħdija",
+        "offset": "Bidu",
+        "limit": "Limitu",
+        "pattern": "Mudell",
+        "include": "Inklużjoni",
+        "patchText": "Test tal-patċ",
+        "query": "Tfittxija",
+        "prompt": "Istruzzjoni",
+        "header": "Titolu",
+        "question": "Mistoqsija",
+        "options": "Għażliet"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Ma setax jintwera l-kontenut."

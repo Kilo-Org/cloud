@@ -2669,7 +2669,21 @@
       "thought": "Mintis",
       "showDetails": "Rodyti informaciją",
       "pending": "Laukiama…",
-      "running": "Vykdoma…"
+      "running": "Vykdoma…",
+      "field": {
+        "filePath": "Failo kelias",
+        "path": "Kelias",
+        "offset": "Poslinkis",
+        "limit": "Riba",
+        "pattern": "Šablonas",
+        "include": "Įtraukimas",
+        "patchText": "Pataisos tekstas",
+        "query": "Užklausa",
+        "prompt": "Nurodymas",
+        "header": "Antraštė",
+        "question": "Klausimas",
+        "options": "Parinktys"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nepavyko parodyti turinio."

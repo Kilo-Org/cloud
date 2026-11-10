@@ -43,7 +43,16 @@ vi.mock('../session-events', () => ({
   notifyUserSessionEvent: vi.fn(),
 }));
 
+vi.mock('../services/workspace-checkout', () => ({
+  recordWorkspaceCheckout: vi.fn(async () => undefined),
+}));
+
+vi.mock('../services/worktree-deletion', () => ({
+  isWorktreeDeleting: vi.fn(async () => false),
+}));
+
 import { getWorkerDb } from '@kilocode/db/client';
+import { recordWorkspaceCheckout } from '../services/workspace-checkout';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { notifyUserSessionEvent } from '../session-events';
 import {
@@ -200,6 +209,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
       cloudAgentSessionId: options.cloudAgentSessionId ?? null,
       gitUrl: options.initialGitUrl ?? null,
       organizationId: options.initialOrganizationId ?? null,
+      worktreeId: options.cloudAgentWorktreeId ?? null,
     };
   }
 
@@ -608,6 +618,7 @@ describe('applyMetadataChanges', () => {
   const cacheRemove = vi.fn(async () => undefined);
 
   beforeEach(() => {
+    vi.mocked(recordWorkspaceCheckout).mockClear();
     vi.mocked(getWorkerDb).mockReset();
     vi.mocked(notifyUserSessionEvent).mockReset();
     vi.mocked(getSessionAccessCacheDO).mockReset();
@@ -669,6 +680,38 @@ describe('applyMetadataChanges', () => {
       expect.objectContaining({ type: 'session.status.updated' }),
       undefined
     );
+  });
+
+  it("records a Cloud Agent workspace chat's reported branch on its workspace", async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentWorktreeId: 'worktree_1',
+      cloudAgentSessionId: 'workspace_1',
+      initialGitUrl: 'https://github.com/acme/widgets',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['gitBranch', 'kilo/feature']]));
+
+    expect(recordWorkspaceCheckout).toHaveBeenCalledWith(db, 'usr_1', {
+      worktreeId: 'worktree_1',
+      gitUrl: 'https://github.com/acme/widgets',
+      gitBranch: 'kilo/feature',
+    });
+  });
+
+  it('does not record a branch for a session outside a workspace or a cleared branch', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: 'https://github.com/acme/widgets' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['gitBranch', 'kilo/feature']]));
+
+    const worktreeDb = createApplyMetadataDb({
+      cloudAgentWorktreeId: 'worktree_1',
+      initialGitUrl: 'https://github.com/acme/widgets',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(worktreeDb as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['gitBranch', null]]));
+
+    expect(recordWorkspaceCheckout).not.toHaveBeenCalled();
   });
 
   it('projects blocker clearing at source time without inventing history from the projection', async () => {

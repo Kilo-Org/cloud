@@ -2577,7 +2577,21 @@
       "thought": "Pentsamendua",
       "showDetails": "Erakutsi xehetasunak",
       "pending": "Zain…",
-      "running": "Exekutatzen…"
+      "running": "Exekutatzen…",
+      "field": {
+        "filePath": "Fitxategiaren bidea",
+        "path": "Bidea",
+        "offset": "Desplazamendua",
+        "limit": "Muga",
+        "pattern": "Eredua",
+        "include": "Sartzea",
+        "patchText": "Adabaki-testua",
+        "query": "Kontsulta",
+        "prompt": "Argibidea",
+        "header": "Izenburua",
+        "question": "Galdera",
+        "options": "Aukerak"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Ezin izan da edukia bistaratu."

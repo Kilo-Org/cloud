@@ -2577,7 +2577,21 @@
       "thought": "विचार",
       "showDetails": "विवरण देखाउनुहोस्",
       "pending": "पर्खाइमा…",
-      "running": "चलिरहेको…"
+      "running": "चलिरहेको…",
+      "field": {
+        "filePath": "फाइल पथ",
+        "path": "पथ",
+        "offset": "अफसेट",
+        "limit": "सीमा",
+        "pattern": "ढाँचा",
+        "include": "समावेश",
+        "patchText": "प्याच पाठ",
+        "query": "क्वेरी",
+        "prompt": "निर्देश",
+        "header": "शीर्षक",
+        "question": "प्रश्न",
+        "options": "विकल्पहरू"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "सामग्री देखाउन सकिएन।"

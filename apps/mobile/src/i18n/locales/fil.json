@@ -2583,7 +2583,21 @@
       "thought": "Naisip",
       "showDetails": "Ipakita ang mga detalye",
       "pending": "Nakabinbin…",
-      "running": "Tumatakbo…"
+      "running": "Tumatakbo…",
+      "field": {
+        "filePath": "Landas ng file",
+        "path": "Landas",
+        "offset": "Offset",
+        "limit": "Hangganan",
+        "pattern": "Padron",
+        "include": "Kasama",
+        "patchText": "Tekstong patch",
+        "query": "Paghahanap",
+        "prompt": "Panuto",
+        "header": "Pamagat",
+        "question": "Tanong",
+        "options": "Pagpipilian"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Hindi maipakita ang nilalaman."

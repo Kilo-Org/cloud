@@ -2039,7 +2039,21 @@
       "thought": "Pemikiran",
       "showDetails": "Tampilkan detail",
       "pending": "Menunggu…",
-      "running": "Berjalan…"
+      "running": "Berjalan…",
+      "field": {
+        "filePath": "Jalur berkas",
+        "path": "Jalur",
+        "offset": "Offset",
+        "limit": "Batas",
+        "pattern": "Pola",
+        "include": "Sertakan",
+        "patchText": "Teks patch",
+        "query": "Kueri",
+        "prompt": "Arahan",
+        "header": "Judul",
+        "question": "Pertanyaan",
+        "options": "Pilihan"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Gagal menampilkan konten."

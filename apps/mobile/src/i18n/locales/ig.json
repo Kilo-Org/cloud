@@ -2577,7 +2577,21 @@
       "thought": "Echiche",
       "showDetails": "Gosi nkọwa",
       "pending": "Na-echere…",
-      "running": "Na-arụ ọrụ…"
+      "running": "Na-arụ ọrụ…",
+      "field": {
+        "filePath": "Ụzọ faịlụ",
+        "path": "Ụzọ",
+        "offset": "Mmalite",
+        "limit": "Oke",
+        "pattern": "Ụkpụrụ",
+        "include": "Ntinye",
+        "patchText": "Ederede ndozi",
+        "query": "Okwu ọchụchọ",
+        "prompt": "Ntụziaka",
+        "header": "Isi okwu",
+        "question": "Ajụjụ",
+        "options": "Nhọrọ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Enweghị ike igosi ọdịnaya ahụ."

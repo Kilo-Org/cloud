@@ -2577,7 +2577,21 @@
       "thought": "Ой",
       "showDetails": "Мәліметтерді көрсету",
       "pending": "Күтілуде…",
-      "running": "Орындалуда…"
+      "running": "Орындалуда…",
+      "field": {
+        "filePath": "Файл жолы",
+        "path": "Жол",
+        "offset": "Ығысу",
+        "limit": "Шектеу",
+        "pattern": "Үлгі",
+        "include": "Қосу",
+        "patchText": "Жамау мәтіні",
+        "query": "Сұраныс",
+        "prompt": "Нұсқау",
+        "header": "Тақырып",
+        "question": "Сұрақ",
+        "options": "Нұсқалар"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Мазмұнды көрсету мүмкін болмады."

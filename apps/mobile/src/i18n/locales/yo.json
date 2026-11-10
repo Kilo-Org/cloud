@@ -2577,7 +2577,21 @@
       "thought": "Ìrònú",
       "showDetails": "Fi àwọn àlàyé hàn",
       "pending": "Ń dúró…",
-      "running": "Ń ṣiṣẹ́…"
+      "running": "Ń ṣiṣẹ́…",
+      "field": {
+        "filePath": "Ọ̀nà fáìlì",
+        "path": "Ọ̀nà",
+        "offset": "Ìbẹ̀rẹ̀",
+        "limit": "Ààlà",
+        "pattern": "Àpẹẹrẹ",
+        "include": "Ìmúpẹ̀lú",
+        "patchText": "Ọ̀rọ̀ àtúnṣe",
+        "query": "Ìwádìí",
+        "prompt": "Ìtọ́ni",
+        "header": "Àkọlé",
+        "question": "Ìbéèrè",
+        "options": "Àwọn àṣàyàn"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "A kò lè fi àkóónú hàn."

@@ -2577,7 +2577,21 @@
       "thought": "ఆలోచన",
       "showDetails": "వివరాలను చూపించండి",
       "pending": "వేచి ఉంది…",
-      "running": "నడుస్తోంది…"
+      "running": "నడుస్తోంది…",
+      "field": {
+        "filePath": "ఫైల్ మార్గం",
+        "path": "మార్గం",
+        "offset": "ఆఫ్సెట్",
+        "limit": "పరిమితి",
+        "pattern": "నమూనా",
+        "include": "చేర్పు",
+        "patchText": "ప్యాచ్ పాఠ్యం",
+        "query": "శోధన ప్రశ్న",
+        "prompt": "ప్రాంప్ట్",
+        "header": "శీర్షిక",
+        "question": "ప్రశ్న",
+        "options": "ఎంపికలు"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "విషయాన్ని చూపలేకపోయాము."

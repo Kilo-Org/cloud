@@ -2577,7 +2577,21 @@
       "thought": "Միտք",
       "showDetails": "Ցուցադրել մանրամասները",
       "pending": "Սպասում է…",
-      "running": "Կատարվում է…"
+      "running": "Կատարվում է…",
+      "field": {
+        "filePath": "Ֆայլի ուղի",
+        "path": "Ուղի",
+        "offset": "Շեղում",
+        "limit": "Սահմանաչափ",
+        "pattern": "Նախշ",
+        "include": "Ներառում",
+        "patchText": "Կարկատակի տեքստ",
+        "query": "Հարցում",
+        "prompt": "Հուշում",
+        "header": "Վերնագիր",
+        "question": "Հարց",
+        "options": "Ընտրանքներ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Չհաջողվեց ցուցադրել բովանդակությունը։"

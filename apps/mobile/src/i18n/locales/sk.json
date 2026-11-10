@@ -2669,7 +2669,21 @@
       "thought": "Uvažovanie",
       "showDetails": "Zobraziť podrobnosti",
       "pending": "Čaká sa…",
-      "running": "Beží…"
+      "running": "Beží…",
+      "field": {
+        "filePath": "Cesta k súboru",
+        "path": "Cesta",
+        "offset": "Posun",
+        "limit": "Limit",
+        "pattern": "Vzor",
+        "include": "Zahrnutie",
+        "patchText": "Text záplaty",
+        "query": "Dopyt",
+        "prompt": "Pokyn",
+        "header": "Nadpis",
+        "question": "Otázka",
+        "options": "Možnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Obsah sa nepodarilo zobraziť."

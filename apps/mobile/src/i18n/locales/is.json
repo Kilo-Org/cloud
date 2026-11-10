@@ -2577,7 +2577,21 @@
       "thought": "Hugsun",
       "showDetails": "Sýna upplýsingar",
       "pending": "Í bið…",
-      "running": "Í keyrslu…"
+      "running": "Í keyrslu…",
+      "field": {
+        "filePath": "Skráarslóð",
+        "path": "Slóð",
+        "offset": "Hliðrun",
+        "limit": "Hámark",
+        "pattern": "Mynstur",
+        "include": "Innifalið",
+        "patchText": "Breytingatexti",
+        "query": "Fyrirspurn",
+        "prompt": "Fyrirmæli",
+        "header": "Fyrirsögn",
+        "question": "Spurning",
+        "options": "Valkostir"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Ekki tókst að birta efnið."

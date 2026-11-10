@@ -2577,7 +2577,21 @@
       "thought": "Разсъждения",
       "showDetails": "Покажи подробностите",
       "pending": "В изчакване…",
-      "running": "В изпълнение…"
+      "running": "В изпълнение…",
+      "field": {
+        "filePath": "Файлов път",
+        "path": "Път",
+        "offset": "Отместване",
+        "limit": "Ограничение",
+        "pattern": "Шаблон",
+        "include": "Включване",
+        "patchText": "Корекционен текст",
+        "query": "Заявка",
+        "prompt": "Инструкция",
+        "header": "Заглавие",
+        "question": "Въпрос",
+        "options": "Опции"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не успяхме да покажем съдържанието."

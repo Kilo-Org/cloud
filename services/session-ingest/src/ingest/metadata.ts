@@ -11,6 +11,7 @@ import { refreshGlanceableSessions } from '../remote-session-notifications';
 import { SessionStatusSchema } from '../types/user-connection-protocol';
 import { isDefaultSessionTitle } from './default-session-title';
 import { isWorktreeDeleting } from '../services/worktree-deletion';
+import { recordWorkspaceCheckout } from '../services/workspace-checkout';
 
 /** Stored status written when a CLI disconnects while the session is waiting on input. */
 export const CLI_DISCONNECT_ATTENTION_RESET_STATUS = 'retry' as const;
@@ -202,6 +203,9 @@ export async function applyMetadataChanges(
 
   /** True only when a PR link/head-field write was actually applied (not rejected as a repo mismatch). */
   let prLinkWriteApplied = false;
+
+  /** The checkout a Cloud Agent workspace chat reported, recorded on its workspace after commit. */
+  let workspaceCheckout: { worktreeId: string; gitUrl: string; gitBranch: string } | null = null;
 
   const notification = await db.transaction(async tx => {
     const selectCurrentRow = () =>
@@ -410,6 +414,15 @@ export async function applyMetadataChanges(
         );
     }
 
+    const effectiveGitUrl = updates.git_url !== undefined ? updates.git_url : currentRow.gitUrl;
+    if (currentRow.worktreeId && effectiveGitUrl && updates.git_branch) {
+      workspaceCheckout = {
+        worktreeId: currentRow.worktreeId,
+        gitUrl: effectiveGitUrl,
+        gitBranch: updates.git_branch,
+      };
+    }
+
     let parentSessionIdWriteApplied = false;
     if (parentSessionId !== undefined) {
       if (currentRow.cloudAgentSessionId != null) {
@@ -560,6 +573,12 @@ export async function applyMetadataChanges(
       session: mapSessionEventRow(persistedRow),
     };
   });
+
+  if (workspaceCheckout) {
+    // After commit: worktree deletion locks the worktree before its sessions,
+    // so writing it while holding the session row lock could deadlock.
+    await recordWorkspaceCheckout(db, kiloUserId, workspaceCheckout);
+  }
 
   if (organizationIdWriteApplied) {
     try {

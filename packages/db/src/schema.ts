@@ -6654,6 +6654,11 @@ export const cloud_agent_worktrees = pgTable(
     }),
     base_branch: text(),
     base_sha: text(),
+    // The repository and the branch checked out in the workspace, as last
+    // reported by its chats. A pull request on this repository and branch in
+    // the workspace's tenant is the workspace's pull request.
+    git_url: text(),
+    git_branch: text(),
     sidebar_position: text(),
     name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -6681,6 +6686,11 @@ export const cloud_agent_worktrees = pgTable(
     index('IDX_cloud_agent_worktrees_parent_worktree_id')
       .on(table.parent_worktree_id)
       .where(isNotNull(table.parent_worktree_id))
+      .concurrently(),
+    // Supports the pull_request webhook, which finds workspaces by repository and branch.
+    index('IDX_cloud_agent_worktrees_git_url_branch')
+      .on(table.git_url, table.git_branch)
+      .where(isNotNull(table.git_branch))
       .concurrently(),
     check(
       'cloud_agent_worktrees_deletion_check',
@@ -7038,6 +7048,7 @@ export type CloudAgentFailureReason =
   | 'managed_provider_unavailable'
   | 'managed_provider_authentication'
   | 'managed_model_configuration'
+  | 'model_catalog_unavailable'
   | 'provider_unavailable'
   | 'provider_disconnect'
   | 'gateway_unavailable'
@@ -7349,11 +7360,12 @@ export const github_branch_pull_requests = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Identity is the PR, not the branch: the cache is only a state/review
-    // cache for a PR a session already verifiably links. Branch names are
-    // reused and shared across sessions, so (git_url, git_branch) can never
-    // identify which PR belongs to which session. These partial unique indexes
-    // serve as ON CONFLICT targets for the webhook upsert, keyed by PR number.
+    // Identity is the PR, not the branch: the cache holds state/review for a
+    // PR a session verifiably links, or a PR on the branch a Cloud Agent
+    // workspace has checked out. Outside workspaces branch names are reused
+    // and shared across sessions, so (git_url, git_branch) never identifies a
+    // session's PR. These partial unique indexes serve as ON CONFLICT targets
+    // for the webhook upsert, keyed by PR number.
     uniqueIndex('UQ_github_branch_prs_repo_pr_org')
       .on(table.git_url, table.pr_number, table.owned_by_organization_id)
       .where(isNotNull(table.pr_number))
@@ -7362,9 +7374,13 @@ export const github_branch_pull_requests = pgTable(
       .on(table.git_url, table.pr_number, table.owned_by_user_id)
       .where(isNotNull(table.pr_number))
       .concurrently(),
-    // Reads resolve a PR by identity (git_url, pr_number); branch columns are
-    // no longer part of the join key.
+    // Session reads resolve a PR by identity (git_url, pr_number).
     index('IDX_github_branch_prs_url_pr_number').on(table.git_url, table.pr_number).concurrently(),
+    // Cloud Agent workspace reads resolve their PR by the workspace's repository and branch.
+    index('IDX_github_branch_prs_url_branch')
+      .on(table.git_url, table.git_branch)
+      .where(isNotNull(table.pr_number))
+      .concurrently(),
     check(
       'github_branch_pull_requests_owner_check',
       sql`(

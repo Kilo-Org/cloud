@@ -62,6 +62,8 @@ function worktree(values: Partial<CloudAgentWorktree> = {}): CloudAgentWorktree 
     parent_worktree_id: null,
     base_branch: null,
     base_sha: null,
+    git_url: null,
+    git_branch: null,
     sidebar_position: null,
     name: 'Private worktree name',
     folder_id: null,

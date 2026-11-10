@@ -2019,7 +2019,21 @@
       "thought": "विचार",
       "showDetails": "विवरण दिखाएँ",
       "pending": "लंबित…",
-      "running": "चल रहा है…"
+      "running": "चल रहा है…",
+      "field": {
+        "filePath": "फ़ाइल पथ",
+        "path": "पथ",
+        "offset": "ऑफ़सेट",
+        "limit": "सीमा",
+        "pattern": "पैटर्न",
+        "include": "समावेश",
+        "patchText": "संशोधन पाठ",
+        "query": "क्वेरी",
+        "prompt": "प्रॉम्प्ट",
+        "header": "शीर्षक",
+        "question": "प्रश्न",
+        "options": "विकल्प"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "सामग्री दिखाई नहीं जा सकी।"

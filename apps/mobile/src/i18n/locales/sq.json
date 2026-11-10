@@ -2577,7 +2577,21 @@
       "thought": "Mendimi",
       "showDetails": "Shfaq detajet",
       "pending": "Në pritje…",
-      "running": "Duke u ekzekutuar…"
+      "running": "Duke u ekzekutuar…",
+      "field": {
+        "filePath": "Shtegu i skedarit",
+        "path": "Shtegu",
+        "offset": "Zhvendosja",
+        "limit": "Kufiri",
+        "pattern": "Modeli",
+        "include": "Përfshirja",
+        "patchText": "Teksti i arnës",
+        "query": "Kërkimi",
+        "prompt": "Udhëzimi",
+        "header": "Titulli",
+        "question": "Pyetja",
+        "options": "Opsionet"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nuk u shfaq përmbajtja."

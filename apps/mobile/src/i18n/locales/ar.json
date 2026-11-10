@@ -2139,7 +2139,21 @@
       "thought": "التفكير",
       "showDetails": "عرض التفاصيل",
       "pending": "قيد الانتظار…",
-      "running": "جارٍ التنفيذ…"
+      "running": "جارٍ التنفيذ…",
+      "field": {
+        "filePath": "مسار الملف",
+        "path": "المسار",
+        "offset": "الإزاحة",
+        "limit": "الحد الأقصى",
+        "pattern": "النمط",
+        "include": "التضمين",
+        "patchText": "نص الرقعة",
+        "query": "الاستعلام",
+        "prompt": "المطالبة",
+        "header": "العنوان",
+        "question": "السؤال",
+        "options": "الخيارات"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "تعذّر عرض المحتوى."

@@ -2655,7 +2655,21 @@
       "thought": "Thought",
       "showDetails": "Show details",
       "pending": "Pending…",
-      "running": "Running…"
+      "running": "Running…",
+      "field": {
+        "filePath": "File path",
+        "path": "Path",
+        "offset": "Offset",
+        "limit": "Limit",
+        "pattern": "Pattern",
+        "include": "Include",
+        "patchText": "Patch text",
+        "query": "Query",
+        "prompt": "Prompt",
+        "header": "Header",
+        "question": "Question",
+        "options": "Options"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Failed to render content"

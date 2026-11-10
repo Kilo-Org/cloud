@@ -2583,7 +2583,21 @@
       "thought": "Umcabango",
       "showDetails": "Bonisa imininingwane",
       "pending": "Iyalinda…",
-      "running": "Iyasebenza…"
+      "running": "Iyasebenza…",
+      "field": {
+        "filePath": "Indlela yefayela",
+        "path": "Indlela",
+        "offset": "Isiqalo",
+        "limit": "Umkhawulo",
+        "pattern": "Iphethini",
+        "include": "Okufakiwe",
+        "patchText": "Umbhalo wesichibiyelo",
+        "query": "Umbuzo wokusesha",
+        "prompt": "Umyalelo",
+        "header": "Isihloko",
+        "question": "Umbuzo",
+        "options": "Izinketho"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Asikwazanga ukubonisa okuqukethwe."

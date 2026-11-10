@@ -2089,7 +2089,21 @@
       "thought": "Tok rozumowania",
       "showDetails": "Pokaż szczegóły",
       "pending": "Oczekiwanie…",
-      "running": "Wykonywanie…"
+      "running": "Wykonywanie…",
+      "field": {
+        "filePath": "Ścieżka pliku",
+        "path": "Ścieżka",
+        "offset": "Przesunięcie",
+        "limit": "Limit",
+        "pattern": "Wzorzec",
+        "include": "Filtr plików",
+        "patchText": "Tekst łatki",
+        "query": "Zapytanie",
+        "prompt": "Instrukcja",
+        "header": "Nagłówek",
+        "question": "Pytanie",
+        "options": "Opcje"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nie udało się wyświetlić treści."

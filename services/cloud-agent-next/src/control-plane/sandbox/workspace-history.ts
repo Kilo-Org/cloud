@@ -18,8 +18,7 @@ export function workspaceHistorySessionsQuery(
 ) {
   const source = route.credentialSource;
   const worktree = cloudAgentWorktreeIdSchema.safeParse(route.spec.kilo?.scopeId);
-  if (!source || !worktree.success || route.spec.runtimeIsolation || route.state === 'failed')
-    return null;
+  if (!source || !worktree.success || route.state === 'failed') return null;
   const anchor = alias(cli_sessions_v2, 'anchor');
   const organization = source.orgId;
   const anchorQuery = db
@@ -77,4 +76,48 @@ export async function readWorkspaceHistorySessions(
 ): Promise<WorkspaceHistorySession[]> {
   const query = workspaceHistorySessionsQuery(db, route, target);
   return query === null ? [] : workspaceHistorySessionsSchema.parse(await query);
+}
+
+/** Reuse discovery authorization only for its ten-second preload, never across sockets. */
+export function createWorkspaceHistoryReader(
+  read: (
+    route: RouteRecord,
+    target?: WorkspaceHistorySession
+  ) => Promise<WorkspaceHistorySession[]>,
+  now: () => number = Date.now
+) {
+  let discovery:
+    | { key: string; sessions: WorkspaceHistorySession[]; expiresAt: number }
+    | undefined;
+  const key = (route: RouteRecord) =>
+    JSON.stringify([
+      route.sessionId,
+      route.attemptId,
+      route.spec.kiloSessionId,
+      route.spec.kilo?.scopeId,
+      route.credentialSource?.userId,
+      route.credentialSource?.orgId,
+    ]);
+  return {
+    async readRecent(route: RouteRecord): Promise<WorkspaceHistorySession[]> {
+      const expiresAt = now() + 10_000;
+      const sessions = await read(route);
+      discovery = { key: key(route), sessions, expiresAt };
+      return sessions;
+    },
+    async authorize(route: RouteRecord, target: WorkspaceHistorySession): Promise<boolean> {
+      if (route.state === 'failed') return false;
+      if (
+        discovery &&
+        discovery.expiresAt > now() &&
+        discovery.key === key(route) &&
+        discovery.sessions.some(
+          session =>
+            session.sessionId === target.sessionId && session.kiloSessionId === target.kiloSessionId
+        )
+      )
+        return true;
+      return (await read(route, target)).length === 1;
+    },
+  };
 }

@@ -28,18 +28,26 @@ export function createWorkspaceHistoryPreloader(deps: {
       opening.set(client, sessions);
     }
     const existing = sessions.get(input.sessionId);
-    if (existing) return existing;
     const aborted = Promise.withResolvers<never>();
     const onAbort = () =>
       aborted.reject(input.signal?.reason ?? new Error('Session open was aborted'));
     input.signal?.addEventListener('abort', onAbort, { once: true });
-    const promise = Promise.race([client.open(input), aborted.promise]);
+    // Serialize imports, but never borrow another caller's restore inputs or abort budget.
+    const run = async () => {
+      if (existing) await existing.catch(() => undefined);
+      input.signal?.throwIfAborted();
+      return Promise.race([client.open(input), aborted.promise]);
+    };
+    const promise = run();
     sessions.set(input.sessionId, promise);
+    const cleanup = () => {
+      if (sessions.get(input.sessionId) === promise) sessions.delete(input.sessionId);
+    };
+    void promise.then(cleanup, cleanup);
     try {
-      return await promise;
+      return await Promise.race([promise, aborted.promise]);
     } finally {
       input.signal?.removeEventListener('abort', onAbort);
-      sessions.delete(input.sessionId);
     }
   }
 
@@ -54,6 +62,7 @@ export function createWorkspaceHistoryPreloader(deps: {
     if (
       !readRecent ||
       !readPage ||
+      !client.supportsHistoryPreload ||
       spec.workspaceSnapshot ||
       spec.runtimeIsolation ||
       !spec.kilo?.scopeId.startsWith('worktree_')

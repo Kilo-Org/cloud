@@ -404,7 +404,7 @@ import {
   type SharedWorktreeChangesInput,
 } from './worktree-changes.js';
 import { serveHistoryPage, serveRecentHistory, type HistoryPageSession } from './history-pages.js';
-import { readWorkspaceHistorySessions } from './workspace-history.js';
+import { createWorkspaceHistoryReader, readWorkspaceHistorySessions } from './workspace-history.js';
 import { getPgDb } from '../../db/pg.js';
 import type {
   GetWorktreeChangesOutput,
@@ -926,6 +926,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private workspaceSnapshotCapturePending = false;
   /** Earliest retry per grant scope after a failed renewal; in memory, so eviction retries once. */
   private readonly credentialRenewalRetryAt: CredentialRenewalRetries = new Map();
+  private readonly workspaceHistoryReaders = new WeakMap<
+    WebSocket,
+    ReturnType<typeof createWorkspaceHistoryReader>
+  >();
   /**
    * Notification factory for the V2 Session DO. The default resolves the
    * `ownerId:sessionId` name through the shared binding accessor; tests inject a
@@ -6499,7 +6503,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             serveRecentHistory({
               frame,
               readRoute: sessionId => readRoute(this.db, sessionId),
-              readRecent: route => readWorkspaceHistorySessions(getPgDb(this.env), route),
+              readRecent: route => this.workspaceHistoryReader(ws).readRecent(route),
               send: result => this.trySendFrame(ws, result),
             })
           );
@@ -6511,14 +6515,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
             serveHistoryPage({
               frame,
               readRoute: sessionId => readRoute(this.db, sessionId),
-              authorizeWorkspaceSession: async (route, target) =>
-                (
-                  await withTimeout(
-                    readWorkspaceHistorySessions(getPgDb(this.env), route, target),
-                    10_000,
-                    'Workspace history authorization timed out'
-                  )
-                ).length === 1,
+              authorizeWorkspaceSession: (route, target) =>
+                withTimeout(
+                  this.workspaceHistoryReader(ws).authorize(route, target),
+                  10_000,
+                  'Workspace history authorization timed out'
+                ),
               session: async sessionId => {
                 const owner = await this.requireOwner();
                 return owner === null ? null : this.sessionPeerFor(owner, sessionId);
@@ -6530,6 +6532,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
       default:
         return;
     }
+  }
+
+  private workspaceHistoryReader(ws: WebSocket) {
+    let reader = this.workspaceHistoryReaders.get(ws);
+    if (!reader) {
+      reader = createWorkspaceHistoryReader((route, target) =>
+        readWorkspaceHistorySessions(getPgDb(this.env), route, target)
+      );
+      this.workspaceHistoryReaders.set(ws, reader);
+    }
+    return reader;
   }
 
   private releaseBoundSockets(ws: WebSocket, allocationId: string): void {

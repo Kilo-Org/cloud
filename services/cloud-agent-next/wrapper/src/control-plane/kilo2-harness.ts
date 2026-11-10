@@ -200,6 +200,7 @@ export function createKilo2Harness(options: {
     },
   };
   return {
+    supportsHistoryPreload: true,
     async open(input) {
       try {
         const existing = await session(input.sessionId, input.signal);

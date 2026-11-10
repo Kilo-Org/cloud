@@ -1,7 +1,10 @@
 import { getWorkerDb } from '@kilocode/db/client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { RouteRecord } from './routes.js';
-import { workspaceHistorySessionsQuery } from './workspace-history.js';
+import {
+  createWorkspaceHistoryReader,
+  workspaceHistorySessionsQuery,
+} from './workspace-history.js';
 
 const workspaceId = 'worktree_6a7199ec-d6d7-4788-b5a5-d74960f401e3';
 const route: RouteRecord = {
@@ -11,6 +14,7 @@ const route: RouteRecord = {
     kiloSessionId: `ses_${'a'.repeat(26)}`,
     directory: '/workspace/project',
     attemptId: 'attempt',
+    runtimeIsolation: 'per-session',
     kilo: {
       scopeId: workspaceId,
       token: 'test-token',
@@ -38,6 +42,10 @@ const route: RouteRecord = {
 const db = getWorkerDb('postgres://unused:unused@localhost/unused');
 
 describe('workspace history ownership query', () => {
+  it('accepts production stored routes retaining the runtime isolation compatibility field', () => {
+    expect(route.spec.runtimeIsolation).toBe('per-session');
+    expect(workspaceHistorySessionsQuery(db, route)).not.toBeNull();
+  });
   it('selects the five most recently updated root chats, with a deterministic tie-breaker', () => {
     const query = workspaceHistorySessionsQuery(db, route)?.toSQL();
     expect(query?.sql).toContain(
@@ -81,12 +89,78 @@ describe('workspace history ownership query', () => {
   it.each([
     { ...route, credentialSource: null },
     { ...route, state: 'failed' as const },
-    { ...route, spec: { ...route.spec, runtimeIsolation: 'per-session' as const } },
     {
       ...route,
       spec: { ...route.spec, kilo: { ...route.spec.kilo!, scopeId: 'not-a-workspace' } },
     },
-  ])('does not authorize a missing, failed or non-shared workspace route (%j)', candidate => {
+  ])('does not authorize a missing, failed or invalid workspace route (%j)', candidate => {
     expect(workspaceHistorySessionsQuery(db, candidate)).toBeNull();
+  });
+});
+
+describe('workspace history preload authorization', () => {
+  const target = { sessionId: 'workspace_sibling', kiloSessionId: `ses_${'b'.repeat(26)}` };
+
+  it('authorizes all discovered sibling pages with one ledger read during the preload', async () => {
+    const read = vi.fn(async () => [target]);
+    const reader = createWorkspaceHistoryReader(read);
+    expect(await reader.readRecent(route)).toEqual([target]);
+    for (let page = 0; page < 10; page++) expect(await reader.authorize(route, target)).toBe(true);
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it('rechecks the ledger after ten seconds without extending the grant on page reads', async () => {
+    let now = 0;
+    const read = vi.fn(async () => [target]);
+    const reader = createWorkspaceHistoryReader(read, () => now);
+    await reader.readRecent(route);
+    now = 9_999;
+    expect(await reader.authorize(route, target)).toBe(true);
+    now = 10_000;
+    read.mockResolvedValue([]);
+    expect(await reader.authorize(route, target)).toBe(false);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(read).toHaveBeenLastCalledWith(route, target);
+  });
+
+  it.each([
+    { ...route, sessionId: 'workspace_other' },
+    { ...route, attemptId: 'new-attempt' },
+    { ...route, spec: { ...route.spec, kiloSessionId: 'ses_other' } },
+    { ...route, spec: { ...route.spec, kilo: { ...route.spec.kilo!, scopeId: 'other' } } },
+    { ...route, credentialSource: { ...route.credentialSource!, userId: 'oauth/other' } },
+    { ...route, credentialSource: { ...route.credentialSource!, orgId: 'other-org' } },
+    { ...route, credentialSource: null },
+  ])('does not reuse authorization for a changed route (%j)', async changed => {
+    const read = vi.fn(async () => [target]);
+    const reader = createWorkspaceHistoryReader(read);
+    await reader.readRecent(route);
+    read.mockResolvedValue([]);
+    expect(await reader.authorize(changed, target)).toBe(false);
+    expect(read).toHaveBeenLastCalledWith(changed, target);
+  });
+
+  it('denies failed routes and rechecks undiscovered or mismatched native sessions', async () => {
+    const read = vi.fn(async () => [target]);
+    const reader = createWorkspaceHistoryReader(read);
+    await reader.readRecent(route);
+    expect(await reader.authorize({ ...route, state: 'failed' }, target)).toBe(false);
+    expect(read).toHaveBeenCalledTimes(1);
+    read.mockResolvedValue([]);
+    const other = { ...target, kiloSessionId: 'ses_other' };
+    expect(await reader.authorize(route, other)).toBe(false);
+    expect(read).toHaveBeenLastCalledWith(route, other);
+  });
+
+  it('does not reuse discovery across sockets or cache discovery failures', async () => {
+    const read = vi.fn(async () => [target]);
+    const first = createWorkspaceHistoryReader(read);
+    const second = createWorkspaceHistoryReader(read);
+    await first.readRecent(route);
+    read.mockRejectedValueOnce(new Error('unavailable'));
+    await expect(second.readRecent(route)).rejects.toThrow('unavailable');
+    read.mockResolvedValue([]);
+    expect(await second.authorize(route, target)).toBe(false);
+    expect(read).toHaveBeenCalledTimes(3);
   });
 });

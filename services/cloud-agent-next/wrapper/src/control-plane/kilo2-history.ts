@@ -47,7 +47,7 @@ export async function restoreKilo2History(
       .parse(data);
     if (header.info.id !== input.sessionId)
       throw new Error('Cloud history belongs to another native session');
-    title ??= header.info.title;
+    title ??= header.info.title?.trim().slice(0, 200) || undefined;
     // A new Cloud chat has no native source until its first runtime opens it.
     // v1 history needs a separate migration, so its session starts empty.
     if (header.source.version !== 'v2') {

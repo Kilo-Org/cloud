@@ -55,6 +55,7 @@ describe('workspace startup history', () => {
     const started = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
     const h = createHarness(FAST_TIMERS, {
+      supportsHistoryPreload: true,
       readRecentHistory: async () => recent,
       readHistoryPage: async () => ({}),
     });
@@ -85,6 +86,7 @@ describe('workspace startup history', () => {
   it('reports the requested chat ready even when recent-chat discovery fails', async () => {
     const base = routeSpec();
     const h = createHarness(FAST_TIMERS, {
+      supportsHistoryPreload: true,
       readRecentHistory: async () => {
         throw new Error('unavailable');
       },
@@ -96,6 +98,26 @@ describe('workspace startup history', () => {
     });
     expect(h.frames.some(frame => frame.type === 'session.ready')).toBe(true);
     expect(h.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+  });
+
+  it('does not preload legacy chats before their on-demand file restore', async () => {
+    let discoveries = 0;
+    const h = createHarness(FAST_TIMERS, {
+      readRecentHistory: async () => {
+        discoveries++;
+        return [];
+      },
+      readHistoryPage: async () => ({}),
+    });
+    h.setSessionExists(false);
+    const base = routeSpec();
+    await h.manager.prepare({
+      ...base,
+      kilo: { ...base.kilo!, scopeId: 'worktree_6a7199ec-d6d7-4788-b5a5-d74960f401e3' },
+    });
+    expect(discoveries).toBe(0);
+    expect(h.restoreOptions().map(options => options?.restoreFiles)).toEqual([true]);
+    expect(h.frames.some(frame => frame.type === 'session.ready')).toBe(true);
   });
 });
 
@@ -794,6 +816,7 @@ function createHarness(
     spawnSetup?: ProcessSpawn;
     readRecentHistory?: PrepareDeps['readRecentHistory'];
     readHistoryPage?: PrepareDeps['readHistoryPage'];
+    supportsHistoryPreload?: boolean;
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -922,6 +945,7 @@ function createHarness(
         },
         log: message => logs.push(message),
       });
+      currentClient.supportsHistoryPreload = options.supportsHistoryPreload;
       return currentClient;
     },
     installCredentials: async (key, env, cloudAgentMcp) => {

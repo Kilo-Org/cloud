@@ -364,6 +364,7 @@ function newSessionReasonInput(overrides: {
   hasAttachments?: boolean;
   selectedRepositoryResolved?: boolean;
   isLoadingRepositories?: boolean;
+  isLoadingModels?: boolean;
   isRemoteTargetSelected?: boolean;
   selectedRepo?: string;
   gate?: ReturnType<typeof newSessionGate>;
@@ -375,6 +376,7 @@ function newSessionReasonInput(overrides: {
     hasAttachments: overrides.hasAttachments ?? false,
     selectedRepositoryResolved: overrides.selectedRepositoryResolved ?? true,
     isLoadingRepositories: overrides.isLoadingRepositories ?? false,
+    isLoadingModels: overrides.isLoadingModels ?? false,
     isRemoteTargetSelected: overrides.isRemoteTargetSelected ?? false,
     selectedRepo: overrides.selectedRepo ?? '',
     gate: overrides.gate ?? newSessionGate(),
@@ -387,6 +389,7 @@ function continueReasonInput(overrides: {
   hasAttachments?: boolean;
   selectedRepositoryResolved?: boolean;
   isLoadingRepositories?: boolean;
+  isLoadingModels?: boolean;
   isRemoteTargetSelected?: boolean;
   selectedRepo?: string;
   gate?: ReturnType<typeof continueGate>;
@@ -398,6 +401,7 @@ function continueReasonInput(overrides: {
     hasAttachments: overrides.hasAttachments ?? false,
     selectedRepositoryResolved: overrides.selectedRepositoryResolved ?? true,
     isLoadingRepositories: overrides.isLoadingRepositories ?? false,
+    isLoadingModels: overrides.isLoadingModels ?? false,
     isRemoteTargetSelected: overrides.isRemoteTargetSelected ?? false,
     selectedRepo: overrides.selectedRepo ?? '',
     gate: overrides.gate ?? continueGate(),
@@ -555,7 +559,9 @@ describe('resolveNewSessionStartBlockedReason', () => {
     ).toBe('enter-prompt');
   });
 
-  it('stays silent for Cloud Agent when the prompt is missing beside another blocker', () => {
+  it('never blames the missing prompt for a blocker that outranks it', () => {
+    // The pending profile read keeps the footer quiet: the Environment row
+    // names it.
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
@@ -564,6 +570,8 @@ describe('resolveNewSessionStartBlockedReason', () => {
         })
       )
     ).toBeNull();
+    // An empty model is the blocker, so naming the prompt would point at the
+    // wrong field.
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
@@ -571,7 +579,7 @@ describe('resolveNewSessionStartBlockedReason', () => {
           gate: newSessionGate({ hasPrompt: false, model: '' }),
         })
       )
-    ).toBeNull();
+    ).toBe('select-model');
   });
 
   it('never blames the prompt for a selected repository that no longer resolves', () => {
@@ -646,12 +654,89 @@ describe('resolveNewSessionStartBlockedReason', () => {
     ).toBe('select-repository');
   });
 
-  it('returns null when another precondition blocks Start', () => {
+  it('names the attachment and model preconditions the form rows do not explain', () => {
+    // A settled composer with prompt, repository, and model: Start enables and
+    // the footer says nothing.
     expect(
       resolveNewSessionStartBlockedReason(
-        newSessionReasonInput({ gate: newSessionGate({ model: '' }) })
+        newSessionReasonInput({
+          hasRepositories: true,
+          selectedRepo: 'org/repo',
+          hasAttachments: true,
+        })
       )
     ).toBeNull();
+
+    // The same state with an upload still in flight: the create would carry a
+    // partial file, so Start stays disabled and the footer names the upload.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          hasRepositories: true,
+          selectedRepo: 'org/repo',
+          hasAttachments: true,
+          gate: newSessionGate({ attachmentsIsUploading: true }),
+        })
+      )
+    ).toBe('wait-for-upload');
+    // The repository is still unpicked: the upload is named, not the repository,
+    // because re-evaluating the gate with a repository supplied stays disabled.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          hasRepositories: true,
+          hasAttachments: true,
+          gate: newSessionGate({ attachmentsIsUploading: true }),
+        })
+      )
+    ).toBe('wait-for-upload');
+
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          hasAttachments: true,
+          gate: newSessionGate({ attachmentsHasFailed: true }),
+        })
+      )
+    ).toBe('retry-failed-attachment');
+
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ model: '' }),
+        })
+      )
+    ).toBe('select-model');
+
+    // An empty model while the catalog is still loading is a pending read, not
+    // a missing choice: naming it would point at a picker that is not ready.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          isLoadingModels: true,
+          gate: newSessionGate({ model: '' }),
+        })
+      )
+    ).toBeNull();
+
+    // A loading list with no rows yet does not hide a gate precondition.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          hasRepositories: false,
+          isLoadingRepositories: true,
+          gate: newSessionGate({ attachmentsIsUploading: true }),
+        })
+      )
+    ).toBe('wait-for-upload');
+  });
+
+  it('stays silent only where another control already names the state', () => {
+    // A pending profile read is announced by the Environment row; an in-flight
+    // create or submit keeps Start's own busy spinner.
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({ gate: newSessionGate({ isProfileLoading: true }) })
@@ -664,15 +749,27 @@ describe('resolveNewSessionStartBlockedReason', () => {
     ).toBeNull();
     expect(
       resolveNewSessionStartBlockedReason(
-        newSessionReasonInput({
-          gate: newSessionGate({ hasPrompt: false, attachmentsIsUploading: true }),
-        })
+        newSessionReasonInput({ gate: newSessionGate({ isCreating: true }) })
       )
     ).toBeNull();
+  });
+
+  it('names the remote spawn preconditions instead of leaving its Start inert', () => {
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
-          gate: newSessionGate({ hasPrompt: false, attachmentsHasFailed: true }),
+          isRemoteTargetSelected: true,
+          hasAttachments: true,
+          gate: newSessionGate({ isRemoteTargetSelected: true, model: '' }),
+        })
+      )
+    ).toBe('select-model');
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          isRemoteTargetSelected: true,
+          hasAttachments: true,
+          gate: newSessionGate({ isRemoteTargetSelected: true }),
         })
       )
     ).toBeNull();

@@ -1164,6 +1164,7 @@ export function NewSessionScreenBody() {
           selectedRepo,
           hasAttachments: attachments.attachments.length > 0,
           selectedRepositoryResolved: selectedRepository !== null,
+          isLoadingModels,
           gate: {
             isCreating,
             isSubmitting,
@@ -1185,6 +1186,7 @@ export function NewSessionScreenBody() {
           selectedRepo,
           hasAttachments: attachments.attachments.length > 0,
           selectedRepositoryResolved: selectedRepository !== null,
+          isLoadingModels,
           gate: {
             attachmentsHasFailed: attachments.hasFailedAttachments,
             attachmentsIsUploading: attachments.isUploading,
@@ -1234,6 +1236,14 @@ export function NewSessionScreenBody() {
     startBlockedReason = t('agentChat.newSession.enterPromptToStart');
   } else if (startBlockedReasonKey === 'enter-prompt-or-file') {
     startBlockedReason = t('agentChat.newSession.enterPromptOrFileToStart');
+  } else if (startBlockedReasonKey === 'wait-for-upload') {
+    // The same sentence the composer shows when a send is attempted too early:
+    // one upload rule, one wording.
+    startBlockedReason = t('agentChat.composer.waitForUploads');
+  } else if (startBlockedReasonKey === 'retry-failed-attachment') {
+    startBlockedReason = t('agentChat.composer.removeOrRetryFailed');
+  } else if (startBlockedReasonKey === 'select-model') {
+    startBlockedReason = t('agentChat.composer.selectModelBeforeSending');
   }
 
   // The plan explanation already says why Start cannot run, and nothing the

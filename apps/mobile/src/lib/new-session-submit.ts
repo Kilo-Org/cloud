@@ -151,7 +151,13 @@ export type NewSessionStartBlockedReason =
   /** Cloud Agent needs prompt text; an attachment alone does not submit. */
   | 'enter-prompt'
   /** Remote CLI needs prompt text or a file; an empty composer spawns nothing. */
-  | 'enter-prompt-or-file';
+  | 'enter-prompt-or-file'
+  /** An attachment upload is in flight; the create would carry a partial file. */
+  | 'wait-for-upload'
+  /** An attachment chip is terminally failed; the create would drop that file. */
+  | 'retry-failed-attachment'
+  /** The model list settled without a selection, so the create has no model. */
+  | 'select-model';
 
 /**
  * The inputs for `resolveNewSessionStartBlockedReason`. `gate` is the entry's
@@ -181,6 +187,11 @@ type NewSessionStartBlockedReasonInput = {
    * the empty composer is not what blocks it and must not be named.
    */
   selectedRepositoryResolved: boolean;
+  /**
+   * True while the model catalog is still loading. An empty selection then is
+   * a pending read, not a choice the user can make, so it names no reason.
+   */
+  isLoadingModels: boolean;
 } & (
   | {
       entry: 'new-session';
@@ -220,7 +231,37 @@ type NewSessionStartBlockedReasonInput = {
  * empty composer is named instead, because a disabled Start with no
  * explanation is a dead end: Cloud Agent needs prompt text, and a remote CLI
  * needs a prompt or a file.
+ *
+ * The preconditions no row of the form names — an upload still in flight, a
+ * failed attachment chip, a catalog that settled without a model — are named
+ * here rather than returning nothing: the footer is where the disabled Start
+ * is, so silence there is the dead end. Two states stay unnamed on purpose. A
+ * pending profile read is announced by the Environment row's own loading state
+ * and live region, and an in-flight create or submit keeps Start's busy
+ * spinner, so naming either again would describe the same state twice.
  */
+function resolveNewSessionGateBlockedReason(
+  gate: Omit<
+    Parameters<typeof resolveNewSessionStartDisabled>[0],
+    'selectedRepo' | 'selectedRepositoryResolved'
+  >,
+  isLoadingModels: boolean
+): NewSessionStartBlockedReason | null {
+  if (gate.attachmentsIsUploading) {
+    return 'wait-for-upload';
+  }
+  if (gate.attachmentsHasFailed) {
+    return 'retry-failed-attachment';
+  }
+  // An empty selection while the catalog is still loading is a pending read,
+  // not a missing choice: naming it would tell the user to pick from a picker
+  // that is not ready yet.
+  if (!isLoadingModels && gate.model === '') {
+    return 'select-model';
+  }
+  return null;
+}
+
 export function resolveNewSessionStartBlockedReason(
   input: NewSessionStartBlockedReasonInput
 ): NewSessionStartBlockedReason | null {
@@ -229,8 +270,13 @@ export function resolveNewSessionStartBlockedReason(
   // empty composer hands the spawn nothing (`buildComposerSharePayload` returns
   // null for it). A clone entry has no composer at all.
   if (input.isRemoteTargetSelected) {
-    if (input.entry !== 'new-session' || input.gate.hasPrompt || input.hasAttachments) {
+    if (input.entry !== 'new-session') {
       return null;
+    }
+    if (input.gate.hasPrompt || input.hasAttachments) {
+      // The spawn is gated on the same attachment and model states as a cloud
+      // create, so the footer names them instead of leaving Start inert.
+      return resolveNewSessionGateBlockedReason(input.gate, input.isLoadingModels);
     }
     return 'enter-prompt-or-file';
   }
@@ -256,14 +302,21 @@ export function resolveNewSessionStartBlockedReason(
     ) {
       return 'enter-prompt';
     }
-    return null;
+    // The repository question is settled: anything still holding Start is one
+    // of the gate's own preconditions, and the footer names it.
+    return input.entry === 'new-session'
+      ? resolveNewSessionGateBlockedReason(input.gate, input.isLoadingModels)
+      : null;
   }
   // A still-loading list only defers the decision while it could change it: when
   // no rows exist yet, naming a blocker now could name the wrong one. Once rows
   // already exist, `select-repository` is unambiguous and must not be hidden
-  // behind an unrelated group that is still loading.
+  // behind an unrelated group that is still loading. A gate precondition is
+  // named either way: it is not a repository guess.
   if (!input.hasRepositories && input.isLoadingRepositories) {
-    return null;
+    return input.entry === 'new-session'
+      ? resolveNewSessionGateBlockedReason(input.gate, input.isLoadingModels)
+      : null;
   }
 
   const gateDisabledWithSyntheticRepo =
@@ -286,9 +339,12 @@ export function resolveNewSessionStartBlockedReason(
         });
 
   // Still disabled with a repository supplied: some other condition blocks
-  // Start, so the missing repository is not the reason.
+  // Start, so the missing repository is not the reason. Name that condition
+  // instead of leaving the footer silent.
   if (gateDisabledWithSyntheticRepo) {
-    return null;
+    return input.entry === 'new-session'
+      ? resolveNewSessionGateBlockedReason(input.gate, input.isLoadingModels)
+      : null;
   }
 
   // The account cannot pick a repository yet and a provider can still be

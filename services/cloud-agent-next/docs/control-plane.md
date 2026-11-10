@@ -757,11 +757,16 @@ keep environment snapshots and existing history/worktree recovery.
 
 The route `directory` is the working directory (cwd): where Kilo starts and setup runs. The frame's
 optional `roots` list the git roots, one for each repository of a V2 environment
-(`{ directory, repoFullName, git: { url, platform }, branch, branchMode? }`, no credential). Every
-root is the route directory or a path under it. A frame without `roots` (every V1 route, and any
-frame from an older Worker) has one root at `directory`. With one root the cwd is that root. With
-several, the cwd is `/workspace`, which is not itself a git root: it is never emptied, stamped or
-checked out. Setup runs there and can write into it.
+(`{ directory, repoFullName, git: { url, platform }, branch, branchMode?, baseBranch?, baseSha? }`,
+no credential). Every root is the route directory or a path under it. A frame without `roots`
+(every V1 route, and any frame from an older Worker) has one root at `directory`. With one root the
+cwd is that root. With several, the cwd is `/workspace`, which is not itself a git root: it is never
+emptied, stamped or checked out. Setup runs there and can write into it.
+
+With `roots`, checkout uses each root's own `branch`, `branchMode`, `baseBranch` and `baseSha`,
+never inheriting those fields from the route. Only the launch repository's root carries the stacked
+base; other roots keep their configured branches without that base. Without `roots`, checkout uses
+the route-level branch and base fields for the single root at `directory`.
 
 The wrapper owns the step timeouts and retries. Clone, checkout, restore and stamp run once for
 each root, in order. The clone and restore bounds are totals for the whole preparation, not for each
@@ -1543,6 +1548,12 @@ parent worktree. The flat `prepareSession` input and the grouped `start` input a
 The first session-ingest ownership row for the worktree records the same three values and later
 sibling registrations leave them untouched. A sibling chat inherits them; a transcript fork does
 not (a clone create never passes them).
+
+The Sandbox DO forwards the stored `baseBranch` and `baseSha` in `session.prepare`. For a V2
+environment workspace, registration also puts them only on the launch repository's entry in
+`roots`; the wrapper uses each root's fields rather than copying the route-level base to every
+repository. This applies even to a single-repository V2 environment. A route without `roots` uses
+the route-level base for its single checkout.
 
 When the wrapper creates the working branch and no local or remote branch exists, it fetches
 `origin/<baseBranch>` and checks `baseSha` is an ancestor of it before running

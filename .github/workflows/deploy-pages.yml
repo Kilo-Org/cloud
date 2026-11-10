@@ -11,8 +11,8 @@ name: Deploy Pages
 #
 # * `build` fetches the pinned commit, builds it and uploads the package. It
 #   holds no secret.
-# * `deploy` installs only this repository's lockfile, checks the package with
-#   a dry run, and publishes it when `deploy` is ticked.
+# * `deploy` installs only this repository's lockfile, checks the package
+#   against the profile, dry-runs it, and publishes it when `deploy` is ticked.
 on:
   workflow_dispatch:
     inputs:
@@ -117,6 +117,14 @@ jobs:
         with:
           name: pages-package-${{ inputs.profile }}
           path: ${{ runner.temp }}/pages-package
+
+      # The package was built by the other repository's scripts. Before Wrangler
+      # reads it: no field that runs a command, and no Worker, account, route,
+      # database or bucket other than the profile's.
+      - name: Check the package against the profile
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: node services/pages/scripts/check-package.mjs "$PROFILE" "$RUNNER_TEMP/pages-package"
 
       # Reads the package the way a deploy does and stops before any request to
       # Cloudflare. It needs no token.

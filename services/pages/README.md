@@ -11,6 +11,7 @@ records the dev deployment, so it can be diagnosed or repeated.
 | `source.json` | The source repository and the full id of the commit that is built |
 | `profiles/dev.json` | The dev Worker's name, account, hostname, D1 databases, R2 bucket and plain variables |
 | `scripts/stage.mjs` | Fetches the pinned commit, builds it, and writes a package Wrangler deploys as it is |
+| `scripts/check-package.mjs` | Refuses a package whose Wrangler configuration names anything the profile does not |
 | `package.json` | Wrangler, from this repository's lockfile |
 
 There is no `wrangler.jsonc` here on purpose. `deploy-workers.yml` finds
@@ -35,7 +36,10 @@ scripts never run in a job that holds the Cloudflare token:
    `scripts/cloudflare-stage.mjs` with the profile. `npm run setup` also
    fetches `automerge/automerge-repo` at a commit the Pages source pins. This
    job holds no secret.
-2. `deploy` installs Wrangler from this repository's lockfile and runs
+2. `deploy` installs Wrangler from this repository's lockfile. It runs
+   `scripts/check-package.mjs` first: the package's `wrangler.json` may hold
+   no field that runs a command, and no Worker, account, route, database or
+   bucket other than the profile's. Then it runs
    `wrangler deploy --config PACKAGE/wrangler.json` with
    `CLOUDFLARE_API_TOKEN`, the repository secret the other Workers deploy
    with.
@@ -50,6 +54,7 @@ last command needs `wrangler login` or `CLOUDFLARE_API_TOKEN`:
 ```sh
 pnpm install --filter '{.}...'
 pnpm run stage dev NEW_DIRECTORY
+pnpm run check-package dev NEW_DIRECTORY
 pnpm exec wrangler deploy --dry-run --config NEW_DIRECTORY/wrangler.json
 pnpm exec wrangler deploy --config NEW_DIRECTORY/wrangler.json
 ```

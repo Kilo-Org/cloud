@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "stage": "node scripts/stage.mjs",
-    "typecheck": "node --check scripts/stage.mjs"
+    "check-package": "node scripts/check-package.mjs",
+    "test": "node --test scripts/*.test.mjs",
+    "typecheck": "node --check scripts/stage.mjs && node --check scripts/check-package.mjs"
   },
   "devDependencies": {
     "wrangler": "catalog:"

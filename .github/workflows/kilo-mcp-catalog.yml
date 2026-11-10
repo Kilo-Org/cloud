@@ -220,23 +220,23 @@ jobs:
           echo "::error::Kilo CLI install did not finish"
           exit 1
 
-      - name: Install root dependencies
+      # One install pass serves both the wiring check and the dump: the root
+      # project the check reads, the web closure the dump parses, and
+      # `cloud-agent-next`. That last project is not in web's dependency
+      # closure, but `apps/web/src/routers/cloud-agent-next-schemas.ts` imports
+      # schemas from it by relative path. Without that project installed, its
+      # bare `zod` import falls back to pnpm's hoisted copy, which can be a
+      # different version from the one the tests use, and the dump then rewrites
+      # the catalog with that version's JSON Schema output. Scripts stay
+      # enabled, as they are for the merge job, so the web closure's postinstalls
+      # run the way they do there.
+      - name: Install dependencies
         if: steps.catalog_changes.outputs.catalog == 'true'
-        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
+        run: pnpm install --frozen-lockfile --filter 'web...' --filter cloud-agent-next --filter kilocode-monorepo
 
       - name: Check catalog workflow wiring
         if: steps.catalog_changes.outputs.catalog == 'true'
         run: node --test scripts/kilo-mcp-catalog.test.mjs
-
-      # `cloud-agent-next` is not in web's dependency closure, but
-      # `apps/web/src/routers/cloud-agent-next-schemas.ts` imports schemas from
-      # it by relative path. Without that project installed, its bare `zod`
-      # import falls back to pnpm's hoisted copy, which can be a different
-      # version from the one the tests use, and the dump then rewrites the
-      # catalog with that version's JSON Schema output.
-      - name: Install web dependencies
-        if: steps.catalog_changes.outputs.catalog == 'true'
-        run: pnpm install --frozen-lockfile --filter web... --filter cloud-agent-next
 
       # Same dummies the jest suite already tolerates (ci.yml does the same for
       # the production build). The dump itself layers apps/web/.env.test under

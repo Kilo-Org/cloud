@@ -639,8 +639,9 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
 
 Workspace snapshots are private full-disk checkpoints for trusted registered `worktree_*`
 workspaces. `workspace_*` identifies a Cloud Agent session, not the workspace.
-`WORKSPACE_SNAPSHOT_ORG_IDS` and `WORKSPACE_SNAPSHOT_USER_IDS` are explicit allowlists;
-empty or unset disables the feature, and `*` does not enroll owners.
+`WORKSPACE_SNAPSHOT_IDS` is a comma-separated allowlist of user or organization IDs;
+matching either enrolls the owner. `*` enrolls everyone; empty or unset enrolls no owners.
+Production sets it to `*` to enable snapshots for everyone eligible below.
 Standalone sessions never capture or restore tail snapshots.
 
 `src/control-plane/sandbox/workspace-snapshot.ts` owns identity, publication and selection.

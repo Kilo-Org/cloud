@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import type { Env } from '../../types.js';
+import { isOrgInList } from '../../sandbox-id.js';
 import type {
   ControlPlaneCredentialSource,
   ControlPlaneRouteSpec,
@@ -103,19 +104,12 @@ export function sameWorkspaceSnapshotIdentity(
 }
 
 export function workspaceSnapshotsEnabled(
-  env: Pick<Env, 'WORKSPACE_SNAPSHOT_USER_IDS' | 'WORKSPACE_SNAPSHOT_ORG_IDS'>,
+  env: Pick<Env, 'WORKSPACE_SNAPSHOT_IDS'>,
   source: Pick<ControlPlaneCredentialSource, 'userId' | 'orgId'>
 ): boolean {
-  const includes = (raw: string | undefined, id: string | undefined) =>
-    id !== undefined &&
-    id !== '*' &&
-    (raw ?? '')
-      .split(',')
-      .map(value => value.trim())
-      .includes(id);
   return (
-    includes(env.WORKSPACE_SNAPSHOT_USER_IDS, source.userId) ||
-    includes(env.WORKSPACE_SNAPSHOT_ORG_IDS, source.orgId)
+    isOrgInList(env.WORKSPACE_SNAPSHOT_IDS, source.userId) ||
+    isOrgInList(env.WORKSPACE_SNAPSHOT_IDS, source.orgId)
   );
 }
 

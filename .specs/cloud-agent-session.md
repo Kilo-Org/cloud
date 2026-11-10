@@ -299,8 +299,8 @@ repository.
 
 ### Workspace tail snapshots
 
-1. `WORKSPACE_SNAPSHOT_ORG_IDS` and `WORKSPACE_SNAPSHOT_USER_IDS` MUST use explicit
-   enrolled IDs. Empty or unset is off. `*` MUST NOT enable snapshots.
+1. `WORKSPACE_SNAPSHOT_IDS` MUST accept a comma-separated allowlist of user or organization
+   IDs. Matching either MUST enroll the owner. Empty or unset is off; `*` MUST enroll everyone.
 2. Only a trusted registered `worktree_*` workspace MAY capture or restore a tail
    snapshot. Standalone sessions MUST NOT capture or restore one.
 3. A snapshot MUST belong to one workspace, user, organization, sandbox binding,

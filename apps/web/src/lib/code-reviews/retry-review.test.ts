@@ -37,7 +37,7 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 }));
 
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
-import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import { getAgentConfigForOwner, type AgentConfigRow } from '@/lib/agent-config/db/agent-configs';
 import type { Owner } from '@/lib/code-reviews/core';
 import {
   createCodeReviewAttempt,
@@ -77,6 +77,24 @@ const mockedGitLabProjectToken = jest.mocked(getValidGitLabProjectAccessToken);
 const mockedGitLabToken = jest.mocked(getValidGitLabToken);
 
 const OWNER: Owner = { type: 'user', id: 'user-1', userId: 'user-1' };
+
+function makeAgentConfig(overrides: Partial<AgentConfigRow> = {}): AgentConfigRow {
+  return {
+    id: 'config-1',
+    owned_by_organization_id: null,
+    owned_by_user_id: 'user-1',
+    agent_type: 'code_review',
+    platform: 'github',
+    config: {},
+    is_enabled: true,
+    runtime_state: {},
+    created_by: 'user-1',
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    config_revision: 1,
+    ...overrides,
+  };
+}
 
 function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCodeReview {
   return {
@@ -360,6 +378,18 @@ describe('retryFailedCodeReview', () => {
     expect(result).toEqual({ outcome: 'refused', reason: 'reviewer_disabled' });
     expect(mockedReset).not.toHaveBeenCalled();
     expect(mockedDispatch).not.toHaveBeenCalled();
+  });
+
+  it('refuses from the configuration row its caller already read', async () => {
+    const result = await retryFailedCodeReview({
+      review: makeReview(),
+      owner: OWNER,
+      retryReason: 'automatic_recovery',
+      agentConfig: makeAgentConfig({ is_enabled: false }),
+    });
+
+    expect(result).toEqual({ outcome: 'refused', reason: 'reviewer_disabled' });
+    expect(mockedGetAgentConfig).not.toHaveBeenCalled();
   });
 
   it('answers refused for a reviewer whose configuration needs attention', async () => {

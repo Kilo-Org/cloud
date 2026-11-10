@@ -39,6 +39,7 @@ const mockListAttempts = jest.fn<Promise<Array<{ id: string }>>, unknown[]>();
 const mockRetryFailedCodeReview = jest.fn<Promise<RetryOutcome>, unknown[]>();
 const mockGetBotUserId = jest.fn<Promise<string | null>, unknown[]>();
 const mockGetAgentConfig = jest.fn<Promise<unknown>, unknown[]>();
+const mockCouncilEntitled = jest.fn<Promise<boolean>, unknown[]>();
 const mockAssertAuthorized = jest.fn<Promise<void>, unknown[]>();
 
 jest.mock('@/lib/agent-config/db/agent-configs', () => ({
@@ -97,10 +98,10 @@ jest.mock('./retry-review', () => {
   };
 });
 
-// The council entitlement is a prerequisite lookup the handler may extend;
-// kept as a stub so an added call stays a stub rather than a live lookup.
+// The council entitlement is a prerequisite lookup the restart gate repeats;
+// stubbed so an added call stays a stub rather than a live lookup.
 jest.mock('@/lib/code-reviews/core/council-entitlement', () => ({
-  isCouncilEntitledForOwner: async () => false,
+  isCouncilEntitledForOwner: (...args: unknown[]) => mockCouncilEntitled(...args),
 }));
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
@@ -220,6 +221,51 @@ function makePull(overrides: Partial<OpenPullRequest> = {}): OpenPullRequest {
   } as OpenPullRequest;
 }
 
+type CouncilRestartConfig = {
+  review_style: string;
+  focus_areas: string[];
+  model_slug: string;
+  council: Record<string, unknown>;
+  council_enabled_repository_ids: number[];
+};
+
+/**
+ * A stored Code Reviewer configuration whose council is active and whose
+ * repository is the pull request's base repository, so the restart gate has a
+ * selection it can recognise.
+ */
+function councilConfiguration(overrides: Partial<CouncilRestartConfig> = {}): CouncilRestartConfig {
+  return {
+    review_style: 'balanced',
+    focus_areas: [],
+    model_slug: 'kilo/test',
+    council: {
+      enabled: true,
+      aggregation_strategy: 'advisory',
+      specialists: [
+        {
+          id: 'security',
+          role: 'security',
+          name: 'Security',
+          enabled: true,
+          required: true,
+          lens: 'Security defects',
+        },
+        {
+          id: 'testing',
+          role: 'testing',
+          name: 'Testing',
+          enabled: true,
+          required: true,
+          lens: 'Missing tests',
+        },
+      ],
+    },
+    council_enabled_repository_ids: [501],
+    ...overrides,
+  };
+}
+
 /**
  * Stubs the raw SQL reads: the count aggregate, the repository slice, and the
  * integration rows of the slice. The slice repeats, like the same database
@@ -260,6 +306,7 @@ beforeEach(() => {
   mockRetryFailedCodeReview.mockResolvedValue({ outcome: 'retried' });
   mockGetBotUserId.mockResolvedValue('bot-user-1');
   mockGetAgentConfig.mockResolvedValue({ config: {}, is_enabled: true });
+  mockCouncilEntitled.mockResolvedValue(false);
   mockAssertAuthorized.mockResolvedValue();
   handlerVerdict = 'started';
   mockHandlePullRequestCodeReview.mockClear();
@@ -455,6 +502,25 @@ describe('recoverMissedReviews', () => {
     });
   });
 
+  it('counts a restart against the same per-run budget as a new review', async () => {
+    const pulls: OpenPullRequest[] = [];
+    for (let index = 0; index < RECOVER_MISSED_REVIEWS_START_LIMIT + 3; index += 1) {
+      pulls.push(makePull({ number: 10 + index, headSha: `sha-${index}` }));
+    }
+    mockFetchOpenPullRequests.mockResolvedValue(pulls);
+    mockFindExistingReview.mockImplementation(async (_scope: unknown, headSha: unknown) =>
+      headSha === 'sha-0'
+        ? { id: 'review-1', status: 'failed', terminal_reason: 'assistant_timeout' }
+        : null
+    );
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary.reviewsRetried).toBe(1);
+    expect(summary.reviewsStarted).toBe(RECOVER_MISSED_REVIEWS_START_LIMIT - 1);
+    expect(summary.skippedStartLimit).toBe(3);
+  });
+
   it('stops starting reviews at the per-run limit and counts the remainder', async () => {
     const pulls: OpenPullRequest[] = [];
     for (let index = 0; index < RECOVER_MISSED_REVIEWS_START_LIMIT + 3; index += 1) {
@@ -536,6 +602,8 @@ describe('recoverMissedReviews', () => {
   });
 
   it('restarts a review that stopped on a transient failure instead of treating the head as done', async () => {
+    const storedConfig = { config: { model_slug: 'kilo/test' }, is_enabled: true };
+    mockGetAgentConfig.mockResolvedValue(storedConfig);
     mockFindExistingReview.mockResolvedValue({
       id: 'review-1',
       status: 'failed',
@@ -546,7 +614,7 @@ describe('recoverMissedReviews', () => {
 
     expect(summary).toMatchObject({
       reviewsRetried: 1,
-      reviewsStarted: 1,
+      reviewsStarted: 0,
       skippedExisting: 0,
       providerFailures: 0,
     });
@@ -555,7 +623,10 @@ describe('recoverMissedReviews', () => {
       review: { id: 'review-1', status: 'failed', terminal_reason: 'assistant_timeout' },
       owner: { type: 'org', id: ORG_ID, userId: 'bot-user-1' },
       retryReason: 'automatic_recovery',
+      // The gate passes the row it read, so the restart reads the configuration once.
+      agentConfig: storedConfig,
     });
+    expect(mockGetAgentConfig).toHaveBeenCalledTimes(1);
     // The restart owns the new review; the webhook handler must not also start one.
     expect(mockHandlePullRequestCodeReview).not.toHaveBeenCalled();
   });
@@ -688,6 +759,106 @@ describe('recoverMissedReviews', () => {
 
     expect(summary).toMatchObject({ reviewsRetried: 0, skippedRetryRefused: 1 });
     expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('does not restart a configuration that cannot be read', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+      manual_config: null,
+    });
+    mockGetAgentConfig.mockResolvedValue({
+      is_enabled: true,
+      config: { review_style: 'not-a-review-style' },
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ reviewsRetried: 0, skippedRetryRefused: 1 });
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('does not restart a council review on a repository the current configuration opts out', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+      review_type: 'council',
+      manual_config: null,
+    });
+    mockGetAgentConfig.mockResolvedValue({
+      is_enabled: true,
+      config: councilConfiguration({ council_enabled_repository_ids: [999] }),
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ reviewsRetried: 0, skippedRetryRefused: 1 });
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+    // The cheap configuration checks answer first; the entitlement read is never made.
+    expect(mockCouncilEntitled).not.toHaveBeenCalled();
+  });
+
+  it('does not restart a council review the current labels no longer select', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+      review_type: 'council',
+      manual_config: null,
+    });
+    mockCouncilEntitled.mockResolvedValue(true);
+    mockGetAgentConfig.mockResolvedValue({
+      is_enabled: true,
+      config: councilConfiguration({
+        council: { ...councilConfiguration().council, required_labels: ['council'] },
+      }),
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ reviewsRetried: 0, skippedRetryRefused: 1 });
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('restarts a council review the current configuration still selects', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+      review_type: 'council',
+      manual_config: null,
+    });
+    mockCouncilEntitled.mockResolvedValue(true);
+    mockGetAgentConfig.mockResolvedValue({
+      is_enabled: true,
+      config: councilConfiguration(),
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ reviewsRetried: 1, skippedRetryRefused: 0 });
+    expect(mockRetryFailedCodeReview).toHaveBeenCalledTimes(1);
+  });
+
+  it('restarts a standard review on a council-configured repository without asking for entitlement', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+      review_type: 'standard',
+      manual_config: null,
+    });
+    mockGetAgentConfig.mockResolvedValue({
+      is_enabled: true,
+      config: councilConfiguration(),
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ reviewsRetried: 1, skippedRetryRefused: 0 });
+    expect(mockCouncilEntitled).not.toHaveBeenCalled();
   });
 
   it('reads no attempt rows for a head whose review already finished', async () => {

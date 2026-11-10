@@ -12,7 +12,7 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
-import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import { getAgentConfigForOwner, type AgentConfigRow } from '@/lib/agent-config/db/agent-configs';
 import {
   getCodeReviewActionRequiredCopy,
   getCodeReviewActionRequiredState,
@@ -126,6 +126,9 @@ export type CodeReviewRetryRefusalReason =
   /** A manual Code Reviewer job runs only in local development. */
   | 'local_development_only';
 
+/** The stored reviewer configuration row, as this module reads it. */
+export type ReviewerConfigRow = AgentConfigRow | null;
+
 /**
  * Whether the Code Reviewer configuration allows this review to run at all.
  *
@@ -133,10 +136,14 @@ export type CodeReviewRetryRefusalReason =
  * whose reviewer the owner switched off, or whose configuration needs
  * attention, must not start. Both callers ask here, so a person and an
  * unattended sweep get the same answer for the same review.
+ *
+ * A caller that has already read the row for its own gate passes it, so one
+ * restart reads the configuration once.
  */
 async function getRetryRefusal(
   review: CloudAgentCodeReview,
-  owner: Owner
+  owner: Owner,
+  knownAgentConfig?: ReviewerConfigRow
 ): Promise<CodeReviewRetryRefusalReason | null> {
   const manualConfig = getManualCodeReviewConfig(review);
   if (manualConfig?.outputMode === 'kilo' && !isLocalCodeReviewDevelopmentEnabled()) {
@@ -144,11 +151,14 @@ async function getRetryRefusal(
   }
   if (manualConfig) return null;
 
-  const agentConfig = await getAgentConfigForOwner(
-    owner,
-    'code_review',
-    CodeReviewPlatformSchema.parse(review.platform)
-  );
+  const agentConfig =
+    knownAgentConfig === undefined
+      ? await getAgentConfigForOwner(
+          owner,
+          'code_review',
+          CodeReviewPlatformSchema.parse(review.platform)
+        )
+      : knownAgentConfig;
   if (getCodeReviewActionRequiredState(agentConfig)) return 'action_required';
   if (!agentConfig?.is_enabled) return 'reviewer_disabled';
   return null;
@@ -160,15 +170,19 @@ async function getRetryRefusal(
  * The reset is a status compare-and-set: only a review still in a retriggable
  * terminal state matches, so a concurrent restart of the same review answers
  * `already_in_flight` instead of dispatching twice.
+ *
+ * A caller that already read the reviewer configuration for its own gate passes
+ * it as `agentConfig`, so one restart reads the configuration once.
  */
 export async function retryFailedCodeReview(params: {
   review: CloudAgentCodeReview;
   owner: Owner;
   retryReason: string;
+  agentConfig?: ReviewerConfigRow;
 }): Promise<RetryCodeReviewOutcome> {
-  const { review, owner, retryReason } = params;
+  const { review, owner, retryReason, agentConfig } = params;
 
-  const refusal = await getRetryRefusal(review, owner);
+  const refusal = await getRetryRefusal(review, owner, agentConfig);
   if (refusal !== null) {
     return { outcome: 'refused', reason: refusal };
   }

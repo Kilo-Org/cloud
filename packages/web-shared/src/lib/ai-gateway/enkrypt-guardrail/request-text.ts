@@ -756,14 +756,24 @@ export function extractRequestSegments(request: GatewayRequest): string[] {
   });
 }
 
-const BLOCK_BOUNDARY = /\n\n(?=\[\[source: )/;
-
-/** The texts of a segment's user messages, excluding tool results and other user-role content. */
-export function userMessageTexts(segment: string): string[] {
+/**
+ * The texts of the user messages that end at or before `end`, excluding tool results and other
+ * user-role content. Every header in `text` was written by the gateway, so each one starts a block.
+ */
+export function userMessageTextsBefore(text: string, end: number): string[] {
   const header = `${sourceHeader('user message')}\n`;
-  return segment
-    .split(BLOCK_BOUNDARY)
-    .flatMap(block => (block.startsWith(header) ? [block.slice(header.length)] : []));
+  const texts: string[] = [];
+  let blockStart = text.indexOf(SOURCE_HEADER_PREFIX);
+  while (blockStart !== -1) {
+    const next = text.indexOf(SOURCE_HEADER_PREFIX, blockStart + 1);
+    const blockEnd = next === -1 ? text.length : next - SEGMENT_SEPARATOR.length;
+    if (blockEnd > end) break;
+    if (text.startsWith(header, blockStart)) {
+      texts.push(text.slice(blockStart + header.length, blockEnd));
+    }
+    blockStart = next;
+  }
+  return texts;
 }
 
 /**

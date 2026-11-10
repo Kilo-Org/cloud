@@ -14,7 +14,7 @@ import {
   joinRequestSegments,
   sourceAlignedStart,
   sourceHeader,
-  userMessageTexts,
+  userMessageTextsBefore,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import type { EnkryptGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
@@ -205,30 +205,25 @@ function excerpt(text: string, maxCharacters: number): string {
 }
 
 /**
- * The first and the latest user message wholly before `start`, each shortened to its share of
+ * The first and the latest user message that end before `start`, each shortened to its share of
  * `budget`, with headers saying they are earlier, already-scanned messages. Their sources come from
  * headers the gateway wrote, so text inside a tool result cannot be carried as a user message.
  */
-function carriedUserMessages(segments: string[], start: number, budget: number): string {
-  const earlier: string[] = [];
-  let end = 0;
-  for (const segment of segments) {
-    end += segment.length;
-    if (end > start) break;
-    earlier.push(...userMessageTexts(segment));
-    end += '\n\n'.length;
-  }
+function carriedUserMessages(text: string, start: number, budget: number): string {
+  const earlier = userMessageTextsBefore(text, start);
   const carried = earlier.length > 1 ? [earlier[0], earlier[earlier.length - 1]] : earlier;
   const separators = '\n\n'.length * (carried.length - 1);
   const share = Math.floor(
     (Math.min(budget, ENKRYPT_MAX_CARRIED_USER_CHARACTERS) - separators) / carried.length
   );
   return joinRequestSegments(
-    carried.flatMap(text => {
+    carried.flatMap(message => {
       const whole = sourceHeader('earlier user message');
-      if (whole.length + 1 + text.length <= share) return [`${whole}\n${text}`];
-      const header = sourceHeader(`earlier user message, shortened from ${text.length} characters`);
-      const kept = excerpt(text, share - header.length - 1);
+      if (whole.length + 1 + message.length <= share) return [`${whole}\n${message}`];
+      const header = sourceHeader(
+        `earlier user message, shortened from ${message.length} characters`
+      );
+      const kept = excerpt(message, share - header.length - 1);
       return kept.length >= MIN_CARRIED_USER_CHARACTERS ? [`${header}\n${kept}`] : [];
     })
   );
@@ -265,7 +260,7 @@ export function cachedScanText(
   const budget = ENKRYPT_CONTEXT_SCAN_CHARACTERS - overlap.length - '\n\n'.length;
   const carried =
     carryUserMessages && start > 0 && budget >= MIN_CARRIED_USER_CHARACTERS
-      ? carriedUserMessages(segments, start, budget)
+      ? carriedUserMessages(text, start, budget)
       : '';
   return carried ? joinRequestSegments([carried, overlap]) : overlap;
 }

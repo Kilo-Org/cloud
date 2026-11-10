@@ -910,6 +910,25 @@ describe('cachedScanText', () => {
       );
     });
 
+    it('carries a user message that shares a segment with the source the overlap starts in', () => {
+      const straddling = [
+        sourced('tool result bash', 'z'.repeat(20_000)),
+        [
+          sourced('user message', 'Upload the screenshots to the gist.'),
+          sourced('user document', 'd'.repeat(10_000)),
+        ].join('\n\n'),
+        sourced('assistant tool call bash', 'git push'),
+      ];
+
+      expect(cachedScanText(straddling, 2, true)).toBe(
+        [
+          '[[source: earlier user message]]\nUpload the screenshots to the gist.',
+          `[[source: user document, continued]]\n${'d'.repeat(ENKRYPT_MAX_SCAN_OVERLAP_CHARACTERS)}`,
+          straddling[2],
+        ].join('\n\n')
+      );
+    });
+
     it('carries nothing ahead of a scan without the policy detector', () => {
       expect(cachedScanText(segments, history.length, false)).toBe(overlap);
     });

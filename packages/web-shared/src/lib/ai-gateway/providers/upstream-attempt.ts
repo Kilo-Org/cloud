@@ -58,6 +58,7 @@ export type SendUpstreamAttemptInput = {
   vercelRequestId?: string | null;
   costLimit?: { maximumMicrodollars: string; availableBalanceMicrodollars: number };
   dataRegion: OrganizationDataRegion | null;
+  upstreamDurationBudgetMs?: number;
 };
 
 export type SendUpstreamAttemptResult =
@@ -87,6 +88,7 @@ export async function sendUpstreamAttempt({
   vercelRequestId,
   costLimit,
   dataRegion,
+  upstreamDurationBudgetMs,
 }: SendUpstreamAttemptInput): Promise<SendUpstreamAttemptResult> {
   const extraHeaders: Record<string, string> = {};
   await applyProviderSpecificLogic(
@@ -142,6 +144,7 @@ export async function sendUpstreamAttempt({
     signal,
     vercelRequestId,
     reasoningEffort: getReasoningEffort(request),
+    durationBudgetMs: upstreamDurationBudgetMs,
   });
   if (result.type === 'error') return result;
 

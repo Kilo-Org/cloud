@@ -5,6 +5,9 @@ import {
   type SendUpstreamAttemptInput,
   type SendUpstreamAttemptResult,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
+import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+
+const MIN_FAILOVER_BUDGET_MS = 30_000;
 
 type ByokFailoverResult = {
   attempt: SendUpstreamAttemptResult;
@@ -45,10 +48,15 @@ export async function sendUpstreamAttemptWithByokFailover(
 
   // Provider transforms mutate the request they send, so each failover sends a copy of the original.
   const original = structuredClone(request);
+  const startedAt = performance.now();
   let attempt = await sendUpstreamAttempt(input);
   for (;;) {
     const status = failedStatus(attempt);
     if (status === null || input.signal?.aborted) break;
+    // All attempts share one upstream budget, so the invocation still ends within the route's
+    // maxDuration with time left for usage accounting.
+    const remainingBudgetMs = UPSTREAM_DURATION_BUDGET_MS - (performance.now() - startedAt);
+    if (remainingBudgetMs < MIN_FAILOVER_BUDGET_MS) break;
     const next = await nextByokFailover();
     if (!next) break;
     console.warn('[byok-failover] BYOK upstream failed, trying the next BYOK key', {
@@ -59,7 +67,12 @@ export async function sendUpstreamAttemptWithByokFailover(
     await discardResponse(attempt);
     providerContext = next;
     request = structuredClone(original);
-    attempt = await sendUpstreamAttempt({ ...input, providerContext, request });
+    attempt = await sendUpstreamAttempt({
+      ...input,
+      providerContext,
+      request,
+      upstreamDurationBudgetMs: remainingBudgetMs,
+    });
   }
   return { attempt, providerContext, request };
 }

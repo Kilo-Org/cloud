@@ -1466,6 +1466,81 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
 });
 
+// The plugin files reach one check only: test-scripts runs
+// `test:oxlint-plugins` over them. The web Jest suite, the web build and the
+// cycle check read none of them, so the plugin path has its own filter pair and
+// the shared filter that gates those three names no plugin file. A plugin path
+// back in the shared filter would start four web-test shards, the production
+// build and the cycle check for a change none of them reads.
+const oxlintPluginPath = 'tools/oxlint/anti-slop/rules/no-runtime-typeof.ts';
+const webBackendPath = 'apps/web/src/routers/active-sessions-router.ts';
+
+test('a lint-plugin change runs the plugin suite without the web gates', () => {
+  const filtersOf = id => {
+    const step = ciJobs.changes.steps.find(candidate => candidate.id === id);
+    assert.ok(step, `changes: the ${id} step is missing`);
+    return load(step.with.filters);
+  };
+  const matches = (patterns, path) => patterns.some(pattern => posix.matchesGlob(path, pattern));
+
+  const backend = filtersOf('filter').kilocode_backend;
+  assert.deepEqual(
+    filtersOf('filter_retry').kilocode_backend,
+    backend,
+    'the shared retry keeps the filters of the attempt it replaces'
+  );
+  assert.equal(
+    matches(backend, webBackendPath),
+    true,
+    'a backend path still matches the shared filter'
+  );
+  assert.equal(matches(backend, oxlintPluginPath), false, 'the shared filter names no plugin path');
+
+  const plugins = filtersOf('filter_oxlint').oxlint_plugins;
+  assert.deepEqual(
+    filtersOf('filter_oxlint_retry').oxlint_plugins,
+    plugins,
+    'the plugin retry keeps the filters of the attempt it replaces'
+  );
+  assert.equal(matches(plugins, oxlintPluginPath), true, 'the plugin pair detects a plugin change');
+  assert.equal(matches(plugins, webBackendPath), false, 'the plugin pair detects nothing else');
+  assert.equal(
+    ciJobs.changes.outputs.oxlint_plugins,
+    '${{ steps.filter_oxlint.outputs.oxlint_plugins || steps.filter_oxlint_retry.outputs.oxlint_plugins }}',
+    'the plugin output falls back to its retry attempt'
+  );
+
+  assert.match(
+    ciJobs['test-scripts'].if,
+    /needs\.changes\.outputs\.oxlint_plugins == 'true'/,
+    'test-scripts keeps the one check that reads those paths'
+  );
+  // The root script chain decides what test-scripts runs: a run that starts the
+  // job without the plugin entry would report a plugin-only change unexercised.
+  const rootScripts = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+  ).scripts;
+  assert.match(
+    rootScripts['test:scripts'],
+    /test:oxlint-plugins/,
+    'test-scripts reaches the plugin suite'
+  );
+  assert.match(
+    rootScripts['test:oxlint-plugins'],
+    /tools\/oxlint\//,
+    'the plugin suite runs the plugin tests'
+  );
+  for (const job of ['web-test', 'build', 'dependency-cycle-check']) {
+    const condition = ciJobs[job].if;
+    assert.match(
+      condition,
+      /needs\.changes\.outputs\.kilocode_backend == 'true'/,
+      `${job}: gated on the shared filter alone, which names no plugin path`
+    );
+    assert.doesNotMatch(condition, /oxlint_plugins/, `${job}: the plugin output starts no web job`);
+  }
+});
+
 // The account database job runs the root `drizzle` script, which executes
 // drizzle-kit inside packages/db, and one session-sync suite whose workspace
 // imports are @kilocode/db and @kilocode/worker-utils, both declared by the

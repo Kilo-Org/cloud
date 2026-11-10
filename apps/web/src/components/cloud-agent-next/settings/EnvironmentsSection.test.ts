@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import type { EnvironmentResponse, EnvironmentSummary } from '@kilocode/cloud-agent-profile';
 import type * as EnvironmentHooks from '@/hooks/useCloudAgentEnvironments';
 import type { EnvironmentRepositoryChoice } from '@/hooks/useEnvironmentRepositoryChoices';
+import type { EnvironmentBuildStatus } from '../environment-build-display';
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
 Object.assign(globalThis, { React });
@@ -22,6 +23,7 @@ let mockListLoading = false;
 let mockListError = false;
 let mockListOptions: { organizationId?: string; enabled?: boolean } | null = null;
 let mockBuildStatusOptions: Record<string, { organizationId?: string; enabled?: boolean }> = {};
+let mockBuildStatuses: Record<string, EnvironmentBuildStatus | undefined> = {};
 
 const mockRefetchList = jest.fn(async () => undefined);
 const mockRefetchDetail = jest.fn(async () => undefined);
@@ -122,7 +124,7 @@ jest.mock('@/hooks/useCloudAgentEnvironments', () => {
       options: { organizationId?: string; enabled?: boolean }
     ) => {
       mockBuildStatusOptions[environmentId] = options;
-      return { data: undefined };
+      return { data: mockBuildStatuses[environmentId] };
     },
   };
 });
@@ -280,6 +282,7 @@ beforeEach(() => {
   mockListError = false;
   mockListOptions = null;
   mockBuildStatusOptions = {};
+  mockBuildStatuses = {};
   mockConfirm.mockReset();
   mockConfirm.mockReturnValue(true);
   mockToastSuccess.mockClear();
@@ -496,6 +499,84 @@ function renderSection(canManage: boolean): React.ReactElement {
 }
 
 describe('EnvironmentsSection inline detail pane', () => {
+  test('renders snapshot metadata below the repository without provider or status badges', () => {
+    mockBuildStatuses['env-1'] = {
+      environmentId: 'env-1',
+      supported: true,
+      unsupportedReason: null,
+      configurationRevision: 1,
+      activeBuild: null,
+      latestBuild: null,
+      published: {
+        buildId: 'build-1',
+        revision: 1,
+        sourceCommit: 'a'.repeat(40),
+        sourceBranch: 'main',
+        capturedAt: Date.now() - 6 * 24 * 60 * 60_000,
+        size: 100,
+        setupDurationMs: 60_000,
+        stale: 'age',
+        expiresAt: Date.now(),
+      },
+      automaticBackoff: null,
+      sessionPreparationBudgetMs: 12 * 60_000,
+    };
+    const mounted = mount(renderSection(true));
+    try {
+      const row = mounted.container.querySelector(
+        '[aria-label="Edit environment Kilo Environment"]'
+      );
+      const metadata = Array.from(row?.querySelectorAll('span[title]') ?? []);
+      expect(metadata.map(span => span.textContent)).toEqual([
+        'Kilo Environment',
+        'Kilo-Org/kilocode',
+        'Snapshot 6 days ago',
+      ]);
+      expect(metadata.every(span => span.classList.contains('truncate'))).toBe(true);
+      expect(row?.querySelector('[data-slot="badge"]')).toBeNull();
+      expect(row?.textContent).not.toMatch(/\b(GH|stale)\b/);
+      expect(row?.getAttribute('aria-pressed')).toBe('true');
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('keeps every repository visible without a redundant repository-count badge', () => {
+    mockEnvironments = [
+      {
+        id: 'env-1',
+        name: 'Multi-repo environment',
+        createdAt,
+        updatedAt: createdAt,
+        plainVarCount: 0,
+        secretCount: 0,
+        commandCount: 0,
+        configurationRevision: 1,
+        sandboxAllocation: null,
+        repositories: [
+          { platform: 'github', repoFullName: 'Kilo-Org/cloud' },
+          {
+            platform: 'gitlab',
+            repoFullName: 'group/project',
+            gitlabCloneUrl: 'https://gitlab.com/group/project.git',
+          },
+        ],
+      },
+    ];
+    const mounted = mount(renderSection(true));
+    try {
+      const row = mounted.container.querySelector(
+        '[aria-label="Edit environment Multi-repo environment"]'
+      );
+      expect(row?.textContent).toContain('Kilo-Org/cloud');
+      expect(row?.textContent).toContain('group/project');
+      expect(row?.textContent).not.toMatch(/\b(GH|GL|repos)\b/);
+      expect(row?.querySelector('[data-slot="badge"]')).toBeNull();
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
   test('selects the first environment and switches the detail pane on selection', () => {
     const mounted = mount(renderSection(true));
     try {

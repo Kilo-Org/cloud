@@ -183,5 +183,5 @@ export function snapshotBadge(
     return status.latestBuild?.state === 'failed' ? 'Snapshot build failed' : 'No snapshot';
   }
   const age = formatAge(status.published.capturedAt, now);
-  return status.published.stale === null ? `Snapshot ${age}` : `Snapshot ${age} (stale)`;
+  return `Snapshot ${age}`;
 }

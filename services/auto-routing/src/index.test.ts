@@ -1241,7 +1241,7 @@ describe('auto routing worker', () => {
       latencyMs: 0,
       hasError: false,
     };
-    const failureBilling = { ...successBilling, call: null, hasError: true };
+    const failureBilling = { ...successBilling, hasError: true };
     const billingFor = (result: 'success' | 'billed failure') =>
       result === 'success' ? successBilling : failureBilling;
 
@@ -1371,6 +1371,7 @@ describe('auto routing worker', () => {
                   cost: classifierResult.cost,
                   classifierModel,
                   failureStage: 'invalid_response',
+                  call: classifierResult.call,
                 })
               );
             }
@@ -1418,7 +1419,7 @@ describe('auto routing worker', () => {
             classification: 'cache',
             cacheHit: true,
             classifierCostCredits: classifierResult.cost,
-            classifierGenerationId: result === 'success' ? 'gen-classifier-1' : null,
+            classifierGenerationId: 'gen-classifier-1',
             sampled: false,
             timings: { classifierMs: expect.any(Number) },
           });
@@ -1429,9 +1430,7 @@ describe('auto routing worker', () => {
               doubles: [0, classifierResult.cost, mockClassification.confidence, 1],
             })
           );
-          expect(writeDataPoint.mock.calls[0]?.[0]?.blobs[9]).toBe(
-            result === 'success' ? 'gen-classifier-1' : ''
-          );
+          expect(writeDataPoint.mock.calls[0]?.[0]?.blobs[9]).toBe('gen-classifier-1');
           await expectClassifierUsage(
             input as NormalizedClassifierInput,
             'speculative',
@@ -1539,6 +1538,7 @@ describe('auto routing worker', () => {
                 cost: classifierResult.cost,
                 classifierModel,
                 failureStage: 'invalid_response',
+                call: classifierResult.call,
               })
             );
           }
@@ -1616,7 +1616,7 @@ describe('auto routing worker', () => {
       await expectClassifierUsage(
         { ...normalizedInput, messageCount: 2 } as NormalizedClassifierInput,
         'speculative',
-        { ...failureBilling, call: classifierResult.call }
+        failureBilling
       );
       expect(cachePutEntry).not.toHaveBeenCalled();
       classifyNormalizedInput.mockRejectedValueOnce(new Error('unbilled failure'));
@@ -1628,7 +1628,7 @@ describe('auto routing worker', () => {
       await expectClassifierUsage(
         { ...normalizedInput, messageCount: 2 } as NormalizedClassifierInput,
         'speculative',
-        { ...failureBilling, call: classifierResult.call }
+        failureBilling
       );
     });
   });

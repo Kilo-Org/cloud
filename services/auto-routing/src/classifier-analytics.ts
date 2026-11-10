@@ -37,9 +37,10 @@ type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS_V2'>;
  *   blob7   = reasoningComplexity
  *   blob8   = executionMode
  *   blob9   = "1" if classified request requires tools, "0" if not, "" if unknown
- *   blob10  = OpenRouter generation ID of the classifier call, matching
- *             microdollar_usage_metadata.upstream_id of its usage row; "" for
- *             cache hits and calls that returned no response body
+ *   blob10  = OpenRouter generation ID of the billed classifier call, matching
+ *             microdollar_usage_metadata.upstream_id of its usage row. A cache
+ *             hit carries the ID of the speculative call it settled, if any;
+ *             "" when no call returned a response body
  *   double1 = classifier model-call duration ms; forced to 0 for cache hits
  *             so duration queries (which filter double1 > 0) keep measuring
  *             model calls only — filter on double4, not the 0 sentinel, to

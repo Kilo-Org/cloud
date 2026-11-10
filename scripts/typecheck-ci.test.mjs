@@ -51,6 +51,69 @@ const pnpmCleanup = fileURLToPath(
   new URL('../.github/actions/pnpm-store/cleanup/cleanup.cjs', import.meta.url)
 );
 
+// A required status check matches by context name and app, so two workflows
+// publishing one required name let either workflow's pass satisfy the ruleset.
+// The main-tests ruleset (12440145) requires exactly these contexts. The mobile
+// workflow mirrors work that ci.yml also runs; those jobs carry a `mobile-`
+// prefix so only ci.yml publishes the required name. The names below that the
+// mobile workflow still owns (`i18n-leftover`, `check-unused`) have no other
+// publisher, so a rename there would leave a required check unreported.
+const requiredContexts = [
+  'test',
+  'build',
+  'typecheck',
+  'format-check',
+  'catalog (PR)',
+  'i18n-leftover',
+  'check-unused',
+  'lint',
+];
+
+function publishingJobs(workflow) {
+  return Object.entries(workflow.jobs ?? {}).map(([id, job]) => ({
+    id,
+    name: typeof job?.name === 'string' ? job.name : id,
+  }));
+}
+
+test('each required check name is published by exactly one pull-request workflow', () => {
+  const directory = new URL('../.github/workflows/', import.meta.url);
+  const publishers = new Map(requiredContexts.map(name => [name, []]));
+  for (const file of readdirSync(directory)
+    .filter(name => /\.ya?ml$/.test(name))
+    .sort()) {
+    const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
+    const triggers = workflow.on ?? {};
+    // A workflow without these triggers never reports a check on a PR or a
+    // merge-queue entry, so its job names cannot satisfy the ruleset there.
+    if (!('pull_request' in triggers) && !('merge_group' in triggers)) continue;
+    for (const { id, name } of publishingJobs(workflow)) {
+      publishers.get(name)?.push(`${file}:${id}`);
+    }
+  }
+  for (const [name, found] of publishers) {
+    assert.equal(
+      found.length,
+      1,
+      `required context ${name} must have one publisher, found ${found.join(', ') || 'none'}`
+    );
+  }
+  // The names ci.yml owns are the ones the mobile workflow used to duplicate.
+  assert.equal(publishers.get('test')[0], 'ci.yml:test');
+  assert.equal(publishers.get('typecheck')[0], 'ci.yml:typecheck');
+  assert.equal(publishers.get('lint')[0], 'ci.yml:lint');
+});
+
+test('the mobile workflow publishes no colliding required check name', () => {
+  const ids = Object.keys(workflows['kilo-app-ci.yml'].jobs);
+  for (const name of ['mobile-typecheck', 'mobile-lint', 'mobile-test-result']) {
+    assert.ok(ids.includes(name), `the mobile workflow publishes ${name}`);
+  }
+  for (const name of ['typecheck', 'lint', 'test']) {
+    assert.ok(!ids.includes(name), `the mobile workflow must not publish ${name}`);
+  }
+});
+
 test('dependency cache keeps only the content store on the mounted filesystem', t => {
   const action = load(
     readFileSync(new URL('../.github/actions/pnpm-store/action.yml', import.meta.url), 'utf8')
@@ -510,8 +573,8 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
   // both producers. The unused-export check and the shards import only the
   // harness SDK build, so a declaration miss must not delay them.
   for (const [name, producers] of [
-    ['typecheck', [harnessProducer, trpcProducer]],
-    ['lint', [harnessProducer, trpcProducer]],
+    ['mobile-typecheck', [harnessProducer, trpcProducer]],
+    ['mobile-lint', [harnessProducer, trpcProducer]],
     ['check-unused', [harnessProducer]],
     ['mobile-test', [harnessProducer]],
   ]) {
@@ -569,8 +632,8 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
   // passes, so the aggregator must carry each producer's failure.
   for (const requiredProducer of [harnessProducer, trpcProducer]) {
     assert.ok(
-      [jobs.test.needs].flat().includes(requiredProducer),
-      `the required test job fails with a failed ${requiredProducer}`
+      [jobs['mobile-test-result'].needs].flat().includes(requiredProducer),
+      `the mobile-test-result aggregator fails with a failed ${requiredProducer}`
     );
   }
 });
@@ -705,8 +768,8 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   assert.equal(upload.with['if-no-files-found'], 'error', 'an empty build must fail');
 
   for (const [name, run] of [
-    ['typecheck', 'Typecheck'],
-    ['lint', 'Lint'],
+    ['mobile-typecheck', 'Typecheck'],
+    ['mobile-lint', 'Lint'],
   ]) {
     const job = jobs[name];
     assert.ok([job.needs ?? []].flat().includes(trpcProducer), `${name} waits for the producer`);
@@ -744,8 +807,8 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   // A failed declaration build leaves the checks skipped, and a skipped
   // required check passes, so the aggregator must carry the failure.
   assert.ok(
-    [jobs.test.needs].flat().includes(trpcProducer),
-    'the required test job fails with the declaration build'
+    [jobs['mobile-test-result'].needs].flat().includes(trpcProducer),
+    'the mobile-test-result aggregator fails with the declaration build'
   );
 });
 
@@ -1221,24 +1284,24 @@ test('the ci-wiring job installs its closure in one pass', () => {
 });
 
 // The measured per-job install share of wall time keeps a narrowing above one
-// tenth of the job it saves: the mobile-test shards, `lint` and `check-unused`
-// clear that bar, and `typecheck`'s sample run does not, so it keeps the whole
-// workspace for now. When a measurement moves a job over the bar, name it here;
-// a step that starts importing another workspace widens its job's filter, and
-// no job restores the full install to hide an undeclared import. Dependency
-// postinstalls stay enabled across these jobs.
+// tenth of the job it saves: the mobile-test shards, `mobile-lint` and
+// `check-unused` clear that bar, and `mobile-typecheck`'s sample run does not,
+// so it keeps the whole workspace for now. When a measurement moves a job over
+// the bar, name it here; a step that starts importing another workspace widens
+// its job's filter, and no job restores the full install to hide an undeclared
+// import. Dependency postinstalls stay enabled across these jobs.
 const appClosureInstall =
   "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
 
 test('the kilo-app CI consumers install the app closure', () => {
   // The producer jobs keep their own wider (or whole-workspace) closures, and
-  // `typecheck` keeps the whole workspace until its measured saving clears the
-  // bar; every other install in this workflow is the app's.
+  // `mobile-typecheck` keeps the whole workspace until its measured saving
+  // clears the bar; every other install in this workflow is the app's.
   const consumerJobs = Object.entries(kiloAppJobs)
     .filter(
       ([name, job]) =>
         !name.startsWith('prepare') &&
-        name !== 'typecheck' &&
+        name !== 'mobile-typecheck' &&
         (job.steps ?? []).some(step => /^pnpm install --frozen-lockfile\b/.test(step.run ?? ''))
     )
     .map(([name]) => name);
@@ -1252,7 +1315,7 @@ test('the kilo-app CI consumers install the app closure', () => {
   }
   assert.deepEqual(
     consumerJobs,
-    ['lint', 'check-unused', 'mobile-test'],
+    ['mobile-lint', 'check-unused', 'mobile-test'],
     'the app closure covers the measured consumer installs and leaves the others alone'
   );
 });

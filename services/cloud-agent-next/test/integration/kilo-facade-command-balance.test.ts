@@ -24,15 +24,16 @@ const kiloSessionId = `ses_${'c0mmandba1ancegate'.padEnd(26, '0')}`;
 const cloudAgentSessionId = 'workspace_20000000-0000-4000-8000-000000000001';
 
 /**
- * The facade reads the payer's balance from the Cloud backend, so the run
- * replaces that one outbound response. Routing, authorization, the Durable
- * Objects and the durable queue stay real.
+ * The facade reads the payer balance and validates the model against the
+ * Cloud backend, so the run replaces those two outbound responses. Routing,
+ * authorization, the Durable Objects and the durable queue stay real.
  */
 type BalancePage = { balance: number; isDepleted: boolean };
 
 type FetchScope = {
   fetch: typeof fetch;
   __commandBalanceOriginalFetch?: typeof fetch;
+  __commandBalanceRequests?: string[];
 };
 
 const DEPLETED_PAGE: BalancePage = { balance: 0, isDepleted: true };
@@ -42,26 +43,40 @@ function facadeStub() {
   return env.USER_KILO_FACADE.get(env.USER_KILO_FACADE.idFromName(userId));
 }
 
-async function installBalanceResponder(page: BalancePage): Promise<() => Promise<void>> {
+async function installBackendResponder(page: BalancePage): Promise<{
+  release: () => Promise<void>;
+  requests: () => Promise<string[]>;
+}> {
   const facade = facadeStub();
   await runInDurableObject(facade, () => {
     const scope = globalThis as unknown as FetchScope;
     scope.__commandBalanceOriginalFetch ??= scope.fetch;
+    scope.__commandBalanceRequests = [];
     scope.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(String(input), init);
       const url = new URL(request.url);
+      scope.__commandBalanceRequests?.push(url.pathname);
       if (url.pathname.endsWith('/balance')) return Response.json(page);
+      if (url.pathname.endsWith('/models/validate')) return Response.json({ valid: true });
       throw new Error(`unexpected outbound fetch ${url.origin}${url.pathname}`);
     };
   });
-  return async () => {
-    await runInDurableObject(facade, () => {
-      const scope = globalThis as unknown as FetchScope;
-      if (scope.__commandBalanceOriginalFetch) {
-        scope.fetch = scope.__commandBalanceOriginalFetch;
-        delete scope.__commandBalanceOriginalFetch;
-      }
-    });
+  return {
+    release: async () => {
+      await runInDurableObject(facade, () => {
+        const scope = globalThis as unknown as FetchScope;
+        if (scope.__commandBalanceOriginalFetch) {
+          scope.fetch = scope.__commandBalanceOriginalFetch;
+          delete scope.__commandBalanceOriginalFetch;
+        }
+        delete scope.__commandBalanceRequests;
+      });
+    },
+    requests: () =>
+      runInDurableObject(facade, () => {
+        const scope = globalThis as unknown as FetchScope;
+        return [...(scope.__commandBalanceRequests ?? [])];
+      }),
   };
 }
 
@@ -119,7 +134,7 @@ async function sealedAuthorization(): Promise<{ seal: string; token: string }> {
   return { seal, token };
 }
 
-/** A registered session that has not requested compute. */
+/** A registered hosted session with a live runtime authorization and no compute. */
 async function registerColdSession(): Promise<DurableObjectStub<SandboxSessionV2>> {
   const authorization = await sealedAuthorization();
   const stub = sessions.getByName(sessionDoName(USER_ID, cloudAgentSessionId));
@@ -172,7 +187,7 @@ describe('hosted facade command balance gate', { timeout: 30_000 }, () => {
   it('answers a command turn with the payer balance failure', async () => {
     const stub = await registerColdSession();
     await seedFacadeRoot();
-    const restore = await installBalanceResponder(DEPLETED_PAGE);
+    const backend = await installBackendResponder(DEPLETED_PAGE);
     try {
       const prompt = await postFacadeMutation('/prompt_async', {
         parts: [{ type: 'text', text: 'hello' }],
@@ -194,27 +209,33 @@ describe('hosted facade command balance gate', { timeout: 30_000 }, () => {
       await expect(stub.getMessageResult(messageId)).resolves.toEqual({
         type: 'message-not-found',
       });
+      // The balance check runs once per mutation, ahead of model validation.
+      const issued = await backend.requests();
+      expect(issued.filter(path => path.endsWith('/balance'))).toHaveLength(2);
+      expect(issued.some(path => path.endsWith('/models/validate'))).toBe(false);
     } finally {
-      await restore();
+      await backend.release();
     }
   });
 
-  it('admits a command turn for a payer with usable balance', async () => {
+  it('answers a funded payer with no balance failure', async () => {
     await registerColdSession();
     await seedFacadeRoot();
-    const restore = await installBalanceResponder(FUNDED_PAGE);
+    const backend = await installBackendResponder(FUNDED_PAGE);
     try {
       const prompt = await postFacadeMutation('/prompt_async', {
         parts: [{ type: 'text', text: 'hello' }],
       });
       const command = await postFacadeMutation('/command', { command: 'compact' });
-      // Both mutations reach the same downstream preflight for a session
-      // without live compute, so each answers with its own route result.
+      // Both mutations run the balance check before they answer. The fixture has no
+      // live runtime, so each answers from the same model preflight.
       expect(prompt.status).toBe(command.status);
-      const body = await command.json();
-      expect(body).not.toMatchObject({ error: 'KILO_BALANCE_VALIDATION_FAILED' });
+      await expect(command.json()).resolves.not.toMatchObject({
+        error: 'KILO_BALANCE_VALIDATION_FAILED',
+      });
+      expect(await backend.requests()).toContainEqual(expect.stringContaining('/balance'));
     } finally {
-      await restore();
+      await backend.release();
     }
   });
 

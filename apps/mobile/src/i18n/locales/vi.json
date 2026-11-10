@@ -4012,6 +4012,7 @@
       "namePlaceholder": "Đại lý của tôi",
       "promptPlaceholder": "Bạn là một...",
       "tools": "Công cụ",
+      "wholeToolRule": "Tác nhân này áp dụng một quy tắc cho mọi công cụ cùng lúc: {{rule}}. Các công tắc này chỉ đọc.",
       "visibility": "Khả năng hiển thị",
       "visibilityPrimary": "Chính — hiển thị trong bộ chọn",
       "visibilitySubagent": "Subagent — chỉ có thể gọi được từ người khác",

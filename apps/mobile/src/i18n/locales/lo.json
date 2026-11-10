@@ -4012,6 +4012,7 @@
       "namePlaceholder": "ຕົວແທນຂອງຂ້ອຍ",
       "promptPlaceholder": "ເຈົ້າເປັນ...",
       "tools": "ເຄື່ອງມື",
+      "wholeToolRule": "ຕົວແທນນີ້ນຳໃຊ້ກົດໜຶ່ງກັບທຸກໆເຄື່ອງມືພ້ອມກັນ: {{rule}}. ສະວິດເຫຼົ່ານີ້ອ່ານໄດ້ຢ່າງດຽວ.",
       "visibility": "ການເບິ່ງເຫັນ",
       "visibilityPrimary": "ປະຖົມ — ສະແດງໃຫ້ເຫັນຢູ່ໃນຕົວເລືອກ",
       "visibilitySubagent": "Subagent — ພຽງແຕ່ສາມາດໂທໄດ້ຈາກຄົນອື່ນ",

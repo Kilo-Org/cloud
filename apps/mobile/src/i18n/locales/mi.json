@@ -4012,6 +4012,7 @@
       "namePlaceholder": "Taku Kaihoko",
       "promptPlaceholder": "He...",
       "tools": "Utauta",
+      "wholeToolRule": "Ka whakahāngai tēnei māngai i tētahi ture ki ngā utauta katoa i te wā kotahi: {{rule}}. He pānui anake ēnei whakakā.",
       "visibility": "Tirohanga",
       "visibilityPrimary": "Tuatahi — ka whakaatuhia ki te kaikokoti",
       "visibilitySubagent": "Subagent — ka taea anake te waea mai i etahi atu",

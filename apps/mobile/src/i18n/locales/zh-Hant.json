@@ -4012,6 +4012,7 @@
       "namePlaceholder": "我的代理",
       "promptPlaceholder": "你是一個...",
       "tools": "工具",
+      "wholeToolRule": "此代理會一次將一條規則套用到所有工具：{{rule}}。這些開關為唯讀。",
       "visibility": "可見性",
       "visibilityPrimary": "主要 — 顯示在選擇器中",
       "visibilitySubagent": "子代理程式 — 只能從其他人調用",

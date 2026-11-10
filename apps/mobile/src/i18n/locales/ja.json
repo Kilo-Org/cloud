@@ -4012,6 +4012,7 @@
       "namePlaceholder": "私のエージェント",
       "promptPlaceholder": "あなたは...",
       "tools": "ツール",
+      "wholeToolRule": "このエージェントは、すべてのツールに一度に1つのルールを適用します：{{rule}}。これらのスイッチは読み取り専用です。",
       "visibility": "可視性",
       "visibilityPrimary": "プライマリ — ピッカーに表示されます",
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",

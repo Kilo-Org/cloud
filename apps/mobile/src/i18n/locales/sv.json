@@ -4012,6 +4012,7 @@
       "namePlaceholder": "Min agent",
       "promptPlaceholder": "Du är en...",
       "tools": "Verktyg",
+      "wholeToolRule": "Den här agenten tillämpar en regel på alla verktyg samtidigt: {{rule}}. Dessa reglage är skrivskyddade.",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primär — visas i väljaren",
       "visibilitySubagent": "Subagent — endast anropsbar från andra",

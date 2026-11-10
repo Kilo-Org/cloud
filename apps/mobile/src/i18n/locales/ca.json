@@ -4074,6 +4074,7 @@
       "namePlaceholder": "El meu agent",
       "promptPlaceholder": "Ets un...",
       "tools": "Eines",
+      "wholeToolRule": "Aquest agent aplica una regla a cada eina alhora: {{rule}}. Aquests interruptors són de només lectura.",
       "visibility": "Visibilitat",
       "visibilityPrimary": "Principal — es mostra al selector",
       "visibilitySubagent": "Subagent — només es pot trucar des d'altres",

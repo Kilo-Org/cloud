@@ -4012,6 +4012,7 @@
       "namePlaceholder": "میرا ایجنٹ",
       "promptPlaceholder": "آپ ایک...",
       "tools": "اوزار",
+      "wholeToolRule": "یہ ایجنٹ بیک وقت ہر اوزار پر ایک اصول لاگو کرتا ہے: {{rule}}۔ یہ سوئچز صرف پڑھنے کے لیے ہیں۔",
       "visibility": "مرئیت",
       "visibilityPrimary": "پرائمری — چننے والے میں دکھایا گیا ہے۔",
       "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",

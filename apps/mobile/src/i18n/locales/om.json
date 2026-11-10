@@ -4012,6 +4012,7 @@
       "namePlaceholder": "Bakka bu'aa koo",
       "promptPlaceholder": "Ati nama ...",
       "tools": "Meeshaalee",
+      "wholeToolRule": "Maajentiin kun seera tokko meeshaalee hunda irratti yeroo tokkotti hojiirra oolcha: {{rule}}. Qalqalloonni kunneen dubbisuu qofa danda'u.",
       "visibility": "Mul’achuu",
       "visibilityPrimary": "Primary — kan agarsiifame picker keessatti",
       "visibilitySubagent": "Subagent — kanneen biroo irraa qofa kan waamamu",

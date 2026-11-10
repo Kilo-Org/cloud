@@ -4136,6 +4136,7 @@
       "namePlaceholder": "Můj agent",
       "promptPlaceholder": "ty jsi...",
       "tools": "Nástroje",
+      "wholeToolRule": "Tento agent aplikuje jedno pravidlo na všechny nástroje najednou: {{rule}}. Tyto přepínače jsou pouze pro čtení.",
       "visibility": "Viditelnost",
       "visibilityPrimary": "Primární — zobrazí se ve výběru",
       "visibilitySubagent": "Subagent — lze volat pouze od ostatních",

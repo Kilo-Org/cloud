@@ -133,35 +133,54 @@ function permissionMapOf(permission: AgentPermissionMap): Readonly<Record<string
 }
 
 /**
+ * The whole-agent action a stored permission applies to every tool at once, or
+ * `undefined` when the permission is a per-tool map (or absent). The switches
+ * cannot express such a rule: it governs tools this editor does not list.
+ */
+export function readWholeToolAction(permission: AgentPermissionMap): string | undefined {
+  if (permission == null || typeof permission === 'object') return undefined;
+  return permission;
+}
+
+/**
  * The tools denied for this agent. Only a simple string rule of `deny` counts;
- * per-pattern maps and other actions are left alone, matching the web editor.
+ * per-pattern maps and other actions are left alone. A whole-agent `deny`
+ * denies every tool.
  */
 export function readDisabledTools(permission: AgentPermissionMap): string[] {
+  if (typeof permission === 'string') {
+    return permission === 'deny' ? [...PERMISSION_TOOLS] : [];
+  }
   const map = permissionMapOf(permission);
   return PERMISSION_TOOLS.filter(tool => map[tool] === 'deny');
 }
 
 /**
- * Apply the UI's disable toggles onto the existing permission map, preserving
- * any per-pattern rules and unrelated tool keys. Toggling a tool off writes
- * `deny`; toggling it back on clears a simple string rule but leaves a
- * per-pattern map alone. An empty result becomes `undefined` so the config
- * carries no empty permission object.
+ * Apply the UI's disable toggles onto the existing permission map.
+ *
+ * A tool the user switches off gets `deny`. A tool whose stored rule is `deny`
+ * and is now on loses its entry. Every other stored rule keeps its loaded
+ * value, including per-tool `ask`/`allow`, per-pattern maps, and a tool the user
+ * switched off and back on in the same edit. Unrelated tool keys are retained.
+ *
+ * A whole-agent permission (one action for every tool) cannot be expressed by
+ * these switches, so it is returned untouched instead of being rewritten into a
+ * partial per-tool map that would drop the tools this editor does not list.
  */
 export function mergePermissions(
   existing: AgentPermissionMap,
   disabledTools: readonly string[]
-): Record<string, unknown> | undefined {
-  const base = new Map(Object.entries(permissionMapOf(existing)));
+): Record<string, unknown> | string | undefined {
+  if (typeof existing === 'string') return existing;
+  const base: Record<string, unknown> = { ...permissionMapOf(existing) };
   for (const tool of PERMISSION_TOOLS) {
     if (disabledTools.includes(tool)) {
-      base.set(tool, 'deny');
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- permission values are an open rule union; a string arm is the only clearable one
-    } else if (typeof base.get(tool) === 'string') {
-      base.delete(tool);
+      base[tool] = 'deny';
+    } else if (base[tool] === 'deny') {
+      delete base[tool];
     }
   }
-  return base.size > 0 ? Object.fromEntries(base) : undefined;
+  return Object.keys(base).length > 0 ? base : undefined;
 }
 
 /** The add/edit form fields. Every numeric field is text; blank means "inherit". */

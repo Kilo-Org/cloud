@@ -4012,6 +4012,7 @@
       "namePlaceholder": "Mein Agent",
       "promptPlaceholder": "Du bist ein...",
       "tools": "Werkzeuge",
+      "wholeToolRule": "Dieser Agent wendet eine Regel gleichzeitig auf jedes Werkzeug an: {{rule}}. Diese Schalter sind schreibgeschützt.",
       "visibility": "Sichtweite",
       "visibilityPrimary": "Primär — wird im Picker angezeigt",
       "visibilitySubagent": "Subagent — nur von anderen aufrufbar",

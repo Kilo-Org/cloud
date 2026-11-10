@@ -4136,6 +4136,7 @@
       "namePlaceholder": "Mano agentas",
       "promptPlaceholder": "Tu esi...",
       "tools": "Įrankiai",
+      "wholeToolRule": "Šis agentas vienu metu taiko vieną taisyklę visiems įrankiams: {{rule}}. Šie jungikliai yra tik skaitomi.",
       "visibility": "Matomumas",
       "visibilityPrimary": "Pagrindinis — rodomas rinkiklyje",
       "visibilitySubagent": "Subagentas — skambinama tik iš kitų",

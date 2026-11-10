@@ -4012,6 +4012,7 @@
       "namePlaceholder": "Minu agent",
       "promptPlaceholder": "Sa oled…",
       "tools": "Tööriistad",
+      "wholeToolRule": "See agent rakendab ühte reeglit korraga kõigile tööriistadele: {{rule}}. Need lülitid on kirjutuskaitstud.",
       "visibility": "Nähtavus",
       "visibilityPrimary": "Esmane — kuvatakse valijas",
       "visibilitySubagent": "Subagent — kutsutav ainult teiste poolt",

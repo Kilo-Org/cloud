@@ -4012,6 +4012,7 @@
       "namePlaceholder": "Agenten min",
       "promptPlaceholder": "Du er en...",
       "tools": "Verktøy",
+      "wholeToolRule": "Denne agenten bruker én regel på alle verktøy samtidig: {{rule}}. Disse bryterne er skrivebeskyttede.",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primær — vist i velgeren",
       "visibilitySubagent": "Subagent — kan kun ringes opp fra andre",

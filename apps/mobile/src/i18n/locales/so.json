@@ -4012,6 +4012,7 @@
       "namePlaceholder": "Wakiilkayga",
       "promptPlaceholder": "Waxaad tahay...",
       "tools": "Qalabka",
+      "wholeToolRule": "Wakiilkan waxa uu hal xeer isku mar ku dabaqaa qalab kasta: {{rule}}. Beddelladan waa akhris-kaliya.",
       "visibility": "Muuqashada",
       "visibilityPrimary": "Aasaasiga ah — oo lagu muujiyay dooriyaha",
       "visibilitySubagent": "Subagent — kaliya kuwa kale looga yeeri karo",

@@ -4074,6 +4074,7 @@
       "namePlaceholder": "Moj agent",
       "promptPlaceholder": "ti si...",
       "tools": "Alati",
+      "wholeToolRule": "Ovaj agent primenjuje jedno pravilo na sve alate odjednom: {{rule}}. Ovi prekidači su samo za čitanje.",
       "visibility": "Vidljivost",
       "visibilityPrimary": "Primarni — prikazuje se u biraču",
       "visibilitySubagent": "Subagent — može se pozvati samo od drugih",

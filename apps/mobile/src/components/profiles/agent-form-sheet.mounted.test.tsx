@@ -238,6 +238,59 @@ describe('AgentFormSheet parity fields', () => {
     unmount();
   });
 
+  it('shows a whole-agent rule as read-only switches with a note naming it', async () => {
+    const wholeRule = agentSource();
+    const { renderer, unmount } = await mountSheet({
+      ...wholeRule,
+      config: { ...wholeRule.config, permission: 'ask' },
+    });
+
+    const switches = findAll(renderer.root, 'Switch').filter(node =>
+      PERMISSION_TOOLS.includes(node.props.accessibilityLabel as string)
+    );
+    expect(switches).toHaveLength(PERMISSION_TOOLS.length);
+    for (const node of switches) {
+      expect(node.props.disabled).toBe(true);
+      expect(node.props.value).toBe(true);
+    }
+    expect(
+      findAll(renderer.root, 'Text').some(node => String(node.props.children).includes('ask'))
+    ).toBe(true);
+
+    unmount();
+  });
+
+  it('denies every tool when the stored whole-agent rule is an outright denial', async () => {
+    const base = agentSource();
+    const { renderer, unmount } = await mountSheet({
+      ...base,
+      config: { ...base.config, permission: 'deny' },
+    });
+
+    const switches = findAll(renderer.root, 'Switch').filter(node =>
+      PERMISSION_TOOLS.includes(node.props.accessibilityLabel as string)
+    );
+    for (const node of switches) {
+      expect(node.props.disabled).toBe(true);
+      expect(node.props.value).toBe(false);
+    }
+
+    unmount();
+  });
+
+  it('leaves a per-tool map editable', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    const switches = findAll(renderer.root, 'Switch').filter(node =>
+      PERMISSION_TOOLS.includes(node.props.accessibilityLabel as string)
+    );
+    for (const node of switches) {
+      expect(node.props.disabled).toBe(false);
+    }
+
+    unmount();
+  });
+
   it('happy: lists the model variants and saves the picked effort', async () => {
     h.useAvailableModels.mockReturnValue({
       models: [modelOption('anthropic/claude', ['low', 'high'])],

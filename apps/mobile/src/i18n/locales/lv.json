@@ -4074,6 +4074,7 @@
       "namePlaceholder": "Mans aģents",
       "promptPlaceholder": "Tu esi...",
       "tools": "Rīki",
+      "wholeToolRule": "Šis aģents vienlaikus piemēro vienu noteikumu visiem rīkiem: {{rule}}. Šie slēdži ir tikai lasāmi.",
       "visibility": "Redzamība",
       "visibilityPrimary": "Primārais — parādīts atlasītājā",
       "visibilitySubagent": "Subaģents — izsaucams tikai no citiem",

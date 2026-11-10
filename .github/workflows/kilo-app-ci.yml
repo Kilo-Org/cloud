@@ -42,10 +42,11 @@ permissions:
   contents: read
 
 jobs:
-  # Always runs: the required suite checks must report on every PR and every
-  # main push. The detection step diffs against the PR's base sha or, on a main
-  # push, `github.event.before`; when neither is available (a release's
-  # schedule or manual call), the suite runs (a release must validate).
+  # Always runs: `i18n-leftover` and `check-unused` are required contexts and
+  # must report on every PR and every main push. The detection step diffs against
+  # the PR's base sha or, on a main push, `github.event.before`; when neither is
+  # available (a release's schedule or manual call), the suite runs (a release
+  # must validate).
   mobile-changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
@@ -118,7 +119,7 @@ jobs:
   # a cache miss pay the typia compile once per job, because the shards start
   # together and actions/cache saves at the end of a job, so no job can hit
   # another's save. The action still runs here, so its cache serves a later run
-  # with the same inputs, and the required `mobile-test-result` job needs this
+  # with the same inputs, and the `mobile-test-result` aggregator needs this
   # one, so a failed build fails the gate instead of leaving the suites skipped.
   #
   # One tRPC declaration build per run, for the same reason: typecheck and lint

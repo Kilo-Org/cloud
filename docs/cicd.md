@@ -46,7 +46,7 @@ from the required context list above, asserts each context has exactly one
 publisher, and asserts the mobile workflow has no bare `test`, `typecheck` or
 `lint` job.
 
-## Required aggregators
+## Aggregators
 
 `test` in `ci.yml` is the main CI fan-in. It needs every job whose failure would
 otherwise only skip another required check, and it fails when any of them
@@ -54,7 +54,8 @@ fails or is cancelled. A skipped job satisfies a required check, so an
 unrelated change passes the gate while the work stays skipped.
 
 `mobile-test-result` in `kilo-app-ci.yml` is the mobile fan-in and follows the
-same rule for its shards and producers.
+same rule for its shards and producers. It is not a ruleset-required context;
+the `mobile-` prefix keeps it from competing with `ci.yml`'s `test`.
 
 ## Adding or renaming a required check
 

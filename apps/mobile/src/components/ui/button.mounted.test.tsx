@@ -280,27 +280,23 @@ describe('Button native target contract', () => {
   it('keeps a disabled primary label legible instead of dimming the brand pair', () => {
     const button = renderButton({ disabled: true });
     const classes = (button.props.className as string).split(' ');
-    // bg-primary-disabled must win over the variant's bg-primary so the disabled
-    // fill is the muted surface the ink label stays readable on.
+    // The muted pair must win over the variant's brand fill and its ink: the
+    // dark fill is the inactive control surface, and the label takes the ink
+    // that reads on it there while light keeps the palette pair.
     expect(classes).toContain('bg-primary-disabled');
+    expect(classes).toContain('dark:bg-control-idle');
     expect(classes).not.toContain('bg-primary');
     expect(classes).not.toContain('opacity-50');
-    // The label keeps the ink colour; the disabled fill is chosen to contrast
-    // with it, so hard-coded primaryForeground children stay legible too.
-    const label = button.findByType(NativeText).props.className as string;
-    expect(label).toContain('text-primary-foreground');
-    expect(label).not.toContain('text-muted-foreground');
-  });
+    const labelClasses = (button.findByType(NativeText).props.className as string).split(' ');
+    expect(labelClasses).toContain('text-primary-foreground');
+    expect(labelClasses).toContain('dark:text-ink2');
+    expect(labelClasses).not.toContain('text-muted-foreground');
 
-  it('keeps a hard-coded primaryForeground child on a fill that contrasts with it', () => {
-    const button = renderButton({
-      disabled: true,
-      children: createElement(Text, { className: 'text-primary-foreground' }, 'Save'),
-    });
-    const classes = (button.props.className as string).split(' ');
-    expect(classes).toContain('bg-primary-disabled');
-    expect(classes).not.toContain('bg-muted');
-    expect(button.findByType(NativeText).props.className).toContain('text-primary-foreground');
+    const busy = renderButton({ disabled: true, loading: true });
+    expect((busy.props.className as string).split(' ')).not.toContain('dark:bg-control-idle');
+    expect((busy.findByType(NativeText).props.className as string).split(' ')).not.toContain(
+      'dark:text-ink2'
+    );
   });
 
   it('keeps a busy primary on its brand fill so it still reads as working', () => {

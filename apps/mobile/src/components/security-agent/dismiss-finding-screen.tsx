@@ -17,7 +17,7 @@ import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
 import { isSecuritySyncRetryable, securityMutationCopyKey } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
 // (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
@@ -61,6 +61,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
   const [reason, setReason] = useState<DismissReason | null>(null);
@@ -294,9 +295,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
         <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>
           {dismissFinding.isPending ? (
-            <ActivityIndicator size="small" color={colors.primaryForeground} />
+            <ActivityIndicator size="small" color={mutedDisabledInk} />
           ) : null}
-          <Text className="text-primary-foreground">{t('securityAgent.dismiss.title')}</Text>
+          <Text>{t('securityAgent.dismiss.title')}</Text>
         </Button>
       </ScrollView>
     </View>

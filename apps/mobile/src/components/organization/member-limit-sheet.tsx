@@ -119,7 +119,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
       />
 
       <Button disabled={!canSave} loading={mutations.updateMember.isPending} onPress={onSave}>
-        <Text className="text-primary-foreground">{t('common.save')}</Text>
+        <Text>{t('common.save')}</Text>
       </Button>
 
       {currentLimit != null && (

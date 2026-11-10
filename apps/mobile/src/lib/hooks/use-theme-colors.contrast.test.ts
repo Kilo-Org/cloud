@@ -226,24 +226,26 @@ describe('disabled toolbar badge label contrast (WCAG AA text)', () => {
 
 describe('disabled primary fill contrast (WCAG AA text)', () => {
   // A disabled default-variant Button paints primaryForeground on
-  // `--primary-disabled`; the pair must clear 4.5:1 in both themes so the
-  // label (and any child that hard-codes primaryForeground) stays legible.
+  // `--primary-disabled` in light, where the pair clears 4.5:1. Dark instead
+  // paints the inactive control surface, because `--primary-disabled` there is
+  // a light neutral that outshines the near-black page; its label takes
+  // `--ink2` and that pair must clear 4.5:1 too.
   it('light theme: primaryForeground vs primaryDisabled >= 4.5:1', () => {
     const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabled);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
-  it('dark theme: primaryForeground vs primaryDisabled >= 4.5:1', () => {
-    const ratio = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
+  it('dark theme: ink2 vs controlIdle >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.ink2, darkColors.controlIdle);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
   it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
-    // The disabled fill is a neutral grey that must read as a superseded
-    // control next to the enabled brand fill, not as a second brand colour
-    // (2.69:1 between the two fills), or a disabled Start would look tappable
-    // and an enabled one would lose its emphasis.
-    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabled);
+    // The disabled fill is the inactive control surface: it must read as a
+    // superseded control next to the enabled brand fill, not as a second brand
+    // colour, or a disabled Start would look tappable and an enabled one would
+    // lose its emphasis.
+    const separation = contrastRatio(darkColors.primary, darkColors.controlIdle);
     expect(separation).toBeGreaterThanOrEqual(1.5);
   });
 });

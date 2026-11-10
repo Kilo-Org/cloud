@@ -20,7 +20,10 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#FFFFFF',
+  useThemeColors: () => ({}),
+}));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: authorization,
   reportLateLaunchFailure: reportLate,

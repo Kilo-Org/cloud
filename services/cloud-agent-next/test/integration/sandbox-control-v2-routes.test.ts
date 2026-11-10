@@ -156,6 +156,9 @@ function configuredPrepareInput(
       ...input.spec,
       directory,
       setupCommands,
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
     },
@@ -1260,9 +1263,13 @@ describe('SandboxControlV2 routes and forwarding', () => {
     if (first?.type !== 'session.attach') throw new Error('expected session.attach');
     expect(first.spec).not.toHaveProperty('setupCommands');
     expect(first.spec).not.toHaveProperty('runtimeAgents');
+    expect(first.spec).not.toHaveProperty('runtimeInstructions');
     expect(first.spec).not.toHaveProperty('kiloCommands');
     expect(first.spec).not.toHaveProperty('env');
     expect(first.workspace).toMatchObject({
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
       setupCommands: ['echo shared'],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
@@ -1367,6 +1374,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const first = await wrapper.next();
     if (first?.type !== 'session.attach') throw new Error('expected session.attach');
     expect(first.workspace).toBeDefined();
+    expect(first.workspace.runtimeInstructions).toEqual([
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ]);
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
 
@@ -1405,6 +1415,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(frame?.type).toBe('session.prepare');
     if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
     expect(frame.spec.setupCommands).toEqual(['echo shared']);
+    expect(frame.spec.runtimeInstructions).toEqual([
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ]);
     expect(frame.spec.runtimeAgents).toEqual([{ slug: 'helper', name: 'Helper', config: {} }]);
     expect(frame.spec.kiloCommands).toEqual([{ name: 'review', template: 'Review the change' }]);
   });

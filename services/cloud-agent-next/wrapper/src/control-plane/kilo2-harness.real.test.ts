@@ -12,6 +12,8 @@ import { createKilo2Api } from './kilo2-api.js';
 import { createKilo2Reads } from './kilo2-reads.js';
 import type { HarnessActivityEvent } from './harness-activity.js';
 import type { KiloServer } from '../kilo-server-auth.js';
+import { createRuntimeProfileMaterializer } from './runtime-profile.js';
+import { buildCloudAgentRules } from '../../../src/shared/cloud-agent-rules.js';
 
 const binary = process.env.KILO2_BINARY;
 const suite = binary ? describe : describe.skip;
@@ -23,6 +25,19 @@ suite('real Kilo v2 harness', () => {
       throw new Error('Run this suite with KILO_RUNTIME_HARNESS=kilo2');
     const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-harness-')));
     const directory = path.join(root, 'workspace');
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(path.join(directory, 'AGENTS.md'), 'SYNTHETIC_REPOSITORY_INSTRUCTION');
+    await fs.mkdir(path.join(root, '.kilocode/rules'), { recursive: true });
+    await fs.writeFile(
+      path.join(root, '.kilocode/rules/disabled-proof.md'),
+      'SYNTHETIC_DISABLED_PROFILE_INSTRUCTION'
+    );
+    const profile = {
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
+    };
+    await createRuntimeProfileMaterializer().materialize(root, profile);
     const events: KiloFeedEvent[] = [];
     const activity: HarnessActivityEvent[] = [];
     const requests: string[] = [];
@@ -248,6 +263,11 @@ suite('real Kilo v2 harness', () => {
         expect(runtime.sessionState(sessionId)).toBeUndefined();
       }
       await prompt('remember amber-history-marker', `${startupFailureNote}\n\n${callbackContext}`);
+      expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
+      expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
+      expect(requests.at(-1)).not.toContain('SYNTHETIC_DISABLED_PROFILE_INSTRUCTION');
+      const builtIn = buildCloudAgentRules({});
+      expect(requests.at(-1)?.split(JSON.stringify(builtIn).slice(1, -1))).toHaveLength(2);
       expect(requests.at(-1)).toContain('workspace_callback-marker');
       expect(requests.at(-1)).toContain(startupFailureNote);
       expect(
@@ -270,6 +290,8 @@ suite('real Kilo v2 harness', () => {
         onRestore() {},
       });
       await prompt('recall the earlier marker', callbackContext);
+      expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
+      expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
       expect(requests.at(-1)).toContain('amber-history-marker');
       expect(requests.at(-1)).toContain('workspace_callback-marker');
       // V2 preserves the original prompt prefix and supersedes changed context in-band.
@@ -305,6 +327,8 @@ suite('real Kilo v2 harness', () => {
       expect(restored).toBe(true);
       expect(historyReads).toEqual([undefined, undefined]);
       await prompt('recall the marker after native database replacement', callbackContext);
+      expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
+      expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
       expect(requests.at(-1)).toContain('amber-history-marker');
       expect(requests.at(-1)).toContain('workspace_callback-marker');
       mode = 'tool';

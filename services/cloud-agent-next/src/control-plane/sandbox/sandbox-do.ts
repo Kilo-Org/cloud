@@ -3306,6 +3306,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.branchMode === undefined ? {} : { branchMode: spec.branchMode }),
       ...(spec.worktreeRecovery === undefined ? {} : { worktreeRecovery: spec.worktreeRecovery }),
       ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
+      ...(spec.runtimeInstructions === undefined
+        ? {}
+        : { runtimeInstructions: spec.runtimeInstructions }),
       ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
       ...(spec.builtinAgents === undefined ? {} : { builtinAgents: spec.builtinAgents }),
       ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),

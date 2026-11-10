@@ -4,6 +4,7 @@ import {
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
   RuntimeKiloCommandsSchema,
+  RuntimeInstructionsSchema,
 } from './runtime-profile.js';
 import type {
   CloudAgentAssistantFailureReason,
@@ -470,6 +471,7 @@ const routeSpecObjectSchema = z
      */
     environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
+    runtimeInstructions: RuntimeInstructionsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
@@ -525,6 +527,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     startCommands: true,
     environmentSetupCommandCount: true,
     runtimeSkills: true,
+    runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
     kiloCommands: true,
@@ -541,6 +544,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     startCommands: true,
     environmentSetupCommandCount: true,
     runtimeSkills: true,
+    runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
     kiloCommands: true,

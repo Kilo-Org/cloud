@@ -141,10 +141,10 @@ export function SandboxSelect({
                     textValue={choice.instance}
                     disabled={!!choice.unavailableReason}
                   >
-                    <span className="tabular-nums">{choice.instance}</span>
-                    {price && (
-                      <span className="text-muted-foreground tabular-nums"> · {price}</span>
-                    )}
+                    <span className="tabular-nums">
+                      {choice.instance}
+                      {price && <span className="text-muted-foreground"> · {price}</span>}
+                    </span>
                   </SelectItem>
                 );
               })}

@@ -19,7 +19,9 @@
  * rules require, and prints one line per language with the number of families
  * the language is missing. That is the report the translation pass works from,
  * so the app's `check:plurals` passes `--source-only`; the locale categories
- * are gated in CI by `check:i18n` (`check-catalogs.mjs`).
+ * are gated in CI by `check:i18n` (`check-catalogs.mjs`). A catalog that cannot
+ * be read, parsed, or given plural rules is one problem line naming its
+ * language, and the rest of the audit still runs.
  *
  * A counted message whose copy owns no word whose form the count changes — a
  * participle, a bare number in parentheses, a label — needs no family, because
@@ -30,12 +32,12 @@
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { endOfComment, endOfQuotedOrComment } from '../lib/js-scan.mjs';
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
-const ROOT = new URL('../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SOURCE_DIR = join(ROOT, 'apps/mobile/src');
 const LOCALES_DIR = join(ROOT, 'apps/mobile/src/i18n/locales');
 
@@ -644,6 +646,7 @@ function localeTags(localesDir = LOCALES_DIR) {
 function run() {
   const sourceOnly = process.argv.includes('--source-only');
   const problems = [];
+  const report = [];
   const calls = collectCountedCalls(SOURCE_DIR);
   const english = readEnglishCatalog();
 
@@ -662,14 +665,21 @@ function run() {
   if (!sourceOnly) {
     const families = englishPluralFamilies(english);
     const owed = familiesOwedByEveryLocale(english);
-    const report = [];
     let totalKeys = 0;
     for (const tag of localeTags()) {
       if (tag === 'en') {
         continue;
       }
-      const catalog = flatten(JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8')));
-      const categories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+      let catalog;
+      let categories;
+      try {
+        catalog = flatten(JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8')));
+        categories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        problems.push(`${tag}: cannot audit catalog: ${message}`);
+        continue;
+      }
       const localeFamilyBases = new Set();
       for (const key of catalog.keys()) {
         const base = pluralFamilyBase(key);
@@ -694,7 +704,6 @@ function run() {
       if (flagged > 0) {
         report.push(`${tag}: ${flagged} keys`);
         totalKeys += flagged;
-        problems.push(`${tag}: ${flagged} plural family key(s) lack a category of ${tag}`);
       }
     }
     if (report.length > 0) {
@@ -703,11 +712,19 @@ function run() {
     }
   }
 
-  if (problems.length > 0) {
-    for (const problem of problems) {
-      console.error(problem);
+  for (const problem of problems) {
+    console.error(problem);
+  }
+
+  if (problems.length > 0 || report.length > 0) {
+    const counts = [];
+    if (problems.length > 0) {
+      counts.push(`${problems.length} problem(s)`);
     }
-    console.error(`\ncheck-plurals: ${problems.length} problem(s)`);
+    if (report.length > 0) {
+      counts.push(`${report.length} language(s) with missing plural categories`);
+    }
+    console.error(`\ncheck-plurals: ${counts.join('; ')}`);
     process.exit(1);
   }
 

@@ -222,7 +222,7 @@ describe('organization group deletion with an input guardrail', () => {
 
   it.each<{ name: string; inputGuardrail: (groupId: string) => OrganizationSettings }>([
     {
-      name: 'legacy detectors because none were saved',
+      name: 'Kilo Default because no detectors were saved',
       inputGuardrail: groupId => ({
         kilo_encrypt: true,
         enkrypt: { input_guardrail: { enabled: true, group_id: groupId } },

@@ -3,7 +3,6 @@ import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
-  createLegacyEnkryptInputDetectors,
   type EnkryptDetectRequestDetectors,
 } from './detectors';
 import {
@@ -50,14 +49,14 @@ describe('resolveEnkryptInputGuardrail', () => {
     expect(resolve(settings)).toBeNull();
   });
 
-  it('blocks prompt injection and scans tool results when no detectors were saved', () => {
+  it('applies Kilo Default, logging prompt injection, and scans tool results when no detectors were saved', () => {
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true } } })).toEqual({
       scanToolResults: true,
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
       },
-      blockingDetectors: ['injection_attack'],
+      blockingDetectors: [],
     });
   });
 
@@ -141,7 +140,8 @@ describe('resolveEnkryptInputGuardrail', () => {
   });
 
   it('ignores saved detectors that are not configurable', () => {
-    const detectors = createLegacyEnkryptInputDetectors();
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.injection_attack.action = 'block';
     detectors.pii = { enabled: true, action: 'block', entities: ['secrets', 'url'] };
     detectors.nsfw.enabled = true;
     detectors.keyword_detector = { enabled: true, action: 'block', banned_keywords: ['Phoenix'] };

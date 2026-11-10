@@ -66,17 +66,6 @@ export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors 
   };
 }
 
-/**
- * What a guardrail enabled before detectors were saved enforces: prompt injection blocks, as Kilo
- * Default did then. Those organizations keep blocking until an admin saves detectors.
- */
-export function createLegacyEnkryptInputDetectors(): EnkryptInputDetectors {
-  return {
-    ...createKiloDefaultEnkryptInputDetectors(),
-    injection_attack: { enabled: true, action: 'block' },
-  };
-}
-
 /** The input detectors admins can configure, in the order the page shows them. */
 export const ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS = [
   'injection_attack',

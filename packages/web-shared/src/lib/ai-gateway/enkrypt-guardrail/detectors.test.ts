@@ -17,7 +17,6 @@ import {
   buildEnkryptDetectRequestDetectors,
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
-  createLegacyEnkryptInputDetectors,
   enabledEnkryptDetectorIds,
   enabledEnkryptOutputDetectorIds,
   ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
@@ -305,18 +304,6 @@ describe('blockingEnkryptDetectorIds', () => {
 
     expect(enabledEnkryptDetectorIds(detectors)).toEqual(['injection_attack']);
     expect(blockingEnkryptDetectorIds(detectors)).toEqual([]);
-  });
-
-  it('blocks prompt injection for guardrails enabled before detectors were saved', () => {
-    const detectors = createLegacyEnkryptInputDetectors();
-
-    expect(issueMessages(detectors)).toEqual([]);
-    expect(detectors).toEqual({
-      ...createKiloDefaultEnkryptInputDetectors(),
-      injection_attack: { enabled: true, action: 'block' },
-    });
-    expect(enabledEnkryptDetectorIds(detectors)).toEqual(['injection_attack']);
-    expect(blockingEnkryptDetectorIds(detectors)).toEqual(['injection_attack']);
   });
 
   it('only logs configurable detectors set to log only', () => {

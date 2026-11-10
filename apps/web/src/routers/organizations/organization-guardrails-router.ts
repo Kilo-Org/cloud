@@ -13,7 +13,6 @@ import { organization_groups } from '@kilocode/db/schema';
 import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
-  createLegacyEnkryptInputDetectors,
   enabledEnkryptOutputDetectorIds,
   ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
   enforcedEnkryptInputDetectors,
@@ -23,7 +22,6 @@ import {
   enkryptInputGuardrailGroupId,
   readStoredEnkryptDetectors,
   readStoredEnkryptOutputDetectors,
-  type StoredEnkryptDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import {
   isOrganizationFeatureEnabled,
@@ -139,16 +137,6 @@ export function describeGuardrailsConfig(
   ].join('; ');
 }
 
-/**
- * A guardrail enabled before detectors were saved shows the legacy detectors the gateway enforces;
- * otherwise missing or invalid detectors start from Kilo Default.
- */
-function savedDetectors(enabled: boolean, stored: StoredEnkryptDetectors) {
-  if (stored.status === 'found') return stored.detectors;
-  if (stored.status === 'missing' && enabled) return createLegacyEnkryptInputDetectors();
-  return createKiloDefaultEnkryptInputDetectors();
-}
-
 function savedInputGuardrail(organizationId: string, settings: OrganizationSettings) {
   const saved = EnkryptInputGuardrailSettingsSchema.safeParse(settings.enkrypt?.input_guardrail);
   if (!saved.success) {
@@ -163,7 +151,8 @@ function savedInputGuardrail(organizationId: string, settings: OrganizationSetti
   return {
     enabled: saved.data.enabled,
     group_id: enkryptInputGuardrailGroupId(settings),
-    detectors: savedDetectors(saved.data.enabled, stored),
+    detectors:
+      stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors(),
     invalid_saved_detectors: stored.status === 'invalid',
   };
 }

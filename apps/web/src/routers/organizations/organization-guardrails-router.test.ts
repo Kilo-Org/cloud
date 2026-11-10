@@ -17,7 +17,6 @@ import type { EnkryptPolicyRule } from '@kilocode/db/schema-types';
 import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
-  createLegacyEnkryptInputDetectors,
   storableEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
@@ -217,7 +216,8 @@ describe('organization guardrails router', () => {
   });
 
   it('reads input detectors saved before they had an action as blocking', async () => {
-    const { injection_attack, policy_violation, ...others } = createLegacyEnkryptInputDetectors();
+    const { injection_attack, policy_violation, ...others } =
+      createKiloDefaultEnkryptInputDetectors();
     const legacyOrganization = await createTestOrganization(
       'Legacy Action Guardrails Org',
       owner.id,
@@ -247,51 +247,39 @@ describe('organization guardrails router', () => {
     await expect(
       caller.organizations.guardrails.get({ organizationId: legacyOrganization.id })
     ).resolves.toMatchObject({
-      detectors: createLegacyEnkryptInputDetectors(),
+      detectors: {
+        ...createKiloDefaultEnkryptInputDetectors(),
+        injection_attack: { enabled: true, action: 'block' },
+      },
       invalid_saved_detectors: false,
     });
   });
 
-  it('shows the blocking legacy detectors for a guardrail enabled before detectors were saved', async () => {
-    const legacyOrganization = await createTestOrganization(
-      'Legacy Enabled Guardrails Org',
-      owner.id,
-      0,
-      { kilo_encrypt: true, enkrypt: { input_guardrail: { enabled: true } } },
-      false
-    );
-    const caller = await createCallerForUser(owner.id);
+  it.each([true, false])(
+    'shows logging Kilo Default when no detectors were saved and the guardrail is enabled: %s',
+    async enabled => {
+      const withoutDetectors = await createTestOrganization(
+        `Without Detectors Guardrails Org ${enabled}`,
+        owner.id,
+        0,
+        { kilo_encrypt: true, enkrypt: { input_guardrail: { enabled } } },
+        false
+      );
+      const caller = await createCallerForUser(owner.id);
 
-    const config = await caller.organizations.guardrails.get({
-      organizationId: legacyOrganization.id,
-    });
+      const config = await caller.organizations.guardrails.get({
+        organizationId: withoutDetectors.id,
+      });
 
-    expect(config).toMatchObject({
-      enabled: true,
-      group_id: null,
-      detectors: createLegacyEnkryptInputDetectors(),
-      invalid_saved_detectors: false,
-    });
-    expect(config.detectors.injection_attack).toEqual({ enabled: true, action: 'block' });
-  });
-
-  it('starts a disabled guardrail without saved detectors from logging Kilo Default', async () => {
-    const disabledOrganization = await createTestOrganization(
-      'Disabled Without Detectors Guardrails Org',
-      owner.id,
-      0,
-      { kilo_encrypt: true, enkrypt: { input_guardrail: { enabled: false } } },
-      false
-    );
-    const caller = await createCallerForUser(owner.id);
-
-    const config = await caller.organizations.guardrails.get({
-      organizationId: disabledOrganization.id,
-    });
-
-    expect(config.detectors).toEqual(createKiloDefaultEnkryptInputDetectors());
-    expect(config.detectors.injection_attack).toEqual({ enabled: true, action: 'log' });
-  });
+      expect(config).toMatchObject({
+        enabled,
+        group_id: null,
+        detectors: createKiloDefaultEnkryptInputDetectors(),
+        invalid_saved_detectors: false,
+      });
+      expect(config.detectors.injection_attack).toEqual({ enabled: true, action: 'log' });
+    }
+  );
 
   it('saves the output guardrail separately from the input guardrail', async () => {
     const caller = await createCallerForUser(owner.id);

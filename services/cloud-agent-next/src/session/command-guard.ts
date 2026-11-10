@@ -215,6 +215,19 @@ const CODE_REVIEW_GIT_READ_SUBCOMMANDS = [
   'status',
 ];
 
+// The review workflow reads with these subcommands and the options named here
+// are outside that workflow, so each read rule keeps a matching denial pattern.
+// Git accepts any unambiguous prefix of a long option, and the matcher has no
+// character class, so a pattern covers the shortest accepted prefix at any
+// position, with `=` and with a separating space.
+const CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS = [
+  'git fetch *--u*',
+  'git pull *--u*',
+  'git diff *--output*',
+  'git log *--output*',
+  'git show *--output*',
+];
+
 const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
   'ls',
   'cat',
@@ -359,11 +372,12 @@ export function getCommandGuardPolicy(
       allowed: CODE_REVIEW_ALLOWED_COMMANDS,
       denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS, 'git'],
       // The read set is installed after the git denial, and the last matching
-      // rule wins.
+      // rule wins. The denied read options are installed after them.
       allowedAfterDenied: CODE_REVIEW_GIT_READ_SUBCOMMANDS.flatMap(subcommand => [
         `git ${subcommand}`,
         `git ${subcommand} *`,
       ]),
+      deniedAfterAllowedOverrides: CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS,
     };
   }
 

@@ -202,6 +202,67 @@ describe('code-review command guard policy', () => {
     }
   });
 
+  it('keeps the fetch and pull read rules inside the review workflow', () => {
+    const policy = getCommandGuardPolicy('code-review');
+    if (!policy) throw new Error('Expected code-review command guard policy');
+    const permissions = buildCommandGuardBashPermissions(policy);
+
+    expect(permissions['git fetch *--u*']).toBe('deny');
+    expect(permissions['git pull *--u*']).toBe('deny');
+
+    // The option is matched at any position, with `=` or a separating space, and
+    // through any accepted prefix.
+    for (const command of [
+      'git fetch --upload-pack=./fetch-helper .',
+      'git fetch --upload-pack ./fetch-helper .',
+      'git fetch --upload-pack=./fetch-helper file:///tmp/repo',
+      'git fetch origin --upload-pack=./fetch-helper',
+      'git fetch --upl=./fetch-helper /tmp/repo',
+      'git fetch --upload-p=./fetch-helper /tmp/repo',
+      'git pull --upload-pack=./fetch-helper file:///tmp/repo',
+      'git pull --upload-pack ./fetch-helper',
+      'git pull origin --upl=./fetch-helper',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
+    // The read forms of the review workflow resolve to allow.
+    for (const command of [
+      'git fetch origin',
+      'git fetch --prune origin',
+      'git fetch origin main',
+      'git pull',
+      'git pull origin main',
+      'git pull --ff-only',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+    }
+  });
+
+  it('keeps the diff, log and show read rules inside the review workflow', () => {
+    const policy = getCommandGuardPolicy('code-review');
+    if (!policy) throw new Error('Expected code-review command guard policy');
+    const permissions = buildCommandGuardBashPermissions(policy);
+
+    for (const command of [
+      'git diff --output=.git/hooks/pre-merge-commit HEAD',
+      'git diff HEAD --output=notes.txt',
+      'git log --output=notes.txt -5',
+      'git show --output=notes.txt HEAD',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
+    for (const command of [
+      'git diff',
+      'git diff HEAD~1..HEAD',
+      'git log --oneline -5',
+      'git show HEAD:src/app.ts',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+    }
+  });
+
   it('matches only purpose-built Bitbucket review commands and exact scratch redirection', () => {
     const reviewId = '123e4567-e89b-12d3-a456-426614174023';
     const inputPath = bitbucketReviewInputPath(reviewId);

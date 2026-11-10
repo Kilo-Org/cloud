@@ -43,10 +43,12 @@ export function SettingsSaveButton({
   // pending change. Before that the action is a quiet text control: still
   // present and still disabled, so its place in the header never moves.
   const actionable = dirty && valid;
-  // The spinner has to follow the surface it sits in. The filled variant's ink
-  // is `primaryForeground`, the quiet variant's is the body foreground; a
-  // hard-coded primary ink vanished when the draft turned invalid while a save
-  // was in flight and the header fell back to the quiet style.
+  // The spinner has to follow the surface it sits in. While a save is in
+  // flight the filled variant is disabled, so the button paints the muted
+  // disabled fill and the spinner takes the ink that fill is paired with; the
+  // quiet variant keeps the body foreground. A hard-coded primary ink vanished
+  // when the draft turned invalid while a save was in flight and the header
+  // fell back to the quiet style.
   const spinnerColor = actionable ? mutedDisabledInk : colors.foreground;
 
   return (

@@ -522,9 +522,12 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   without resetting attempt deadlines or starting a sandbox merely to obtain credentials.
 - Organization membership gates every organization-attributed grant. Preparation, the wrapper
   rebind after a restart and a warm renewal all issue through the same path, which reads the session
-  owner's current membership of the grant's organization first. None of the three paths sends a
-  grant or a `session.credentials` frame to a non-member. A read that answers "not a member" is
-  proof: preparation and the rebind fail the attempt with `workspace_setup_failed` stage
+  owner's current membership of the grant's organization first. That membership is the direct
+  membership row that session creation also requires, not the wider read predicate: an inherited
+  parent-organization role keeps the session readable but does not authorize a grant. Grant
+  authority therefore stays no wider than the authority to start the session. None of the three
+  paths sends a grant or a `session.credentials` frame to a non-member. A read that answers "not a
+  member" is proof: preparation and the rebind fail the attempt with `workspace_setup_failed` stage
   `organization_access_revoked` and do not retry it, and a warm renewal retires the route at the
   Sandbox DO on the path that proved the loss, so the route, its grant and the wrapper path go and
   the wrapper receives `session.release` instead of the route continuing on the grant it already
@@ -540,10 +543,11 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   client sockets: the route row, its organization-attributed grant and the wrapper path go, and the
   wrapper receives `session.release`, ending organization-scoped execution instead of letting it
   run to grant expiry. One session's failed close does not skip the remaining sessions of the same
-  member, and a later grant renewal that proves the loss retires that session's route from the
-  Sandbox DO itself, so the same end does not depend on the close call. A session that holds no
-  route at that sandbox owns nothing there: its release changes no policy, keeps the shared rules of
-  the other sessions and sends no wrapper frame.
+  member, and every matching close starts at once, so a slow release for one session does not spend
+  the caller's time budget before the others start. A later grant renewal that proves the loss
+  retires that session's route from the Sandbox DO itself, so the same end does not depend on the
+  close call. A session that holds no route at that sandbox owns nothing there: its release changes
+  no policy, keeps the shared rules of the other sessions and sends no wrapper frame.
 - Worktree deletion commits the authoritative ingest content removal before runtime cleanup, then
   attempts every journaled runtime location. Missing runtime history or an unconfirmed provider
   stop returns the logical deletion as successful with `cleanup: 'pending'`, retains the deletion

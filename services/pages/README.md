@@ -16,8 +16,8 @@ ready for that. The dev Worker is deployed by hand from a profile.
 | Worker | `pages-dev` |
 | Address | `https://pages-dev.kiloapps.io` |
 | First deployed | 2026-11-10, from `nteract/nteract` at `3c22117f7`, version `e11cd161-d009-4619-8cdb-b8464a0a17a1` |
-| Running now | `nteract/nteract` at `a3bd8130f`, version `c4b89d58-0f7f-49ee-aee4-610728a47076` |
-| Build id | `70d74a204a5c` (reported by `/health`) |
+| Running now | `nteract/nteract` PR 4963 at `5f3379fb7` (main at `a3bd8130f` plus the packaging change), version `a9ff34e1-750a-4f87-b422-da8708cc7c6d` |
+| Build id | `cdb234a8943e` (reported by `/health`) |
 | D1, auth and catalog | `pages-dev-auth` (`13db1af4-e01e-447d-ae51-cc37625d5f77`) |
 | D1, usage | `pages-dev-usage` (`8691d489-5105-49f4-bbec-63ecbca319e9`) |
 | R2 | `pages-dev-assets` |
@@ -35,21 +35,15 @@ attached on 2026-11-10. It is the Worker's public origin
 (`NOTEBOOK_CLOUD_PUBLIC_ORIGIN`): links, the MCP metadata and browser origin
 checks all use it.
 
-The first address, `https://pages-dev.engineering-e11.workers.dev`, still
-answers because `workers_dev` is on. Nothing names it as the origin any more,
-so a browser can't use it. Turn `workers_dev` off once nothing calls it.
+The first address, `https://pages-dev.engineering-e11.workers.dev`, is off:
+the profile has `workers_dev: false`, and that address answers 404. Nothing
+was ever pointed at it.
 
-The packaging script sets no route. The custom domain is added to the staged
-`wrangler.json` by hand before each deploy:
-
-```json
-"routes": [
-  { "pattern": "pages-dev.kiloapps.io", "zone_name": "kiloapps.io", "custom_domain": true }
-]
-```
-
-`wrangler deploy --domain` does not work here: it can't name the zone, and the
-API answers "Can't infer zone from route".
+The profile names the hostname and its zone under `custom_domain`, and the
+packaging script turns that into the route (nteract/nteract PR 4963). Until
+that PR merges, deploy from its branch, `pages/cloudflare-profile-domain`.
+Do not use `wrangler deploy --domain`: it can't name the zone, and the API
+answers "Can't infer zone from route".
 
 ## Who can sign in
 
@@ -68,7 +62,6 @@ have no untracked files when it is built, or the stage step refuses the build:
 ```sh
 npm run build
 node scripts/cloudflare-stage.mjs NEW_EMPTY_DIR services/pages/profiles/dev.json
-# add the "routes" entry from the Hostname section to NEW_EMPTY_DIR/wrangler.json
 node_modules/.bin/wrangler deploy --config NEW_EMPTY_DIR/wrangler.json
 ```
 
@@ -102,12 +95,13 @@ took 70 to 480 ms.
 
 ## Checked after the hostname change
 
-- `https://pages-dev.kiloapps.io/health` answers `ok` with build `70d74a204a5c`.
+- `https://pages-dev.kiloapps.io/health` answers `ok` with the build id above.
 - `/`, `/connect` and `/llms.txt` answer 200, and `/llms.txt` names only the
   new origin.
 - The OAuth metadata names `https://pages-dev.kiloapps.io` as issuer.
 - Anonymous `/mcp` answers 401. `/api/auth/session` answers signed out.
 - `/api/auth/login` still answers 503: there is no browser sign-in yet.
+- The `workers.dev` address answers 404.
 
 ## Not checked yet
 

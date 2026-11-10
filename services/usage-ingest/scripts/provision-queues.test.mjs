@@ -325,6 +325,19 @@ for (const environment of ['staging', 'production'])
       assert.equal(patches(f).length, 1);
     });
 
+    test('object-valued settings are preserved and confirmed by value', async t => {
+      const f = await fixture(t, [dlq, source]);
+      const queue = f.queues.get(dlq);
+      queue.settings.future_setting = { mode: 'kept', tags: ['a'] };
+      await f.cli();
+      assert.deepEqual(queue.settings, {
+        ...defaultSettings,
+        future_setting: { mode: 'kept', tags: ['a'] },
+        message_retention_period: maxRetention,
+      });
+      assert.ok(f.queues.has(source));
+    });
+
     test('equal or higher DLQ retention makes no update call and is never lowered', async t => {
       for (const retention of [maxRetention, maxRetention + 1]) {
         const f = await fixture(t, [dlq, source]);

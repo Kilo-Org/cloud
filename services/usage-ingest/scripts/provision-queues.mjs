@@ -1,4 +1,5 @@
 import { pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { experimental_readRawConfig } from 'wrangler';
 
 export const supportedEnvironments = ['staging', 'production'];
@@ -151,7 +152,9 @@ export async function prepareQueues(
     if (
       !updated ||
       updated.jurisdiction !== queue.jurisdiction ||
-      Object.entries(expected).some(([key, value]) => updated.settings?.[key] !== value)
+      Object.entries(expected).some(
+        ([key, value]) => !isDeepStrictEqual(updated.settings?.[key], value)
+      )
     )
       throw new Error(`${dlq} retention update was not confirmed; stop deployment.`);
   };

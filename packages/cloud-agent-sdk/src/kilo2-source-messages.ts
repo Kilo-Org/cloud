@@ -302,6 +302,9 @@ export function readKilo2Messages(
         else if (state.status === 'completed')
           parts.push({
             ...tool,
+            // A Cloud preview marks its shortened native entry; keep the marker on
+            // the display part so the complete call can be read on expansion.
+            ...(item['cloudDetail'] === undefined ? {} : { cloudDetail: item['cloudDetail'] }),
             state: {
               status: 'completed',
               input,

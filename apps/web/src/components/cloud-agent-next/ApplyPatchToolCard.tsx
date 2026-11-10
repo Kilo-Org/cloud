@@ -1,5 +1,6 @@
 import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { FileDiff } from 'lucide-react';
+import { readToolDetailMarker } from '@kilocode/cloud-agent-sdk/tool-part-detail';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolDiff, ToolDiffStats, ToolFilePath } from './ToolDiff';
 import { ToolCodeBlock } from './ToolOutput';
@@ -32,7 +33,10 @@ export function ApplyPatchToolCard({ toolPart }: ApplyPatchToolCardProps) {
       ? files.map(file =>
           cloudAgentFileLabel(file.relativePath ?? file.movePath ?? file.filePath ?? '')
         )
-      : readApplyPatchInputPaths(patchText).map(cloudAgentFileLabel);
+      : // A preview keeps every patched path even when its patch input is shortened.
+        (readToolDetailMarker(toolPart)?.summary?.paths ?? readApplyPatchInputPaths(patchText)).map(
+          cloudAgentFileLabel
+        );
   const error = state.status === 'error' ? state.error : undefined;
 
   return (

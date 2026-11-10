@@ -1,5 +1,6 @@
 import type { Part, TextPart } from '@kilocode/app-shared/opencode';
 import { partSettledAt } from '../part-utils';
+import { isPreviewOfStoredTool } from '../tool-detail-marker';
 import type { MessageInfo } from '../types';
 
 function compareIds(left: string, right: string): number {
@@ -376,6 +377,9 @@ function upsertPartDroppingStaleSyntheticParts(
     ) {
       return arr;
     }
+    // A later history page or replay may carry a bounded preview of a tool call
+    // this storage already holds in full; keep the complete copy.
+    if (existing !== undefined && isPreviewOfStoredTool(existing, part)) return arr;
     const nextArr = [...filtered];
     nextArr[idx] = nextPart;
     // Remember the ordering evidence the accepted update actually won on: its

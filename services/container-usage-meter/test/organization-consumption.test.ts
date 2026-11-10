@@ -11,6 +11,7 @@ import {
   kilo_pass_org_term_versions,
   kilocode_users,
   organization_memberships,
+  organization_seats_purchases,
   organization_user_limits,
   organization_user_usage,
   organizations,
@@ -80,6 +81,9 @@ afterAll(async () => {
     await client.db
       .delete(credit_transactions)
       .where(eq(credit_transactions.organization_id, f.orgId));
+    await client.db
+      .delete(organization_seats_purchases)
+      .where(eq(organization_seats_purchases.organization_id, f.orgId));
     for (const agreement of agreements)
       await client.db
         .delete(kilo_pass_org_term_versions)
@@ -215,6 +219,68 @@ async function fixture() {
 }
 
 describe('native organization compute accounting', () => {
+  it.each([
+    { status: 'active', wildcard: false, billingMode: 'shadow' },
+    { status: 'active', wildcard: true, billingMode: 'shadow' },
+    { status: 'past_due', wildcard: true, billingMode: 'shadow' },
+    { status: 'trialing', wildcard: true, billingMode: 'paid' },
+    { status: 'ended', wildcard: true, billingMode: 'paid' },
+    { status: 'canceled', wildcard: true, billingMode: 'paid' },
+    { status: null, wildcard: true, billingMode: 'paid' },
+  ])(
+    'uses $billingMode billing for latest seat status $status (wildcard: $wildcard)',
+    async ({ status, wildcard, billingMode }) => {
+      const f = await fixture();
+      if (wildcard) f.config.cloudAgentOrgIds = new Set(['*']);
+      f.config.warnRemainingMicrodollars = 5_000_000;
+      if (status !== null) {
+        const purchase = {
+          organization_id: f.orgId,
+          subscription_stripe_id: `sub_${f.orgId}`,
+          seat_count: 1,
+          amount_usd: 19,
+          starts_at: new Date(f.start).toISOString(),
+          expires_at: new Date(f.start + 30 * 86_400_000).toISOString(),
+        };
+        // An old active purchase must not hide a newer trial or cancellation.
+        await client.db.insert(organization_seats_purchases).values([
+          {
+            ...purchase,
+            subscription_status: 'active',
+            created_at: new Date(f.start - 86_400_000).toISOString(),
+          },
+          {
+            ...purchase,
+            subscription_status: status,
+            created_at: new Date(f.start).toISOString(),
+          },
+        ]);
+      }
+      if (billingMode === 'shadow') await f.limit(0);
+
+      expect(await f.admission()).toMatchObject({ kind: 'applied', billingMode, dedup: false });
+      expect(await f.admission()).toMatchObject({ kind: 'applied', billingMode, dedup: true });
+      expect(await f.heartbeat()).toMatchObject({
+        billingMode,
+        budget: { verdict: 'continue' },
+      });
+      const charged = billingMode === 'paid';
+      expect((await f.payer()).microdollars_used).toBe(charged ? 3_000_000 : 0);
+      expect(await f.usage()).toBe(charged ? 3_000_000 : undefined);
+      const charges = await client.db
+        .select()
+        .from(compute_usage_charge)
+        .where(eq(compute_usage_charge.organization_id, f.orgId));
+      expect(charges).toHaveLength(charged ? 1 : 0);
+      const [interval] = await client.db
+        .select()
+        .from(container_usage_interval)
+        .where(eq(container_usage_interval.id, f.intervalId));
+      expect(interval.billing_mode).toBe(billingMode);
+      expect(interval.confirmed_seconds).toBe(300);
+    }
+  );
+
   it('blocks a $1.50 allowance, counts a running $3 charge once and recovers only after the allowance rises', async () => {
     const f = await fixture();
     await f.limit(1_500_000);

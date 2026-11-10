@@ -5,10 +5,11 @@ import {
   container_usage_segment,
   getWorkerDb,
   kilocode_users,
+  organization_seats_purchases,
   organizations,
   type WorkerDb,
 } from '@kilocode/db';
-import { and, eq, gt, lt, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, lt, ne, sql } from 'drizzle-orm';
 import type {
   RecordHeartbeatInput,
   RecordStartFailureCode,
@@ -477,7 +478,24 @@ export async function applyStartWithDb(
       };
     }
 
-    const billingMode = billingModeFor(billingConfig, input.service, input.subject);
+    let billingMode = billingModeFor(billingConfig, input.service, input.subject);
+    if (
+      billingMode === 'paid' &&
+      input.service.startsWith('cloud-agent-next-') &&
+      input.subject.type === 'org'
+    ) {
+      // Read the latest event, not any historical active subscription. Trialing
+      // subscriptions deliberately remain eligible for compute billing.
+      const [purchase] = await tx
+        .select({ status: organization_seats_purchases.subscription_status })
+        .from(organization_seats_purchases)
+        .where(eq(organization_seats_purchases.organization_id, input.subject.id))
+        .orderBy(desc(organization_seats_purchases.created_at))
+        .limit(1);
+      if (purchase?.status === 'active' || purchase?.status === 'past_due') {
+        billingMode = 'shadow';
+      }
+    }
     const [open] = await tx
       .select()
       .from(container_usage_interval)

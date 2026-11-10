@@ -521,10 +521,8 @@ class EnvironmentSnapshotRequiredError extends Error {
 type EnvironmentSnapshotUnusableReason = 'provider_no_snapshots' | 'not_isolated';
 
 const ENVIRONMENT_SNAPSHOT_UNUSABLE_DETAIL: Record<EnvironmentSnapshotUnusableReason, string> = {
-  provider_no_snapshots:
-    'This sandbox provider does not support environment snapshots yet, so it cannot start an environment with build commands.',
-  not_isolated:
-    'This session uses a retired sandbox type that cannot use an environment with build commands. Start a new session.',
+  provider_no_snapshots: 'This sandbox does not support environment snapshots.',
+  not_isolated: 'This session cannot use environment snapshots. Start a new session.',
 };
 
 /**
@@ -5489,23 +5487,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'multiple_environments':
         return {
           reason: 'environment_snapshot_unavailable',
-          detail:
-            'The sessions use different environment revisions, so no single environment snapshot applies. Align the environment revision and retry.',
+          detail: 'Sessions use different environment settings. Use matching settings and retry.',
           environmentId: blockedEnvironmentId,
           buildId: null,
         };
       case 'no_actor':
         return {
           reason: 'environment_snapshot_unavailable',
-          detail:
-            'The environment snapshot owner could not be identified. Retry from an authenticated session.',
+          detail: 'Could not verify the snapshot owner. Sign in again and retry.',
           environmentId: blockedEnvironmentId,
           buildId: null,
         };
       default:
         return {
           reason: 'environment_not_built',
-          detail: 'The session requires an environment build, but no environment is available.',
+          detail: 'No environment is selected. Choose an environment to start.',
           environmentId: blockedEnvironmentId,
           buildId: null,
         };
@@ -5654,10 +5650,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     const detail =
       reason === 'transient'
-        ? 'The environment snapshot could not start. Rebuild the environment and retry.'
+        ? 'Could not restore the environment snapshot. Rebuild the environment.'
         : reason === 'expired'
-          ? 'The environment snapshot expired. Rebuild the environment and retry.'
-          : 'The environment snapshot cannot start. Rebuild the environment and retry.';
+          ? 'Environment snapshot expired. Rebuild the environment.'
+          : 'Environment snapshot cannot be restored. Rebuild the environment.';
     const block =
       selection?.source === 'environment'
         ? environmentSnapshotStartBlock(selection.candidate, selection.buildId ?? null)

@@ -50,15 +50,15 @@ describe('summarizePreparationAttempt', () => {
     expect(phaseDisplayText(step({ key, latestDetail }))).toBe(latestDetail);
   });
 
-  it('preserves environment snapshot warnings alongside the local capture time', () => {
+  it('preserves the short cached-settings warning alongside the local capture time', () => {
     const capturedAt = Date.parse('2026-10-24T21:32:19Z');
-    const latestDetail = 'Using environment snapshot; environment settings have changed';
+    const latestDetail = 'Using environment snapshot; cached files may use older settings';
     expect(
       phaseDisplayText(
         step({ key: 'environment_snapshot', latestDetail, snapshotCapturedAt: capturedAt })
       )
     ).toBe(
-      `Using environment snapshot · ${formatSnapshotTime(capturedAt)}; environment settings have changed`
+      `Using environment snapshot · ${formatSnapshotTime(capturedAt)}; cached files may use older settings`
     );
   });
 

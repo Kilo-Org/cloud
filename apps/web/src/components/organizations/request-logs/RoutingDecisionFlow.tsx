@@ -150,6 +150,11 @@ function failoverStopLabels(stopReason: string | undefined): { title: string; de
         title: 'BYOK failover ran out of time',
         detail: 'Too little time was left to try another key, so the last error was returned.',
       };
+    case 'model-unavailable':
+      return {
+        title: 'BYOK failover reached a gateway that does not list this model',
+        detail: 'No further keys were tried, and the model-not-found error was returned.',
+      };
     case 'client-disconnected':
       return {
         title: 'The client disconnected during BYOK failover',

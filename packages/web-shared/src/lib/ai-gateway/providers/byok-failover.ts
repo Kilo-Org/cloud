@@ -126,6 +126,10 @@ export async function sendUpstreamAttemptWithByokFailover(
   let attemptDurationMs = Math.round(performance.now() - attemptStartedAt);
   let stopReason: ByokFailoverAttempt['stop_reason'];
   for (;;) {
+    if (attempt.type === 'invalid-openrouter-model') {
+      stopReason = 'model-unavailable';
+      break;
+    }
     const failed = failedResponse(attempt);
     if (!failed) break;
     if (input.signal?.aborted) {

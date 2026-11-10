@@ -135,6 +135,7 @@ describe('RoutingSections BYOK failover', () => {
   it.each([
     ['budget-exhausted', 'BYOK failover ran out of time'],
     ['client-disconnected', 'The client disconnected during BYOK failover'],
+    ['model-unavailable', 'BYOK failover reached a gateway that does not list this model'],
   ])('does not claim every key failed when failover stopped because of %s', (stopReason, title) => {
     const text =
       render(

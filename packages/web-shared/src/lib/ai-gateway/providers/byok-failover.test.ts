@@ -394,11 +394,17 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
   it('records a final model OpenRouter does not list as a failed 404', async () => {
     answerAfter(100, upstreamJsonFailure(500, { error: { code: 'server_error' } }));
     answerAfter(5, { type: 'invalid-openrouter-model' });
+    const nextByokFailover = nextRoutes(
+      route('failover-key', 'openrouter', 'openrouter'),
+      route('third-key', 'anthropic')
+    );
 
     const result = await sendUpstreamAttemptWithByokFailover(
       input(withFailovers(route('primary-key'))),
-      nextRoutes(route('failover-key', 'openrouter', 'openrouter'))
+      nextByokFailover
     );
+
+    expect(nextByokFailover).toHaveBeenCalledTimes(1);
 
     expect((await failoverAttemptsOf(result)).at(-1)).toEqual({
       provider_type: 'openrouter',
@@ -406,7 +412,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
       status: 404,
       duration_ms: 5,
       outcome: 'failed',
-      stop_reason: 'no-keys-left',
+      stop_reason: 'model-unavailable',
     });
   });
 

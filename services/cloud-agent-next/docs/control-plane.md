@@ -733,6 +733,12 @@ keep environment snapshots and existing history/worktree recovery.
   WebSocket upgrade. The Sandbox DO retains this capability in the socket attachment across
   hibernation and omits `runtimeInstructions` from both `session.prepare` and `session.attach` for
   older wrappers, whose strict schemas reject the field. Stored workspace instructions are unchanged.
+- Profile instruction cleanup removes only files tracked in `$HOME/.kilocode/profile-instructions.json`.
+  Invalid entries are skipped individually without losing ownership of valid entries. Restored HOMEs
+  from wrappers predating this manifest retain untracked rules, including stale profile rules: their
+  filenames cannot distinguish them from setup/user-created rules, so cleanup does not infer ownership.
+  A missing or malformed JSON manifest likewise cannot establish ownership. Re-materializing an enabled
+  profile rule tracks it for subsequent cleanup.
 
 - Connect, send `hello` (`wrapperId`, `allocationId`, protocol version), wait for `welcome` or
   `shutdown`. On `shutdown`, permanently close the connection and exit with code 0, even when the

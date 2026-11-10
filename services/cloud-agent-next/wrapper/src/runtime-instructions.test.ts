@@ -42,6 +42,56 @@ describe('runtime instruction cleanup', () => {
     }
   );
 
+  it('cleans valid owned rules even when other manifest entries are invalid', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-instructions-'));
+    const rules = path.join(home, '.kilocode/rules');
+    try {
+      await writeRuntimeInstructions(home, [
+        { name: 'stale', content: 'Old' },
+        { name: 'retained', content: 'Old' },
+      ]);
+      await fs.writeFile(
+        path.join(home, '.kilocode/profile-instructions.json'),
+        JSON.stringify(['stale.md', '../outside.md', 'cloud-agent.md', null, 42, 'retained.md'])
+      );
+      await fs.writeFile(path.join(home, '.kilocode/outside.md'), 'Outside');
+      await fs.writeFile(path.join(rules, 'cloud-agent.md'), 'Built-in');
+      await writeRuntimeInstructions(home, [{ name: 'retained', content: 'Updated' }], {
+        replaceExisting: true,
+      });
+      expect((await fs.readdir(rules)).sort()).toEqual(['cloud-agent.md', 'retained.md']);
+      expect(await fs.readFile(path.join(rules, 'retained.md'), 'utf8')).toBe('Updated');
+      expect(await fs.readFile(path.join(home, '.kilocode/outside.md'), 'utf8')).toBe('Outside');
+      expect(await fs.readFile(path.join(rules, 'cloud-agent.md'), 'utf8')).toBe('Built-in');
+      expect(
+        JSON.parse(
+          await fs.readFile(path.join(home, '.kilocode/profile-instructions.json'), 'utf8')
+        )
+      ).toEqual(['retained.md']);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves unowned legacy rules when a restored HOME has no manifest', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-instructions-'));
+    const rules = path.join(home, '.kilocode/rules');
+    try {
+      await fs.mkdir(rules, { recursive: true });
+      await fs.writeFile(path.join(rules, 'legacy-rule.md'), 'Ownership unknown');
+      await writeRuntimeInstructions(home, [{ name: 'current-profile', content: 'Current' }], {
+        replaceExisting: true,
+      });
+      await writeRuntimeInstructions(home, undefined, { replaceExisting: true });
+      expect(await fs.readdir(rules)).toEqual(['legacy-rule.md']);
+      expect(await fs.readFile(path.join(rules, 'legacy-rule.md'), 'utf8')).toBe(
+        'Ownership unknown'
+      );
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
   it('removes only previously materialized profile rules from a restored HOME', async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-instructions-'));
     const rules = path.join(home, '.kilocode/rules');

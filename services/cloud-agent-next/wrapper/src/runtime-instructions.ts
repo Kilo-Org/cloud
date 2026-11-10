@@ -4,16 +4,21 @@ import { z } from 'zod';
 import type { RuntimeInstructionInput } from '../../src/shared/runtime-profile.js';
 import { logToFile } from './utils.js';
 
-const profileRuleFilesSchema = z.array(
-  z
-    .string()
-    .regex(/^[a-z0-9][a-z0-9-]*\.md$/)
-    .refine(filename => filename !== 'cloud-agent.md')
-);
+const profileRuleFileSchema = z
+  .string()
+  .regex(/^[a-z0-9][a-z0-9-]*\.md$/)
+  .refine(filename => filename !== 'cloud-agent.md');
 
 async function readProfileRuleFiles(manifest: string): Promise<string[]> {
   try {
-    return profileRuleFilesSchema.parse(JSON.parse(await fs.readFile(manifest, 'utf8')));
+    const entries = z.array(z.unknown()).parse(JSON.parse(await fs.readFile(manifest, 'utf8')));
+    const files: string[] = [];
+    for (const entry of entries) {
+      const result = profileRuleFileSchema.safeParse(entry);
+      if (result.success) files.push(result.data);
+      else logToFile('bootstrap ignored invalid profile instruction manifest entry');
+    }
+    return files;
   } catch (error) {
     if (error instanceof SyntaxError || error instanceof z.ZodError) {
       logToFile('bootstrap ignored invalid profile instruction manifest');

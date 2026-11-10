@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
 import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { createPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
 import { POST } from './route';
@@ -15,11 +16,16 @@ jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+  isUserBlacklistedByDomain: jest.fn(),
+}));
+
 jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   getProfileOrganizations: jest.fn(),
 }));
 
 const mockedFindUserById = jest.mocked(findUserById);
+const mockedIsUserBlacklistedByDomain = jest.mocked(isUserBlacklistedByDomain);
 const mockedGetProfileOrganizations = jest.mocked(getProfileOrganizations);
 
 const NOW = new Date('2026-03-01T12:00:00.000Z');
@@ -30,14 +36,16 @@ const DEV_SECRET = 'd'.repeat(40);
 const STATE = 'S'.repeat(43);
 const organizations = [{ id: 'org-1', name: 'Kilo', role: 'member' }];
 
-function exchange(body: unknown, secret: string | null = SECRET) {
+/** `secret` is sent as a bearer credential; `authorization` replaces the whole header. */
+function exchange(body: unknown, secret: string | null = SECRET, authorization?: string) {
+  const credential = authorization ?? (secret === null ? null : `Bearer ${secret}`);
   return POST(
     new NextRequest('http://localhost:3000/api/pages-auth/exchange', {
       method: 'POST',
       body: typeof body === 'string' ? body : JSON.stringify(body),
       headers: {
         'Content-Type': 'application/json',
-        ...(secret === null ? {} : { Authorization: `Bearer ${secret}` }),
+        ...(credential === null ? {} : { Authorization: credential }),
       },
     })
   );
@@ -56,6 +64,7 @@ describe('POST /api/pages-auth/exchange', () => {
       google_user_email: 'ada@kilo.test',
       blocked_reason: null,
     } as never);
+    mockedIsUserBlacklistedByDomain.mockResolvedValue(false);
     mockedGetProfileOrganizations.mockResolvedValue(organizations as never);
   });
 
@@ -84,6 +93,30 @@ describe('POST /api/pages-auth/exchange', () => {
     ["another deployment's secret", DEV_SECRET],
   ])('refuses a caller with %s before looking anyone up', async (_name, secret) => {
     const response = await exchange({ code: codeFor(), origin: PAGES, state: STATE }, secret);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'invalid_client' });
+    expect(mockedFindUserById).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['a lowercase scheme', `bearer ${SECRET}`],
+    ['an uppercase scheme', `BEARER ${SECRET}`],
+    ['space around the credential', `  Bearer   ${SECRET}  `],
+  ])('reads a bearer credential sent with %s', async (_name, authorization) => {
+    const body = { code: codeFor(), origin: PAGES, state: STATE };
+    const response = await exchange(body, null, authorization);
+
+    expect(response.status).toBe(200);
+  });
+
+  test.each([
+    ['another scheme', `Basic ${SECRET}`],
+    ['no scheme', SECRET],
+    ['a scheme and nothing else', 'Bearer '],
+  ])('refuses a credential sent with %s', async (_name, authorization) => {
+    const body = { code: codeFor(), origin: PAGES, state: STATE };
+    const response = await exchange(body, null, authorization);
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'invalid_client' });
@@ -136,7 +169,7 @@ describe('POST /api/pages-auth/exchange', () => {
     expect(mockedFindUserById).not.toHaveBeenCalled();
   });
 
-  test('refuses an account that is gone or blocked', async () => {
+  test('refuses an account that is gone, blocked, or on a blacklisted domain', async () => {
     mockedFindUserById.mockResolvedValueOnce(undefined);
     const gone = await exchange({ code: codeFor(), origin: PAGES, state: STATE });
 
@@ -147,7 +180,13 @@ describe('POST /api/pages-auth/exchange', () => {
     } as never);
     const blocked = await exchange({ code: codeFor(), origin: PAGES, state: STATE });
 
-    for (const response of [gone, blocked]) {
+    mockedIsUserBlacklistedByDomain.mockResolvedValueOnce(true);
+    const blacklisted = await exchange({ code: codeFor(), origin: PAGES, state: STATE });
+    expect(mockedIsUserBlacklistedByDomain).toHaveBeenCalledWith(
+      expect.objectContaining({ google_user_email: 'ada@kilo.test' })
+    );
+
+    for (const response of [gone, blocked, blacklisted]) {
       expect(response.status).toBe(403);
       expect(await response.json()).toEqual({ error: 'account_unavailable' });
     }

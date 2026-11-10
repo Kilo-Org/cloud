@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { isPagesAuthClient } from '@/lib/pages-auth/pages-auth-clients';
 import { PAGES_AUTH_STATE_PATTERN, verifyPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
 
@@ -16,11 +18,6 @@ function refuse(status: number, error: string) {
   return NextResponse.json({ error }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-/** The bearer credential of a request, or null. */
-function bearerOf(request: Request): string | null {
-  return /^Bearer (.+)$/u.exec(request.headers.get('authorization') ?? '')?.[1] ?? null;
-}
-
 /**
  * Trades a Pages sign-in code for the person it names.
  *
@@ -31,8 +28,12 @@ function bearerOf(request: Request): string | null {
  *
  * A caller that is not a configured deployment gets 401 before the code is
  * checked. A code that is forged, stale, or minted for another deployment or
- * another `state` gets 400. An account that no longer exists or is blocked
- * gets 403.
+ * another `state` gets 400.
+ *
+ * The account is read again, since the code was minted up to a minute ago: one
+ * that no longer exists, is blocked, or is on a blacklisted email domain gets
+ * 403. This call carries no web session, so it cannot tell that the session
+ * which minted the code has since ended.
  */
 export const POST = withRestTiming('/api/pages-auth/exchange', async (request: Request) => {
   const body: unknown = await request.json().catch(() => null);
@@ -40,7 +41,8 @@ export const POST = withRestTiming('/api/pages-auth/exchange', async (request: R
   if (!parsed.success) return refuse(400, 'invalid_request');
   const { code, origin, state } = parsed.data;
 
-  if (!isPagesAuthClient(origin, bearerOf(request))) return refuse(401, 'invalid_client');
+  const secret = extractBearerToken(request.headers.get('authorization'));
+  if (!isPagesAuthClient(origin, secret)) return refuse(401, 'invalid_client');
 
   const grant = verifyPagesAuthCode(code);
   if (!grant || grant.origin !== origin || grant.state !== state) {
@@ -48,7 +50,9 @@ export const POST = withRestTiming('/api/pages-auth/exchange', async (request: R
   }
 
   const user = await findUserById(grant.userId);
-  if (!user || user.blocked_reason) return refuse(403, 'account_unavailable');
+  if (!user || user.blocked_reason || (await isUserBlacklistedByDomain(user))) {
+    return refuse(403, 'account_unavailable');
+  }
 
   const organizations = await getProfileOrganizations(user.id, { excludeAccessBlocked: true });
 

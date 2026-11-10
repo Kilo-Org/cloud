@@ -38,7 +38,12 @@ const mockFindActiveReviews = jest.fn<Promise<string[]>, unknown[]>();
 const mockListAttempts = jest.fn<Promise<Array<{ id: string }>>, unknown[]>();
 const mockRetryFailedCodeReview = jest.fn<Promise<RetryOutcome>, unknown[]>();
 const mockGetBotUserId = jest.fn<Promise<string | null>, unknown[]>();
+const mockGetAgentConfig = jest.fn<Promise<unknown>, unknown[]>();
 const mockAssertAuthorized = jest.fn<Promise<void>, unknown[]>();
+
+jest.mock('@/lib/agent-config/db/agent-configs', () => ({
+  getAgentConfigForOwner: (...args: unknown[]) => mockGetAgentConfig(...args),
+}));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchOpenPullRequests: (params: unknown) => mockFetchOpenPullRequests(params),
@@ -254,6 +259,7 @@ beforeEach(() => {
   mockListAttempts.mockResolvedValue([{ id: 'attempt-1' }]);
   mockRetryFailedCodeReview.mockResolvedValue({ outcome: 'retried' });
   mockGetBotUserId.mockResolvedValue('bot-user-1');
+  mockGetAgentConfig.mockResolvedValue({ config: {}, is_enabled: true });
   mockAssertAuthorized.mockResolvedValue();
   handlerVerdict = 'started';
   mockHandlePullRequestCodeReview.mockClear();
@@ -642,6 +648,46 @@ describe('recoverMissedReviews', () => {
       skippedRetryRefused: 1,
       providerFailures: 0,
     });
+  });
+
+  it('does not restart a repository the current configuration no longer selects', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+      manual_config: null,
+    });
+    mockGetAgentConfig.mockResolvedValue({
+      is_enabled: true,
+      config: { repository_selection_mode: 'selected', selected_repository_ids: [777] },
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({
+      reviewsRetried: 0,
+      reviewsStarted: 0,
+      skippedRetryRefused: 1,
+      providerFailures: 0,
+    });
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('does not restart a bot pull request the current configuration skips', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+      manual_config: null,
+    });
+    mockFetchOpenPullRequests.mockResolvedValue([
+      makePull({ authorType: 'Bot', authorLogin: 'dependabot[bot]' }),
+    ]);
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ reviewsRetried: 0, skippedRetryRefused: 1 });
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
   });
 
   it('reads no attempt rows for a head whose review already finished', async () => {

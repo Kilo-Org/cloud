@@ -19,6 +19,11 @@
  * of the two: it also runs the handler's merge-head guard, so a head that
  * merges base content a review already covers is gated from that review instead
  * of being reviewed a second time.
+ *
+ * A head that already has a review stopped on a transient failure is restarted
+ * through the same sequence the manual retry uses, under an attempt cap. The
+ * restart reapplies the reviewer configuration and the repository and bot rules
+ * the handler would apply to a new head, because it reaches no handler itself.
  */
 
 import * as z from 'zod';
@@ -26,7 +31,11 @@ import pLimit from 'p-limit';
 import { inArray, sql, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { platform_integrations, type PlatformIntegration } from '@kilocode/db/schema';
+import {
+  platform_integrations,
+  type CloudAgentCodeReview,
+  type PlatformIntegration,
+} from '@kilocode/db/schema';
 import {
   fetchOpenPullRequests,
   type OpenPullRequest,
@@ -38,6 +47,8 @@ import {
 } from '@/lib/integrations/github/runtime-authorization';
 import { PLATFORM, GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
+import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import { getManualCodeReviewConfig } from '@/lib/code-reviews/manual-config';
 import {
   findActiveReviewsForPR,
   findExistingReview,
@@ -425,6 +436,39 @@ function toPullRequestPayload(
   });
 }
 
+/**
+ * Whether the owner's current Code Reviewer configuration still admits this
+ * pull request.
+ *
+ * The sweep hands a pull request without a review to the handler, which applies
+ * every configuration rule. A restart reaches no handler, so it repeats the two
+ * rules a stored review can outlive: a repository the owner removed from the
+ * selected set, and a bot pull request the owner asks to skip. A manual review
+ * keeps the request a person made and is not subject to either rule.
+ */
+async function isReviewableUnderCurrentConfig(params: {
+  owner: Owner;
+  review: CloudAgentCodeReview;
+  pull: OpenPullRequest;
+}): Promise<boolean> {
+  if (getManualCodeReviewConfig(params.review) !== null) return true;
+
+  const agentConfig = await getAgentConfigForOwner(params.owner, 'code_review', PLATFORM.GITHUB);
+  const config = agentConfig?.config;
+  if (!config) return false;
+
+  if (
+    config.repository_selection_mode === 'selected' &&
+    Array.isArray(config.selected_repository_ids) &&
+    !config.selected_repository_ids.includes(params.pull.baseRepoId)
+  ) {
+    return false;
+  }
+
+  const skipBotPullRequests = config.skip_bot_pull_requests ?? true;
+  return !(skipBotPullRequests && params.pull.authorType === 'Bot');
+}
+
 async function recoverPullRequest(params: {
   pull: OpenPullRequest;
   entry: RecoverableRepository;
@@ -468,18 +512,24 @@ async function recoverPullRequest(params: {
       summary.skippedStartLimit += 1;
       return;
     }
-    // The attempt rows are read only for a review this run can restart, so a
-    // head that already has its review costs one query.
-    const attempts = await listCodeReviewAttempts(existingReview.id);
-    if (!isAutomaticallyRetryableReview(existingReview, attempts.length)) {
-      summary.skippedExisting += 1;
-      return;
-    }
-    // Reserve the slot before the awaited retry, as the start path does: a retry
-    // starts a review, so it spends the same per-run budget.
+    // Reserve the slot synchronously, before any await, as the start path does:
+    // several repositories sweep at once, and a retry starts a review, so it
+    // spends the same per-run budget. The reservation is released below when
+    // this row does not restart.
     summary.reviewsStarted += 1;
     let retried = false;
     try {
+      // The attempt rows are read only for a review inside the start budget, so
+      // a head that already has its review costs one query.
+      const attempts = await listCodeReviewAttempts(existingReview.id);
+      if (!isAutomaticallyRetryableReview(existingReview, attempts.length)) {
+        summary.skippedExisting += 1;
+        return;
+      }
+      if (!(await isReviewableUnderCurrentConfig({ owner, review: existingReview, pull }))) {
+        summary.skippedRetryRefused += 1;
+        return;
+      }
       const retry = await retryFailedCodeReview({
         review: existingReview,
         owner,

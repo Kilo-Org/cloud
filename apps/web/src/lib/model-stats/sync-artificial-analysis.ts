@@ -111,111 +111,131 @@ export async function syncArtificialAnalysisBenchmarks() {
   };
 }
 
-/**
- * Fetch models from Artificial Analysis API
- */
+// Legacy `/api/v2/data/llms/models` returns 410. Pro list is the field-compatible
+// replacement; free keys get 403 and must use the free sibling.
+const LANGUAGE_MODELS_URL = 'https://artificialanalysis.ai/api/v2/language/models';
+const LANGUAGE_MODELS_FREE_URL = 'https://artificialanalysis.ai/api/v2/language/models/free';
+const MAX_MODEL_PAGES = 50;
+
 async function fetchArtificialAnalysisModels(): Promise<ArtificialAnalysisModel[]> {
   if (!ARTIFICIAL_ANALYSIS_API_KEY) {
     throw new Error('ARTIFICIAL_ANALYSIS_API_KEY is not configured');
   }
 
-  const response = await fetchWithBackoff(
-    'https://artificialanalysis.ai/api/v2/data/llms/models',
-    {
-      headers: {
-        'x-api-key': ARTIFICIAL_ANALYSIS_API_KEY,
-      },
-    },
-    {
-      baseDelayMs: 1000,
-      maxDelayMs: 10000,
-      retryResponse: r => r.status === 429 || r.status >= 500,
-    }
-  );
+  const proModels = await fetchModelPages(LANGUAGE_MODELS_URL);
+  if (proModels !== 'forbidden') return proModels;
 
-  if (!response.ok) {
-    const errorText = await response.text();
+  console.log('[artificial-analysis] Pro models endpoint returned 403, using free endpoint');
+  const freeModels = await fetchModelPages(LANGUAGE_MODELS_FREE_URL);
+  if (freeModels === 'forbidden') {
     throw new Error(
-      `Artificial Analysis API error: ${response.status} ${response.statusText} - ${errorText}`
+      'Artificial Analysis API error: 403 subscription does not cover language models'
     );
   }
-
-  const rawData = await response.json();
-  const parsedData = ArtificialAnalysisResponseSchema.parse(rawData);
-  return parsedData.data ?? [];
+  return freeModels;
 }
 
-/**
- * Extract benchmark data from AA model
- */
+async function fetchModelPages(url: string): Promise<ArtificialAnalysisModel[] | 'forbidden'> {
+  const models: ArtificialAnalysisModel[] = [];
+
+  for (let page = 1; page <= MAX_MODEL_PAGES; page++) {
+    const response = await fetchWithBackoff(
+      `${url}?page=${page}`,
+      {
+        headers: {
+          'x-api-key': ARTIFICIAL_ANALYSIS_API_KEY,
+        },
+      },
+      {
+        baseDelayMs: 1000,
+        maxDelayMs: 10000,
+        retryResponse: r => r.status === 429 || r.status >= 500,
+      }
+    );
+
+    if (response.status === 403) return 'forbidden';
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Artificial Analysis API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const parsedData = ArtificialAnalysisResponseSchema.parse(await response.json());
+    models.push(...(parsedData.data ?? []));
+    if (!parsedData.pagination?.has_more) return models;
+  }
+
+  throw new Error(`Artificial Analysis API pagination exceeded ${MAX_MODEL_PAGES} pages`);
+}
+
 function extractBenchmarkData(aaModel: ArtificialAnalysisModel) {
   const lastUpdated = new Date().toISOString();
   const evals = aaModel.evaluations || {};
+  // `performance` medians are null from 2026-12-10; v3 means are the replacement.
+  const speedTokensPerSec =
+    aaModel.performance?.median_output_tokens_per_second ??
+    aaModel.performance_v3?.mean_output_tokens_per_second ??
+    null;
+  const timeToFirstTokenSeconds =
+    aaModel.performance?.median_time_to_first_token_seconds ??
+    aaModel.performance_v3?.mean_time_to_first_token_seconds;
 
   return {
     codingIndex: evals.artificial_analysis_coding_index ?? null,
-    speedTokensPerSec: aaModel.median_output_tokens_per_second ?? null,
+    speedTokensPerSec,
     benchmarks: {
       codingIndex: evals.artificial_analysis_coding_index,
-      liveCodeBench: evals.livecodebench,
       sciCode: evals.scicode,
       terminalBenchHard: evals.terminalbench_hard,
-      lcr: evals.lcr,
+      lcr: evals.aa_lcr,
       ifBench: evals.ifbench,
-      timeToFirstTokenSeconds: aaModel.median_time_to_first_token_seconds,
+      timeToFirstTokenSeconds,
       lastUpdated,
     },
   };
 }
 
-/**
- * Zod schema for Artificial Analysis API response
- */
+const nullableNumber = z.number().nullable().optional();
+
 const ArtificialAnalysisModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
   release_date: z.string().nullable().optional(),
-  model_creator: z
-    .object({
-      id: z.string(),
-      name: z.string(),
-      slug: z.string(),
-    })
-    .optional(),
   evaluations: z
     .object({
-      artificial_analysis_intelligence_index: z.number().nullable().optional(),
-      artificial_analysis_coding_index: z.number().nullable().optional(),
-      artificial_analysis_math_index: z.number().nullable().optional(),
-      mmlu_pro: z.number().nullable().optional(),
-      gpqa: z.number().nullable().optional(),
-      hle: z.number().nullable().optional(),
-      livecodebench: z.number().nullable().optional(),
-      scicode: z.number().nullable().optional(),
-      math_500: z.number().nullable().optional(),
-      aime: z.number().nullable().optional(),
-      aime_25: z.number().nullable().optional(),
-      ifbench: z.number().nullable().optional(),
-      lcr: z.number().nullable().optional(),
-      terminalbench_hard: z.number().nullable().optional(),
-      tau2: z.number().nullable().optional(),
+      artificial_analysis_coding_index: nullableNumber,
+      scicode: nullableNumber,
+      terminalbench_hard: nullableNumber,
+      aa_lcr: nullableNumber,
+      ifbench: nullableNumber,
     })
     .optional(),
-  pricing: z
+  performance: z
     .object({
-      price_1m_blended_3_to_1: z.number().optional(),
-      price_1m_input_tokens: z.number().optional(),
-      price_1m_output_tokens: z.number().optional(),
+      median_output_tokens_per_second: nullableNumber,
+      median_time_to_first_token_seconds: nullableNumber,
     })
+    .nullable()
     .optional(),
-  median_output_tokens_per_second: z.number().optional(),
-  median_time_to_first_token_seconds: z.number().optional(),
-  median_time_to_first_answer_token: z.number().optional(),
+  performance_v3: z
+    .object({
+      mean_output_tokens_per_second: nullableNumber,
+      mean_time_to_first_token_seconds: nullableNumber,
+    })
+    .nullable()
+    .optional(),
 });
 
 const ArtificialAnalysisResponseSchema = z.object({
   data: z.array(ArtificialAnalysisModelSchema).optional(),
+  pagination: z
+    .object({
+      has_more: z.boolean(),
+    })
+    .optional(),
 });
 
 type ArtificialAnalysisModel = z.infer<typeof ArtificialAnalysisModelSchema>;

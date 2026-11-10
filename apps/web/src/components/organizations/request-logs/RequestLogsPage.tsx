@@ -288,19 +288,18 @@ function RequestsTab({
   );
 }
 
-const TABS = ['requests', 'enkrypt'] as const;
-type Tab = (typeof TABS)[number];
-
-function isTab(value: string | null): value is Tab {
-  return TABS.some(tab => tab === value);
-}
-
-export function RequestLogsPage({ organizationId }: { organizationId: string }) {
+export function RequestLogsPage({
+  organizationId,
+  enkryptEnabled,
+}: {
+  organizationId: string;
+  enkryptEnabled: boolean;
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const tabParam = searchParams.get('tab');
-  const activeTab: Tab = isTab(tabParam) ? tabParam : 'requests';
+  const activeTab = tabParam === 'enkrypt' && enkryptEnabled ? 'enkrypt' : 'requests';
   const filters: RequestFilters = {
     startTime: parseStartParam(searchParams.get('start')),
     userId: searchParams.get('user') || null,
@@ -330,7 +329,7 @@ export function RequestLogsPage({ organizationId }: { organizationId: string }) 
       >
         <TabsList className="self-start">
           <TabsTrigger value="requests">Requests</TabsTrigger>
-          <TabsTrigger value="enkrypt">Enkrypt</TabsTrigger>
+          {enkryptEnabled && <TabsTrigger value="enkrypt">Enkrypt</TabsTrigger>}
         </TabsList>
         <TabsContent value="requests">
           <RequestsTab
@@ -339,13 +338,15 @@ export function RequestLogsPage({ organizationId }: { organizationId: string }) 
             onFiltersChange={replaceParams}
           />
         </TabsContent>
-        <TabsContent value="enkrypt">
-          <EnkryptUsageTab
-            organizationId={organizationId}
-            filters={parseEnkryptFilters(searchParams)}
-            onFiltersChange={replaceParams}
-          />
-        </TabsContent>
+        {enkryptEnabled && (
+          <TabsContent value="enkrypt">
+            <EnkryptUsageTab
+              organizationId={organizationId}
+              filters={parseEnkryptFilters(searchParams)}
+              onFiltersChange={replaceParams}
+            />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

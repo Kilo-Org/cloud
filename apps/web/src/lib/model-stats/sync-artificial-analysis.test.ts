@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
+import type { fetchWithBackoff as FetchWithBackoff } from '@kilocode/web-shared/lib/fetchWithBackoff';
 
-const mockedFetch =
-  jest.fn<typeof import('@kilocode/web-shared/lib/fetchWithBackoff').fetchWithBackoff>();
+const mockedFetch = jest.fn() as jest.MockedFunction<typeof FetchWithBackoff>;
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ARTIFICIAL_ANALYSIS_API_KEY: 'test-artificial-analysis-key',

@@ -5211,6 +5211,64 @@ describe('UserConnectionDO', () => {
       expect(allSent(cliWs).some(message => message.type === 'command')).toBe(true);
       expect(allSent(webWs).some(message => message.error)).toBe(false);
     });
+
+    it('fails an unknown session immediately when nothing was trimmed', async () => {
+      const { doInstance, mockCtx } = setup();
+      addCliSocket(mockCtx, 'cli-1', [makeSession('s1')]);
+      const webWs = addWebSocket(mockCtx);
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 'ses-unknown',
+      });
+
+      expect(allSent(webWs)).toContainEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: 'Session owner not found',
+      });
+    });
+
+    it('fails a shed session once the owner wait elapses without a heartbeat', async () => {
+      vi.useFakeTimers();
+      try {
+        const { doInstance, mockCtx } = setup();
+        const cliWs = addCliSocket(mockCtx, 'cli-1');
+        const webWs = addWebSocket(mockCtx);
+        capAttachment(cliWs);
+        await doInstance.webSocketMessage(
+          cliWs as never,
+          JSON.stringify({
+            type: 'heartbeat',
+            protocolVersion: '1',
+            sessions: oversizedSessions(),
+          })
+        );
+        const restored = new UserConnectionDO(mockCtx.build() as never, {} as Env);
+        webWs.send.mockClear();
+
+        const command = restored.webSocketMessage(
+          webWs as never,
+          JSON.stringify({
+            type: 'command',
+            id: 'cmd-1',
+            command: 'send_message',
+            sessionId: 'ses-cap-199',
+          })
+        );
+        await vi.advanceTimersByTimeAsync(12_000);
+        await command;
+
+        expect(allSent(webWs)).toContainEqual({
+          type: 'response',
+          id: 'cmd-1',
+          error: 'Session owner not found',
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('getConnectedInstances', () => {

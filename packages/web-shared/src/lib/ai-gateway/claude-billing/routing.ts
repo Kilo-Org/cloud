@@ -142,7 +142,7 @@ export function buildClaudeBillingProvider(
       context.extraHeaders['anthropic-version'] ??= ANTHROPIC_VERSION;
       appendAnthropicBetaHeader(context.extraHeaders, OAUTH_API_BETA);
       appendAnthropicBetaHeader(context.extraHeaders, CLAUDE_BILLING_BETA);
-      dropThinkingBlocksOnPrefixMismatch({ ...context, model: upstreamModel });
+      dropThinkingBlocksOnPrefixMismatch(context);
       context.extraHeaders['anthropic-user-profile-id'] = userProfileId;
       markBilled(context.request.body, upstreamModel);
     },

@@ -87,8 +87,8 @@ function sharedOwner() {
 }
 
 describe('Claude customer-billed routing', () => {
-  it.each(['anthropic/claude-fable-5.2', '~anthropic/latest'])(
-    'drops mismatched thinking blocks for the resolved billing model (%s)',
+  it.each(['anthropic/claude-fable-5.2', '~anthropic/claude-fable-latest'])(
+    'drops mismatched thinking blocks for %s',
     async model => {
       const provider = buildClaudeBillingProvider(
         'operator-token',
@@ -110,7 +110,7 @@ describe('Claude customer-billed routing', () => {
         'x-anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
       };
 
-      await provider.transformRequest({
+      const context = {
         provider,
         model,
         request: gatewayRequest,
@@ -120,8 +120,10 @@ describe('Claude customer-billed routing', () => {
         kilo_user_id: 'user',
         organization_id: null,
         session_id: null,
-      });
+      };
+      await provider.transformRequest(context);
 
+      expect(context.model).toBe(model);
       expect(gatewayRequest.body).toMatchObject({
         model: 'claude-fable-5-2',
         thinking: {

@@ -19,6 +19,7 @@ const ASSISTANT_FAILURE_MESSAGES = {
   output_limit: 'The model output limit was reached',
   content_filter: 'The model provider blocked the response under its content policy',
   structured_output: 'The model response did not match the required format',
+  model_catalog_unavailable: 'The Kilo model catalog could not be loaded',
   unknown: 'Assistant request failed',
 } as const satisfies Record<CloudAgentAssistantFailureReason, string>;
 const BYOK_INVALID_REQUEST_MESSAGE =
@@ -414,6 +415,13 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
     reason => ASSISTANT_FAILURE_MESSAGES[reason].toLocaleLowerCase() === canonicalMessage
   );
   if (canonicalReason !== undefined) return canonicalReason;
+  // Kilo v2 reports a catalog load failure as `provider.no-route`. Only a 404
+  // is claimed: it means the catalog path is missing on the Kilo side (for
+  // example, refused by the runtime credential proxy). Other statuses keep
+  // their provider, authentication or unknown reasons below.
+  if (/\bfailed to load the kilo model catalog \(http 404\)/.test(message)) {
+    return 'model_catalog_unavailable';
+  }
   if (/\b(payment required|insufficient (?:credits?|balance|funds))\b/.test(message)) {
     return 'insufficient_credits';
   }

@@ -111,6 +111,8 @@ describe('classifyCloudAgentFailure', () => {
     ['gateway_unavailable', 'managed', 'provider', 'gateway_unavailable'],
     ['gateway_unavailable', 'byok', 'provider', 'gateway_unavailable'],
     ['gateway_unavailable', 'unknown', 'provider', 'gateway_unavailable'],
+    ['model_catalog_unavailable', 'managed', 'platform', 'model_catalog_unavailable'],
+    ['model_catalog_unavailable', 'unknown', 'platform', 'model_catalog_unavailable'],
   ] as const)(
     'classifies %s with %s ownership without losing the known cause',
     (assistantReason, providerOwnership, responsibility, reason) => {
@@ -686,6 +688,14 @@ const ASSISTANT_FAILURE_CLASSIFICATIONS: ReadonlyArray<{
   {
     match: { code: ['assistant_error'], assistantReason: ['structured_output'] },
     expected: { responsibility: 'platform', reason: 'assistant_structured_output' },
+  },
+  // A Kilo-side catalog path failure is the platform's, whatever the code or ownership.
+  {
+    match: {
+      code: ['assistant_error', 'model_missing'],
+      assistantReason: ['model_catalog_unavailable'],
+    },
+    expected: { responsibility: 'platform', reason: 'model_catalog_unavailable' },
   },
   // `model_missing` resolves to the unavailable-model branch for every reason except the overrides above.
   {

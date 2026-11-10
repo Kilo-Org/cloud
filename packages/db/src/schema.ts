@@ -6971,6 +6971,7 @@ export type CloudAgentFailureReason =
   | 'managed_provider_unavailable'
   | 'managed_provider_authentication'
   | 'managed_model_configuration'
+  | 'model_catalog_unavailable'
   | 'provider_unavailable'
   | 'provider_disconnect'
   | 'gateway_unavailable'

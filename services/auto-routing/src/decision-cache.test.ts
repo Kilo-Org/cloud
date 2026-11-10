@@ -48,7 +48,7 @@ async function classifierUsage() {
       requestStart: 'request-start',
       requestedModel: 'kilo-auto/efficient',
     },
-    0.000013,
+    { costUsd: 0.000013, call: null, latencyMs: 0, hasError: false },
     new Date().toISOString()
   );
 }

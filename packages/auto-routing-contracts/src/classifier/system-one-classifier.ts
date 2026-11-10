@@ -18,10 +18,19 @@ export type SystemOneClient = {
   attributionHeaders: Record<string, string>;
 };
 
+// What OpenRouter reported about the call that produced a response body.
+export type ClassifierCallDetails = {
+  generationId: string | null;
+  provider: string | null;
+  inputTokens: number;
+  outputTokens: number;
+};
+
 export type ClassifierRunResult = {
   cost: number | null;
   classifierModel: string;
   classification: ClassifierOutput;
+  call: ClassifierCallDetails;
 };
 
 export type ClassifierFailureStage = 'transport' | `http_${number}` | 'invalid_response';
@@ -31,6 +40,7 @@ export type ClassifierRunFailureMetadata = {
   classifierModel: string;
   failureStage: ClassifierFailureStage;
   schemaIssueSummary?: string[];
+  call?: ClassifierCallDetails;
 };
 
 export class ClassifierRunError extends Error {
@@ -38,6 +48,8 @@ export class ClassifierRunError extends Error {
   readonly classifierModel: string;
   readonly failureStage: ClassifierFailureStage;
   readonly schemaIssueSummary: string[];
+  // Null when the call failed before OpenRouter returned a response body.
+  readonly call: ClassifierCallDetails | null;
 
   constructor(message: string, metadata: ClassifierRunFailureMetadata) {
     super(message);
@@ -46,6 +58,7 @@ export class ClassifierRunError extends Error {
     this.classifierModel = metadata.classifierModel;
     this.failureStage = metadata.failureStage;
     this.schemaIssueSummary = metadata.schemaIssueSummary ?? [];
+    this.call = metadata.call ?? null;
   }
 }
 
@@ -254,6 +267,30 @@ function billedCost(body: unknown): number | null {
   return parsed.success ? parsed.data.usage.cost : null;
 }
 
+const tokenCount = z.number().int().nonnegative().catch(0);
+const optionalString = z.string().nullish().catch(null);
+
+// Lenient so a missing or malformed field never fails a classification it does not affect.
+const CallDetailsSchema = z
+  .object({
+    id: optionalString,
+    provider: optionalString,
+    usage: z
+      .object({ input_tokens: tokenCount, output_tokens: tokenCount })
+      .catch({ input_tokens: 0, output_tokens: 0 }),
+  })
+  .catch({ id: null, provider: null, usage: { input_tokens: 0, output_tokens: 0 } });
+
+function callDetails(body: unknown): ClassifierCallDetails {
+  const { id, provider, usage } = CallDetailsSchema.parse(body);
+  return {
+    generationId: id ?? null,
+    provider: provider ?? null,
+    inputTokens: usage.input_tokens,
+    outputTokens: usage.output_tokens,
+  };
+}
+
 const TRANSIENT_RETRY_DELAY_MS = 250;
 // The gateway waits 5 s for /decide. Two attempts plus the retry delay stay
 // inside that budget, so a hung request ends here with a typed error instead of
@@ -336,6 +373,7 @@ export async function classifyWithSystemOne(
   );
 
   const responseBody: unknown = await response.json().catch(() => null);
+  const call = callDetails(responseBody);
   const parsed = SystemOneClassifierResponseSchema.safeParse(responseBody);
   if (!parsed.success) {
     throw new ClassifierRunError('System One returned an invalid classifier response', {
@@ -343,6 +381,7 @@ export async function classifyWithSystemOne(
       classifierModel,
       failureStage: 'invalid_response',
       schemaIssueSummary: issuePaths(parsed.error),
+      call,
     });
   }
 
@@ -353,8 +392,14 @@ export async function classifyWithSystemOne(
       classifierModel,
       failureStage: 'invalid_response',
       schemaIssueSummary: issuePaths(classification.error),
+      call,
     });
   }
 
-  return { cost: parsed.data.usage.cost, classifierModel, classification: classification.data };
+  return {
+    cost: parsed.data.usage.cost,
+    classifierModel,
+    classification: classification.data,
+    call,
+  };
 }

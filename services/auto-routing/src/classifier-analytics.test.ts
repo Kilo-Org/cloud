@@ -28,6 +28,7 @@ describe('classifier analytics', () => {
         classification,
         classifierDurationMs: 123.45,
         classifierCostCredits: 0.00000123,
+        generationId: 'gen-classifier-1',
       }
     );
 
@@ -43,6 +44,7 @@ describe('classifier analytics', () => {
         'medium',
         'code_change',
         '1',
+        'gen-classifier-1',
       ],
       doubles: [123.45, 0.00000123, 0.74, 0],
     });

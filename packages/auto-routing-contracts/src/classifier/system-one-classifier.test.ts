@@ -57,7 +57,8 @@ describe('classifyWithSystemOne', () => {
           'debugging/test_repair': 0.8,
           'implementation/feature_development': 0.2,
         }),
-        usage: { input_tokens: 6300, output_tokens: 0, cost: 0.000265 },
+        usage: { input_tokens: 6300, output_tokens: 33, cost: 0.000265 },
+        provider: 'TypeSafe',
       })
     );
 
@@ -74,6 +75,7 @@ describe('classifyWithSystemOne', () => {
         requiresTools: true,
         confidence: 0.7,
       },
+      call: { generationId: 'gen-1', provider: 'TypeSafe', inputTokens: 6300, outputTokens: 33 },
     });
 
     const [url, init] = fetchMock.mock.calls[0];
@@ -110,6 +112,26 @@ describe('classifyWithSystemOne', () => {
     });
   });
 
+  it('classifies a response whose call details are missing or malformed', async () => {
+    mockFetch(
+      Response.json({
+        id: 42,
+        answers: answers({ 'debugging/bug_fixing': 1 }),
+        usage: { input_tokens: 'many', cost: 0.0001 },
+      })
+    );
+
+    const result = await classifyWithSystemOne(client, input, 'typesafe/jev-1.13');
+
+    expect(result.classification.taskType).toBe('debugging');
+    expect(result.call).toEqual({
+      generationId: null,
+      provider: null,
+      inputTokens: 0,
+      outputTokens: 0,
+    });
+  });
+
   it('throws an http-stage error without billing or retrying when OpenRouter rejects the request', async () => {
     const fetchMock = mockFetch(new Response('{"error":"bad model"}', { status: 400 }));
 
@@ -120,6 +142,7 @@ describe('classifyWithSystemOne', () => {
       failureStage: 'http_400',
       cost: null,
       classifierModel: 'google/gemini-2.5-flash-lite',
+      call: null,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -165,6 +188,7 @@ describe('classifyWithSystemOne', () => {
       failureStage: 'invalid_response',
       cost: 0.00042,
       schemaIssueSummary: ['answers.routeKey:invalid_type'],
+      call: { generationId: 'gen-3', provider: null, inputTokens: 10, outputTokens: 0 },
     });
   });
 

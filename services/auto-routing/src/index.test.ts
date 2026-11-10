@@ -27,6 +27,7 @@ import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usa
 import {
   buildClassifierUsage,
   writeClassifierUsage,
+  type ClassifierCallBilling,
   type ClassifierCallKind,
 } from './classifier-usage';
 
@@ -126,6 +127,12 @@ const mockClassifierResult = {
   cost: 0.00000123,
   classifierModel: 'google/gemini-2.5-flash-lite',
   classification: mockClassification,
+  call: {
+    generationId: 'gen-classifier-1',
+    provider: 'TypeSafe',
+    inputTokens: 344,
+    outputTokens: 33,
+  },
 };
 
 const normalizedInput: NormalizedClassifierInput = {
@@ -888,6 +895,7 @@ describe('auto routing worker', () => {
         'medium',
         'code_change',
         '1',
+        'gen-classifier-1',
       ],
       doubles: [expect.any(Number), 0.00000123, 0.82, 0],
     });
@@ -897,6 +905,7 @@ describe('auto routing worker', () => {
       event: 'auto_routing_decision',
       status: 'classified',
       cacheHit: false,
+      classifierGenerationId: 'gen-classifier-1',
       userIdHash: expect.stringMatching(/^[0-9a-f]{16}$/),
       isAnonymousUser: false,
       sessionId: 'task-123',
@@ -1226,6 +1235,15 @@ describe('auto routing worker', () => {
       classification: mockClassification as ClassifierOutput,
     };
     const generation = 1_780_000_000_000;
+    const successBilling = {
+      costUsd: classifierResult.cost ?? 0,
+      call: classifierResult.call,
+      latencyMs: 0,
+      hasError: false,
+    };
+    const failureBilling = { ...successBilling, call: null, hasError: true };
+    const billingFor = (result: 'success' | 'billed failure') =>
+      result === 'success' ? successBilling : failureBilling;
 
     beforeEach(() => {
       vi.spyOn(Date, 'now').mockReturnValue(generation);
@@ -1235,7 +1253,7 @@ describe('auto routing worker', () => {
     async function expectClassifierUsage(
       input: NormalizedClassifierInput,
       kind: ClassifierCallKind,
-      cost: number
+      billing: ClassifierCallBilling & { costUsd: number }
     ) {
       await drainBackgroundTasks();
       const hashes = await computeContentHashes(input);
@@ -1250,7 +1268,7 @@ describe('auto routing worker', () => {
           requestStart: `${generation}:10`,
           requestedModel: input.requestedModel,
         },
-        cost,
+        billing,
         new Date(generation).toISOString()
       );
       expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(1);
@@ -1325,7 +1343,7 @@ describe('auto routing worker', () => {
           await expectClassifierUsage(
             { ...normalizedInput, messageCount } as NormalizedClassifierInput,
             'speculative',
-            classifierResult.cost ?? 0
+            { ...successBilling, latencyMs: first === 'classifier' ? 20 : 60 }
           );
         }
       );
@@ -1413,7 +1431,7 @@ describe('auto routing worker', () => {
           await expectClassifierUsage(
             input as NormalizedClassifierInput,
             'speculative',
-            classifierResult.cost ?? 0
+            billingFor(result)
           );
           await expect(
             (await decideRequest(mirrorPayload({ input }))).json()
@@ -1430,7 +1448,7 @@ describe('auto routing worker', () => {
           await expectClassifierUsage(
             input as NormalizedClassifierInput,
             'speculative',
-            classifierResult.cost ?? 0
+            billingFor(result)
           );
         }
       );
@@ -1452,7 +1470,7 @@ describe('auto routing worker', () => {
       await expectClassifierUsage(
         normalizedInput as NormalizedClassifierInput,
         'sync',
-        mockClassifierResult.cost
+        successBilling
       );
     });
 
@@ -1526,7 +1544,7 @@ describe('auto routing worker', () => {
         await expectClassifierUsage(
           input as NormalizedClassifierInput,
           'speculative',
-          classifierResult.cost ?? 0
+          billingFor(result)
         );
         const decisionLogs = [...logSpy.mock.calls, ...warnSpy.mock.calls]
           .map(([message]) => JSON.parse(String(message)))
@@ -1555,7 +1573,7 @@ describe('auto routing worker', () => {
         await expectClassifierUsage(
           input as NormalizedClassifierInput,
           'speculative',
-          classifierResult.cost ?? 0
+          billingFor(result)
         );
         expect(classifyNormalizedInput).toHaveBeenCalledTimes(result === 'success' ? 1 : 3);
       }
@@ -1570,6 +1588,7 @@ describe('auto routing worker', () => {
           cost: classifierResult.cost,
           classifierModel,
           failureStage: 'invalid_response',
+          call: classifierResult.call,
         })
       );
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -1593,7 +1612,7 @@ describe('auto routing worker', () => {
       await expectClassifierUsage(
         { ...normalizedInput, messageCount: 2 } as NormalizedClassifierInput,
         'speculative',
-        classifierResult.cost ?? 0
+        { ...failureBilling, call: classifierResult.call }
       );
       expect(cachePutEntry).not.toHaveBeenCalled();
       classifyNormalizedInput.mockRejectedValueOnce(new Error('unbilled failure'));
@@ -1605,7 +1624,7 @@ describe('auto routing worker', () => {
       await expectClassifierUsage(
         { ...normalizedInput, messageCount: 2 } as NormalizedClassifierInput,
         'speculative',
-        classifierResult.cost ?? 0
+        { ...failureBilling, call: classifierResult.call }
       );
     });
   });
@@ -2211,6 +2230,7 @@ describe('auto routing worker', () => {
         '',
         '',
         '',
+        '',
       ],
       doubles: [expect.any(Number), 0.00000123, -1, 0],
     });
@@ -2233,7 +2253,7 @@ describe('auto routing worker', () => {
     // SQL queries rely on this exact layout.
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['unknown'],
-      blobs: ['unknown', '', 'invalid_json', '', '', '', '', '', ''],
+      blobs: ['unknown', '', 'invalid_json', '', '', '', '', '', '', ''],
       doubles: [0, 0, -1, 0],
     });
   });

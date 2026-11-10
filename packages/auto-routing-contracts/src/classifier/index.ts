@@ -8,6 +8,7 @@ export {
   DEFAULT_CLASSIFIER_MODEL,
   OPENROUTER_SYSTEM_ONE_URL,
   requestSystemOne,
+  type ClassifierCallDetails,
   type ClassifierFailureStage,
   type ClassifierRunFailureMetadata,
   type ClassifierRunResult,

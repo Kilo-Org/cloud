@@ -1,4 +1,5 @@
 import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
+import type { ClassifierCallDetails } from '@kilocode/auto-routing-contracts/classifier';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
@@ -19,6 +20,14 @@ export type ClassifierUsageIdentity = {
   requestedModel: string;
 };
 
+export type ClassifierCallBilling = {
+  costUsd: number | null;
+  // Null when the call failed before OpenRouter returned a response body.
+  call: ClassifierCallDetails | null;
+  latencyMs: number;
+  hasError: boolean;
+};
+
 type ClassifierUsageEnv = Pick<
   Env,
   'AUTO_ROUTING_DECISION_CACHE' | 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'
@@ -31,9 +40,10 @@ function clean(value: string | null): string | null {
 export async function buildClassifierUsage(
   payload: MirrorPayload,
   identity: ClassifierUsageIdentity,
-  costUsd: number,
+  billing: ClassifierCallBilling & { costUsd: number },
   createdAt: string
 ): Promise<UsageRecordRequest> {
+  const { costUsd, call } = billing;
   const hash = await sha256Hex(
     JSON.stringify([
       identity.scope,
@@ -50,8 +60,8 @@ export async function buildClassifierUsage(
       id,
       kilo_user_id: clean(payload.userId),
       cost: Math.round(costUsd * 1_000_000),
-      input_tokens: 0,
-      output_tokens: 0,
+      input_tokens: call?.inputTokens ?? 0,
+      output_tokens: call?.outputTokens ?? 0,
       cache_write_tokens: 0,
       cache_hit_tokens: 0,
       created_at: createdAt,
@@ -59,10 +69,10 @@ export async function buildClassifierUsage(
       model: 'auto-routing/classifier',
       requested_model: clean(identity.requestedModel.toLowerCase()),
       cache_discount: null,
-      has_error: false,
+      has_error: billing.hasError,
       abuse_classification: 0,
       organization_id: payload.organizationId ?? null,
-      inference_provider: null,
+      inference_provider: clean(call?.provider ?? null),
       project_id: null,
     },
     metadata: {
@@ -81,10 +91,11 @@ export async function buildClassifierUsage(
       http_user_agent: clean(payload.userAgent),
       max_tokens: null,
       has_middle_out_transform: null,
+      // Only HTTP 200 responses carry a billed cost.
       status_code: 200,
-      upstream_id: null,
+      upstream_id: clean(call?.generationId ?? null),
       finish_reason: null,
-      latency: null,
+      latency: billing.latencyMs,
       moderation_latency: null,
       generation_time: null,
       is_byok: false,
@@ -130,13 +141,14 @@ export async function recordClassifierUsage(
   env: ClassifierUsageEnv,
   payload: MirrorPayload,
   identity: ClassifierUsageIdentity,
-  costUsd: number | null | undefined,
+  billing: ClassifierCallBilling,
   createdAt: string
 ): Promise<void> {
+  const { costUsd } = billing;
   if (costUsd == null) return;
   let usage: UsageRecordRequest;
   try {
-    usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    usage = await buildClassifierUsage(payload, identity, { ...billing, costUsd }, createdAt);
   } catch (error) {
     if (!(error instanceof ZodError)) throw error;
     for (const issue of error.issues) {

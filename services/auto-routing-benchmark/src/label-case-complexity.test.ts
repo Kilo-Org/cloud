@@ -34,6 +34,7 @@ const result: ClassifierRunResult = {
     requiresTools: false,
     confidence: 1,
   },
+  call: { generationId: null, provider: null, inputTokens: 0, outputTokens: 0 },
 };
 const cases: DeciderCase[] = ['first', 'second'].map(id => ({
   id,

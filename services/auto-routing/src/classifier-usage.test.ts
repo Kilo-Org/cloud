@@ -39,7 +39,17 @@ const identity: ClassifierUsageIdentity = {
   requestedModel: 'kilo-auto/efficient',
 };
 const createdAt = '2026-01-01T00:00:00.000Z';
-const costUsd = 0.000013;
+const billing = {
+  costUsd: 0.000013,
+  call: {
+    generationId: 'gen-classifier-1',
+    provider: 'TypeSafe',
+    inputTokens: 344,
+    outputTokens: 33,
+  },
+  latencyMs: 412,
+  hasError: false,
+};
 const fetchMock = vi.fn<typeof fetch>();
 
 beforeEach(() => {
@@ -55,11 +65,11 @@ afterEach(() => {
 
 describe('classifier usage identity', () => {
   it('produces a stable UUID per call independently of delivery time', async () => {
-    const first = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const first = await buildClassifierUsage(payload, identity, billing, createdAt);
     const retry = await buildClassifierUsage(
       payload,
       identity,
-      costUsd,
+      billing,
       '2026-01-02T00:00:00.000Z'
     );
     expect(first.core.id).toBe(retry.core.id);
@@ -75,28 +85,28 @@ describe('classifier usage identity', () => {
     { kind: 'speculative' as const },
     { requestStart: 'request-start-2' },
   ])('separates calls when identity changes: %j', async change => {
-    const first = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const first = await buildClassifierUsage(payload, identity, billing, createdAt);
     const other = await buildClassifierUsage(
       payload,
       { ...identity, ...change },
-      costUsd,
+      billing,
       createdAt
     );
     expect(first.core.id).not.toBe(other.core.id);
   });
 
   it('namespaces usage IDs by decision scope', async () => {
-    const efficientUsage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const efficientUsage = await buildClassifierUsage(payload, identity, billing, createdAt);
     const frontierUsage = await buildClassifierUsage(
       payload,
       { ...identity, scope: 'frontier' },
-      costUsd,
+      billing,
       createdAt
     );
     const customUsage = await buildClassifierUsage(
       payload,
       { ...identity, scope: 'custom:router-1' },
-      costUsd,
+      billing,
       createdAt
     );
     expect(new Set([efficientUsage.core.id, frontierUsage.core.id, customUsage.core.id]).size).toBe(
@@ -109,7 +119,7 @@ describe('classifier usage identity', () => {
     const usage = await buildClassifierUsage(
       payload,
       { ...identity, scope: 'custom:router-1', requestedModel: 'kilo-auto/custom/org/team' },
-      costUsd,
+      billing,
       createdAt
     );
     expect(usage.core.requested_model).toBe('kilo-auto/custom/org/team');
@@ -117,19 +127,23 @@ describe('classifier usage identity', () => {
   });
 
   it('matches classifier billing fields without persisting prompt text or lifecycle identity', async () => {
-    const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const usage = await buildClassifierUsage(payload, identity, billing, createdAt);
     expect(usage.core).toMatchObject({
       kilo_user_id: payload.userId,
       model: 'auto-routing/classifier',
       requested_model: 'kilo-auto/efficient',
       provider: 'openrouter',
       cost: 13,
-      input_tokens: 0,
-      output_tokens: 0,
+      input_tokens: 344,
+      output_tokens: 33,
       organization_id: null,
       has_error: false,
+      inference_provider: 'TypeSafe',
     });
     expect(usage.metadata).toMatchObject({
+      upstream_id: 'gen-classifier-1',
+      latency: 412,
+      status_code: 200,
       session_id: payload.sessionId,
       machine_id: payload.machineId,
       mode: payload.mode,
@@ -145,13 +159,41 @@ describe('classifier usage identity', () => {
     expect(JSON.stringify(usage)).not.toContain('private');
   });
 
+  it('marks a billed failure as an error and records zero tokens when no call details exist', async () => {
+    const usage = await buildClassifierUsage(
+      payload,
+      identity,
+      { ...billing, call: null, hasError: true },
+      createdAt
+    );
+    expect(usage.core).toMatchObject({
+      cost: 13,
+      has_error: true,
+      input_tokens: 0,
+      output_tokens: 0,
+      inference_provider: null,
+    });
+    expect(usage.metadata.upstream_id).toBeNull();
+  });
+
+  it('keeps the usage ID stable when only the call details differ', async () => {
+    const first = await buildClassifierUsage(payload, identity, billing, createdAt);
+    const other = await buildClassifierUsage(
+      payload,
+      identity,
+      { ...billing, call: null, latencyMs: 9, hasError: true },
+      createdAt
+    );
+    expect(other.core.id).toBe(first.core.id);
+  });
+
   it('maps an omitted organization to the same personal payer as the parsed payload', async () => {
     const legacyPayload = { ...payload };
     Reflect.deleteProperty(legacyPayload, 'organizationId');
     const parsedPayload = MirrorPayloadSchema.parse(legacyPayload);
     expect(parsedPayload.organizationId).toBeNull();
-    const legacyUsage = await buildClassifierUsage(legacyPayload, identity, costUsd, createdAt);
-    const parsedUsage = await buildClassifierUsage(parsedPayload, identity, costUsd, createdAt);
+    const legacyUsage = await buildClassifierUsage(legacyPayload, identity, billing, createdAt);
+    const parsedUsage = await buildClassifierUsage(parsedPayload, identity, billing, createdAt);
     expect(legacyUsage.core.organization_id).toBeNull();
     expect(legacyUsage).toEqual(parsedUsage);
     expect(legacyUsage.core.cost).toBe(13);
@@ -168,7 +210,7 @@ describe('classifier usage identity', () => {
         userAgent: 'client\u00001',
       },
       identity,
-      costUsd,
+      billing,
       createdAt
     );
     expect(usage.core.organization_id).toBe(organizationId);
@@ -194,11 +236,11 @@ describe('classifier usage delivery', () => {
           get: vi.fn(() => ({ recordClassifierUsage: record })),
         },
       } as unknown as Env;
-      await recordClassifierUsage(env, payload, { ...identity, kind }, costUsd, createdAt);
+      await recordClassifierUsage(env, payload, { ...identity, kind }, billing, createdAt);
       const expected = await buildClassifierUsage(
         payload,
         { ...identity, kind },
-        costUsd,
+        billing,
         createdAt
       );
       expect(record).toHaveBeenCalledExactlyOnceWith(expected);
@@ -219,7 +261,7 @@ describe('classifier usage delivery', () => {
       env,
       payload,
       { ...identity, scope: 'custom:router-1' },
-      costUsd,
+      billing,
       createdAt
     );
     expect(idFromName).toHaveBeenCalledExactlyOnceWith(
@@ -242,7 +284,7 @@ describe('classifier usage delivery', () => {
         env,
         { ...payload, organizationId: 'private-invalid-org-id' },
         identity,
-        costUsd,
+        billing,
         createdAt
       )
     ).resolves.toBeUndefined();
@@ -257,7 +299,7 @@ describe('classifier usage delivery', () => {
   });
 
   it('posts the usage contract to the existing web writer using the internal secret', async () => {
-    const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const usage = await buildClassifierUsage(payload, identity, billing, createdAt);
     fetchMock.mockResolvedValueOnce(
       Response.json({
         status: 'recorded',
@@ -286,7 +328,7 @@ describe('classifier usage delivery', () => {
   });
 
   it('returns unavailable when the secret cannot be read so the DO retains the event', async () => {
-    const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const usage = await buildClassifierUsage(payload, identity, billing, createdAt);
     await expect(
       writeClassifierUsage(
         {

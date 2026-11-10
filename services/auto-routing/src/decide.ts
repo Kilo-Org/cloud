@@ -29,7 +29,10 @@ import {
   getDecisionLogSampleRate,
   getShadowRoutingTable,
 } from './classifier-config';
-import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
+import type {
+  ClassifierCallDetails,
+  ClassifierOutput,
+} from '@kilocode/auto-routing-contracts/classifier';
 import {
   computeContentHashes,
   deriveConversationKey,
@@ -57,7 +60,11 @@ import { getAutoRoutingMode } from './routing-mode';
 import type { HonoEnv } from './hono-env';
 import { getModelCapabilities } from './model-capabilities';
 import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabilities';
-import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
+import {
+  recordClassifierUsage,
+  type ClassifierCallBilling,
+  type ClassifierCallKind,
+} from './classifier-usage';
 
 function stickyToIncumbent(sticky: StickyDecision | null): DecisionIncumbent | null {
   if (!sticky) return null;
@@ -115,6 +122,7 @@ function getClassifierFailureMetadata(error: unknown): {
   classifierModel?: string;
   failureStage?: string;
   schemaIssueSummary?: string[];
+  call?: ClassifierCallDetails | null;
 } {
   if (error instanceof ClassifierRunError) {
     return {
@@ -122,6 +130,7 @@ function getClassifierFailureMetadata(error: unknown): {
       classifierModel: error.classifierModel,
       failureStage: error.failureStage,
       schemaIssueSummary: error.schemaIssueSummary,
+      call: error.call,
     };
   }
   return {};
@@ -193,6 +202,7 @@ type DecisionSummary = {
   classifierModel: string | null;
   classification?: ClassifierOutput;
   cost: number | null;
+  generationId: string | null;
   cacheHit: boolean;
   // Outcome-specific log fields (failure diagnostics).
   details: Record<string, unknown>;
@@ -206,6 +216,7 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
         classifierModel: outcome.classifierModel,
         classification: outcome.classification,
         cost: 0,
+        generationId: null,
         cacheHit: true,
         details: {},
       };
@@ -216,6 +227,7 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
         classifierModel: classifier.classifierModel,
         classification: classifier.classification,
         cost: classifier.cost,
+        generationId: classifier.call.generationId,
         cacheHit: false,
         details: {},
       };
@@ -226,6 +238,7 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
         status: classifierErrorStatus(outcome.error),
         classifierModel: metadata.classifierModel ?? null,
         cost: metadata.cost ?? null,
+        generationId: metadata.call?.generationId ?? null,
         cacheHit: false,
         details: {
           reason: getClassifierFailureReason(outcome.error),
@@ -267,6 +280,7 @@ function recordDecision(
     classifierCostCredits: summary.cost,
     classifierDurationMs: durationMs,
     cacheHit: summary.cacheHit,
+    generationId: summary.generationId,
   });
 
   const incumbentModel = incumbent?.model ?? null;
@@ -307,6 +321,7 @@ function recordDecision(
       scope: ctx.scope,
       classifierDurationMs: Math.round(durationMs),
       classifierCostCredits: summary.cost,
+      classifierGenerationId: summary.generationId,
       messageCount: ctx.payload.input.messageCount,
       bodyBytes: ctx.payload.bodyBytes,
       taskType: summary.classification?.taskType ?? null,
@@ -442,22 +457,24 @@ export async function runDecision(
       requestStart,
       requestedModel: target.requestedModel,
     };
-    try {
-      const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel);
-      c.executionCtx.waitUntil(
-        recordClassifierUsage(c.env, payload, identity, classifier.cost, usageCreatedAt)
-      );
-      return classifier;
-    } catch (error) {
+    const callStartedAt = performance.now();
+    const bill = (billing: Omit<ClassifierCallBilling, 'latencyMs'>) =>
       c.executionCtx.waitUntil(
         recordClassifierUsage(
           c.env,
           payload,
           identity,
-          getClassifierFailureMetadata(error).cost,
+          { ...billing, latencyMs: Math.round(performance.now() - callStartedAt) },
           usageCreatedAt
         )
       );
+    try {
+      const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel);
+      bill({ costUsd: classifier.cost, call: classifier.call, hasError: false });
+      return classifier;
+    } catch (error) {
+      const failure = getClassifierFailureMetadata(error);
+      bill({ costUsd: failure.cost ?? null, call: failure.call ?? null, hasError: true });
       throw error;
     }
   };

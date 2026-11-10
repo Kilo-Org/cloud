@@ -425,6 +425,12 @@ beforeEach(() => {
     cost: 0.000002,
     classifierModel: 'test/classifier',
     classification,
+    call: {
+      generationId: 'gen-classifier-1',
+      provider: 'TypeSafe',
+      inputTokens: 1,
+      outputTokens: 1,
+    },
   });
   recordUsage.mockClear();
   cacheIdFromName.mockClear();

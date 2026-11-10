@@ -41,8 +41,8 @@ export function isPagesAuthOrigin(origin: string): boolean {
 
 /**
  * Whether `secret` is the one configured for the Pages deployment at `origin`.
- * Both sides are hashed first, so the comparison takes the same time whatever
- * the length of the value presented.
+ * Both sides are hashed first, so the comparison is over equal lengths and in
+ * constant time.
  */
 export function isPagesAuthClient(origin: string, secret: string | null): boolean {
   const client = findPagesAuthClient(origin);

@@ -46,9 +46,13 @@ function parsePagesAuthGrant(payload: Record<string, unknown>): PagesAuthGrant |
  *
  * A code is not stored, so it is not single use. It is bound instead: it is
  * good for a minute, only for the deployment and the `state` it was minted
- * for, and only when presented with that deployment's secret. Pages accepts a
- * `state` once, from the browser that started it, so a code copied out of a
- * browser signs nobody else in.
+ * for, and only when presented with that deployment's secret. So nobody but
+ * Pages can trade a code, and Pages trades it only for the sign-in it names.
+ *
+ * The rest is Pages' side of the contract: a `state` is good for one callback,
+ * and a session follows only in the browser that started it. A callback that
+ * reaches another browser ends that sign-in, so the code it carried can't be
+ * taken back to the browser that started.
  */
 export function createPagesAuthCode(grant: PagesAuthGrant): string {
   return createSignedToken({ purpose: CODE_PURPOSE, ...grant });

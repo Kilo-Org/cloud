@@ -51,7 +51,7 @@ describe('GET /pages-auth', () => {
     });
   });
 
-  test('a person without a session signs in and comes back to the same link', async () => {
+  test('sign-in is asked to come back to the same link', async () => {
     await enter(queryOf(PAGES, STATE));
 
     const signInUrl = mockedGetUser.mock.calls[0]?.[0] ?? '';

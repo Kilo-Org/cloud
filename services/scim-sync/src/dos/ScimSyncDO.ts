@@ -125,6 +125,12 @@ export class ScimSyncDO extends DurableObject<Env> {
       const app: AppCallContext = {
         origin: this.env.BACKEND_API_URL,
         apiKey: await resolveSecret(this.env.INTERNAL_API_SECRET, 'INTERNAL_API_SECRET'),
+        // A plain Worker secret rather than a Secrets Store binding, because
+        // only the protected origin needs one: a `secrets_store_secrets` entry
+        // for a secret that does not exist fails the deploy, so production
+        // could not simply omit it. `usage-ingest` holds its equivalent the
+        // same way. Undefined when unset, which omits the header.
+        protectionBypass: this.env.SCIM_PROTECTION_BYPASS,
       };
 
       const deadline = Date.now() + DRAIN_BUDGET_MS;

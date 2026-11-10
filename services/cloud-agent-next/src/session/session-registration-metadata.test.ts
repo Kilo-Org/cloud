@@ -179,6 +179,55 @@ describe('session registration repository metadata', () => {
       allowUserAuthorization: true,
     });
   });
+
+  it('persists stacked base fields and the parent worktree, and appends the stack instruction', async () => {
+    const baseSha = 'a'.repeat(40);
+    const result = await buildSessionMetadataFromRegistration({
+      identity: { sessionId: 'workspace_child', userId: 'user_fixture' },
+      auth: {},
+      agent: { mode: 'code', model: 'kilo/test-model', appendSystemPrompt: 'Be concise.' },
+      repository: { ...GITHUB_REPOSITORY, baseBranch: 'feat/parent', baseSha },
+      parentWorktreeId: 'worktree_12345678-1234-4123-8123-123456789012',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.metadata.repository).toMatchObject({
+      type: 'github',
+      baseBranch: 'feat/parent',
+      baseSha,
+    });
+    expect(result.metadata.workspace?.parentWorktreeId).toBe(
+      'worktree_12345678-1234-4123-8123-123456789012'
+    );
+    expect(result.metadata.agent?.appendSystemPrompt).toContain('Be concise.');
+    expect(result.metadata.agent?.appendSystemPrompt).toContain('--base feat/parent');
+    expect(result.metadata.agent?.appendSystemPrompt).toContain(
+      'Do not rebase or push branches other than'
+    );
+    expect(result.metadata.agent?.appendSystemPrompt).toContain(
+      result.metadata.workspace?.branchName
+    );
+  });
+
+  it('does not write stacked fields or the stack instruction for a fork/clone create', async () => {
+    const result = await buildSessionMetadataFromRegistration({
+      identity: { sessionId: 'workspace_fork', userId: 'user_fixture' },
+      auth: {},
+      agent: { mode: 'code', model: 'kilo/test-model' },
+      repository: GITHUB_REPOSITORY,
+      clone: {
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.metadata.repository).not.toHaveProperty('baseBranch');
+    expect(result.metadata.repository).not.toHaveProperty('baseSha');
+    expect(result.metadata.workspace?.parentWorktreeId).toBeUndefined();
+    expect(result.metadata.agent?.appendSystemPrompt).toBeUndefined();
+  });
 });
 
 describe('session registration environment metadata', () => {

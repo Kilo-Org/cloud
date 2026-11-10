@@ -15,10 +15,12 @@ import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   clientKiloSessionIdSchema,
+  cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import { worktreeBranchOperationResultSchema } from '@kilocode/worker-utils/cloud-agent-worktree-operations';
 import {
   CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
@@ -468,6 +470,14 @@ const PrepareSessionSharedFields = {
   runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
   runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),
   upstreamBranch: z.string().optional(),
+  /** Start the new working branch from an existing pushed branch instead of the default. */
+  baseBranch: z.string().min(1).max(256).optional(),
+  /**
+   * Create this workspace on top of another worktree. The server derives the
+   * repository, platform, and integration from that parent; callers cannot
+   * substitute a different repository or base.
+   */
+  stackOnWorktreeId: cloudAgentWorktreeIdSchema.optional(),
   autoCommit: z.boolean().optional(),
   attachments: cloudAgentAttachmentsSchema.optional(),
   devcontainer: z
@@ -514,18 +524,39 @@ export const basePrepareSessionNextSchema = z
   .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
   .and(egressPolicySchema)
   .refine(
-    data =>
-      [data.githubRepo, data.gitlabProject, data.bitbucketRepo, data.publicRepoUrl].filter(
-        repository => repository !== undefined
-      ).length === 1,
+    data => {
+      const repositoryCount = [
+        data.githubRepo,
+        data.gitlabProject,
+        data.bitbucketRepo,
+        data.publicRepoUrl,
+      ].filter(repository => repository !== undefined).length;
+      return (
+        repositoryCount === 1 || (repositoryCount === 0 && data.stackOnWorktreeId !== undefined)
+      );
+    },
     {
-      message: 'Must provide exactly one repository source',
+      message: 'Must provide exactly one repository source, or stack on an existing worktree',
       path: ['githubRepo'],
     }
   )
-  .refine(data => data.githubIntegrationId === undefined || data.githubRepo !== undefined, {
-    message: 'GitHub integration requires a GitHub repository',
-    path: ['githubIntegrationId'],
+  .refine(
+    data =>
+      data.githubIntegrationId === undefined ||
+      data.githubRepo !== undefined ||
+      data.stackOnWorktreeId !== undefined,
+    {
+      message: 'GitHub integration requires a GitHub repository',
+      path: ['githubIntegrationId'],
+    }
+  )
+  .refine(data => data.baseBranch === undefined || data.upstreamBranch === undefined, {
+    message: 'Choose either a base branch or an upstream branch, not both',
+    path: ['baseBranch'],
+  })
+  .refine(data => data.stackOnWorktreeId === undefined || data.upstreamBranch === undefined, {
+    message: 'A stacked workspace cannot use an upstream branch',
+    path: ['upstreamBranch'],
   });
 
 export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema
@@ -559,9 +590,72 @@ export const organizationPrepareSessionNextSchema = basePrepareSessionNextSchema
 export const basePrepareSessionNextOutputSchema = z.object({
   kiloSessionId: kiloSessionIdSchema,
   cloudAgentSessionId: z.string(),
+  worktreeId: cloudAgentWorktreeIdSchema.optional(),
   /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed: z.boolean().optional(),
 });
+
+export const baseGetStackedWorkspaceSourceNextSchema = z
+  .object({
+    worktreeId: cloudAgentWorktreeIdSchema,
+  })
+  .strict();
+
+export const organizationGetStackedWorkspaceSourceNextSchema =
+  baseGetStackedWorkspaceSourceNextSchema.extend({
+    organizationId: z.uuid(),
+  });
+
+export const stackedWorkspaceProviderInputNextSchema = z
+  .object({
+    githubRepo: z.string().optional(),
+    githubIntegrationId: z.uuid().nullable().optional(),
+    gitlabProject: z.string().optional(),
+    bitbucketRepo: z
+      .object({
+        fullName: z.string(),
+        workspaceUuid: z.uuid(),
+        repositoryUuid: z.uuid(),
+      })
+      .strict()
+      .optional(),
+    publicRepoUrl: z.string().optional(),
+  })
+  .strict();
+
+export const baseStackedWorkspaceSourceNextOutputSchema = z
+  .object({
+    worktreeId: z.string(),
+    repository: z.string(),
+    gitUrl: z.string(),
+    platform: z.enum(['github', 'gitlab', 'bitbucket', 'git']),
+    branch: z.string(),
+    prNumber: z.number().int().nullable(),
+    basePushed: z.boolean(),
+    githubIntegrationId: z.uuid().nullable(),
+    providerInput: stackedWorkspaceProviderInputNextSchema,
+  })
+  .strict();
+
+/**
+ * Sync and Restack are session-only: the caller names the session and the
+ * server derives the branch, base, and upstream. No client-supplied SHA or
+ * branch target is accepted.
+ */
+export const baseSyncWorktreeBranchNextSchema = z
+  .object({
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
+  })
+  .strict();
+
+export const baseRestackWorktreeBranchNextSchema = z
+  .object({
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
+  })
+  .strict();
+
+export const baseSyncWorktreeBranchNextOutputSchema = worktreeBranchOperationResultSchema;
+export const baseRestackWorktreeBranchNextOutputSchema = worktreeBranchOperationResultSchema;
 
 export const baseCreateWorktreeChatNextSchema = z
   .object({

@@ -693,6 +693,10 @@ export async function listUnreviewedEmergencyGrants(): Promise<SupportAccessGran
  * parent when support access is on. A parent grant applies to the child, so the
  * org banner and the View Org button must see it; the grant row still names the
  * parent organization it was issued for.
+ *
+ * The deadline decides: a row counts as active only while `expires_at` is
+ * still ahead, the same rule `deriveGrantStatus` applies when a grant is
+ * presented.
  */
 export async function getActiveSupportGrantsForOrganization(
   organizationId: string
@@ -722,7 +726,8 @@ export async function getActiveSupportGrantsForOrganization(
     .where(
       and(
         inArray(support_access_grants.organization_id, organizationIds),
-        eq(support_access_grants.status, 'active')
+        eq(support_access_grants.status, 'active'),
+        sql`${support_access_grants.expires_at} > now()`
       )
     )
     .orderBy(asc(support_access_grants.expires_at));

@@ -49,10 +49,7 @@ import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils'
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useExpiringCredits } from './useExpiringCredits';
-import {
-  useAdminOrganizationDetails,
-  useAdminOrganizationHierarchy,
-} from '@/app/admin/api/organizations/hooks';
+import { useAdminOrganizationHierarchy } from '@/app/admin/api/organizations/hooks';
 import { OrganizationSalesDemoResetButton } from './OrganizationSalesDemoResetButton';
 
 const formatDate = (dateString: string) => {
@@ -267,8 +264,6 @@ function Inner(props: InnerProps) {
   const isInAdminDashboard = isKiloAdmin && showAdminControls;
   const canManageBilling = useCanManageBilling();
   const hierarchyQuery = useAdminOrganizationHierarchy(id, isInAdminDashboard);
-  const adminDetailsQuery = useAdminOrganizationDetails(id, isInAdminDashboard);
-  const stripe_customer_id = adminDetailsQuery.data?.stripe_customer_id ?? null;
 
   const handleSeatsRequirementEdit = () => {
     setPendingSeatsValue(!info.require_seats);
@@ -496,24 +491,6 @@ function Inner(props: InnerProps) {
                 </Button>
               </div>
             </div>
-            {stripe_customer_id && (
-              <div>
-                <label className="text-muted-foreground text-sm font-medium">
-                  Stripe Customer ID
-                </label>
-                <p className="font-mono text-sm">
-                  {stripe_customer_id}
-                  <a
-                    href={`https://dashboard.stripe.com/${process.env.NODE_ENV === 'development' ? 'test/' : ''}customers/${stripe_customer_id}`}
-                    target="_blank"
-                    className="ml-1 inline-flex items-center rounded-full bg-purple-900 px-2 py-1 text-xs font-medium text-purple-200 transition-colors hover:bg-purple-800"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    View in Stripe
-                  </a>
-                </p>
-              </div>
-            )}
             <div>
               <label className="text-muted-foreground text-sm font-medium">Seats Required</label>
               <div className="mt-1 flex items-center gap-2">

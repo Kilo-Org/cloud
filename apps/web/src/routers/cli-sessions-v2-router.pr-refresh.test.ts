@@ -463,6 +463,10 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       reviewDecision: 'approved',
       reviewDecisionPending: false,
       platform: 'github',
+      baseRef: null,
+      stackNumber: null,
+      stackPosition: null,
+      stackSize: null,
     });
   });
 
@@ -531,6 +535,10 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       reviewDecision: 'approved',
       reviewDecisionPending: false,
       platform: 'github',
+      baseRef: null,
+      stackNumber: null,
+      stackPosition: null,
+      stackSize: null,
     });
     expect(mockInsertValues).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -965,6 +973,10 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       reviewDecision: 'changes_requested',
       reviewDecisionPending: false,
       platform: 'github',
+      baseRef: null,
+      stackNumber: null,
+      stackPosition: null,
+      stackSize: null,
     });
     expect(result.associatedPr?.title).not.toBe('Stale fetch');
     expect(result.associatedPr?.headSha).not.toBe(FETCHED_HEAD_SHA);

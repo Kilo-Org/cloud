@@ -1,5 +1,6 @@
 import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
+import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type {
   AgentSelection,
@@ -28,11 +29,15 @@ export type SessionRepositoryRequest =
       allowUserAuthorization?: boolean;
       pullRequestNumber?: number;
       branch?: string;
+      baseBranch?: string;
+      baseSha?: string;
     }
   | {
       type: 'gitlab';
       url: string;
       branch?: string;
+      baseBranch?: string;
+      baseSha?: string;
     }
   | {
       type: 'bitbucket';
@@ -41,12 +46,16 @@ export type SessionRepositoryRequest =
       repositoryUuid: string;
       bitbucketIntegrationId?: string;
       branch?: string;
+      baseBranch?: string;
+      baseSha?: string;
     }
   | {
       type: 'git';
       url: string;
       token?: string;
       branch?: string;
+      baseBranch?: string;
+      baseSha?: string;
     };
 
 export type SessionRuntimeIntent = {
@@ -58,6 +67,8 @@ export type SessionRuntimeIntent = {
 
 export type SessionCreateRequest = {
   parentCloudAgentSessionId?: string;
+  /** Parent worktree for a stacked workspace; persisted on the session's workspace. */
+  parentWorktreeId?: CloudAgentWorktreeId;
   /** Omitted for a clone-only create: the copied transcript is the session state. */
   initialTurn?: ExecutionTurnSubmission;
   agent: AgentSelection;

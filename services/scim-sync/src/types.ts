@@ -10,6 +10,24 @@
 
 import type { AttemptClass } from './dispatch/app-client';
 
+/**
+ * Augments the generated `Env` with the one secret that is not a
+ * `secrets_store_secrets` binding.
+ *
+ * `wrangler types` only sees what `wrangler.jsonc` declares, and
+ * `SCIM_PROTECTION_BYPASS` is deliberately not declared there: it is a plain
+ * Worker secret (`wrangler secret put`), because only the staging origin needs
+ * one and a Secrets Store binding for a missing secret fails the deploy.
+ * Optional, so production and the test config simply leave it undefined and
+ * the header is omitted. `services/usage-ingest/src/publish-usage.ts` carries
+ * its `USAGE_WRITER_PROTECTION_BYPASS` the same way.
+ */
+declare global {
+  interface Env {
+    SCIM_PROTECTION_BYPASS?: string;
+  }
+}
+
 /** Which of the two cursor sources the loop is running on. */
 export type CursorSource =
   /** Nothing stored and no var: the Events API returns the oldest events. */

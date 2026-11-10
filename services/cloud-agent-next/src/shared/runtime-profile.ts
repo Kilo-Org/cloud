@@ -3,7 +3,7 @@ import { BUILTIN_AGENT_MODES } from './agent-modes.js';
 
 export const RuntimeProfileLimits = {
   MAX_RUNTIME_SKILLS: 50,
-  MAX_RUNTIME_SKILL_MARKDOWN: 100_000, // ~100KB
+  MAX_RUNTIME_SKILL_MARKDOWN: 100_000,
   MAX_RUNTIME_SKILL_NAME_LENGTH: 100,
   MAX_RUNTIME_SKILL_COMPANION_FILES: 40,
   MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE: 100_000,
@@ -58,7 +58,7 @@ const RuntimeSkillFilesSchema = z
     if (total > RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL) {
       ctx.addIssue({
         code: 'custom',
-        message: `Skill companion files total ${total} bytes, exceeds ${RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL}`,
+        message: `Skill companion files total ${total} characters, over the limit of ${RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL} characters`,
       });
     }
   });

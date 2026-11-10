@@ -380,6 +380,8 @@ function makeRootWriteDb(params: {
     insert: vi.fn((table: unknown) => (table === cloud_agent_worktrees ? worktreeInsert : insert)),
     select: vi.fn(() => select),
     update: vi.fn(() => update),
+    // Worktree registration opens a nested transaction (a savepoint) on the root write.
+    transaction: vi.fn(async (callback: (nested: unknown) => unknown) => callback(tx)),
   };
   return {
     db: { transaction: vi.fn(async callback => callback(tx)) },

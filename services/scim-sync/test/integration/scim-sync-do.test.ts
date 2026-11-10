@@ -10,6 +10,7 @@ import {
 } from '../../src/util/constants';
 import { resolveSecret } from '../../src/util/secret';
 import {
+  activationWithNonListDomains,
   activationWithoutDomains,
   directoryEvent,
   groupEvent,
@@ -420,13 +421,12 @@ describe('response classes', () => {
 
   it('records an unexpected dispatcher throw against its event and then makes progress', async () => {
     const target = stub('dispatch-throw');
-    // The SDK copies `domains` through without defaulting it, so an activation
-    // without the field makes the dispatcher's `.map(...)` throw a TypeError.
-    // Unrecorded, that unwound into the poll's catch: a poll-level error with
-    // no event id, no `event_failures` row and an unmoved cursor, so every
-    // later poll refetched the same event and threw again forever.
+    // The dispatcher is total: for a payload it cannot map to a request, the
+    // failure is recorded against that event, retried, and then parked once the
+    // budget from the first failure is spent, so the loop keeps moving and the
+    // operator view names the event.
     const clock = steppingClock(0);
-    const io = harness({ pages: [[activationWithoutDomains('evt_1')]] });
+    const io = harness({ pages: [[activationWithNonListDomains('evt_1')]] });
 
     const first = await runInDurableObject(target, instance => instance.poll());
 
@@ -447,13 +447,13 @@ describe('response classes', () => {
     // Retried rather than parked on the first attempt, then parked once the
     // budget from the first failure is spent — so the loop moves on instead of
     // spinning on one event.
-    harness({ pages: [[activationWithoutDomains('evt_1')]] });
+    harness({ pages: [[activationWithNonListDomains('evt_1')]] });
     const retried = await runInDurableObject(target, instance => instance.poll());
     expect(retried.heldFailure?.attempts).toBe(2);
     expect(retried.eventsParked).toBe(0);
 
     clock.advanceBy(CONFLICT_RETRY_BUDGET_MS);
-    harness({ pages: [[activationWithoutDomains('evt_1'), directoryEvent('evt_2')]] });
+    harness({ pages: [[activationWithNonListDomains('evt_1'), directoryEvent('evt_2')]] });
     const parked = await runInDurableObject(target, instance => instance.poll());
 
     expect(parked.eventsParked).toBe(1);
@@ -462,6 +462,40 @@ describe('response classes', () => {
     const state = await readState(target);
     expect(state.parked).toEqual(['evt_1']);
     expect(state.failures).toBe(0);
+  });
+
+  it('applies an activation for a directory with no domains and the next event in one poll', async () => {
+    const target = stub('activation-without-domains');
+    // A directory created before any domain is attached arrives without
+    // `domains`. Both events apply in one poll, in stream order, and the cursor
+    // advances past each of them.
+    const io = harness({
+      pages: [[activationWithoutDomains('evt_1'), directoryEvent('evt_2', null, 'dsync.deleted')]],
+    });
+
+    const result = await runInDurableObject(target, instance => instance.poll());
+
+    expect(result.error).toBeNull();
+    expect(result.heldFailure).toBeNull();
+    expect(result.eventsApplied).toBe(2);
+    expect(result.eventsParked).toBe(0);
+    expect(result.cursor).toBe('evt_2');
+    // Both events reached the app, in stream order.
+    expect(io.calls.map(call => `${call.method} ${call.path}`)).toEqual([
+      'PUT /api/internal/scim/organizations/directory_01',
+      'DELETE /api/internal/scim/organizations/directory_01',
+    ]);
+    // No domains on the event means an empty list in the body, which the route
+    // reads as saying nothing about domains.
+    expect(io.calls[0]?.body).toEqual({
+      workOSOrganizationId: 'org_workos',
+      name: 'Acme',
+      capturedDomains: [],
+    });
+    const state = await readState(target);
+    expect(state.rows[CURSOR_KEY]).toBe('evt_2');
+    expect(state.failures).toBe(0);
+    expect(state.parked).toEqual([]);
   });
 
   it('never parks a 5xx, however many times it repeats', async () => {
@@ -493,6 +527,41 @@ describe('response classes', () => {
 
     expect(result.heldFailure).toMatchObject({ lastClass: 'unavailable', lastStatus: 401 });
     expect(result.eventsParked).toBe(0);
+  });
+
+  it('omits the Vercel bypass header when no bypass is configured', async () => {
+    const target = stub('no-bypass');
+    const io = harness({ pages: [[directoryEvent('evt_1')]] });
+
+    await runInDurableObject(target, instance => instance.poll());
+
+    // Production's origin is unprotected, and an empty bypass is a *rejected*
+    // bypass rather than no bypass, so the header must be absent entirely.
+    expect(io.calls).toHaveLength(1);
+    expect(io.calls[0]?.protectionBypass).toBeNull();
+  });
+
+  it('sends the Vercel bypass header when one is configured', async () => {
+    const target = stub('with-bypass');
+    const io = harness({ pages: [[directoryEvent('evt_1')]] });
+
+    // Staging's origin sits behind Deployment Protection: without this header
+    // Vercel's edge answers every call before the app runs, so no
+    // `x-internal-api-key` can authenticate. The binding is read per poll, so
+    // setting it on the test env is what the deployed secret does.
+    const configured = env as Env;
+    configured.SCIM_PROTECTION_BYPASS = 'bypass-token';
+    try {
+      await runInDurableObject(target, instance => instance.poll());
+
+      expect(io.calls).toHaveLength(1);
+      expect(io.calls[0]?.protectionBypass).toBe('bypass-token');
+      // The internal secret still travels with it; the bypass only gets past
+      // the edge, it does not authenticate.
+      expect(io.calls[0]?.apiKey).not.toBeNull();
+    } finally {
+      delete configured.SCIM_PROTECTION_BYPASS;
+    }
   });
 
   it('never parks a network failure', async () => {

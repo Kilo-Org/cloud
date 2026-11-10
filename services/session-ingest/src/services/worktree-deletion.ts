@@ -28,7 +28,7 @@ import {
   type RecordCloudAgentWorktreeCleanupParams,
   type CanDestroyCloudAgentWorktreeSandboxParams,
 } from '@kilocode/session-ingest-contracts';
-import { hasOrganizationAccess, withDORetry } from '@kilocode/worker-utils';
+import { hasOrganizationAccess, normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 import type { Env } from '../env';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
@@ -40,7 +40,11 @@ import {
   readSessionAllocations,
 } from './worktree-allocation';
 
-type WorktreeDb = Pick<WorkerDb, 'select' | 'insert' | 'update' | 'delete' | 'execute'>;
+type WorktreeDb = Pick<
+  WorkerDb,
+  'select' | 'insert' | 'update' | 'delete' | 'execute' | 'transaction'
+>;
+type WorktreeTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 
 type DeletedSessionRecord = {
   sessionId: string;
@@ -58,6 +62,11 @@ type WorktreeContentDeletion = {
 
 export const WORKTREE_ACCESS_DENIED = 'worktree_access_denied';
 export const WORKTREE_DELETING = 'worktree_deleting';
+export const WORKTREE_PARENT_SELF = 'worktree_parent_self';
+export const WORKTREE_PARENT_UNAVAILABLE = 'worktree_parent_unavailable';
+export const WORKTREE_PARENT_DELETING = 'worktree_parent_deleting';
+export const WORKTREE_PARENT_REPOSITORY_REQUIRED = 'worktree_parent_repository_required';
+export const WORKTREE_PARENT_REPOSITORY_MISMATCH = 'worktree_parent_repository_mismatch';
 
 async function deletionDiagnostic<T>(
   operation: 'begin' | 'record_cleanup' | 'delete_content' | 'complete',
@@ -157,33 +166,97 @@ export async function registerCloudAgentWorktree(
   params: CreateSessionForCloudAgentParams
 ): Promise<void> {
   if (!params.cloudAgentWorktreeId) return;
-  await db
-    .insert(cloud_agent_worktrees)
-    .values({
-      worktree_id: params.cloudAgentWorktreeId,
-      kilo_user_id: params.kiloUserId,
-      organization_id: params.organizationId ?? null,
-    })
-    .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
-  const row = await lockWorktree(db, {
-    worktreeId: params.cloudAgentWorktreeId,
-    kiloUserId: params.kiloUserId,
-    organizationId: params.organizationId,
-  });
-  if (row.deletion_started_at !== null) throw new Error(WORKTREE_DELETING);
-  if (params.cloudAgentWorktreeLocation) {
-    const current = locations(row);
-    const incoming = params.cloudAgentWorktreeLocation;
-    if (
-      !current.some(
-        item => item.sandboxId === incoming.sandboxId && item.provider === incoming.provider
-      )
-    ) {
-      await db
-        .update(cloud_agent_worktrees)
-        .set({ runtime_locations: [...current, incoming] })
-        .where(eq(cloud_agent_worktrees.worktree_id, params.cloudAgentWorktreeId));
+  const worktreeId = params.cloudAgentWorktreeId;
+  await db.transaction(async tx => {
+    await assertStackParent(tx, params, worktreeId);
+    await tx
+      .insert(cloud_agent_worktrees)
+      .values({
+        worktree_id: worktreeId,
+        kilo_user_id: params.kiloUserId,
+        organization_id: params.organizationId ?? null,
+        ...(params.parentWorktreeId !== undefined
+          ? { parent_worktree_id: params.parentWorktreeId }
+          : {}),
+        ...(params.baseBranch !== undefined ? { base_branch: params.baseBranch } : {}),
+        ...(params.baseSha !== undefined ? { base_sha: params.baseSha } : {}),
+      })
+      .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
+    const row = await lockWorktree(tx, {
+      worktreeId,
+      kiloUserId: params.kiloUserId,
+      organizationId: params.organizationId,
+    });
+    if (row.deletion_started_at !== null) throw new Error(WORKTREE_DELETING);
+    if (params.cloudAgentWorktreeLocation) {
+      const current = locations(row);
+      const incoming = params.cloudAgentWorktreeLocation;
+      if (
+        !current.some(
+          item => item.sandboxId === incoming.sandboxId && item.provider === incoming.provider
+        )
+      ) {
+        await tx
+          .update(cloud_agent_worktrees)
+          .set({ runtime_locations: [...current, incoming] })
+          .where(eq(cloud_agent_worktrees.worktree_id, worktreeId));
+      }
     }
+  });
+}
+
+/**
+ * A stack parent is only usable when it is in the same owner scope, is not
+ * being deleted, and points at the same canonical repository as the child.
+ * The registration omits `gitUrl` on old callers, so a stack link fails
+ * closed rather than skipping the repository check.
+ */
+async function assertStackParent(
+  tx: WorktreeTransaction,
+  params: CreateSessionForCloudAgentParams,
+  worktreeId: string
+): Promise<void> {
+  if (params.parentWorktreeId === undefined) return;
+  if (params.parentWorktreeId === worktreeId) throw new Error(WORKTREE_PARENT_SELF);
+  if (params.gitUrl === undefined) throw new Error(WORKTREE_PARENT_REPOSITORY_REQUIRED);
+
+  const [parent] = await tx
+    .select({
+      kiloUserId: cloud_agent_worktrees.kilo_user_id,
+      organizationId: cloud_agent_worktrees.organization_id,
+      deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
+      deletionCompletedAt: cloud_agent_worktrees.deletion_completed_at,
+    })
+    .from(cloud_agent_worktrees)
+    .where(eq(cloud_agent_worktrees.worktree_id, params.parentWorktreeId))
+    .limit(1);
+
+  if (
+    !parent ||
+    parent.kiloUserId !== params.kiloUserId ||
+    parent.organizationId !== (params.organizationId ?? null)
+  ) {
+    throw new Error(WORKTREE_PARENT_UNAVAILABLE);
+  }
+  if (parent.deletionStartedAt !== null || parent.deletionCompletedAt !== null) {
+    throw new Error(WORKTREE_PARENT_DELETING);
+  }
+
+  const [parentSession] = await tx
+    .select({ gitUrl: cli_sessions_v2.git_url })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
+        eq(cli_sessions_v2.cloud_agent_worktree_id, params.parentWorktreeId),
+        isNotNull(cli_sessions_v2.git_url)
+      )
+    )
+    .orderBy(cli_sessions_v2.created_at)
+    .limit(1);
+  if (!parentSession?.gitUrl) throw new Error(WORKTREE_PARENT_REPOSITORY_MISMATCH);
+  if (normalizeGitUrl(parentSession.gitUrl) !== normalizeGitUrl(params.gitUrl)) {
+    throw new Error(WORKTREE_PARENT_REPOSITORY_MISMATCH);
   }
 }
 

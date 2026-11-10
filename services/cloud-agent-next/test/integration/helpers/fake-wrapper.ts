@@ -38,6 +38,7 @@ export type FakeWrapperHelloInput = {
   /** The retired capability sent by wrappers built before workspace snapshots. */
   sessionSnapshots?: boolean;
   startCommands?: boolean;
+  worktreeGit?: boolean;
 };
 
 export type FakeNativeEvent = {
@@ -194,6 +195,7 @@ export class FakeWrapper {
       ...(input.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
       ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
       ...(input.startCommands ? { startCommands: true } : {}),
+      ...(input.worktreeGit ? { worktreeGit: true } : {}),
     });
     return this.next();
   }

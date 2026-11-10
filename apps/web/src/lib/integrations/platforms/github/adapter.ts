@@ -1129,9 +1129,13 @@ export type AssociatedPullRequest = {
   /** Branch the PR was opened from, as reported by GitHub. */
   headRef?: string;
   baseSha?: string;
+  /** Branch the PR targets, as reported by GitHub. */
   baseRef?: string;
   mergeable?: boolean | null;
   mergeableState?: string | null;
+  stackNumber?: number | null;
+  stackPosition?: number | null;
+  stackSize?: number | null;
   /**
    * SHAs of the PR's commits. Populated only when the caller passes
    * `includeCommits` and the session SHA is not already the PR head. `undefined`
@@ -1358,6 +1362,11 @@ export async function fetchPullRequestByNumber(params: {
       }
     }
 
+    const stack = (
+      pr as typeof pr & {
+        stack?: { number?: number | null; position?: number | null; size?: number | null } | null;
+      }
+    ).stack;
     return {
       number: pr.number,
       htmlUrl: pr.html_url,
@@ -1373,6 +1382,9 @@ export async function fetchPullRequestByNumber(params: {
       baseRef: pr.base.ref,
       mergeable: pr.mergeable,
       mergeableState: pr.mergeable_state,
+      stackNumber: stack?.number ?? null,
+      stackPosition: stack?.position ?? null,
+      stackSize: stack?.size ?? null,
       ...(commitShas ? { commitShas } : {}),
     };
   } catch (error) {

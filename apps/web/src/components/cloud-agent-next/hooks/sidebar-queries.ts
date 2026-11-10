@@ -4,6 +4,7 @@ import {
   cloudAgentWorktreeIdSchema,
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
+import { WORKSPACE_LIST_SEARCH_MAX_LENGTH } from '@/lib/cloud-agent/workspace-folders';
 
 /**
  * The sidebar's query inputs, shared by the client hooks and the server prefetch,
@@ -11,6 +12,7 @@ import {
  */
 
 export const SIDEBAR_LIST_LIMIT = 200;
+export const SIDEBAR_WORKSPACE_PAGE_LIMIT = 200;
 export const DEFAULT_SIDEBAR_PLATFORM_FILTER = ['cloud-agent'];
 const WORKTREE_DETAILS_BATCH_SIZE = 200;
 
@@ -53,7 +55,7 @@ export function sidebarListInput({
   return {
     updatedSince,
     limit: SIDEBAR_LIST_LIMIT,
-    orderBy: 'updated_at' as const,
+    orderBy: 'activity' as const,
     organizationId,
     createdOnPlatform,
     gitUrl,
@@ -61,19 +63,19 @@ export function sidebarListInput({
   };
 }
 
-/** The latest session of a worktree in a folder, which may be older than the list. */
-export function sidebarFolderListInput(
-  worktreeId: CloudAgentWorktreeId,
-  { organizationId, createdOnPlatform, gitUrl }: SidebarFilters
-) {
+/** Workspace rows are loaded independently of the 5-day chat window. */
+export function sidebarWorkspaceListInput({
+  organizationId,
+  createdOnPlatform,
+  gitUrl,
+  search,
+}: SidebarFilters & { search?: string }) {
   return {
-    worktreeId,
-    limit: 1,
-    orderBy: 'updated_at' as const,
-    organizationId,
+    organizationId: organizationId ?? null,
     createdOnPlatform,
     gitUrl,
-    fetchReviewDecision: true,
+    search: search?.trim().slice(0, WORKSPACE_LIST_SEARCH_MAX_LENGTH) || undefined,
+    limit: SIDEBAR_WORKSPACE_PAGE_LIMIT,
   };
 }
 

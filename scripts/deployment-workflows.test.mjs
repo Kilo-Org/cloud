@@ -755,7 +755,11 @@ test('Worker detection runs beside the staging chain and still gates the Worker 
   // Detection reads only the SHAs check-changes publishes, so neither workflow
   // waits for a Vercel staging deploy or a promotion before it starts.
   for (const [name, deployment, stagingDependencies] of [
-    ['production', production, ['stage-app', 'stage-ai-gateway', 'promote-app', 'promote-ai-gateway']],
+    [
+      'production',
+      production,
+      ['stage-app', 'stage-ai-gateway', 'promote-app', 'promote-ai-gateway'],
+    ],
     ['staging', staging, ['deploy-app', 'deploy-ai-gateway']],
   ]) {
     const job = deployment.jobs['detect-workers'];

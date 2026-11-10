@@ -24,11 +24,11 @@ import {
   remoteSessionEyebrowLabel,
   remoteSessionEyebrowState,
   repoNameFromGitUrl,
-  sectionAwareTimeMeta,
   selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
   storedSessionEyebrowState,
 } from './session-list-helpers';
+import { sectionAwareTimeMeta } from './session-row-time-meta';
 import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 
 afterEach(async () => {
@@ -199,16 +199,20 @@ describe('formatMeta (moved helper, regression guard)', () => {
 });
 
 describe('sectionAwareTimeMeta', () => {
-  // 2026-10-30T16:00Z is a Friday; the rows below land on the calendar days the
-  // Agents list buckets as Today/Yesterday/a weekday, so each heading is the one
-  // that section really renders above the row.
-  const NOW = new Date('2026-10-30T16:00:00.000Z').getTime();
+  // 2026-10-30T19:00Z is a Friday. The rows below land on the calendar days the
+  // Agents list buckets as Today/Yesterday/a weekday in UTC, so each heading is
+  // the one that section really renders above the row. The zone is passed in so
+  // the suite never depends on the machine it runs on.
+  const NOW = new Date('2026-10-30T19:00:00.000Z').getTime();
+  const ZONE = 'UTC';
   const HOUR = 60 * 60 * 1000;
 
   function clockOf(iso: string): string {
-    return new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(
-      new Date(iso)
-    );
+    return new Intl.DateTimeFormat('en', {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: ZONE,
+    }).format(new Date(iso));
   }
 
   it('shows the clock time of the row timestamp when the relative label restates the heading', () => {
@@ -216,74 +220,117 @@ describe('sectionAwareTimeMeta', () => {
     // The premise: the relative label is the section heading itself.
     expect(formatMeta(iso, NOW)).toBe('YESTERDAY');
 
-    expect(sectionAwareTimeMeta(iso, 'Yesterday', NOW)).toEqual({
+    expect(sectionAwareTimeMeta(iso, 'Yesterday', { nowMs: NOW, timeZone: ZONE })).toEqual({
       visible: clockOf(iso),
       clock: clockOf(iso),
+      spoken: clockOf(iso),
     });
   });
 
   it('matches a heading already in the eyebrow casing, and every locale casing', async () => {
     const iso = new Date(NOW - 27 * HOUR).toISOString();
-    expect(sectionAwareTimeMeta(iso, 'YESTERDAY', NOW).clock).toBe(clockOf(iso));
+    expect(sectionAwareTimeMeta(iso, 'YESTERDAY', { nowMs: NOW, timeZone: ZONE }).clock).toBe(
+      clockOf(iso)
+    );
 
     // German heads the section "Gestern" while RelativeTimeFormat says "gestern".
     await i18n.changeLanguage('de');
     expect(formatMeta(iso, NOW)).toBe('GESTERN');
-    expect(sectionAwareTimeMeta(iso, 'Gestern', NOW).clock).not.toBeNull();
+    expect(
+      sectionAwareTimeMeta(iso, 'Gestern', { nowMs: NOW, timeZone: ZONE }).clock
+    ).not.toBeNull();
   });
 
   it('counts calendar days, so a 47-hour-old row is not "yesterday"', () => {
     // The shape the History list showed: read on local Tuesday 20:52, a session
     // from local Sunday 21:00 is 47 h 52 m old, so the elapsed-time word is
     // "yesterday" while the heading above it names Sunday.
-    const now = new Date(2026, 10, 10, 20, 52).getTime();
-    const iso = new Date(2026, 10, 8, 21, 0).toISOString();
+    const now = new Date('2026-11-10T20:52:00.000Z').getTime();
+    const iso = new Date('2026-11-08T21:00:00.000Z').toISOString();
     expect(formatMeta(iso, now)).toBe('YESTERDAY');
 
-    expect(sectionAwareTimeMeta(iso, 'Sunday', now)).toEqual({
+    expect(sectionAwareTimeMeta(iso, 'Sunday', { nowMs: now, timeZone: ZONE })).toEqual({
       visible: '2 DAYS AGO',
       clock: null,
+      spoken: '2 days ago',
     });
   });
 
   it('still reaches the clock time for a row the calendar really places yesterday', () => {
     // 26 hours old, but the previous local date: the day word agrees with the
     // heading, so the row shows its clock instead of repeating the section.
-    const now = new Date(2026, 10, 10, 12, 0).getTime();
-    const iso = new Date(2026, 10, 9, 10, 0).toISOString();
-    expect(sectionAwareTimeMeta(iso, 'Yesterday', now)).toEqual({
+    const now = new Date('2026-11-10T12:00:00.000Z').getTime();
+    const iso = new Date('2026-11-09T10:00:00.000Z').toISOString();
+    expect(sectionAwareTimeMeta(iso, 'Yesterday', { nowMs: now, timeZone: ZONE })).toEqual({
       visible: clockOf(iso),
       clock: clockOf(iso),
+      spoken: clockOf(iso),
     });
+  });
+
+  it('names the day the given zone shows, not the one the runtime started in', () => {
+    // Sunday 21:00 UTC is Monday 11:00 in Kiritimati, and the clock reads
+    // Tuesday 23:00 there, so the row is the previous local date and its
+    // heading is that day's weekday. In UTC the same row is two dates back, so
+    // the label cannot name yesterday under a weekday heading.
+    const now = new Date('2026-11-10T09:00:00.000Z').getTime();
+    const iso = new Date('2026-11-08T21:00:00.000Z').toISOString();
+    expect(
+      sectionAwareTimeMeta(iso, 'Monday', { nowMs: now, timeZone: 'Pacific/Kiritimati' })
+    ).toEqual({
+      visible: 'YESTERDAY',
+      clock: null,
+      spoken: 'yesterday',
+    });
+    expect(sectionAwareTimeMeta(iso, 'Sunday', { nowMs: now, timeZone: 'UTC' }).spoken).toBe(
+      '2 days ago'
+    );
   });
 
   it('keeps the relative label under a heading it does not repeat', () => {
     const today = new Date(NOW - 3 * HOUR).toISOString();
-    expect(sectionAwareTimeMeta(today, 'Today', NOW)).toEqual({
+    expect(sectionAwareTimeMeta(today, 'Today', { nowMs: NOW, timeZone: ZONE })).toEqual({
       visible: '3 HOURS AGO',
       clock: null,
+      spoken: '3 hours ago',
     });
 
     const midWeek = new Date(NOW - 51 * HOUR).toISOString();
-    expect(sectionAwareTimeMeta(midWeek, 'Wednesday', NOW)).toEqual({
+    expect(sectionAwareTimeMeta(midWeek, 'Wednesday', { nowMs: NOW, timeZone: ZONE })).toEqual({
       visible: '2 DAYS AGO',
       clock: null,
+      spoken: '2 days ago',
     });
   });
 
-  it('keeps the relative label on a row with no section (share sheet)', () => {
-    const iso = new Date(NOW - 27 * HOUR).toISOString();
-    expect(sectionAwareTimeMeta(iso, null, NOW)).toEqual({ visible: 'YESTERDAY', clock: null });
-    expect(sectionAwareTimeMeta(iso, undefined, NOW)).toEqual({
+  it('keeps the elapsed-time label on a row with no section (Home card, share sheet)', () => {
+    // Scope: only rows under a date heading read the calendar. A 47-hour-old
+    // row with no heading keeps the label every other surface renders.
+    const iso = new Date('2026-11-08T21:00:00.000Z').toISOString();
+    const nowMs = new Date('2026-11-10T20:52:00.000Z').getTime();
+    expect(sectionAwareTimeMeta(iso, null, { nowMs, timeZone: ZONE })).toEqual({
       visible: 'YESTERDAY',
       clock: null,
+      spoken: 'yesterday',
     });
+    expect(sectionAwareTimeMeta(iso, undefined, { nowMs, timeZone: ZONE })).toEqual({
+      visible: 'YESTERDAY',
+      clock: null,
+      spoken: 'yesterday',
+    });
+    // And it is exactly what `formatMeta` draws, not merely a similar word.
+    expect(sectionAwareTimeMeta(iso, null, { nowMs, timeZone: ZONE }).visible).toBe(
+      formatMeta(iso, nowMs)
+    );
   });
 
   it('omits the meta for an unparseable timestamp instead of inventing a clock', () => {
-    expect(sectionAwareTimeMeta('not-a-timestamp', 'Yesterday', NOW)).toEqual({
+    expect(
+      sectionAwareTimeMeta('not-a-timestamp', 'Yesterday', { nowMs: NOW, timeZone: ZONE })
+    ).toEqual({
       visible: '',
       clock: null,
+      spoken: '',
     });
   });
 });

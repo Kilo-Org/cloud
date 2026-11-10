@@ -23,19 +23,15 @@ import {
   composeStoredSessionVisibleMeta,
   formatScheduledWake,
   formatSessionTotalCost,
-  sectionAwareTimeMeta,
   storedSessionEyebrowLabel,
   storedSessionEyebrowState,
 } from './session-list-helpers';
 import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
+import { sectionAwareTimeMeta } from './session-row-time-meta';
 import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
-import {
-  formatSpokenCost,
-  formatSpokenTimeAgo,
-  sessionRowAccessibilityLabel,
-} from './session-row-accessibility-label';
+import { formatSpokenCost, sessionRowAccessibilityLabel } from './session-row-accessibility-label';
 
 /** Container shape only. `'list'` (default) keeps the Agents list look
  * (`stripMode="inline"`, inner padding so the strip sits inside the
@@ -226,13 +222,14 @@ export function StoredSessionRow({
   // the wake (null on a stored row, which carries none).
   // A row under the section its relative label would restate (`YESTERDAY` under
   // the Yesterday heading) shows its clock time instead, and speaks the same
-  // clock time rather than repeating the heading.
-  const timeMeta = sectionAwareTimeMeta(timestamp, sectionTitle, now);
+  // clock time rather than repeating the heading. Otherwise it speaks the same
+  // calendar-day label it draws, so the two can never name different days.
+  const timeMeta = sectionAwareTimeMeta(timestamp, sectionTitle, { nowMs: now });
   const visibleMeta = composeStoredSessionVisibleMeta(
     formatSessionTotalCost(session.total_cost_microdollars),
     timeMeta.visible
   );
-  const spokenTime = timeMeta.clock ?? formatSpokenTimeAgo(timestamp, now);
+  const spokenTime = timeMeta.spoken;
   const storedSpokenMeta = needsInput
     ? null
     : composeStoredSessionSpokenMeta(formatSpokenCost(session.total_cost_microdollars), spokenTime);

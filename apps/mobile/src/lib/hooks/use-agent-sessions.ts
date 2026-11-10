@@ -121,7 +121,7 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   // cannot outlive a zone change or a midnight the rows already followed.
   const now = useRelativeTimeNow();
   const dateGroups = useMemo(
-    () => groupAgentSessionsByDate(sessions, sortBy, new Date(now)),
+    () => groupAgentSessionsByDate(sessions, sortBy, { now: new Date(now) }),
     [now, sessions, sortBy]
   );
 
@@ -244,7 +244,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // cannot sit above a row that already reads a different day.
   const now = useRelativeTimeNow();
   const dateGroups = useMemo(
-    () => groupAgentSessionsByDate(storedSessions, sortBy, new Date(now)),
+    () => groupAgentSessionsByDate(storedSessions, sortBy, { now: new Date(now) }),
     [now, sortBy, storedSessions]
   );
 

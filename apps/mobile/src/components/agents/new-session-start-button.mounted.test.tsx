@@ -242,4 +242,18 @@ describe('NewSessionStartButton', () => {
 
     renderer.unmount();
   });
+
+  // A disabled Start keeps the shared disabled primary pair in both schemes, so
+  // it reads as the same control the rest of the app disables. A dark-only
+  // inactive fill leaves the control 1.67:1 off the near-black page, where it
+  // merges with the background instead of standing as the primary action.
+  it('draws a disabled Start in the shared disabled primary pair', async () => {
+    const renderer = await mountButton({ isStartDisabled: true });
+    const button = hostByType(renderer.root, 'Pressable')[0];
+    const classes = String(button?.props.className).split(' ');
+    expect(classes).toContain('bg-primary-disabled-action');
+    expect(classes).not.toContain('dark:bg-control-idle');
+
+    renderer.unmount();
+  });
 });

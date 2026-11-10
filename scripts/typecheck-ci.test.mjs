@@ -21,7 +21,13 @@ import { load } from 'js-yaml';
 import { DEPENDENCY_INPUTS } from './affected-workspaces.mjs';
 
 const workflows = Object.fromEntries(
-  ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
+  [
+    'ci.yml',
+    'extension-ci.yml',
+    'kilo-app-ci.yml',
+    'mobile-native-build.yml',
+    'explorer-ios-release.yml',
+  ].map(file => [
     file,
     load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')),
   ])
@@ -836,9 +842,11 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   );
 });
 
-// Both workflows run the same declaration action, so both must install the same
-// closure. The action's program is the whole input: a wider install links
-// workspaces the build never reads, and a narrower one breaks the build.
+// Every producer that builds the declarations for other jobs must install the
+// same closure. The action's program is the whole input: a wider install links
+// workspaces the build never reads, and a narrower one breaks the build. The
+// jobs that build and then use the tree in one job install the whole workspace,
+// so they are not producers and this test does not cover them.
 test('kilo-app CI installs the closure the declaration action needs', () => {
   const install = (file, job) =>
     workflows[file].jobs[job].steps.find(step =>
@@ -850,11 +858,99 @@ test('kilo-app CI installs the closure the declaration action needs', () => {
     /^pnpm install --frozen-lockfile --filter '@kilocode\/trpc\.\.\.' --filter 'web\.\.\.' --filter kilocode-monorepo$/,
     'the producer installs the declaration closure, not the whole workspace'
   );
+  for (const [file, job] of [
+    ['ci.yml', 'trpc-declarations'],
+    ['mobile-native-build.yml', trpcProducer],
+  ]) {
+    assert.equal(
+      producerInstall,
+      install(file, job),
+      `${file}'s ${job} builds the same declarations, so it installs the same closure`
+    );
+  }
+});
+
+// mobile-native-build needs the same producer for the same reason: both
+// platform jobs start together after the gate, so running the action in each
+// made a cache miss compile the declaration program twice and race both jobs to
+// save the one key. `prepare-trpc` builds it once, and both platform jobs
+// download the tree, as they already do for the harness SDK.
+test('mobile-native-build builds the tRPC declarations once and both platform jobs download them', () => {
+  const jobs = workflows['mobile-native-build.yml'].jobs;
+  const actionUsers = Object.entries(jobs)
+    .filter(([, job]) => (job.steps ?? []).some(step => step.uses === trpcAction))
+    .map(([name]) => name);
+  assert.deepEqual(actionUsers, [trpcProducer], 'only the producer builds the declarations');
+
+  const producer = jobs[trpcProducer];
+  assert.equal(producer.needs, 'gate', 'the producer waits for the gate it is skipped by');
   assert.equal(
-    producerInstall,
-    install('ci.yml', 'trpc-declarations'),
-    'the two workflow jobs that build these declarations install the same closure'
+    producer.if,
+    "needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'",
+    'a run with every platform published must not pay a build for nobody'
   );
+  const producerSteps = producer.steps;
+  const installIndex = producerSteps.findIndex(step =>
+    /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+  );
+  const actionIndex = producerSteps.findIndex(step => step.uses === trpcAction);
+  assert.ok(installIndex >= 0 && actionIndex > installIndex, 'the producer builds after install');
+  const uploads = producerSteps
+    .map((step, index) => ({ step, index }))
+    .filter(
+      ({ step }) =>
+        step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === trpcArtifact
+    );
+  assert.equal(uploads.length, 1, 'the producer uploads the declarations exactly once');
+  assert.ok(uploads[0].index > actionIndex, 'the producer uploads what it built');
+  const upload = uploads[0].step;
+  assert.match(upload.uses, /^actions\/upload-artifact@[0-9a-f]{40}$/, 'immutable upload pin');
+  assert.equal(upload.with.path, trpcDist, 'the artifact root is the dist directory');
+  assert.equal(upload.with['retention-days'], 1);
+  assert.equal(upload.with['if-no-files-found'], 'error', 'an empty build must fail');
+
+  for (const name of ['ios', 'android']) {
+    const job = jobs[name];
+    assert.ok(
+      [job.needs ?? []].flat().includes(trpcProducer),
+      `${name} waits for the build it downloads`
+    );
+    const steps = job.steps;
+    assert.deepEqual(
+      steps.filter(step => step.uses === trpcAction).map(step => step.name),
+      [],
+      `${name} never builds the declarations itself`
+    );
+    const downloads = steps
+      .map((step, index) => ({ step, index }))
+      .filter(
+        ({ step }) =>
+          step.uses?.startsWith('actions/download-artifact@') && step.with?.name === trpcArtifact
+      );
+    assert.equal(downloads.length, 1, `${name} downloads the declarations once`);
+    assert.match(
+      downloads[0].step.uses,
+      /^actions\/download-artifact@[0-9a-f]{40}$/,
+      'immutable download pin'
+    );
+    assert.equal(
+      downloads[0].step.with.path,
+      trpcDist,
+      `${name} restores it where the build writes`
+    );
+    const jobInstall = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    assert.ok(
+      jobInstall >= 0 && downloads[0].index > jobInstall,
+      `${name} downloads the declarations after install`
+    );
+    assert.equal(
+      downloads[0].step.if,
+      "steps.published.outputs.published != 'true'",
+      `${name} still skips its whole build when another run published`
+    );
+  }
 });
 
 // The tRPC action gets the same guard as the harness SDK build action: a hit
@@ -1262,6 +1358,93 @@ test('the changes job installs the root project only for a dependency input', ()
   assert.ok(
     steps.indexOf(install) > steps.indexOf(local),
     'the install reads an answer the check wrote'
+  );
+});
+
+// The extension changes job is the serialized prelude of every extension CI
+// run: `verify`, `build-firefox` and `e2e-chrome` all need it, so an install it
+// does not need costs every run. It reads the repository for the same reason as
+// the ci.yml job above, over the same detector set, so it carries one gate:
+// these assertions compare the two step definitions, and a new detector input
+// added to one gate without the other fails here.
+test('the extension changes job carries the shared dependency-input install gate', () => {
+  const steps = workflows['extension-ci.yml'].jobs.changes.steps;
+  const shared = ciJobs.changes.steps;
+  const sharedStep = id => shared.find(step => step.id === id);
+  const step = id => steps.find(candidate => candidate.id === id);
+
+  const filter = step('filter_resources');
+  const retry = step('filter_resources_retry');
+  const base = step('resources_base');
+  assert.ok(filter, 'extension-ci changes: the dependency-input filter is missing');
+  assert.ok(retry, 'extension-ci changes: the dependency-input filter retry is missing');
+  assert.ok(base, 'extension-ci changes: the detector-base dependency-input check is missing');
+
+  assert.equal(
+    filter.with.filters,
+    sharedStep('filter_resources').with.filters,
+    'both changes jobs filter the same dependency inputs'
+  );
+  assert.equal(
+    filter['continue-on-error'],
+    sharedStep('filter_resources')['continue-on-error'],
+    'the first attempt tolerates a transient failure'
+  );
+  assert.equal(
+    retry.if,
+    sharedStep('filter_resources_retry').if,
+    'the retry runs only after a failed first attempt'
+  );
+  assert.equal(
+    retry.with.filters,
+    filter.with.filters,
+    'the retry evaluates the same paths as the attempt it replaces'
+  );
+  assert.equal(
+    retry['continue-on-error'],
+    sharedStep('filter_resources_retry')['continue-on-error'],
+    'the retry shares the shared changes job retry contract'
+  );
+  assert.equal(
+    retry['continue-on-error'],
+    undefined,
+    'a persistent filter failure fails the job instead of installing nothing'
+  );
+  assert.equal(
+    base.env.BASE_SHA,
+    sharedStep('resources_base').env.BASE_SHA,
+    'both changes jobs diff the base their detector diffs'
+  );
+  assert.equal(
+    base.run,
+    sharedStep('resources_base').run,
+    'one detector-base check serves both jobs, so the input set stays in one place'
+  );
+
+  const install = steps.find(candidate => candidate.name === 'Install root dependencies');
+  const sharedInstall = shared.find(candidate => candidate.name === 'Install root dependencies');
+  assert.equal(
+    install.run,
+    sharedInstall.run,
+    'the gate removes the install from the run, never changes what it installs'
+  );
+  assert.equal(
+    install.if,
+    sharedInstall.if,
+    'the extension and the shared changes job gate the install on the same answers'
+  );
+  assert.ok(
+    steps.indexOf(install) > steps.indexOf(retry) && steps.indexOf(install) > steps.indexOf(base),
+    'the install reads answers both detections already wrote'
+  );
+  assert.ok(
+    steps.indexOf(install) < steps.indexOf(step('workspaces')),
+    'the detector that may need js-yaml runs after the install it can ask for'
+  );
+  assert.equal(
+    workflows['extension-ci.yml'].jobs.changes.outputs.extension,
+    "${{ steps.filter.outputs.extension == 'true' || steps.workspaces.outputs.extension == 'true' }}",
+    'the gate leaves the job output that the three downstream jobs read'
   );
 });
 

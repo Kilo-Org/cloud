@@ -1,4 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+type RetryOutcome =
+  | { outcome: 'retried' | 'already_in_flight' }
+  | { outcome: 'still_failed'; errorMessage: string | null };
 // The sweep asserts branch behaviour, so the wide-signature collaborators are
 // mocked while the real webhook handler decides the review-start verdict.
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
@@ -28,6 +31,8 @@ const mockDbExecute = jest.fn<Promise<{ rows: any[] }>, unknown[]>();
 const mockFetchOpenPullRequests = jest.fn<Promise<OpenPullRequest[]>, unknown[]>();
 const mockFindExistingReview = jest.fn<Promise<any>, unknown[]>();
 const mockFindActiveReviews = jest.fn<Promise<string[]>, unknown[]>();
+const mockListAttempts = jest.fn<Promise<Array<{ id: string }>>, unknown[]>();
+const mockRetryFailedCodeReview = jest.fn<Promise<RetryOutcome>, unknown[]>();
 const mockGetBotUserId = jest.fn<Promise<string | null>, unknown[]>();
 const mockAssertAuthorized = jest.fn<Promise<void>, unknown[]>();
 
@@ -65,10 +70,21 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => {
     ...actual,
     findExistingReview: (...args: unknown[]) => mockFindExistingReview(...args),
     findActiveReviewsForPR: (...args: unknown[]) => mockFindActiveReviews(...args),
+    listCodeReviewAttempts: (...args: unknown[]) => mockListAttempts(...args),
     createCodeReview: async () => {
       throw new Error('createCodeReview must not be reached; the handler mock decides');
     },
     updateCheckRunId: async () => undefined,
+  };
+});
+
+// The restart sequence has its own test; the sweep is asserted on its decision to
+// restart and on what the outcome does to its counters.
+jest.mock('./retry-review', () => {
+  const actual = jest.requireActual('./retry-review');
+  return {
+    ...actual,
+    retryFailedCodeReview: (...args: unknown[]) => mockRetryFailedCodeReview(...args),
   };
 });
 
@@ -231,6 +247,8 @@ beforeEach(() => {
   mockFetchOpenPullRequests.mockResolvedValue([makePull()]);
   mockFindExistingReview.mockResolvedValue(null);
   mockFindActiveReviews.mockResolvedValue([]);
+  mockListAttempts.mockResolvedValue([{ id: 'attempt-1' }]);
+  mockRetryFailedCodeReview.mockResolvedValue({ outcome: 'retried' });
   mockGetBotUserId.mockResolvedValue('bot-user-1');
   mockAssertAuthorized.mockResolvedValue();
   handlerVerdict = 'started';
@@ -505,5 +523,99 @@ describe('recoverMissedReviews', () => {
         )
       ).toBe(expected);
     }
+  });
+
+  it('restarts a review that stopped on a transient failure instead of treating the head as done', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({
+      reviewsRetried: 1,
+      reviewsStarted: 1,
+      skippedExisting: 0,
+      providerFailures: 0,
+    });
+    expect(mockRetryFailedCodeReview).toHaveBeenCalledTimes(1);
+    expect(mockRetryFailedCodeReview.mock.calls[0]?.[0]).toMatchObject({
+      review: { id: 'review-1', status: 'failed', terminal_reason: 'assistant_timeout' },
+      owner: { type: 'org', id: ORG_ID, userId: 'bot-user-1' },
+      retryReason: 'automatic_recovery',
+    });
+    // The restart owns the new review; the webhook handler must not also start one.
+    expect(mockHandlePullRequestCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('leaves a review that failed on a cause a restart cannot fix', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'billing',
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ skippedExisting: 1, reviewsRetried: 0, reviewsStarted: 0 });
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('stops restarting a review that used all of its unattended attempts', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+    });
+    mockListAttempts.mockResolvedValue([
+      { id: 'attempt-1' },
+      { id: 'attempt-2' },
+      { id: 'attempt-3' },
+    ]);
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ skippedExisting: 1, reviewsRetried: 0, reviewsStarted: 0 });
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('frees the start slot and reports the failure when the restart fails again', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+    });
+    mockRetryFailedCodeReview.mockResolvedValue({
+      outcome: 'still_failed',
+      errorMessage: 'worker refused the job',
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({
+      reviewsRetried: 0,
+      reviewsStarted: 0,
+      providerFailures: 1,
+    });
+  });
+
+  it('counts nothing when another caller already restarted the review', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+    });
+    mockRetryFailedCodeReview.mockResolvedValue({ outcome: 'already_in_flight' });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({
+      reviewsRetried: 0,
+      reviewsStarted: 0,
+      skippedExisting: 1,
+      providerFailures: 0,
+    });
   });
 });

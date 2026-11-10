@@ -41,8 +41,10 @@ import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import {
   findActiveReviewsForPR,
   findExistingReview,
+  listCodeReviewAttempts,
   type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
+import { isAutomaticallyRetryableReview, retryFailedCodeReview } from './retry-review';
 import {
   PullRequestPayloadSchema,
   type PullRequestPayload,
@@ -74,6 +76,8 @@ export type RecoverMissedReviewsSummary = {
   integrationsUnavailable: number;
   pullRequestsConsidered: number;
   reviewsStarted: number;
+  /** Failed reviews reset and handed back to dispatch by this run. */
+  reviewsRetried: number;
   skippedExisting: number;
   skippedActiveReview: number;
   /**
@@ -109,6 +113,7 @@ function summaryWith(counts: Partial<RecoverMissedReviewsSummary>): RecoverMisse
     integrationsUnavailable: 0,
     pullRequestsConsidered: 0,
     reviewsStarted: 0,
+    reviewsRetried: 0,
     skippedExisting: 0,
     skippedActiveReview: 0,
     unaddressableRepositories: 0,
@@ -441,9 +446,51 @@ async function recoverPullRequest(params: {
     platformIntegrationId: entry.integration.id,
   };
 
-  if ((await findExistingReview(scope, pull.headSha)) !== null) {
-    summary.skippedExisting += 1;
-    return;
+  const existingReview = await findExistingReview(scope, pull.headSha);
+  if (existingReview !== null) {
+    // A review row at this head used to end the sweep's interest in it. A row
+    // that stopped on a transient failure is not an answer: left alone, it keeps
+    // the pull request's gate failed and its head never gets a review, because
+    // nothing retries it without a person. Restart it here, under an attempt cap
+    // so a persistent fault settles instead of billing a run every sweep.
+    const attempts = await listCodeReviewAttempts(existingReview.id);
+    if (!isAutomaticallyRetryableReview(existingReview, attempts.length)) {
+      summary.skippedExisting += 1;
+      return;
+    }
+    if (summary.reviewsStarted >= RECOVER_MISSED_REVIEWS_START_LIMIT) {
+      summary.skippedStartLimit += 1;
+      return;
+    }
+    // Reserve the slot before the awaited retry, as the start path does: a retry
+    // starts a review, so it spends the same per-run budget.
+    summary.reviewsStarted += 1;
+    let retried = false;
+    try {
+      const retry = await retryFailedCodeReview({
+        review: existingReview,
+        owner,
+        retryReason: 'automatic_recovery',
+      });
+      if (retry.outcome === 'retried') {
+        retried = true;
+        summary.reviewsRetried += 1;
+        return;
+      }
+      if (retry.outcome === 'already_in_flight') {
+        // Another caller reset this review first, so nothing was dispatched.
+        summary.skippedExisting += 1;
+        return;
+      }
+      // Dispatch refused the retried attempt, so the row is failed again.
+      summary.providerFailures += 1;
+      warnExceptInTest('[recoverMissedReviews] Retried review failed again', {
+        reviewId: existingReview.id,
+      });
+      return;
+    } finally {
+      if (!retried) summary.reviewsStarted -= 1;
+    }
   }
   // A review still in flight at an earlier head must not be superseded by a
   // synthetic synchronize event; the webhook path reaches this handler only

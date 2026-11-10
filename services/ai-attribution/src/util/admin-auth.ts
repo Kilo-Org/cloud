@@ -1,17 +1,9 @@
-/**
- * Admin authentication middleware for service-to-service communication
- * Validates requests using a shared secret passed via X-Admin-Secret header
- */
-
 import { createMiddleware } from 'hono/factory';
 import { logger } from './logger';
 import type { HonoContext } from '../ai-attribution.worker';
 
 const ADMIN_SECRET_HEADER = 'X-Admin-Secret';
 
-/**
- * Validates the admin shared secret from request headers
- */
 export function validateAdminSecret(
   secretHeader: string | null,
   expectedSecret: string
@@ -27,10 +19,6 @@ export function validateAdminSecret(
   return { success: true };
 }
 
-/**
- * Hono middleware for authenticating admin/service-to-service requests
- * Expects the shared secret in the X-Admin-Secret header
- */
 export const adminAuthMiddleware = createMiddleware<HonoContext>(async (c, next) => {
   const secretHeader = c.req.header(ADMIN_SECRET_HEADER);
   const expectedSecret = await c.env.ADMIN_SECRET.get();

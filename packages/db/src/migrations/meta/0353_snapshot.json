@@ -1,5 +1,5 @@
 {
-  "id": "eaeb9f2d-90bb-47e7-8d12-81cf39ba7bd8",
+  "id": "c8c10634-624b-4cad-801f-411d5719ba80",
   "prevId": "d903a12a-7060-4cf1-a376-4d752713957b",
   "version": "7",
   "dialect": "postgresql",
@@ -4477,7 +4477,7 @@
           ],
           "isUnique": true,
           "where": "\"claude_billing_connections\".\"organization_id\" IS NULL AND \"claude_billing_connections\".\"status\" <> 'removed'",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -4499,7 +4499,7 @@
           ],
           "isUnique": true,
           "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL AND \"claude_billing_connections\".\"status\" <> 'removed'",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -4515,7 +4515,7 @@
           ],
           "isUnique": true,
           "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL AND \"claude_billing_connections\".\"kilo_user_id\" IS NULL AND \"claude_billing_connections\".\"status\" <> 'removed'",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }

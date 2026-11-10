@@ -7683,15 +7683,18 @@ export const claude_billing_connections = pgTable(
     unique('UQ_claude_billing_connections_user_profile_id').on(table.user_profile_id),
     uniqueIndex('UQ_claude_billing_connections_personal')
       .on(table.kilo_user_id)
-      .where(sql`${table.organization_id} IS NULL AND ${table.status} <> 'removed'`),
+      .where(sql`${table.organization_id} IS NULL AND ${table.status} <> 'removed'`)
+      .concurrently(),
     uniqueIndex('UQ_claude_billing_connections_org_member')
       .on(table.kilo_user_id, table.organization_id)
-      .where(sql`${table.organization_id} IS NOT NULL AND ${table.status} <> 'removed'`),
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.status} <> 'removed'`)
+      .concurrently(),
     uniqueIndex('UQ_claude_billing_connections_shared_services')
       .on(table.organization_id)
       .where(
         sql`${table.organization_id} IS NOT NULL AND ${table.kilo_user_id} IS NULL AND ${table.status} <> 'removed'`
-      ),
+      )
+      .concurrently(),
     enumCheck(
       'claude_billing_connections_status_check',
       table.status,

@@ -19,7 +19,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { providerPrivacySchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import { providerPreferencesSchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -261,7 +261,7 @@ export async function handleAudioTranscriptionsRequest(
   // as chat, so the organization data-collection policy and provider routes are
   // forwarded with the request instead of rejecting it.
   const requestProvider = parsedRequest.kind === 'json' ? parsedRequest.body.provider : undefined;
-  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
+  const requestPrivacy = providerPreferencesSchema.optional().safeParse(requestProvider);
   if (!requestPrivacy.success) return invalidRequestResponse();
   const organizationDecision = organizationId
     ? (

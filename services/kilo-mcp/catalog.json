@@ -9143,6 +9143,17 @@
     ],
     "searchBlob": "cloudAgentSettings.get Get the Cloud Agent settings for the user or organization, including the context sandbox allocation, per-repository profile allocations, and which sandbox options are available. cloudagentsettings get organizationid organizationId"
   },
+  "cloudAgentSettings.getBuiltinAgents": {
+    "path": "cloudAgentSettings.getBuiltinAgents",
+    "kind": "query",
+    "summary": "Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides.",
+    "inputSchema": {},
+    "tags": [
+      "cloudagentsettings",
+      "getbuiltinagents"
+    ],
+    "searchBlob": "cloudAgentSettings.getBuiltinAgents Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides. cloudagentsettings getbuiltinagents"
+  },
   "cloudAgentSettings.getWorkspaceOrder": {
     "path": "cloudAgentSettings.getWorkspaceOrder",
     "kind": "query",

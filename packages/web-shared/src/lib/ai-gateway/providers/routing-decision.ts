@@ -218,6 +218,11 @@ const ByokFailoverAttemptSchema = z.object({
   duration_ms: z.number().int().nonnegative(),
   /** `failed-over`: the next BYOK key took the request. The last attempt is `served` or `failed`. */
   outcome: z.enum(['failed-over', 'served', 'failed']),
+  /**
+   * On a final `failed` attempt, why no further key was tried: none of the remaining keys could take
+   * the request, the shared upstream budget ran out, or the client went away.
+   */
+  stop_reason: z.enum(['no-keys-left', 'budget-exhausted', 'client-disconnected']).optional(),
 });
 
 export type ByokFailoverAttempt = z.infer<typeof ByokFailoverAttemptSchema>;

@@ -124,16 +124,30 @@ export async function sendUpstreamAttemptWithByokFailover(
   let attemptStartedAt = startedAt;
   let attempt = await sendUpstreamAttempt(input);
   let attemptDurationMs = Math.round(performance.now() - attemptStartedAt);
+  let stopReason: ByokFailoverAttempt['stop_reason'];
   for (;;) {
     const failed = failedResponse(attempt);
-    if (!failed || input.signal?.aborted) break;
+    if (!failed) break;
+    if (input.signal?.aborted) {
+      stopReason = 'client-disconnected';
+      break;
+    }
     // All attempts share one upstream budget, so the invocation still ends within the route's
     // maxDuration with time left for usage accounting.
-    if (remainingBudgetMs(startedAt) < MIN_FAILOVER_BUDGET_MS) break;
+    if (remainingBudgetMs(startedAt) < MIN_FAILOVER_BUDGET_MS) {
+      stopReason = 'budget-exhausted';
+      break;
+    }
     const next = await nextByokFailover();
-    if (!next) break;
+    if (!next) {
+      stopReason = 'no-keys-left';
+      break;
+    }
     const budgetMs = remainingBudgetMs(startedAt);
-    if (budgetMs < MIN_FAILOVER_BUDGET_MS) break;
+    if (budgetMs < MIN_FAILOVER_BUDGET_MS) {
+      stopReason = 'budget-exhausted';
+      break;
+    }
     console.warn('[byok-failover] BYOK upstream failed, trying the next BYOK key', {
       status: failed.status,
       failedProviderIds: byokProviderIds(providerContext),
@@ -170,7 +184,9 @@ export async function sendUpstreamAttemptWithByokFailover(
     // The client still reads the failure, so the code comes from a copy.
     errorCode: failed ? readErrorCode(failed.clone()) : Promise.resolve(undefined),
     duration_ms: attemptDurationMs,
-    outcome: failed || attempt.type === 'invalid-openrouter-model' ? 'failed' : 'served',
+    ...(failed || attempt.type === 'invalid-openrouter-model'
+      ? { outcome: 'failed' as const, stop_reason: stopReason ?? 'no-keys-left' }
+      : { outcome: 'served' as const }),
   });
   const failoverAttempts = Promise.all(
     pending.map(async ({ errorCode, ...rest }) => {

@@ -356,6 +356,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
         error_code: 'rate_limit_exceeded',
         duration_ms: 200,
         outcome: 'failed',
+        stop_reason: 'no-keys-left',
       },
     ]);
     if (result.attempt.type === 'invalid-openrouter-model') throw new Error('Expected a response');
@@ -405,6 +406,55 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
       status: 404,
       duration_ms: 5,
       outcome: 'failed',
+      stop_reason: 'no-keys-left',
+    });
+  });
+
+  it('records that failover stopped when the budget ran out with keys left', async () => {
+    answerAfter(100, upstreamJsonFailure(500, { error: { code: 'server_error' } }));
+    answerAfter(
+      UPSTREAM_DURATION_BUDGET_MS - 10_000,
+      upstreamJsonFailure(503, { error_type: 'upstream_disconnect' })
+    );
+    const nextByokFailover = nextRoutes(
+      route('failover-key', 'anthropic'),
+      route('third-key', 'openrouter', 'openrouter')
+    );
+
+    const result = await sendUpstreamAttemptWithByokFailover(
+      input(withFailovers(route('primary-key'))),
+      nextByokFailover
+    );
+
+    expect(nextByokFailover).toHaveBeenCalledTimes(1);
+    expect((await failoverAttemptsOf(result)).at(-1)).toMatchObject({
+      byok_provider_ids: ['anthropic'],
+      outcome: 'failed',
+      stop_reason: 'budget-exhausted',
+    });
+  });
+
+  it('records that failover stopped when the client disconnected', async () => {
+    const controller = new AbortController();
+    answerAfter(100, upstreamJsonFailure(500, { error: { code: 'server_error' } }));
+    mockedSendUpstreamAttempt.mockImplementationOnce(async () => {
+      controller.abort();
+      return upstreamJsonFailure(500, { error: { code: 'server_error' } });
+    });
+    const nextByokFailover = nextRoutes(
+      route('failover-key', 'anthropic'),
+      route('third-key', 'openrouter', 'openrouter')
+    );
+
+    const result = await sendUpstreamAttemptWithByokFailover(
+      { ...input(withFailovers(route('primary-key'))), signal: controller.signal },
+      nextByokFailover
+    );
+
+    expect(nextByokFailover).toHaveBeenCalledTimes(1);
+    expect((await failoverAttemptsOf(result)).at(-1)).toMatchObject({
+      outcome: 'failed',
+      stop_reason: 'client-disconnected',
     });
   });
 

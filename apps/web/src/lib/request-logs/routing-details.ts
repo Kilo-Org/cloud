@@ -75,6 +75,7 @@ const ByokFailoverAttemptSchema = z.object({
   error_code: optionalString,
   duration_ms: optionalNumber,
   outcome: z.string(),
+  stop_reason: optionalString,
 });
 
 export type RequestLogByokFailoverAttempt = z.infer<typeof ByokFailoverAttemptSchema>;

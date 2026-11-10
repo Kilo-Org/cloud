@@ -7628,6 +7628,7 @@ describe('BYOK failover', () => {
           status: 503,
           error_code: 'upstream_disconnect',
           outcome: 'failed',
+          stop_reason: 'no-keys-left',
         }),
       ]);
       expect(record.byok_failover_attempts?.[0]).not.toHaveProperty('error_code');

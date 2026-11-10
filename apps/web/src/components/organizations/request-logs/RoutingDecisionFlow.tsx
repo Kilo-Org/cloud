@@ -143,6 +143,26 @@ function KiloStepDetails({ step }: { step: RequestLogRoutingStep }) {
   );
 }
 
+function failoverStopLabels(stopReason: string | undefined): { title: string; detail: string } {
+  switch (stopReason) {
+    case 'budget-exhausted':
+      return {
+        title: 'BYOK failover ran out of time',
+        detail: 'Too little time was left to try another key, so the last error was returned.',
+      };
+    case 'client-disconnected':
+      return {
+        title: 'The client disconnected during BYOK failover',
+        detail: 'No further keys were tried.',
+      };
+    default:
+      return {
+        title: 'Every BYOK key that could serve the request failed',
+        detail: "The last key's error was returned.",
+      };
+  }
+}
+
 function FailoverNote({ attempts }: { attempts: RequestLogByokFailoverAttempt[] }) {
   const failed = attempts.filter(attempt => attempt.outcome !== 'served').length;
   return (
@@ -172,11 +192,12 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
     );
   }
   if (finalAttempt?.outcome === 'failed') {
+    const stopped = failoverStopLabels(finalAttempt.stop_reason);
     return (
       <FlowNode tone="rejected" icon={Flag} isLast>
-        <span className="text-sm font-medium">Every BYOK key failed</span>
+        <span className="text-sm font-medium">{stopped.title}</span>
         <p className="text-muted-foreground text-xs">
-          The last key&apos;s error was returned. Kilo credits were not used. See BYOK failover.
+          {stopped.detail} Kilo credits were not used. See BYOK failover.
         </p>
       </FlowNode>
     );

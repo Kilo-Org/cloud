@@ -117,17 +117,31 @@ describe('RoutingSections BYOK failover', () => {
           error_code: 'upstream_disconnect',
           duration_ms: 30_000,
           outcome: 'failed',
+          stop_reason: 'no-keys-left',
         },
       ])
     );
 
     const text = document.body.textContent ?? '';
-    expect(text).toContain('Every BYOK key failed');
+    expect(text).toContain('Every BYOK key that could serve the request failed');
     expect(text).toContain('Kilo credits were not used');
     expect(text).not.toContain('Sent to');
     expect(candidateRows(document)).toEqual([
       expect.stringContaining('Failed'),
       expect.stringContaining('Failed'),
     ]);
+  });
+
+  it.each([
+    ['budget-exhausted', 'BYOK failover ran out of time'],
+    ['client-disconnected', 'The client disconnected during BYOK failover'],
+  ])('does not claim every key failed when failover stopped because of %s', (stopReason, title) => {
+    const text =
+      render(
+        routing([openAiFailed, { ...openAiFailed, outcome: 'failed', stop_reason: stopReason }])
+      ).body.textContent ?? '';
+
+    expect(text).toContain(title);
+    expect(text).not.toContain('Every BYOK key');
   });
 });

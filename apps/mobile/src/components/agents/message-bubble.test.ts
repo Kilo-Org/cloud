@@ -119,13 +119,13 @@ vi.mock('./chat-markdown-text', () => ({
   ChatMarkdownText: () => null,
 }));
 vi.mock('./compaction-separator', () => ({
-  CompactionSeparator: () => null,
+  CompactionSeparator: 'CompactionSeparator',
 }));
 vi.mock('./file-part-renderer', () => ({
   FilePartRenderer: () => null,
 }));
 vi.mock('./part-renderer', () => ({
-  PartRenderer: () => null,
+  PartRenderer: 'PartRenderer',
 }));
 vi.mock('./tool-run-rows', () => ({
   CondensedToolRunRow: 'CondensedToolRunRow',
@@ -147,6 +147,33 @@ vi.mock('./use-message-copy', () => ({
 }));
 
 const BADGE_CLASS = 'flex-row items-center gap-1 self-end pr-1';
+
+describe('MessageBubble compaction', () => {
+  it('passes assistant status to the compaction-only separator', async () => {
+    const message = assistantMessage('compaction');
+    message.parts = [
+      { id: 'part', sessionID: 'ses_1', messageID: 'compaction', type: 'compaction', auto: false },
+    ];
+    const tree = await renderBubble(message);
+    expect(findElementByType(tree, 'CompactionSeparator')?.props.info).toBe(message.info);
+  });
+
+  it('passes assistant status to parts in a mixed message', async () => {
+    const message = assistantMessage('compaction');
+    message.parts = [
+      { id: 'part', sessionID: 'ses_1', messageID: 'compaction', type: 'compaction', auto: false },
+      {
+        id: 'text',
+        sessionID: 'ses_1',
+        messageID: 'compaction',
+        type: 'text',
+        text: 'Other content',
+      },
+    ];
+    const tree = await renderBubble(message);
+    expect(findElementByType(tree, 'PartRenderer')?.props.messageInfo).toBe(message.info);
+  });
+});
 
 describe('MessageBubble queued badge', () => {
   it('renders the Queued badge visible when deliveryState is queued', async () => {

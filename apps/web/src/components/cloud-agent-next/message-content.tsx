@@ -48,7 +48,7 @@ export function CompactionSeparator({
 }: {
   compactionPart: CompactionPart;
   timestamp: number | string;
-  status?: 'running' | 'completed' | 'failed';
+  status?: 'running' | 'completed' | 'failed' | 'interrupted';
 }) {
   const isAuto = compactionPart.auto;
 
@@ -66,7 +66,9 @@ export function CompactionSeparator({
             ? 'Compacting context…'
             : status === 'failed'
               ? 'Context compaction failed'
-              : 'Context compacted'}
+              : status === 'interrupted'
+                ? 'Context compaction interrupted'
+                : 'Context compacted'}
           {isAuto ? ' (auto)' : ''}
         </span>
         <span className="text-muted-foreground/60">·</span>

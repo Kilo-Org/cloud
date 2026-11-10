@@ -7,6 +7,7 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import {
   type KiloSessionId,
+  type MessageInfo,
   type Part,
   type SessionManager,
   type StoredMessage,
@@ -39,6 +40,7 @@ type ChildSessionStatus = ToolPart['state']['status'];
 
 export type RenderPartFn = (props: {
   part: Part;
+  messageInfo?: MessageInfo;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
 }) => ReactNode;
@@ -267,7 +269,12 @@ export function ChildSessionMessage({
 
         return (
           <MessageErrorBoundary key={p.id}>
-            {renderPart({ part: p, getChildMessages, onOpenChildSession })}
+            {renderPart({
+              part: p,
+              messageInfo: message.info,
+              getChildMessages,
+              onOpenChildSession,
+            })}
           </MessageErrorBoundary>
         );
       })}

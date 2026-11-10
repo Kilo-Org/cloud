@@ -81,11 +81,13 @@ function userMessage(text: string): StoredMessage {
 
 describe('MessageBubble', () => {
   it.each([
-    ['pending', 'Compacting context…'],
-    ['running', 'Compacting context…'],
-    ['completed', 'Context compacted'],
-    ['failed', 'Context compaction failed'],
-  ])('renders a %s V2 compaction after rebuilding the transcript', (status, label) => {
+    ['pending', 'Compacting context…', undefined],
+    ['running', 'Compacting context…', undefined],
+    ['completed', 'Context compacted', undefined],
+    ['failed', 'Context compaction failed', { type: 'model', message: 'Model unavailable' }],
+    ['failed', 'Context compaction failed', undefined],
+    ['failed', 'Context compaction interrupted', { type: 'aborted', message: 'Raw abort text' }],
+  ])('renders a %s V2 compaction as %s with error %j', (status, label, error) => {
     const messages = readKilo2Messages(
       {
         id: 'ses-1',
@@ -107,9 +109,7 @@ describe('MessageBubble', () => {
           reason: 'manual',
           summary: 'Internal context summary',
           time: { created: 4 },
-          ...(status === 'failed'
-            ? { error: { type: 'model', message: 'Model unavailable' } }
-            : {}),
+          ...(error ? { error } : {}),
         },
         ...(status === 'completed'
           ? [
@@ -142,6 +142,8 @@ describe('MessageBubble', () => {
     expect(html).toContain(label);
     expect(html).toContain('Before compaction');
     expect(html).not.toContain('Internal context summary');
+    expect(html.split(label)).toHaveLength(2);
+    expect(html).not.toContain('Raw abort text');
     expect(html.match(/data-message-id="msg_compaction"/g)).toHaveLength(1);
     if (status === 'completed') {
       expect(html).toContain('After compaction');
@@ -149,7 +151,8 @@ describe('MessageBubble', () => {
       expect(html.indexOf(label)).toBeLessThan(html.indexOf('After compaction'));
     }
     if (status === 'failed') {
-      expect(html).toContain('Model unavailable');
+      if (error?.type === 'model') expect(html).toContain('Model unavailable');
+      if (error?.type === 'aborted') expect(html).not.toContain('Context compaction failed');
       expect(html).not.toContain('Context compacted');
     }
     expect(render()).toBe(html);
@@ -157,6 +160,8 @@ describe('MessageBubble', () => {
       React.createElement(CloudSharedTranscript, { messages })
     );
     expect(sharedHtml).toContain(label);
+    expect(sharedHtml.split(label)).toHaveLength(2);
+    expect(sharedHtml).not.toContain('Raw abort text');
     expect(sharedHtml).not.toContain('Internal context summary');
     expect(sharedHtml.match(/data-message-id="msg_compaction"/g)).toHaveLength(1);
   });

@@ -1,4 +1,4 @@
-import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type MessageInfo, type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -29,6 +29,7 @@ import { type OpenChildSession } from './child-session-section';
 
 type PartRendererProps = {
   part: Part;
+  messageInfo?: MessageInfo;
   isStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   defaultReasoningExpanded?: boolean;
@@ -38,6 +39,7 @@ type PartRendererProps = {
 
 export function PartRenderer({
   part,
+  messageInfo,
   isStreaming,
   getChildMessages,
   defaultReasoningExpanded,
@@ -88,7 +90,7 @@ export function PartRenderer({
     );
   }
   if (isCompactionPart(part)) {
-    return <CompactionSeparator />;
+    return <CompactionSeparator info={messageInfo} />;
   }
   // Standalone PatchPart (`type: 'patch'`) carries only file paths — no diff
   // text — so the diff engine cannot apply. The web renderer renders null for

@@ -45,6 +45,7 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
   const error = first.info.role === 'assistant' ? first.info.error : undefined;
   const showError = !presentation.isStreaming && error != null;
   const interrupted = error != null && isAssistantInterruptError(error);
+  const errorMessage = error != null && !interrupted ? getAssistantErrorMessage(error) : undefined;
   const statusClass = interrupted ? 'text-muted-foreground' : 'text-destructive';
   const review = isUser ? parseWorktreeReviewMessage(text) : null;
   const callback = isUser ? parseChildSessionCallbackPrompt(text) : null;
@@ -94,15 +95,17 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
                 compactionPart={compaction}
                 timestamp={presentation.displayTimestamp}
                 status={
-                  error != null
-                    ? 'failed'
-                    : first.info.role === 'assistant' && first.info.time.completed === undefined
-                      ? 'running'
-                      : 'completed'
+                  interrupted
+                    ? 'interrupted'
+                    : error != null
+                      ? 'failed'
+                      : first.info.role === 'assistant' && first.info.time.completed === undefined
+                        ? 'running'
+                        : 'completed'
                 }
               />
-              {error != null && (
-                <p className="text-destructive text-sm">{getAssistantErrorMessage(error)}</p>
+              {errorMessage && errorMessage !== 'Context compaction failed' && (
+                <p className="text-destructive text-sm">{errorMessage}</p>
               )}
             </>
           ) : isUser ? (

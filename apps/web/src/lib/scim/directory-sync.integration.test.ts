@@ -504,14 +504,26 @@ describe('upsertDirectoryUser', () => {
     // The enterprise runs several mail domains through one directory, and only
     // one of them can be the SSO authority (Policy Resolution rules 4 and 6).
     // A DNS-verified domain is the organization proving it owns the others.
+    //
+    // `upsertDirectoryUser` is called directly rather than through
+    // `seedUser()`: that helper captures the fixture address's own domain as
+    // `sso_domain`, which satisfies the gate on its no-network fast path and
+    // leaves the DNS lookup unreached.
     await seedOrganizationWithDomain(`primary-${suffix}.test`);
     verifiedDomains.listDnsVerifiedDomains.mockResolvedValueOnce(['example.test']);
 
-    const userId = await seedUser();
+    const created = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    });
+    createdUserIds.push(created.id);
 
-    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, userId));
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, created.id));
     expect(row.external_id).toBe(externalId);
     expect(row.google_user_email).toBe(email);
+    // The lookup is what authorized this bind, so it must have happened.
     expect(verifiedDomains.listDnsVerifiedDomains).toHaveBeenCalledWith(workOSOrganizationId);
   });
 
@@ -522,10 +534,17 @@ describe('upsertDirectoryUser', () => {
     await seedOrganization();
     verifiedDomains.listDnsVerifiedDomains.mockResolvedValueOnce(['example.test']);
 
-    const userId = await seedUser();
+    const created = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    });
+    createdUserIds.push(created.id);
 
-    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, userId));
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, created.id));
     expect(row.external_id).toBe(externalId);
+    expect(verifiedDomains.listDnsVerifiedDomains).toHaveBeenCalledWith(workOSOrganizationId);
   });
 
   test('parks rather than retries when the organization carries no WorkOS id', async () => {

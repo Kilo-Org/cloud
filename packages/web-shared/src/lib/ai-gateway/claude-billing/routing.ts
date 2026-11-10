@@ -89,6 +89,7 @@ export function buildClaudeBillingProvider(
 ): Provider {
   return {
     type: 'claude-billing',
+    inferenceProviderId: 'anthropic',
     claudeBillingOwner: owner,
     claudeBillingUserProfileId: userProfileId,
     apiUrl: `${CLAUDE_API_BASE_URL}/v1`,

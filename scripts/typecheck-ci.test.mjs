@@ -1489,7 +1489,11 @@ test('a lint-plugin change runs the plugin suite without the web gates', () => {
     backend,
     'the shared retry keeps the filters of the attempt it replaces'
   );
-  assert.equal(matches(backend, webBackendPath), true, 'a backend path still matches the shared filter');
+  assert.equal(
+    matches(backend, webBackendPath),
+    true,
+    'a backend path still matches the shared filter'
+  );
   assert.equal(matches(backend, oxlintPluginPath), false, 'the shared filter names no plugin path');
 
   const plugins = filtersOf('filter_oxlint').oxlint_plugins;

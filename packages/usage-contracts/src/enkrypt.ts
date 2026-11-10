@@ -56,9 +56,26 @@ export type EnkryptUsageWrite = z.infer<typeof EnkryptUsageWriteSchema>;
 
 export type EnkryptUsageWriteInput = z.input<typeof EnkryptUsageWriteSchema>;
 
-/** `duplicate` means an earlier delivery of the same usage id already committed it and its debit. */
+/**
+ * `duplicate` means an earlier delivery of the same usage id already committed it and its debit.
+ * `usageId` echoes the written id. It is optional so a sender accepts replies from a writer
+ * deployed before the echo; a sender that receives it must check that it matches.
+ */
 export const EnkryptUsageWriteResponseSchema = z.strictObject({
   status: z.enum(['recorded', 'duplicate']),
+  usageId: z.uuid().optional(),
 });
 
 export type EnkryptUsageWriteResponse = z.infer<typeof EnkryptUsageWriteResponseSchema>;
+
+/**
+ * Body of an Enkrypt usage message on the shared usage queue. The kind tag is what separates it
+ * from an LLM usage message, which is always sent untagged.
+ */
+export const EnkryptUsageQueueMessageSchema = z.strictObject({
+  kind: z.literal('enkrypt_usage'),
+  v: z.literal(1),
+  record: EnkryptUsageWriteSchema,
+});
+
+export type EnkryptUsageQueueMessage = z.infer<typeof EnkryptUsageQueueMessageSchema>;

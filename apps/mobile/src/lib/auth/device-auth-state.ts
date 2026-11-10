@@ -1,4 +1,5 @@
 import { type AuthErrorMessageKey } from '@/lib/auth/auth-error-messages';
+import { type PendingLinkResult } from '@/lib/auth/native-auth-contract';
 
 type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
 
@@ -29,6 +30,10 @@ export type DeviceAuthState = {
   error: DeviceAuthError | undefined;
   verificationUrl: string | undefined;
   resumed?: boolean;
+  /** What happened to the pending link the approved code carried. */
+  pendingLink?: PendingLinkResult;
+  /** The pending-link token the device-code route refused as no longer live. */
+  expiredPendingLinkToken?: string;
 };
 
 export function errorDeviceAuthState(
@@ -82,6 +87,7 @@ export function approvedDeviceAuthState(params: {
   refreshToken?: string;
   expiresIn?: number;
   previousVerificationUrl?: string;
+  pendingLink?: PendingLinkResult;
 }): DeviceAuthState {
   return {
     status: 'approved',
@@ -91,6 +97,7 @@ export function approvedDeviceAuthState(params: {
     expiresIn: params.expiresIn,
     error: undefined,
     verificationUrl: params.previousVerificationUrl,
+    ...(params.pendingLink ? { pendingLink: params.pendingLink } : {}),
   };
 }
 

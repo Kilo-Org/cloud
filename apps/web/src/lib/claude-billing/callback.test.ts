@@ -1,29 +1,41 @@
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromSession: jest.fn() }));
-jest.mock('./pending', () => ({ consumeClaudeBillingPending: jest.fn() }));
+jest.mock('./pending', () => ({
+  consumeClaudeBillingPending: jest.fn(),
+  saveClaudeBillingPending: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => ({
+  createClaudeUserProfile: jest.fn(async () => `uprof_${crypto.randomUUID()}`),
+}));
 jest.mock('./access', () => ({
   canManageClaudeBillingOrganization: jest.fn(),
+  isClaudeBillingOrganizationMember: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
   isClaudePlatformOAuthEnabled: jest.fn(async () => true),
 }));
-jest.mock('./protocol', () => ({
-  exchangeClaudeBillingCode: jest.fn(),
-  ClaudeBillingExchangeError: class extends Error {
-    constructor(readonly oauthError: string) {
-      super(oauthError);
+jest.mock('./protocol', () => {
+  class ClaudeBillingExchangeError extends Error {
+    constructor(readonly oauthError: string | null) {
+      super('Claude billing exchange failed');
     }
-  },
-}));
+  }
+  return {
+    exchangeClaudeBillingCode: jest.fn(),
+    pushClaudeAuthorizationRequest: jest.fn(async () => 'http://127.0.0.1/oauth/authorize'),
+    ClaudeBillingExchangeError,
+  };
+});
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { claude_billing_connections, byok_api_keys } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
+import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { consumeClaudeBillingPending } from './pending';
-import { canManageClaudeBillingOrganization } from './access';
+import { canManageClaudeBillingOrganization, isClaudeBillingOrganizationMember } from './access';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { exchangeClaudeBillingCode, ClaudeBillingExchangeError } from './protocol';
 import { GET } from '@/app/claude/billing/callback/route';
@@ -38,40 +50,62 @@ import {
 beforeEach(() => {
   jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
   jest.mocked(canManageClaudeBillingOrganization).mockReset().mockResolvedValue(true);
+  jest.mocked(isClaudeBillingOrganizationMember).mockReset().mockResolvedValue(true);
   jest.mocked(exchangeClaudeBillingCode).mockReset().mockResolvedValue('ocon_new');
 });
 
-async function seed(organization = false) {
+type Scope = 'personal' | 'member' | 'shared_services';
+
+async function seed(scope: Scope = 'personal') {
   const user = await insertTestUser();
-  const org = organization ? await createTestOrganization('Claude callback', user.id, 0) : null;
+  const org =
+    scope === 'personal' ? null : await createTestOrganization('Claude callback', user.id, 0);
+  if (scope !== 'personal' && !org) throw new Error('Missing organization fixture');
+  const owner: ClaudeBillingOwner =
+    scope === 'personal'
+      ? { kind: 'personal', kiloUserId: user.id }
+      : scope === 'member'
+        ? { kind: 'member', kiloUserId: user.id, organizationId: org?.id ?? '' }
+        : { kind: 'shared_services', organizationId: org?.id ?? '' };
   const [row] = await db
     .insert(claude_billing_connections)
     .values({
-      kilo_user_id: org ? null : user.id,
+      kilo_user_id: scope === 'shared_services' ? null : user.id,
       organization_id: org?.id ?? null,
       user_profile_id: `uprof_${user.id}`,
       created_by: user.id,
     })
     .returning();
   if (!row) throw new Error('Missing connection fixture');
-  await db.insert(byok_api_keys).values({
-    kilo_user_id: org ? null : user.id,
-    organization_id: org?.id ?? null,
-    provider_id: 'anthropic',
-    encrypted_api_key: { encryptedData: 'fake' } as never,
-    created_by: user.id,
-  });
+  await db.insert(byok_api_keys).values([
+    {
+      kilo_user_id: user.id,
+      organization_id: null,
+      provider_id: 'anthropic',
+      created_by: user.id,
+    },
+    ...(org
+      ? [
+          {
+            kilo_user_id: null,
+            organization_id: org.id,
+            provider_id: 'anthropic',
+            created_by: user.id,
+          },
+        ]
+      : []),
+  ]);
   jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
   jest.mocked(consumeClaudeBillingPending).mockResolvedValue({
     kiloUserId: user.id,
-    owner: org?.id ?? 'personal',
+    owner,
     returnPath: '/byok',
     state: 'expected',
     codeVerifier: 'verifier',
     userProfileId: row.user_profile_id,
     connectionVersion: row.updated_at,
   });
-  return { user, row, org };
+  return { user, row, org, owner };
 }
 
 function callback(query = 'state=expected&code=one-use-code') {
@@ -84,24 +118,31 @@ async function state(id: string) {
     .where(eq(claude_billing_connections.id, id));
   return row;
 }
+async function anthropicKeys(userId: string) {
+  return await db
+    .select()
+    .from(byok_api_keys)
+    .where(and(eq(byok_api_keys.provider_id, 'anthropic'), eq(byok_api_keys.created_by, userId)));
+}
 
 describe('Claude billing callback', () => {
-  it.each([false, true])(
-    'connects the authorized owner and deletes only its pasted key (org=%s)',
-    async org => {
-      const fixture = await seed(org);
+  it.each(['personal', 'member', 'shared_services'] as const)(
+    'connects the authorized %s owner and deletes only a personal pasted key',
+    async scope => {
+      const fixture = await seed(scope);
       const response = await callback();
-      expect(response.headers.get('location')).toContain('claude_billing=connected');
+      expect(response.headers.get('location')).toContain(
+        scope === 'shared_services' ? 'claude_billing_shared=connected' : 'claude_billing=connected'
+      );
       expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(fixture.user.google_user_email);
       expect(await state(fixture.row.id)).toMatchObject({
         status: 'connected',
         connection_id: 'ocon_new',
       });
-      const keys = await db
-        .select()
-        .from(byok_api_keys)
-        .where(eq(byok_api_keys.created_by, fixture.user.id));
-      expect(keys).toEqual([]);
+      const keys = await anthropicKeys(fixture.user.id);
+      expect(keys.map(key => key.organization_id)).toEqual(
+        scope === 'personal' ? [] : [null, fixture.org?.id]
+      );
     }
   );
 
@@ -121,9 +162,31 @@ describe('Claude billing callback', () => {
     expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
   });
 
-  it('rechecks organization management after approval', async () => {
-    const { row } = await seed(true);
+  it('rechecks the shared-services role after approval', async () => {
+    const { row } = await seed('shared_services');
     jest.mocked(canManageClaudeBillingOrganization).mockResolvedValue(false);
+    expect((await callback()).headers.get('location')).toContain('claude_billing_shared=forbidden');
+    expect(await state(row.id)).toMatchObject({ status: 'pending' });
+    expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
+  });
+
+  it('records the admin who links shared services again as its connector', async () => {
+    const { row } = await seed('shared_services');
+    const nextAdmin = await insertTestUser();
+    const pending = await consumeClaudeBillingPending();
+    if (!pending) throw new Error('Missing pending fixture');
+    jest.mocked(getUserFromSession).mockResolvedValue({ id: nextAdmin.id });
+    jest.mocked(consumeClaudeBillingPending).mockResolvedValue({
+      ...pending,
+      kiloUserId: nextAdmin.id,
+    });
+    expect((await callback()).headers.get('location')).toContain('claude_billing_shared=connected');
+    expect(await state(row.id)).toMatchObject({ status: 'connected', created_by: nextAdmin.id });
+  });
+
+  it('rechecks membership for a member connection after approval', async () => {
+    const { row } = await seed('member');
+    jest.mocked(isClaudeBillingOrganizationMember).mockResolvedValue(false);
     expect((await callback()).headers.get('location')).toContain('claude_billing=forbidden');
     expect(await state(row.id)).toMatchObject({ status: 'pending' });
     expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
@@ -158,6 +221,7 @@ describe('Claude billing callback', () => {
       jest.mocked(consumeClaudeBillingPending).mockResolvedValue({
         ...pending,
         kiloUserId: missingUserId,
+        owner: { kind: 'personal', kiloUserId: missingUserId },
       });
       jest.mocked(isClaudePlatformOAuthEnabled).mockImplementation(async email => Boolean(email));
 
@@ -201,8 +265,7 @@ describe('Claude billing callback', () => {
       .where(eq(claude_billing_connections.id, row.id));
     expect((await callback()).headers.get('location')).toContain('claude_billing=failed');
     expect(await state(row.id)).toMatchObject({ status: 'removed', connection_id: null });
-    const keys = await db.select().from(byok_api_keys).where(eq(byok_api_keys.created_by, user.id));
-    expect(keys.map(key => key.provider_id)).toEqual(['anthropic']);
+    expect((await anthropicKeys(user.id)).map(key => key.provider_id)).toEqual(['anthropic']);
   });
 
   it('keeps normalized return paths on Kilo at both ends of the connection flow', async () => {
@@ -260,5 +323,58 @@ describe('Claude billing callback', () => {
       connection_id: 'ocon_new',
       last_refusal_code: null,
     });
+  });
+
+  it('starts only a shared-services link for an organization manager', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('Claude connect', user.id, 0);
+    jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
+    jest.mocked(consumeClaudeBillingPending).mockResolvedValue(null);
+
+    await connect(
+      new NextRequest(
+        `http://localhost/claude/billing/connect?owner=${org.id}&scope=shared_services&return=%2Fbyok`
+      )
+    );
+    const [row] = await db
+      .select()
+      .from(claude_billing_connections)
+      .where(eq(claude_billing_connections.organization_id, org.id));
+    expect(row).toMatchObject({ kilo_user_id: null, created_by: user.id, status: 'pending' });
+  });
+
+  it('starts a member link for an organization member', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('Claude member', user.id, 0);
+    jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
+    jest.mocked(consumeClaudeBillingPending).mockResolvedValue(null);
+
+    await connect(
+      new NextRequest(`http://localhost/claude/billing/connect?owner=${org.id}&return=%2Fbyok`)
+    );
+    const [row] = await db
+      .select()
+      .from(claude_billing_connections)
+      .where(eq(claude_billing_connections.organization_id, org.id));
+    expect(row).toMatchObject({ kilo_user_id: user.id, created_by: user.id, status: 'pending' });
+  });
+
+  it('refuses a shared-services link from a person who does not manage the organization', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('Claude refused', user.id, 0);
+    jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
+    jest.mocked(canManageClaudeBillingOrganization).mockResolvedValue(false);
+
+    const response = await connect(
+      new NextRequest(
+        `http://localhost/claude/billing/connect?owner=${org.id}&scope=shared_services&return=%2Fbyok`
+      )
+    );
+    expect(response.headers.get('location')).toContain('claude_billing_shared=forbidden');
+    const rows = await db
+      .select()
+      .from(claude_billing_connections)
+      .where(eq(claude_billing_connections.organization_id, org.id));
+    expect(rows).toEqual([]);
   });
 });

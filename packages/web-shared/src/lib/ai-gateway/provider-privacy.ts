@@ -6,6 +6,18 @@ export const providerPrivacySchema = z.object({
   zdr: z.boolean().optional(),
 });
 
+const providerIdsSchema = z.array(z.string()).nullish();
+
+/**
+ * Validates the request `provider` fields the gateway reads itself. Parsing strips other fields,
+ * so callers forward the original object to keep the remaining OpenRouter options.
+ */
+export const providerPreferencesSchema = providerPrivacySchema.extend({
+  order: providerIdsSchema,
+  only: providerIdsSchema,
+  ignore: providerIdsSchema,
+});
+
 export function getEffectiveProviderPrivacy(
   requestProvider: Pick<OpenRouterProviderConfig, 'data_collection' | 'zdr'> | undefined,
   organizationDataCollection?: OpenRouterProviderConfig['data_collection'] | null

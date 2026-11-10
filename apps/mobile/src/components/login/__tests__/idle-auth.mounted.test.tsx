@@ -26,7 +26,8 @@ import {
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import { i18n } from '@/i18n';
 
-import { IdleAuth, PROVIDER_GLYPH_SLOT_CLASS } from '../idle-auth';
+import { IdleAuth } from '../idle-auth';
+import { PROVIDER_GLYPH_SLOT_CLASS } from '../provider-buttons';
 
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 
@@ -73,6 +74,8 @@ vi.mock('@/lib/auth/use-native-auth', () => ({
     ssoRecovery: ssoRecovery.value,
     clearSsoRecovery: vi.fn(),
     handleSsoError: vi.fn(),
+    pendingLinkFailure: undefined,
+    clearPendingLinkFailure: vi.fn(),
   }),
 }));
 
@@ -108,7 +111,7 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
 vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
-vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound' }));
+vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Mail: 'Mail' }));
 
 vi.mock('expo-web-browser', () => ({
   openBrowserAsync: vi.fn(),
@@ -586,7 +589,8 @@ describe('IdleAuth SSO recovery', () => {
       (btn.props.onPress as () => void)();
     });
 
-    expect(start).toHaveBeenCalledWith('sso', 'user@example.com');
+    // Without a pending link the browser start carries no link token.
+    expect(start).toHaveBeenCalledWith('sso', 'user@example.com', undefined);
   });
 
   it('moves the SSO busy spinner inside its primary Button', async () => {

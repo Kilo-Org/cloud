@@ -6,11 +6,8 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { eq } from 'drizzle-orm';
-import type {
-  CustomLlmDefinition,
-  CustomPricingTiers,
-  StoredModel,
-} from '@kilocode/db/schema-types';
+import type { CustomLlmDefinition, CustomPricingTiers } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 
@@ -46,7 +43,7 @@ const publicDefinition: CustomLlmDefinition = {
 beforeEach(async () => {
   jest
     .mocked(getOpenRouterModelsMetadataFromDatabase)
-    .mockResolvedValue({ 'openai/gpt-4o': {} as StoredModel });
+    .mockResolvedValue({ 'openai/gpt-4o': {} as GatewayModelWithEndpoints });
   await cleanupDbForTest();
   admin = await insertTestUser({
     google_user_email: `custom-llm-admin-${Math.random()}@admin.example.com`,

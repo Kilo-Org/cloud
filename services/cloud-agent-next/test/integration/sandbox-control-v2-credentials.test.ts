@@ -496,8 +496,8 @@ async function reconstructPreB(
     Object.assign(reconstructed, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
-      // A reconstructed instance loses fixture injection; the membership gate
-      // must still see a current member, as the fake env provides.
+      // A reconstructed instance keeps the fixture membership reader, so these
+      // route tests run against a current member.
       organizationMembershipFor: async () => true,
       sessionPeerFor: (_ownerId: string, sessionId: string) => ({
         onRoute: async (update: ControlPlaneRouteUpdate) => {
@@ -2522,7 +2522,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(await readRouteRow(stub, SESSION)).toBeNull();
   });
 
-  it('leaves the policy and the sandbox alone when the released session holds no route', async () => {
+  it('releases a session without a route and keeps the shared policy', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setupVercel(provider, broker);
@@ -2534,9 +2534,8 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const policyCalls = provider.policyCalls.length;
     const framesBefore = wrapper.receivedFrames();
 
-    // The unregistered session owns no alias here, so its release must not
-    // rebuild the policy the live route shares: a rebuild that fails would stop
-    // the sandbox and take that route with it.
+    // The session holds no alias, so its release keeps the shared policy and
+    // the live route connected.
     provider.failPolicy = true;
     await stub.release({ sessionId: SESSION_NEXT });
 
@@ -3851,6 +3850,31 @@ describe('SandboxControlV2 environment repository credentials', () => {
     expect(prepareFrame.spec.directory).toBe(`/workspace/${SESSION}`);
     const row = await readRouteRow(stub, SESSION);
     expect(JSON.parse(row?.grant ?? '{}')).toMatchObject({ directory: `/workspace/${SESSION}` });
+  });
+
+  it('delivers a stacked base in the prepare frame', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker());
+    const baseSha = 'a'.repeat(40);
+    const { prepareFrame } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, credentialsSource(SESSION), {
+        ...routeSpec(SESSION),
+        branch: 'kilo/stacked',
+        branchMode: 'working',
+        baseBranch: 'feature/parent',
+        baseSha,
+      })
+    );
+
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec).toMatchObject({
+      branch: 'kilo/stacked',
+      branchMode: 'working',
+      baseBranch: 'feature/parent',
+      baseSha,
+    });
   });
 
   it('redeems the capability of the member that the request URL names', async () => {

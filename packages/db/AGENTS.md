@@ -38,9 +38,12 @@ concurrent-index migration must therefore survive a retry:
 1. Add `COMMIT;` immediately before and `BEGIN;` immediately after the unchanged
    generated `CREATE [UNIQUE] INDEX CONCURRENTLY` statement group, each
    separated with `--> statement-breakpoint`.
-2. Add `SET statement_timeout = 0;` after `COMMIT;` and `RESET
-   statement_timeout;` before `BEGIN;`. The deploy job's `timeout-minutes`
-   still caps how long the build can wait.
+2. Add `SET statement_timeout = 0;` and `SET lock_timeout = 0;` after
+   `COMMIT;`, and `RESET lock_timeout;` and `RESET statement_timeout;` before
+   `BEGIN;`. Deploys run migrations with a short `lock_timeout` (via
+   `PGOPTIONS`), and a concurrent build waits on older transactions through
+   lock waits, so it is cancelled unless both are lifted. The deploy job's
+   `timeout-minutes` still caps how long the build can wait.
 3. Precede each `CREATE ... INDEX CONCURRENTLY` with `DROP INDEX CONCURRENTLY
    IF EXISTS` for the same index name, so a retry rebuilds an `INVALID` index.
 4. If the first transaction, before `COMMIT;`, contains DDL that fails when

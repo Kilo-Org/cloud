@@ -35,6 +35,7 @@ const launch = {
   mode: 'code',
   prompt: 'Implement the child task',
   autoInitiate: true,
+  operationKey: '33333333-3333-4333-8333-333333333333',
 };
 
 function claims(overrides: Record<string, unknown> = {}) {
@@ -245,6 +246,55 @@ describe('Cloud Agent authority contract', () => {
     expect(JSON.stringify(schema)).toContain('workspace:new-chat');
     expect(JSON.stringify(schema)).toContain('workspace:workspace_');
     expect(JSON.stringify(schema)).not.toContain('session:parent');
+  });
+  it.each([null, organizationId])('allows a stacked launch in its pinned scope: %s', orgId => {
+    const authority = { ...scope, organizationId: orgId };
+    const input = {
+      ...launch,
+      stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+      ...(orgId === null ? {} : { organizationId: orgId }),
+    };
+    expect(
+      validateCloudAgentAuthorityRequest(authority, cloudAgentAuthorityProcedure(authority), input)
+    ).toEqual(input);
+    expect(cloudAgentAuthorityInputSchema(authority)).toHaveProperty(
+      'properties.stackOnWorktreeId.type',
+      'string'
+    );
+  });
+  it.each([
+    { stackOnWorktreeId: 'worktree_invalid' },
+    { stackOnWorktreeId: 'workspace_11111111-1111-4111-8111-111111111111' },
+    {
+      stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      upstreamBranch: 'main',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    },
+    { stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111', baseBranch: 'main' },
+    { baseSha: 'a'.repeat(40) },
+    { parentWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111' },
+  ])('rejects malformed or caller-resolved stack input %j', options => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, cloudAgentAuthorityProcedure(scope), {
+        ...launch,
+        ...options,
+      })
+    ).toThrow();
+  });
+  it('lets an orchestrator stack on another worker while receiving the callback itself', () => {
+    const authority = {
+      ...scope,
+      parentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+    };
+    const input = {
+      ...launch,
+      stackOnWorktreeId: 'worktree_44444444-4444-4444-8444-444444444444',
+      callbackTarget: { url: 'workspace:new-chat' },
+    };
+    expect(
+      validateCloudAgentAuthorityRequest(authority, cloudAgentAuthorityProcedure(authority), input)
+    ).toEqual(input);
   });
   it.each([
     { parentCloudAgentSessionId: 'workspace_sibling' },

@@ -17,7 +17,7 @@ Do **not** try to instrument every possible interaction. Instrument the decision
 - **PostHog client-side**: Provider in `src/components/PostHogProvider.tsx` with manual `$pageview` capture, user identification by email, alias linking, feature flags, session recording, and autocapture.
 - **PostHog server-side**: Singleton in `src/lib/posthog.ts` with immediate flush. Used for ~30 server events (auth, billing, security agent, code indexing).
 - **KiloClaw**: 16+ client-side events covering the full instance lifecycle (`claw_create_instance_clicked`, `claw_save_config_clicked`, etc.), the most thoroughly instrumented product surface.
-- **Cloudflare Analytics Engine**: 5 datasets across KiloClaw, Gastown, and O11y workers for infrastructure telemetry.
+- **Cloudflare Analytics Engine**: datasets across the KiloClaw and O11y workers for infrastructure telemetry.
 - **DataLayer**: `src/components/DataLayerProvider.tsx` pushes email/name/is_new_user for GTM.
 
 ### What is missing

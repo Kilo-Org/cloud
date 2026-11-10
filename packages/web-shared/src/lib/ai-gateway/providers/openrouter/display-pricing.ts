@@ -1,6 +1,6 @@
-import type { StoredModel } from '@kilocode/db';
+import type { Endpoint } from '@kilocode/db/schema-types';
 
-export type EndpointPricing = NonNullable<StoredModel['endpoints'][number]['pricing']>;
+export type EndpointPricing = NonNullable<Endpoint['pricing']>;
 
 export function undoPricingDiscount(pricing: EndpointPricing): EndpointPricing {
   const { discount, ...prices } = pricing;

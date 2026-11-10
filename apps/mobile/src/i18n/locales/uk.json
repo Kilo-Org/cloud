@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Введіть адресу електронної пошти.",
     "or": "або"
   },
+  "pendingLink": {
+    "description": "Адреса {{email}} уже використовується в обліковому записі. Увійдіть одним із його способів, щоб додати {{provider}}.",
+    "emailCode": "Надіслати код для входу електронною поштою",
+    "continueInBrowser": "Продовжити в браузері",
+    "startAgain": "Почати знову",
+    "expired": "Термін дії цього запиту на додавання {{provider}} минув.",
+    "noMethods": "Цей обліковий запис не має іншого способу входу, тому {{provider}} не можна додати.",
+    "linked": "{{provider}} додано до вашого облікового запису.",
+    "failedExpired": "{{provider}} не додано, бо термін дії запиту минув.",
+    "failedWrongAccount": "{{provider}} не додано, бо ви увійшли в інший обліковий запис.",
+    "failedAccountAlreadyLinked": "{{provider}} не додано, бо його вже пов’язано з іншим обліковим записом.",
+    "failedProviderAlreadyLinked": "{{provider}} не додано, бо у вашому обліковому записі вже є інший вхід через {{provider}}.",
+    "failedLinking": "Не вдалося додати {{provider}} до вашого облікового запису.",
+    "notAdded": "Ви увійшли. {{provider}} не додано до вашого облікового запису."
+  },
   "profile": {
     "codeReviewerSubtitle": "Автоматичні перевірки PR",
     "securityAgentSubtitle": "Пошук і усунення вразливостей",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Тестовий обліковий запис",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Корпоративний SSO",
     "passkeysTitle": "Ключі доступу",
     "passkeysSubtitle": "Увійти без пароля",

@@ -229,6 +229,21 @@
     "signInCodeField": "Prisijungimo kodas",
     "or": "arba"
   },
+  "pendingLink": {
+    "description": "Paskyra su {{email}} jau yra. Prisijunk vienu iš jos būdų, kad pridėtum {{provider}}.",
+    "emailCode": "Atsiųsti man prisijungimo kodą el. paštu",
+    "continueInBrowser": "Tęsti naršyklėje",
+    "startAgain": "Pradėti iš naujo",
+    "expired": "Ši užklausa pridėti {{provider}} nebegalioja.",
+    "noMethods": "Ši paskyra neturi kito prisijungimo būdo, todėl {{provider}} pridėti negalima.",
+    "linked": "{{provider}} pridėtas prie tavo paskyros.",
+    "failedExpired": "{{provider}} nepridėtas, nes užklausa nebegalioja.",
+    "failedWrongAccount": "{{provider}} nepridėtas, nes prisijungei prie kitos paskyros.",
+    "failedAccountAlreadyLinked": "{{provider}} nepridėtas, nes jau susietas su kita paskyra.",
+    "failedProviderAlreadyLinked": "{{provider}} nepridėtas, nes tavo paskyra jau turi kitą {{provider}} prisijungimą.",
+    "failedLinking": "Nepavyko pridėti {{provider}} prie tavo paskyros.",
+    "notAdded": "Esi prisijungęs. {{provider}} nepridėtas prie tavo paskyros."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatinės PR peržiūros",
     "securityAgentSubtitle": "Rasti ir pašalinti pažeidžiamumus",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Bandomoji paskyra",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Įmonės SSO",
     "passkeysTitle": "Priėjimo raktai",
     "passkeysSubtitle": "Prisijunkite be slaptažodžio",

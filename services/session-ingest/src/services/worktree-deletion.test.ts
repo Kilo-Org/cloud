@@ -59,6 +59,10 @@ function worktree(values: Partial<CloudAgentWorktree> = {}): CloudAgentWorktree 
     worktree_id: worktreeId,
     kilo_user_id: userId,
     organization_id: null,
+    parent_worktree_id: null,
+    base_branch: null,
+    base_sha: null,
+    sidebar_position: null,
     name: 'Private worktree name',
     folder_id: null,
     created_at: createdAt,
@@ -248,9 +252,16 @@ function database(rootCount = 1, descendantCount = 0) {
       if (table === cloud_agent_worktrees) {
         const source = !inTransaction && frozenWorktreeReads ? frozenWorktreeReads : worktrees;
         const id = bound.find(value => typeof value === 'string' && value.startsWith('worktree_'));
-        return id
+        const selected = id
           ? source.filter(row => row.worktree_id === id)
           : source.filter(row => row.deletion_completed_at === null);
+        return selected.map(row => ({
+          ...row,
+          kiloUserId: row.kilo_user_id,
+          organizationId: row.organization_id,
+          deletionStartedAt: row.deletion_started_at,
+          deletionCompletedAt: row.deletion_completed_at,
+        }));
       }
       if (table === organization_memberships)
         return membershipAllowed ? [{ id: 'membership' }] : [];
@@ -1322,7 +1333,7 @@ describe('durable worktree deletion journal', () => {
     const f = database();
     await beginWorktreeDeletion(env, params);
     await expect(
-      registerCloudAgentWorktree(f.tx as never, {
+      registerCloudAgentWorktree(f.db as never, {
         sessionId: kiloId(100),
         kiloUserId: userId,
         cloudAgentSessionId: cloudId(100),
@@ -1567,11 +1578,123 @@ describe('retireWorktreeIfSoleMember', () => {
     expect(f.ledgerReads).toEqual([]);
   });
 
+  it('writes the stack parent and base on the first insert only', async () => {
+    const f = database();
+    f.members[0].gitUrl = 'https://github.com/acme/repo.git';
+    const registration = {
+      sessionId: kiloId(100),
+      kiloUserId: userId,
+      cloudAgentSessionId: cloudId(100),
+      cloudAgentWorktreeId: otherWorktreeId,
+      parentWorktreeId: worktreeId,
+      baseBranch: 'feat-a',
+      baseSha: 'a'.repeat(40),
+      gitUrl: 'https://github.com/acme/repo',
+      createdOnPlatform: 'cloud-agent-web',
+    } as const;
+
+    await registerCloudAgentWorktree(f.db as never, registration);
+    expect(f.worktrees.find(row => row.worktree_id === otherWorktreeId)).toMatchObject({
+      parent_worktree_id: worktreeId,
+      base_branch: 'feat-a',
+      base_sha: 'a'.repeat(40),
+    });
+
+    await registerCloudAgentWorktree(f.db as never, {
+      ...registration,
+      baseBranch: 'feat-b',
+      baseSha: 'b'.repeat(40),
+    });
+    expect(f.worktrees.find(row => row.worktree_id === otherWorktreeId)).toMatchObject({
+      base_branch: 'feat-a',
+      base_sha: 'a'.repeat(40),
+    });
+  });
+
+  it.each([
+    ['another owner', { kilo_user_id: 'oauth/github:someone-else' }],
+    ['another organization', { organization_id: organizationId }],
+  ])('rejects a stack parent from %s', async (_name, parentScope) => {
+    const f = database();
+    f.members[0].gitUrl = 'https://github.com/acme/repo.git';
+    Object.assign(f.worktrees[0], parentScope);
+    await expect(
+      registerCloudAgentWorktree(f.db as never, {
+        sessionId: kiloId(100),
+        kiloUserId: userId,
+        cloudAgentSessionId: cloudId(100),
+        cloudAgentWorktreeId: otherWorktreeId,
+        parentWorktreeId: worktreeId,
+        baseBranch: 'feat-a',
+        baseSha: 'a'.repeat(40),
+        gitUrl: 'https://github.com/acme/repo',
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).rejects.toThrow('worktree_parent_unavailable');
+  });
+
+  it('fails closed when a stack registration omits the child repository', async () => {
+    const f = database();
+    f.members[0].gitUrl = 'https://github.com/acme/repo.git';
+    await expect(
+      registerCloudAgentWorktree(f.db as never, {
+        sessionId: kiloId(100),
+        kiloUserId: userId,
+        cloudAgentSessionId: cloudId(100),
+        cloudAgentWorktreeId: otherWorktreeId,
+        parentWorktreeId: worktreeId,
+        baseBranch: 'feat-a',
+        baseSha: 'a'.repeat(40),
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).rejects.toThrow('worktree_parent_repository_required');
+  });
+
+  it.each([
+    ['differs', 'https://github.com/acme/other'],
+    ['is missing from the parent session', null],
+  ])('rejects a stack parent whose repository %s', async (_name, parentGitUrl) => {
+    const f = database();
+    if (parentGitUrl !== null) f.members[0].gitUrl = parentGitUrl;
+    await expect(
+      registerCloudAgentWorktree(f.db as never, {
+        sessionId: kiloId(100),
+        kiloUserId: userId,
+        cloudAgentSessionId: cloudId(100),
+        cloudAgentWorktreeId: otherWorktreeId,
+        parentWorktreeId: worktreeId,
+        baseBranch: 'feat-a',
+        baseSha: 'a'.repeat(40),
+        gitUrl: 'https://github.com/acme/repo',
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).rejects.toThrow('worktree_parent_repository_mismatch');
+  });
+
+  it('rejects a stack parent that is being deleted', async () => {
+    const f = database();
+    f.members[0].gitUrl = 'https://github.com/acme/repo.git';
+    f.worktrees[0].deletion_started_at = '2026-08-27 02:00:00+00';
+    await expect(
+      registerCloudAgentWorktree(f.db as never, {
+        sessionId: kiloId(100),
+        kiloUserId: userId,
+        cloudAgentSessionId: cloudId(100),
+        cloudAgentWorktreeId: otherWorktreeId,
+        parentWorktreeId: worktreeId,
+        baseBranch: 'feat-a',
+        baseSha: 'a'.repeat(40),
+        gitUrl: 'https://github.com/acme/repo',
+        createdOnPlatform: 'cloud-agent-web',
+      })
+    ).rejects.toThrow('worktree_parent_deleting');
+  });
+
   it('race: a competing registration loses after the retirement marker and throws WORKTREE_DELETING', async () => {
     const f = database();
     await expect(retire(f).call()).resolves.toEqual({ kind: 'exclusive' });
     await expect(
-      registerCloudAgentWorktree(f.tx as never, {
+      registerCloudAgentWorktree(f.db as never, {
         sessionId: kiloId(100),
         kiloUserId: userId,
         cloudAgentSessionId: cloudId(100),

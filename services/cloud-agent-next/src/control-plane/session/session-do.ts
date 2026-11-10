@@ -3,6 +3,7 @@ import {
   workspaceSnapshotIdentity,
   type WorkspaceSnapshotIdentity,
 } from '../sandbox/workspace-snapshot.js';
+import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -27,6 +28,7 @@ import {
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { sessionCallbackContext } from './callback-context.js';
+import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -37,6 +39,7 @@ import { asc, eq, gt } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
+import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import { resolveSecret } from '../../auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
@@ -129,6 +132,24 @@ import {
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
 } from '../../shared/control-plane-protocol.js';
+import {
+  worktreeBranchOperationResultSchema,
+  type ControlPlaneWorktreeGitInput,
+  type WorktreeBranchOperationResult,
+} from '../../shared/worktree-git-operations.js';
+import {
+  matchesExpectedWorktree,
+  nextRepositoryBase,
+  withRepositoryBase,
+  type AdoptWorktreeBaseRequest,
+  type AdoptWorktreeBaseResponse,
+  type WorktreeBranchOperationInput,
+  type WorktreeBranchOperationResponse,
+} from '../../session/worktree-branch-operation.js';
+
+/** Bounded wake for a branch operation: idle sandboxes prepare async. */
+const WORKTREE_GIT_PREPARE_TIMEOUT_MS = 90_000;
+const WORKTREE_GIT_PREPARE_POLL_MS = 500;
 import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
 import type {
@@ -178,7 +199,11 @@ import {
 } from '../worktree-changes-ready.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
-import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
+import type {
+  PreviewSandboxScope,
+  PreviewTargetResult,
+  ResolvedPreviewTarget,
+} from '../sandbox/preview-target.js';
 import { isTerminalSessionEligible } from '../../terminal/access.js';
 import type { ListPreviewServicesOutput } from '../../shared/preview-services.js';
 import { readWorktreeChildSessions } from './worktree-child-sessions.js';
@@ -520,14 +545,16 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   } | null>;
   /** B10: forwards one worktree-change request to the wrapper. */
   worktreeCapture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;
+  /** Forwards one Sync/Restack branch operation to the wrapper. */
+  worktreeGit(input: ControlPlaneWorktreeGitInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one terminal request to the wrapper. */
   terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one allowlisted native read to the live wrapper. */
   kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult>;
   /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
-  previewTarget(sessionId: string): Promise<PreviewTargetResult>;
+  previewTarget(scope: PreviewSandboxScope): Promise<PreviewTargetResult>;
   /** Lists live listening services through the bound wrapper (never wakes an allocation). */
-  previewServices(sessionId: string): Promise<ListPreviewServicesOutput>;
+  previewServices(scope: PreviewSandboxScope): Promise<ListPreviewServicesOutput>;
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
@@ -599,6 +626,9 @@ function rowToMessage(row: SessionMessageRow): SessionMessage {
     acceptedAt: row.accepted_at,
     settledAt: row.settled_at,
     reason: row.reason,
+    ...(row.billing_failure == null
+      ? {}
+      : { billingFailure: readCustomerBillingFailure(row.billing_failure) }),
     ...(container === undefined ? {} : { container }),
   };
 }
@@ -612,6 +642,8 @@ function messageToRow(message: SessionMessage): SessionMessageRow {
     accepted_at: message.acceptedAt,
     settled_at: message.settledAt,
     reason: message.reason,
+    billing_failure:
+      message.billingFailure === undefined ? null : JSON.stringify(message.billingFailure),
     container: message.container === undefined ? null : JSON.stringify(message.container),
   };
 }
@@ -718,6 +750,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private readonly historyHydrations = new Map<string, Promise<void>>();
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
+  private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
   /** Worktree-changes projection from the shared event log (plan B10). */
@@ -763,6 +796,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE,
     });
+    this.listStatusOutbox = createSessionListStatusOutbox({
+      storage: ctx.storage,
+      publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
+    });
     this.messageCallbacks = createMessageCallbacks({
       storage: ctx.storage,
       getMetadata: () => this.metadata,
@@ -807,7 +844,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
     this.preview = createControlPlanePreview({
       getMetadata: () => this.metadata,
-      resolveTarget: sandboxId => this.previewTargetFor(sandboxId),
+      resolveTarget: (sandboxId, scope) => this.previewTargetFor(sandboxId, scope),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
@@ -826,14 +863,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return peer.terminal(input);
   }
 
-  private async previewTargetFor(sandboxId: string): Promise<PreviewTargetResult> {
+  private async previewTargetFor(
+    sandboxId: string,
+    scope: PreviewSandboxScope
+  ): Promise<PreviewTargetResult> {
     const peer = this.sandboxPeerFor(sandboxId);
     if (peer === null) {
       return { status: 'not_running' };
     }
     return withDORetry(
       () => this.sandboxPeerFor(sandboxId) ?? peer,
-      stub => stub.previewTarget(this.sessionId),
+      stub => stub.previewTarget(scope),
       'previewTarget'
     );
   }
@@ -860,6 +900,272 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       };
     }
     return peer.worktreeCapture(input);
+  }
+
+  /**
+   * Runs a Sync or Restack against the worktree's own sandbox.
+   *
+   * The target is derived from this session only: callers cannot name a sandbox
+   * or directory. An idle sandbox is woken through the existing preparation
+   * path (no synthetic turn); preparation is bounded so the caller learns
+   * rather than waiting for the provider. The wrapper owns the active-turn and
+   * directory locks and answers `refused`, so the DO never forces a rewrite
+   * over a running turn.
+   */
+  async syncWorktreeBranch(
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    return this.runWorktreeBranchOperation('sync', input);
+  }
+
+  async restackWorktreeBranch(
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    return this.runWorktreeBranchOperation('restack', input);
+  }
+
+  private async runWorktreeBranchOperation(
+    operation: 'sync' | 'restack',
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    await this.initialized;
+    const metadata = this.metadata;
+    const registration = this.registration;
+    const worktreeId = metadata?.workspace?.worktreeId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const directory = registration?.spec.directory;
+    if (
+      metadata === null ||
+      registration === null ||
+      worktreeId === undefined ||
+      kiloSessionId === undefined ||
+      directory === undefined ||
+      metadata.identity.createdOnPlatform !== 'cloud-agent-web' ||
+      metadata.workspace?.sandboxKind === 'shared' ||
+      metadata.workspace?.sandboxRoute !== undefined
+    ) {
+      return {
+        ok: false,
+        code: 'not_a_worktree_session',
+        message: 'Sync and Restack run only in a browser workspace session with its own sandbox',
+        retryable: false,
+      };
+    }
+
+    const baseBranch = input.baseBranch ?? metadata.repository?.baseBranch;
+    const upstreamSha = input.upstreamSha ?? metadata.repository?.baseSha;
+
+    const ready = await this.ensureReadyForBranchOperation();
+    if (!ready.ok) {
+      return { ok: false, code: 'sandbox_not_ready', message: ready.message, retryable: true };
+    }
+
+    const sandboxId = metadata.workspace?.sandboxId;
+    if (sandboxId === undefined) {
+      return {
+        ok: false,
+        code: 'sandbox_not_ready',
+        message: 'Sandbox is not available',
+        retryable: true,
+      };
+    }
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return {
+        ok: false,
+        code: 'sandbox_not_ready',
+        message: 'Sandbox is not available',
+        retryable: true,
+      };
+    }
+    let result: ControlPlaneControlResult;
+    try {
+      result = await peer.worktreeGit({
+        session: {
+          sessionId: this.sessionId,
+          kiloSessionId,
+          directory,
+        },
+        payload: {
+          operation,
+          ...(baseBranch === undefined ? {} : { baseBranch }),
+          ...(upstreamSha === undefined ? {} : { upstreamSha }),
+        },
+      });
+    } catch (error) {
+      // The wrapper may have completed a lease push before the reply was lost.
+      // Surface the ambiguity; the Worker must not retry this mutation.
+      return {
+        ok: false,
+        code: 'operation_outcome_unknown',
+        message: error instanceof Error ? error.message : 'Worktree operation outcome is unknown',
+        retryable: false,
+      };
+    }
+    if (!result.ok) {
+      return {
+        ok: false,
+        code:
+          result.error.code === 'operation_outcome_unknown'
+            ? 'operation_outcome_unknown'
+            : 'operation_failed',
+        message: result.error.message,
+        retryable: result.error.retryable,
+      };
+    }
+    const parsed = worktreeBranchOperationResultSchema.safeParse(result.result);
+    if (!parsed.success) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Worktree branch operation returned an invalid result');
+      return {
+        ok: false,
+        code: 'invalid_result',
+        message: 'The sandbox returned an invalid branch operation result',
+        retryable: false,
+      };
+    }
+    const outcome = parsed.data;
+    if (
+      (outcome.status === 'changed' || outcome.status === 'unchanged') &&
+      !(operation === 'restack' && outcome.operation === 'sync')
+    ) {
+      await this.persistWorktreeBranchOperation(outcome);
+    }
+    return { ok: true, result: outcome };
+  }
+
+  private async persistWorktreeBranchOperation(
+    outcome: Extract<WorktreeBranchOperationResult, { status: 'changed' | 'unchanged' }>
+  ): Promise<void> {
+    const metadata = this.metadata;
+    if (metadata?.repository === undefined) return;
+    const nextBase = nextRepositoryBase({
+      current: {
+        ...(metadata.repository.baseBranch === undefined
+          ? {}
+          : { baseBranch: metadata.repository.baseBranch }),
+        ...(metadata.repository.baseSha === undefined
+          ? {}
+          : { baseSha: metadata.repository.baseSha }),
+      },
+      result: { baseBranch: outcome.baseBranch, baseSha: outcome.baseSha },
+    });
+    await this.persistAdoptedBase(nextBase, outcome.branch);
+  }
+
+  /**
+   * Internal metadata-only adoption for a sibling session that shares the
+   * worktree. It never wakes the sandbox or creates a turn: the next capture
+   * reads the updated grouped metadata, so a sibling cannot overwrite the
+   * shared Changes snapshot with its old base.
+   */
+  async adoptWorktreeBase(input: AdoptWorktreeBaseRequest): Promise<AdoptWorktreeBaseResponse> {
+    await this.initialized;
+    if (!matchesExpectedWorktree(this.metadata, input.expectedWorktreeId)) {
+      return {
+        ok: false,
+        code: 'worktree_mismatch',
+        message: 'This session does not belong to the expected worktree',
+      };
+    }
+    const persisted = await this.persistAdoptedBase({
+      baseBranch: input.baseBranch,
+      baseSha: input.baseSha,
+    });
+    return persisted
+      ? { ok: true }
+      : {
+          ok: false,
+          code: 'invalid_metadata',
+          message: 'Adopted base did not produce valid session metadata',
+        };
+  }
+
+  /**
+   * Writes a base + effective prompt + route spec through the queue. Callers
+   * have already resolved the effective values; a null result keeps the
+   * current value upstream in `nextRepositoryBase`.
+   */
+  private async persistAdoptedBase(
+    nextBase: { baseBranch?: string; baseSha?: string },
+    fallbackBranch?: string
+  ): Promise<boolean> {
+    const metadata = this.metadata;
+    if (metadata?.repository === undefined) return false;
+    const next = withRepositoryBase(metadata, nextBase, fallbackBranch);
+    const validated = CurrentSessionMetadataSchema.safeParse(next);
+    if (!validated.success) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Worktree base adoption produced invalid session metadata');
+      return false;
+    }
+    await this.enqueue(async () => {
+      await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(validated.data));
+      this.metadata = validated.data;
+      if (this.registration !== null) {
+        const spec = {
+          ...this.registration.spec,
+          ...(validated.data.repository?.baseBranch === undefined
+            ? {}
+            : { baseBranch: validated.data.repository.baseBranch }),
+          ...(validated.data.repository?.baseSha === undefined
+            ? {}
+            : { baseSha: validated.data.repository.baseSha }),
+        };
+        const registration = { ...this.registration, spec };
+        await this.ctx.storage.put(REGISTRATION_KEY, registration);
+        this.registration = registration;
+      }
+    });
+    return true;
+  }
+
+  /** Wakes an idle sandbox through the ordinary preparation path. */
+  private async ensureReadyForBranchOperation(): Promise<
+    { ok: true } | { ok: false; message: string }
+  > {
+    const prepared = await this.prepareSandbox();
+    if (prepared !== null) {
+      await this.applyView(prepared, this.transportPass());
+      if (prepared.state === 'ready') return { ok: true };
+      if (prepared.state === 'failed') return { ok: false, message: prepared.reason };
+    }
+    const deadline = Date.now() + WORKTREE_GIT_PREPARE_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      if (this.route.state === 'ready') return { ok: true };
+      const failed = this.branchOperationRouteFailure();
+      if (failed !== undefined) return { ok: false, message: failed };
+      const peer = this.sandboxPeer();
+      if (peer !== null) {
+        try {
+          const status = await peer.status({ sessionId: this.sessionId });
+          if (status.view.state !== 'preparing') {
+            await this.applyView(status.view, this.transportPass());
+          }
+        } catch {
+          // A transient Sandbox RPC failure is retried within the bound.
+        }
+        if (this.routeIsReady()) return { ok: true };
+        const afterPoll = this.branchOperationRouteFailure();
+        if (afterPoll !== undefined) return { ok: false, message: afterPoll };
+      }
+      await new Promise(resolve => setTimeout(resolve, WORKTREE_GIT_PREPARE_POLL_MS));
+    }
+    return {
+      ok: false,
+      message: 'Sandbox preparation did not finish within 90 seconds',
+    };
+  }
+
+  private branchOperationRouteFailure(): string | undefined {
+    const route = this.route;
+    return route.state === 'failed' ? route.reason : undefined;
+  }
+
+  private routeIsReady(): boolean {
+    return this.route.state === 'ready';
   }
 
   private async initializeStorage(): Promise<void> {
@@ -1970,7 +2276,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.settleMessages(
           this.messages.filter(m => m.state === 'accepted').map(m => m.messageId),
           'failed',
-          parsed.reason
+          parsed.reason,
+          undefined,
+          'coordinator',
+          parsed.billingFailure
         );
         await this.applyView({ state: 'unknown' });
         await this.armAlarm();
@@ -2176,6 +2485,39 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * Outbox due times retry failed reporting even once no message is open.
    */
   private async armAlarm(): Promise<void> {
+    let statusDueAt: number | null = null;
+    try {
+      if (
+        this.metadata !== null &&
+        this.registration !== null &&
+        this.env.SESSION_INGEST !== undefined
+      ) {
+        const nativeStatus = this.deriveSessionStatus()?.type;
+        const status = deriveSessionListStatus({
+          messages: this.messages,
+          nativeStatus,
+          pendingInteractions: this.pendingInteractions,
+          routeState: this.route.state,
+        });
+        // Registration alone is not a transition. Native work may start without
+        // a Cloud message, so do not gate those updates on message admission.
+        if (this.messages.length > 0 || nativeStatus !== undefined || status !== 'idle') {
+          this.listStatusOutbox.record(
+            {
+              sessionId: this.registration.spec.kiloSessionId,
+              kiloUserId: this.metadata.identity.userId,
+              cloudAgentSessionId: this.sessionId,
+            },
+            status
+          );
+        }
+        statusDueAt = this.listStatusOutbox.nextDueAt();
+      }
+    } catch {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Session list status projection failed; execution alarms are unaffected');
+    }
     if (!this.messages.some(message => message.state === 'queued')) {
       await this.clearTransportRecovery();
     }
@@ -2184,12 +2526,30 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
+      statusDueAt,
     ].filter((value): value is number => value !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
     await this.ctx.storage.setAlarm(Math.min(...candidates));
+    if (statusDueAt !== null && statusDueAt <= Date.now()) {
+      // Metadata publication never holds up preparation, answers, or outcomes.
+      this.ctx.waitUntil(
+        this.listStatusOutbox
+          .repair()
+          .then(() =>
+            this.enqueue(async () => {
+              // The serialized finalizer re-arms the alarm after publication.
+            })
+          )
+          .catch(() => {
+            logger
+              .withFields({ sessionId: this.sessionId })
+              .warn('Session list status repair failed');
+          })
+      );
+    }
   }
 
   async getSession(): Promise<ControlPlaneSessionSnapshot> {
@@ -2903,11 +3263,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (sandboxId === undefined || sandboxId.length === 0) {
       return { services: [], status: 'not_ready' };
     }
+    const scope: PreviewSandboxScope = {
+      ownerId: metadata.identity.userId,
+      organizationId: metadata.identity.orgId ?? null,
+      scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    };
     const peer = this.sandboxPeerFor(sandboxId);
     if (peer === null) return { services: [], status: 'not_running' };
     return withDORetry(
       () => this.sandboxPeerFor(sandboxId) ?? peer,
-      stub => stub.previewServices(this.sessionId),
+      stub => stub.previewServices(scope),
       'previewServices'
     );
   }
@@ -3117,7 +3482,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           openMessages(this.messages).map(message => message.messageId),
           'failed',
           route.reason,
-          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype }
+          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype },
+          'coordinator',
+          route.billingFailure
         );
         return;
     }
@@ -3295,7 +3662,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           .filter(message => message.state === 'accepted')
           .map(message => message.messageId),
         'failed',
-        ownerHint.reason
+        ownerHint.reason,
+        undefined,
+        'coordinator',
+        ownerHint.billingFailure
       );
     }
     if (ownerHint && view.state !== 'unknown' && view.attemptId !== this.currentAttemptId()) {
@@ -3553,10 +3923,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     status: Extract<SessionMessageState, 'completed' | 'failed' | 'cancelled'>,
     reason: string | undefined,
     facts?: ControlPlaneReportFacts,
-    source: ControlPlaneMessageSource = 'coordinator'
+    source: ControlPlaneMessageSource = 'coordinator',
+    billingFailure?: CustomerBillingFailure
   ): Promise<void> {
     await this.applySettlement(
-      settleMessages(this.messages, messageIds, status, reason, Date.now()),
+      settleMessages(this.messages, messageIds, status, reason, Date.now(), billingFailure),
       facts,
       source
     );
@@ -3718,6 +4089,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               status: 'failed',
               delivery: accepted ? 'sent' : 'queued',
               accepted,
+              ...(message.billingFailure === undefined
+                ? {}
+                : { billingFailure: message.billingFailure }),
               ...(message.reason === null
                 ? {}
                 : { reason: message.reason, error: messageFailureText(message.reason) }),
@@ -3878,6 +4252,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             status: 'failed',
             delivery: message.acceptedAt === null ? 'queued' : 'sent',
             accepted: message.acceptedAt !== null,
+            ...(message.billingFailure === undefined
+              ? {}
+              : { billingFailure: message.billingFailure }),
             ...(message.reason === null
               ? { error: 'The message failed' }
               : { reason: message.reason, error: messageFailureText(message.reason) }),
@@ -3949,7 +4326,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const run = this.operations.tail.then(task, task);
+    const withStatus = async () => {
+      try {
+        return await task();
+      } finally {
+        try {
+          await this.armAlarm();
+        } catch {
+          logger
+            .withFields({ sessionId: this.sessionId })
+            .warn('Session alarm finalization failed; the operation result is unchanged');
+        }
+      }
+    };
+    const run = this.operations.tail.then(withStatus, withStatus);
     this.operations.tail = run.then(
       () => undefined,
       () => undefined

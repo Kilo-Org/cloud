@@ -124,6 +124,8 @@ export function controlPlaneRouteSpecFromAttachPayload(
     directory: payload.directory,
     ...(payload.branch ? { branch: payload.branch } : {}),
     ...(payload.branchMode ? { branchMode: payload.branchMode } : {}),
+    ...(payload.baseBranch ? { baseBranch: payload.baseBranch } : {}),
+    ...(payload.baseSha ? { baseSha: payload.baseSha } : {}),
     ...(git ? { git } : {}),
     ...(env ? { env } : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands } : {}),

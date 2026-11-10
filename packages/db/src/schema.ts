@@ -183,7 +183,6 @@ import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
   StripeSubscriptionStatus,
-  StoredModel,
   ContributorChampionTier,
 } from './schema-types';
 import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
@@ -2650,6 +2649,46 @@ export const user_auth_provider = pgTable(
       .concurrently(),
   ]
 );
+
+export const pending_auth_links = pgTable(
+  'pending_auth_links',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    secret_hash: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    kind: text().notNull().$type<'existing_account' | 'explicit_link'>(),
+    provider: text().notNull().$type<AuthProviderId>(),
+    provider_account_id: text().notNull(),
+    email: text().notNull(),
+    avatar_url: text().notNull(),
+    display_name: text(),
+    hosted_domain: text(),
+    email_code_allowed: boolean().notNull(),
+    email_code_send_count: integer().default(0).notNull(),
+    email_code_challenge_id: uuid(),
+    callback_path: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_pending_auth_links_secret_hash').on(table.secret_hash),
+    index('IDX_pending_auth_links_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_pending_auth_links_expires_at').on(table.expires_at),
+    check(
+      'check_pending_auth_links_kind',
+      sql`${table.kind} IN ('existing_account', 'explicit_link')`
+    ),
+  ]
+);
+
+export type PendingAuthLink = typeof pending_auth_links.$inferSelect;
+export type NewPendingAuthLink = typeof pending_auth_links.$inferInsert;
 
 export type PaymentMethod = typeof payment_methods.$inferSelect;
 
@@ -5620,6 +5659,7 @@ export const ModelStatsBenchmarksSchema = z
         terminalBenchHard: z.number().optional(),
         lcr: z.number().optional(),
         ifBench: z.number().optional(),
+        timeToFirstTokenSeconds: z.number().optional(),
         lastUpdated: z.string().optional(),
       })
       .optional(),
@@ -5962,8 +6002,6 @@ export type ContributorChampionSyncState = typeof contributor_champion_sync_stat
 export const modelsByProvider = pgTable('models_by_provider', {
   id: serial().notNull().primaryKey(),
   data: jsonb('data').$type<NormalizedOpenRouterResponse>().notNull(),
-  openrouter: jsonb('openrouter').$type<Record<string, StoredModel>>(),
-  vercel: jsonb('vercel').$type<Record<string, StoredModel>>(),
 });
 
 export const ai_gateway_config = pgTable(
@@ -6564,6 +6602,9 @@ export const cloud_agent_workspace_folders = pgTable(
     name: text().notNull(),
     color: text().$type<WorkspaceFolderColor>().notNull().default(WorkspaceFolderColor.Default),
     position: integer().notNull(),
+    kind: text().$type<'manual' | 'smart'>().notNull().default('manual'),
+    smart_preset: text().$type<'needs_you' | 'in_review' | 'done'>(),
+    sort_mode: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6583,6 +6624,19 @@ export const cloud_agent_workspace_folders = pgTable(
       sql`char_length(btrim(${table.name})) BETWEEN 1 AND 200 AND ${table.name} = btrim(${table.name})`
     ),
     check('cloud_agent_workspace_folders_position_check', sql`${table.position} >= 0`),
+    check('cloud_agent_workspace_folders_kind_check', sql`${table.kind} IN ('manual', 'smart')`),
+    check(
+      'cloud_agent_workspace_folders_smart_preset_check',
+      sql`(${table.kind} = 'manual' AND ${table.smart_preset} IS NULL) OR (${table.kind} = 'smart' AND ${table.smart_preset} IS NOT NULL AND ${table.smart_preset} IN ('needs_you', 'in_review', 'done'))`
+    ),
+    check(
+      'cloud_agent_workspace_folders_sort_mode_check',
+      sql`${table.sort_mode} IN ('manual', 'created', 'activity')`
+    ),
+    uniqueIndex('UQ_cloud_agent_workspace_folders_smart_preset')
+      .on(table.kilo_user_id, sql`coalesce(${table.organization_id}::text, '')`, table.smart_preset)
+      .where(sql`${table.kind} = 'smart'`)
+      .concurrently(),
   ]
 );
 
@@ -6595,6 +6649,12 @@ export const cloud_agent_worktrees = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'restrict' }),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
     folder_id: uuid().references(() => cloud_agent_workspace_folders.id, { onDelete: 'set null' }),
+    parent_worktree_id: text().references((): AnyPgColumn => cloud_agent_worktrees.worktree_id, {
+      onDelete: 'set null',
+    }),
+    base_branch: text(),
+    base_sha: text(),
+    sidebar_position: text(),
     name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -6618,6 +6678,10 @@ export const cloud_agent_worktrees = pgTable(
     index('IDX_cloud_agent_worktrees_folder_id')
       .on(table.folder_id)
       .where(isNotNull(table.folder_id)),
+    index('IDX_cloud_agent_worktrees_parent_worktree_id')
+      .on(table.parent_worktree_id)
+      .where(isNotNull(table.parent_worktree_id))
+      .concurrently(),
     check(
       'cloud_agent_worktrees_deletion_check',
       sql`${table.deletion_completed_at} IS NULL OR (${table.deletion_started_at} IS NOT NULL AND ${table.name} IS NULL AND ${table.deletion_manifest} IS NULL AND ${table.runtime_locations} = '[]'::jsonb)`
@@ -6707,6 +6771,9 @@ export const cli_sessions_v2 = pgTable(
       .where(isNotNull(table.cloud_agent_session_id)),
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    index('IDX_cli_sessions_v2_user_activity')
+      .on(table.kilo_user_id, sql`coalesce(${table.last_activity_at}, ${table.created_at})`)
+      .concurrently(),
     index('IDX_cli_sessions_v2_briefing_activity')
       .on(
         table.kilo_user_id,
@@ -7268,6 +7335,10 @@ export const github_branch_pull_requests = pgTable(
     pr_head_sha: text(),
     pr_observations: jsonb().$type<unknown>(),
     pr_review_decision: text(),
+    pr_base_ref: text(),
+    stack_number: integer(),
+    stack_position: integer(),
+    stack_size: integer(),
     review_decision_pending: boolean().notNull().default(false),
     review_decision_fetching_at: timestamp({ withTimezone: true, mode: 'string' }),
     pr_last_synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -7341,6 +7412,8 @@ export const device_auth_requests = pgTable(
     requesting_redirect_origin: text(),
     /** When the approver confirmed that exact client; null until then. */
     client_confirmed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    /** SHA-256 hash of the pending account link secret to complete on approval. */
+    pending_link_secret_hash: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -7438,7 +7511,7 @@ export const byok_api_keys = pgTable(
       onDelete: 'cascade',
     }),
     provider_id: text().notNull(),
-    encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
+    encrypted_api_key: jsonb().$type<EncryptedData>(),
     encrypted_api_key_envelope: jsonb().$type<BYOKApiKeyEnvelope>(),
     management_source: text().$type<BYOKManagementSource>().notNull().default('user'),
     is_enabled: boolean().default(true).notNull(),
@@ -7549,11 +7622,17 @@ export const openai_chatgpt_connections = pgTable(
 export type OpenAiChatGptConnectionRow = typeof openai_chatgpt_connections.$inferSelect;
 
 /**
- * A Claude billing connection: one Kilo owner (a personal account or an
- * organization) linked through its Anthropic user profile to a customer's
- * Claude organization, so the Claude requests the owner makes bill that
- * organization. No credential is stored: Kilo's operator service account sends
- * the requests, and the user profile ID names who pays.
+ * A Claude billing connection: one Kilo owner linked through its Anthropic
+ * user profile to a customer's Claude organization, so the Claude requests the
+ * owner makes bill that organization. No credential is stored: Kilo's operator
+ * service account sends the requests, and the user profile ID names who pays.
+ *
+ * The set columns name the owner:
+ * - `kilo_user_id` only: the person's personal account.
+ * - `kilo_user_id` and `organization_id`: the person's own requests in that
+ *   organization.
+ * - `organization_id` only: the organization's shared services, such as code
+ *   review. `created_by` records the person who connected it.
  *
  * Anthropic allows one user profile per customer organization for each OAuth
  * app, so `user_profile_id` is unique and kept after a removal: a reconnect
@@ -7592,9 +7671,12 @@ export const claude_billing_connections = pgTable(
     uniqueIndex('UQ_claude_billing_connections_personal')
       .on(table.kilo_user_id)
       .where(sql`${table.organization_id} IS NULL`),
-    uniqueIndex('UQ_claude_billing_connections_organization')
-      .on(table.organization_id)
+    uniqueIndex('UQ_claude_billing_connections_org_member')
+      .on(table.kilo_user_id, table.organization_id)
       .where(sql`${table.organization_id} IS NOT NULL`),
+    uniqueIndex('UQ_claude_billing_connections_shared_services')
+      .on(table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.kilo_user_id} IS NULL`),
     enumCheck(
       'claude_billing_connections_status_check',
       table.status,
@@ -7602,10 +7684,7 @@ export const claude_billing_connections = pgTable(
     ),
     check(
       'claude_billing_connections_owner_check',
-      sql`(
-        (${table.kilo_user_id} IS NOT NULL AND ${table.organization_id} IS NULL) OR
-        (${table.kilo_user_id} IS NULL AND ${table.organization_id} IS NOT NULL)
-      )`
+      sql`${table.kilo_user_id} IS NOT NULL OR ${table.organization_id} IS NOT NULL`
     ),
   ]
 );
@@ -8896,11 +8975,42 @@ export type CloudAgentSandboxAllocationSetting =
 export type NewCloudAgentSandboxAllocationSetting =
   typeof cloud_agent_sandbox_allocation_settings.$inferInsert;
 
-// ============ CLOUD AGENT BUILT-IN AGENT SETTINGS ============
-// User-scoped model and visibility overrides for the CLI's built-in agents
-// (for example `explore`, `compaction`, `plan`, and `debug`). These apply to
-// every Cloud Agent session the user starts, independent of a profile.
+// ============ CLOUD AGENT USER SETTINGS ============
+// One row per user. These personal settings apply to every Cloud Agent session
+// and sidebar of the user, in the personal account and in every organization.
 
+// Map of built-in agent slug (for example `explore`, `compaction`, `plan`) to an
+// override. See BuiltinAgentSettingsSchema in `@kilocode/cloud-agent-profile`.
+export type CloudAgentBuiltinAgentOverrides = Record<
+  string,
+  { model?: string | null; variant?: string; disable?: boolean }
+>;
+
+export const cloud_agent_user_settings = pgTable(
+  'cloud_agent_user_settings',
+  {
+    kilo_user_id: text()
+      .primaryKey()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    workspace_order: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
+    builtin_agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'cloud_agent_user_settings_workspace_order_check',
+      sql`${table.workspace_order} IN ('manual', 'created', 'activity')`
+    ),
+  ]
+);
+
+// Replaced by cloud_agent_user_settings.builtin_agents, which migration 0345
+// copied from this table. Code in this repository no longer reads it. Drop it
+// after the deployed web app and cloud-agent-next Worker stop reading it.
 export const cloud_agent_builtin_agent_settings = pgTable(
   'cloud_agent_builtin_agent_settings',
   {
@@ -8911,13 +9021,7 @@ export const cloud_agent_builtin_agent_settings = pgTable(
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    // Map of built-in agent slug → override. Only model, variant, and disable
-    // are meaningful here; see BuiltinAgentSettingsSchema in
-    // `@kilocode/cloud-agent-profile`.
-    agents: jsonb()
-      .$type<Record<string, { model?: string | null; variant?: string; disable?: boolean }>>()
-      .notNull()
-      .default({}),
+    agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -8926,10 +9030,6 @@ export const cloud_agent_builtin_agent_settings = pgTable(
   },
   table => [uniqueIndex('UQ_cloud_agent_builtin_agent_settings_user').on(table.user_id)]
 );
-
-export type CloudAgentBuiltinAgentSetting = typeof cloud_agent_builtin_agent_settings.$inferSelect;
-export type NewCloudAgentBuiltinAgentSetting =
-  typeof cloud_agent_builtin_agent_settings.$inferInsert;
 
 // ============ AGENT ENVIRONMENT PROFILE MCP SERVERS ============
 // MCP servers configured on an environment profile. Materialized into the
@@ -11396,6 +11496,10 @@ export const operation_ledgers = pgTable(
       table.operation_key
     ),
     index('IDX_operation_ledgers_status_expires_at').on(table.status, table.expires_at),
+    index('IDX_operation_ledgers_admin_renewal_batch')
+      .on(table.intent, table.resource_key, table.status)
+      .concurrently()
+      .where(sql`${table.domain} = 'admin_kiloclaw_stripe_renewals'`),
     // Partial: provider_ref is NULL for every non-security domain, so the
     // index only carries the rows the provider-ref join actually reads.
     index('IDX_operation_ledgers_provider_ref')
@@ -11631,6 +11735,7 @@ export const compute_usage_charge = pgTable(
   },
   table => [
     primaryKey({ columns: [table.usage_source, table.usage_source_id, table.created_at] }),
+    index('IDX_compute_usage_charge_created').on(table.created_at),
     index('IDX_compute_usage_charge_user_created').on(table.user_id, table.created_at),
     index('IDX_compute_usage_charge_organization_created').on(
       table.organization_id,

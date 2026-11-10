@@ -148,6 +148,40 @@ describe('groupAssistantParts', () => {
     ]);
   });
 
+  it('keeps files a tool returned beside that tool, and other files in chat', () => {
+    const file = (id: string): Part => ({
+      id,
+      sessionID: 'ses_1',
+      messageID: 'msg_1',
+      type: 'file',
+      mime: 'image/png',
+      url: '',
+      filename: `/tmp/${id}.png`,
+    });
+    const failedTool: ToolPart = {
+      ...makeToolPart('t3', 'bash'),
+      state: { status: 'error', input: {}, error: 'failed', time: { start: 1, end: 2 } },
+    };
+    const segments = groupAssistantParts(
+      [
+        makeToolPart('t1', 'read'),
+        file('t1_file_0'),
+        makeToolPart('t2', 'read'),
+        file('t2_file_0'),
+        failedTool,
+        file('t3_file_0'),
+        file('attachment'),
+      ],
+      'live'
+    );
+
+    expect(segments.map(segment => [segment.type, segment.parts.map(part => part.id)])).toEqual([
+      ['agent-work', ['t1', 't1_file_0', 't2', 't2_file_0']],
+      ['chat', ['t3', 't3_file_0', 'attachment']],
+    ]);
+    expect(segments[0]).toMatchObject({ summary: expect.stringContaining('2 tool calls') });
+  });
+
   it('hides empty reasoning and internal plan tools', () => {
     const planTool: ToolPart = {
       ...makeToolPart('plan', 'plan_enter'),

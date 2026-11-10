@@ -21,7 +21,13 @@ import { load } from 'js-yaml';
 import { DEPENDENCY_INPUTS } from './affected-workspaces.mjs';
 
 const workflows = Object.fromEntries(
-  ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
+  [
+    'ci.yml',
+    'extension-ci.yml',
+    'kilo-app-ci.yml',
+    'mobile-native-build.yml',
+    'explorer-ios-release.yml',
+  ].map(file => [
     file,
     load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')),
   ])
@@ -836,9 +842,11 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   );
 });
 
-// Both workflows run the same declaration action, so both must install the same
-// closure. The action's program is the whole input: a wider install links
-// workspaces the build never reads, and a narrower one breaks the build.
+// Every producer that builds the declarations for other jobs must install the
+// same closure. The action's program is the whole input: a wider install links
+// workspaces the build never reads, and a narrower one breaks the build. The
+// jobs that build and then use the tree in one job install the whole workspace,
+// so they are not producers and this test does not cover them.
 test('kilo-app CI installs the closure the declaration action needs', () => {
   const install = (file, job) =>
     workflows[file].jobs[job].steps.find(step =>
@@ -850,11 +858,119 @@ test('kilo-app CI installs the closure the declaration action needs', () => {
     /^pnpm install --frozen-lockfile --filter '@kilocode\/trpc\.\.\.' --filter 'web\.\.\.' --filter kilocode-monorepo$/,
     'the producer installs the declaration closure, not the whole workspace'
   );
+  for (const [file, job] of [
+    ['ci.yml', 'trpc-declarations'],
+    ['mobile-native-build.yml', trpcProducer],
+  ]) {
+    assert.equal(
+      producerInstall,
+      install(file, job),
+      `${file}'s ${job} builds the same declarations, so it installs the same closure`
+    );
+  }
+});
+
+// Both harness SDK producers run the same action and no other step that reads
+// a workspace, so both install the same closure. The package has no workspace
+// dependency; the root project supplies the `tsgo` binary the action's key
+// script runs, so it stays in the filter.
+const harnessProducerInstall =
+  "pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo";
+
+test('both harness SDK producers install the harness SDK closure', () => {
+  for (const file of ['kilo-app-ci.yml', 'mobile-native-build.yml']) {
+    const install = workflows[file].jobs[harnessProducer].steps.find(
+      step => step.name === 'Install dependencies'
+    );
+    assert.equal(
+      install.run,
+      harnessProducerInstall,
+      `${file}'s ${harnessProducer} installs the harness SDK closure, not the whole workspace`
+    );
+  }
+});
+
+// mobile-native-build needs the same producer for the same reason: both
+// platform jobs start together after the gate, so running the action in each
+// made a cache miss compile the declaration program twice and race both jobs to
+// save the one key. `prepare-trpc` builds it once, and both platform jobs
+// download the tree, as they already do for the harness SDK.
+test('mobile-native-build builds the tRPC declarations once and both platform jobs download them', () => {
+  const jobs = workflows['mobile-native-build.yml'].jobs;
+  const actionUsers = Object.entries(jobs)
+    .filter(([, job]) => (job.steps ?? []).some(step => step.uses === trpcAction))
+    .map(([name]) => name);
+  assert.deepEqual(actionUsers, [trpcProducer], 'only the producer builds the declarations');
+
+  const producer = jobs[trpcProducer];
+  assert.equal(producer.needs, 'gate', 'the producer waits for the gate it is skipped by');
   assert.equal(
-    producerInstall,
-    install('ci.yml', 'trpc-declarations'),
-    'the two workflow jobs that build these declarations install the same closure'
+    producer.if,
+    "needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'",
+    'a run with every platform published must not pay a build for nobody'
   );
+  const producerSteps = producer.steps;
+  const installIndex = producerSteps.findIndex(step =>
+    /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+  );
+  const actionIndex = producerSteps.findIndex(step => step.uses === trpcAction);
+  assert.ok(installIndex >= 0 && actionIndex > installIndex, 'the producer builds after install');
+  const uploads = producerSteps
+    .map((step, index) => ({ step, index }))
+    .filter(
+      ({ step }) =>
+        step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === trpcArtifact
+    );
+  assert.equal(uploads.length, 1, 'the producer uploads the declarations exactly once');
+  assert.ok(uploads[0].index > actionIndex, 'the producer uploads what it built');
+  const upload = uploads[0].step;
+  assert.match(upload.uses, /^actions\/upload-artifact@[0-9a-f]{40}$/, 'immutable upload pin');
+  assert.equal(upload.with.path, trpcDist, 'the artifact root is the dist directory');
+  assert.equal(upload.with['retention-days'], 1);
+  assert.equal(upload.with['if-no-files-found'], 'error', 'an empty build must fail');
+
+  for (const name of ['ios', 'android']) {
+    const job = jobs[name];
+    assert.ok(
+      [job.needs ?? []].flat().includes(trpcProducer),
+      `${name} waits for the build it downloads`
+    );
+    const steps = job.steps;
+    assert.deepEqual(
+      steps.filter(step => step.uses === trpcAction).map(step => step.name),
+      [],
+      `${name} never builds the declarations itself`
+    );
+    const downloads = steps
+      .map((step, index) => ({ step, index }))
+      .filter(
+        ({ step }) =>
+          step.uses?.startsWith('actions/download-artifact@') && step.with?.name === trpcArtifact
+      );
+    assert.equal(downloads.length, 1, `${name} downloads the declarations once`);
+    assert.match(
+      downloads[0].step.uses,
+      /^actions\/download-artifact@[0-9a-f]{40}$/,
+      'immutable download pin'
+    );
+    assert.equal(
+      downloads[0].step.with.path,
+      trpcDist,
+      `${name} restores it where the build writes`
+    );
+    const jobInstall = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    assert.ok(
+      jobInstall >= 0 && downloads[0].index > jobInstall,
+      `${name} downloads the declarations after install`
+    );
+    assert.equal(
+      downloads[0].step.if,
+      "steps.published.outputs.published != 'true'",
+      `${name} still skips its whole build when another run published`
+    );
+  }
 });
 
 // The tRPC action gets the same guard as the harness SDK build action: a hit
@@ -1265,6 +1381,93 @@ test('the changes job installs the root project only for a dependency input', ()
   );
 });
 
+// The extension changes job is the serialized prelude of every extension CI
+// run: `verify`, `build-firefox` and `e2e-chrome` all need it, so an install it
+// does not need costs every run. It reads the repository for the same reason as
+// the ci.yml job above, over the same detector set, so it carries one gate:
+// these assertions compare the two step definitions, and a new detector input
+// added to one gate without the other fails here.
+test('the extension changes job carries the shared dependency-input install gate', () => {
+  const steps = workflows['extension-ci.yml'].jobs.changes.steps;
+  const shared = ciJobs.changes.steps;
+  const sharedStep = id => shared.find(step => step.id === id);
+  const step = id => steps.find(candidate => candidate.id === id);
+
+  const filter = step('filter_resources');
+  const retry = step('filter_resources_retry');
+  const base = step('resources_base');
+  assert.ok(filter, 'extension-ci changes: the dependency-input filter is missing');
+  assert.ok(retry, 'extension-ci changes: the dependency-input filter retry is missing');
+  assert.ok(base, 'extension-ci changes: the detector-base dependency-input check is missing');
+
+  assert.equal(
+    filter.with.filters,
+    sharedStep('filter_resources').with.filters,
+    'both changes jobs filter the same dependency inputs'
+  );
+  assert.equal(
+    filter['continue-on-error'],
+    sharedStep('filter_resources')['continue-on-error'],
+    'the first attempt tolerates a transient failure'
+  );
+  assert.equal(
+    retry.if,
+    sharedStep('filter_resources_retry').if,
+    'the retry runs only after a failed first attempt'
+  );
+  assert.equal(
+    retry.with.filters,
+    filter.with.filters,
+    'the retry evaluates the same paths as the attempt it replaces'
+  );
+  assert.equal(
+    retry['continue-on-error'],
+    sharedStep('filter_resources_retry')['continue-on-error'],
+    'the retry shares the shared changes job retry contract'
+  );
+  assert.equal(
+    retry['continue-on-error'],
+    undefined,
+    'a persistent filter failure fails the job instead of installing nothing'
+  );
+  assert.equal(
+    base.env.BASE_SHA,
+    sharedStep('resources_base').env.BASE_SHA,
+    'both changes jobs diff the base their detector diffs'
+  );
+  assert.equal(
+    base.run,
+    sharedStep('resources_base').run,
+    'one detector-base check serves both jobs, so the input set stays in one place'
+  );
+
+  const install = steps.find(candidate => candidate.name === 'Install root dependencies');
+  const sharedInstall = shared.find(candidate => candidate.name === 'Install root dependencies');
+  assert.equal(
+    install.run,
+    sharedInstall.run,
+    'the gate removes the install from the run, never changes what it installs'
+  );
+  assert.equal(
+    install.if,
+    sharedInstall.if,
+    'the extension and the shared changes job gate the install on the same answers'
+  );
+  assert.ok(
+    steps.indexOf(install) > steps.indexOf(retry) && steps.indexOf(install) > steps.indexOf(base),
+    'the install reads answers both detections already wrote'
+  );
+  assert.ok(
+    steps.indexOf(install) < steps.indexOf(step('workspaces')),
+    'the detector that may need js-yaml runs after the install it can ask for'
+  );
+  assert.equal(
+    workflows['extension-ci.yml'].jobs.changes.outputs.extension,
+    "${{ steps.filter.outputs.extension == 'true' || steps.workspaces.outputs.extension == 'true' }}",
+    'the gate leaves the job output that the three downstream jobs read'
+  );
+});
+
 // The four shards run one Jest suite, and its roots are apps/web, the
 // web-shared and db sources its config maps in, and apps/ai-gateway. A
 // recursive workspace install links every other project for a step that reads
@@ -1281,6 +1484,107 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.deepEqual(job.strategy.matrix.shard, [1, 2, 3, 4], 'four shards still run');
   const run = job.steps.find(step => step.name === 'Run web tests');
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
+});
+
+// The plugin files reach one check only: test-scripts runs
+// `test:oxlint-plugins` over them. The web Jest suite, the web build and the
+// cycle check read none of them, so the plugin path has its own filter pair and
+// the shared filter that gates those three names no plugin file. A plugin path
+// back in the shared filter would start four web-test shards, the production
+// build and the cycle check for a change none of them reads.
+const oxlintPluginPath = 'tools/oxlint/anti-slop/rules/no-runtime-typeof.ts';
+const webBackendPath = 'apps/web/src/routers/active-sessions-router.ts';
+
+test('a lint-plugin change runs the plugin suite without the web gates', () => {
+  const filtersOf = id => {
+    const step = ciJobs.changes.steps.find(candidate => candidate.id === id);
+    assert.ok(step, `changes: the ${id} step is missing`);
+    return load(step.with.filters);
+  };
+  const matches = (patterns, path) => patterns.some(pattern => posix.matchesGlob(path, pattern));
+
+  const backend = filtersOf('filter').kilocode_backend;
+  assert.deepEqual(
+    filtersOf('filter_retry').kilocode_backend,
+    backend,
+    'the shared retry keeps the filters of the attempt it replaces'
+  );
+  assert.equal(
+    matches(backend, webBackendPath),
+    true,
+    'a backend path still matches the shared filter'
+  );
+  assert.equal(matches(backend, oxlintPluginPath), false, 'the shared filter names no plugin path');
+
+  const plugins = filtersOf('filter_oxlint').oxlint_plugins;
+  assert.deepEqual(
+    filtersOf('filter_oxlint_retry').oxlint_plugins,
+    plugins,
+    'the plugin retry keeps the filters of the attempt it replaces'
+  );
+  assert.equal(matches(plugins, oxlintPluginPath), true, 'the plugin pair detects a plugin change');
+  assert.equal(matches(plugins, webBackendPath), false, 'the plugin pair detects nothing else');
+  assert.equal(
+    ciJobs.changes.outputs.oxlint_plugins,
+    '${{ steps.filter_oxlint.outputs.oxlint_plugins || steps.filter_oxlint_retry.outputs.oxlint_plugins }}',
+    'the plugin output falls back to its retry attempt'
+  );
+
+  assert.match(
+    ciJobs['test-scripts'].if,
+    /needs\.changes\.outputs\.oxlint_plugins == 'true'/,
+    'test-scripts keeps the one check that reads those paths'
+  );
+  // The root script chain decides what test-scripts runs: a run that starts the
+  // job without the plugin entry would report a plugin-only change unexercised.
+  const rootScripts = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+  ).scripts;
+  assert.match(
+    rootScripts['test:scripts'],
+    /test:oxlint-plugins/,
+    'test-scripts reaches the plugin suite'
+  );
+  assert.match(
+    rootScripts['test:oxlint-plugins'],
+    /tools\/oxlint\//,
+    'the plugin suite runs the plugin tests'
+  );
+  for (const job of ['web-test', 'build', 'dependency-cycle-check']) {
+    const condition = ciJobs[job].if;
+    assert.match(
+      condition,
+      /needs\.changes\.outputs\.kilocode_backend == 'true'/,
+      `${job}: gated on the shared filter alone, which names no plugin path`
+    );
+    assert.doesNotMatch(condition, /oxlint_plugins/, `${job}: the plugin output starts no web job`);
+  }
+});
+
+// The account database job runs the root `drizzle` script, which executes
+// drizzle-kit inside packages/db, and one session-sync suite whose workspace
+// imports are @kilocode/db and @kilocode/worker-utils, both declared by the
+// service. The install names those closures, and packages/db stays listed
+// because the migrate step resolves drizzle-kit there. A step that starts
+// reading another workspace widens the filter; it does not restore the full
+// install.
+const sessionSyncPostgresInstall =
+  "pnpm install --frozen-lockfile --filter 'cloudflare-session-sync...' --filter '@kilocode/db...' --filter kilocode-monorepo";
+
+test('the session-sync Postgres job installs the closure its steps read', () => {
+  const job = ciJobs['session-sync-postgres'];
+  const installs = job.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    [sessionSyncPostgresInstall],
+    'one install links the session-sync closure, the database closure and the root project'
+  );
+  const run = job.steps.find(step => step.name === 'Run session-sync account database tests');
+  assert.equal(
+    run.run,
+    'NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-sync test:postgres',
+    'the migrate and suite commands are unchanged'
+  );
 });
 
 // The wiring job reads the root project and executes Wrangler's real config
@@ -1319,9 +1623,9 @@ const appClosureInstall =
   "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
 
 test('the kilo-app CI consumers install the app closure', () => {
-  // The producer jobs keep their own wider (or whole-workspace) closures, and
-  // `mobile-typecheck` keeps the whole workspace until its measured saving
-  // clears the bar; every other install in this workflow is the app's.
+  // The producer jobs install their own build closure, and `mobile-typecheck`
+  // keeps the whole workspace until its measured saving clears the bar; every
+  // other install in this workflow is the app's.
   const consumerJobs = Object.entries(kiloAppJobs)
     .filter(
       ([name, job]) =>

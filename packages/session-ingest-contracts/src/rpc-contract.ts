@@ -11,6 +11,20 @@ export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentW
 
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
+export const publishCloudAgentSessionStatusSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    kiloUserId: z.string().min(1),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
+    status: z.enum(['busy', 'retry', 'question', 'permission', 'idle', 'failed']),
+    occurredAt: z.iso.datetime(),
+    transitionId: z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/),
+  })
+  .strict();
+export type PublishCloudAgentSessionStatusParams = z.infer<
+  typeof publishCloudAgentSessionStatusSchema
+>;
+
 export const cloudAgentWorktreeLocationSchema = z
   .object({
     sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
@@ -176,6 +190,18 @@ export const createSessionForCloudAgentSchema = z.object({
   cloudAgentSessionId: z.string().min(1),
   cloudAgentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
   cloudAgentWorktreeLocation: cloudAgentWorktreeLocationSchema.optional(),
+  /**
+   * The workspace this worktree is stacked on. Recorded on the first
+   * registration only; later sibling registrations leave it untouched.
+   */
+  parentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
+  /** The branch the new working branch starts from. Null means the default branch. */
+  baseBranch: z.string().min(1).max(256).optional(),
+  /** The exact commit the working branch starts from, resolved by the web router. */
+  baseSha: z
+    .string()
+    .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+    .optional(),
   organizationId: z.string().optional(),
   createdOnPlatform: z.string().min(1),
   title: z.string().optional(),
@@ -1341,6 +1367,7 @@ export type AuthorizedSessionMessages = {
 export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 
 export type SessionIngestRpcMethods = {
+  publishCloudAgentSessionStatus: (params: PublishCloudAgentSessionStatusParams) => Promise<void>;
   beginCloudAgentWorktreeDeletion: (
     params: CloudAgentWorktreeDeletionParams
   ) => Promise<CloudAgentWorktreeDeletionState>;

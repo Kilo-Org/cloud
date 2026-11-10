@@ -105,6 +105,7 @@ const adminAreaPolicies: Record<string, AdminAreaPolicy> = {
   kiloclawInstances: platform,
   kiloclawProviders: platform,
   kiloclawRegions: platform,
+  kiloclawStripeRenewals: { read: 'platform_read', write: 'sensitive_write', target: 'none' },
   kiloclawVersions: platform,
   kiloPass: sensitiveWrite,
   modelEvalIngest: platform,

@@ -65,6 +65,16 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
 
 const CONNECTED_CHATGPT = { connection: { status: 'connected' }, isEnabled: true };
 
+const mockGetClaudeBillingConnection = jest.fn();
+const mockResolveClaudeBillingModel = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/store', () => ({
+  getClaudeBillingConnection: (...args: unknown[]) => mockGetClaudeBillingConnection(...args),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/routing', () => ({
+  resolveClaudeBillingModel: (...args: unknown[]) => mockResolveClaudeBillingModel(...args),
+}));
+
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
 
 const PAID_MODEL = 'anthropic/claude-sonnet-4';
@@ -202,6 +212,57 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     expect(await eligibility(true)).toEqual({ isFree: false, hasUserByokAvailable: true });
     expect(await eligibility(false)).toEqual({ isFree: false, hasUserByokAvailable: false });
+  });
+
+  describe('Claude billing link', () => {
+    const eligibility = (includeSharedServicesConnection: boolean, organizationId?: string) =>
+      computeCloudAgentNextBalanceCheckEligibility({
+        fromDb: fakeDb,
+        user: fakeUser,
+        modelId: PAID_MODEL,
+        ...(organizationId ? { organizationId } : {}),
+        includeSharedServicesConnection,
+      });
+
+    beforeEach(() => {
+      mockResolveClaudeBillingModel.mockResolvedValue('claude-sonnet-4');
+    });
+
+    it("counts the organization's shared-services Claude link for service runs only", async () => {
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'shared_services' ? { status: 'connected' } : null
+      );
+      expect(await eligibility(true, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: true,
+      });
+      expect(await eligibility(false, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
+
+    it("counts a member's own Claude link in the organization", async () => {
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'member' ? { status: 'connected' } : null
+      );
+      expect(await eligibility(false, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: true,
+      });
+    });
+
+    it('does not count past a shared-services link that cannot bill', async () => {
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'shared_services'
+          ? { status: 'billing_unavailable' }
+          : { status: 'connected' }
+      );
+      expect(await eligibility(true, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
   });
 
   describe('direct BYOK key', () => {

@@ -12,7 +12,7 @@ jest.mock('@kilocode/worker-utils/account-access', () => ({
   isOrganizationMember: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
-  getBlacklistedDomains: async () => [],
+  isEmailBlacklisted: async () => false,
 }));
 jest.mock('@kilocode/web-shared/lib/posthog', () => ({
   __esModule: true,

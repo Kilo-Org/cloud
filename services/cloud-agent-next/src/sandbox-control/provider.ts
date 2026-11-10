@@ -1,4 +1,5 @@
 import type { SandboxBillingInput, SandboxClassName } from '../container-usage-context.js';
+import type { CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { SessionCredentialGrant } from './session-credentials.js';
 import {
@@ -21,7 +22,10 @@ export type ProviderCreationCause =
   | 'invalid_configuration';
 
 export class ProviderCreationError extends AgentSandboxUnavailableError {
-  constructor(public readonly code: ProviderCreationCause) {
+  constructor(
+    public readonly code: ProviderCreationCause,
+    public readonly billingFailure?: CustomerBillingFailure
+  ) {
     super(
       code === 'insufficient_credits'
         ? 'Sandbox billing requires additional credits'

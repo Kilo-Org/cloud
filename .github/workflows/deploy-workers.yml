@@ -15,6 +15,15 @@ on:
         options:
           - production
           - staging
+  # A call does one of two things, decided by its inputs:
+  #
+  # * detection: `base_sha` is set and `worker_matrix` is empty, so only
+  #   `detect-changes` runs and the call publishes the matrix as an output.
+  #   A caller can start it as soon as it holds the baseline, beside other work.
+  # * deploy: `worker_matrix` holds the matrix a detection call produced, so only
+  #   the deploy jobs run, behind the caller's gate, with the same SHAs.
+  #
+  # Manual dispatch stays the single-Worker path (`worker`).
   workflow_call:
     inputs:
       worker:
@@ -27,6 +36,16 @@ on:
         required: false
         default: ''
         type: string
+      worker_matrix:
+        description: 'JSON array of Worker folders to deploy; a call without it only detects changes'
+        required: false
+        default: ''
+        type: string
+      deploy_cloud_agent_after_session_ingest:
+        description: 'Deploy session-ingest and then cloud-agent-next ahead of the parallel matrix'
+        required: false
+        default: 'false'
+        type: string
       source_sha:
         description: 'Exact tested commit to deploy (defaults to the caller SHA)'
         required: false
@@ -37,6 +56,11 @@ on:
         required: false
         default: production
         type: string
+    outputs:
+      matrix:
+        value: ${{ jobs.detect-changes.outputs.matrix }}
+      deploy-cloud-agent-after-session-ingest:
+        value: ${{ jobs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest }}
 
 permissions:
   contents: read
@@ -175,11 +199,17 @@ jobs:
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
+  # The detection-only call: a deploy call passes `worker_matrix`, so this job
+  # skips there and no caller runs the diff twice.
   detect-changes:
     # Manual dispatch has no `base_sha` (it is a `workflow_call` input only), so
     # change detection is reachable only through `workflow_call`.
     # Guard: privileged workflow. Only the canonical repo may run it.
-    if: inputs.worker == '' && inputs.base_sha != '' && github.repository == 'Kilo-Org/cloud'
+    if: >-
+      inputs.worker == '' &&
+      inputs.base_sha != '' &&
+      inputs.worker_matrix == '' &&
+      github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -364,16 +394,29 @@ jobs:
             echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           fi
 
+  # A call must select its work: one Worker, a baseline to detect changes from,
+  # or a detected matrix to deploy. A call that names none of them would deploy
+  # nothing and still report success, so it fails here. The job reserves no
+  # runner on a healthy call.
+  missing-selection:
+    if: inputs.worker == '' && inputs.worker_matrix == '' && inputs.base_sha == ''
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Reject a call without a Worker selection
+        run: |
+          echo "::error::Pass \`worker\` for a single deploy, or \`base_sha\` to detect changes, or \`worker_matrix\` to deploy a detected matrix; a call with none of them is a wiring error." >&2
+          exit 1
+
   deploy-changed:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != '' && github.repository == 'Kilo-Org/cloud'
+    if: inputs.worker_matrix != '[]' && inputs.worker_matrix != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ matrix.worker == 'services/cloud-agent-next' && 75 || matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     environment: ${{ inputs.target_environment }}
     strategy:
       fail-fast: false
       matrix:
-        worker: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+        worker: ${{ fromJson(inputs.worker_matrix) }}
     name: Deploy ${{ matrix.worker }}
     steps:
       - name: Checkout code
@@ -498,11 +541,11 @@ jobs:
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
   deploy-session-ingest:
-    needs: detect-changes
     # Guard: this reusable workflow can be invoked from a fork, and the job
     # deploys to the target environment with inherited repo secrets. Only the
-    # canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud' && needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'
+    # canonical repo may run it. The ordered path comes from the detection call,
+    # because a deploy call does not run detection.
+    if: github.repository == 'Kilo-Org/cloud' && inputs.deploy_cloud_agent_after_session_ingest == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25
     environment: ${{ inputs.target_environment }}
@@ -555,12 +598,12 @@ jobs:
           command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
 
   deploy-cloud-agent-after-session-ingest:
-    needs: [detect-changes, deploy-session-ingest]
+    needs: deploy-session-ingest
     # GitHub skips a dependent job when a needed job fails: cloud-agent-next never
     # deploys after an unsuccessful session-ingest deployment.
     if: >-
       github.repository == 'Kilo-Org/cloud' &&
-      needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true' &&
+      inputs.deploy_cloud_agent_after_session_ingest == 'true' &&
       needs.deploy-session-ingest.result == 'success'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 75

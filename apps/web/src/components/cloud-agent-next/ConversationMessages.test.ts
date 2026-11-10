@@ -841,6 +841,17 @@ describe('ConversationMessages', () => {
       {
         isStreaming: true,
         dynamicMessages: [
+          {
+            info: {
+              id: 'user-2',
+              role: 'user',
+              sessionID: 'ses-1',
+              time: { created: 4 },
+              agent: 'code',
+              model: { providerID: 'test', modelID: 'test' },
+            },
+            parts: [],
+          },
           assistantMessage(
             'assistant-3',
             [reasoningPart('active-reasoning', { time: { start: 5 } })],
@@ -856,7 +867,8 @@ describe('ConversationMessages', () => {
       expect.stringContaining('Thinking'),
     ]);
     expect(html.match(/data-message-role="assistant"/g)).toHaveLength(2);
-    expect(html.match(/<time\b/g)).toHaveLength(1);
+    // The completed answer's timestamp and the later prompt's timestamp.
+    expect(html.match(/<time\b/g)).toHaveLength(2);
     expect(html.indexOf('Message timestamp')).toBeGreaterThan(
       html.indexOf('The previous turn is complete.')
     );
@@ -1655,6 +1667,15 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).toContain('Thought');
     expect(container.textContent).toContain('pnpm test -- bash-1');
     expect(container.textContent).not.toContain('Output for');
+    const groupContentId = group?.getAttribute('aria-controls');
+    const groupContent = groupContentId ? document.getElementById(groupContentId) : null;
+    expect(groupContent).not.toBeNull();
+    expect(groupContent?.getAttribute('role')).toBe('region');
+    expect(groupContent?.getAttribute('aria-label')).toContain('1 tool call');
+    expect(groupContent?.getAttribute('tabindex')).toBe('0');
+    expect(groupContent?.classList.contains('max-h-[min(24rem,50vh)]')).toBe(true);
+    expect(groupContent?.classList.contains('overflow-y-auto')).toBe(true);
+    expect(groupContent?.classList.contains('overscroll-y-contain')).toBe(true);
 
     renderConversationMessages({
       ...props,
@@ -1677,6 +1698,8 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).toContain('pnpm test -- bash-2');
     expect(group?.textContent).toContain('bash: pnpm test -- bash-2');
     expect(group?.getAttribute('aria-expanded')).toBe('true');
+    expect(groupContent?.getAttribute('aria-label')).toContain('2 tool calls');
+    expect(groupContent?.querySelectorAll('[data-tool-card]')).toHaveLength(3);
 
     renderConversationMessages({ ...props, isStreaming: false });
     expect(group?.textContent).not.toContain('bash:');

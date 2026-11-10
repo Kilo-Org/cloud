@@ -8,7 +8,7 @@ import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { clearOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
-import { deletePersonalClaudeProfile } from '@/lib/claude-billing/delete';
+import { deleteUserClaudeProfiles } from '@/lib/claude-billing/delete';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import { lockGitHubIdentityWrites } from '@kilocode/db/github-identity';
@@ -115,6 +115,7 @@ import {
   github_connection_attempts,
   github_app_installations,
   provider_oauth_attempts,
+  pending_auth_links,
   model_eval_ingestions,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -141,13 +142,16 @@ import {
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import {
+  AUTH_PROVIDER_DISPLAY_NAMES,
   hosted_domain_specials,
   knownSignupStepUpMethods,
   type AuthErrorType,
   type SignupStepUpMethod,
 } from '@kilocode/web-shared/lib/auth/constants';
+import { sendNewSignInMethodEmail } from '@kilocode/web-shared/lib/email';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
+import { runAfterResponse } from '@/lib/after-response';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
@@ -276,10 +280,19 @@ export type CreateOrUpdateUserOptions = {
    * set it on any path a user can reach.
    */
   skipSignupAdmission?: boolean;
+  /**
+   * Resolves whether the sign-in credential proved ownership of its email.
+   * Called only when the sign-in email already belongs to an account, so a
+   * proof that costs a provider request is not spent on ordinary sign-ins.
+   */
+  resolveEmailProof?: () => Promise<boolean>;
 };
 
-/** A user settlement error other than a signup step-up, which carries its methods. */
-type UserSettlementError = Exclude<AuthErrorType, 'SIGNUP-STEP-UP'>;
+/**
+ * A user settlement error other than a signup step-up or a DIFFERENT-OAUTH
+ * refusal; those two carry extra fields in their own result types.
+ */
+type UserSettlementError = Exclude<AuthErrorType, 'SIGNUP-STEP-UP' | 'DIFFERENT-OAUTH'>;
 
 /** Bouncer admits this signup only with a stronger sign-in method; nothing was created. */
 export type SignupStepUpFailure = {
@@ -289,12 +302,22 @@ export type SignupStepUpFailure = {
   methods: SignupStepUpMethod[];
 };
 
+/** The sign-in email belongs to an existing account the credential did not settle. */
+export type DifferentOAuthFailure = {
+  success: false;
+  error: 'DIFFERENT-OAUTH';
+  targetUserId: string;
+  accountHasVerifiedPrimaryAddress: boolean;
+  providerAlreadyPresent: boolean;
+};
+
 export type CreateOrUpdateUserResult =
   | Result<
       { user: User; isNew: boolean; deferredSignInEvent?: DeferredSignInEvent },
       UserSettlementError
     >
-  | SignupStepUpFailure;
+  | SignupStepUpFailure
+  | DifferentOAuthFailure;
 
 export type CreateOrUpdateUserTrackingContext = {
   affiliateTouch?: ParsedImpactAffiliateTouch | null;
@@ -550,6 +573,14 @@ function hasVerifiedPrimaryAddress(
   );
 }
 
+/** The D3 rule: an account with no provider rows also counts as verified. */
+export async function accountHasVerifiedPrimaryAddress(userId: string): Promise<boolean> {
+  const user = await findUserById(userId);
+  if (!user) return false;
+  const providers = await getUserAuthProviders(userId);
+  return providers.length === 0 || hasVerifiedPrimaryAddress(user.google_user_email, providers);
+}
+
 export async function createOrUpdateUser(
   args: CreateOrUpdateUserArgs,
   turnstile_guid: UUID | undefined,
@@ -625,11 +656,19 @@ export async function createOrUpdateUser(
     const accountHasVerifiedPrimaryAddress =
       existingProviders.length === 0 ||
       hasVerifiedPrimaryAddress(userByEmail.google_user_email, existingProviders);
-    const workosSettles = args.provider === 'workos' && autoLinkToExistingUser;
+    // A lazy proof is resolved only when it can change the outcome: a different
+    // provider type on an account that verified its address. Otherwise the
+    // sign-in is refused or resolved for reasons the proof cannot affect, and
+    // asking a provider for it would only cost a request.
+    const proofDecides = !hasThisProvider && accountHasVerifiedPrimaryAddress && !onlyHasFakeLogin;
+    const provesEmailOwnership =
+      autoLinkToExistingUser ||
+      (proofDecides && options.resolveEmailProof ? await options.resolveEmailProof() : false);
+    const workosSettles = args.provider === 'workos' && provesEmailOwnership;
     const shouldLink =
       workosSettles ||
       (!hasThisProvider &&
-        (onlyHasFakeLogin || (autoLinkToExistingUser && accountHasVerifiedPrimaryAddress)));
+        (onlyHasFakeLogin || (provesEmailOwnership && accountHasVerifiedPrimaryAddress)));
 
     if (shouldLink) {
       let linkedUser = userByEmail;
@@ -740,7 +779,13 @@ export async function createOrUpdateUser(
           },
         });
       }
-      return failureResult('DIFFERENT-OAUTH');
+      return {
+        success: false,
+        error: 'DIFFERENT-OAUTH',
+        targetUserId: userByEmail.id,
+        accountHasVerifiedPrimaryAddress,
+        providerAlreadyPresent: hasThisProvider,
+      } satisfies DifferentOAuthFailure;
     }
   }
 
@@ -983,6 +1028,13 @@ export async function linkAccountToExistingUser(
     return failureResult('SYSTEM_ERROR');
   }
 
+  const providersBeforeLink = await getUserAuthProviders(existingKiloUserId);
+  const isNoOpRelink = providersBeforeLink.some(
+    p =>
+      p.provider === authProviderData.provider &&
+      p.provider_account_id === authProviderData.provider_account_id
+  );
+
   // Link the new auth provider to the existing user
   const linkResult = await linkAuthProviderToUser({
     kilo_user_id: existingKiloUserId,
@@ -1020,6 +1072,32 @@ export async function linkAccountToExistingUser(
     authProviderData.provider_account_id,
     existingKiloUserId
   );
+
+  if (!isNoOpRelink && authProviderData.provider !== 'fake-login') {
+    // Sent after the response: the notice must never delay or fail the sign-in.
+    await runAfterResponse(async () => {
+      try {
+        const notice = await sendNewSignInMethodEmail(
+          existingUser.google_user_email,
+          AUTH_PROVIDER_DISPLAY_NAMES[authProviderData.provider],
+          {
+            email: authProviderData.google_user_email,
+            displayName: authProviderData.display_name ?? null,
+          }
+        );
+        if (!notice.sent) {
+          console.warn('[auth] New sign-in method notice was not sent', {
+            provider: authProviderData.provider,
+            reason: notice.reason,
+          });
+        }
+      } catch {
+        console.warn('[auth] New sign-in method notice failed', {
+          provider: authProviderData.provider,
+        });
+      }
+    });
+  }
 
   // Log the account linking event
   posthogClient.capture({
@@ -1165,7 +1243,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   the person's own openai_chatgpt_connections rows, their personal
- *   claude_billing_connections row, agent_configs, webhook_events,
+ *   claude_billing_connections rows, agent_configs, webhook_events,
  *   code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles, cloud_agent_environments,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
@@ -1318,6 +1396,7 @@ export async function anonymizeCloudUserData(
 
   // ── 2. Hard-delete PII tables ────────────────────────────────────────
   await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
+  await tx.delete(pending_auth_links).where(eq(pending_auth_links.kilo_user_id, userId));
   await tx.execute(sql`
     INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id, available_at)
     SELECT COALESCE(r2_object_key, 'exports/' || id::text || '/kilo-data-export.jsonl.gz'),
@@ -1658,7 +1737,8 @@ export async function anonymizeCloudUserData(
       )
     );
   // Organization rows belong to the organization; `created_by` is an audit
-  // reference like the shared-services ChatGPT row's.
+  // reference like the shared-services ChatGPT row's. This removes the person's
+  // personal connection and their own connections in each organization.
   await tx
     .delete(claude_billing_connections)
     .where(eq(claude_billing_connections.kilo_user_id, userId));
@@ -2151,7 +2231,7 @@ export async function softDeleteUser(userId: string) {
   if (!user) return;
 
   await assertUserCanBeSoftDeleted(userId);
-  await deletePersonalClaudeProfile(userId);
+  await deleteUserClaudeProfiles(userId);
 
   let cursor: UsagePromptPrefixCursor | null = null;
   while (true) {

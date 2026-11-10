@@ -16,17 +16,18 @@ import {
   PREVIEW_PORT_MAX,
   PREVIEW_PORT_MIN,
 } from '../../../../../services/cloud-agent-next/src/shared/preview-port';
+import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import { useOpenPreview, usePreviewServices } from './use-preview';
 
 export function PreviewPortDialog({
   open,
   onOpenChange,
-  cloudAgentSessionId,
+  target,
   organizationId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cloudAgentSessionId: `workspace_${string}`;
+  target: PreviewTarget;
   organizationId?: string;
 }) {
   const { openPreview, isOpening } = useOpenPreview(organizationId);
@@ -45,13 +46,14 @@ export function PreviewPortDialog({
             Discover services running in this sandbox. Open a web server in a new tab.
           </DialogDescription>
         </DialogHeader>
+        {/* DialogContent unmounts on close, so each open and each target starts fresh. */}
         <PreviewServices
-          key={cloudAgentSessionId}
-          cloudAgentSessionId={cloudAgentSessionId}
+          key={target.worktreeId ?? target.cloudAgentSessionId}
+          target={target}
           organizationId={organizationId}
           isOpening={isOpening}
           onOpenPort={async port => {
-            if (await openPreview(cloudAgentSessionId, port)) onOpenChange(false);
+            if (await openPreview(target, port)) onOpenChange(false);
           }}
         />
       </DialogContent>
@@ -60,17 +62,17 @@ export function PreviewPortDialog({
 }
 
 function PreviewServices({
-  cloudAgentSessionId,
+  target,
   organizationId,
   isOpening,
   onOpenPort,
 }: {
-  cloudAgentSessionId: `workspace_${string}`;
+  target: PreviewTarget;
   organizationId?: string;
   isOpening: boolean;
   onOpenPort: (port: number) => Promise<void>;
 }) {
-  const query = usePreviewServices(cloudAgentSessionId, organizationId);
+  const query = usePreviewServices(target, organizationId);
   const [openingPort, setOpeningPort] = useState<number | null>(null);
   const data = query.data;
   const openPort = async (port: number) => {

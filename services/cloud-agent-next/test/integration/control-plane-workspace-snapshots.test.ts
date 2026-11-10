@@ -125,8 +125,7 @@ async function setup(
   await runInDurableObject(sandbox, async instance => {
     await instance.getAllocationState();
     installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
-      WORKSPACE_SNAPSHOT_USER_IDS: options.enabled === false ? '' : USER,
-      WORKSPACE_SNAPSHOT_ORG_IDS: '',
+      WORKSPACE_SNAPSHOT_IDS: options.enabled === false ? '' : USER,
       RUNTIME_STARTUP_MODE: 'preinstalled',
       NATIVE_RUNTIME_IMAGE: 'all-in-one',
       RUNTIME_RELEASE_DESCRIPTOR: '',
@@ -226,6 +225,18 @@ async function setup(
       sandbox,
       instance => readWorkspaceSnapshot(instance['db'], workspaceId) ?? undefined
     );
+  }
+  async function expectRestoreFailure(retry = false) {
+    const descriptor = await snapshot();
+    if (descriptor === undefined) throw new Error('Missing checkpoint');
+    const retryDetail = retry ? ' Send a message to retry.' : '';
+    const detail = `Could not restore the workspace snapshot.${retryDetail} Start fresh discards changes since ${new Date(descriptor.capturedAt).toISOString()}.`;
+    await waitFor(async () => {
+      const attempts = await session.getPreparationAttempts();
+      expect(attempts.flatMap(attempt => attempt.steps.map(step => step.latestDetail))).toContain(
+        detail
+      );
+    });
   }
   const alarm = async (settle = true) => {
     await runInDurableObject(sandbox, instance => instance.alarm());
@@ -341,6 +352,7 @@ async function setup(
     start,
     idle,
     snapshot,
+    expectRestoreFailure,
     cold,
     checkpoint,
     registerSibling,
@@ -888,6 +900,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(1);
+    await test.expectRestoreFailure(true);
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     expect(fields.mock.calls.map(call => call[0])).toContainEqual(
       expect.objectContaining({
@@ -902,9 +915,8 @@ describe('idle workspace disk checkpoint', () => {
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
-  it('fails a tail start when the private snapshot uses a different image, without an environment fallback', async () => {
+  it('restores a tail captured from an earlier base image with the current image identity', async () => {
     const test = await setup();
-    const fields = vi.spyOn(logger, 'withFields');
     await test.checkpoint();
     await test.cold();
     await runInDurableObject(test.sandbox, instance => {
@@ -915,21 +927,13 @@ describe('idle workspace disk checkpoint', () => {
         .run();
     });
     await test.session.send(prompt('m2'));
-    await waitFor(async () => {
-      const route = await runInDurableObject(test.sandbox, instance =>
-        readRoute(instance['db'], test.sessionId)
-      );
-      expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    const { wrapper } = await test.connect(1);
+    expect(test.launchOptions[1]?.snapshot).toEqual({
+      snapshotId: 'session-snapshot',
+      baseImage: 'image:1',
     });
-    expect(test.launchEnvs).toHaveLength(1);
-    expect(test.launchOptions[1]).toBeUndefined();
-    expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
-    expect(fields.mock.calls.map(call => call[0])).toContainEqual(
-      expect.objectContaining({
-        diagnosticEvent: 'workspace_snapshot_launch',
-        reason: 'image_mismatch',
-      })
-    );
+    wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
+    await test.messageState('m2', 'accepted');
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
@@ -937,7 +941,7 @@ describe('idle workspace disk checkpoint', () => {
     const test = await setup();
     const wrapper = await test.checkpoint();
     await runInDurableObject(test.sandbox, instance => {
-      instance['env'].WORKSPACE_SNAPSHOT_USER_IDS = '';
+      instance['env'].WORKSPACE_SNAPSHOT_IDS = '';
     });
     await test.idle(wrapper);
     await test.alarm();
@@ -955,7 +959,7 @@ describe('idle workspace disk checkpoint', () => {
     const sourceAllocationId = (await test.sandbox.getAllocationState()).allocationId;
     await test.cold();
     await runInDurableObject(test.sandbox, instance => {
-      instance['env'].WORKSPACE_SNAPSHOT_USER_IDS = '';
+      instance['env'].WORKSPACE_SNAPSHOT_IDS = '';
     });
     await test.session.send(prompt('m2'));
     const { wrapper } = await test.connect(1);
@@ -973,7 +977,7 @@ describe('idle workspace disk checkpoint', () => {
     await test.messageState('m2', 'completed');
     await test.cold();
     await runInDurableObject(test.sandbox, instance => {
-      instance['env'].WORKSPACE_SNAPSHOT_USER_IDS = USER;
+      instance['env'].WORKSPACE_SNAPSHOT_IDS = USER;
     });
     await test.session.send(prompt('m3'));
     const resumed = await test.connect(2);
@@ -1300,6 +1304,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(1);
+    await test.expectRestoreFailure();
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     expect(fields.mock.calls.map(call => call[0])).toContainEqual(
       expect.objectContaining({
@@ -1413,6 +1418,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(3);
+    await test.expectRestoreFailure(true);
     for (const options of test.launchOptions.slice(1)) {
       expect(options?.snapshot?.snapshotId).toBe('session-snapshot');
     }
@@ -1476,6 +1482,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(2);
+    await test.expectRestoreFailure();
     expect(test.launchOptions[1]?.snapshot?.snapshotId).toBe('session-snapshot');
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     test.wrappers.forEach(wrapper => wrapper.close());
@@ -1529,6 +1536,7 @@ describe('idle workspace disk checkpoint', () => {
       })
     );
     // No image relaunch and no descriptor deletion.
+    await test.expectRestoreFailure();
     expect(test.launchEnvs).toHaveLength(2);
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     expect(await test.sandbox.getWorkspaceSnapshotRecovery({ sessionId: test.sessionId })).toEqual({

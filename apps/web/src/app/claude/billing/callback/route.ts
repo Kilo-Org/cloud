@@ -4,20 +4,29 @@ import type { NextRequest } from 'next/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys } from '@kilocode/db/schema';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { claude_billing_connections } from '@kilocode/db/schema';
-import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import {
+  claudeBillingOwnerWhere,
+  type ClaudeBillingOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { consumeClaudeBillingPending } from '@/lib/claude-billing/pending';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import {
   ClaudeBillingExchangeError,
   exchangeClaudeBillingCode,
 } from '@/lib/claude-billing/protocol';
-import { CLAUDE_BILLING_CALLBACK_PATH } from '@/lib/claude-billing/constants';
-import { canManageClaudeBillingOrganization } from '@/lib/claude-billing/access';
+import {
+  CLAUDE_BILLING_CALLBACK_PATH,
+  claudeBillingOutcomeParam,
+} from '@/lib/claude-billing/constants';
+import {
+  canManageClaudeBillingOrganization,
+  isClaudeBillingOrganizationMember,
+} from '@/lib/claude-billing/access';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 /**
@@ -26,9 +35,13 @@ import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/clau
  * into another session.
  */
 
-function outcomeRedirect(returnPath: string, outcome: string): NextResponse {
+function outcomeRedirect(
+  returnPath: string,
+  owner: Pick<ClaudeBillingOwner, 'kind'>,
+  outcome: string
+): NextResponse {
   const url = new URL(returnPath, APP_URL);
-  url.searchParams.set('claude_billing', outcome);
+  url.searchParams.set(claudeBillingOutcomeParam(owner), outcome);
   return NextResponse.redirect(url);
 }
 
@@ -39,34 +52,46 @@ function errorOutcome(error: string): string {
   return 'failed';
 }
 
+/** The person may still complete the connection they started. */
+async function mayComplete(owner: ClaudeBillingOwner, userId: string): Promise<boolean> {
+  if (owner.kind === 'personal') return owner.kiloUserId === userId;
+  if (owner.kind === 'shared_services') {
+    return await canManageClaudeBillingOrganization(userId, owner.organizationId);
+  }
+  return (
+    owner.kiloUserId === userId &&
+    (await isClaudeBillingOrganizationMember(userId, owner.organizationId))
+  );
+}
+
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const pending = await consumeClaudeBillingPending();
   const session = await getUserFromSession();
 
   if (!pending || !session || pending.kiloUserId !== session.id) {
-    return outcomeRedirect('/byok', 'failed');
+    return outcomeRedirect('/byok', { kind: 'personal' }, 'failed');
   }
+  const { owner } = pending;
   const returnPath = validateReturnPath(pending.returnPath) ?? '/byok';
 
   // auth.claude.com returns the state with every outcome, including a refusal.
-  if (params.get('state') !== pending.state) return outcomeRedirect(returnPath, 'failed');
+  if (params.get('state') !== pending.state) {
+    return outcomeRedirect(returnPath, owner, 'failed');
+  }
   const user = await findUserById(session.id);
   if (!(await isClaudePlatformOAuthEnabled(user?.google_user_email))) {
-    return outcomeRedirect(returnPath, 'forbidden');
+    return outcomeRedirect(returnPath, owner, 'forbidden');
   }
-  // Membership can change while the person is on Claude's approval page.
-  if (
-    pending.owner !== 'personal' &&
-    !(await canManageClaudeBillingOrganization(session.id, pending.owner))
-  ) {
-    return outcomeRedirect(returnPath, 'forbidden');
+  // Membership and role can change while the person is on Claude's approval page.
+  if (!(await mayComplete(owner, session.id))) {
+    return outcomeRedirect(returnPath, owner, 'forbidden');
   }
   const error = params.get('error');
-  if (error) return outcomeRedirect(returnPath, errorOutcome(error));
+  if (error) return outcomeRedirect(returnPath, owner, errorOutcome(error));
 
   const code = params.get('code');
-  if (!code) return outcomeRedirect(returnPath, 'failed');
+  if (!code) return outcomeRedirect(returnPath, owner, 'failed');
 
   let connectionId: string;
   try {
@@ -78,13 +103,8 @@ export async function GET(request: NextRequest) {
   } catch (exchangeError) {
     const oauthError =
       exchangeError instanceof ClaudeBillingExchangeError ? exchangeError.oauthError : null;
-    return outcomeRedirect(returnPath, oauthError ? errorOutcome(oauthError) : 'failed');
+    return outcomeRedirect(returnPath, owner, oauthError ? errorOutcome(oauthError) : 'failed');
   }
-
-  const owner: ClaudeBillingOwner =
-    pending.owner === 'personal'
-      ? { kind: 'personal', kiloUserId: session.id }
-      : { kind: 'organization', organizationId: pending.owner };
 
   try {
     await db.transaction(async tx => {
@@ -96,34 +116,37 @@ export async function GET(request: NextRequest) {
           connected_at: new Date().toISOString(),
           last_refusal_code: null,
           last_refusal_at: null,
+          // The person who linked it last; a shared-services link is gated on them.
+          created_by: session.id,
         })
         .where(
           and(
             eq(claude_billing_connections.user_profile_id, pending.userProfileId),
             eq(claude_billing_connections.updated_at, pending.connectionVersion),
-            owner.kind === 'personal'
-              ? eq(claude_billing_connections.kilo_user_id, owner.kiloUserId)
-              : eq(claude_billing_connections.organization_id, owner.organizationId)
+            claudeBillingOwnerWhere(owner)
           )
         )
         .returning({ id: claude_billing_connections.id });
       if (saved.length !== 1) throw new Error('Claude connection disappeared during approval');
-      // The connection replaces a stored Anthropic API key: the customer no
-      // longer shares one, and Kilo never uses a dormant key it did not need.
-      await tx
-        .delete(byok_api_keys)
-        .where(
-          and(
-            eq(byok_api_keys.provider_id, 'anthropic'),
-            owner.kind === 'organization'
-              ? eq(byok_api_keys.organization_id, owner.organizationId)
-              : eq(byok_api_keys.kilo_user_id, owner.kiloUserId)
-          )
-        );
+      // A personal link replaces the person's stored Anthropic API key: they no
+      // longer share one, and Kilo never uses a dormant key it did not need. An
+      // organization key stays, because it still serves that organization's
+      // other requests.
+      if (owner.kind === 'personal') {
+        await tx
+          .delete(byok_api_keys)
+          .where(
+            and(
+              eq(byok_api_keys.provider_id, 'anthropic'),
+              eq(byok_api_keys.kilo_user_id, owner.kiloUserId),
+              isNull(byok_api_keys.organization_id)
+            )
+          );
+      }
     });
   } catch {
-    return outcomeRedirect(returnPath, 'failed');
+    return outcomeRedirect(returnPath, owner, 'failed');
   }
 
-  return outcomeRedirect(returnPath, 'connected');
+  return outcomeRedirect(returnPath, owner, 'connected');
 }

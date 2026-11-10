@@ -173,6 +173,7 @@ import {
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { testByokEnvelope } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
 import {
   insertTestUser,
@@ -1964,6 +1965,122 @@ describe('User', () => {
       expect(result.isNew).toBe(false);
     });
 
+    it('links through a lazy email proof only when the address collides', async () => {
+      const existing = await insertTestUserAndGoogleAuth({
+        google_user_email: 'lazy-proof@example.com',
+        google_user_name: 'Lazy Proof',
+        hosted_domain: 'example.com',
+      });
+      const args = {
+        google_user_email: 'lazy-proof@example.com',
+        google_user_name: 'octo',
+        google_user_image_url: '',
+        hosted_domain: hosted_domain_specials.github,
+        provider: 'github' as const,
+        provider_account_id: 'github-lazy-proof',
+        display_name: 'octo',
+      };
+
+      const refused = await createOrUpdateUser(
+        args,
+        undefined,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        undefined,
+        {
+          resolveEmailProof: async () => false,
+        }
+      );
+      expect(refused).toMatchObject({ success: false, error: 'DIFFERENT-OAUTH' });
+
+      const linked = await createOrUpdateUser(
+        args,
+        undefined,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        undefined,
+        {
+          resolveEmailProof: async () => true,
+        }
+      );
+      expect(linked.success).toBe(true);
+      if (!linked.success) return;
+      expect(linked.user.id).toBe(existing.id);
+    });
+
+    it('does not ask for an email proof when the account already has that provider type', async () => {
+      const existing = await insertTestUserAndGoogleAuth({
+        google_user_email: 'lazy-proof-same-provider@example.com',
+        google_user_name: 'Same Provider',
+        hosted_domain: 'example.com',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'github',
+        provider_account_id: 'github-same-provider-existing',
+        email: 'lazy-proof-same-provider@example.com',
+        avatar_url: '',
+        hosted_domain: null,
+      });
+      const resolveEmailProof = jest.fn(async () => true);
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'lazy-proof-same-provider@example.com',
+          google_user_name: 'octo',
+          google_user_image_url: '',
+          hosted_domain: hosted_domain_specials.github,
+          provider: 'github',
+          provider_account_id: 'github-same-provider-other',
+          display_name: 'octo',
+        },
+        undefined,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        undefined,
+        { resolveEmailProof }
+      );
+
+      expect(result).toMatchObject({ success: false, error: 'DIFFERENT-OAUTH' });
+      expect(resolveEmailProof).not.toHaveBeenCalled();
+    });
+
+    it('does not ask for an email proof when no account holds the address', async () => {
+      const resolveEmailProof = jest.fn(async () => false);
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'lazy-proof-new@example.com',
+          google_user_name: 'octo',
+          google_user_image_url: '',
+          hosted_domain: hosted_domain_specials.github,
+          provider: 'github',
+          provider_account_id: 'github-lazy-proof-new',
+          display_name: 'octo',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.91' }),
+        undefined,
+        undefined,
+        false,
+        undefined,
+        { resolveEmailProof }
+      );
+
+      expect(result.success).toBe(true);
+      expect(resolveEmailProof).not.toHaveBeenCalled();
+    });
+
     it('links a magic-link sign-in to an existing user with a google provider', async () => {
       const existing = await insertTestUserAndGoogleAuth({
         google_user_email: 'link-email@example.com',
@@ -2065,6 +2182,11 @@ describe('User', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(result).toMatchObject({
+        targetUserId: existing.id,
+        accountHasVerifiedPrimaryAddress: true,
+        providerAlreadyPresent: false,
+      });
 
       const providerRows = await db
         .select()
@@ -2096,6 +2218,7 @@ describe('User', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(result).toMatchObject({ providerAlreadyPresent: true });
     });
 
     it('keeps the dev-only upgrade path: any provider links to a user whose only provider is fake-login', async () => {
@@ -2609,7 +2732,7 @@ describe('User', () => {
       ).toHaveLength(0);
     });
 
-    it("removes the deleted user's personal Claude billing connection and keeps the organization's", async () => {
+    it("removes the deleted user's own Claude billing connections and keeps the organization's shared one", async () => {
       const user = await insertTestUser({
         google_user_email: `claude-billing-cleanup-${randomUUID()}@example.com`,
       });
@@ -2621,6 +2744,13 @@ describe('User', () => {
       await db.insert(claude_billing_connections).values([
         { kilo_user_id: user.id, user_profile_id: `uprof_${randomUUID()}`, created_by: user.id },
         {
+          kilo_user_id: user.id,
+          organization_id: organization.id,
+          user_profile_id: `uprof_${randomUUID()}`,
+          created_by: user.id,
+        },
+        {
+          kilo_user_id: null,
           organization_id: organization.id,
           user_profile_id: `uprof_${randomUUID()}`,
           created_by: user.id,
@@ -2635,12 +2765,12 @@ describe('User', () => {
           .from(claude_billing_connections)
           .where(eq(claude_billing_connections.kilo_user_id, user.id))
       ).toHaveLength(0);
-      expect(
-        await db
-          .select()
-          .from(claude_billing_connections)
-          .where(eq(claude_billing_connections.organization_id, organization.id))
-      ).toHaveLength(1);
+      const organizationRows = await db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.organization_id, organization.id));
+      expect(organizationRows).toHaveLength(1);
+      expect(organizationRows[0]?.kilo_user_id).toBeNull();
     });
 
     it("keeps the organization's shared-services row when the connector is deleted", async () => {
@@ -7715,7 +7845,7 @@ describe('User', () => {
         .values({
           kilo_user_id: user.id,
           provider_id: 'minimax',
-          encrypted_api_key: encrypted,
+          encrypted_api_key_envelope: testByokEnvelope('test-key-for-gdpr'),
           management_source: 'coding_plan',
           created_by: user.id,
         })

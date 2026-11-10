@@ -918,7 +918,7 @@ describe('environment snapshot resolution', () => {
     harness.environment.revision = 1;
   });
 
-  it('uses a previous-image snapshot inside the rollout window and admits its replacement', async () => {
+  it('uses an earlier-image snapshot and admits its replacement', async () => {
     const harness = await setup();
     const { auth } = await readyBuild(harness);
     await harness.stub.runnerResult(auth, {

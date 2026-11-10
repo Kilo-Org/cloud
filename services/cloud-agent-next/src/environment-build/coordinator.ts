@@ -1326,7 +1326,7 @@ function summarizeSnapshot(
   current: SnapshotCompatibility
 ) {
   const stale =
-    snapshotImageCompatibility(published, current, now) !== 'current'
+    snapshotImageCompatibility(published, current) !== 'current'
       ? ('image' as const)
       : published.revision < currentRevision
         ? ('revision' as const)

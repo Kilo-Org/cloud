@@ -555,17 +555,17 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   build; `environmentId` and `buildId` are logged with `snapshot_start_blocked`. The web client
   offers "View environment build", which opens the session environment's build panel, when the
   latest attempt failed at the `environment_snapshot` step. The start never falls back to the image.
-- **Image rollout.** A published snapshot from the previous base image stays usable for 24 hours
-  after its capture, while compatibility with the current image and an automatic replacement build
-  are still unresolved. The runtime ABI must match. After 24 hours the snapshot is incompatible,
-  so an environment with build commands blocks until its replacement publishes. The coordinator
-  reads the current image from the builder's container DO.
-- **Start.** `launch` receives `snapshot: { snapshotId, baseImage }`. During the rollout window a
-  previous-image snapshot is restored and the provider receives the current image identity, because
-  a container snapshot restore does not use the old image and startup installs the current runtime
-  over the disk. `launch` returns `startSource` (`repository` or `image`). The progress detail names
-  the snapshot capture date and time in UTC, the changed environment settings, the rollout window
-  and the real admission outcome.
+- **Image rollout.** A published snapshot from an earlier base image stays usable until its
+  eligible lifetime ends. It is stale and admits an automatic replacement build. The runtime ABI
+  must match; a snapshot for another ABI is incompatible, so an environment with build commands
+  blocks until its replacement publishes. The coordinator reads the current image from the
+  builder's container DO.
+- **Start.** `launch` receives `snapshot: { snapshotId, baseImage }`. An earlier-image snapshot is
+  restored and the provider receives the current image identity, because a container snapshot
+  restore does not use the old image and startup installs the current runtime over the disk.
+  `launch` returns `startSource` (`repository` or `image`). The progress detail names the snapshot
+  capture date and time in UTC, the changed environment settings, an earlier base image and the
+  real admission outcome.
 - **No fallback.** A failed snapshot start stops that container and retries the same snapshot once
   within the original deadline. A permanent reason (expired, missing, image mismatch, provenance, or a
   provider that started the image instead) fails at once. The route then fails with "Rebuild
@@ -653,9 +653,10 @@ keep environment snapshots and existing history/worktree recovery.
   snapshot. Current credential grants and native request authorization exclude deleted members
   after restore.
 - **Cold startup.** When a descriptor exists, the workspace tail is the only startup source.
-  Selection validates ownership, enrollment, provider, startup mode, image class, the 30-day
-  lifetime and the exact base image; the current image lookup is retried within the deadline. A
-  descriptor that cannot start (malformed, ownership or runtime mismatch, expired, image mismatch,
+  Selection validates ownership, enrollment, provider, startup mode, image class and the 30-day
+  lifetime. A later base image does not block a tail: the restore uses the captured disk, and the
+  provider receives the current image identity, which is looked up with retries within the
+  deadline. A descriptor that cannot start (malformed, ownership or runtime mismatch, expired,
   provider unsupported, a permanent or repeated provider failure, or a wrapper failure in the
   restore step) fails the route as `workspace_snapshot_start_failed` with a specific detail that
   names the capture time; a possibly transient failure (image lookup, repeated provider error) also

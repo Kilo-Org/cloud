@@ -28,7 +28,7 @@ beforeAll(async () => {
     throw new Error('Worktree registration tests require a local PostgreSQL database');
   }
   client = createDrizzleClient({ connectionString, poolConfig: { max: 1 }, ssl: false });
-  // Include the primary key so ON CONFLICT exercises the real insert-only boundary.
+  // Include the primary key so retries exercise the real conflict boundary.
   await client.db.execute(sql`
     CREATE TEMP TABLE cloud_agent_worktrees (
       LIKE public.cloud_agent_worktrees INCLUDING DEFAULTS INCLUDING INDEXES
@@ -102,7 +102,7 @@ describe('registerCloudAgentWorktree checkout', () => {
   });
 
   it.each([{}, { gitUrl }, { gitBranch: 'kilo/first' }])(
-    'requires both repository and branch on the initial registration: %j',
+    'fills an unregistered checkout when a later registration supplies both fields: %j',
     async checkout => {
       await registerCloudAgentWorktree(client.db, { ...params, ...checkout });
       expect(await readWorktree()).toMatchObject({ git_url: null, git_branch: null });
@@ -112,11 +112,29 @@ describe('registerCloudAgentWorktree checkout', () => {
         gitUrl,
         gitBranch: 'kilo/later',
       });
-      expect(await readWorktree()).toMatchObject({ git_url: null, git_branch: null });
+      expect(await readWorktree()).toMatchObject({ git_url: gitUrl, git_branch: 'kilo/later' });
     }
   );
 
-  it('does not record the base branch as the workspace branch', async () => {
+  it.each([
+    { git_url: gitUrl, git_branch: null },
+    { git_url: null, git_branch: 'kilo/existing' },
+  ])('does not overwrite a partially recorded checkout: %j', async checkout => {
+    await client.db.insert(cloud_agent_worktrees).values({
+      worktree_id: worktreeId,
+      kilo_user_id: params.kiloUserId,
+      ...checkout,
+    });
+    await registerCloudAgentWorktree(client.db, {
+      ...params,
+      gitUrl: 'https://github.com/acme/other',
+      gitBranch: 'kilo/later',
+    });
+    expect(await readWorktree()).toMatchObject(checkout);
+  });
+
+  it.each([false, true])('does not record the base branch (existing=%s)', async existing => {
+    if (existing) await registerCloudAgentWorktree(client.db, { ...params, baseBranch: 'main' });
     await registerCloudAgentWorktree(client.db, {
       ...params,
       gitUrl,

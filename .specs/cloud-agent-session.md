@@ -439,7 +439,9 @@ repository.
    MUST remain stable across registration retries and takeovers; an explicitly
    selected upstream branch MUST take precedence. Registration MUST NOT record
    the base branch as the workspace's working branch or overwrite a previously
-   registered checkout. Legacy CLI checkout reports MAY still update it.
+   registered checkout. A later registration MUST fill the repository and working
+   branch when both stored fields are absent. Legacy CLI checkout reports MAY
+   still update it.
 3. Open workspace tabs — the workspace terminal and file tabs, their order, and
    the active tab — MUST survive refresh and navigation between worktrees, and
    MUST remain scoped to the current user and personal or organization context.

@@ -5,22 +5,29 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { usePathname } from 'expo-router';
-import { CenteredState } from '@/components/centered-state';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { GitHubIcon } from '@/components/icons/github-icon';
-import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
+import { PrReviewGateActionGroup } from '@/components/pr-review/pr-review-gate-action-group';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
+import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item-line';
+import { PrReviewGateLoading } from '@/components/pr-review/pr-review-gate-loading';
 import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-connect-gate';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
+import {
+  PR_REVIEW_GATE_ICON_TILE_CLASS,
+  usePrReviewGateIconColor,
+} from '@/lib/pr-review/pr-review-gate-illustration';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
-import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderPrPlatform, type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 type PrReviewConnectGateProps = {
   readonly children: ReactNode;
@@ -32,6 +39,12 @@ type PrReviewConnectGateProps = {
   readonly platform?: ProviderPrPlatform;
   /** The selected organization for a provider check; null = personal scope. */
   readonly organizationId?: string | null;
+  /**
+   * The PR/MR the route opened, when it names one. The gate prints it above
+   * the account line so the reader can tell which item they are connecting
+   * for; a mount with no known item (the entry route) keeps the generic copy.
+   */
+  readonly prRef?: ProviderPrRef;
 };
 
 /**
@@ -50,6 +63,9 @@ type PrReviewConnectGateProps = {
  *  - happy: connected → render children
  *  - retryable: the status check fails → QueryError + Retry
  *  - empty: not connected → EmptyState CTA into the provider's connect flow
+ *  - reconnect: the connection exists but can no longer be used (GitHub
+ *    revoked, or a personal GitLab row whose credential the token service
+ *    refuses) → re-authorize copy and the same integration-page CTA
  *  - non-retryable: Bitbucket personal → org-only explanation, no CTA
  *
  * The entry screen is provider-neutral — a pasted GitLab or Bitbucket link
@@ -57,14 +73,16 @@ type PrReviewConnectGateProps = {
  * pass-through there; the provider gates protect each detail route.
  *
  * The GitHub CTA calls `githubApps.connectUserAuthorization` and opens the
- * returned URL with the shared auth-session launcher. Cancellation on either platform
- * simply leaves the gate showing — there's nothing to roll back because the
- * auth flow is server-driven.
+ * returned URL with the shared auth-session launcher. Backing out of the sign-in
+ * sheet returns the CTA to idle so the user can retry, on both platforms; there
+ * is nothing to roll back because the auth flow is server-driven, and the status
+ * re-check runs without holding the CTA.
  */
 export function PrReviewConnectGate({
   children,
   platform = 'github',
   organizationId = null,
+  prRef,
 }: PrReviewConnectGateProps) {
   const pathname = usePathname();
   // The entry route (`(app)/pr-review` → pathname `/pr-review`) is the one
@@ -74,19 +92,23 @@ export function PrReviewConnectGate({
     return <>{children}</>;
   }
   if (platform === 'github') {
-    return <GitHubConnectGate>{children}</GitHubConnectGate>;
+    return <GitHubConnectGate prRef={prRef}>{children}</GitHubConnectGate>;
   }
   return (
-    <ProviderConnectGate platform={platform} organizationId={organizationId}>
+    <ProviderConnectGate platform={platform} organizationId={organizationId} prRef={prRef}>
       {children}
     </ProviderConnectGate>
   );
 }
 
-function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
+function GitHubConnectGate({
+  children,
+  prRef,
+}: Readonly<{ children: ReactNode; prRef?: ProviderPrRef }>) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
   const connect = useMutation(
@@ -102,6 +124,9 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   useEffect(() => () => connectAbort.current?.abort(), []);
 
   const handleConnect = async () => {
+    // A retry supersedes the attempt still waiting: abort it first, so its late
+    // report cannot speak for this one.
+    connectAbort.current?.abort();
     const controller = new AbortController();
     connectAbort.current = controller;
     setConnecting(true);
@@ -110,11 +135,22 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
       await launchConnectGateBrowser(result.authorizationUrl, {
         signal: controller.signal,
         onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
-        onReturn: async () => {
-          await authorization.refetch();
-          await queryClient.invalidateQueries({
-            queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
-          });
+        onReturn: () => {
+          // Detached on purpose: the sheet closing is the user's edge, so the
+          // CTA returns to idle as soon as it happens. A status read that stays
+          // pending (the default `networkMode: 'online'` never settles while the
+          // online manager reports offline) must not keep Connect disabled — the
+          // read's own states carry the outcome, and a real failure renders the
+          // retryable QueryError below.
+          void authorization
+            .refetch()
+            .then(() =>
+              queryClient.invalidateQueries({
+                queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
+              })
+            )
+            .catch(() => undefined);
+          return Promise.resolve();
         },
       });
     } catch {
@@ -136,8 +172,14 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
     // settles.
     isLoading: authorization.isPending,
     connected: authorization.data?.connected === true,
-    revoked: authorization.data?.revoked === true,
+    reconnectRequired: authorization.data?.revoked === true,
+    // GitHub has one host and no per-instance connection to mismatch.
+    instanceMismatch: false,
     organizationId: null,
+    // The GitHub connect is the caller's own account authorization, identical
+    // with or without an organization selected, so it never waits on that
+    // selection.
+    organizationSelectionLoaded: true,
   });
 
   if (view === 'error') {
@@ -158,14 +200,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   }
 
   if (view === 'loading') {
-    return (
-      <View className="flex-1 bg-background">
-        <PrReviewGateHeader />
-        <CenteredState>
-          <ActivityIndicator size="small" color={colors.mutedForeground} />
-        </CenteredState>
-      </View>
-    );
+    return <PrReviewGateLoading />;
   }
 
   if (view === 'connect' || view === 'reconnect') {
@@ -175,36 +210,44 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
         <PrReviewGateHeader />
         <EmptyState
           icon={revoked ? ShieldAlert : PlugZap}
+          iconContainerClassName={PR_REVIEW_GATE_ICON_TILE_CLASS}
+          iconColor={iconColor}
           title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
           description={
             <>
-              <PrReviewContextLine />
+              <PrReviewGateItemLine prRef={prRef} />
               <Text variant="muted" className="text-center">
+                {/* The benefit line, not a second "Connect your GitHub account":
+                    the title and the CTA already name the action, and the item
+                    and scope lines above give the context. The reconnect arm's
+                    key states the cause only, for the same reason. */}
                 {revoked
                   ? t('prReview.connect.reconnectDescription')
-                  : t('prReview.connect.description')}
+                  : t('common.prReviewSubtitle')}
               </Text>
             </>
           }
           action={
-            <Button
-              className="mt-3 w-full flex-row gap-2"
-              disabled={connecting}
-              onPress={() => {
-                void handleConnect();
-              }}
-            >
-              <View className="size-4 items-center justify-center">
-                {connecting ? (
-                  <ActivityIndicator size="small" color={colors.primaryForeground} />
-                ) : (
-                  <GitHubIcon size={16} color={colors.primaryForeground} />
-                )}
-              </View>
-              <Text>
-                {revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
-              </Text>
-            </Button>
+            <PrReviewGateActionGroup>
+              <Button
+                className={cn('w-full flex-row gap-2', STATE_ACTION_CLASS)}
+                disabled={connecting}
+                onPress={() => {
+                  void handleConnect();
+                }}
+              >
+                <View className="size-4 items-center justify-center">
+                  {connecting ? (
+                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                  ) : (
+                    <GitHubIcon size={16} color={colors.primaryForeground} />
+                  )}
+                </View>
+                <Text>
+                  {revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
+                </Text>
+              </Button>
+            </PrReviewGateActionGroup>
           }
         />
       </View>

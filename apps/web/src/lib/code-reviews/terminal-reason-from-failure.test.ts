@@ -34,6 +34,15 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     );
   });
 
+  it.each(['base_branch_changed', 'base_branch_missing', 'base_branch_stale'] as const)(
+    'classifies %s as a repository checkout failure',
+    subtype => {
+      expect(terminalReasonFromCloudAgentFailure({ code: 'workspace_setup_failed', subtype })).toBe(
+        'repository_checkout_failed'
+      );
+    }
+  );
+
   it('maps the codes behind the largest uncategorized buckets', () => {
     expect(terminalReasonFromCloudAgentFailure({ code: 'assistant_error' })).toBe(
       'assistant_failed'
@@ -52,6 +61,12 @@ describe('terminalReasonFromCloudAgentFailure', () => {
   it('does not treat container concurrency denial as a wrapper or model provider failure', () => {
     expect(terminalReasonFromCloudAgentFailure({ code: 'container_limit_reached' })).toBe(
       'delivery_failed'
+    );
+  });
+
+  it('does not report a blocked account as insufficient credit', () => {
+    expect(terminalReasonFromCloudAgentFailure({ code: 'account_blocked' })).toBe(
+      'account_blocked'
     );
   });
 

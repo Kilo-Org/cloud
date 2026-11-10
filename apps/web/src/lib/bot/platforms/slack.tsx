@@ -12,8 +12,9 @@ import {
 } from '@/lib/bot/platforms/shared';
 import type { BotPlatform, RequesterInfo } from '@/lib/bot/platforms/types';
 import { BOT_CONTEXT_MESSAGE_LIMIT } from '@/lib/bot/constants';
+import { createSlackAttachmentUrlFetcher } from '@/lib/bot/platforms/slack-attachment-fetcher';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
-import { getAccessTokenFromInstallation } from '@/lib/integrations/slack-service';
+import { getSlackBotToken } from '@/lib/integrations/slack-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getSlackMessagePermalink } from '@/lib/slack-bot/slack-utils';
 import { captureException } from '@sentry/nextjs';
@@ -219,7 +220,7 @@ async function getSlackRequesterInfo(
   platformIntegration: PlatformIntegration,
   displayName: string
 ): Promise<RequesterInfo> {
-  const accessToken = getAccessTokenFromInstallation(platformIntegration);
+  const accessToken = await getSlackBotToken(platformIntegration);
   if (!accessToken) {
     return { displayName, platform: PLATFORM.SLACK };
   }
@@ -294,6 +295,15 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
       return await slackAdapter.withBotToken(installation.botToken, fn, {
         installationId: platformAccountId,
       });
+    },
+    async createAttachmentUrlFetcher({ platformIntegration }) {
+      const platformAccountId = platformIntegration.platform_account_id;
+      if (!platformAccountId) return undefined;
+
+      const installation = await slackAdapter.getInstallation(platformAccountId);
+      if (!installation) return undefined;
+
+      return createSlackAttachmentUrlFetcher(installation.botToken);
     },
     async getConversationContext({ thread, triggerMessage }) {
       return await getSlackConversationContext(thread, triggerMessage);

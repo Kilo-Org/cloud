@@ -391,6 +391,8 @@ export type StoredSession = {
   status: 'active' | 'completed' | 'error';
   createdAt: string;
   updatedAt: string;
+  /** Real user or agent activity; falls back to `createdAt` when absent. */
+  lastActivityAt?: string | null;
   /** @deprecated Always empty - use StoredMessage[] from session loading instead */
   messages: LegacySessionMessage[];
   envVars?: Record<string, string>;
@@ -404,6 +406,8 @@ export type StoredSession = {
   worktreeId?: string | null;
   sessionStatus?: string | null;
   sessionStatusUpdatedAt?: string | null;
+  latestRunFailureKind?: 'failed' | 'system_interrupted' | null;
+  latestRunTerminalAt?: string | null;
   /**
    * Associated GitHub pull request for this session's own verified link, if
    * any.

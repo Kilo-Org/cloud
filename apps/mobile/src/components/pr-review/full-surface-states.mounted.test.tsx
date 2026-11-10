@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite mounts every PR-review body (overview, composer, submit, merge, navigator) with the same query mock, so their shared loading/error states are asserted against one harness. */
 import type * as ReactQuery from '@tanstack/react-query';
 import { createElement } from 'react';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -90,6 +91,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -111,7 +113,10 @@ vi.mock('@/lib/pr-review/pending-review-provider', () => ({
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {},
   useTRPC: () => ({
-    githubPrReview: { getPullRequest: { queryOptions: () => ({}) } },
+    githubPrReview: {
+      getPullRequest: { queryOptions: () => ({}) },
+      listChecks: { queryOptions: () => ({}) },
+    },
     githubApps: { getUserAuthorization: { queryKey: () => [] } },
     // s6: the submit/merge screens build the provider seam's capability and
     // merge-state options even on the GitHub arm (the queries register
@@ -120,6 +125,7 @@ vi.mock('@/lib/trpc', () => ({
       getCapabilities: { queryOptions: () => ({}) },
       getMergeState: { queryOptions: () => ({}) },
       getPullRequest: { queryOptions: () => ({}) },
+      listChecks: { queryOptions: () => ({}) },
     },
   }),
 }));
@@ -173,6 +179,33 @@ describe('PR Overview full-body states', () => {
     }
   );
 
+  it('paints an announced progress body while the read is in flight', async () => {
+    // A first load is the only thing on screen until it settles, and the app
+    // retries twice before the error copy appears. The pending body must be a
+    // visible, announced loading state: an unlabelled, background-coloured
+    // block reads as an empty screen to both users and assistive technology.
+    query.isError = false;
+    query.isLoading = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+    const body = renderer.root.find(
+      node => String(node.type) === 'View' && node.props.accessibilityRole === 'progressbar'
+    );
+    expect(body.props.accessibilityLabel).toBe('Loading…');
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    // The loading body keeps the loaded overview's top edge: one section gap
+    // (17.5 dp) below the tab selector, with the progress band out of flow.
+    const scroller = renderer.root.find(node => String(node.type) === 'ScrollView');
+    expect(scroller.props.contentContainerClassName).toBe('px-4 pt-3');
+    expect(scroller.props.overlayRefreshProgress).toBe(true);
+    unmount();
+  });
+
   it('gives a provider reconnect its own notice and recovery CTA instead of the GitHub empty state', async () => {
     query.error.data.code = 'PRECONDITION_FAILED';
     const scope: ProviderPrScope = {
@@ -199,6 +232,10 @@ describe('PR Overview full-body states', () => {
           String(node.type) === 'Button' && node.props.accessibilityLabel === 'Check connection'
       )
     ).toHaveLength(1);
+    // Same top edge as the loaded and loading bodies.
+    const scroller = renderer.root.find(node => String(node.type) === 'ScrollView');
+    expect(scroller.props.contentContainerClassName).toBe('px-4 pb-4 pt-3');
+    expect(scroller.props.overlayRefreshProgress).toBe(true);
     unmount();
   });
 

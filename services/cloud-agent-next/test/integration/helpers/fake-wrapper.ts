@@ -1,6 +1,13 @@
 import {
+  RUNTIME_HARNESS_HEADER,
+  WORKSPACE_CONFIGURATION_HEADER,
+  WORKSPACE_CONFIGURATION_VERSION,
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
+} from '../../../src/shared/control-plane-runtime-contract.js';
+import {
+  KILO_CLI_VERSION_HEADER,
+  WRAPPER_VERSION_HEADER,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import { SELF } from 'cloudflare:test';
 import {
@@ -14,6 +21,11 @@ export type FakeWrapperConnectInput = {
   credential: string;
   path?: string;
   runtimeContract?: 'legacy' | 'worktree';
+  workspaceConfiguration?: boolean;
+  /** Raw `x-kilo-runtime-harness` value, so a test can also send an unknown one. */
+  runtimeHarness?: string;
+  kiloCliVersion?: string;
+  wrapperVersion?: string;
 };
 
 export type FakeWrapperHelloInput = {
@@ -21,6 +33,12 @@ export type FakeWrapperHelloInput = {
   allocationId: string;
   protocolVersion?: number;
   redactsNamedSecrets?: boolean;
+  installsSkillsSh?: boolean;
+  workspaceSnapshots?: boolean;
+  /** The retired capability sent by wrappers built before workspace snapshots. */
+  sessionSnapshots?: boolean;
+  startCommands?: boolean;
+  worktreeGit?: boolean;
 };
 
 export type FakeNativeEvent = {
@@ -79,6 +97,18 @@ export class FakeWrapper {
         ...(input.runtimeContract === 'legacy'
           ? {}
           : { [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION }),
+        ...(input.workspaceConfiguration
+          ? { [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION }
+          : {}),
+        ...(input.runtimeHarness === undefined
+          ? {}
+          : { [RUNTIME_HARNESS_HEADER]: input.runtimeHarness }),
+        ...(input.kiloCliVersion === undefined
+          ? {}
+          : { [KILO_CLI_VERSION_HEADER]: input.kiloCliVersion }),
+        ...(input.wrapperVersion === undefined
+          ? {}
+          : { [WRAPPER_VERSION_HEADER]: input.wrapperVersion }),
       },
     });
     if (response.status !== 101 || !response.webSocket) {
@@ -161,6 +191,11 @@ export class FakeWrapper {
       allocationId: input.allocationId,
       protocolVersion: input.protocolVersion ?? CONTROL_PLANE_PROTOCOL_VERSION,
       ...(input.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+      ...(input.installsSkillsSh ? { installsSkillsSh: true } : {}),
+      ...(input.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
+      ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
+      ...(input.startCommands ? { startCommands: true } : {}),
+      ...(input.worktreeGit ? { worktreeGit: true } : {}),
     });
     return this.next();
   }

@@ -52,5 +52,23 @@ export const COMMENT_ACTIONS_HIT_SLOP = {
   right: COMPACT_H11_HIT_SLOP_DP,
 } as const;
 
+/**
+ * The empty band the overflow's frame adds above and below its visible circle.
+ * The author row is as tall as that frame, so the views around the row trim
+ * their spacing by this band instead of drawing it as visible padding.
+ */
+const COMMENT_AUTHOR_ROW_SLACK_DP = (COMMENT_ACTIONS_FRAME_DP - COMMENT_ACTIONS_VISUAL_DP) / 2;
+
+/** The gap between a comment's author row, body, and reactions, in dp. */
+export const COMMENT_ROW_GAP_DP = 8.75;
+
+/**
+ * Top padding for a view whose first child is a comment author row, so the
+ * visible space above the row's circle equals `visibleDp`.
+ */
+export function commentAuthorRowTopPadding(visibleDp: number) {
+  return { paddingTop: Math.max(0, visibleDp - COMMENT_AUTHOR_ROW_SLACK_DP) };
+}
+
 /** The trailing group's `gap-3` class, in dp: 0.75rem at NativeWind's 14pt rem. */
 export const COMMENT_TRAILING_CONTROLS_GAP_DP = 10.5;

@@ -574,6 +574,360 @@ describe('UserConnectionDO', () => {
       expect(cliWs.send).not.toHaveBeenCalled();
     });
 
+    it('persists authoritative idle over a question heartbeat before broadcasting and after hibernation', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      const changedAt = '2026-10-22T10:00:02.000Z';
+      const snapshotsAtDelivery: Array<Array<{ id: string; status: string }>> = [];
+      webWs.send.mockImplementation(() => {
+        snapshotsAtDelivery.push(doInstance.getActiveSessions());
+        const restored = new UserConnectionDO(ctx as never, {} as Env);
+        snapshotsAtDelivery.push(restored.getActiveSessions());
+      });
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: changedAt,
+          changedAt,
+        },
+      });
+
+      expect(snapshotsAtDelivery).toMatchObject([
+        [{ id: 's1', status: 'idle' }],
+        [{ id: 's1', status: 'idle' }],
+      ]);
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 's1', status: 'idle' }]);
+      const restored = new UserConnectionDO(ctx as never, {} as Env);
+      expect(restored.getActiveSessions()).toMatchObject([{ id: 's1', status: 'idle' }]);
+      expect(allSent(webWs).at(-1)).toMatchObject({
+        event: 'session.status.updated',
+        data: { sessionId: 's1', status: 'idle' },
+      });
+    });
+
+    it('allows a later undated heartbeat to raise a genuine new question after authoritative idle', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      const changedAt = '2026-10-22T10:00:02.000Z';
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: changedAt,
+          changedAt,
+        },
+      });
+      const restored = new UserConnectionDO(ctx as never, {} as Env);
+
+      sendHeartbeat(restored, cliWs, [makeSession('s1', 'question')]);
+
+      expect(restored.getActiveSessions()).toMatchObject([{ id: 's1', status: 'question' }]);
+      expect(allSent(webWs).at(-1)).toMatchObject({
+        event: 'sessions.heartbeat',
+        data: { sessions: [{ id: 's1', status: 'question' }] },
+      });
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'question' },
+      ]);
+    });
+
+    it('preserves distinct same-millisecond explicit transitions in arrival order after hibernation', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: '2026-10-22T10:00:02.000Z',
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+      webWs.send.mockClear();
+      const restored = new UserConnectionDO(ctx as never, {} as Env);
+
+      const result = await restored.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'busy',
+          status: 'question',
+          statusUpdatedAt: '2026-10-22T10:00:02.000Z',
+          changedAt: '2026-10-22T10:00:04.000Z',
+        },
+      });
+
+      expect(result).toEqual({ delivered: 1 });
+      expect(allSent(webWs)).toMatchObject([
+        { event: 'session.status.updated', data: { sessionId: 's1', status: 'question' } },
+      ]);
+      expect(restored.getActiveSessions()).toMatchObject([{ id: 's1', status: 'question' }]);
+    });
+
+    it('updates full-row child statuses without erasing another live child raise', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [
+        { ...makeSession('root', 'scheduled'), scheduledAt: '2026-10-22T11:00:00.000Z' },
+        makeSession('child-1', 'question', 'First child', 'root'),
+        makeSession('child-2', 'permission', 'Second child', 'root'),
+      ]);
+      for (const [sessionId, changedAt] of [
+        ['child-2', '2026-10-22T10:00:02.000Z'],
+        ['child-1', '2026-10-22T10:00:03.000Z'],
+      ]) {
+        await doInstance.notifySessionEvent({
+          type: 'session.status.updated',
+          data: {
+            source: 'v2',
+            session: {
+              source: 'v2',
+              sessionId,
+              createdAt: '2026-10-22T10:00:00.000Z',
+              updatedAt: changedAt,
+              title: 'Child',
+              createdOnPlatform: 'linux',
+              organizationId: null,
+              gitUrl: null,
+              gitBranch: null,
+              parentSessionId: 'root',
+              status: 'idle',
+              statusUpdatedAt: changedAt,
+            },
+            previousStatus: sessionId === 'child-2' ? 'permission' : 'question',
+            status: 'idle',
+            statusUpdatedAt: changedAt,
+            changedAt,
+          },
+        });
+        const restored = new UserConnectionDO(ctx as never, {} as Env);
+        expect(restored.getActiveSessions()).toMatchObject([
+          { id: 'root', status: sessionId === 'child-2' ? 'question' : 'scheduled' },
+        ]);
+        expect(allSent(webWs).at(-1)).toMatchObject({
+          event: 'session.status.updated',
+          data: {
+            sessionId: 'root',
+            status: sessionId === 'child-2' ? 'question' : 'scheduled',
+            statusUpdatedAt: null,
+            ...(sessionId === 'child-1' ? { scheduledAt: '2026-10-22T11:00:00.000Z' } : {}),
+          },
+        });
+      }
+    });
+
+    it('keeps independent child attention when the root itself becomes idle', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('root', 'question'),
+        makeSession('child', 'permission', 'Child', 'root'),
+      ]);
+      webWs.send.mockClear();
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 'root',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: '2026-10-22T10:00:02.000Z',
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 'root', status: 'permission' }]);
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 'root', status: 'permission' },
+      ]);
+      expect(allSent(webWs)).toMatchObject([
+        {
+          event: 'session.status.updated',
+          data: { sessionId: 'root', status: 'permission', statusUpdatedAt: null },
+        },
+      ]);
+    });
+
+    it('keeps the live snapshot and the broadcast when attachment persistence fails', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      webWs.send.mockClear();
+      vi.spyOn(cliWs, 'serializeAttachment').mockImplementation(() => {
+        throw new Error('Attachment too large');
+      });
+
+      const result = await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+
+      expect(result).toEqual({ delivered: 1 });
+      expect(allSent(webWs).at(-1)).toMatchObject({
+        event: 'session.status.updated',
+        data: { sessionId: 's1', status: 'idle' },
+      });
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 's1', status: 'idle' }]);
+      // The recovered snapshot keeps the last persisted status: the next
+      // heartbeat rewrites the attachment with the live list.
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'question' },
+      ]);
+    });
+
+    it('updates only the current owner when another connected CLI retains an old session row', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const firstCli = addCliSocket(mockCtx, 'cli-1');
+      const currentCli = addCliSocket(mockCtx, 'cli-2');
+      sendHeartbeat(doInstance, firstCli, [makeSession('s1', 'question')]);
+      sendHeartbeat(doInstance, currentCli, [makeSession('s1', 'permission')]);
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'permission',
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+
+      expect(doInstance.getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'idle', connectionId: 'cli-2' },
+      ]);
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'idle', connectionId: 'cli-2' },
+      ]);
+      expect(firstCli.deserializeAttachment()).toMatchObject({
+        sessions: [{ id: 's1', status: 'question' }],
+      });
+    });
+
+    it('persists into the open replacement when a closing socket retains the same connection id', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const oldCli = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, oldCli, [makeSession('s1', 'question')]);
+      oldCli.readyState = WebSocket.CLOSING;
+      const replacement = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, replacement, [makeSession('s1', 'question')]);
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'question',
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+      mockCtx.removeSocket(oldCli);
+      mockCtx.addSocket(oldCli);
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'idle' },
+      ]);
+      mockCtx.removeSocket(oldCli);
+
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 's1', status: 'idle' }]);
+      expect(new UserConnectionDO(ctx as never, {} as Env).getActiveSessions()).toMatchObject([
+        { id: 's1', status: 'idle' },
+      ]);
+    });
+
+    it('does not clear the current root owner attention when a former owner child resolves', async () => {
+      const { doInstance, mockCtx } = setup();
+      const firstCli = addCliSocket(mockCtx, 'cli-1');
+      const currentCli = addCliSocket(mockCtx, 'cli-2');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, firstCli, [
+        makeSession('root', 'idle'),
+        makeSession('old-child', 'permission', 'Old child', 'root'),
+      ]);
+      sendHeartbeat(doInstance, currentCli, [
+        makeSession('root', 'busy'),
+        makeSession('current-child', 'question', 'Current child', 'root'),
+      ]);
+      webWs.send.mockClear();
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 'old-child',
+          previousStatus: 'permission',
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+
+      expect(doInstance.getActiveSessions()).toMatchObject([
+        { id: 'root', status: 'question', connectionId: 'cli-2' },
+      ]);
+      expect(allSent(webWs)).toMatchObject([
+        { event: 'session.status.updated', data: { sessionId: 'old-child', status: 'idle' } },
+      ]);
+    });
+
+    it('clears unknown authoritative status and obsolete scheduled wake times without inventing idle', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [
+        {
+          ...makeSession('s1', 'scheduled'),
+          scheduledAt: '2026-10-22T11:00:00.000Z',
+        },
+      ]);
+
+      await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 's1',
+          previousStatus: 'scheduled',
+          status: null,
+          statusUpdatedAt: null,
+          changedAt: '2026-10-22T10:00:03.000Z',
+        },
+      });
+
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 's1', status: '' }]);
+      const restored = new UserConnectionDO(ctx as never, {} as Env);
+      expect(restored.getActiveSessions()).toMatchObject([{ id: 's1', status: '' }]);
+      expect(restored.getActiveSessions()[0]).not.toHaveProperty('scheduledAt');
+    });
+
     it('rejects invalid session event payloads without broadcasting', async () => {
       const { doInstance, mockCtx } = setup();
       const webWs = addWebSocket(mockCtx);
@@ -2012,6 +2366,37 @@ describe('UserConnectionDO', () => {
       expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
         true
       );
+    });
+
+    it('reconstructs a lone closing owner after hibernation before scheduling disconnect cleanup', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const otherCli = addCliSocket(mockCtx, 'cli-other');
+      const webWs = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s-question', 'question')]);
+      sendHeartbeat(doInstance, otherCli, [makeSession('s-other', 'busy')]);
+      webWs.send.mockClear();
+      cliWs.readyState = WebSocket.CLOSING;
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const restored = new UserConnectionDO(ctx as never, {} as Env);
+
+      await disconnectCli(restored, cliWs);
+
+      expect(ctx.storage.store.get('attentionReset:s-question')).toEqual({
+        kiloUserId: 'usr_1',
+        dueAt: now + CLI_ABSENCE_ATTENTION_RESET_MS,
+        connectionId: 'cli-1',
+      });
+      expect(ctx.storage.store.has('attentionReset:s-other')).toBe(false);
+      expect(restored.getActiveSessions()).toMatchObject([
+        { id: 's-other', status: 'busy', connectionId: 'cli-other' },
+      ]);
+      expect(allSent(webWs)).toContainEqual({
+        type: 'system',
+        event: 'cli.disconnected',
+        data: { connectionId: 'cli-1' },
+      });
     });
 
     it('does not hold attention when kiloUserId is missing on the attachment', async () => {
@@ -4533,7 +4918,7 @@ describe('UserConnectionDO', () => {
       ],
     };
 
-    it('retries capacity with every current legacy field, then broadcasts and acknowledges', async () => {
+    it('keeps the instance metadata and the acknowledgement when the write hits the frame limit', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(
         mockCtx,
@@ -4556,18 +4941,19 @@ describe('UserConnectionDO', () => {
       expect(cliWs.deserializeAttachment()).toEqual({
         role: 'cli',
         connectionId: 'cli-1',
-        sessions: heartbeat.sessions,
+        sessions: [],
+        sessionsTrimmed: 1,
         heartbeatAt: now,
         protocolVersion: '1',
         capabilities: heartbeat.capabilities,
         kiloUserId: 'usr_1',
-        instance: legacyInstance,
+        instance: heartbeat.instance,
       });
       expect(doInstance.hasActiveCliSession('current-session')).toBe(true);
       expect(doInstance.hasActiveCliSession('previous-session')).toBe(false);
       expect(doInstance.getConnectedInstances()).toEqual({
         instances: [
-          { connectionId: 'cli-1', ...legacyInstance, capabilities: heartbeat.capabilities },
+          { connectionId: 'cli-1', ...heartbeat.instance, capabilities: heartbeat.capabilities },
         ],
       });
       expect(allSent(webWs)).toEqual([
@@ -4585,87 +4971,29 @@ describe('UserConnectionDO', () => {
       expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
     });
 
-    it.each([{ kind: 'remote' }, { startedAt: '2026-08-28T12:34:56.789Z' }, { gitBranch: '' }])(
-      'permits a capacity retry when only %j is present',
-      async metadata => {
-        const { doInstance, mockCtx } = setup();
-        const cliWs = addCliSocket(mockCtx, 'cli-1');
-        doInstance.getActiveSessions();
-        vi.spyOn(cliWs, 'serializeAttachment').mockImplementationOnce(() => {
-          throw new Error(capacityMessage);
-        });
-        await doInstance.webSocketMessage(
-          cliWs as never,
-          JSON.stringify({
-            ...heartbeat,
-            instance: { ...legacyInstance, ...metadata },
-          })
-        );
-        expect(cliWs.deserializeAttachment()).toHaveProperty('instance', legacyInstance);
-        expect(cliWs.deserializeAttachment()).toHaveProperty('sessions', heartbeat.sessions);
-        expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
-      }
-    );
-
     it.each([
-      {
-        label: 'unrelated error',
-        error: new Error('unrelated persistence failure'),
-        instance: heartbeat.instance,
-      },
-      {
-        label: 'wrong error class',
-        error: new TypeError(capacityMessage),
-        instance: heartbeat.instance,
-      },
-      {
-        label: 'legacy-only capacity failure',
-        error: new Error(capacityMessage),
-        instance: legacyInstance,
-      },
-      {
-        label: 'instance-free capacity failure',
-        error: new Error(capacityMessage),
-        instance: undefined,
-      },
-      {
-        label: 'failed retry',
-        error: new Error(capacityMessage),
-        instance: heartbeat.instance,
-        retryError: new Error('retry failed'),
-      },
-      {
-        label: 'capacity failure on retry',
-        error: new Error(capacityMessage),
-        instance: heartbeat.instance,
-        retryError: new Error(capacityMessage),
-      },
+      { label: 'unrelated error', error: new Error('unrelated persistence failure'), writes: 1 },
+      { label: 'wrong error class', error: new TypeError(capacityMessage), writes: 1 },
+      { label: 'capacity on both attempts', error: new Error(capacityMessage), writes: 2 },
     ])(
-      'rethrows $label unchanged without broadcasting or acknowledging',
-      async ({ error, instance, retryError }) => {
+      'acknowledges and broadcasts when persistence fails with $label',
+      async ({ error, writes }) => {
         const { doInstance, mockCtx } = setup();
         const cliWs = addCliSocket(mockCtx, 'cli-1', [], heartbeat.instance);
         const webWs = addWebSocket(mockCtx);
         doInstance.getActiveSessions();
         const before = structuredClone(cliWs.deserializeAttachment());
-        const write = vi
-          .spyOn(cliWs, 'serializeAttachment')
-          .mockImplementation(() => {
-            throw retryError ?? error;
-          })
-          .mockImplementationOnce(() => {
-            throw error;
-          });
+        const write = vi.spyOn(cliWs, 'serializeAttachment').mockImplementation(() => {
+          throw error;
+        });
 
-        // sendHeartbeat discards its promise; await the production handler itself.
-        await expect(
-          doInstance.webSocketMessage(cliWs as never, JSON.stringify({ ...heartbeat, instance }))
-        ).rejects.toBe(retryError ?? error);
+        await doInstance.webSocketMessage(cliWs as never, JSON.stringify(heartbeat));
 
-        expect(write).toHaveBeenCalledTimes(retryError ? 2 : 1);
+        expect(write).toHaveBeenCalledTimes(writes);
         expect(cliWs.deserializeAttachment()).toEqual(before);
-        expect(allSent(cliWs)).toEqual([]);
-        expect(allSent(webWs)).toEqual([]);
+        expect(doInstance.hasActiveCliSession('current-session')).toBe(true);
+        expect(allSent(webWs)).toEqual([expect.objectContaining({ event: 'sessions.heartbeat' })]);
+        expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
       }
     );
 
@@ -4690,6 +5018,371 @@ describe('UserConnectionDO', () => {
         expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
       }
     );
+  });
+
+  describe('attachment frame capacity', () => {
+    const ATTACHMENT_FRAME_BYTES = 16_384;
+
+    /**
+     * Enforce the platform frame per write, the way workerd does, so a
+     * regression that only shows up past the frame is exercised.
+     */
+    function capAttachment(ws: MockWS) {
+      return vi.spyOn(ws, 'serializeAttachment').mockImplementation((att: unknown) => {
+        const bytes = new TextEncoder().encode(JSON.stringify(att)).byteLength;
+        if (bytes > ATTACHMENT_FRAME_BYTES) {
+          throw new Error(
+            `A WebSocket 'attachment' cannot be larger than 16384 bytes.'attachment' was ${bytes} bytes.`
+          );
+        }
+        ws._attachment = att;
+      });
+    }
+
+    /** A session list that cannot fit in one attachment frame. */
+    function oversizedSessions(): Array<{ id: string; status: string; title: string }> {
+      return Array.from({ length: 200 }, (_, index) =>
+        makeSession(`ses-cap-${index}`, 'busy', 'A session title long enough to fill the frame')
+      );
+    }
+
+    it('acknowledges a heartbeat whose session list fills the attachment frame', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      capAttachment(cliWs);
+      const sessions = oversizedSessions();
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions })
+      );
+
+      expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
+      expect(
+        new TextEncoder().encode(JSON.stringify(cliWs.deserializeAttachment())).byteLength
+      ).toBeLessThanOrEqual(ATTACHMENT_FRAME_BYTES);
+      const persisted = cliWs.deserializeAttachment() as { sessions: unknown[] };
+      expect(persisted.sessions.length).toBeGreaterThan(0);
+      expect(persisted.sessions.length).toBeLessThan(sessions.length);
+      const broadcast = allSent(webWs).find(message => message.event === 'sessions.heartbeat');
+      expect((broadcast?.data as { sessions: unknown[] } | undefined)?.sessions).toHaveLength(
+        sessions.length
+      );
+      expect(doInstance.hasActiveCliSession('ses-cap-199')).toBe(true);
+    });
+
+    it('persists an attention row ahead of the busy rows that filled the frame', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      capAttachment(cliWs);
+      const sessions = [
+        ...oversizedSessions(),
+        { id: 'ses-cap-permission', status: 'permission', title: 'Approve the command' },
+      ];
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions })
+      );
+
+      const persisted = cliWs.deserializeAttachment() as { sessions: Array<{ id: string }> };
+      expect(persisted.sessions.map(session => session.id)).toContain('ses-cap-permission');
+      expect(persisted.sessions.length).toBeLessThan(sessions.length);
+      expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
+    });
+
+    it('persists the root row that surfaces a subagent raise', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      capAttachment(cliWs);
+      const sessions = [
+        ...oversizedSessions(),
+        {
+          id: 'ses-cap-root',
+          status: 'busy',
+          title: 'Root waiting on a subagent',
+        },
+        {
+          id: 'ses-cap-child',
+          status: 'permission',
+          title: 'Subagent approval',
+          parentSessionId: 'ses-cap-root',
+        },
+      ];
+
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions })
+      );
+
+      const persisted = cliWs.deserializeAttachment() as { sessions: Array<{ id: string }> };
+      expect(persisted.sessions.map(session => session.id)).toContain('ses-cap-root');
+      expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
+    });
+
+    it('delivers status events when the owning CLI attachment cannot hold the full list', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      capAttachment(cliWs);
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      webWs.send.mockClear();
+      const changedAt = '2026-11-10T10:00:00.000Z';
+
+      const result = await doInstance.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 'ses-cap-0',
+          previousStatus: 'busy',
+          status: 'idle',
+          statusUpdatedAt: changedAt,
+          changedAt,
+        },
+      });
+
+      expect(result).toEqual({ delivered: 1 });
+      expect(allSent(webWs).at(-1)).toMatchObject({
+        event: 'session.status.updated',
+        data: { sessionId: 'ses-cap-0', status: 'idle' },
+      });
+      expect(
+        new TextEncoder().encode(JSON.stringify(cliWs.deserializeAttachment())).byteLength
+      ).toBeLessThanOrEqual(ATTACHMENT_FRAME_BYTES);
+    });
+
+    it('reports a steady trim once, not once per heartbeat', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      capAttachment(cliWs);
+      const warn = vi.spyOn(console, 'warn');
+      const heartbeat = JSON.stringify({
+        type: 'heartbeat',
+        protocolVersion: '1',
+        sessions: oversizedSessions(),
+      });
+
+      await doInstance.webSocketMessage(cliWs as never, heartbeat);
+      await doInstance.webSocketMessage(cliWs as never, heartbeat);
+
+      const trims = warn.mock.calls.filter(call =>
+        String(call[0]).includes('Trimmed the CLI socket attachment')
+      );
+      expect(trims).toHaveLength(1);
+      warn.mockRestore();
+    });
+
+    it('keeps the trim marker through a partial write and clears it on a complete one', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      capAttachment(cliWs);
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      expect(cliWs.deserializeAttachment()).toHaveProperty('sessionsTrimmed');
+
+      // A hibernation wake knows only the kept rows; a status event then writes
+      // that short list, which fits but cannot prove the CLI owns nothing else.
+      const restored = new UserConnectionDO(mockCtx.build() as never, {} as Env);
+      await restored.notifySessionEvent({
+        type: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: 'ses-cap-0',
+          previousStatus: 'busy',
+          status: 'idle',
+          statusUpdatedAt: null,
+          changedAt: '2026-11-10T10:00:00.000Z',
+        },
+      });
+      const afterNotify = cliWs.deserializeAttachment() as { sessionsTrimmed?: number };
+      expect(afterNotify.sessionsTrimmed).toBeGreaterThan(0);
+      expect(afterNotify).toHaveProperty('sessionsTrimmed');
+
+      // A heartbeat carries the whole live list, so a list that fits means
+      // nothing was shed and the marker goes.
+      await restored.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: [makeSession('s1')] })
+      );
+      expect(cliWs.deserializeAttachment()).not.toHaveProperty('sessionsTrimmed');
+    });
+
+    it('waits for the next heartbeat instead of failing a command for a shed row', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      capAttachment(cliWs);
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      // Rebuild in-memory ownership from the trimmed attachment, the state a
+      // hibernation wake produces.
+      const restored = new UserConnectionDO(mockCtx.build() as never, {} as Env);
+      webWs.send.mockClear();
+
+      const command = restored.webSocketMessage(
+        webWs as never,
+        JSON.stringify({
+          type: 'command',
+          id: 'cmd-1',
+          command: 'send_message',
+          sessionId: 'ses-cap-199',
+        })
+      );
+      await flushAsync();
+      expect(allSent(webWs)).toEqual([]);
+
+      await restored.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      await command;
+
+      expect(allSent(cliWs).some(message => message.type === 'command')).toBe(true);
+      expect(allSent(webWs).some(message => message.error)).toBe(false);
+    });
+
+    it('waits for the next heartbeat when the viewer names the owning connection', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx);
+      capAttachment(cliWs);
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      const restored = new UserConnectionDO(mockCtx.build() as never, {} as Env);
+      webWs.send.mockClear();
+
+      const command = restored.webSocketMessage(
+        webWs as never,
+        JSON.stringify({
+          type: 'command',
+          id: 'cmd-1',
+          command: 'send_message',
+          sessionId: 'ses-cap-199',
+          connectionId: 'cli-1',
+          data: {},
+        })
+      );
+      await flushAsync();
+      expect(allSent(webWs)).toEqual([]);
+
+      await restored.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      await command;
+
+      expect(allSent(cliWs).some(message => message.type === 'command')).toBe(true);
+      expect(allSent(webWs).some(message => message.error)).toBe(false);
+    });
+
+    it('fails an unknown session immediately when nothing was trimmed', async () => {
+      const { doInstance, mockCtx } = setup();
+      addCliSocket(mockCtx, 'cli-1', [makeSession('s1')]);
+      const webWs = addWebSocket(mockCtx);
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 'ses-unknown',
+      });
+
+      expect(allSent(webWs)).toContainEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: 'Session owner not found',
+      });
+    });
+
+    it('rejects a different owner at once while the named connection is trimmed', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      addCliSocket(mockCtx, 'cli-2', [makeSession('ses-elsewhere')]);
+      const webWs = addWebSocket(mockCtx);
+      capAttachment(cliWs);
+      await doInstance.webSocketMessage(
+        cliWs as never,
+        JSON.stringify({ type: 'heartbeat', protocolVersion: '1', sessions: oversizedSessions() })
+      );
+      // `ses-elsewhere` is owned by the other connection while the named one
+      // reports a trim, so the wait must not mask a real ownership change.
+      const restored = new UserConnectionDO(mockCtx.build() as never, {} as Env);
+      webWs.send.mockClear();
+
+      const command = restored.webSocketMessage(
+        webWs as never,
+        JSON.stringify({
+          type: 'command',
+          id: 'cmd-1',
+          command: 'send_message',
+          sessionId: 'ses-elsewhere',
+          connectionId: 'cli-1',
+          data: {},
+        })
+      );
+      await flushAsync();
+      await command;
+
+      expect(allSent(webWs)).toContainEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+      expect(allSent(cliWs).some(message => message.type === 'command')).toBe(false);
+    });
+
+    it('fails a shed session once the owner wait elapses without a heartbeat', async () => {
+      vi.useFakeTimers();
+      try {
+        const { doInstance, mockCtx } = setup();
+        const cliWs = addCliSocket(mockCtx, 'cli-1');
+        const webWs = addWebSocket(mockCtx);
+        capAttachment(cliWs);
+        await doInstance.webSocketMessage(
+          cliWs as never,
+          JSON.stringify({
+            type: 'heartbeat',
+            protocolVersion: '1',
+            sessions: oversizedSessions(),
+          })
+        );
+        const restored = new UserConnectionDO(mockCtx.build() as never, {} as Env);
+        webWs.send.mockClear();
+
+        const command = restored.webSocketMessage(
+          webWs as never,
+          JSON.stringify({
+            type: 'command',
+            id: 'cmd-1',
+            command: 'send_message',
+            sessionId: 'ses-cap-199',
+          })
+        );
+        await vi.advanceTimersByTimeAsync(12_000);
+        await command;
+
+        expect(allSent(webWs)).toContainEqual({
+          type: 'response',
+          id: 'cmd-1',
+          error: 'Session owner not found',
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('getConnectedInstances', () => {

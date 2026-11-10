@@ -13,6 +13,13 @@ describe('agentProfilesMobileRouter', () => {
     'list',
     'listCombined',
     'get',
+    'overview',
+    'agents',
+    'vars',
+    'commands',
+    'mcpServers',
+    'skills',
+    'kiloCommands',
     // profile mutations the mobile profiles screens call
     'create',
     'update',

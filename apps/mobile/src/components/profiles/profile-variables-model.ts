@@ -8,7 +8,11 @@
  * edit applies.
  */
 
-import { cleanVariableKey, VARIABLE_KEY_MAX_LENGTH } from '@/lib/agent-profile-forms';
+import {
+  cleanVariableKey,
+  isReservedVariableKey,
+  VARIABLE_KEY_MAX_LENGTH,
+} from '@/lib/agent-profile-forms';
 
 /** The fields of a variable the screen reads. Structural, so a test needs no tRPC type. */
 export type ProfileVarSource = Readonly<{
@@ -28,7 +32,7 @@ export type VariableRow = Readonly<{
 }>;
 
 /** The dot run a hidden secret renders instead of its value. */
-export const SECRET_MASK = '••••••••';
+export const SECRET_MASK = '••••••';
 
 /**
  * Render rows from the profile's variables. A secret is masked by default: the
@@ -44,32 +48,80 @@ export function variableRows(vars: readonly ProfileVarSource[]): VariableRow[] {
   }));
 }
 
-export type VariableInputError = 'empty' | 'too-long' | 'duplicate';
+export type VariableInputError = 'empty' | 'too-long' | 'duplicate' | 'reserved' | 'value-required';
+
+/** Options the caller's surface adds to the shared key rules. */
+export type VariableInputRules = Readonly<{
+  /**
+   * Refuse a blank value. The profile Variables screen sets it: an empty field
+   * there offers the reader nothing to save. The new-session draft editor
+   * leaves it off, because prepare-session accepts an empty value and the web
+   * editor saves `KEY=` too.
+   */
+  requireValue?: boolean;
+  /**
+   * Refuse a key the sandbox runtime owns. A stored key keeps saving: the
+   * package applies the rule when a profile stores a key for the first time, so
+   * an edit of an older row must not be blocked here.
+   */
+  newKey?: boolean;
+}>;
 
 /**
- * Validate the edited variable before a save. Matches the server's
- * `VarSchema` key bound (`z.string().min(1).max(256)`); `value` is part of the
- * form's input but unconstrained, matching the server. `takenKeys` are the
+ * Validate the edited variable before a save. Measures the key the save will
+ * store, because the form adds a leading `_` to a digit-initial key, and the
+ * server bound applies to what it stores. When `requireValue` is set, a blank
+ * value is refused too. `takenKeys` are the
  * profile's stored keys: the server upserts on `(profile_id, key)` with the
  * cleaned key the form sends, so a new key that normalizes onto an existing one
- * would silently replace that variable. Returns an error code, or `null` when
- * valid.
+ * would silently replace that variable. `newKey` (on by default) also applies
+ * the reserved-name rule. Returns an error code, or `null` when valid.
  */
 export function validateVariableInput(
   input: Readonly<{ key: string; value: string }>,
-  takenKeys: readonly string[] = []
+  takenKeys: readonly string[] = [],
+  rules: VariableInputRules = {}
 ): VariableInputError | null {
   const key = input.key.trim();
   if (key.length === 0) {
     return 'empty';
   }
-  if (key.length > VARIABLE_KEY_MAX_LENGTH) {
+  if (savedVariableKey(key).length > VARIABLE_KEY_MAX_LENGTH) {
     return 'too-long';
   }
   if (takenKeys.includes(cleanVariableKey(key))) {
     return 'duplicate';
   }
+  if (rules.newKey !== false && isReservedVariableKey(savedVariableKey(key))) {
+    return 'reserved';
+  }
+  if (rules.requireValue === true && input.value.trim().length === 0) {
+    return 'value-required';
+  }
   return null;
+}
+
+/**
+ * The key the server stores for what was typed: upper case, with everything
+ * outside `A-Z0-9_` replaced by `_`. The form saves this value and shows it, so
+ * the saved row never differs from the key the reader saw.
+ */
+export function savedVariableKey(typed: string): string {
+  return cleanVariableKey(typed.trim());
+}
+
+/**
+ * The key a save will store, when that differs from what was typed; `null` when
+ * the typed key saves unchanged or the field is blank. The form renders this
+ * under the key field, so a normalization is never silent.
+ */
+export function variableKeyPreview(typed: string): string | null {
+  const trimmed = typed.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  const saved = savedVariableKey(trimmed);
+  return saved === trimmed ? null : saved;
 }
 
 /** A saved environment variable, as the screen sends it to `setVar`. */

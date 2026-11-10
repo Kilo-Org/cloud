@@ -3,6 +3,7 @@ import {
   customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import {
   createAllowPredicateFromProviderAllowList,
@@ -10,28 +11,24 @@ import {
   type ProviderLookup,
 } from '@kilocode/web-shared/lib/model-allow.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
-import type * as ExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
-// The live catalog's restricted Kilo-exclusive models come and go, so the restriction
-// cases use a synthetic alias restricted to StepFun and keep the real lookup otherwise.
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
-  const actual = jest.requireActual<typeof ExclusiveModels>(
-    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
-  );
-  return {
-    ...actual,
-    getKiloExclusiveInferenceProviders: (modelId: string) =>
-      modelId === 'test/restricted-exclusive'
-        ? new Set(['stepfun'])
-        : actual.getKiloExclusiveInferenceProviders(modelId),
-  };
-});
+const RESTRICTED_PUBLIC_MODEL = 'test/restricted-public';
 
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);
 }
 
 describe('model access predicates', () => {
+  beforeAll(async () => {
+    await insertCustomLlmForTest('acme/public-model', publicCustomLlmDefinition(['acme']));
+    await insertCustomLlmForTest(RESTRICTED_PUBLIC_MODEL, publicCustomLlmDefinition(['stepfun']));
+  });
+
+  afterAll(async () => {
+    await deleteCustomLlmForTest('acme/public-model');
+    await deleteCustomLlmForTest(RESTRICTED_PUBLIC_MODEL);
+  });
+
   test('undefined provider allow list only applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       ['openai/gpt-4o'],
@@ -215,6 +212,31 @@ describe('model access predicates', () => {
     }
   );
 
+  test('applies provider allow lists to the providers of a public custom LLM', async () => {
+    const restrictions = { requireModelInCurrentSnapshot: true, modelDenyList: [] };
+    const allowsAcme = createAllowPredicateFromRestrictions(
+      { ...restrictions, providerAllowList: ['acme'] },
+      lookup({})
+    );
+    const allowsOpenAi = createAllowPredicateFromRestrictions(
+      { ...restrictions, providerAllowList: ['openai'] },
+      lookup({ 'acme/public-model': ['openai'] })
+    );
+    const deniesModel = createAllowPredicateFromRestrictions(
+      {
+        ...restrictions,
+        providerAllowList: ['acme'],
+        modelDenyList: ['acme/public-model'],
+        customLlmGrantee: { organizationId: '00000000-0000-4000-8000-0000000000a1', groupIds: [] },
+      },
+      lookup({})
+    );
+
+    await expect(allowsAcme('acme/public-model')).resolves.toBe(true);
+    await expect(allowsOpenAi('acme/public-model')).resolves.toBe(false);
+    await expect(deniesModel('acme/public-model')).resolves.toBe(false);
+  });
+
   test('provider allow list still applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       ['openai/gpt-4o'],
@@ -239,31 +261,31 @@ describe('model access predicates', () => {
     await expect(isAllowed('openai/gpt-4.1')).resolves.toBe(true);
   });
 
-  test('provider allow list hides restricted exclusive models when every restricted provider is disabled', async () => {
+  test('provider allow list hides restricted public custom LLMs when every restricted provider is disabled', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       undefined,
       ['deepseek', 'fireworks'],
       lookup({ 'stepfun/step-5-preview': ['fireworks', 'stepfun'] })
     );
 
-    await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(false);
+    await expect(isAllowed(RESTRICTED_PUBLIC_MODEL)).resolves.toBe(false);
     await expect(isAllowed('stepfun/step-5-preview')).resolves.toBe(true);
   });
 
-  test('provider allow list keeps restricted exclusive models when a restricted provider remains enabled', async () => {
+  test('provider allow list keeps restricted public custom LLMs when a restricted provider remains enabled', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       undefined,
       ['stepfun', 'fireworks'],
       lookup({ 'stepfun/step-5-preview': ['fireworks'] })
     );
 
-    await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(true);
+    await expect(isAllowed(RESTRICTED_PUBLIC_MODEL)).resolves.toBe(true);
   });
 
-  test('provider allow list still evaluates restricted exclusive models missing from the snapshot', async () => {
+  test('provider allow list still evaluates restricted public custom LLMs missing from the snapshot', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['stepfun'], lookup({}));
 
-    await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(true);
+    await expect(isAllowed(RESTRICTED_PUBLIC_MODEL)).resolves.toBe(true);
     await expect(isAllowed('unknown/model')).resolves.toBe(false);
   });
 });

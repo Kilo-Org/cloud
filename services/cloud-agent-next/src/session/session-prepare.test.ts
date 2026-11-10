@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'node:crypto';
+import { TRPCError } from '@trpc/server';
 import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
@@ -23,10 +24,6 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
-import {
-  resolveSharedSandboxAssignment,
-  SHARED_SANDBOX_FAILOVER_SUFFIX,
-} from '../shared-sandbox-route.js';
 import type { OperationLedgerRow } from '@kilocode/db/schema';
 
 import type { Env } from '../types.js';
@@ -34,12 +31,13 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type { SessionMessageAdmissionResult } from '../execution/types.js';
 import type { SessionCreateRequest } from './session-requests.js';
-import type * as SandboxIdModule from '../sandbox-id.js';
 import type * as SessionPlaneModule from '../session-identity.js';
-import type * as SharedSandboxRouteModule from '../shared-sandbox-route.js';
+import type * as ByocCredentialResolverModule from '../byoc/vercel-credential-resolver.js';
+import { ByocCredentialMissingError } from '../byoc/vercel-credential-resolver.js';
 import type * as SandboxPlacementModule from '../sandbox-placement.js';
 import type * as MessageIdModule from './message-id.js';
 import type * as CloudAgentProfileModule from '@kilocode/cloud-agent-profile';
+import { mergeProfileConfiguration } from '@kilocode/cloud-agent-profile';
 import {
   assertSessionOperationIdentity,
   createSessionWithLedger,
@@ -70,9 +68,10 @@ const {
   createSessionReportMock,
   recordSandboxIdentityMock,
   recordSessionFailureMock,
-  generateSandboxRoutingTargetMock,
   getSandboxAllocationCandidatesMock,
   selectControlPlaneSandboxMock,
+  fetchByocVercelEnrollmentMock,
+  fetchByocVercelEnrollmentForUserMock,
 } = vi.hoisted(() => ({
   admitOperationMock: vi.fn(),
   settleOperationMock: vi.fn().mockResolvedValue({ settled: true }),
@@ -86,9 +85,10 @@ const {
   createSessionReportMock: vi.fn().mockResolvedValue(undefined),
   recordSandboxIdentityMock: vi.fn().mockResolvedValue(undefined),
   recordSessionFailureMock: vi.fn().mockResolvedValue(undefined),
-  generateSandboxRoutingTargetMock: vi.fn(),
   getSandboxAllocationCandidatesMock: vi.fn().mockResolvedValue({}),
   selectControlPlaneSandboxMock: vi.fn(),
+  fetchByocVercelEnrollmentMock: vi.fn(),
+  fetchByocVercelEnrollmentForUserMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
@@ -96,13 +96,17 @@ vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
   sealRuntimeAuthorization: vi.fn(),
 }));
 vi.mock('../model-validation.js', () => ({ assertKiloModelAvailable: vi.fn() }));
+// These cases cover allocation and ledger behavior, not the unverified Vercel SCM gate.
+vi.mock('../scm-broker/vercel-identity.js', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  verifiedVercelSandboxIdentityContract: { issuerForTeam: () => null, sandboxIdForRef: () => null },
+}));
 
 function modernContext(
   ctx: SessionRegistrationContext,
   organizationId?: string
 ): SessionRegistrationContext {
   ctx.env.NEXTAUTH_SECRET = 'registration-test-secret';
-  ctx.env.RUNTIME_ISOLATION_ENABLED = 'true';
   ctx.authToken = jwt.sign(
     {
       kiloUserId: ctx.userId,
@@ -165,25 +169,18 @@ vi.mock('./message-id.js', async importOriginal => {
   };
 });
 
-vi.mock('../sandbox-id.js', async importOriginal => {
-  const actual = await importOriginal<typeof SandboxIdModule>();
-  return {
-    ...actual,
-    generateSandboxRoutingTarget: generateSandboxRoutingTargetMock,
-  };
-});
-
 vi.mock('../sandbox-placement.js', async importOriginal => {
   const actual = await importOriginal<typeof SandboxPlacementModule>();
   selectControlPlaneSandboxMock.mockImplementation(actual.selectControlPlaneSandbox);
   return { ...actual, selectControlPlaneSandbox: selectControlPlaneSandboxMock };
 });
 
-vi.mock('../shared-sandbox-route.js', async importOriginal => {
-  const actual = await importOriginal<typeof SharedSandboxRouteModule>();
+vi.mock('../byoc/vercel-credential-resolver.js', async importOriginal => {
+  const actual = await importOriginal<typeof ByocCredentialResolverModule>();
   return {
     ...actual,
-    resolveSharedSandboxAssignment: vi.fn(),
+    fetchByocVercelEnrollment: fetchByocVercelEnrollmentMock,
+    fetchByocVercelEnrollmentForUser: fetchByocVercelEnrollmentForUserMock,
   };
 });
 
@@ -192,6 +189,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importOriginal => {
   return {
     ...actual,
     getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
+    mergeProfileConfiguration: vi.fn(),
   };
 });
 
@@ -207,6 +205,7 @@ const PLACED_SANDBOX_DECISION = {
   sandboxKind: 'isolated',
 } as const;
 const WORKTREE_ID = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+const CONTROL_CLOUD_AGENT_SESSION_ID = 'workspace_12345678-1234-1234-1234-123456789abc';
 const KILO_SESSION_ID = 'ses_12345678901234567890123456';
 const INITIAL_MESSAGE_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const ROW_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
@@ -257,6 +256,8 @@ type DoStubOverrides = {
   createSessionWithInitialAdmission?: ReturnType<typeof vi.fn>;
   getMetadata?: ReturnType<typeof vi.fn>;
   getMessageResult?: ReturnType<typeof vi.fn>;
+  recordCloudAgentChildSession?: ReturnType<typeof vi.fn>;
+  authorizeCloudAgentChild?: ReturnType<typeof vi.fn>;
 };
 
 function makeDoStub(overrides: DoStubOverrides = {}) {
@@ -272,6 +273,11 @@ function makeDoStub(overrides: DoStubOverrides = {}) {
         messageId: INITIAL_MESSAGE_ID,
         compatibilityDelivery: 'queued',
       } satisfies SessionMessageAdmissionResult),
+    recordCloudAgentChildSession:
+      overrides.recordCloudAgentChildSession ?? vi.fn().mockResolvedValue({ success: true }),
+    authorizeCloudAgentChild:
+      overrides.authorizeCloudAgentChild ??
+      vi.fn().mockResolvedValue({ token: 'runtime-token', seal: 'runtime-seal' }),
     getMetadata:
       overrides.getMetadata ??
       vi.fn().mockResolvedValue({
@@ -347,6 +353,29 @@ function makeContext(doStub: ReturnType<typeof makeDoStub>): SessionRegistration
     userId: USER_ID,
     authToken: AUTH_TOKEN,
   };
+}
+
+const PARENT_SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
+
+function scopedChildContext(ctx: SessionRegistrationContext): SessionRegistrationContext {
+  return {
+    ...ctx,
+    cloudAgentAuthority: {
+      version: 1,
+      ownerId: ctx.userId,
+      parentSessionId: PARENT_SESSION_ID,
+      organizationId: null,
+      authorizationId: '22222222-2222-4222-8222-222222222222',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    },
+  };
+}
+
+function scopedChildRequest(): SessionCreateRequest {
+  return makeRequest({
+    parentCloudAgentSessionId: PARENT_SESSION_ID,
+    options: { operationKey: OPERATION_KEY, createdOnPlatform: 'cloud-agent-web' },
+  });
 }
 
 function makeRequest(overrides: Partial<SessionCreateRequest> = {}): SessionCreateRequest {
@@ -458,9 +487,6 @@ describe('explicit sandbox session creation', () => {
     const ctx = makeContext(doStub);
     Object.assign(ctx.env, vercel, {
       SANDBOX_SELECTION_IDS: orgId,
-      PER_SESSION_SANDBOX_ORG_IDS: '*',
-      VERCEL_SANDBOX_ORG_IDS: '*',
-      CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
     });
     return ctx;
   }
@@ -472,19 +498,15 @@ describe('explicit sandbox session creation', () => {
     expect(doStub.registerSession).not.toHaveBeenCalled();
   }
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
+    admitOperationMock.mockReset();
+    fetchByocVercelEnrollmentMock.mockReset();
     getPgDbMock.mockReturnValue(
       makeDb([[{ id: 'member' }], [{ email: 'test@example.com' }], [{ id: 'member' }]])
     );
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    const routing = await vi.importActual<typeof SandboxIdModule>('../sandbox-id.js');
-    generateSandboxRoutingTargetMock.mockImplementation(routing.generateSandboxRoutingTarget);
-    vi.mocked(resolveSharedSandboxAssignment).mockImplementation(async (_store, routeKey) => ({
-      sandboxId: await routing.deriveSharedSandboxId(routeKey, SHARED_SANDBOX_FAILOVER_SUFFIX),
-      suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
-    }));
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({ organization_id: orgId }),
@@ -494,38 +516,100 @@ describe('explicit sandbox session creation', () => {
   });
 
   it.each(
-    [undefined, [], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist }))
-  )('preserves start policy %j', async ({ egressAllowlist }) => {
+    [
+      { egressMode: undefined, egressAllowlist: undefined },
+      { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+      ...[undefined, [], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({
+        egressMode: 'allowlist' as const,
+        egressAllowlist,
+      })),
+    ].flatMap(policy => [undefined, false, true].map(egressAudit => ({ ...policy, egressAudit })))
+  )('preserves start policy %j', async ({ egressMode, egressAllowlist, egressAudit }) => {
     const doStub = makeDoStub();
     const request = requestFromStructuredAllocation('cloudflare-containers-standard-3');
-    request.runtime = { ...request.runtime, egressMode: 'allowlist', egressAllowlist };
+    request.runtime = { ...request.runtime, egressMode, egressAllowlist, egressAudit };
     await runCreate(selectedContext(doStub), request);
-    const expected = !egressAllowlist?.length ? [] : ['example.com', 'z.example.com'];
-    expect(createdMetadata(doStub)?.workspace?.egressMode).toBe('allowlist');
+    const expected =
+      egressMode !== 'allowlist'
+        ? undefined
+        : !egressAllowlist?.length
+          ? []
+          : ['example.com', 'z.example.com'];
+    expect(createdMetadata(doStub)?.workspace?.egressMode).toBe(egressMode);
     expect(createdMetadata(doStub)?.workspace?.egressAllowlist).toEqual(expected);
+    expect(createdMetadata(doStub)?.workspace?.egressAudit).toBe(egressAudit);
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         sandboxSelection: expect.objectContaining({
-          egressMode: 'allowlist',
-          egressAllowlist: expected,
+          ...(egressMode === undefined ? {} : { egressMode }),
+          ...(expected === undefined ? {} : { egressAllowlist: expected }),
+          ...(egressAudit === undefined ? {} : { egressAudit }),
         }),
       })
     );
   });
 
-  it.each(['vercel-small', 'cloudflare-shared', 'isolated-standard'] as const)(
-    'rejects egress policy on resolved %s before ownership creation',
-    async sandboxAllocation => {
+  it.each(
+    (['vercel-small', 'cloudflare-shared', 'isolated-standard'] as const).flatMap(
+      sandboxAllocation =>
+        [
+          { egressMode: 'allowlist' as const },
+          { egressAudit: true },
+          { egressMode: 'unrestricted' as const, egressAudit: true },
+        ].map(policy => ({ sandboxAllocation, policy }))
+    )
+  )(
+    'rejects egress policy on resolved placement before ownership creation: %j',
+    async ({ sandboxAllocation, policy }) => {
       const doStub = makeDoStub();
       const request = requestForPreset(sandboxAllocation);
-      request.runtime = { sandboxAllocation, egressMode: 'allowlist' };
-      await expect(runCreate(selectedContext(doStub), request)).rejects.toMatchObject({
+      request.runtime = { sandboxAllocation, ...policy };
+      const ctx = selectedContext(doStub);
+      if (sandboxAllocation === 'vercel-small') {
+        ctx.env.BYOC_VERCEL_IDS = orgId;
+        fetchByocVercelEnrollmentMock.mockResolvedValueOnce({
+          organizationId: orgId,
+          credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
+          setupStatus: 'ready',
+        });
+      }
+      await expect(runCreate(ctx, request)).rejects.toMatchObject({
         code: 'BAD_REQUEST',
       });
       expect(createCliSessionMock).not.toHaveBeenCalled();
       expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     }
   );
+
+  it('resolves an inherited allowlist to the native containers replacement', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+      runtime: { egressMode: 'allowlist', egressAllowlist: [] },
+    });
+
+    await runCreate(ctx, request);
+
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledOnce();
+    expect(selectControlPlaneSandboxMock.mock.calls[0][0].sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
+    await expect(selectControlPlaneSandboxMock.mock.results[0].value).resolves.toMatchObject({
+      provider: 'cloudflare-containers',
+      sandboxKind: 'isolated',
+    });
+    expect(createdMetadata(doStub)?.workspace).toMatchObject({
+      sandboxProvider: 'cloudflare-containers',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      sandboxKind: 'isolated',
+      egressMode: 'allowlist',
+      egressAllowlist: [],
+    });
+    expect(createCliSessionMock).toHaveBeenCalledOnce();
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledOnce();
+  });
 
   it('accepts a supported resolved native replacement of cloudflare-single', async () => {
     const doStub = makeDoStub();
@@ -539,25 +623,123 @@ describe('explicit sandbox session creation', () => {
     });
   });
 
-  it('forwards the policy on legacy registration-only creation', async () => {
+  it.each([
+    new TRPCError({ code: 'BAD_REQUEST', message: 'model unavailable' }),
+    new TRPCError({ code: 'FORBIDDEN', message: 'catalog access denied' }),
+    new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'catalog unavailable' }),
+    new Error('catalog request failed'),
+  ])('filters unverifiable built-in agent models after %s', async error => {
     const doStub = makeDoStub();
-    const request = requestForPreset('cloudflare-containers-standard-3');
-    request.runtime = { ...request.runtime, egressMode: 'allowlist' };
-    await registerNewSession(request, selectedContext(doStub));
-    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
-      expect.objectContaining({
-        metadata: expect.objectContaining({
-          workspace: expect.objectContaining({
-            egressMode: 'allowlist',
-            egressAllowlist: [],
+    const requestOrganizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d490';
+    const createdOnPlatform = 'cloud-agent-web';
+    const builtinAgents = {
+      plan: { model: 'blocked/model', variant: 'high', disable: true },
+      debug: { model: 'allowed/model', variant: 'low' },
+      ask: { model: null },
+      orchestrator: { disable: true },
+      compaction: { model: 'blocked/model', variant: 'high' },
+    } as const;
+    const request = makeRequest({
+      options: {
+        operationKey: OPERATION_KEY,
+        kilocodeOrganizationId: requestOrganizationId,
+        createdOnPlatform,
+      },
+      profile: { resolved: { builtinAgents } },
+    });
+    const ctx = modernContext(selectedContext(doStub), requestOrganizationId);
+    vi.mocked(assertKiloModelAvailable).mockImplementation(async ({ submittedModel }) => {
+      if (submittedModel === 'blocked/model') {
+        throw error;
+      }
+    });
+
+    await registerNewSession(request, ctx);
+
+    expect(createdMetadata(doStub)?.profile?.builtinAgents).toEqual({
+      plan: { disable: true },
+      debug: { model: 'allowed/model', variant: 'low' },
+      ask: { model: null },
+      orchestrator: { disable: true },
+    });
+    const validationCalls = vi.mocked(assertKiloModelAvailable).mock.calls;
+    expect(validationCalls.map(call => call[0].submittedModel)).toEqual([
+      'claude-3',
+      'blocked/model',
+      'allowed/model',
+    ]);
+    for (const [validation] of validationCalls) {
+      expect(validation).toMatchObject({
+        originalToken: 'runtime-token',
+        originalOrganizationId: requestOrganizationId,
+        createdOnPlatform,
+      });
+      expect(validation.originalToken).not.toBe(ctx.authToken);
+    }
+    expect(request.profile?.resolved?.builtinAgents).toEqual({
+      plan: { model: 'blocked/model', variant: 'high', disable: true },
+      debug: { model: 'allowed/model', variant: 'low' },
+      ask: { model: null },
+      orchestrator: { disable: true },
+      compaction: { model: 'blocked/model', variant: 'high' },
+    });
+  });
+
+  it.each([undefined, 'unrestricted', 'allowlist'] as const)(
+    'forwards %s audit policy on legacy registration-only creation',
+    async egressMode => {
+      const doStub = makeDoStub();
+      const request = requestForPreset('cloudflare-containers-standard-3');
+      request.runtime = { ...request.runtime, egressMode, egressAudit: true };
+      await registerNewSession(request, selectedContext(doStub));
+      expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            workspace: expect.objectContaining({
+              ...(egressMode === undefined ? {} : { egressMode }),
+              ...(egressMode === 'allowlist' ? { egressAllowlist: [] } : {}),
+              egressAudit: true,
+            }),
           }),
-        }),
-        sandboxSelection: expect.objectContaining({
-          egressMode: 'allowlist',
-          egressAllowlist: [],
-        }),
-      })
+          sandboxSelection: expect.objectContaining({
+            ...(egressMode === undefined ? {} : { egressMode }),
+            ...(egressMode === 'allowlist' ? { egressAllowlist: [] } : {}),
+            egressAudit: true,
+          }),
+        })
+      );
+    }
+  );
+
+  it('records a spawned child in the parent registry before returning', async () => {
+    const doStub = makeDoStub();
+    const ctx = modernContext(makeContext(doStub));
+    const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
+    await registerNewSession(makeRequest({ parentCloudAgentSessionId: parentSessionId }), ctx);
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledTimes(1);
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: WORKSPACE_SESSION_ID })
     );
+  });
+
+  it('does not fail a registered spawn when the parent registry hint write fails', async () => {
+    // Registry entries are discovery hints, not authority. A transient parent-DO
+    // failure after the session already registered must not turn the create into
+    // an unacknowledgeable error.
+    const doStub = makeDoStub({
+      recordCloudAgentChildSession: vi
+        .fn()
+        .mockRejectedValue(new Error('Cloud Agent child registry denied')),
+    });
+    const ctx = modernContext(makeContext(doStub));
+    const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
+
+    await expect(
+      registerNewSession(makeRequest({ parentCloudAgentSessionId: parentSessionId }), ctx)
+    ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledTimes(1);
   });
 
   it.each(['vercel-small', 'cloudflare-shared'] as const)(
@@ -574,6 +756,28 @@ describe('explicit sandbox session creation', () => {
       expect(createCliSessionMock).not.toHaveBeenCalled();
     }
   );
+
+  it.each([
+    { egressMode: 'allowlist' as const },
+    { egressAudit: true },
+    { egressMode: 'unrestricted' as const, egressAudit: true },
+  ])('rejects egress policy on a resolved legacy Cloudflare sandbox: %j', async policy => {
+    const doStub = makeDoStub();
+    selectControlPlaneSandboxMock.mockResolvedValueOnce({
+      ...PLACED_SANDBOX_DECISION,
+      provider: 'cloudflare',
+    });
+    await expect(
+      registerNewSession(
+        {
+          ...requestForPreset('cloudflare-single'),
+          runtime: { sandboxAllocation: 'cloudflare-single', ...policy },
+        },
+        selectedContext(doStub)
+      )
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+  });
 
   it('forwards legacy prepare mode-only input without an explicit allocation', () => {
     const request = prepareInputToSessionCreateRequest(
@@ -608,10 +812,55 @@ describe('explicit sandbox session creation', () => {
     expect(await fingerprint(['example.com'])).not.toBe(await fingerprint(['other.example.com']));
   });
 
+  it.each([undefined, 'unrestricted', 'allowlist'] as const)(
+    'keeps audit opt-out fingerprints stable for mode %s',
+    async egressMode => {
+      const request = {
+        ...requestForPreset('cloudflare-containers-standard-3'),
+        runtime: { egressMode },
+      };
+      const implicit = await sessionCreateIntentFingerprint(request);
+      expect(
+        await sessionCreateIntentFingerprint({
+          ...request,
+          runtime: { egressMode, egressAudit: false },
+        })
+      ).toBe(implicit);
+      expect(
+        await sessionCreateIntentFingerprint({
+          ...request,
+          runtime: { egressMode, egressAudit: true },
+        })
+      ).not.toBe(implicit);
+    }
+  );
+
+  it.each([
+    { egressAudit: false },
+    { egressAudit: true },
+    { egressMode: 'unrestricted' as const, egressAudit: false },
+    { egressMode: 'unrestricted' as const, egressAudit: true },
+    { egressMode: 'allowlist' as const, egressAudit: true },
+  ])('forwards legacy prepare audit settings without an allocation: %j', policy => {
+    const request = prepareInputToSessionCreateRequest(
+      PrepareSessionInput.parse({
+        prompt: 'hello',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        ...policy,
+      })
+    );
+    expect(request.runtime?.egressAudit).toBe(policy.egressAudit);
+    expect(request.runtime?.sandboxAllocation).toBeUndefined();
+  });
+
   it('fingerprints unrestricted and omitted mode as equivalent, distinct from allowlist mode', async () => {
     for (const runtime of [
       undefined,
       { sandboxAllocation: 'cloudflare-containers-standard-3' as const },
+      { egressAudit: true },
+      { sandboxAllocation: 'cloudflare-containers-standard-3' as const, egressAudit: true },
     ]) {
       const request = { ...requestForPreset('cloudflare-containers-standard-3'), runtime };
       const implicit = await sessionCreateIntentFingerprint(request);
@@ -634,6 +883,7 @@ describe('explicit sandbox session creation', () => {
     { egressAllowlist: [] },
     { egressMode: 'unrestricted', egressAllowlist: [] },
     { egressMode: 'invalid' },
+    { egressMode: 'allowlist', egressAudit: 'true' },
   ])('rejects invalid internal egress policy before allocating: %j', async runtime => {
     const doStub = makeDoStub();
     const request = requestForPreset('cloudflare-containers-standard-3');
@@ -643,15 +893,17 @@ describe('explicit sandbox session creation', () => {
     expectNoAllocation(doStub);
   });
 
-  it.each(['vercel-small', 'cloudflare-shared', 'isolated-standard'] as const)(
-    'allows explicit unrestricted mode on %s',
+  it.each(['cloudflare-shared', 'isolated-standard'] as const)(
+    'rejects retired explicit allocation %s before allocating',
     async sandboxAllocation => {
       const doStub = makeDoStub();
       const request = requestForPreset(sandboxAllocation);
-      request.runtime = { sandboxAllocation, egressMode: 'unrestricted' };
-      await runCreate(selectedContext(doStub), request);
-      expect(createdMetadata(doStub)?.workspace?.egressMode).toBe('unrestricted');
-      expect(createdMetadata(doStub)?.workspace?.egressAllowlist).toBeUndefined();
+      request.runtime = { sandboxAllocation, egressMode: 'unrestricted', egressAudit: false };
+      await expect(runCreate(selectedContext(doStub), request)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('has been retired'),
+      });
+      expectNoAllocation(doStub);
     }
   );
 
@@ -661,6 +913,7 @@ describe('explicit sandbox session creation', () => {
     { egressMode: 'allowlist' as const },
     { egressMode: 'allowlist' as const, egressAllowlist: [] },
     { egressMode: 'allowlist' as const, egressAllowlist: ['other.example.com'] },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'], egressAudit: true },
   ])('rejects a changed policy on ledger replay: %j', async policy => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
@@ -694,6 +947,183 @@ describe('explicit sandbox session creation', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
     expect(doStub.getMetadata).not.toHaveBeenCalled();
+  });
+
+  describe.each(['duplicate_settled', 'takeover', 'duplicate_reconcile_pending'] as const)(
+    '%s changed network policy',
+    admission => {
+      it('conflicts before allocation, registration, or settlement', async () => {
+        const doStub = makeDoStub();
+        const ctx = selectedContext(doStub);
+        const request = {
+          ...requestForPreset('cloudflare-containers-standard-3'),
+          runtime: {
+            sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+            egressMode: 'allowlist' as const,
+            egressAllowlist: ['api.example.com'],
+          },
+        };
+        await runCreate(ctx, request);
+        const progress = Object.assign(
+          {},
+          ...recordOperationProgressMock.mock.calls.map(call => call[2])
+        );
+        const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+        const settles = settleOperationMock.mock.calls.length;
+        const progressWrites = recordOperationProgressMock.mock.calls.length;
+        getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+        admitOperationMock.mockResolvedValueOnce({
+          admission,
+          row: makeLedgerRow({
+            organization_id: orgId,
+            status: admission === 'duplicate_settled' ? 'completed' : 'reconcile_pending',
+            canonical_result: progress,
+          }),
+        });
+
+        await expect(
+          runCreate(ctx, {
+            ...request,
+            runtime: { ...request.runtime, egressAllowlist: ['other.example.com'] },
+          })
+        ).rejects.toMatchObject({
+          code: 'CONFLICT',
+          message: 'session_create_intent_conflict',
+        });
+
+        expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+        expect(doStub.getMetadata).not.toHaveBeenCalled();
+        expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+        expect(recordOperationProgressMock).toHaveBeenCalledTimes(progressWrites);
+      });
+    }
+  );
+
+  it('conflicts a changed policy against an in-flight admitted fingerprint before effects', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = {
+      ...requestForPreset('cloudflare-containers-standard-3'),
+      runtime: {
+        sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+        egressMode: 'allowlist' as const,
+        egressAllowlist: ['api.example.com'],
+      },
+    };
+    await runCreate(ctx, request);
+    const admission = admitOperationMock.mock.calls[0][1] as {
+      initialCanonicalResult: Record<string, unknown>;
+    };
+    const allocations = selectControlPlaneSandboxMock.mock.calls.length;
+    const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+    const settles = settleOperationMock.mock.calls.length;
+    const progressWrites = recordOperationProgressMock.mock.calls.length;
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_in_flight',
+      row: makeLedgerRow({
+        organization_id: orgId,
+        status: 'admitted',
+        canonical_result: admission.initialCanonicalResult,
+      }),
+    });
+
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        runtime: { ...request.runtime, egressAllowlist: ['other.example.com'] },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledTimes(allocations);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+    expect(recordOperationProgressMock).toHaveBeenCalledTimes(progressWrites);
+  });
+
+  it('keeps the in-flight bound for an admitted row without recorded progress', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = requestForPreset('cloudflare-containers-standard-3');
+    request.runtime = {
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      egressMode: 'allowlist',
+      egressAllowlist: ['api.example.com'],
+    };
+    await runCreate(ctx, request);
+    const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+    const settles = settleOperationMock.mock.calls.length;
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_in_flight',
+      row: makeLedgerRow({ organization_id: orgId, status: 'admitted' }),
+    });
+
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        runtime: { ...request.runtime, egressAllowlist: ['other.example.com'] },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+    expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+  });
+
+  it('conflicts a restricted retry against an unrestricted Vercel creation before recovery', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    ctx.env.BYOC_VERCEL_IDS = orgId;
+    fetchByocVercelEnrollmentMock.mockResolvedValueOnce({
+      organizationId: orgId,
+      credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
+      setupStatus: 'ready',
+    });
+    const request = requestForPreset('vercel-small');
+    await runCreate(ctx, request);
+    expect(createdMetadata(doStub)?.workspace).toMatchObject({
+      sandboxProvider: 'vercel',
+      sandboxAllocation: 'vercel-small',
+    });
+    expect(createdMetadata(doStub)?.workspace?.egressAllowlist).toBeUndefined();
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledOnce();
+    const admission = admitOperationMock.mock.calls[0][1] as {
+      initialCanonicalResult: Record<string, unknown>;
+    };
+    const allocations = selectControlPlaneSandboxMock.mock.calls.length;
+    const dispatches = createCliSessionMock.mock.calls.length;
+    const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+    const settles = settleOperationMock.mock.calls.length;
+    const progressWrites = recordOperationProgressMock.mock.calls.length;
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        organization_id: orgId,
+        status: 'reconcile_pending',
+        canonical_result: admission.initialCanonicalResult,
+      }),
+    });
+
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        runtime: {
+          sandboxAllocation: 'vercel-small',
+          egressMode: 'allowlist',
+          egressAllowlist: ['api.example.com'],
+        },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledTimes(allocations);
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledOnce();
+    expect(createCliSessionMock).toHaveBeenCalledTimes(dispatches);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+    expect(recordOperationProgressMock).toHaveBeenCalledTimes(progressWrites);
   });
 
   it.each([
@@ -732,66 +1162,159 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
-  it('rejects a recovered registration that dropped the persisted policy', async () => {
-    const doStub = makeDoStub();
-    const ctx = selectedContext(doStub);
-    const request = {
-      ...requestForPreset('cloudflare-containers-standard-3'),
-      runtime: {
-        sandboxAllocation: 'cloudflare-containers-standard-3' as const,
-        egressMode: 'allowlist' as const,
-        egressAllowlist: [],
-      },
-    };
-    await runCreate(ctx, request);
-    const progress = Object.assign(
-      {},
-      ...recordOperationProgressMock.mock.calls.map(call => call[2])
-    );
-    const stored = createdMetadata(doStub);
-    if (!stored) throw new Error('Missing registered metadata');
-    doStub.getMetadata.mockResolvedValueOnce({
-      ...stored,
-      workspace: { ...stored.workspace, egressMode: undefined, egressAllowlist: undefined },
-    });
-    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [{ sessionId: KILO_SESSION_ID }]]));
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_reconcile_pending',
-      row: makeLedgerRow({
-        organization_id: orgId,
-        status: 'reconcile_pending',
-        canonical_result: progress,
-      }),
-    });
-    await expect(runCreate(ctx, request)).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'session_creation_failed',
-    });
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
-    expect(doStub.getMessageResult).not.toHaveBeenCalled();
-  });
+  it.each([
+    { dropped: 'policy', egressMode: 'allowlist' as const },
+    ...([undefined, 'unrestricted', 'allowlist'] as const).map(egressMode => ({
+      dropped: 'audit',
+      egressMode,
+    })),
+  ])(
+    'rejects a recovered registration that dropped persisted policy: %j',
+    async ({ dropped, egressMode }) => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      const request = {
+        ...requestForPreset('cloudflare-containers-standard-3'),
+        runtime: {
+          sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+          egressMode,
+          ...(egressMode === 'allowlist' ? { egressAllowlist: [] } : {}),
+          egressAudit: true,
+        },
+      };
+      await runCreate(ctx, request);
+      const progress = Object.assign(
+        {},
+        ...recordOperationProgressMock.mock.calls.map(call => call[2])
+      );
+      const stored = createdMetadata(doStub);
+      if (!stored) throw new Error('Missing registered metadata');
+      doStub.getMetadata.mockResolvedValueOnce({
+        ...stored,
+        workspace:
+          dropped === 'audit'
+            ? { ...stored.workspace, egressAudit: undefined }
+            : {
+                ...stored.workspace,
+                egressMode: undefined,
+                egressAllowlist: undefined,
+                egressAudit: undefined,
+              },
+      });
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [{ sessionId: KILO_SESSION_ID }]]));
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: makeLedgerRow({
+          organization_id: orgId,
+          status: 'reconcile_pending',
+          canonical_result: progress,
+        }),
+      });
+      await expect(runCreate(ctx, request)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'session_creation_failed',
+      });
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+      expect(doStub.getMessageResult).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(
-    SELECTABLE_SANDBOX_ALLOCATIONS.flatMap(preset => [
-      { preset, format: 'legacy' },
-      { preset, format: 'structured' },
-    ])
+    ([undefined, 'unrestricted'] as const).flatMap(egressMode =>
+      [undefined, true].map(egressAudit => ({ egressMode, egressAudit }))
+    )
+  )(
+    'rejects changed unrestricted audit on ledger replay: %j',
+    async ({ egressMode, egressAudit }) => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      const request = {
+        ...requestForPreset('cloudflare-containers-standard-3'),
+        runtime: {
+          sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+          egressMode,
+          egressAudit,
+        },
+      };
+      await runCreate(ctx, request);
+      const progress = Object.assign(
+        {},
+        ...recordOperationProgressMock.mock.calls.map(call => call[2])
+      );
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: makeLedgerRow({
+          organization_id: orgId,
+          status: 'completed',
+          canonical_result: progress,
+        }),
+      });
+      await expect(
+        runCreate(ctx, {
+          ...request,
+          runtime: { ...request.runtime, egressAudit: egressAudit !== true },
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'session_create_intent_conflict',
+      });
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+      expect(doStub.getMetadata).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([undefined, 'unrestricted'] as const)(
+    'rejects audited %s ledger replay without an intent fingerprint',
+    async egressMode => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      const request = {
+        ...requestForPreset('cloudflare-containers-standard-3'),
+        runtime: { egressMode, egressAudit: true },
+        savedSandboxAllocation: 'cloudflare-containers-standard-3' as const,
+      };
+      await runCreate(ctx, request);
+      const progress = Object.assign(
+        {},
+        ...recordOperationProgressMock.mock.calls.map(call => call[2])
+      );
+      delete progress[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: makeLedgerRow({
+          organization_id: orgId,
+          status: 'completed',
+          canonical_result: progress,
+        }),
+      });
+      await expect(runCreate(ctx, request)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'session_creation_failed',
+      });
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')).flatMap(
+      preset => [
+        { preset, format: 'legacy' },
+        { preset, format: 'structured' },
+      ]
+    )
   )(
     'persists $format $preset with its canonical allocation and valid metadata',
     async ({ preset, format }) => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
-      if (preset.startsWith('vercel-')) {
-        ctx.env.VERCEL_SANDBOX_ORG_IDS = '';
-        ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '';
-      }
       await runCreate(
         ctx,
         format === 'structured' ? requestFromStructuredAllocation(preset) : requestForPreset(preset)
       );
-      const persistedAllocation =
-        preset === 'cloudflare-single' ? 'cloudflare-containers-standard-3' : preset;
-      const sandboxKind = preset === 'cloudflare-shared' ? 'shared' : 'isolated';
+      const persistedAllocation = preset;
+      const sandboxKind = 'isolated';
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
@@ -827,30 +1350,28 @@ describe('explicit sandbox session creation', () => {
       expect(metadata.workspace?.sandboxId).toMatch(/^sbx-[0-9a-f]{48}$/);
       expect(metadata.workspace?.sandboxKind).toBe(sandboxKind);
       expect(metadata.workspace?.sandboxRoute).toBeUndefined();
-      expect(resolveSharedSandboxAssignment).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     }
   );
 
   it.each(['vercel-small', 'vercel-large'] as const)(
-    'forces the control plane for %s even when the owner is not enrolled',
+    'rejects %s when the owner has no Vercel BYOC enrollment',
     async preset => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
-      ctx.env.VERCEL_SANDBOX_ORG_IDS = '';
-      await runCreate(ctx, requestForPreset(preset));
-      expect(generateSessionIdMock).toHaveBeenCalledWith();
-      const command = createdMetadata(doStub);
-      expect(command?.workspace).toMatchObject({
-        sandboxAllocation: preset,
-        sandboxProvider: 'vercel',
-        sandboxKind: 'isolated',
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+      await expect(runCreate(ctx, requestForPreset(preset))).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Configure Vercel BYOC'),
       });
-      expect(command?.workspace?.sandboxId).toMatch(/^sbx-/);
+      expectNoAllocation(doStub);
     }
   );
 
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+  it.each(
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')).filter(
+      allocation => !allocation.startsWith('vercel-')
+    )
+  )(
     'recovers %s on same-key takeover after membership lookup fails before progress',
     async sandboxAllocation => {
       const request = requestForPreset(sandboxAllocation);
@@ -883,10 +1404,7 @@ describe('explicit sandbox session creation', () => {
         operationKey: OPERATION_KEY,
       });
       expect(generateSessionIdMock).toHaveBeenCalledOnce();
-      const persistedAllocation =
-        sandboxAllocation === 'cloudflare-single'
-          ? 'cloudflare-containers-standard-3'
-          : sandboxAllocation;
+      const persistedAllocation = sandboxAllocation;
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
@@ -977,12 +1495,15 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+  it.each(
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')).filter(
+      allocation => !allocation.startsWith('vercel-')
+    )
+  )(
     'creates the first worktree chat with %s and upstream finalization/containment semantics',
     async sandboxAllocation => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
-      ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
       const request = requestForPreset(sandboxAllocation);
       request.options = {
         ...request.options,
@@ -1000,7 +1521,7 @@ describe('explicit sandbox session creation', () => {
       expect(metadata.workspace).toMatchObject({
         worktreeId: WORKTREE_ID,
         sandboxAllocation,
-        credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: false },
+        credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
       });
       expect(metadata.finalization?.autoCommit).toBe(true);
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
@@ -1081,6 +1602,14 @@ describe('explicit sandbox session creation', () => {
           initialMessageId: INITIAL_MESSAGE_ID,
           sandboxId: `ses-${'a'.repeat(48)}`,
           sandboxProvider: 'vercel',
+          sandboxProviderBinding: {
+            kind: 'vercel',
+            source: {
+              kind: 'byoc',
+              organizationId: orgId,
+              credentialId: '22222222-2222-4222-8222-222222222222',
+            },
+          },
           sandboxAllocation: 'vercel-large',
           [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
           [SESSION_CREATE_FINALIZATION_VERSION_KEY]: finalizationVersion,
@@ -1154,7 +1683,7 @@ describe('explicit sandbox session creation', () => {
     );
   });
 
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')))(
     'replays a structured %s request against a legacy stored fingerprint',
     async sandboxAllocation => {
       const legacyRequest = requestForPreset(sandboxAllocation);
@@ -1174,7 +1703,7 @@ describe('explicit sandbox session creation', () => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
       ctx.env.SANDBOX_SELECTION_IDS = '';
-      ctx.env.VERCEL_TOKEN = '';
+      Object.assign(ctx.env, { VERCEL_TOKEN: '' });
       getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row]]));
       admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
       await expect(runCreate(ctx, request)).resolves.toEqual({
@@ -1201,7 +1730,7 @@ describe('explicit sandbox session creation', () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = '';
-    ctx.env.VERCEL_TOKEN = '';
+    Object.assign(ctx.env, { VERCEL_TOKEN: '' });
     getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row]]));
     admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
     await expect(runCreate(ctx, request)).resolves.toEqual({
@@ -1212,7 +1741,7 @@ describe('explicit sandbox session creation', () => {
     expectNoAllocation(doStub);
   });
 
-  it.each(['vercel-small', 'cloudflare-single', undefined] as const)(
+  it.each(['cloudflare-containers-standard-4', 'cloudflare-single', undefined] as const)(
     'rejects a same-key replay changing or removing the preset to %s',
     async sandboxAllocation => {
       const row = makeLedgerRow({
@@ -1221,16 +1750,16 @@ describe('explicit sandbox session creation', () => {
         canonical_result: {
           cloudAgentSessionId: WORKSPACE_SESSION_ID,
           kiloSessionId: KILO_SESSION_ID,
-          sandboxAllocation: 'vercel-large',
+          sandboxAllocation: 'cloudflare-shared',
           [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(
-            requestForPreset('vercel-large')
+            requestForPreset('cloudflare-shared')
           ),
         },
       });
       const doStub = makeDoStub();
       admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
       const request = {
-        ...requestForPreset('vercel-large'),
+        ...requestForPreset('cloudflare-shared'),
         runtime: sandboxAllocation ? { sandboxAllocation } : undefined,
       };
       await expect(runCreate(selectedContext(doStub), request)).rejects.toThrow(
@@ -1322,6 +1851,14 @@ describe('explicit sandbox session creation', () => {
         kiloSessionId: KILO_SESSION_ID,
         sandboxId: `ses-${'a'.repeat(48)}`,
         sandboxProvider: 'vercel',
+        sandboxProviderBinding: {
+          kind: 'vercel',
+          source: {
+            kind: 'byoc',
+            organizationId: orgId,
+            credentialId: '22222222-2222-4222-8222-222222222222',
+          },
+        },
         sandboxAllocation: 'vercel-large',
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
       },
@@ -1370,7 +1907,7 @@ describe('explicit sandbox session creation', () => {
     getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
     admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
     await expect(runCreate(selectedContext(doStub), request)).rejects.toThrow(
-      'creation_in_progress'
+      'Configure Vercel BYOC'
     );
     expectNoAllocation(doStub);
   });
@@ -1516,11 +2053,235 @@ describe('explicit sandbox session creation', () => {
 
     await expect(runCreate(ctx, request)).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: 'Vercel sandboxes support GitHub repositories only',
+      message: expect.stringContaining('Configure Vercel BYOC'),
     });
     expect(admitOperationMock).not.toHaveBeenCalled();
     expect(recordOperationProgressMock).not.toHaveBeenCalled();
     expectNoAllocation(doStub);
+  });
+
+  describe('environment with several repositories', () => {
+    const member = (repoFullName: string) => ({
+      identity: { platform: 'github' as const, repoFullName },
+      repoFullName,
+      leaf: repoFullName.split('/')[1] ?? repoFullName,
+    });
+    const v2Environment = {
+      environmentId: '123e4567-e89b-12d3-a456-426614174099',
+      owner: { type: 'organization' as const, id: orgId },
+      configurationRevision: 1,
+      repositories: [member('acme/repo'), member('acme/api')],
+    };
+    const v1Environment = {
+      environmentId: v2Environment.environmentId,
+      owner: v2Environment.owner,
+      configurationRevision: 1,
+      repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
+    };
+    const environmentRequest = (
+      environment: SessionCreateRequest['environment'],
+      sandboxAllocation?: SandboxAllocation,
+      environmentSandboxAllocation?: SandboxAllocation
+    ) =>
+      makeRequest({
+        ...(environment ? { environment } : {}),
+        ...(environmentSandboxAllocation ? { environmentSandboxAllocation } : {}),
+        ...(sandboxAllocation ? { runtime: { sandboxAllocation } } : {}),
+        options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+      });
+
+    it.each([
+      ['the retired shared sandbox', 'cloudflare-shared', 'has been retired'],
+      ['a Vercel sandbox', 'vercel-small', 'Vercel sandbox'],
+    ] as const)(
+      'fails a ledger create on %s before admission',
+      async (_name, allocation, reason) => {
+        const doStub = makeDoStub();
+        const ctx = selectedContext(doStub);
+        ctx.env.BYOC_VERCEL_IDS = orgId;
+        getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+
+        await expect(
+          runCreate(ctx, environmentRequest(v2Environment, allocation))
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(reason) });
+        expect(admitOperationMock).not.toHaveBeenCalled();
+        expectNoAllocation(doStub);
+      }
+    );
+
+    it("fails a ledger create whose environment's saved allocation is Vercel, before admission", async () => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      ctx.env.BYOC_VERCEL_IDS = orgId;
+      fetchByocVercelEnrollmentMock.mockResolvedValueOnce({ setupStatus: 'ready' });
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+
+      await expect(
+        createSessionWithLedger(environmentRequest(v2Environment, undefined, 'vercel-small'), ctx, {
+          ...CREATE_OPTIONS,
+          resolveSavedAllocationBeforeAdmission: true,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Vercel sandbox'),
+      });
+      expect(admitOperationMock).not.toHaveBeenCalled();
+      expectNoAllocation(doStub);
+    });
+
+    it("settles the ledger row failed when the environment's saved Vercel allocation resolves after admission", async () => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      ctx.env.BYOC_VERCEL_IDS = orgId;
+      fetchByocVercelEnrollmentMock.mockResolvedValueOnce({ setupStatus: 'ready' });
+
+      // No `resolveSavedAllocationBeforeAdmission`: the row is admitted first.
+      await expect(
+        runCreate(ctx, environmentRequest(v2Environment, undefined, 'vercel-small'))
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Vercel sandbox'),
+      });
+
+      expect(admitOperationMock).toHaveBeenCalledOnce();
+      expect(settleOperationMock).toHaveBeenCalledOnce();
+      expect(settleOptions(0)?.outboxEvent).toMatchObject({
+        properties: { outcome: 'failed' },
+      });
+      expect(doStub.registerSession).not.toHaveBeenCalled();
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    });
+
+    it('starts a V2 environment', async () => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+
+      await expect(runCreate(ctx, environmentRequest(v2Environment))).resolves.toMatchObject({
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      });
+    });
+
+    it.each([
+      ['cloudflare-shared', 'has been retired'],
+      ['vercel-small', 'Vercel sandbox'],
+    ] as const)(
+      'fails a split registration on %s before it allocates',
+      async (allocation, reason) => {
+        const doStub = makeDoStub();
+        const ctx = selectedContext(doStub);
+        ctx.env.BYOC_VERCEL_IDS = orgId;
+
+        await expect(
+          registerNewSession(environmentRequest(v2Environment, allocation), ctx)
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining(reason),
+        });
+        expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
+        expect(createCliSessionMock).not.toHaveBeenCalled();
+        expect(doStub.registerSession).not.toHaveBeenCalled();
+        expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+      }
+    );
+
+    it('starts on an isolated sandbox', async () => {
+      const doStub = makeDoStub();
+
+      await expect(
+        runCreate(
+          selectedContext(doStub),
+          environmentRequest(v2Environment, 'cloudflare-containers-standard-3')
+        )
+      ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+      expect(createdMetadata(doStub)?.workspace).toMatchObject({
+        sandboxAllocation: 'cloudflare-containers-standard-3',
+        sandboxProvider: 'cloudflare-containers',
+        sandboxKind: 'isolated',
+      });
+      expect(createdMetadata(doStub)?.environment).toMatchObject(v2Environment);
+    });
+
+    it.each([true, false])(
+      'skips a retired saved environment allocation (resolve before admission: %s)',
+      async resolveSavedAllocationBeforeAdmission => {
+        const doStub = makeDoStub();
+
+        await expect(
+          createSessionWithLedger(
+            environmentRequest(v2Environment, undefined, 'cloudflare-shared'),
+            selectedContext(doStub),
+            { ...CREATE_OPTIONS, resolveSavedAllocationBeforeAdmission }
+          )
+        ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+        expect(createdMetadata(doStub)?.workspace).toMatchObject({
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+          sandboxProvider: 'cloudflare-containers',
+          sandboxKind: 'isolated',
+        });
+        expect(createdMetadata(doStub)?.environment).toMatchObject(v2Environment);
+        expect(settleOptions(0)?.outboxEvent).toMatchObject({
+          properties: { outcome: 'completed' },
+        });
+      }
+    );
+
+    it.each([
+      'cloudflare-single',
+      'cloudflare-shared',
+      'isolated-standard',
+      'vercel-small',
+    ] as const)(
+      'skips an incompatible owner default %s and starts a V2 environment on an isolated sandbox',
+      async contextAllocation => {
+        getSandboxAllocationCandidatesMock.mockResolvedValue({
+          contextAllocation,
+        });
+        const doStub = makeDoStub();
+
+        await expect(
+          runCreate(selectedContext(doStub), environmentRequest(v2Environment))
+        ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+        expect(createdMetadata(doStub)?.workspace).toMatchObject({
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+          sandboxProvider: 'cloudflare-containers',
+          sandboxKind: 'isolated',
+        });
+        expect(createdMetadata(doStub)?.environment).toMatchObject(v2Environment);
+        expect(settleOptions(0)?.outboxEvent).toMatchObject({
+          properties: { outcome: 'completed' },
+        });
+      }
+    );
+
+    it('skips a retired shared owner default for a V1 environment', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        contextAllocation: 'cloudflare-shared',
+      });
+      const doStub = makeDoStub();
+
+      await expect(
+        runCreate(selectedContext(doStub), environmentRequest(v1Environment))
+      ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+      expect(createdMetadata(doStub)?.workspace).toMatchObject({
+        sandboxAllocation: 'cloudflare-containers-standard-3',
+        sandboxProvider: 'cloudflare-containers',
+        sandboxKind: 'isolated',
+      });
+    });
+
+    it('rejects the retired explicit shared sandbox even for a V1 environment', async () => {
+      const doStub = makeDoStub();
+
+      await expect(
+        runCreate(selectedContext(doStub), environmentRequest(v1Environment, 'cloudflare-shared'))
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('has been retired'),
+      });
+      expect(admitOperationMock).not.toHaveBeenCalled();
+      expectNoAllocation(doStub);
+    });
   });
 
   it('rejects a fresh explicit Vercel allocation for a security-remediation origin before admission', async () => {
@@ -1662,9 +2423,13 @@ describe('explicit sandbox session creation', () => {
     );
     admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
 
-    await expect(runCreate(ctx, request)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(runCreate(ctx, request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
     expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
-    expectNoAllocation(doStub);
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
   });
 
   it('does not read settings for a legacy fingerprint row without a choice', async () => {
@@ -1692,7 +2457,9 @@ describe('explicit sandbox session creation', () => {
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
     });
     expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
-    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBeUndefined();
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
   });
 
   it('admits a fresh create whose request pins a selectable allocation', async () => {
@@ -1719,37 +2486,77 @@ describe('explicit sandbox session creation', () => {
     );
   });
 
+  it('records no environment in the ledger and registers the reference with branches', async () => {
+    const request = requestForPreset('cloudflare-single');
+    const repositoryOf = (repoFullName: string) => ({
+      identity: { platform: 'github' as const, repoFullName },
+      repoFullName,
+      leaf: repoFullName.split('/')[1],
+    });
+    request.environment = {
+      environmentId: '11111111-1111-4111-8111-111111111111',
+      owner: { type: 'organization', id: orgId },
+      configurationRevision: 2,
+      repositories: [repositoryOf('acme/repo'), repositoryOf('acme/api')],
+    };
+    request.requestedEnvironment = {
+      id: '11111111-1111-4111-8111-111111111111',
+      repositories: [{ repoFullName: 'acme/api', branch: 'feature/api' }],
+    };
+    const doStub = makeDoStub();
+    admitOperationMock.mockImplementationOnce(
+      async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
+        admission: 'admitted' as const,
+        row: makeLedgerRow({
+          organization_id: orgId,
+          canonical_result: admitted.initialCanonicalResult,
+        }),
+      })
+    );
+
+    await runCreate(selectedContext(doStub), request);
+
+    const admitted = admitOperationMock.mock.calls[0]?.[1] as {
+      initialCanonicalResult: Record<string, unknown>;
+    };
+    expect(admitted.initialCanonicalResult).not.toHaveProperty('environment');
+    const metadata = createdMetadata(doStub);
+    expect(
+      metadata?.environment?.repositories?.map(entry => [entry.repoFullName, entry.branch])
+    ).toEqual([
+      ['acme/repo', metadata?.workspace?.generatedBranchName],
+      ['acme/api', 'feature/api'],
+    ]);
+  });
+
   it.each([
     { allocation: 'cloudflare-single' as const, pinned: true },
-    { allocation: 'isolated-standard' as const, pinned: false },
-  ])(
-    'pins a requested $allocation at admission only when selectable',
-    async ({ allocation, pinned }) => {
-      const request = requestForPreset(allocation);
-      const doStub = makeDoStub();
-      admitOperationMock.mockImplementationOnce(
-        async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
-          admission: 'admitted' as const,
-          row: makeLedgerRow({
-            organization_id: orgId,
-            canonical_result: admitted.initialCanonicalResult,
-          }),
-        })
-      );
+    { allocation: 'cloudflare-containers-standard-3' as const, pinned: true },
+  ])('pins a requested $allocation at admission', async ({ allocation, pinned }) => {
+    const request = requestForPreset(allocation);
+    const doStub = makeDoStub();
+    admitOperationMock.mockImplementationOnce(
+      async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
+        admission: 'admitted' as const,
+        row: makeLedgerRow({
+          organization_id: orgId,
+          canonical_result: admitted.initialCanonicalResult,
+        }),
+      })
+    );
 
-      await expect(runCreate(selectedContext(doStub), request)).resolves.toMatchObject({
-        cloudAgentSessionId: WORKSPACE_SESSION_ID,
-      });
-      const canonical = admitOperationMock.mock.calls[0]?.[1] as {
-        initialCanonicalResult: Record<string, unknown>;
-      };
-      if (pinned) {
-        expect(canonical.initialCanonicalResult).toMatchObject({ sandboxAllocation: allocation });
-      } else {
-        expect(canonical.initialCanonicalResult).not.toHaveProperty('sandboxAllocation');
-      }
+    await expect(runCreate(selectedContext(doStub), request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
+    const canonical = admitOperationMock.mock.calls[0]?.[1] as {
+      initialCanonicalResult: Record<string, unknown>;
+    };
+    if (pinned) {
+      expect(canonical.initialCanonicalResult).toMatchObject({ sandboxAllocation: allocation });
+    } else {
+      expect(canonical.initialCanonicalResult).not.toHaveProperty('sandboxAllocation');
     }
-  );
+  });
 
   it('resolves the saved allocation for a fresh prepare create', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
@@ -1774,11 +2581,16 @@ describe('explicit sandbox session creation', () => {
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
     });
     expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledOnce();
-    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe('cloudflare-shared');
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
     expect(recordOperationProgressMock).toHaveBeenCalledWith(
       expect.anything(),
       ROW_ID,
-      expect.objectContaining({ [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-shared' })
+      expect.objectContaining({ sandboxAllocation: 'cloudflare-containers-standard-3' })
+    );
+    expect(recordOperationProgressMock.mock.calls[0]?.[2]).not.toHaveProperty(
+      SESSION_CREATE_SAVED_ALLOCATION_KEY
     );
   });
 
@@ -1829,6 +2641,24 @@ describe('explicit sandbox session creation', () => {
 });
 
 describe('sessionCreateIntentFingerprint', () => {
+  it('distinguishes the stack parent, base branch, and resolved base commit', async () => {
+    const repository = {
+      type: 'github' as const,
+      repo: 'acme/repo',
+      baseBranch: 'feature/parent',
+      baseSha: 'a'.repeat(40),
+    };
+    const base = makeRequest({ parentWorktreeId: 'worktree_parent', repository });
+    const fingerprint = await sessionCreateIntentFingerprint(base);
+    const alternatives: SessionCreateRequest[] = [
+      { ...base, parentWorktreeId: 'worktree_other' },
+      { ...base, repository: { ...repository, baseBranch: 'feature/other' } },
+      { ...base, repository: { ...repository, baseSha: 'b'.repeat(40) } },
+    ];
+    for (const changed of alternatives) {
+      expect(await sessionCreateIntentFingerprint(changed)).not.toBe(fingerprint);
+    }
+  });
   it('changes when resolved runtime instructions change', async () => {
     const base = makeRequest({
       profile: { resolved: { runtimeInstructions: [{ name: 'repo-rules', content: 'v1' }] } },
@@ -1844,15 +2674,18 @@ describe('sessionCreateIntentFingerprint', () => {
 });
 
 describe('createSessionWithLedger admission ladder', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    admitOperationMock.mockReset();
+    fetchByocVercelEnrollmentMock.mockReset();
+    fetchByocVercelEnrollmentForUserMock.mockReset();
+    const actualPlacement =
+      await vi.importActual<typeof SandboxPlacementModule>('../sandbox-placement.js');
+    selectControlPlaneSandboxMock.mockReset();
+    selectControlPlaneSandboxMock.mockImplementation(actualPlacement.selectControlPlaneSandbox);
     getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
     generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({}),
@@ -1923,126 +2756,50 @@ describe('createSessionWithLedger admission ladder', () => {
     });
   });
 
-  it('rejects a new modern control-plane session before durable session effects when isolation is disabled', async () => {
-    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
-    const doStub = makeDoStub();
-    const ctx = makeContext(doStub);
-    ctx.env.RUNTIME_ISOLATION_ENABLED = 'false';
-    ctx.authToken = 'eyJhbGciOiJub25lIn0.eyJhdWQiOiJhcGkifQ.';
-
-    await expect(runCreate(ctx)).rejects.toMatchObject({
-      code: 'PRECONDITION_FAILED',
-      message: 'runtime_isolation_unavailable',
-    });
-    expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
-    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-  });
-
-  describe.each([undefined, 'true', 'false', '', 'False', '0'] as const)(
-    'workspace containment samples CREDENTIAL_CONTAINMENT_ENABLED=%s',
-    flag => {
-      it.each([
-        {
-          repository: { type: 'github', repo: 'acme/repo' },
-          expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+  describe('workspace containment', () => {
+    it.each([
+      {
+        repository: { type: 'github', repo: 'acme/repo' },
+        expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+      },
+      {
+        repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+        expected: { github: false, gitlab: true, bitbucket: false, kilocode: true },
+      },
+      {
+        repository: {
+          type: 'bitbucket',
+          url: 'https://bitbucket.org/acme/repo.git',
+          workspaceUuid: '123e4567-e89b-12d3-a456-426614174000',
+          repositoryUuid: '123e4567-e89b-12d3-a456-426614174001',
         },
-        {
-          repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
-          expected: { github: false, gitlab: true, bitbucket: false, kilocode: true },
-        },
-        {
-          repository: {
-            type: 'bitbucket',
-            url: 'https://bitbucket.org/acme/repo.git',
-            workspaceUuid: '123e4567-e89b-12d3-a456-426614174000',
-            repositoryUuid: '123e4567-e89b-12d3-a456-426614174001',
-          },
-          expected: { github: false, gitlab: false, bitbucket: true, kilocode: true },
-        },
-        {
-          repository: { type: 'git', url: 'https://example.com/acme/repo.git' },
-          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
-        },
-      ] as const)(
-        'derives $repository.type containment from the allocated workspace ID',
-        async ({ repository, expected }) => {
-          generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
-          const doStub = makeDoStub();
-          const ctx = makeContext(doStub);
-          if (flag !== undefined) ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = flag;
+        expected: { github: false, gitlab: false, bitbucket: true, kilocode: true },
+      },
+      {
+        repository: { type: 'git', url: 'https://example.com/acme/repo.git' },
+        expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+      },
+    ] as const)(
+      'derives $repository.type containment from the allocated workspace ID',
+      async ({ repository, expected }) => {
+        generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+        const doStub = makeDoStub();
+        const ctx = makeContext(doStub);
+        await runCreate(ctx, makeRequest({ repository }));
 
-          await runCreate(ctx, makeRequest({ repository }));
-
-          expect(createdMetadata(doStub)).toMatchObject(
-            expect.objectContaining({
-              identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
-              workspace: expect.objectContaining({
-                credentialContainment:
-                  flag === 'false'
-                    ? { github: false, gitlab: false, bitbucket: false, kilocode: false }
-                    : expected,
-              }),
-            })
-          );
-        }
-      );
-    }
-  );
-
-  it('persists disabled workspace containment independently of later flag changes', async () => {
-    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
-    const doStub = makeDoStub();
-    const ctx = makeContext(doStub);
-    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
-
-    await runCreate(
-      ctx,
-      makeRequest({ repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' } })
-    );
-
-    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
-
-    expect(createdMetadata(doStub)).toMatchObject(
-      expect.objectContaining({
-        identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
-        workspace: expect.objectContaining({
-          credentialContainment: {
-            github: false,
-            gitlab: false,
-            bitbucket: false,
-            kilocode: false,
-          },
-        }),
-      })
+        expect(createdMetadata(doStub)).toMatchObject(
+          expect.objectContaining({
+            identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
+            workspace: expect.objectContaining({
+              credentialContainment: expected,
+            }),
+          })
+        );
+      }
     );
   });
 
-  it('disables toggle containment for an agent ID when CREDENTIAL_CONTAINMENT_ENABLED=false', async () => {
-    const doStub = makeDoStub();
-    const ctx = makeContext(doStub);
-    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
-
-    await runCreate(
-      ctx,
-      makeRequest({ repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' } })
-    );
-
-    expect(createdMetadata(doStub)).toMatchObject(
-      expect.objectContaining({
-        identity: expect.objectContaining({ sessionId: SANDBOX_SESSION_ID }),
-        workspace: expect.objectContaining({
-          credentialContainment: {
-            github: false,
-            gitlab: false,
-            bitbucket: false,
-            kilocode: false,
-          },
-        }),
-      })
-    );
-  });
-
-  it('routes and persists isolated Standard allocation for an enrolled organization', async () => {
+  it('routes and persists a larger containers allocation for an enrolled organization', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     const doStub = makeDoStub();
@@ -2059,7 +2816,7 @@ describe('createSessionWithLedger admission ladder', () => {
     await runCreate(
       ctx,
       makeRequest({
-        runtime: { sandboxAllocation: 'isolated-standard' },
+        runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
         options: {
           operationKey: OPERATION_KEY,
           createdOnPlatform: 'cli',
@@ -2072,7 +2829,8 @@ describe('createSessionWithLedger admission ladder', () => {
       expect.objectContaining({
         sessionId: WORKSPACE_SESSION_ID,
         orgId,
-        sandboxAllocation: 'isolated-standard',
+        sandboxAllocation: 'cloudflare-containers-standard-4',
+        requestedAllocation: 'cloudflare-containers-standard-4',
       })
     );
     expect(createdMetadata(doStub)).toMatchObject(
@@ -2080,18 +2838,18 @@ describe('createSessionWithLedger admission ladder', () => {
         identity: expect.objectContaining({ orgId, createdOnPlatform: 'cli' }),
         workspace: expect.objectContaining({
           sandboxId: expect.any(String),
-          sandboxAllocation: 'isolated-standard',
-          sandboxKind: 'isolated-standard',
-          sandboxProvider: 'cloudflare',
+          sandboxAllocation: 'cloudflare-containers-standard-4',
+          sandboxKind: 'isolated',
+          sandboxProvider: 'cloudflare-containers',
         }),
       })
     );
   });
 
-  it('replays a settled organization Standard allocation', async () => {
+  it('replays a settled organization containers allocation', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const input = makeRequest({
-      runtime: { sandboxAllocation: 'isolated-standard' },
+      runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
       options: {
         operationKey: OPERATION_KEY,
         createdOnPlatform: 'cli',
@@ -2106,6 +2864,7 @@ describe('createSessionWithLedger admission ladder', () => {
         cloudAgentSessionId: SANDBOX_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
         initialMessageId: INITIAL_MESSAGE_ID,
+        sandboxAllocation: 'cloudflare-containers-standard-4',
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
       },
     });
@@ -2118,7 +2877,6 @@ describe('createSessionWithLedger admission ladder', () => {
       replayed: true,
     });
     expect(createCliSessionMock).not.toHaveBeenCalled();
-    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
@@ -2152,6 +2910,23 @@ describe('createSessionWithLedger admission ladder', () => {
     }
   );
 
+  it('refuses an admission stored in another organization scope without any effect', async () => {
+    admitOperationMock.mockResolvedValueOnce({ admission: 'organization_mismatch' });
+    const doStub = makeDoStub();
+
+    await expect(runCreate(makeContext(doStub))).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(doStub.getMessageResult).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
   it.each([
     { autoCommit: true, condenseOnComplete: true },
     { autoCommit: false, condenseOnComplete: true },
@@ -2176,6 +2951,7 @@ describe('createSessionWithLedger admission ladder', () => {
       });
 
       const result = await runCreate(ctx, request);
+      expect(result.worktreeId).toBe(WORKTREE_ID);
 
       expect(createCliSessionMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2219,6 +2995,7 @@ describe('createSessionWithLedger admission ladder', () => {
       expect(result).toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
       });
     }
   );
@@ -2288,6 +3065,7 @@ describe('createSessionWithLedger admission ladder', () => {
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
         replayed: true,
+        ...(worktreeEnabled === true ? { worktreeId: WORKTREE_ID } : {}),
       });
       expect(recordOperationProgressMock).not.toHaveBeenCalled();
       expect(settleOperationMock).not.toHaveBeenCalled();
@@ -2486,7 +3264,715 @@ describe('createSessionWithLedger admission ladder', () => {
     );
   });
 
+  it.each([
+    [
+      'ready',
+      (organizationId: string) =>
+        fetchByocVercelEnrollmentMock.mockResolvedValue({
+          organizationId,
+          credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4aa',
+          setupStatus: 'ready',
+        }),
+    ],
+    [
+      'missing',
+      (_organizationId: string) =>
+        fetchByocVercelEnrollmentMock.mockRejectedValue(
+          new ByocCredentialMissingError('f47ac10b-58cc-4372-a567-0e02b2c3d4ab')
+        ),
+    ],
+    [
+      'failing',
+      (_organizationId: string) =>
+        fetchByocVercelEnrollmentMock.mockRejectedValue(
+          new Error('credential service unavailable')
+        ),
+    ],
+  ] as const)(
+    'never reads %s BYOC credentials for the Cloudflare default',
+    async (_state, configureCredentials) => {
+      const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d4ac';
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+      Object.assign(ctx.env, {
+        BYOC_VERCEL_IDS: organizationId,
+        SANDBOX_SELECTION_IDS: organizationId,
+      });
+      getPgDbMock.mockReturnValue(
+        makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
+      );
+      admitOperationMock.mockResolvedValue({
+        admission: 'admitted',
+        row: makeLedgerRow({ organization_id: organizationId }),
+      });
+      configureCredentials(organizationId);
+
+      await runCreate(
+        ctx,
+        makeRequest({
+          options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: organizationId },
+        })
+      );
+
+      expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+      expect(fetchByocVercelEnrollmentForUserMock).not.toHaveBeenCalled();
+      expect(createdMetadata(doStub)).toMatchObject(
+        expect.objectContaining({
+          workspace: expect.objectContaining({
+            sandboxProvider: 'cloudflare-containers',
+            sandboxAllocation: 'cloudflare-containers-standard-3',
+          }),
+        })
+      );
+    }
+  );
+
+  it.each([
+    [
+      'ready',
+      (organizationId: string) =>
+        fetchByocVercelEnrollmentMock.mockResolvedValue({
+          organizationId,
+          credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4ad',
+          setupStatus: 'ready',
+        }),
+    ],
+    [
+      'missing',
+      (_organizationId: string) =>
+        fetchByocVercelEnrollmentMock.mockRejectedValue(
+          new ByocCredentialMissingError('f47ac10b-58cc-4372-a567-0e02b2c3d4ae')
+        ),
+    ],
+    [
+      'failing',
+      (_organizationId: string) =>
+        fetchByocVercelEnrollmentMock.mockRejectedValue(
+          new Error('credential service unavailable')
+        ),
+    ],
+  ] as const)(
+    'never reads %s BYOC credentials for an explicit Cloudflare choice',
+    async (_state, configureCredentials) => {
+      const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d4af';
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+      Object.assign(ctx.env, {
+        BYOC_VERCEL_IDS: organizationId,
+        SANDBOX_SELECTION_IDS: organizationId,
+      });
+      getPgDbMock.mockReturnValue(
+        makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
+      );
+      admitOperationMock.mockResolvedValue({
+        admission: 'admitted',
+        row: makeLedgerRow({ organization_id: organizationId }),
+      });
+      configureCredentials(organizationId);
+
+      await runCreate(
+        ctx,
+        makeRequest({
+          runtime: { sandboxAllocation: 'cloudflare-single' },
+          options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: organizationId },
+        })
+      );
+
+      expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+      expect(fetchByocVercelEnrollmentForUserMock).not.toHaveBeenCalled();
+      expect(createdMetadata(doStub)).toMatchObject(
+        expect.objectContaining({
+          workspace: expect.objectContaining({
+            sandboxProvider: 'cloudflare-containers',
+            sandboxAllocation: 'cloudflare-containers-standard-3',
+          }),
+        })
+      );
+    }
+  );
+
+  it.each([
+    ['cloudflare-single', 'cloudflare-containers-standard-3', 'cloudflare-containers'],
+    [
+      'cloudflare-containers-standard-4',
+      'cloudflare-containers-standard-4',
+      'cloudflare-containers',
+    ],
+  ] as const)(
+    'keeps an enrolled organization on the explicit Cloudflare allocation %s',
+    async (sandboxAllocation, persistedAllocation, sandboxProvider) => {
+      const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d480';
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+      Object.assign(ctx.env, {
+        BYOC_VERCEL_IDS: organizationId,
+        SANDBOX_SELECTION_IDS: organizationId,
+        CONTROL_PLANE_IDS: '',
+      });
+      getPgDbMock.mockReturnValue(
+        makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
+      );
+      admitOperationMock.mockResolvedValue({
+        admission: 'admitted',
+        row: makeLedgerRow({ organization_id: organizationId }),
+      });
+      fetchByocVercelEnrollmentMock.mockRejectedValue(
+        new Error('Vercel credentials must not be consulted for an explicit Cloudflare choice')
+      );
+
+      await runCreate(
+        ctx,
+        makeRequest({
+          runtime: { sandboxAllocation },
+          options: {
+            operationKey: OPERATION_KEY,
+            kilocodeOrganizationId: organizationId,
+          },
+        })
+      );
+
+      expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+      expect(fetchByocVercelEnrollmentForUserMock).not.toHaveBeenCalled();
+      expect(recordOperationProgressMock).toHaveBeenCalledWith(
+        expect.anything(),
+        ROW_ID,
+        expect.objectContaining({
+          sandboxProvider,
+          sandboxProviderBinding: { kind: sandboxProvider },
+        })
+      );
+      expect(createdMetadata(doStub)).toMatchObject(
+        expect.objectContaining({
+          workspace: expect.objectContaining({
+            sandboxAllocation: persistedAllocation,
+            sandboxProvider,
+          }),
+        })
+      );
+      expect(createCliSessionMock).toHaveBeenCalledOnce();
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+    {
+      type: 'bitbucket',
+      url: 'https://bitbucket.org/acme/repo.git',
+      workspaceUuid: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      repositoryUuid: '6ba7b810-9dad-41d1-80b4-00c04fd430c8',
+    },
+    { type: 'git', url: 'https://example.com/acme/repo.git' },
+  ] as const)('keeps an enrolled default on Cloudflare for $type', async repository => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d481';
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, {
+      BYOC_VERCEL_IDS: organizationId,
+      SANDBOX_SELECTION_IDS: organizationId,
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
+    );
+    admitOperationMock.mockResolvedValue({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: organizationId }),
+    });
+    fetchByocVercelEnrollmentMock.mockRejectedValue(
+      new Error('Vercel credentials must not be consulted for the Cloudflare default')
+    );
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        repository,
+        options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: organizationId },
+      })
+    );
+
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+    expect(fetchByocVercelEnrollmentForUserMock).not.toHaveBeenCalled();
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          sandboxProvider: 'cloudflare-containers',
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+        }),
+      })
+    );
+    expect(createCliSessionMock).toHaveBeenCalledOnce();
+  });
+
+  it('keeps an enrolled default on Cloudflare for a security-remediation origin', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d482';
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, {
+      BYOC_VERCEL_IDS: organizationId,
+      SANDBOX_SELECTION_IDS: organizationId,
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
+    );
+    admitOperationMock.mockResolvedValue({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: organizationId }),
+    });
+    fetchByocVercelEnrollmentMock.mockRejectedValue(
+      new Error('Vercel credentials must not be consulted for the Cloudflare default')
+    );
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        options: {
+          operationKey: OPERATION_KEY,
+          kilocodeOrganizationId: organizationId,
+          createdOnPlatform: 'security-remediation',
+        },
+      })
+    );
+
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ sandboxProvider: 'cloudflare-containers' }),
+      })
+    );
+  });
+
+  it('allocates an explicitly selected Vercel session on the control plane before recording session identity', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d480';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: organizationId }),
+    });
+    const credentialId = 'f47ac10b-58cc-4372-a567-0e02b2c3d481';
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    const getControlSession = vi.spyOn(ctx.env.SANDBOX_SESSION, 'get');
+    Object.assign(ctx.env, {
+      BYOC_VERCEL_IDS: organizationId,
+      SANDBOX_SELECTION_IDS: organizationId,
+      CONTROL_PLANE_IDS: '',
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
+    );
+    generateSessionIdMock.mockReturnValueOnce(CONTROL_CLOUD_AGENT_SESSION_ID);
+    selectControlPlaneSandboxMock.mockResolvedValueOnce({
+      ...PLACED_SANDBOX_DECISION,
+      provider: 'vercel',
+    });
+    fetchByocVercelEnrollmentMock.mockResolvedValue({
+      organizationId,
+      credentialId,
+      setupStatus: 'ready',
+    });
+
+    const result = await runCreate(
+      ctx,
+      makeRequest({
+        runtime: { sandboxAllocation: 'vercel-small' },
+        options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: organizationId },
+      })
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith();
+    expect(recordOperationProgressMock).toHaveBeenNthCalledWith(1, expect.any(Object), ROW_ID, {
+      cloudAgentSessionId: CONTROL_CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      initialMessageId: INITIAL_MESSAGE_ID,
+      [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
+      [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+      createIntentFingerprint: expect.any(String),
+      sandboxAllocation: 'vercel-small',
+    });
+    expect(createSessionReportMock).toHaveBeenCalledWith(
+      {
+        cloudAgentSessionId: CONTROL_CLOUD_AGENT_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        initialMessageId: INITIAL_MESSAGE_ID,
+      },
+      ctx.env
+    );
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledWith(ctx.env, organizationId);
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledWith({
+      env: ctx.env,
+      sessionId: CONTROL_CLOUD_AGENT_SESSION_ID,
+      userId: USER_ID,
+      orgId: organizationId,
+      botId: undefined,
+      codeReview: false,
+      sandboxAllocation: 'vercel-small',
+      requestedAllocation: 'vercel-small',
+    });
+    expect(recordOperationProgressMock).toHaveBeenNthCalledWith(2, expect.any(Object), ROW_ID, {
+      sandboxId: PLACED_SANDBOX_ID,
+      sandboxProvider: 'vercel',
+      sandboxKind: 'isolated',
+      sandboxProviderBinding: {
+        kind: 'vercel',
+        source: { kind: 'byoc', organizationId, credentialId },
+      },
+    });
+    expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
+      {
+        cloudAgentSessionId: CONTROL_CLOUD_AGENT_SESSION_ID,
+        sandboxId: PLACED_SANDBOX_ID,
+      },
+      ctx.env
+    );
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: KILO_SESSION_ID,
+        cloudAgentSessionId: CONTROL_CLOUD_AGENT_SESSION_ID,
+        kiloUserId: USER_ID,
+        organizationId,
+        createdOnPlatform: 'cloud-agent',
+        gitUrl: 'https://github.com/acme/repo',
+      })
+    );
+    expect(getControlSession).toHaveBeenCalledOnce();
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          identity: expect.objectContaining({ sessionId: CONTROL_CLOUD_AGENT_SESSION_ID }),
+          workspace: expect.objectContaining({
+            sandboxId: PLACED_SANDBOX_ID,
+            sandboxProvider: 'vercel',
+            sandboxProviderBinding: {
+              kind: 'vercel',
+              source: { kind: 'byoc', organizationId, credentialId },
+            },
+          }),
+        }),
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: CONTROL_CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+  });
+
+  it('allocates an explicit personal Vercel choice only with ready BYOC credentials', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, { BYOC_VERCEL_IDS: '*', SANDBOX_SELECTION_IDS: USER_ID });
+    const credentialId = 'f47ac10b-58cc-4372-a567-0e02b2c3d484';
+    fetchByocVercelEnrollmentForUserMock.mockResolvedValue({
+      userId: USER_ID,
+      credentialId,
+      setupStatus: 'ready',
+    });
+    selectControlPlaneSandboxMock.mockResolvedValueOnce({
+      ...PLACED_SANDBOX_DECISION,
+      provider: 'vercel',
+    });
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        runtime: { sandboxAllocation: 'vercel-small' },
+        options: { operationKey: OPERATION_KEY },
+      })
+    );
+
+    expect(fetchByocVercelEnrollmentForUserMock).toHaveBeenCalledWith(ctx.env, USER_ID);
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ROW_ID,
+      expect.objectContaining({ sandboxAllocation: 'vercel-small' })
+    );
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          sandboxProvider: 'vercel',
+          sandboxProviderBinding: {
+            kind: 'vercel',
+            source: { kind: 'byoc', userId: USER_ID, credentialId },
+          },
+        }),
+      })
+    );
+  });
+
+  it.each(['pending', 'failed'] as const)(
+    'rejects an explicit Vercel choice when BYOC setup is %s',
+    async setupStatus => {
+      const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d485';
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+      Object.assign(ctx.env, {
+        BYOC_VERCEL_IDS: organizationId,
+        SANDBOX_SELECTION_IDS: organizationId,
+      });
+      getPgDbMock.mockReturnValue(
+        makeDb([[{ id: 'member' }], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+      );
+      admitOperationMock.mockResolvedValue({
+        admission: 'admitted',
+        row: makeLedgerRow({ organization_id: organizationId }),
+      });
+      fetchByocVercelEnrollmentMock.mockResolvedValue({
+        organizationId,
+        credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d486',
+        setupStatus,
+      });
+      selectControlPlaneSandboxMock.mockResolvedValueOnce({
+        ...PLACED_SANDBOX_DECISION,
+        provider: 'vercel',
+      });
+
+      await expect(
+        runCreate(
+          ctx,
+          makeRequest({
+            runtime: { sandboxAllocation: 'vercel-small' },
+            options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: organizationId },
+          })
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringMatching(/vercel/i),
+      });
+      expect(fetchByocVercelEnrollmentMock).toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects an explicit Vercel choice when BYOC credentials are missing', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d487';
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, {
+      BYOC_VERCEL_IDS: organizationId,
+      SANDBOX_SELECTION_IDS: organizationId,
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    admitOperationMock.mockResolvedValue({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: organizationId }),
+    });
+    fetchByocVercelEnrollmentMock.mockRejectedValue(
+      new ByocCredentialMissingError('f47ac10b-58cc-4372-a567-0e02b2c3d488')
+    );
+    selectControlPlaneSandboxMock.mockResolvedValueOnce({
+      ...PLACED_SANDBOX_DECISION,
+      provider: 'vercel',
+    });
+
+    await expect(
+      runCreate(
+        ctx,
+        makeRequest({
+          runtime: { sandboxAllocation: 'vercel-small' },
+          options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: organizationId },
+        })
+      )
+    ).rejects.toThrow();
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the selected Vercel credential lookup fails', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d489';
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, {
+      BYOC_VERCEL_IDS: organizationId,
+      SANDBOX_SELECTION_IDS: organizationId,
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    admitOperationMock.mockResolvedValue({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: organizationId }),
+    });
+    fetchByocVercelEnrollmentMock.mockRejectedValue(new Error('credential service unavailable'));
+    selectControlPlaneSandboxMock.mockResolvedValueOnce({
+      ...PLACED_SANDBOX_DECISION,
+      provider: 'vercel',
+    });
+
+    await expect(
+      runCreate(
+        ctx,
+        makeRequest({
+          runtime: { sandboxAllocation: 'vercel-small' },
+          options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: organizationId },
+        })
+      )
+    ).rejects.toThrow();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('keeps BYOC-enrolled Code Reviewer sessions on their existing Cloudflare plane', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d482';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: organizationId }),
+    });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    const getControlSession = vi.spyOn(ctx.env.SANDBOX_SESSION, 'get');
+    Object.assign(ctx.env, {
+      BYOC_VERCEL_IDS: organizationId,
+      CONTROL_PLANE_IDS: '',
+    });
+    selectControlPlaneSandboxMock.mockResolvedValueOnce({
+      ...PLACED_SANDBOX_DECISION,
+      sandboxKind: 'code-review',
+      provider: 'cloudflare',
+    });
+    const request = makeRequest({
+      options: {
+        operationKey: OPERATION_KEY,
+        kilocodeOrganizationId: organizationId,
+        createdOnPlatform: 'code-review',
+      },
+    });
+
+    const result = await createSessionWithLedger(request, ctx, {
+      ...CREATE_OPTIONS,
+      billingOrigin: 'code-review',
+    });
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith();
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Object),
+      ROW_ID,
+      expect.objectContaining({ cloudAgentSessionId: SANDBOX_SESSION_ID })
+    );
+    expect(recordOperationProgressMock).toHaveBeenNthCalledWith(2, expect.any(Object), ROW_ID, {
+      sandboxId: PLACED_SANDBOX_ID,
+      sandboxProvider: 'cloudflare',
+      sandboxKind: 'code-review',
+      sandboxProviderBinding: { kind: 'cloudflare' },
+    });
+    expect(getControlSession).toHaveBeenCalledOnce();
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          identity: expect.objectContaining({
+            sessionId: SANDBOX_SESSION_ID,
+            billingOrigin: 'code-review',
+          }),
+          workspace: expect.objectContaining({
+            sandboxId: PLACED_SANDBOX_ID,
+            sandboxProvider: 'cloudflare',
+            sandboxProviderBinding: { kind: 'cloudflare' },
+          }),
+        }),
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+  });
+
+  it('keeps an enrolled untrusted code-review label on the Cloudflare default', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d483';
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, {
+      BYOC_VERCEL_IDS: organizationId,
+      SANDBOX_SELECTION_IDS: organizationId,
+    });
+    admitOperationMock.mockResolvedValue({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: organizationId }),
+    });
+    fetchByocVercelEnrollmentMock.mockRejectedValue(
+      new Error('Vercel credentials must not be consulted for the Cloudflare default')
+    );
+
+    await createSessionWithLedger(
+      makeRequest({
+        options: {
+          operationKey: OPERATION_KEY,
+          kilocodeOrganizationId: organizationId,
+          createdOnPlatform: 'code-review',
+        },
+      }),
+      ctx,
+      { ...CREATE_OPTIONS, billingOrigin: 'cloud-agent' }
+    );
+
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ sandboxProvider: 'cloudflare-containers' }),
+      })
+    );
+  });
+
+  it('keeps a personal wildcard-enrolled session on the Cloudflare default', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, { BYOC_VERCEL_IDS: '*', SANDBOX_SELECTION_IDS: USER_ID });
+    fetchByocVercelEnrollmentForUserMock.mockRejectedValue(
+      new Error('Vercel credentials must not be consulted for the Cloudflare default')
+    );
+
+    await runCreate(ctx);
+
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+    expect(fetchByocVercelEnrollmentForUserMock).not.toHaveBeenCalled();
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          sandboxProvider: 'cloudflare-containers',
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+        }),
+      })
+    );
+  });
+
+  it('keeps an enrolled personal session on an explicit Cloudflare allocation', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, { BYOC_VERCEL_IDS: USER_ID, SANDBOX_SELECTION_IDS: USER_ID });
+    fetchByocVercelEnrollmentForUserMock.mockRejectedValue(
+      new Error('Vercel credentials must not be consulted for an explicit Cloudflare choice')
+    );
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        runtime: { sandboxAllocation: 'cloudflare-containers-standard-3' },
+        options: { operationKey: OPERATION_KEY },
+      })
+    );
+
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+    expect(fetchByocVercelEnrollmentForUserMock).not.toHaveBeenCalled();
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          sandboxProvider: 'cloudflare-containers',
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+          sandboxKind: 'isolated',
+        }),
+      })
+    );
+  });
+
   it('passes a normalized GitHub repository URL to the session-ingest create call', async () => {
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ resource_key: null }),
+    });
     const ctx = makeContext(makeDoStub());
 
     await runCreate(
@@ -2815,6 +4301,67 @@ describe('createSessionWithLedger admission ladder', () => {
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
+  it('rewrites the parent child registry hint on a completed replay', async () => {
+    const parentSessionId = 'workspace_parent';
+    const request = makeRequest({
+      parentCloudAgentSessionId: parentSessionId,
+      options: { operationKey: OPERATION_KEY },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: makeLedgerRow({
+        status: 'completed',
+        canonical_result: {
+          cloudAgentSessionId: WORKSPACE_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          initialMessageId: INITIAL_MESSAGE_ID,
+          [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+        },
+      }),
+    });
+    const doStub = makeDoStub();
+
+    await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
+      replayed: true,
+    });
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      initialMessageId: INITIAL_MESSAGE_ID,
+      worktreeId: WORKTREE_ID,
+    });
+  });
+
+  it('replays a completed spawn when the parent registry hint write fails', async () => {
+    const request = makeRequest({
+      parentCloudAgentSessionId: 'workspace_parent',
+      options: { operationKey: OPERATION_KEY },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: makeLedgerRow({
+        status: 'completed',
+        canonical_result: {
+          cloudAgentSessionId: SANDBOX_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          initialMessageId: INITIAL_MESSAGE_ID,
+        },
+      }),
+    });
+    const doStub = makeDoStub({
+      recordCloudAgentChildSession: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
+    });
+
+    await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
   it('rejects a settled row without canonical IDs as a non-retryable failure', async () => {
     admitOperationMock.mockResolvedValueOnce({
       admission: 'duplicate_settled',
@@ -2892,17 +4439,252 @@ describe('createSessionWithLedger admission ladder', () => {
     expect(settleOperationMock).not.toHaveBeenCalled();
     expect(markReconcilePendingMock).not.toHaveBeenCalled();
   });
+
+  it('registers an authenticated scoped child as a worktree workspace without spawn authority', async () => {
+    const doStub = makeDoStub();
+    const ctx = modernContext(scopedChildContext(makeContext(doStub)));
+    const expectedWorktreeId = `worktree_${SANDBOX_SESSION_ID.slice('workspace_'.length)}`;
+
+    await expect(runCreate(ctx, scopedChildRequest())).resolves.toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      worktreeId: expectedWorktreeId,
+    });
+
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ROW_ID,
+      expect.objectContaining({ [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true })
+    );
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+        createdOnPlatform: 'cloud-agent-web',
+        cloudAgentWorktreeId: expectedWorktreeId,
+        cloudAgentWorktreeLocation: expect.objectContaining({ sandboxId: expect.any(String) }),
+      })
+    );
+    const metadata = createdMetadata(doStub);
+    expect(metadata).toMatchObject({
+      parentCloudAgentSessionId: PARENT_SESSION_ID,
+      allowSubagentSessions: false,
+      identity: expect.objectContaining({ createdOnPlatform: 'cloud-agent-web' }),
+      workspace: expect.objectContaining({
+        worktreeId: expectedWorktreeId,
+        workspacePath: expect.stringContaining(expectedWorktreeId),
+      }),
+    });
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+        worktreeId: expectedWorktreeId,
+      })
+    );
+  });
+
+  it('replays an authenticated scoped child with its recorded worktree', async () => {
+    const input = scopedChildRequest();
+    const expectedWorktreeId = `worktree_${SANDBOX_SESSION_ID.slice('workspace_'.length)}`;
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: makeLedgerRow({
+        status: 'completed',
+        canonical_result: {
+          cloudAgentSessionId: SANDBOX_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          initialMessageId: INITIAL_MESSAGE_ID,
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+          [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
+        },
+      }),
+    });
+    const doStub = makeDoStub();
+    const ctx = modernContext(scopedChildContext(makeContext(doStub)));
+
+    await expect(runCreate(ctx, input)).resolves.toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      worktreeId: `worktree_${SANDBOX_SESSION_ID.slice('workspace_'.length)}`,
+      replayed: true,
+    });
+
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+        worktreeId: expectedWorktreeId,
+      })
+    );
+  });
+
+  it.each([
+    {
+      name: 'no implicit configuration',
+      legacyProfile: { resolved: {} },
+      profile: { resolved: {} },
+    },
+    {
+      name: 'implicit environment and profile configuration',
+      legacyProfile: { resolved: {} },
+      profile: {
+        resolvedProfileId: 'default-profile',
+        resolved: {
+          setupCommands: ['pnpm install'],
+          mcpServers: { docs: { type: 'remote', url: 'https://mcp.example.com/docs' } },
+          runtimeInstructions: [{ name: 'repo-rules', content: 'Follow repository conventions' }],
+          kiloCommands: [{ name: 'verify', template: 'Run the tests' }],
+        },
+      },
+    },
+    {
+      name: 'inline overrides and implicit configuration',
+      legacyProfile: {
+        overrides: { setupCommands: ['pnpm build'] },
+        resolved: { setupCommands: ['pnpm build'] },
+      },
+      profile: {
+        overrides: { setupCommands: ['pnpm build'] },
+        resolved: {
+          setupCommands: ['pnpm install', 'pnpm build'],
+          runtimeInstructions: [{ name: 'repo-rules', content: 'Follow repository conventions' }],
+        },
+      },
+    },
+    {
+      name: 'an explicit profile and implicit environment',
+      legacyProfile: {
+        id: 'explicit-profile',
+        resolved: { setupCommands: ['pnpm build'] },
+      },
+      profile: {
+        id: 'explicit-profile',
+        resolved: { setupCommands: ['pnpm install', 'pnpm build'] },
+      },
+    },
+  ] satisfies {
+    name: string;
+    legacyProfile: SessionCreateRequest['profile'];
+    profile: SessionCreateRequest['profile'];
+  }[])(
+    'replays a legacy scoped child fingerprint with $name without converting worktree state',
+    async ({ legacyProfile, profile }) => {
+      const input: SessionCreateRequest = { ...scopedChildRequest(), profile };
+      const legacyFingerprint = await sessionCreateIntentFingerprint({
+        ...input,
+        profile: legacyProfile,
+        options: { ...input.options, createdOnPlatform: 'cloud-agent' },
+      });
+      vi.mocked(mergeProfileConfiguration).mockResolvedValue({
+        setupCommands: ['pnpm build'],
+      });
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: makeLedgerRow({
+          status: 'completed',
+          canonical_result: {
+            cloudAgentSessionId: SANDBOX_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+            initialMessageId: INITIAL_MESSAGE_ID,
+            sandboxId: 'ses-0123456789abcdef',
+            sandboxProvider: 'cloudflare',
+            [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
+            [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+            [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: legacyFingerprint,
+          },
+        }),
+      });
+      const doStub = makeDoStub();
+      const ctx = modernContext(scopedChildContext(makeContext(doStub)));
+
+      await expect(runCreate(ctx, input)).resolves.toEqual({
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        replayed: true,
+      });
+
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+      const childCall = doStub.recordCloudAgentChildSession.mock.calls.at(-1)?.[0];
+      expect(childCall).not.toHaveProperty('worktreeId');
+      if (input.profile?.id) {
+        expect(mergeProfileConfiguration).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ profileId: input.profile.id, environment: undefined })
+        );
+      } else {
+        expect(mergeProfileConfiguration).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each([
+    {
+      name: 'the prompt',
+      change: { initialTurn: { type: 'prompt', prompt: 'Changed prompt' } },
+    },
+    {
+      name: 'inline setup commands',
+      change: { profile: { overrides: { setupCommands: ['pnpm build'] } } },
+    },
+    {
+      name: 'the explicit profile id',
+      change: { profile: { id: 'different-profile' } },
+    },
+  ] satisfies { name: string; change: Partial<SessionCreateRequest> }[])(
+    'rejects a legacy scoped child fingerprint when $name changed',
+    async ({ change }) => {
+      vi.mocked(mergeProfileConfiguration).mockResolvedValue({});
+      const input = scopedChildRequest();
+      const legacyFingerprint = await sessionCreateIntentFingerprint({
+        ...input,
+        profile: { resolved: {} },
+        options: { ...input.options, createdOnPlatform: 'cloud-agent' },
+      });
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: makeLedgerRow({
+          status: 'completed',
+          canonical_result: {
+            cloudAgentSessionId: SANDBOX_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+            initialMessageId: INITIAL_MESSAGE_ID,
+            sandboxId: 'ses-0123456789abcdef',
+            sandboxProvider: 'cloudflare',
+            [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
+            [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+            [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: legacyFingerprint,
+          },
+        }),
+      });
+      const doStub = makeDoStub();
+      const ctx = modernContext(scopedChildContext(makeContext(doStub)));
+
+      await expect(
+        runCreate(ctx, {
+          ...input,
+          ...change,
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'session_create_intent_conflict',
+      });
+
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(doStub.recordCloudAgentChildSession).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('createSessionWithLedger takeover reconciliation ladder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fetchByocVercelEnrollmentMock.mockReset();
     generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
     recordOperationProgressMock.mockResolvedValue(undefined);
@@ -3221,6 +5003,58 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
   });
 
+  it('(d) rewrites the parent child registry hint when reconciling a completed spawn', async () => {
+    const request = makeRequest({
+      parentCloudAgentSessionId: 'workspace_parent',
+      options: { operationKey: OPERATION_KEY },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({ canonical_result: canonicalIds }),
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub();
+
+    await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      initialMessageId: INITIAL_MESSAGE_ID,
+    });
+  });
+
+  it('(d) replays a reconciled spawn when the parent registry hint write fails', async () => {
+    const request = makeRequest({
+      parentCloudAgentSessionId: 'workspace_parent',
+      options: { operationKey: OPERATION_KEY },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({ canonical_result: canonicalIds }),
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub({
+      recordCloudAgentChildSession: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
+    });
+
+    await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ rowId: ROW_ID, status: 'completed', outcomeCode: 'ok' })
+    );
+  });
+
   it('(d) settles failed and surfaces session_creation_failed when the found initial message status is failed', async () => {
     // The initial message was admitted but ended in a terminal failure. The
     // ladder must settle the row as a terminal failure and surface the typed
@@ -3516,8 +5350,8 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
   });
 
   it('regression: concurrent reconcile retries run the effect once and report creation_in_progress to the rest', async () => {
-    // The first retry atomically claimed the reconciliation lease and may
-    // reconcile; every concurrent retry sees the live lease and must not.
+    // The first admission atomically claims the reconciliation lease and may
+    // reconcile; every concurrent admission sees the live lease and must not.
     admitOperationMock
       .mockResolvedValueOnce({
         admission: 'duplicate_reconcile_pending',
@@ -3534,20 +5368,24 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const [winner, loser] = await Promise.all([
-      runCreate(ctx),
-      runCreate(ctx).then(
-        () => null,
-        (error: unknown) => error
-      ),
-    ]);
+    const outcomes = await Promise.allSettled([runCreate(ctx), runCreate(ctx)]);
 
-    expect(winner).toEqual({
-      cloudAgentSessionId: SANDBOX_SESSION_ID,
-      kiloSessionId: KILO_SESSION_ID,
-      replayed: true,
-    });
-    expect(loser).toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    expect(outcomes).toEqual(
+      expect.arrayContaining([
+        {
+          status: 'fulfilled',
+          value: {
+            cloudAgentSessionId: SANDBOX_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+            replayed: true,
+          },
+        },
+        {
+          status: 'rejected',
+          reason: expect.objectContaining({ code: 'CONFLICT', message: 'creation_in_progress' }),
+        },
+      ])
+    );
     // Exactly one retry reconciled: the ladder read the DO state once.
     expect(doStub.getMessageResult).toHaveBeenCalledTimes(1);
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
@@ -3651,10 +5489,11 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
 
   beforeEach(() => {
     vi.clearAllMocks();
+    admitOperationMock.mockReset();
+    fetchByocVercelEnrollmentMock.mockReset();
     getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({ kind: 'isolated', sandboxId });
     selectControlPlaneSandboxMock.mockResolvedValue(PLACED_SANDBOX_DECISION);
     admitOperationMock.mockResolvedValue({ admission: 'admitted', row: makeLedgerRow() });
     settleOperationMock.mockResolvedValue({ settled: true });
@@ -3767,7 +5606,69 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     }
   );
 
-  it.each(['admission', 'isolation', 'model'] as const)(
+  it('filters unavailable built-in agent models when resuming an allocation', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d491';
+    const createdOnPlatform = 'cloud-agent-web';
+    const builtinAgents = {
+      plan: { model: 'blocked/model', variant: 'high', disable: true },
+      debug: { model: 'allowed/model', variant: 'low' },
+      ask: { model: null },
+    };
+    const input = request({
+      options: { ...request().options, kilocodeOrganizationId: organizationId },
+      profile: { resolved: { builtinAgents } },
+    });
+    const stub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = modernContext(context(stub), organizationId);
+    vi.mocked(assertKiloModelAvailable).mockImplementation(async ({ submittedModel }) => {
+      if (submittedModel === 'blocked/model') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'model blocked for organization' });
+      }
+    });
+    const progress = await canonicalProgress(input);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        organization_id: organizationId,
+        status: 'reconcile_pending',
+        canonical_result: progress,
+      }),
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[ownershipRow({ organizationId })], [{ email: 'test@example.com' }]])
+    );
+
+    await expect(runCreate(ctx, input)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+
+    expect(createdMetadata(stub)?.profile?.builtinAgents).toEqual({
+      plan: { disable: true },
+      debug: { model: 'allowed/model', variant: 'low' },
+      ask: { model: null },
+    });
+    expect(assertKiloModelAvailable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        submittedModel: 'blocked/model',
+        originalToken: 'runtime-token',
+        originalOrganizationId: organizationId,
+        createdOnPlatform,
+      })
+    );
+    expect(assertKiloModelAvailable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        submittedModel: 'allowed/model',
+        originalToken: 'runtime-token',
+        originalOrganizationId: organizationId,
+        createdOnPlatform,
+      })
+    );
+    expect(input.profile?.resolved?.builtinAgents).toEqual(builtinAgents);
+  });
+
+  it.each(['admission', 'model'] as const)(
     'fails closed on resumed modern %s rejection',
     async failure => {
       const input = request();
@@ -3783,8 +5684,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
         vi.mocked(createRuntimeAuthorization).mockRejectedValueOnce(
           new Error('Invalid runtime admission')
         );
-      } else if (failure === 'isolation') {
-        ctx.env.RUNTIME_ISOLATION_ENABLED = 'false';
       } else {
         vi.mocked(assertKiloModelAvailable).mockRejectedValueOnce(new Error('Model unavailable'));
       }
@@ -3796,6 +5695,101 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(settleOperationMock).not.toHaveBeenCalled();
     }
   );
+
+  it('reconciles the original BYOC worktree binding after enrollment changes without reallocating', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d488';
+    const credentialId = 'f47ac10b-58cc-4372-a567-0e02b2c3d489';
+    const input = request({
+      runtime: { sandboxAllocation: 'vercel-large' },
+      options: { ...request().options, kilocodeOrganizationId: organizationId },
+    });
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    ctx.env.BYOC_VERCEL_IDS = organizationId;
+    ctx.env.SANDBOX_SELECTION_IDS = organizationId;
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: organizationId }),
+    });
+    selectControlPlaneSandboxMock.mockResolvedValueOnce({
+      ...PLACED_SANDBOX_DECISION,
+      provider: 'vercel',
+    });
+    fetchByocVercelEnrollmentMock.mockResolvedValue({
+      organizationId,
+      credentialId,
+      setupStatus: 'ready',
+    });
+    createCliSessionMock.mockRejectedValueOnce(new Error('ownership response lost after commit'));
+
+    await expect(runCreate(ctx, input)).rejects.toThrow('ownership response lost after commit');
+    const storedProgress: Record<string, unknown> = Object.assign(
+      {},
+      ...recordOperationProgressMock.mock.calls.map(call => call[2])
+    );
+    const sandboxProviderBinding = {
+      kind: 'vercel',
+      source: { kind: 'byoc', organizationId, credentialId },
+    };
+    expect(storedProgress).toMatchObject({
+      [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+      sandboxId: PLACED_SANDBOX_ID,
+      sandboxProvider: 'vercel',
+      sandboxProviderBinding,
+      sandboxAllocation: 'vercel-large',
+    });
+    const enrollmentLookups = fetchByocVercelEnrollmentMock.mock.calls.length;
+    expect(enrollmentLookups).toBeGreaterThan(0);
+    expect(fetchByocVercelEnrollmentForUserMock).not.toHaveBeenCalled();
+    ctx.env.BYOC_VERCEL_IDS = '';
+    const reconcileRow = makeLedgerRow({
+      organization_id: organizationId,
+      status: 'reconcile_pending',
+      canonical_result: storedProgress,
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: reconcileRow,
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([
+        [{ id: 'member' }],
+        [reconcileRow],
+        [ownershipRow({ organizationId })],
+        [{ email: 'test@example.com' }],
+      ])
+    );
+
+    await expect(runCreate(ctx, input)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
+      replayed: true,
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          workspace: expect.objectContaining({
+            sandboxId: PLACED_SANDBOX_ID,
+            sandboxProvider: 'vercel',
+            sandboxProviderBinding,
+            worktreeId: WORKTREE_ID,
+            workspacePath: `/workspace/${organizationId}/${USER_ID}/worktrees/${WORKTREE_ID}`,
+          }),
+          finalization: input.finalization,
+        }),
+      })
+    );
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledTimes(enrollmentLookups);
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledOnce();
+    expect(generateSessionIdMock).toHaveBeenCalledOnce();
+    expect(createCliSessionMock).toHaveBeenCalledOnce();
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
+  });
 
   it.each([true, false, undefined])(
     'recovers committed ownership with autoCommit=%s without changing the initial turn',
@@ -3837,6 +5831,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(result).toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
         replayed: true,
       });
       expect(createCliSessionMock).toHaveBeenCalledTimes(1);
@@ -3844,7 +5839,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(generateKiloSessionIdMock).toHaveBeenCalledTimes(1);
       // The replay rebuilds the recorded placed key; it never decides a second one.
       expect(selectControlPlaneSandboxMock).toHaveBeenCalledTimes(1);
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
       const rpcInput = createdRpcInput(doStub);
       expect(rpcInput.metadata).toMatchObject({
@@ -3899,6 +5893,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
             ...recordOperationProgressMock.mock.calls.map(call => call[2])
           );
           vi.clearAllMocks();
+          fetchByocVercelEnrollmentMock.mockReset();
           const db = makeDb([[ownershipRow()]]);
           const select = vi.spyOn(db, 'select');
           getPgDbMock.mockReturnValue(db);
@@ -4007,6 +6002,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     await expect(runCreate(ctx, input)).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
       replayed: true,
     });
 
@@ -4083,6 +6079,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       ).resolves.toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
         replayed: true,
       });
 
@@ -4111,12 +6108,92 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       });
       expect(generateSessionIdMock).not.toHaveBeenCalled();
       expect(generateKiloSessionIdMock).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
       expect(recordOperationProgressMock).not.toHaveBeenCalled();
       expect(deleteCliSessionMock).not.toHaveBeenCalled();
       expect(storedProgress[SESSION_CREATE_FINALIZATION_VERSION_KEY]).toBeUndefined();
     }
   );
+
+  it('resumes an ownership-absent continuation clone with the worktree placement', async () => {
+    const input = request({
+      initialTurn: undefined,
+      clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      ownershipTitle: 'Local session',
+      options: {
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'agent-manager',
+        clientProvenance: 'agent-manager',
+        workspaceContinuation: true,
+      },
+    });
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    const storedProgress = await canonicalProgress(input, {
+      [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: storedProgress }),
+    });
+    // No ownership row: the clone create resumes the stored destination IDs.
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    createCliSessionMock.mockResolvedValueOnce({ status: 'ready' });
+
+    await expect(runCreate(ctx, input)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    // The clone resume now sends the worktree id and location it previously
+    // omitted, plus the copied source title.
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloudAgentWorktreeId: WORKTREE_ID,
+        cloudAgentWorktreeLocation: { sandboxId, provider: 'cloudflare' },
+        title: 'Local session',
+      })
+    );
+    expect(createdMetadata(doStub)).toMatchObject({ continuation: true });
+  });
+
+  it('registers a continuation clone resume without an initial turn and without re-cloning', async () => {
+    const input = request({
+      initialTurn: undefined,
+      clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      ownershipTitle: 'Local session',
+      options: {
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'agent-manager',
+        clientProvenance: 'agent-manager',
+        workspaceContinuation: true,
+      },
+    });
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    const storedProgress = await canonicalProgress(input, {
+      [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: storedProgress }),
+    });
+    // Ownership present but no DO metadata: resume through the register path.
+    getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, input)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    // A clone-only continuation never re-clones and never admits an initial turn.
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(createdMetadata(doStub)).toMatchObject({
+      continuation: true,
+      clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    });
+  });
 
   it.each([
     {
@@ -4125,10 +6202,10 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       provider: 'vercel' as const,
     },
     {
-      label: 'placed Cloudflare sandbox',
+      label: 'placed Cloudflare Containers sandbox',
       storedSandboxId: PLACED_SANDBOX_ID,
-      provider: 'cloudflare' as const,
-      sandboxKind: 'shared' as const,
+      provider: 'cloudflare-containers' as const,
+      sandboxKind: 'isolated' as const,
     },
   ])(
     'restores the recorded $label without recomputing routing',
@@ -4153,6 +6230,18 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
           canonical_result: await canonicalProgress(input, {
             sandboxId: storedSandboxId,
             sandboxProvider: provider,
+            ...(provider === 'vercel'
+              ? {
+                  sandboxProviderBinding: {
+                    kind: 'vercel',
+                    source: {
+                      kind: 'byoc',
+                      userId: USER_ID,
+                      credentialId: '22222222-2222-4222-8222-222222222222',
+                    },
+                  },
+                }
+              : {}),
             ...(sandboxKind ? { sandboxKind } : {}),
           }),
         }),
@@ -4162,6 +6251,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       await expect(runCreate(ctx, input)).resolves.toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
         replayed: true,
       });
 
@@ -4177,12 +6267,36 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(createdMetadata(doStub)?.workspace?.sandboxKind).toBe(sandboxKind);
       expect(controlGet).toHaveBeenCalled();
       expect(legacyGet).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
       expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
       expect(generateSessionIdMock).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
     }
   );
+
+  it('rejects a recorded create on a retired shared sandbox', async () => {
+    const input = request();
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await canonicalProgress(input, {
+          sandboxId: PLACED_SANDBOX_ID,
+          sandboxProvider: 'cloudflare',
+          sandboxKind: 'shared',
+        }),
+      }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('has been retired'),
+    });
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+  });
 
   it.each([
     ['without its kind', {}],
@@ -4317,13 +6431,10 @@ describe('createSessionWithLedger changed-intent rejection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    fetchByocVercelEnrollmentMock.mockReset();
     getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
     generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({ organization_id: ORIGINAL_OPTIONS.kilocodeOrganizationId }),
@@ -4362,7 +6473,8 @@ describe('createSessionWithLedger changed-intent rejection', () => {
   /** Asserts the request is rejected with the typed error and no effect runs. */
   async function expectRejectedWithoutEffects(
     request: SessionCreateRequest,
-    identityConflict = false
+    identityConflict = false,
+    expectedRejection?: { code: string; message: string }
   ) {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
@@ -4370,9 +6482,10 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
 
     await expect(runCreate(ctx, request)).rejects.toMatchObject(
-      identityConflict
-        ? { code: 'CONFLICT', message: 'operation_key_reuse_mismatch' }
-        : { code: 'CONFLICT', message: 'session_create_intent_conflict' }
+      expectedRejection ??
+        (identityConflict
+          ? { code: 'CONFLICT', message: 'operation_key_reuse_mismatch' }
+          : { code: 'CONFLICT', message: 'session_create_intent_conflict' })
     );
 
     // Rejected before replay, reconciliation, or any external effect.
@@ -4450,14 +6563,27 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     );
   });
 
-  it('preserves existing opt-out fingerprints but binds opt-in and authenticated lineage to creation intent', async () => {
+  it('does not bind the fingerprint to an allocation resolved after admission', async () => {
+    const request = {
+      ...originalRequest(),
+      options: { ...ORIGINAL_OPTIONS, createdOnPlatform: 'cloud-agent-web' },
+    };
+    expect(
+      await sessionCreateIntentFingerprint({
+        ...request,
+        savedSandboxAllocation: 'cloudflare-shared',
+      })
+    ).toBe(await sessionCreateIntentFingerprint(request));
+  });
+
+  it('binds interactive origin and authenticated lineage to creation intent', async () => {
     const request = originalRequest();
     const original = await sessionCreateIntentFingerprint(request);
-    expect(await sessionCreateIntentFingerprint({ ...request, allowSubagentSessions: false })).toBe(
-      original
-    );
     expect(
-      await sessionCreateIntentFingerprint({ ...request, allowSubagentSessions: true })
+      await sessionCreateIntentFingerprint({
+        ...request,
+        options: { ...ORIGINAL_OPTIONS, createdOnPlatform: 'cloud-agent-web' },
+      })
     ).not.toBe(original);
     expect(
       await sessionCreateIntentFingerprint({
@@ -4477,11 +6603,14 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     admission?: 'duplicate_settled' | 'takeover' | 'duplicate_reconcile_pending';
     original?: SessionCreateRequest;
     identityConflict?: boolean;
+    rejection?: { code: string; message: string };
     retry: SessionCreateRequest;
   }> = [
     {
-      name: 'subagent opt-in',
-      retry: makeRequest({ allowSubagentSessions: true, options: ORIGINAL_OPTIONS }),
+      name: 'interactive origin',
+      retry: makeRequest({
+        options: { ...ORIGINAL_OPTIONS, createdOnPlatform: 'cloud-agent-web' },
+      }),
     },
     {
       name: 'authenticated parent lineage',
@@ -4568,8 +6697,9 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     },
     {
       name: 'the sandbox allocation',
+      rejection: { code: 'BAD_REQUEST', message: 'session_creation_failed' } as const,
       retry: makeRequest({
-        runtime: { sandboxAllocation: 'isolated-standard' },
+        runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
         options: ORIGINAL_OPTIONS,
       }),
     },
@@ -4727,7 +6857,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
 
   it.each(changedIntentCases)(
     'rejects a same-key retry that changes $name',
-    async ({ admission = 'duplicate_settled', original, identityConflict, retry }) => {
+    async ({ admission = 'duplicate_settled', original, identityConflict, rejection, retry }) => {
       const originalIntent = original ?? originalRequest();
       const status =
         admission === 'duplicate_settled'
@@ -4749,7 +6879,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
           },
         }),
       });
-      await expectRejectedWithoutEffects(retry, identityConflict);
+      await expectRejectedWithoutEffects(retry, identityConflict, rejection);
     }
   );
 
@@ -4858,16 +6988,14 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    fetchByocVercelEnrollmentMock.mockReset();
     const actualPlacement =
       await vi.importActual<typeof SandboxPlacementModule>('../sandbox-placement.js');
+    selectControlPlaneSandboxMock.mockReset();
     selectControlPlaneSandboxMock.mockImplementation(actualPlacement.selectControlPlaneSandbox);
     getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
     generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({}),
@@ -5004,7 +7132,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
   });
 
   it.each(['webhook', 'scheduled'])(
-    'creates a %s workspace session with isolated Standard allocation',
+    'creates a %s workspace session with a larger containers allocation',
     async createdOnPlatform => {
       const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
@@ -5025,7 +7153,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       await runCreate(
         ctx,
         makeRequest({
-          runtime: { sandboxAllocation: 'isolated-standard' },
+          runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
           options: {
             operationKey: OPERATION_KEY,
             createdOnPlatform,
@@ -5041,19 +7169,19 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       });
       expect(metadata.workspace).toMatchObject({
         sandboxId: expect.stringMatching(/^sbx-[0-9a-f]{48}$/),
-        sandboxKind: 'isolated-standard',
-        sandboxProvider: 'cloudflare',
-        sandboxAllocation: 'isolated-standard',
+        sandboxKind: 'isolated',
+        sandboxProvider: 'cloudflare-containers',
+        sandboxAllocation: 'cloudflare-containers-standard-4',
       });
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
-        expect.objectContaining({ sandboxKind: 'isolated-standard' })
+        expect.objectContaining({ sandboxKind: 'isolated' })
       );
     }
   );
 
-  it('allows isolated Standard allocation for non-interactive sessions', async () => {
+  it('allows a larger containers allocation for non-interactive sessions', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
@@ -5070,7 +7198,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     await runCreate(
       ctx,
       makeRequest({
-        runtime: { sandboxAllocation: 'isolated-standard' },
+        runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
         options: {
           operationKey: OPERATION_KEY,
           createdOnPlatform: 'cli',
@@ -5084,9 +7212,9 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       expect.objectContaining({
         identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID, orgId }),
         workspace: expect.objectContaining({
-          sandboxAllocation: 'isolated-standard',
-          sandboxKind: 'isolated-standard',
-          sandboxProvider: 'cloudflare',
+          sandboxAllocation: 'cloudflare-containers-standard-4',
+          sandboxKind: 'isolated',
+          sandboxProvider: 'cloudflare-containers',
         }),
       })
     );
@@ -5132,34 +7260,166 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
   it.each([
     {
       name: 'code review',
-      runtime: { sandboxAllocation: 'isolated-standard' } as const,
+      runtime: { sandboxAllocation: 'cloudflare-containers-standard-3' } as const,
       billingOrigin: 'code-review',
     },
-  ])(
-    'rejects isolated Standard allocation with $name routing before external effects',
-    async input => {
-      const doStub = makeDoStub();
-      const ctx = makeContext(doStub);
+  ])('rejects an allocation with $name routing before external effects', async input => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
 
-      await expect(
-        createSessionWithLedger(
-          makeRequest({
-            runtime: input.runtime,
-            options: { operationKey: OPERATION_KEY },
+    await expect(
+      createSessionWithLedger(
+        makeRequest({
+          runtime: input.runtime,
+          options: { operationKey: OPERATION_KEY },
+        }),
+        ctx,
+        { ...CREATE_OPTIONS, billingOrigin: input.billingOrigin }
+      )
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Sandbox allocations cannot be combined with specialized sandbox routing',
+    });
+
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('registers explicitly selected Vercel clone-only sessions in the control-plane Durable Object', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d486';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: organizationId }),
+    });
+    const credentialId = 'f47ac10b-58cc-4372-a567-0e02b2c3d487';
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    const getControlSession = vi.spyOn(ctx.env.SANDBOX_SESSION, 'get');
+    Object.assign(ctx.env, {
+      BYOC_VERCEL_IDS: organizationId,
+      SANDBOX_SELECTION_IDS: organizationId,
+      CONTROL_PLANE_IDS: '',
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    generateSessionIdMock.mockReturnValueOnce(CONTROL_CLOUD_AGENT_SESSION_ID);
+    selectControlPlaneSandboxMock.mockResolvedValueOnce({
+      ...PLACED_SANDBOX_DECISION,
+      provider: 'vercel',
+    });
+    fetchByocVercelEnrollmentMock.mockResolvedValue({
+      organizationId,
+      credentialId,
+      setupStatus: 'ready',
+    });
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
+    });
+    const request = makeRequest({
+      initialTurn: undefined,
+      clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID },
+      runtime: { sandboxAllocation: 'vercel-small' },
+      options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: organizationId },
+    });
+
+    const result = await runCreate(ctx, request);
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith();
+    expect(recordOperationProgressMock).toHaveBeenNthCalledWith(1, expect.any(Object), ROW_ID, {
+      cloudAgentSessionId: CONTROL_CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
+      [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+      createIntentFingerprint: await sessionCreateIntentFingerprint(request),
+      sandboxAllocation: 'vercel-small',
+    });
+    expect(getControlSession).toHaveBeenCalledOnce();
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          identity: expect.objectContaining({ sessionId: CONTROL_CLOUD_AGENT_SESSION_ID }),
+          workspace: expect.objectContaining({
+            sandboxId: PLACED_SANDBOX_ID,
+            sandboxProvider: 'vercel',
+            sandboxProviderBinding: {
+              kind: 'vercel',
+              source: { kind: 'byoc', organizationId, credentialId },
+            },
           }),
-          ctx,
-          { ...CREATE_OPTIONS, billingOrigin: input.billingOrigin }
-        )
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: 'Sandbox allocations cannot be combined with specialized sandbox routing',
-      });
+        }),
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: CONTROL_CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+  });
 
-      expect(admitOperationMock).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
-      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    }
-  );
+  it('keeps an enrolled clone-only create on the Cloudflare default without a BYOC lookup', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, { BYOC_VERCEL_IDS: '*', SANDBOX_SELECTION_IDS: USER_ID });
+    fetchByocVercelEnrollmentForUserMock.mockRejectedValue(
+      new Error('Vercel credentials must not be consulted for the Cloudflare default')
+    );
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
+    });
+
+    await runCreate(ctx, cloneRequest());
+
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+    expect(fetchByocVercelEnrollmentForUserMock).not.toHaveBeenCalled();
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          sandboxProvider: 'cloudflare-containers',
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+        }),
+      })
+    );
+    expect(doStub.registerSessionFromMetadata).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an explicit Vercel clone before ingest when BYOC setup is not ready', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d490';
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, {
+      BYOC_VERCEL_IDS: organizationId,
+      SANDBOX_SELECTION_IDS: organizationId,
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    admitOperationMock.mockResolvedValue({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: organizationId }),
+    });
+    fetchByocVercelEnrollmentMock.mockResolvedValue({
+      organizationId,
+      credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d491',
+      setupStatus: 'pending',
+    });
+    selectControlPlaneSandboxMock.mockResolvedValue({
+      ...PLACED_SANDBOX_DECISION,
+      provider: 'vercel',
+    });
+
+    await expect(
+      runCreate(ctx, {
+        ...cloneRequest(),
+        runtime: { sandboxAllocation: 'vercel-small' },
+        options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: organizationId },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringMatching(/vercel/i) });
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
 
   it('surfaces BAD_REQUEST session_clone_failed when the clone is rejected', async () => {
     createCliSessionMock.mockResolvedValue({ status: 'rejected', code: 'source_access_denied' });
@@ -5349,6 +7609,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     expect(recordOperationProgressMock).toHaveBeenNthCalledWith(2, expect.any(Object), ROW_ID, {
       sandboxId: expect.stringMatching(/^sbx-/),
       sandboxProvider: PLACED_SANDBOX_DECISION.provider,
+      sandboxProviderBinding: { kind: PLACED_SANDBOX_DECISION.provider },
       sandboxKind: PLACED_SANDBOX_DECISION.sandboxKind,
     });
   });
@@ -5441,15 +7702,12 @@ describe('createSessionWithLedger clone reconciliation', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    fetchByocVercelEnrollmentMock.mockReset();
     const actualPlacement =
       await vi.importActual<typeof SandboxPlacementModule>('../sandbox-placement.js');
     selectControlPlaneSandboxMock.mockImplementation(actualPlacement.selectControlPlaneSandbox);
     generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
     recordOperationProgressMock.mockResolvedValue(undefined);
@@ -5599,7 +7857,22 @@ describe('createSessionWithLedger clone reconciliation', () => {
       const request = cloneRequest();
       admitOperationMock.mockResolvedValueOnce({
         admission: 'takeover',
-        row: await cloneRow({ cloudAgentSessionId: sessionId, sandboxProvider }),
+        row: await cloneRow({
+          cloudAgentSessionId: sessionId,
+          sandboxProvider,
+          ...(sandboxProvider === 'vercel'
+            ? {
+                sandboxProviderBinding: {
+                  kind: 'vercel',
+                  source: {
+                    kind: 'byoc',
+                    userId: USER_ID,
+                    credentialId: '22222222-2222-4222-8222-222222222222',
+                  },
+                },
+              }
+            : {}),
+        }),
       });
       createCliSessionMock.mockResolvedValue({
         status: 'ready',
@@ -5622,7 +7895,6 @@ describe('createSessionWithLedger clone reconciliation', () => {
         })
       );
       expect(generateSessionIdMock).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     }
   );
 
@@ -5689,6 +7961,28 @@ describe('createSessionWithLedger clone reconciliation', () => {
       cloudAgentSessionId: SANDBOX_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
+    });
+  });
+
+  it('reconciles the parent registry hint when a clone-only create settles completed', async () => {
+    const parentSessionId = 'workspace_parent';
+    const request = cloneRequest({ parentCloudAgentSessionId: parentSessionId });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow({}, request),
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const doStub = makeDoStub();
+
+    await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+      cloudAgentSessionId: SANDBOX_SESSION_ID,
     });
   });
 
@@ -5987,6 +8281,95 @@ describe('createSessionWithLedger clone reconciliation', () => {
   });
 });
 
+describe('createSessionWithLedger non-clone rejection', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    fetchByocVercelEnrollmentMock.mockReset();
+    const actualPlacement =
+      await vi.importActual<typeof SandboxPlacementModule>('../sandbox-placement.js');
+    selectControlPlaneSandboxMock.mockImplementation(actualPlacement.selectControlPlaneSandbox);
+    generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
+    generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
+    settleOperationMock.mockResolvedValue({ settled: true });
+    markReconcilePendingMock.mockResolvedValue({});
+    recordOperationProgressMock.mockResolvedValue(undefined);
+    createCliSessionMock.mockResolvedValue(undefined);
+  });
+
+  it('tombstones a refused non-clone create so the next same-key retry allocates fresh IDs', async () => {
+    const request = makeRequest({ options: { operationKey: OPERATION_KEY } });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    // Attempt 1: the ingest plane refuses the destination outright. The
+    // best-effort settle fails, so the row stays non-terminal and the
+    // tombstone is what protects the retry.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({}),
+    });
+    createCliSessionMock.mockResolvedValueOnce({
+      status: 'rejected',
+      code: 'session_retired',
+    });
+    settleOperationMock.mockRejectedValueOnce(new Error('ledger db unavailable'));
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_retired',
+    });
+
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
+      [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+      },
+    });
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+
+    // Attempt 2: the same-key retry sees the tombstone and allocates fresh IDs.
+    const FRESH_CLOUD_ID = 'workspace_fresh_11111111-1111-1111-1111-111111111111';
+    const FRESH_KILO_ID = 'ses_fresh_222222222222222222222222';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        canonical_result: {
+          cloudAgentSessionId: SANDBOX_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+          [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
+            cloudAgentSessionId: SANDBOX_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+          },
+        },
+      }),
+    });
+    generateSessionIdMock.mockReturnValueOnce(FRESH_CLOUD_ID);
+    generateKiloSessionIdMock.mockReturnValueOnce(FRESH_KILO_ID);
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: FRESH_KILO_ID, copiedItemCount: 0 },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+
+    const result = await runCreate(ctx, request);
+
+    expect(createCliSessionMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionId: FRESH_KILO_ID,
+        cloudAgentSessionId: FRESH_CLOUD_ID,
+        kiloUserId: USER_ID,
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: FRESH_CLOUD_ID,
+      kiloSessionId: FRESH_KILO_ID,
+    });
+  });
+});
+
 describe('prepareInputToSessionCreateRequest clone mapping', () => {
   const SOURCE_SESSION_ID = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 
@@ -6066,5 +8449,77 @@ describe('prepareInputToSessionCreateRequest clone mapping', () => {
     });
 
     expect(request.runtime).toEqual({ sandboxAllocation: 'isolated-standard' });
+  });
+
+  it('maps allowUserAuthorization into the GitHub repository', () => {
+    const request = prepareInputToSessionCreateRequest({
+      prompt: 'Continue',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      allowUserAuthorization: true,
+      shallow: false,
+      devcontainer: false,
+    });
+
+    expect(request.repository).toMatchObject({
+      type: 'github',
+      repo: 'acme/repo',
+      allowUserAuthorization: true,
+    });
+  });
+});
+
+describe('prepareInputToSessionCreateRequest environment selection', () => {
+  const ENVIRONMENT_ID = '11111111-1111-4111-8111-111111111111';
+  const parse = (extra: Record<string, unknown>) =>
+    PrepareSessionInput.parse({
+      prompt: 'hello',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      ...extra,
+    });
+
+  it('carries the selected environment, its additional branches and the choice marker', () => {
+    const requestedEnvironment = {
+      id: ENVIRONMENT_ID,
+      repositories: [{ repoFullName: 'acme/api', branch: 'feature/api' }],
+    };
+
+    const request = prepareInputToSessionCreateRequest(
+      parse({ requestedEnvironment, requireEnvironmentChoice: true })
+    );
+
+    expect(request.requestedEnvironment).toEqual(requestedEnvironment);
+    expect(request.requireEnvironmentChoice).toBe(true);
+  });
+
+  it('adds neither field when the client sent neither', () => {
+    const request = prepareInputToSessionCreateRequest(parse({}));
+
+    expect(request).not.toHaveProperty('requestedEnvironment');
+    expect(request).not.toHaveProperty('requireEnvironmentChoice');
+  });
+
+  it.each([
+    { name: 'a non-UUID id', value: { id: 'not-a-uuid' } },
+    {
+      name: 'an unsafe branch',
+      value: { id: ENVIRONMENT_ID, repositories: [{ repoFullName: 'a/b', branch: '-x' }] },
+    },
+    { name: 'an unknown key', value: { id: ENVIRONMENT_ID, extra: true } },
+  ])('rejects $name in the selection', ({ value }) => {
+    expect(() => parse({ requestedEnvironment: value })).toThrow();
+  });
+
+  it('rejects a marker that is not true', () => {
+    expect(() => parse({ requireEnvironmentChoice: false })).toThrow();
+  });
+
+  it('does not accept the old requestedEnvironmentId field', () => {
+    expect(
+      prepareInputToSessionCreateRequest(parse({ requestedEnvironmentId: ENVIRONMENT_ID }))
+    ).not.toHaveProperty('requestedEnvironment');
   });
 });

@@ -1,14 +1,17 @@
 import {
   worktreeChangesSnapshotSchema,
+  worktreeFileIdentity,
   worktreeFileRecordSchema,
   type WorktreeChangesSnapshot,
   type WorktreeFileRecord,
+  type WorktreeRecovery,
   type RefreshWorktreeChangesOutput,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   createWorktreeChanges,
   WORKTREE_CHANGES_KEY,
   WORKTREE_FILE_PREFIX,
+  WORKTREE_RECOVERY_KEY,
   type WorktreeChangesContext,
 } from '../../sandbox-session/worktree-changes.js';
 import type {
@@ -19,7 +22,11 @@ import { WORKTREE_DELETION_PREFIX } from './worktree-deletion.js';
 
 export type SharedWorktreeChangesInput = {
   context: WorktreeChangesContext;
-  saved?: { snapshot: WorktreeChangesSnapshot; files: WorktreeFileRecord[] };
+  saved?: {
+    snapshot: WorktreeChangesSnapshot;
+    files: WorktreeFileRecord[];
+    recovery?: WorktreeRecovery;
+  };
 };
 
 /** The marker of a session that reads the worktree's changes and gets its ready notifications. */
@@ -62,7 +69,8 @@ export function createSharedWorktreeChanges(deps: {
     };
     const previous = worktreeChangesSnapshotSchema.safeParse(storage.kv.get(WORKTREE_CHANGES_KEY));
     if (!deleted() && input.saved) {
-      const snapshot = worktreeChangesSnapshotSchema.parse(input.saved.snapshot);
+      const saved = input.saved;
+      const snapshot = worktreeChangesSnapshotSchema.parse(saved.snapshot);
       const canPromote =
         storage.kv.get(WORKTREE_CHANGES_KEY) === undefined ||
         (deps.storage.kv.get(`${prefix}source`) === 'migration' &&
@@ -74,11 +82,13 @@ export function createSharedWorktreeChanges(deps: {
           previous.success ? previous.data.revision + 1 : 1
         );
         if (!Number.isSafeInteger(revision)) throw new Error('Worktree revision exhausted');
-        const files = input.saved.files
+        const files = saved.files
           .map(file => worktreeFileRecordSchema.parse(file))
           .filter(file =>
             snapshot.files.some(
-              listed => listed.path === file.path && listed.revision === file.revision
+              listed =>
+                worktreeFileIdentity(listed) === worktreeFileIdentity(file) &&
+                listed.revision === file.revision
             )
           );
         storage.transactionSync(() => {
@@ -86,13 +96,24 @@ export function createSharedWorktreeChanges(deps: {
             storage.kv.delete(key);
           }
           for (const file of files) {
-            storage.kv.put(`${WORKTREE_FILE_PREFIX}${file.path}`, { ...file, revision });
+            storage.kv.put(`${WORKTREE_FILE_PREFIX}${worktreeFileIdentity(file)}`, {
+              ...file,
+              revision,
+            });
           }
           storage.kv.put(WORKTREE_CHANGES_KEY, {
             ...snapshot,
             revision,
             files: snapshot.files.map(file => ({ ...file, revision })),
           });
+          if (saved.recovery === undefined) {
+            deps.storage.kv.delete(`${prefix}${WORKTREE_RECOVERY_KEY}`);
+          } else {
+            deps.storage.kv.put(`${prefix}${WORKTREE_RECOVERY_KEY}`, {
+              revision,
+              recovery: saved.recovery,
+            });
+          }
           deps.storage.kv.put(`${prefix}source`, 'migration');
         });
         deps.onSnapshot(context, revision);

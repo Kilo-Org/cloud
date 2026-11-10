@@ -225,7 +225,7 @@ describe('useNativeStateGeometry', () => {
     const mounted = await mount();
     await mounted.resolve(41);
     mounted.emit({ ...snapshot(), visibleBottom: 0 });
-    expect(mounted.read()?.geometry?.visibleBottom).toBe(0);
+    expect(mounted.read()?.geometry?.visibleBottom).toBe(800);
     mounted.emit({ ...snapshot(), visibleBottom: 500 });
     expect(mounted.read()?.geometry?.visibleBottom).toBe(500);
     expect(native.observe).toHaveBeenCalledExactlyOnceWith(41);
@@ -234,6 +234,24 @@ describe('useNativeStateGeometry', () => {
     mounted.unmount();
     expect(native.listeners.size).toBe(0);
     expect(native.unobserve).toHaveBeenCalledExactlyOnceWith(41);
+  });
+
+  it('keeps the geometry a covered scene was last seen with until it is revealed', async () => {
+    const mounted = await mount();
+    await mounted.resolve(41);
+    const seen = mounted.read()?.geometry;
+    mounted.emit({ ...snapshot(), visibleTop: 0, visibleBottom: 0, safeAreaTop: 0 });
+    expect(mounted.read()?.geometry).toBe(seen);
+    mounted.emit(snapshot());
+    expect(mounted.read()?.geometry).toBe(seen);
+    mounted.unmount();
+  });
+
+  it('reports the empty range of a scene that was never seen', async () => {
+    const mounted = await mount();
+    await mounted.resolve(41, { ...snapshot(), visibleBottom: 0 });
+    expect(mounted.read()).toMatchObject({ status: 'ready', geometry: { visibleBottom: 0 } });
+    mounted.unmount();
   });
 
   it('rejects non-finite native bounds', async () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { rankCandidates } from '@kilocode/auto-routing-contracts';
 import type {
   CandidatePricing,
   ClassifierOutput,
@@ -44,6 +45,7 @@ const table: RoutingTable = {
   version: 'run-1',
   generatedAt: '2026-06-11T00:00:00.000Z',
   minAccuracy: 0.7,
+  accuracyNoiseBand: 0.05,
   switchCostFactor: 3,
   bestAccuracySwitchThreshold: 0.05,
   source: 'benchmark',
@@ -232,6 +234,8 @@ describe('complexity effort selection', () => {
         ],
       },
     };
+    // The incumbent pair wins the final-pair accuracy competition itself,
+    // so this is the fresh pick, not a sticky retention.
     expect(
       computeDecision(
         { ...classification, reasoningComplexity: 'high' },
@@ -243,7 +247,7 @@ describe('complexity effort selection', () => {
     ).toMatchObject({
       model: 'other/chat',
       variant: 'other-high',
-      sticky: true,
+      sticky: false,
       switchReason: null,
     });
   });
@@ -385,6 +389,383 @@ describe('complexity effort selection', () => {
   });
 });
 
+describe('final pair competition and request pricing', () => {
+  const route = 'implementation/code_generation';
+  const pairCandidate = (
+    model: string,
+    variant: string | null,
+    accuracy: number,
+    avgCostUsd: number,
+    extra: Partial<RankedCandidate> = {}
+  ): RankedCandidate => ({
+    model,
+    variant,
+    accuracy,
+    avgCostUsd,
+    meetsThreshold: true,
+    cases: 30,
+    p50LatencyMs: 10_000,
+    ...extra,
+  });
+
+  it('ranks mapped final pairs instead of substituting effort after picking a model', () => {
+    const finalPairTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.9,
+      routes: {
+        [route]: [
+          pairCandidate('model-a', 'low', 0.96, 0.001),
+          pairCandidate('model-b', 'low', 0.98, 0.002),
+          pairCandidate('model-a', 'high', 0.99, 0.005),
+        ],
+      },
+      effortByComplexity: {
+        [route]: { 'model-a': { high: 'high' }, 'model-b': { high: 'low' } },
+      },
+    };
+    expect(
+      computeDecision({ ...classification, reasoningComplexity: 'high' }, finalPairTable, null)
+    ).toMatchObject({ model: 'model-b', variant: 'low', sticky: false, switchReason: null });
+    expect(
+      computeDecision({ ...classification, reasoningComplexity: 'low' }, finalPairTable, null)
+    ).toMatchObject({ model: 'model-a', variant: 'low' });
+  });
+
+  it('compares final costs when latency evidence is unavailable', () => {
+    const finalPairTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.9,
+      routes: {
+        [route]: rankCandidates(
+          [
+            pairCandidate('model-a', 'low', 0.96, 0.001),
+            pairCandidate('model-b', 'low', 0.98, 0.002),
+            pairCandidate('model-a', 'high', 0.99, 0.005),
+          ].map(candidate => ({
+            ...candidate,
+            p50LatencyMs: null,
+            pricing: {
+              promptUsdPerToken: 0.00000001,
+              completionUsdPerToken: 0.00000001,
+              cacheReadUsdPerToken: null,
+            },
+          })),
+          0.9
+        ),
+      },
+      effortByComplexity: {
+        [route]: { 'model-a': { high: 'high' }, 'model-b': { high: 'low' } },
+      },
+    };
+    expect(
+      computeDecision(
+        { ...classification, reasoningComplexity: 'high' },
+        finalPairTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        { contextTokens: 100 }
+      )
+    ).toMatchObject({ model: 'model-b', variant: 'low' });
+  });
+
+  it('preserves the published quality band during request repricing', () => {
+    const pricing: CandidatePricing = {
+      promptUsdPerToken: 0.000001,
+      completionUsdPerToken: 0.000001,
+      cacheReadUsdPerToken: null,
+    };
+    const strictTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.95,
+      accuracyNoiseBand: 0,
+      routes: {
+        [route]: [
+          pairCandidate('economical', null, 0.91, 0.001, { pricing }),
+          pairCandidate('accurate', null, 0.99, 0.01, { pricing }),
+        ],
+      },
+    };
+    expect(
+      computeDecision(classification, strictTable, null, new Set(), 'cost_per_accuracy', {
+        contextTokens: 100,
+      })
+    ).toMatchObject({ model: 'accurate' });
+  });
+
+  it('picks the best final pair in the low-confidence accuracy branch', () => {
+    const finalPairTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.9,
+      lowConfidenceThreshold: 0.8,
+      routes: {
+        [route]: [
+          pairCandidate('model-a', 'low', 1, 0.001),
+          pairCandidate('model-b', 'low', 0.98, 0.002),
+          pairCandidate('model-a', 'high', 0.97, 0.005),
+        ],
+      },
+      effortByComplexity: {
+        [route]: { 'model-a': { high: 'high' }, 'model-b': { high: 'low' } },
+      },
+    };
+    expect(
+      computeDecision(
+        { ...classification, reasoningComplexity: 'high' },
+        finalPairTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        { confidence: 0.5 }
+      )
+    ).toMatchObject({ model: 'model-b', variant: 'low', sticky: false });
+  });
+
+  it('honours an explicit null mapping as the final pair', () => {
+    const nullTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.9,
+      routes: {
+        [route]: [
+          pairCandidate('model-a', 'high', 0.99, 0.001),
+          pairCandidate('model-b', 'low', 0.98, 0.002),
+          pairCandidate('model-a', null, 0.99, 0.05),
+        ],
+      },
+      effortByComplexity: { [route]: { 'model-a': { low: null, high: 'high' } } },
+    };
+    expect(computeDecision(classification, nullTable, null)).toMatchObject({
+      model: 'model-b',
+      variant: 'low',
+    });
+    expect(
+      computeDecision({ ...classification, reasoningComplexity: 'high' }, nullTable, null)
+    ).toMatchObject({ model: 'model-a', variant: 'high' });
+  });
+
+  it('does not retain a remapped incumbent pair that loses the cost switch', () => {
+    const incumbentTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.9,
+      routes: {
+        [route]: [
+          pairCandidate('model-a', 'low', 0.96, 0.001),
+          pairCandidate('model-b', 'low', 0.98, 0.002),
+          pairCandidate('model-a', 'high', 0.99, 0.01),
+        ],
+      },
+      effortByComplexity: {
+        [route]: { 'model-a': { high: 'high' }, 'model-b': { high: 'low' } },
+      },
+    };
+    expect(
+      computeDecision(
+        { ...classification, reasoningComplexity: 'high' },
+        incumbentTable,
+        inc('model-a', 'low')
+      )
+    ).toMatchObject({ model: 'model-b', variant: 'low', sticky: false, switchReason: 'cost' });
+  });
+
+  it('keeps the exact-pair incumbent when its final pair is within the switch factor', () => {
+    const incumbentTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.9,
+      routes: {
+        [route]: [
+          pairCandidate('model-a', 'low', 0.96, 0.001),
+          pairCandidate('model-b', 'low', 0.98, 0.002),
+          pairCandidate('model-a', 'high', 0.99, 0.005),
+        ],
+      },
+      effortByComplexity: {
+        [route]: { 'model-a': { high: 'high' }, 'model-b': { high: 'low' } },
+      },
+    };
+    expect(
+      computeDecision(
+        { ...classification, reasoningComplexity: 'high' },
+        incumbentTable,
+        inc('model-b', 'low')
+      )
+    ).toMatchObject({ model: 'model-b', variant: 'low', sticky: false });
+    expect(
+      computeDecision(
+        { ...classification, reasoningComplexity: 'high' },
+        incumbentTable,
+        inc('model-a', 'high')
+      )
+    ).toMatchObject({ model: 'model-a', variant: 'high', sticky: true, switchReason: null });
+  });
+
+  it('does not let a mapping resurrect a capability-filtered model', () => {
+    const filteredTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.9,
+      routes: {
+        [route]: [
+          pairCandidate('model-a', 'low', 0.96, 0.001),
+          pairCandidate('model-a', 'high', 0.99, 0.0015),
+          pairCandidate('model-b', 'low', 0.98, 0.002),
+        ],
+      },
+      effortByComplexity: { [route]: { 'model-a': { high: 'high' } } },
+    };
+    const decision = computeDecision(
+      { ...classification, reasoningComplexity: 'high' },
+      filteredTable,
+      null,
+      new Set(),
+      'cost_per_accuracy',
+      {
+        constraints: { requiredInputModalities: ['image'] },
+        capabilityMap: makeCaps({
+          'model-a': { inputModalities: ['text'] },
+          'model-b': { inputModalities: ['image'] },
+        }),
+      }
+    );
+    expect(decision).toMatchObject({ model: 'model-b', variant: 'low' });
+  });
+
+  it('changes the fresh pick when cold request pricing reverses value ordering', () => {
+    const pricedTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.9,
+      routes: {
+        [route]: [
+          pairCandidate('benchmark-cheap', 'low', 0.98, 0.001, {
+            estimatedRequestCostUsd: 0.001,
+            pricing: {
+              promptUsdPerToken: 0.00001,
+              completionUsdPerToken: 0.00001,
+              cacheReadUsdPerToken: 0.0000001,
+            },
+          }),
+          pairCandidate('prompt-cheap', 'low', 0.98, 0.002, {
+            estimatedRequestCostUsd: 0.002,
+            pricing: {
+              promptUsdPerToken: 0.000001,
+              completionUsdPerToken: 0.00001,
+              cacheReadUsdPerToken: 0.00001,
+            },
+          }),
+        ],
+      },
+    };
+    expect(computeDecision(classification, pricedTable, null)).toMatchObject({
+      model: 'benchmark-cheap',
+    });
+    expect(
+      computeDecision(classification, pricedTable, null, new Set(), 'cost_per_accuracy', {
+        constraints: { promptTokensEstimate: 100 },
+      })
+    ).toMatchObject({ model: 'benchmark-cheap' });
+    expect(
+      computeDecision(classification, pricedTable, null, new Set(), 'cost_per_accuracy', {
+        constraints: { promptTokensEstimate: 100_000 },
+      })
+    ).toMatchObject({ model: 'prompt-cheap', variant: 'low' });
+    expect(
+      computeDecision(classification, pricedTable, null, new Set(), 'cheapest', {
+        contextTokens: 100_000,
+      })
+    ).toMatchObject({ model: 'prompt-cheap', variant: 'low' });
+  });
+
+  it('keeps the published pick without pricing or without a request size', () => {
+    const publishedTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.9,
+      routes: {
+        [route]: [
+          pairCandidate('published-first', 'low', 0.98, 0.002, {
+            estimatedRequestCostUsd: 0.002,
+          }),
+          pairCandidate('benchmark-cheap', 'low', 0.98, 0.001, {
+            estimatedRequestCostUsd: 0.001,
+          }),
+        ],
+      },
+    };
+    expect(
+      computeDecision(classification, publishedTable, null, new Set(), 'cost_per_accuracy', {
+        constraints: { promptTokensEstimate: 100_000 },
+      })
+    ).toMatchObject({ model: 'published-first' });
+    const pricedTable: RoutingTable = {
+      ...publishedTable,
+      routes: {
+        [route]: (publishedTable.routes[route] ?? []).map(c => ({
+          ...c,
+          pricing: {
+            promptUsdPerToken: c.model === 'published-first' ? 0.001 : 0.000001,
+            completionUsdPerToken: 0.00001,
+            cacheReadUsdPerToken: null,
+          },
+        })),
+      },
+    };
+    expect(computeDecision(classification, pricedTable, null)).toMatchObject({
+      model: 'published-first',
+    });
+  });
+  it('retains unknown-price estimates when effort mapping changes the final set', () => {
+    const unpricedTable: RoutingTable = {
+      ...table,
+      minAccuracy: 0.9,
+      routes: {
+        [route]: [
+          pairCandidate('model-b', null, 0.98, 0.01, { estimatedRequestCostUsd: 0.01 }),
+          pairCandidate('model-a', 'high', 0.98, 0.0005, { estimatedRequestCostUsd: 0.25 }),
+          pairCandidate('model-a', 'low', 0.98, 0.001, { estimatedRequestCostUsd: 0.5 }),
+        ],
+      },
+      effortByComplexity: { [route]: { 'model-a': { low: 'low' } } },
+    };
+    expect(
+      computeDecision(classification, unpricedTable, null, new Set(), 'cost_per_accuracy', {
+        contextTokens: 100,
+      })
+    ).toMatchObject({ model: 'model-b' });
+  });
+  it.each([
+    { accuracyNoiseBand: undefined, expected: 'published-first' },
+    { accuracyNoiseBand: 0, expected: 'prompt-cheap' },
+  ])(
+    'reprices a published request only with known band $accuracyNoiseBand',
+    ({ accuracyNoiseBand, expected }) => {
+      const publishedTable: RoutingTable = {
+        ...table,
+        accuracyNoiseBand,
+        routes: {
+          [route]: [
+            pairCandidate('published-first', null, 0.99, 0.001, {
+              pricing: {
+                promptUsdPerToken: 0.0001,
+                completionUsdPerToken: 0.000001,
+                cacheReadUsdPerToken: null,
+              },
+            }),
+            pairCandidate('prompt-cheap', null, 0.99, 0.002, {
+              pricing: {
+                promptUsdPerToken: 0.000001,
+                completionUsdPerToken: 0.000001,
+                cacheReadUsdPerToken: null,
+              },
+            }),
+          ],
+        },
+      };
+      expect(
+        computeDecision(classification, publishedTable, null, new Set(), 'cost_per_accuracy', {
+          contextTokens: 100_000,
+        })
+      ).toMatchObject({ model: expected });
+    }
+  );
+});
+
 describe('computeDecision', () => {
   it('picks the first candidate of the classifier taxonomy route', () => {
     const decision = computeDecision(classification, table, null);
@@ -414,6 +795,115 @@ describe('computeDecision', () => {
       reasoningEffort: null,
       sticky: false,
       switchReason: null,
+    });
+  });
+  describe('cheapest mode', () => {
+    const route = 'implementation/code_generation';
+    const withRoute = (candidates: RankedCandidate[]): RoutingTable => ({
+      ...table,
+      routes: { ...table.routes, [route]: candidates },
+    });
+    const candidate = (
+      model: string,
+      accuracy: number,
+      avgCostUsd: number,
+      meetsThreshold: boolean
+    ): RankedCandidate => ({ model, accuracy, avgCostUsd, meetsThreshold });
+
+    it('picks the lowest-cost candidate that meets the threshold, skipping cheaper failures', () => {
+      const cheapestTable = withRoute([
+        candidate('value/chat', 0.9, 0.01, true),
+        candidate('thrifty/chat', 0.75, 0.004, true),
+        candidate('failing/chat', 0.5, 0.001, false),
+      ]);
+      expect(
+        computeDecision(classification, cheapestTable, null, new Set(), 'cheapest')
+      ).toMatchObject({
+        model: 'thrifty/chat',
+        sticky: false,
+      });
+    });
+
+    it('ranks by estimated request cost when present, breaking ties by accuracy', () => {
+      const cheapestTable = withRoute([
+        { ...candidate('low-avg/chat', 0.8, 0.001, true), estimatedRequestCostUsd: 0.05 },
+        { ...candidate('high-avg/chat', 0.8, 0.5, true), estimatedRequestCostUsd: 0.02 },
+        { ...candidate('tie-better/chat', 0.9, 0.5, true), estimatedRequestCostUsd: 0.02 },
+      ]);
+      expect(
+        computeDecision(classification, cheapestTable, null, new Set(), 'cheapest')
+      ).toMatchObject({
+        model: 'tie-better/chat',
+      });
+    });
+
+    it('falls back to the most accurate candidate when none meets the threshold', () => {
+      const cheapestTable = withRoute([
+        candidate('cheap-weak/chat', 0.4, 0.001, false),
+        candidate('best-weak/chat', 0.6, 0.02, false),
+      ]);
+      expect(
+        computeDecision(classification, cheapestTable, null, new Set(), 'cheapest')
+      ).toMatchObject({
+        model: 'best-weak/chat',
+      });
+    });
+
+    it('keeps a passing incumbent unless switching is cost-worthwhile', () => {
+      const cheapestTable = withRoute([
+        candidate('fresh/chat', 0.8, 0.002, true),
+        candidate('incumbent/chat', 0.8, 0.005, true),
+      ]);
+      expect(
+        computeDecision(classification, cheapestTable, inc('incumbent/chat'), new Set(), 'cheapest')
+      ).toMatchObject({ model: 'incumbent/chat', sticky: true });
+      const pricey = withRoute([
+        candidate('fresh/chat', 0.8, 0.002, true),
+        candidate('incumbent/chat', 0.8, 0.02, true),
+      ]);
+      expect(
+        computeDecision(classification, pricey, inc('incumbent/chat'), new Set(), 'cheapest')
+      ).toMatchObject({ model: 'fresh/chat', sticky: false, switchReason: 'cost' });
+    });
+
+    it('ejects an incumbent below the strict threshold despite a small accuracy gap', () => {
+      const cheapestTable = withRoute([
+        candidate('passing/chat', 0.7, 0.01, true),
+        candidate('incumbent/chat', 0.69, 0.009, false),
+      ]);
+      expect(
+        computeDecision(classification, cheapestTable, inc('incumbent/chat'), new Set(), 'cheapest')
+      ).toMatchObject({ model: 'passing/chat', sticky: false, switchReason: 'threshold' });
+    });
+
+    it('keeps the cheapest passing variant instead of applying a complexity override', () => {
+      const cheapestTable: RoutingTable = {
+        ...withRoute([
+          { ...candidate('variant/chat', 0.8, 0.002, true), variant: 'low' },
+          { ...candidate('variant/chat', 0.6, 0.02, false), variant: 'high' },
+        ]),
+        effortByComplexity: { [route]: { 'variant/chat': { low: 'high' } } },
+      };
+      expect(
+        computeDecision(classification, cheapestTable, null, new Set(), 'cheapest')
+      ).toMatchObject({ model: 'variant/chat', variant: 'low' });
+    });
+
+    it('reuses the best-accuracy safety override for low-confidence classification', () => {
+      const cheapestTable: RoutingTable = {
+        ...withRoute([
+          candidate('cheap/chat', 0.7, 0.002, true),
+          { ...candidate('accurate/chat', 0.9, 0.02, true), variant: 'high' },
+          { ...candidate('accurate/chat', 0.85, 0.01, true), variant: 'low' },
+        ]),
+        lowConfidenceThreshold: 0.8,
+        effortByComplexity: { [route]: { 'accurate/chat': { low: 'low' } } },
+      };
+      expect(
+        computeDecision(classification, cheapestTable, null, new Set(), 'cheapest', {
+          confidence: 0.5,
+        })
+      ).toMatchObject({ model: 'accurate/chat', variant: 'low' });
     });
   });
   describe('low-confidence fallback', () => {
@@ -846,7 +1336,12 @@ describe('computeDecision', () => {
               'implementation/code_generation': [
                 {
                   ...fresh,
-                  pricing: missing === 'fresh pricing' ? null : pricing,
+                  pricing:
+                    missing === 'fresh pricing'
+                      ? null
+                      : missing === 'incumbent pricing'
+                        ? { ...pricing, promptUsdPerToken: 0 }
+                        : pricing,
                   estimatedRequestCostUsd: missing === 'fresh estimate' ? null : 2,
                 },
                 {

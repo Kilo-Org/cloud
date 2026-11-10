@@ -167,6 +167,12 @@ type CloudAgentSessionTransport = {
         options: { cursor?: string }
       ) => Promise<SessionSnapshotPageOutcome | null>)
     | undefined;
+  fetchCloudSnapshotPage?:
+    | ((
+        sessionId: CloudAgentSessionId,
+        options: { cursor?: string; limit?: number; kiloSessionId?: string }
+      ) => Promise<unknown>)
+    | undefined;
   /** Called by the transport after a successful initial bounded page read. */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
@@ -193,6 +199,7 @@ type CloudAgentSession = {
   ) => unknown | Promise<unknown>;
   retryRemoteModels: () => void;
   retryRemoteCommands: () => void;
+  observeProjected: (messages: SessionSnapshot['messages']) => void;
   createRemoteSession: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitRemoteSession: () => Promise<void>;
 
@@ -282,10 +289,25 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     void resolveAndConnect(connectGeneration);
   }
 
+  function emitEventToListener(event: NormalizedEvent): void {
+    try {
+      config.onEvent?.(event);
+    } catch (error) {
+      console.error(`[Session] Event listener threw on ${event.type}:`, error);
+    }
+  }
+
   const sink: TransportSink = {
     onChatEvent(event) {
-      chatProcessor.process(event);
-      config.onEvent?.(event);
+      // Keep one event's failure from taking the events after it: report and
+      // carry on rather than surfacing a session error for a single chat
+      // event, so the transcript keeps streaming.
+      try {
+        if (!chatProcessor.process(event)) return;
+      } catch (error) {
+        console.error(`[Session] Failed to process ${event.type}:`, error);
+      }
+      emitEventToListener(event);
     },
     onServiceEvent(event) {
       serviceState.process(event);
@@ -309,7 +331,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         storage.deleteMessage(event.messageId);
       }
       if (event.type === 'cloud.message.completed') replayedQueuedMessages.delete(event.messageId);
-      config.onEvent?.(event);
+      emitEventToListener(event);
     },
     onReplayStarted: () => {
       replaying = true;
@@ -370,7 +392,10 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
             'CloudAgentSession transport.getTicket is required for Cloud Agent sessions'
           );
         }
-        if (!config.transport.fetchSnapshot) {
+        if (
+          !config.transport.fetchSnapshot &&
+          !resolved.cloudAgentSessionId.startsWith('workspace_')
+        ) {
           throw new Error(
             'CloudAgentSession transport.fetchSnapshot is required for Cloud Agent sessions'
           );
@@ -389,6 +414,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           api: config.transport.api,
           getTicket: config.transport.getTicket,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchCloudSnapshotPage: config.transport.fetchCloudSnapshotPage,
           ...(config.transport.fetchSnapshotPage
             ? { fetchSnapshotPage: config.transport.fetchSnapshotPage }
             : {}),
@@ -561,6 +587,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     },
     retryRemoteCommands() {
       transport?.retryRemoteCommands?.();
+    },
+    observeProjected(messages) {
+      transport?.observeProjected?.(messages);
     },
     createRemoteSession: async (input?: CreateRemoteSessionInput) => {
       if (!transport?.createSession) {

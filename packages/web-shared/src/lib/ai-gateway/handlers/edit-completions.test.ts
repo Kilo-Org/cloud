@@ -1,17 +1,26 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { User } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { NextResponse } from 'next/server';
 
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
 }));
@@ -21,11 +30,21 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok');
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
-    decision: { allowed: true },
-  }),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/is-free-model') as Record<
+    string,
+    unknown
+  >),
+  isFreeModel: jest.fn(),
 }));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
+      decision: { allowed: true },
+    }),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     get: jest.fn().mockResolvedValue(null),
@@ -155,6 +174,10 @@ function makeUpstreamResponse(payload?: unknown) {
   );
 }
 
+function makeUpstreamErrorResponse(status: number) {
+  return Response.json({ error: { message: 'Upstream request failed' } }, { status });
+}
+
 async function flushAfter() {
   // `after()` invocations are scheduled as microtasks; let them settle before
   // asserting on what `logMicrodollarUsage` received.
@@ -170,10 +193,74 @@ describe('POST /api/edit/completions', () => {
     });
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
+    jest.mocked(isFreeModel).mockReturnValue(false);
   });
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it('answers malformed JSON without reporting it to Sentry', async () => {
+    setOrganizationAuth();
+
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      new Request('http://localhost:3000/api/edit/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+        body: '{"model": ',
+      }) as never
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Malformed JSON',
+      error_type: ProxyErrorType.invalid_request,
+    });
+    expect(captureException).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('answers a rejected credential with INVALID_TOKEN', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(
+        { success: false as const, error: 'Invalid API token' },
+        { status: 401 }
+      ),
+      credentialsRejected: true,
+    });
+
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      makeRequest(makeValidRequestBody()) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
+    await expect(response.json()).resolves.toMatchObject({ error: { code: INVALID_TOKEN_CODE } });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('passes an authentication failure without a rejected credential through', async () => {
+    const authFailedResponse = NextResponse.json(
+      { success: false as const, error: 'Access denied (not a member of the organization)' },
+      { status: 403 }
+    );
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse,
+      credentialsRejected: false,
+    });
+
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      makeRequest(makeValidRequestBody()) as never
+    );
+
+    expect(response).toBe(authFailedResponse);
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('rejects unsupported edit models with the dedicated error type', async () => {
@@ -237,6 +324,78 @@ describe('POST /api/edit/completions', () => {
     expect(await response.json()).toMatchObject({
       choices: [{ message: { role: 'assistant', content: 'edited' } }],
     });
+  });
+
+  it.each([400, 401, 403, 404, 422, 429, 500, 502, 503, 504])(
+    'passes upstream %s through without Sentry',
+    async status => {
+      setOrganizationAuth();
+      mockedFetch.mockResolvedValue(makeUpstreamErrorResponse(status));
+
+      const { handleEditCompletionsRequest } = await import('./edit-completions');
+      const response = await handleEditCompletionsRequest(
+        makeRequest(makeValidRequestBody()) as never
+      );
+
+      expect(response.status).toBe(status);
+      expect(await response.json()).toEqual({ error: { message: 'Upstream request failed' } });
+      await flushAfter();
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([null, [], [{ providerId: 'mistral', decryptedAPIKey: 'unused-key' }]])(
+    'masks a platform-funded 402 with BYOK entries %j and preserves upstream accounting',
+    async byokEntries => {
+      setOrganizationAuth();
+      mockedGetBYOKforOrganization.mockResolvedValue(byokEntries as never);
+      mockedFetch.mockResolvedValue(makeUpstreamErrorResponse(402));
+
+      const { handleEditCompletionsRequest } = await import('./edit-completions');
+      const response = await handleEditCompletionsRequest(
+        makeRequest(makeValidRequestBody()) as never
+      );
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({
+        error_type: ProxyErrorType.temporarily_unavailable,
+      });
+      await flushAfter();
+      expect(captureMessage).toHaveBeenCalledWith(
+        'inception returned 402 Payment Required',
+        expect.objectContaining({ extra: expect.objectContaining({ status: 402 }) })
+      );
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ status_code: 402, hasError: true, cost_mUsd: 0 }),
+        expect.objectContaining({ status_code: 402, user_byok: false })
+      );
+      expect(emitApiMetricsForResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 402, userByok: false }),
+        expect.any(Response),
+        expect.any(Number)
+      );
+    }
+  );
+
+  it('passes a BYOK 402 through without Sentry', async () => {
+    setBYOKAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamErrorResponse(402));
+
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      makeRequest(makeValidRequestBody()) as never
+    );
+
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({ error: { message: 'Upstream request failed' } });
+    await flushAfter();
+    expect(captureMessage).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ status_code: 402, hasError: true, cost_mUsd: 0 }),
+      expect.objectContaining({ status_code: 402, user_byok: true })
+    );
   });
 
   it.each([

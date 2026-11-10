@@ -1,4 +1,4 @@
-import { getSandbox } from '@cloudflare/sandbox';
+import { TRPCError } from '@trpc/server';
 import {
   PREVIEW_SESSION_LIFETIME_SECONDS,
   mintPreviewSessionToken,
@@ -6,6 +6,7 @@ import {
   validatePreviewEntryTicket,
   validatePreviewSessionToken,
   type PreviewClaims,
+  type PreviewEntryClaims,
 } from '../auth.js';
 import type {
   PreviewProviderCoordinates,
@@ -25,12 +26,18 @@ import {
 } from '../shared/preview-headers.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { resolveSandboxNamespace } from '../sandbox-placement.js';
 import type { Env } from '../types.js';
-import { isPreviewEnabled, matchPreviewHost, previewLabel, type PreviewHostMatch } from './host.js';
+import {
+  isPreviewEnabled,
+  matchPreviewHost,
+  previewTargetId,
+  previewLabel,
+  type PreviewHostMatch,
+} from './host.js';
 import { PREVIEW_NOT_RUNNING_TEXT, PREVIEW_SESSION_MISSING_TEXT } from './container-port-fetch.js';
 import { isPreviewReservedPath, previewReturnPath } from './return-path.js';
 import { previewUpstreamHost, previewUpstreamUrl } from './upstream.js';
+import { resolveWorkspacePreviewTarget } from './workspace-target.js';
 
 export const PREVIEW_ENTER_PATH = '/.kilo-preview/enter';
 /** Worker-host path the web app links to; it redirects to the preview host. */
@@ -48,14 +55,24 @@ export type PreviewSessionStub = {
   resolvePreviewTarget(): Promise<ResolvedPreviewTarget>;
 };
 
+export type PreviewAccessInput = {
+  env: Env;
+  userId: string;
+  expectedOrganizationId: string | null;
+};
+
+export type PreviewWorkspaceAccessInput = PreviewAccessInput & {
+  worktreeId: string;
+};
+
 export type PreviewRouteDeps = {
-  validateAccess: (input: {
-    env: Env;
-    userId: string;
-    cloudAgentSessionId: string;
-    expectedOrganizationId: string | null;
-  }) => Promise<void>;
+  validateAccess: (
+    input: PreviewAccessInput & {
+      cloudAgentSessionId: string;
+    }
+  ) => Promise<void>;
   getSessionStub: (env: Env, userId: string, sessionId: string) => PreviewSessionStub;
+  resolveWorkspaceTarget: (input: PreviewWorkspaceAccessInput) => Promise<ResolvedPreviewTarget>;
   /** True only for the first use of an entry ticket's nonce. */
   consumeTicketNonce: (env: Env, nonce: string, expiresAtMs: number) => Promise<boolean>;
   fetchUpstream: (
@@ -70,16 +87,6 @@ export async function defaultFetchUpstream(
   coordinates: PreviewProviderCoordinates,
   request: Request
 ): Promise<Response> {
-  if (coordinates.provider === 'cloudflare') {
-    // The same namespace rule as the Sandbox DO's provider adapter: a placed key
-    // routes only through its pinned kind.
-    const namespace = resolveSandboxNamespace(env, {
-      sandboxId: coordinates.allocationName,
-      sandboxKind: coordinates.sandboxKind,
-      contained: coordinates.containment,
-    });
-    return getSandbox(namespace, coordinates.allocationName).fetch(request);
-  }
   const stub = env.SANDBOX_CONTAINERS.getByName(coordinates.logicalSandboxId);
   return stub.fetch(request);
 }
@@ -94,6 +101,13 @@ const defaultPreviewRouteDeps: PreviewRouteDeps = {
     });
   },
   getSessionStub: (env, userId, sessionId) => getSandboxSessionStub(env, userId, sessionId),
+  resolveWorkspaceTarget: ({ env, userId, worktreeId, expectedOrganizationId }) =>
+    resolveWorkspacePreviewTarget({
+      env,
+      kiloUserId: userId,
+      worktreeId,
+      expectedOrganizationId,
+    }),
   consumeTicketNonce: consumeStreamTicketNonce,
   fetchUpstream: defaultFetchUpstream,
 };
@@ -148,10 +162,76 @@ function headersWithinCaps(headers: readonly PreviewHeader[]): boolean {
 
 /**
  * The Worker derives the label from the verified claims alone; it must name the
- * request host. A match also proves the port and that the session is `workspace_`.
+ * request host. A match also proves the port and the target kind.
  */
-function claimsMatchHost(claims: PreviewClaims, match: PreviewHostMatch): boolean {
-  return previewLabel(claims.cloudAgentSessionId, claims.port) === match.label;
+function claimsMatchHost(
+  claims: PreviewEntryClaims | PreviewClaims,
+  match: PreviewHostMatch
+): boolean {
+  const targetId = previewTargetId(claims);
+  return targetId !== null && previewLabel(targetId, claims.port) === match.label;
+}
+
+/**
+ * Legacy session targets still need an explicit access check. Workspace
+ * targets are authorized once inside `resolveWorkspacePreviewTarget`, so the
+ * route must not look up the catalog a second time.
+ */
+async function validateClaimsAccess(
+  claims: PreviewEntryClaims | PreviewClaims,
+  env: Env,
+  deps: PreviewRouteDeps
+): Promise<void> {
+  if (claims.worktreeId !== undefined) return;
+  if (claims.cloudAgentSessionId !== undefined) {
+    await deps.validateAccess({
+      env,
+      userId: claims.userId,
+      cloudAgentSessionId: claims.cloudAgentSessionId,
+      expectedOrganizationId: claims.organizationId ?? null,
+    });
+    return;
+  }
+  throw new Error('Preview claims have no target');
+}
+
+function isForbiddenAccessError(error: unknown): boolean {
+  return error instanceof TRPCError && error.code === 'FORBIDDEN';
+}
+
+async function resolveClaimsTarget(
+  claims: PreviewEntryClaims | PreviewClaims,
+  env: Env,
+  deps: PreviewRouteDeps
+): Promise<ResolvedPreviewTarget> {
+  const expectedOrganizationId = claims.organizationId ?? null;
+  if (claims.worktreeId !== undefined) {
+    return deps.resolveWorkspaceTarget({
+      env,
+      userId: claims.userId,
+      worktreeId: claims.worktreeId,
+      expectedOrganizationId,
+    });
+  }
+  if (claims.cloudAgentSessionId !== undefined) {
+    return withDORetry(
+      () => deps.getSessionStub(env, claims.userId, claims.cloudAgentSessionId),
+      stub => stub.resolvePreviewTarget(),
+      'resolvePreviewTarget'
+    );
+  }
+  throw new Error('Preview claims have no target');
+}
+
+function claimsMatchTarget(
+  claims: PreviewClaims,
+  coordinates: PreviewProviderCoordinates
+): boolean {
+  return (
+    claims.provider === coordinates.provider &&
+    claims.logicalSandboxId === coordinates.logicalSandboxId &&
+    claims.allocationRef === coordinates.allocationRef
+  );
 }
 
 /**
@@ -172,9 +252,11 @@ export async function handlePreviewOpen(request: Request, env: Env): Promise<Res
   const url = new URL(request.url);
   const ticket = url.searchParams.get('ticket');
   const validated = validatePreviewEntryTicket(ticket, await resolveSecret(env.NEXTAUTH_SECRET));
-  const label = validated.success
-    ? previewLabel(validated.claims.cloudAgentSessionId, validated.claims.port)
-    : null;
+  let label: string | null = null;
+  if (validated.success) {
+    const targetId = previewTargetId(validated.claims);
+    if (targetId !== null) label = previewLabel(targetId, validated.claims.port);
+  }
   if (ticket === null || label === null) {
     return entryResponse(401, 'Preview ticket is missing or invalid');
   }
@@ -212,16 +294,25 @@ async function handleEntry(
   }
   const claims = ticket.claims;
   try {
-    await deps.validateAccess({
-      env,
-      userId: claims.userId,
-      cloudAgentSessionId: claims.cloudAgentSessionId,
-      expectedOrganizationId: claims.organizationId ?? null,
-    });
+    await validateClaimsAccess(claims, env, deps);
   } catch (error) {
     const projected = accessErrorResponse(error);
     return entryResponse(projected.status, await projected.text());
   }
+
+  let target: ResolvedPreviewTarget;
+  try {
+    target = await resolveClaimsTarget(claims, env, deps);
+  } catch (error) {
+    if (isForbiddenAccessError(error)) {
+      const projected = accessErrorResponse(error);
+      return entryResponse(projected.status, await projected.text());
+    }
+    logger.withFields({ error: errorMessage(error) }).warn('Preview target resolution failed');
+    return entryResponse(503, 'Preview is temporarily unavailable', true);
+  }
+  if (target.status !== 'ok') return entryUnavailableTargetResponse(target);
+  const coordinates = target.coordinates;
 
   // Single use: a ticket copied from a URL or a log cannot open a second session.
   let firstUse: boolean;
@@ -235,7 +326,13 @@ async function handleEntry(
     return entryResponse(401, PREVIEW_TICKET_USED_TEXT);
   }
 
-  const sessionToken = mintPreviewSessionToken(claims, secret);
+  const sessionClaims: PreviewClaims = {
+    ...claims,
+    provider: coordinates.provider,
+    logicalSandboxId: coordinates.logicalSandboxId,
+    allocationRef: coordinates.allocationRef,
+  };
+  const sessionToken = mintPreviewSessionToken(sessionClaims, secret);
   const cookie = [
     `${previewCookieName(url.protocol === 'https:')}=${sessionToken}`,
     'HttpOnly',
@@ -333,6 +430,16 @@ function unavailableTargetResponse(
   }
 }
 
+function entryUnavailableTargetResponse(
+  target: Exclude<ResolvedPreviewTarget, { status: 'ok' }>
+): Response {
+  const response = unavailableTargetResponse(target);
+  const headers = new Headers(response.headers);
+  headers.set('Referrer-Policy', 'no-referrer');
+  headers.set('Cache-Control', 'no-store');
+  return new Response(response.body, { status: response.status, headers });
+}
+
 async function handleProxy(
   request: Request,
   env: Env,
@@ -373,12 +480,7 @@ async function handleProxy(
   const claims = session.claims;
 
   try {
-    await deps.validateAccess({
-      env,
-      userId: claims.userId,
-      cloudAgentSessionId: claims.cloudAgentSessionId,
-      expectedOrganizationId: claims.organizationId ?? null,
-    });
+    await validateClaimsAccess(claims, env, deps);
   } catch (error) {
     return accessErrorResponse(error);
   }
@@ -386,18 +488,20 @@ async function handleProxy(
   let target: ResolvedPreviewTarget;
   try {
     // A side-effect-free read, so a retryable DO error is retried before it becomes a 503.
-    target = await withDORetry(
-      () => deps.getSessionStub(env, claims.userId, claims.cloudAgentSessionId),
-      stub => stub.resolvePreviewTarget(),
-      'resolvePreviewTarget'
-    );
+    target = await resolveClaimsTarget(claims, env, deps);
   } catch (error) {
+    if (isForbiddenAccessError(error)) return accessErrorResponse(error);
     logger.withFields({ error: errorMessage(error) }).warn('Preview target resolution failed');
     return fixed(503, 'Preview is temporarily unavailable', true);
   }
   if (target.status !== 'ok') return unavailableTargetResponse(target);
   // The physical DO refuses reserved ports before it touches the container.
   const coordinates = target.coordinates;
+
+  // A cookie minted for another allocation must not follow a replacement.
+  if (!claimsMatchTarget(claims, coordinates)) {
+    return fixed(401, PREVIEW_SESSION_MISSING_TEXT);
+  }
 
   let response: Response;
   try {

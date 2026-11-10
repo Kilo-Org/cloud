@@ -1,0 +1,50 @@
+--- a/android/src/main/java/expo/modules/localization/LocalizationModule.kt
++++ b/android/src/main/java/expo/modules/localization/LocalizationModule.kt
+@@ -53,13 +53,16 @@
+ 
+   private fun setRTLFromStringResources(context: Context) {
+     val supportsRTL =
+-      context.getString(R.string.ExpoLocalization_supportsRTL).toBooleanStrictOrNull() ?: true
++      context.getString(R.string.ExpoLocalization_supportsRTL).toBooleanStrictOrNull()
+     val forcesRTL =
+-      context.getString(R.string.ExpoLocalization_forcesRTL).toBooleanStrictOrNull() ?: false
++      context.getString(R.string.ExpoLocalization_forcesRTL).toBooleanStrictOrNull()
+ 
+     // We call these methods before React loads to ensure it gets rendered correctly the first time the app is opened.
+-    I18nUtil.instance.allowRTL(context, supportsRTL)
+-    I18nUtil.instance.forceRTL(context, forcesRTL)
++    // An unset resource leaves the direction to the app: it forces the direction
++    // for the language the user chose and relaunches to apply it, so resetting
++    // the template default here would overwrite that choice before React renders.
++    supportsRTL?.let { I18nUtil.instance.allowRTL(context, it) }
++    forcesRTL?.let { I18nUtil.instance.forceRTL(context, it) }
+   }
+ 
+   private fun getMeasurementSystem(locale: Locale): String? {
+--- a/ios/LocalizationModule.swift
++++ b/ios/LocalizationModule.swift
+@@ -50,14 +50,20 @@
+   }
+ 
+   func setRTLPreferences() {
+-    let supportsRTL = Bundle.main.object(forInfoDictionaryKey: "ExpoLocalization_supportsRTL") as? Bool ?? true
+-    let forcesRTL = Bundle.main.object(forInfoDictionaryKey: "ExpoLocalization_forcesRTL") as? Bool ?? false
++    let supportsRTL = Bundle.main.object(forInfoDictionaryKey: "ExpoLocalization_supportsRTL") as? Bool
++    let forcesRTL = Bundle.main.object(forInfoDictionaryKey: "ExpoLocalization_forcesRTL") as? Bool
+ 
+     // We call these methods before React loads to ensure it gets rendered correctly the first time the app is opened.
+     // Uses required reason API based on the following reason: CA92.1
+     if let i18nUtil = RCTI18nUtil.sharedInstance() {
+-      i18nUtil.allowRTL(supportsRTL)
+-      i18nUtil.forceRTL(forcesRTL)
++      // An absent key leaves the direction to the app, which forces it for the
++      // language the user chose; the template default must not reset it here.
++      if let supportsRTL {
++        i18nUtil.allowRTL(supportsRTL)
++      }
++      if let forcesRTL {
++        i18nUtil.forceRTL(forcesRTL)
++      }
+     }
+   }
+ 

@@ -8,22 +8,56 @@ jest.mock('@/lib/auth/passkey', () => ({
   createRegistrationOptions: jest.fn(),
   verifyRegistration: jest.fn(),
 }));
+jest.mock('@vercel/firewall');
+jest.mock('@sentry/nextjs');
+jest.mock('@/lib/admin/admin-action-audit');
+jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store'),
+  evaluateStepUp: jest.fn(),
+}));
 
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
+import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   createRegistrationOptions,
   verifyRegistration,
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
+import { checkRateLimit } from '@vercel/firewall';
+import { captureMessage } from '@sentry/nextjs';
 import { POST } from './route';
+import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
 
-const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockGetUserFromAuth = jest.mocked(getUserFromSessionForCredentialIssuance);
+const mockEvaluateStepUp = jest.mocked(evaluateStepUp);
+const mockRecordAdminAction = jest.mocked(recordAdminAction);
 const mockCreateRegistrationOptions = jest.mocked(createRegistrationOptions);
 const mockVerifyRegistration = jest.mocked(verifyRegistration);
+const mockCheckRateLimit = jest.mocked(checkRateLimit);
+const mockCaptureMessage = jest.mocked(captureMessage);
 
-const fakeUser = { id: 'user-1', google_user_email: 'user@example.com' };
+const fakeUser = {
+  id: 'user-1',
+  google_user_email: 'user@example.com',
+  google_user_name: 'User',
+  is_admin: false,
+  is_super_admin: false,
+};
 
 const challengeId = '11111111-1111-4111-8111-111111111111';
+
+/** One attestation as the browser's credential API returns it, JSON-encoded. */
+const attestation = {
+  id: 'credential-1',
+  rawId: 'credential-1',
+  type: 'public-key',
+  response: {
+    clientDataJSON: 'client-data',
+    attestationObject: 'attestation-object',
+  },
+  clientExtensionResults: {},
+};
 
 function createRequest(body: unknown): NextRequest {
   return new NextRequest('http://localhost:3000/api/auth/passkey/register', {
@@ -36,9 +70,14 @@ function createRequest(body: unknown): NextRequest {
 describe('POST /api/auth/passkey/register', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    rateLimitTest.resetReportThrottle();
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
     mockGetUserFromAuth.mockResolvedValue({
       user: fakeUser,
       authFailedResponse: null,
+      webSessionId: 'session-1',
+      webSessionPepper: 'session-pepper-1',
+      authenticatedAt: Math.floor(Date.now() / 1000),
     } as never);
   });
 
@@ -51,6 +90,7 @@ describe('POST /api/auth/passkey/register', () => {
     const response = await POST(createRequest({ action: 'options' }));
 
     expect(response.status).toBe(401);
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
     expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
     expect(mockVerifyRegistration).not.toHaveBeenCalled();
   });
@@ -63,26 +103,80 @@ describe('POST /api/auth/passkey/register', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ challengeId, options });
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('passkey-registration-options', {
+      request: expect.any(NextRequest),
+      rateLimitKey: 'passkey-register-options:user-1',
+    });
     expect(mockCreateRegistrationOptions).toHaveBeenCalledWith('user-1', 'user@example.com');
+  });
+
+  it('rate limits the options action per user', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
+
+    const response = await POST(createRequest({ action: 'options' }));
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+    expect(mockVerifyRegistration).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['not-found', 'is not configured'],
+    ['blocked', 'could not be evaluated'],
+  ] as const)(
+    'refuses minting when the registration limiter reports %s',
+    async (error, message) => {
+      mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error });
+
+      const response = await POST(createRequest({ action: 'options' }));
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
+      expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        `Firewall rate limit 'passkey-registration-options' ${message}`,
+        { level: 'error', tags: { source: 'passkey_register_options' } }
+      );
+    }
+  );
+
+  it('reports a not-found registration rule only once per interval', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+    const params = { level: 'error', tags: { source: 'passkey_register_options' } };
+
+    await POST(createRequest({ action: 'options' }));
+    await POST(createRequest({ action: 'options' }));
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'passkey-registration-options' is not configured",
+      params
+    );
+    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
   });
 
   it('binds the credential to the session user, ignoring the request body', async () => {
     mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);
-    const attestation = {
-      id: 'credential-1',
-      rawId: 'credential-1',
-      type: 'public-key',
-      response: { clientDataJSON: 'xxx' },
-      kiloUserId: 'attacker-user',
-    };
 
     const response = await POST(
-      createRequest({ action: 'verify', challengeId, response: attestation })
+      createRequest({
+        action: 'verify',
+        challengeId,
+        // A field the boundary does not know is stripped, so the ceremony is
+        // called with the validated attestation and the session user only.
+        response: { ...attestation, kiloUserId: 'attacker-user' },
+      })
     );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ credentialId: 'credential-1' });
-    expect(mockVerifyRegistration).toHaveBeenCalledWith('user-1', challengeId, attestation);
+    expect(mockVerifyRegistration).toHaveBeenCalledWith(
+      'user-1',
+      challengeId,
+      attestation,
+      'session-pepper-1'
+    );
   });
 
   it('returns 400 for an invalid request', async () => {
@@ -94,16 +188,135 @@ describe('POST /api/auth/passkey/register', () => {
     expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
   });
 
+  it('returns 400 without verifying a body that is not a WebAuthn attestation', async () => {
+    const bodies = [
+      // Only the inner response object: no credential id or type.
+      { action: 'verify', challengeId, response: attestation.response },
+      // A registration response without the attestation object has nothing to
+      // verify.
+      {
+        action: 'verify',
+        challengeId,
+        response: { ...attestation, response: { clientDataJSON: 'client-data' } },
+      },
+      // Anything other than a public-key credential is not an attestation.
+      { action: 'verify', challengeId, response: { ...attestation, type: 'password' } },
+      // The credential API members must be strings, not objects or numbers.
+      {
+        action: 'verify',
+        challengeId,
+        response: {
+          ...attestation,
+          response: { ...attestation.response, clientDataJSON: 42 },
+        },
+      },
+    ];
+
+    for (const body of bodies) {
+      expect((await POST(createRequest(body))).status).toBe(400);
+    }
+    expect(mockVerifyRegistration).not.toHaveBeenCalled();
+  });
+
   it('returns 401 with the stable code when verification is refused', async () => {
     mockVerifyRegistration.mockRejectedValue(
       new PasskeyVerificationError('CHALLENGE_ALREADY_USED')
     );
 
     const response = await POST(
-      createRequest({ action: 'verify', challengeId, response: { id: 'credential-1' } })
+      createRequest({ action: 'verify', challengeId, response: attestation })
     );
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'CHALLENGE_ALREADY_USED' });
+  });
+
+  it('refuses a stale admin enrollment without a fresh sign-in or step-up proof', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: { ...fakeUser, is_admin: true },
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
+    } as never);
+    mockEvaluateStepUp.mockResolvedValue({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 0,
+    } as never);
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: attestation })
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'REAUTH_REQUIRED' });
+    expect(mockVerifyRegistration).not.toHaveBeenCalled();
+  });
+
+  it('refuses the options step for a stale admin enrollment', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: { ...fakeUser, is_admin: true },
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
+    } as never);
+    mockEvaluateStepUp.mockResolvedValue({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 1,
+    } as never);
+
+    const response = await POST(createRequest({ action: 'options' }));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'REAUTH_REQUIRED' });
+    expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
+  });
+
+  it('allows an admin enrollment from a fresh sign-in', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: { ...fakeUser, is_admin: true },
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 60,
+    } as never);
+    mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: attestation })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEvaluateStepUp).not.toHaveBeenCalled();
+    expect(mockRecordAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({ trpcPath: '/api/auth/passkey/register' }),
+      expect.objectContaining({ action: 'admin.passkey.enrolled' })
+    );
+  });
+
+  it('allows an admin enrollment with a live step-up proof', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: { ...fakeUser, is_admin: true },
+      authFailedResponse: null,
+      webSessionId: 'session-1',
+      authenticatedAt: Math.floor(Date.now() / 1000) - 20 * 60,
+    } as never);
+    mockEvaluateStepUp.mockResolvedValue({
+      state: {
+        status: 'fresh',
+        method: 'webauthn_uv',
+        verifiedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+      proof: null,
+      passkeyCount: 1,
+    } as never);
+    mockVerifyRegistration.mockResolvedValue({ credential_id: 'credential-1' } as never);
+
+    const response = await POST(
+      createRequest({ action: 'verify', challengeId, response: attestation })
+    );
+
+    expect(response.status).toBe(200);
   });
 });

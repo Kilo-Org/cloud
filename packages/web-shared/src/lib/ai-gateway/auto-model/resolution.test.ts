@@ -22,10 +22,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
 
 import type * as AutoModelResolution from './resolution';
 import {
+  AUTO_SMALL_TARGET_MODELS,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
+  KILO_AUTO_SMALL_MODEL,
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -70,6 +72,26 @@ const sampleDecision: AutoRoutingDecision = {
   tableVersion: 'v1',
   sticky: false,
 };
+
+describe('resolveAutoModel Auto Small', () => {
+  it.each([
+    { balance: 1, target: AUTO_SMALL_TARGET_MODELS.paid },
+    { balance: 0, target: AUTO_SMALL_TARGET_MODELS.free },
+    { balance: -1, target: AUTO_SMALL_TARGET_MODELS.free },
+  ])('routes balance $balance to $target', async ({ balance, target }) => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_SMALL_MODEL.id,
+        apiKind: 'chat_completions',
+      },
+      nullUserPromise,
+      Promise.resolve(balance)
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: { model: target } });
+  });
+});
 
 describe('resolveAutoModel — kilo-auto/efficient branch', () => {
   it('resolves kilo-auto/balanced as an alias of kilo-auto/efficient', async () => {
@@ -647,6 +669,32 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
 });
 
 describe('resolveAutoModel — Organization Auto branch', () => {
+  it('uses the platform decision when Organization Auto targets Balanced after cutover', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => sampleDecision,
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: { routes: {}, fallback_model: KILO_AUTO_BALANCED_MODEL.id },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: sampleDecision.model },
+      routingTarget: KILO_AUTO_BALANCED_MODEL.id,
+    });
+  });
+
   it('uses exact built-in alias routes before canonical fallback routes', async () => {
     const result = await resolveAutoModel(
       {
@@ -1076,52 +1124,6 @@ describe('resolveAutoModel — custom routers', () => {
       kind: 'custom_router_error',
       code: 'custom_router_unavailable',
     });
-  });
-
-  it('uses the shared migrated pool when Organization Auto targets Balanced', async () => {
-    const result = await resolveAutoModel(
-      {
-        ...baseParams,
-        model: ORG_AUTO_MODEL.id,
-        apiKind: 'chat_completions',
-        legacyPoolRouter: async () => ({ scope: 'org', slug: 'efficient' }),
-        customRouterDecision: okDecide(),
-        organizationContext: Promise.resolve({
-          organizationId: 'org-1',
-          plan: 'enterprise',
-          settings: {
-            default_model: ORG_AUTO_MODEL.id,
-            org_auto_model: {
-              routes: {},
-              fallback_model: KILO_AUTO_BALANCED_MODEL.id,
-            },
-          },
-        }),
-      },
-      nullUserPromise,
-      zeroBalancePromise
-    );
-    expect(result).toEqual({
-      kind: 'ok',
-      resolved: { model: haiku, reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
-      routingTarget: KILO_AUTO_BALANCED_MODEL.id,
-    });
-  });
-
-  it('fails closed when the migrated-pool lookup fails before Efficient resolution', async () => {
-    const result = await resolveAutoModel(
-      {
-        ...baseParams,
-        apiKind: 'chat_completions',
-        legacyPoolRouter: async () => {
-          throw new Error('storage unavailable');
-        },
-        efficientDecision: async () => sampleDecision,
-      },
-      nullUserPromise,
-      zeroBalancePromise
-    );
-    expect(result).toEqual({ kind: 'auto_routing_unavailable' });
   });
 
   it('resolves an Organization Auto route to an organization custom router', async () => {

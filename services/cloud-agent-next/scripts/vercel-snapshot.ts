@@ -6,9 +6,11 @@ import { readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { shellQuote } from '../src/kilo/utils.js';
 import { RUNTIME_DISTRIBUTION } from '../src/shared/runtime-distribution.js';
 import {
   CONTROL_PLANE_SUPERVISOR,
+  GH_STACK_INSTALL_PATH,
   GIT_CREDENTIAL_HELPER,
   WRAPPER_BUNDLES,
 } from '../src/shared/runtime-distribution.js';
@@ -16,16 +18,20 @@ import { CONTROL_PLANE_PROTOCOL_VERSION } from '../src/shared/control-plane-prot
 import { WRAPPER_VERSION } from '../src/shared/wrapper-version.js';
 import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 import {
+  RUNTIME_TOOLCHAIN,
+  installPinnedArchiveScript,
+  installPinnedNpmPackageScript,
+  toolchainVerificationScript,
+} from '../src/shared/runtime-toolchain.js';
+import {
   SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH,
   SNAPSHOT_MANIFEST_PATH,
   SNAPSHOT_RUNTIME,
   createRuntimeManifest,
-  exactVersionCheck,
   hashRuntimeArtifacts,
   runtimeDistributionSourceFiles,
   runtimeManifestArtifacts,
   runtimeVerificationScript,
-  shellQuote,
   validateRuntimeManifest,
   type RuntimeArtifact,
   type RuntimeManifest,
@@ -41,7 +47,6 @@ export {
   hashRuntimeArtifacts,
   runtimeDistributionSourceFiles,
   runtimeVerificationScript,
-  shellQuote,
   validateRuntimeManifest,
 } from './runtime-manifest.js';
 export type { RuntimeArtifact, RuntimeManifest } from './runtime-manifest.js';
@@ -841,76 +846,72 @@ async function scanRemote(config: ProviderConfig, sessionId: string): Promise<vo
   }
 }
 
-async function installBuilder(config: ProviderConfig, sessionId: string): Promise<void> {
+/**
+ * The builder steps that produce the base toolchain. Every third-party tool comes
+ * from a pinned distribution checked against `RUNTIME_TOOLCHAIN`, and the last
+ * step re-checks the installed toolchain by version and digest.
+ */
+export function builderInstallSteps(): Array<{ label: string; script: string }> {
   const versions = RUNTIME_DISTRIBUTION;
-  const steps: Array<{ label: string; script: string }> = [
+  return [
     {
       label: 'install packages (dnf)',
-      script: 'sudo dnf install -y git git-lfs jq tar gzip',
+      // `unzip` unpacks the pinned bun archive.
+      script: 'sudo dnf install -y git git-lfs jq tar gzip unzip',
     },
     {
-      // AL2023 core dnf does not ship ripgrep; it is SPAL-only.
-      label: 'install ripgrep',
-      script: [
-        'RG_VERSION=15.2.0',
-        'curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl.tar.gz" -o /tmp/rg.tar.gz',
-        'tar -xzf /tmp/rg.tar.gz -C /tmp',
-        'sudo install -m 0755 /tmp/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl/rg /usr/local/bin/rg',
-        'rm -rf /tmp/rg.tar.gz /tmp/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl',
-      ].join('\n'),
+      label: `install ripgrep ${RUNTIME_TOOLCHAIN.rg.version}`,
+      script: installPinnedArchiveScript('rg'),
     },
     {
       label: `install bun ${versions.bun}`,
-      script: `curl -fsSL https://bun.sh/install | bash -s ${shellQuote(`bun-v${versions.bun}`)} && sudo install -m 0755 "$HOME/.bun/bin/bun" /usr/local/bin/bun`,
+      script: installPinnedArchiveScript('bun'),
     },
     {
       label: `install glab ${versions.glab}`,
-      script: [
-        `GLAB_VERSION=${shellQuote(versions.glab)}`,
-        'curl -fsSL "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.tar.gz" -o /tmp/glab.tar.gz',
-        'mkdir -p /tmp/glab-extract',
-        'tar -xzf /tmp/glab.tar.gz -C /tmp/glab-extract',
-        'sudo install -m 0755 /tmp/glab-extract/bin/glab /usr/local/bin/glab',
-        'rm -rf /tmp/glab.tar.gz /tmp/glab-extract',
-      ].join('\n'),
+      script: installPinnedArchiveScript('glab'),
     },
     {
       label: `install gh ${versions.gh}`,
+      script: installPinnedArchiveScript('gh'),
+    },
+    {
+      label: `install gh-stack ${versions.ghStack}`,
       script: [
-        `GH_VERSION=${shellQuote(versions.gh)}`,
-        'curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" -o /tmp/gh.tar.gz',
-        'tar -xzf /tmp/gh.tar.gz -C /tmp',
-        'sudo install -m 0755 "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh',
-        'rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"',
+        `GH_STACK_VERSION=${shellQuote(versions.ghStack)}`,
+        `GH_STACK_SHA256=${shellQuote(versions.ghStackSha256)}`,
+        'curl -fsSL "https://github.com/github/gh-stack/releases/download/v${GH_STACK_VERSION}/linux-amd64" -o /tmp/gh-stack',
+        'echo "${GH_STACK_SHA256}  /tmp/gh-stack" | sha256sum -c -',
+        `sudo install -D -m 0755 /tmp/gh-stack ${shellQuote(GH_STACK_INSTALL_PATH)}`,
+        'rm -f /tmp/gh-stack',
       ].join('\n'),
     },
     {
       label: `install pnpm ${versions.pnpm}`,
-      script: `sudo npm install -g ${shellQuote(`pnpm@${versions.pnpm}`)}`,
+      script: installPinnedNpmPackageScript('pnpm'),
     },
     {
       label: `install kilo ${KILO_CLI_VERSION}`,
-      script: `sudo npm install -g ${shellQuote(`@kilocode/cli@${KILO_CLI_VERSION}`)}`,
+      script: installPinnedNpmPackageScript('kilo'),
     },
     {
       label: 'verify runtime pins',
       script: [
         'sudo mkdir -p /usr/local/share/kilo /opt/git/etc',
         'sudo git lfs install --system --skip-repo',
-        `test "$(bun --version)" = ${shellQuote(versions.bun)}`,
-        `test "$(pnpm --version)" = ${shellQuote(versions.pnpm)}`,
+        toolchainVerificationScript(['bun', 'pnpm', 'gh', 'glab', 'rg', 'kilo']),
         `case "$(node --version)" in v${versions.nodeMajor}.*) ;; *) echo "unexpected node $(node --version)" >&2; exit 1 ;; esac`,
         'curl --version >/dev/null',
         'git --version >/dev/null',
-        exactVersionCheck('gh', versions.gh),
-        exactVersionCheck('glab', versions.glab),
-        'command -v rg >/dev/null',
+        `test "$(sha256sum ${shellQuote(GH_STACK_INSTALL_PATH)} | cut -d' ' -f1)" = ${shellQuote(versions.ghStackSha256)}`,
         'git-lfs version >/dev/null',
-        'kilo --version >/dev/null',
       ].join('\n'),
     },
   ];
-  for (const step of steps) {
+}
+
+async function installBuilder(config: ProviderConfig, sessionId: string): Promise<void> {
+  for (const step of builderInstallSteps()) {
     await execute(config, sessionId, 'bash', ['-lc', `set -euo pipefail\n${step.script}`], {
       timeoutMs: DEFAULT_TIMEOUT_MS,
       label: step.label,
@@ -1240,7 +1241,7 @@ Build/validate/acceptance arguments:
   --sandbox-name <name>    Stop only: exact sandbox name used to create it
 
 Activation and rollback:
-  1. Deploy code with VERCEL_SANDBOX_ORG_IDS empty.
+  1. Deploy code with BYOC_VERCEL_IDS empty.
   2. Verify no deployed version-1 Vercel tombstones exist.
   3. Build and accept the snapshot.
   4. Configure accepted runtime values and one allowlisted organization.

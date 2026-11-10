@@ -1,3 +1,4 @@
+import { ModelError } from '@kilocode/harness-sdk';
 import { onlineManager } from '@tanstack/react-query';
 import { describe, expect, it, onTestFinished } from 'vitest';
 
@@ -7,6 +8,7 @@ import { type StoredChatBackend } from './backend-store';
 import {
   backendFailureKey,
   backendTargetId,
+  CREDITS_FAILURE_KEY,
   decodeBackendTarget,
   localTargetId,
   resolveChatTarget,
@@ -40,6 +42,52 @@ describe('backendFailureKey', () => {
 
   it('keeps the generic copy for a failure while online', () => {
     expect(backendFailureKey(new Error('upstream 500'))).toBe('common.somethingWentWrong');
+  });
+
+  it('says the account cannot pay when the gateway answers payment required', () => {
+    const failure = new ModelError({
+      reason: 'status',
+      status: 402,
+      cause: '{"error":{"message":"Add credits to continue"},"error_type":"usage_limit_exceeded"}',
+    });
+
+    expect(backendFailureKey(failure, 'kilo-auto/frontier')).toBe(CREDITS_FAILURE_KEY);
+  });
+
+  it('keeps a payment refusal from a provider the person pays directly generic', () => {
+    const failure = new ModelError({
+      reason: 'status',
+      status: 402,
+      cause: 'Remote request rejected',
+    });
+
+    expect(backendFailureKey(failure, backendTargetId(first, modelId))).toBe(
+      'common.somethingWentWrong'
+    );
+  });
+
+  it('keeps a payment refusal relayed from the account own key generic', () => {
+    /* Kilo relays a 402 from the account's provider key with the same status;
+       the body names the key's failure rather than Kilo's credit block. */
+    const failure = new ModelError({
+      reason: 'status',
+      status: 402,
+      cause: '{"error":"provider says no","error_type":"byok_error","message":"provider says no"}',
+    });
+
+    expect(backendFailureKey(failure, 'kilo-auto/frontier')).toBe('common.somethingWentWrong');
+  });
+
+  it('keeps a 402 whose body names no error type generic', () => {
+    const failure = new ModelError({ reason: 'status', status: 402, cause: 'not json' });
+
+    expect(backendFailureKey(failure, 'kilo-auto/frontier')).toBe('common.somethingWentWrong');
+  });
+
+  it('keeps another gateway status generic', () => {
+    const failure = new ModelError({ reason: 'status', status: 429, cause: 'slow down' });
+
+    expect(backendFailureKey(failure, 'kilo-auto/frontier')).toBe('common.somethingWentWrong');
   });
 });
 

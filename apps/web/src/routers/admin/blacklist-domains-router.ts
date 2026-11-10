@@ -2,19 +2,32 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import {
   BlacklistDomainsInputSchema,
-  DEFAULT_BLACKLIST_DOMAINS_CONFIG,
-  getBlacklistedDomains,
+  DEFAULT_BLACKLIST_DOMAINS_SETTINGS,
+  clearEmailBlacklistCache,
+  envFallbackSignupTlds,
+  listBlacklistedDomains,
+  normalizeSignupTlds,
+  readBlacklistDomainsSettings,
+  type BlacklistDomainsSettings,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import { BlacklistDomainsConfigSchema } from '@kilocode/worker-utils/account-access';
-import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
-import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import { TRPCError } from '@trpc/server';
+import {
+  BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY,
+  LEGACY_BLACKLIST_DOMAINS_REDIS_KEY,
+  LEGACY_BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
+} from '@kilocode/web-shared/lib/redis-keys';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { kilocode_users } from '@kilocode/db/schema';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { blacklisted_domains, kilocode_users } from '@kilocode/db/schema';
+import { TRPCError } from '@trpc/server';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';
+import { createHash } from 'node:crypto';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
+import {
+  BLACKLIST_STATS_ROW_LIMIT,
+  computeBlacklistStats,
+  countUsersByEmailHost,
+} from '@/lib/abuse/blacklist-domain-stats';
 
 const SuspiciousDomainsInputSchema = z
   .object({
@@ -22,69 +35,122 @@ const SuspiciousDomainsInputSchema = z
   })
   .optional();
 
-// The admin table renders one row per entry. An imported blocklist can hold
-// tens of thousands of entries, so the procedure returns only the domains that
-// actually caught users, ordered by count.
-const STATS_ROW_LIMIT = 200;
+const AdminBlacklistDomainsInputSchema = BlacklistDomainsInputSchema.extend({
+  expected_version: z.string().length(64),
+});
 
-async function readConfigOrThrow(): Promise<BlacklistDomainsConfig> {
-  const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
-  if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
-  return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// A save writes its settings before committing its domains. Reads therefore hold at least a
+// SHARE lock, which waits for an in-flight save, so a version never pairs new settings with the
+// old domains.
+async function lockBlacklist(tx: Transaction, mode: 'SHARE' | 'EXCLUSIVE') {
+  await tx.execute(sql`SET LOCAL lock_timeout = '10s'`);
+  await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+  await tx.execute(sql`LOCK TABLE ${blacklisted_domains} IN ${sql.raw(mode)} MODE`);
 }
 
-async function readConfig(): Promise<BlacklistDomainsConfig> {
+async function readConfig(tx: Transaction) {
+  const [domains, storedSettings] = await Promise.all([
+    listBlacklistedDomains(tx),
+    readBlacklistDomainsSettings(),
+  ]);
+  const settings = storedSettings ?? DEFAULT_BLACKLIST_DOMAINS_SETTINGS;
+  return {
+    domains,
+    settings,
+    version: createHash('sha256').update(JSON.stringify({ domains, settings })).digest('hex'),
+  };
+}
+
+// Only after a committed save: its readConfig has already copied the legacy settings into the
+// settings key, so deleting the legacy value loses nothing.
+async function deleteLegacyBlacklist() {
   try {
-    return await readConfigOrThrow();
-  } catch {
-    return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
+    await redisClient.del(
+      LEGACY_BLACKLIST_DOMAINS_REDIS_KEY,
+      LEGACY_BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY
+    );
+  } catch (error) {
+    captureException(error, { tags: { source: 'blacklist_domains_legacy_cleanup' } });
   }
 }
 
 export const adminBlacklistDomainsRouter = createTRPCRouter({
-  get: adminProcedure.query(async () => {
-    return readConfig();
-  }),
+  get: adminProcedure.query(() =>
+    db.transaction(async tx => {
+      await lockBlacklist(tx, 'SHARE');
+      const { domains, settings, version } = await readConfig(tx);
+      return {
+        ...settings,
+        domains,
+        version,
+        // The editor always shows an editable list: the stored one, or the effective fallback
+        // (env or built-in) before an admin first saves one.
+        blocked_signup_tlds: settings.blocked_signup_tlds ?? envFallbackSignupTlds,
+      };
+    })
+  ),
 
-  set: adminProcedure.input(BlacklistDomainsInputSchema).mutation(async ({ input, ctx }) => {
-    // Deduplicate and normalize domains
+  set: adminProcedure.input(AdminBlacklistDomainsInputSchema).mutation(async ({ input, ctx }) => {
     const normalizedDomains = [
       ...new Set(input.domains.map(d => d.toLowerCase().trim()).filter(Boolean)),
     ];
 
-    // Diff against the list the admin started from so only newly added domains
-    // trigger a backfill. A failed read must not look like an empty list: that
-    // would turn a one-domain save into a backfill of every listed domain. Skip
-    // the automatic run in that case and let the manual backfill handle it.
-    let addedDomains: string[] | null;
+    let saved;
     try {
-      const previous = await readConfigOrThrow();
-      const previousDomains = new Set(previous.domains.map(d => d.toLowerCase().trim()));
-      addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
+      saved = await db.transaction(async tx => {
+        // Serializes saves, including the previous-config read.
+        await lockBlacklist(tx, 'EXCLUSIVE');
+        const previous = await readConfig(tx);
+        if (previous.version !== input.expected_version) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Blacklist changed. Reload the complete list before saving.',
+          });
+        }
+        const previousDomains = new Set(previous.domains);
+        const addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
+        const settings: BlacklistDomainsSettings = {
+          blocked_signup_tlds: normalizeSignupTlds(
+            input.blocked_tlds ?? previous.settings.blocked_signup_tlds ?? envFallbackSignupTlds
+          ),
+          updated_at: new Date().toISOString(),
+          updated_by: ctx.user.id,
+          updated_by_email: ctx.user.google_user_email,
+        };
+        const deadline = Date.now() + 120_000;
+        await tx.delete(blacklisted_domains);
+        for (let offset = 0; offset < normalizedDomains.length; offset += 1000) {
+          if (Date.now() > deadline) throw new Error('Blacklist save timed out');
+          await tx
+            .insert(blacklisted_domains)
+            .values(normalizedDomains.slice(offset, offset + 1000).map(domain => ({ domain })));
+        }
+        // Redis and the commit cannot be atomic. Writing last keeps a failed statement from
+        // applying the settings; only a failed commit can leave them ahead of the domains.
+        await redisClient.set(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY, JSON.stringify(settings));
+        return { settings, addedDomains };
+      });
     } catch (error) {
-      captureException(error, { tags: { source: 'blacklist_domains_previous_config_read' } });
-      addedDomains = null;
-    }
-
-    const config: BlacklistDomainsConfig = {
-      domains: normalizedDomains,
-      updated_at: new Date().toISOString(),
-      updated_by: ctx.user.id,
-      updated_by_email: ctx.user.google_user_email,
-    };
-    const written = await redisClient.set(BLACKLIST_DOMAINS_REDIS_KEY, JSON.stringify(config));
-    if (!written) {
+      if (error instanceof TRPCError && error.code === 'CONFLICT') throw error;
+      captureException(error, { tags: { source: 'blacklist_domains_save' } });
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'Redis is not configured — cannot save blacklisted domains',
+        message:
+          'Blacklist save failed. Reload the list before retrying; the signup TLDs may have been saved.',
+        cause: error,
       });
     }
+    const { settings, addedDomains } = saved;
+    clearEmailBlacklistCache();
+    await deleteLegacyBlacklist();
 
     // The list is already live for auth checks at this point, so a backfill
     // failure must not fail the save. Report it and point the admin at the
     // manual backfill instead.
-    const backfill = { blocked: 0, remaining: false, failed: addedDomains === null };
-    if (addedDomains && addedDomains.length > 0) {
+    const backfill = { blocked: 0, remaining: false, failed: false };
+    if (addedDomains.length > 0) {
       try {
         const result = await backfillBlockBlacklistedDomainsBatch({
           actorId: ctx.user.id,
@@ -98,29 +164,21 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       }
     }
 
-    return { ...config, backfill };
+    return { ...settings, domains: normalizedDomains, backfill };
   }),
 
   stats: adminProcedure.query(async () => {
-    const domains = await getBlacklistedDomains();
+    // Read-only admin report: the list and the grouped aggregate stay off the primary pool.
+    const [domains, emailHostCounts] = await Promise.all([
+      listBlacklistedDomains(readDb),
+      countUsersByEmailHost(readDb),
+    ]);
 
-    // One grouped query against the indexed email_domain column rather than
-    // an N+1 LIKE scan of google_user_email per blacklist entry.
-    const emailDomainCounts = await db
-      .select({
-        email_domain: kilocode_users.email_domain,
-        count: count(),
-      })
-      .from(kilocode_users)
-      .where(isNotNull(kilocode_users.email_domain))
-      .groupBy(kilocode_users.email_domain);
-
-    return computeBlacklistStats(domains, emailDomainCounts, STATS_ROW_LIMIT);
+    return computeBlacklistStats(domains, emailHostCounts, BLACKLIST_STATS_ROW_LIMIT);
   }),
 
   suspicious: adminProcedure.input(SuspiciousDomainsInputSchema).query(async ({ input }) => {
-    const blacklistedDomains = await getBlacklistedDomains();
-    const normalizedBlacklist = blacklistedDomains.map(d => d.toLowerCase());
+    const normalizedBlacklist = await listBlacklistedDomains(readDb);
     const hideLegitimateProviders = input?.hideLegitimateProviders ?? true;
 
     const blockedCountExpr = sql<number>`count(*) FILTER (WHERE ${kilocode_users.blocked_reason} IS NOT NULL)`;
@@ -162,64 +220,11 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
   }),
 });
 
-// Mirrors the suffix semantics of isEmailBlacklistedByDomain, but operates
+// Mirrors the suffix semantics of emailDomainSuffixes, but operates
 // directly on a domain string (e.g. the value stored in email_domain). A
 // blacklist entry matches a domain when the domain equals it or is a
 // subdomain of it.
 export function isDomainOnBlacklist(domain: string, normalizedBlacklist: string[]): boolean {
   const lower = domain.toLowerCase();
   return normalizedBlacklist.some(entry => lower === entry || lower.endsWith('.' + entry));
-}
-
-export type EmailDomainCount = { email_domain: string | null; count: number };
-
-export type BlacklistStats = {
-  domains: { domain: string; blockedCount: number }[];
-  totalDomains: number;
-  totalBlockedUsers: number;
-};
-
-/**
- * Aggregates per-email_domain counts into per-blacklist-entry blocked counts.
- *
- * Walks each email_domain once and credits every blacklist entry that is one of
- * its label-boundary suffixes. The entry-major alternative (test every entry
- * against every group) is quadratic and does not survive a large imported list.
- *
- * `limit` caps the returned rows after sorting; `totalDomains` and
- * `totalBlockedUsers` still describe the whole list so the caller can say what
- * it is not showing.
- */
-export function computeBlacklistStats(
-  blacklistedDomains: string[],
-  emailDomainCounts: readonly EmailDomainCount[],
-  limit?: number
-): BlacklistStats {
-  const lookup = new Set(blacklistedDomains.map(domain => domain.toLowerCase()));
-  const counts = new Map<string, number>();
-
-  for (const row of emailDomainCounts) {
-    if (row.email_domain === null) continue;
-
-    const labels = row.email_domain.toLowerCase().split('.');
-    for (let i = 0; i < labels.length; i++) {
-      const candidate = labels.slice(i).join('.');
-      if (!lookup.has(candidate)) continue;
-
-      counts.set(candidate, (counts.get(candidate) ?? 0) + row.count);
-    }
-  }
-
-  const domainCounts = blacklistedDomains.map(domain => ({
-    domain,
-    blockedCount: counts.get(domain.toLowerCase()) ?? 0,
-  }));
-
-  domainCounts.sort((a, b) => b.blockedCount - a.blockedCount);
-
-  return {
-    domains: limit === undefined ? domainCounts : domainCounts.slice(0, limit),
-    totalDomains: blacklistedDomains.length,
-    totalBlockedUsers: domainCounts.reduce((sum, d) => sum + d.blockedCount, 0),
-  };
 }

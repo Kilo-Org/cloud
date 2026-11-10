@@ -21,9 +21,7 @@
     "**/dist/**",
     "**/.wrangler/**",
     "supabase/functions/**",
-    "**/types/opencode.gen.ts",
-    "**/gastown/types/**",
-    "**/wasteland/types/**"
+    "**/types/opencode.gen.ts"
   ],
   "rules": {
     "constructor-super": "off",
@@ -206,12 +204,12 @@
         "services/model-eval-ingest/**/*.ts",
         "services/notifications/**/*.ts",
         "services/o11y/**/*.ts",
+        "services/scim-sync/**/*.ts",
         "services/security-auto-analysis/**/*.ts",
         "services/security-sync/**/*.ts",
         "services/session-ingest/**/*.ts",
         "services/usage-ingest/**/*.ts",
         "services/user-data-export/**/*.ts",
-        "services/wasteland/**/*.ts",
         "services/webhook-agent-ingest/**/*.ts"
       ],
       "rules": {
@@ -244,8 +242,6 @@
     {
       "files": [
         "services/cloud-agent-next/src/session/queries/*.ts",
-        "services/gastown/**/*.ts",
-        "services/wasteland/**/*.ts",
         "services/webhook-agent-ingest/**/*.ts",
         "services/kiloclaw/**/*.ts"
       ],

@@ -22,7 +22,7 @@ import type {
 import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -30,8 +30,10 @@ import {
   WORKTREE_CHANGES_KEY,
   WORKTREE_FILE_PREFIX,
   worktreeChangesContext,
+  WORKTREE_RECOVERY_KEY,
 } from '../../src/sandbox-session/worktree-changes.js';
 import { WORKTREE_DELETION_PREFIX } from '../../src/control-plane/sandbox/worktree-deletion.js';
+import { MAX_WORKTREE_CHANGES_BYTES } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -89,7 +91,7 @@ function metadata(input: {
     workspace: {
       branchName: 'kilo/b10',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
       ...(input.worktreeId ? { worktreeId: input.worktreeId } : {}),
     },
     lifecycle: { version: 1, timestamp: 1 },
@@ -141,7 +143,7 @@ async function injectProvider(
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
@@ -168,11 +170,12 @@ function launchIdentity(provider: FakeProvider): { credential: string; allocatio
 async function connectAndHello(
   provider: FakeProvider,
   sandboxId: string,
-  wrapperId: string
+  wrapperId: string,
+  worktreeGit = false
 ): Promise<FakeWrapper> {
   const { credential, allocationId } = launchIdentity(provider);
   const wrapper = await FakeWrapper.connect({ sandboxId, credential });
-  const reply = await wrapper.hello({ wrapperId, allocationId });
+  const reply = await wrapper.hello({ wrapperId, allocationId, worktreeGit });
   expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return wrapper;
 }
@@ -205,6 +208,7 @@ async function startSessionWithSandbox(input: {
   savedRevision?: number;
   savedCapturedAt?: string;
   worktreeId?: string;
+  seed?: (storage: DurableObjectStorage) => void;
 }): Promise<DurableObjectStub<SandboxSessionV2>> {
   await injectProvider(input.sandboxId, input.provider);
   const sessionStub = sessions.getByName(sessionDoName(USER_ID, input.sessionId));
@@ -240,6 +244,12 @@ async function startSessionWithSandbox(input: {
       });
     });
   }
+  if (input.seed) {
+    await sessionStub.getSession();
+    await runInDurableObject(sessionStub, async (_instance, state) => {
+      input.seed?.(state.storage);
+    });
+  }
   await sessionStub.createSessionWithInitialAdmission({
     metadata: metadata({
       sessionId: input.sessionId,
@@ -248,7 +258,7 @@ async function startSessionWithSandbox(input: {
       worktreeId: input.worktreeId,
     }),
     message: promptPayload(messageId()),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   await waitFor(() => expect(input.provider.launchEnvs).toHaveLength(1));
   return sessionStub;
@@ -313,12 +323,48 @@ afterEach(async () => {
 });
 
 describe('control-plane worktree changes (B10)', () => {
+  it.each([false, true])('gates git operations on wrapper support: %s', async supportsGit => {
+    const sandboxId = await generateSandboxId(newSessionId());
+    const provider = createFakeProvider();
+    const stub = await injectProvider(sandboxId, provider);
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_git_support', supportsGit);
+    const operation = stub.worktreeGit({
+      session: {
+        sessionId: newSessionId(),
+        kiloSessionId: kiloSessionId(),
+        directory: '/workspace/x',
+      },
+      payload: { operation: 'sync' },
+    });
+    if (supportsGit) {
+      const frame = await awaitFrame(wrapper, 'worktree.git');
+      const result = {
+        status: 'refused',
+        operation: 'sync',
+        branch: 'feat/test',
+        reason: 'turn_running',
+        message: 'A turn is running.',
+      };
+      wrapper.send({ type: 'worktree.result', requestId: frame.requestId, ok: true, result });
+      await expect(operation).resolves.toEqual({ ok: true, result });
+    } else {
+      await expect(operation).resolves.toMatchObject({
+        ok: false,
+        error: { code: 'wrapper_upgrade_required', retryable: false },
+      });
+      expect(await wrapper.next(25)).toBeNull();
+    }
+    wrapper.close();
+  });
+
   it.each(['changes', 'file', 'recovery', 'refresh'] as const)(
     'deduplicates %s readers and removes their subscription on worktree deletion',
     async operation => {
       const sessionId = newSessionId();
       const worktreeId = `worktree_${crypto.randomUUID()}`;
-      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const sandboxId = await generateSandboxId(sessionId);
       const sandbox = await injectProvider(sandboxId, createFakeProvider());
       const context = worktreeChangesContext(
         metadata({ sessionId, sandboxId, worktreeId, kiloSessionId: kiloSessionId() }),
@@ -349,7 +395,7 @@ describe('control-plane worktree changes (B10)', () => {
       await sandbox.deleteWorktreeResources({
         worktreeId,
         kiloUserId: USER_ID,
-        location: { sandboxId, provider: 'cloudflare' },
+        location: { sandboxId, provider: 'cloudflare-containers' },
         sessionIds: [context.session.kiloSessionId],
       });
       await read();
@@ -365,7 +411,7 @@ describe('control-plane worktree changes (B10)', () => {
     const sessionId = newSessionId();
     const siblingId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({ sessionId, sandboxId, provider, worktreeId });
     const second = await startSessionWithSandbox({
@@ -429,7 +475,7 @@ describe('control-plane worktree changes (B10)', () => {
     const sessionId = newSessionId();
     const siblingId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({ sessionId, sandboxId, provider, worktreeId });
     const second = await startSessionWithSandbox({
@@ -465,7 +511,7 @@ describe('control-plane worktree changes (B10)', () => {
   it('promotes newer historical sibling captures with lower revisions and rejects older seeds after eviction', async () => {
     const sessionId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({
       sessionId,
@@ -525,7 +571,7 @@ describe('control-plane worktree changes (B10)', () => {
   it('fences captures superseded by migration and never overwrites a live snapshot with historical data', async () => {
     const sessionId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({
       sessionId,
@@ -592,7 +638,7 @@ describe('control-plane worktree changes (B10)', () => {
     const sessionId = newSessionId();
     const siblingId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({
       sessionId,
@@ -668,10 +714,13 @@ describe('control-plane worktree changes (B10)', () => {
 
   it('coalesces concurrent sibling captures with a trailing capture and monotonic revisions', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
-    await sandbox.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await sandbox.ensureAllocation({
+      provider: 'cloudflare-containers',
+      allocationName: sandboxId,
+    });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_concurrent');
     const context = worktreeChangesContext(
@@ -721,7 +770,7 @@ describe('control-plane worktree changes (B10)', () => {
     const worktreeId = `worktree_${crypto.randomUUID()}`;
     const sessionId = newSessionId();
     const siblingId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const first = await startSessionWithSandbox({ sessionId, sandboxId, provider, worktreeId });
     const second = await startSessionWithSandbox({
@@ -872,7 +921,7 @@ describe('control-plane worktree changes (B10)', () => {
   it('promotes a saved session snapshot to the shared owner before the wrapper connects', async () => {
     const sessionId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const patch = '+saved\n';
     const first = await startSessionWithSandbox({
@@ -893,9 +942,84 @@ describe('control-plane worktree changes (B10)', () => {
       sibling.getWorktreeFile({ path: 'lost.txt', expectedRevision: 1 })
     ).resolves.toMatchObject({ status: 'available', file: { diff: { patch } } });
   });
+  it('seeds scoped file identities and net recovery to a fresh shared owner', async () => {
+    const sessionId = newSessionId();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const sandboxId = await generateSandboxId(sessionId);
+    const provider = createFakeProvider();
+    const revision = 4;
+    const scopes = ['uncommitted', 'against-base-branch'] as const;
+    const recovery = {
+      files: [{ path: 'same.txt', status: 'modified' as const, patch: 'net patch' }],
+    };
+    const first = await startSessionWithSandbox({
+      sessionId,
+      sandboxId,
+      provider,
+      worktreeId,
+      seed: storage => {
+        storage.kv.put(WORKTREE_CHANGES_KEY, {
+          ...SNAPSHOT_SUMMARY,
+          revision,
+          schemaVersion: 2,
+          capturedAt: '2026-01-01T00:00:00.000Z',
+          files: scopes.map(scope => ({
+            path: 'same.txt',
+            scope,
+            status: 'modified' as const,
+            additions: 1,
+            deletions: 1,
+            tracked: true,
+            binary: false,
+            countsComplete: true,
+            revision,
+          })),
+        });
+        for (const scope of scopes) {
+          storage.kv.put(`${WORKTREE_FILE_PREFIX}${scope}\0same.txt`, {
+            schemaVersion: 1,
+            revision,
+            path: 'same.txt',
+            scope,
+            diff: { status: 'available', patch: `${scope} patch` },
+            content: { status: 'available', source: 'current', text: `${scope} content` },
+          });
+        }
+        storage.kv.put(WORKTREE_RECOVERY_KEY, { revision, recovery });
+      },
+    });
+
+    await expect(first.getWorktreeChanges()).resolves.toMatchObject({
+      snapshot: { revision, files: scopes.map(scope => ({ path: 'same.txt', scope, revision })) },
+    });
+    await runInDurableObject(sandboxes.getByName(sandboxId), (_instance, state) => {
+      const keys = [...state.storage.kv.list({ prefix: `worktree_changes/${worktreeId}/` })].map(
+        ([key]) => key
+      );
+      for (const scope of scopes) {
+        expect(keys).toContain(
+          `worktree_changes/${worktreeId}/${WORKTREE_FILE_PREFIX}${scope}\0same.txt`
+        );
+      }
+      expect(keys).toContain(`worktree_changes/${worktreeId}/${WORKTREE_RECOVERY_KEY}`);
+    });
+    for (const scope of scopes) {
+      await expect(
+        first.getWorktreeFile({ path: 'same.txt', scope, expectedRevision: revision })
+      ).resolves.toMatchObject({
+        status: 'available',
+        file: { scope, content: { text: `${scope} content` } },
+      });
+    }
+    // The net recovery is promoted through the same seed and reaches the wrapper unchanged.
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_scoped_recovery');
+    const prepare = await awaitFrame(wrapper, 'session.prepare');
+    expect(prepare.spec.worktreeRecovery).toEqual(recovery);
+    wrapper.close();
+  });
   it('carries saved DO patches through credential projection to session.prepare without consuming them', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const patch =
       'diff --git a/lost.txt b/lost.txt\nnew file mode 100644\n--- /dev/null\n+++ b/lost.txt\n@@ -0,0 +1 @@\n+lost\n';
@@ -924,10 +1048,10 @@ describe('control-plane worktree changes (B10)', () => {
     wrapper.close();
   });
   it('forwards a snapshot request to the wrapper and returns its result', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_b10');
 
@@ -948,10 +1072,10 @@ describe('control-plane worktree changes (B10)', () => {
   });
 
   it('returns not_ready when no wrapper is connected', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
 
     await expect(
@@ -968,10 +1092,10 @@ describe('control-plane worktree changes (B10)', () => {
   });
 
   it('does not hold the queue while awaiting the wrapper reply', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_queue');
 
@@ -995,10 +1119,10 @@ describe('control-plane worktree changes (B10)', () => {
   });
 
   it('fails a pending request fast when its socket closes', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_close');
 
@@ -1021,13 +1145,13 @@ describe('control-plane worktree changes (B10)', () => {
   });
 
   it('times out a wrapper that never replies', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
     await runInDurableObject(stub, instance => {
       instance.controlRequestTimeoutMs = 25;
     });
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_timeout');
 
@@ -1050,7 +1174,7 @@ describe('control-plane worktree changes (B10)', () => {
 
   it('captures after attach and persists it through the V2 Session DO', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_session_b10');
@@ -1081,9 +1205,84 @@ describe('control-plane worktree changes (B10)', () => {
     wrapper.close();
   });
 
+  it('persists and retrieves the same path in both scopes through the wrapper and Session DO', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const provider = createFakeProvider();
+    const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_scoped');
+    await markRouteReady(sessionStub, wrapper, sessionId);
+    await settleCaptures(wrapper);
+    const refresh = sessionStub.refreshWorktreeChanges();
+    const frame = await awaitFrame(wrapper, 'worktree.snapshot');
+    const result = snapshotReply(frame.payload.revision, 'refs/remotes/origin/main');
+    const scopes = ['uncommitted', 'against-base-branch'] as const;
+    const summaryFiles = scopes.map(scope => ({
+      path: 'same.txt',
+      scope,
+      status: 'modified' as const,
+      additions: 1,
+      deletions: 1,
+      tracked: true,
+      binary: false,
+      countsComplete: true,
+    }));
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: frame.requestId,
+      ok: true,
+      result: {
+        summary: { ...result.summary, files: summaryFiles },
+        recovery: { files: [{ path: 'same.txt', status: 'modified', patch: 'net patch' }] },
+        files: scopes.map(scope => ({
+          schemaVersion: 1,
+          revision: frame.payload.revision,
+          path: 'same.txt',
+          scope,
+          diff: { status: 'available', patch: `${scope} patch` },
+          content: { status: 'available', source: 'current', text: `${scope} content` },
+        })),
+      },
+    });
+    await expect(refresh).resolves.toMatchObject({ status: 'refreshed' });
+    for (const scope of scopes) {
+      await expect(
+        sessionStub.getWorktreeFile({
+          path: 'same.txt',
+          scope,
+          expectedRevision: frame.payload.revision,
+        })
+      ).resolves.toMatchObject({
+        status: 'available',
+        file: { scope, content: { text: `${scope} content` } },
+      });
+    }
+    await expect(
+      sessionStub.getWorktreeFile({
+        path: 'same.txt',
+        expectedRevision: frame.payload.revision,
+      })
+    ).resolves.toEqual({ status: 'no_longer_listed', currentRevision: frame.payload.revision });
+    const keys = await runInDurableObject(sessionStub, (_instance, state) =>
+      [...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })].map(([key]) => key)
+    );
+    expect(keys).toHaveLength(2);
+    expect(keys).toContain(`${WORKTREE_FILE_PREFIX}uncommitted\0same.txt`);
+    expect(keys).toContain(`${WORKTREE_FILE_PREFIX}against-base-branch\0same.txt`);
+    expect(
+      await runInDurableObject(sessionStub, (_instance, state) =>
+        state.storage.kv.get(WORKTREE_RECOVERY_KEY)
+      )
+    ).toEqual({
+      revision: frame.payload.revision,
+      recovery: { files: [{ path: 'same.txt', status: 'modified', patch: 'net patch' }] },
+    });
+    wrapper.close();
+  });
+
   it('suppresses a capture while preparing and runs it after ready', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_preparing');
@@ -1109,7 +1308,7 @@ describe('control-plane worktree changes (B10)', () => {
 
   it('reports offline when the Sandbox DO has no wrapper (not_ready)', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
     // No wrapper connects: the capture request cannot be delivered.
@@ -1119,17 +1318,57 @@ describe('control-plane worktree changes (B10)', () => {
     });
   });
 
+  it('trims an over-budget saved snapshot to the largest prefix that fits when read', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const provider = createFakeProvider();
+    const files = Array.from({ length: 1_000 }, (_, index) => ({
+      path: `${index}/${'漢"\\\n'.repeat(25)}`,
+      status: 'modified' as const,
+      additions: 1,
+      deletions: 0,
+      tracked: true,
+      binary: false,
+      countsComplete: true,
+      revision: 1,
+    }));
+    const sessionStub = await startSessionWithSandbox({
+      sessionId,
+      sandboxId,
+      provider,
+      seed: storage =>
+        storage.kv.put(WORKTREE_CHANGES_KEY, {
+          ...SNAPSHOT_SUMMARY,
+          revision: 1,
+          schemaVersion: 2,
+          capturedAt: '2026-08-26T12:00:00.000Z',
+          files,
+        }),
+    });
+
+    const { snapshot: saved } = await sessionStub.getWorktreeChanges();
+    if (saved === null) throw new Error('Expected the seeded snapshot to be read back');
+    const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+    expect(saved.files).toEqual(files.slice(0, saved.files.length));
+    expect(saved.files.length).toBeLessThan(files.length);
+    expect(saved.truncated).toBe(true);
+    expect(bytes(saved)).toBeLessThanOrEqual(MAX_WORKTREE_CHANGES_BYTES);
+    expect(bytes({ ...saved, files: files.slice(0, saved.files.length + 1) })).toBeGreaterThan(
+      MAX_WORKTREE_CHANGES_BYTES
+    );
+  });
+
   it('ignores a child-session worktree event and captures for its own', async () => {
     const sessionId = newSessionId();
     const kiloId = kiloSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     await injectProvider(sandboxId, provider);
     const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
     await sessionStub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_child');
@@ -1154,14 +1393,14 @@ describe('control-plane worktree changes (B10)', () => {
   it('captures on an outcome, and on idle only after a user cancel', async () => {
     const sessionId = newSessionId();
     const kiloId = kiloSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     await injectProvider(sandboxId, provider);
     const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
     await sessionStub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_hooks');
@@ -1199,6 +1438,85 @@ describe('control-plane worktree changes (B10)', () => {
       events: [{ type: 'session.idle', properties: { sessionID: kiloId } }],
     });
     replySnapshot(wrapper, await awaitFrame(wrapper, 'worktree.snapshot'));
+    wrapper.close();
+  });
+});
+
+describe('SandboxSessionV2 preview service discovery', () => {
+  async function readySession(wrapperId: string) {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const provider = createFakeProvider();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const sessionStub = await startSessionWithSandbox({
+      sessionId,
+      sandboxId,
+      provider,
+      worktreeId,
+    });
+    const wrapper = await connectAndHello(provider, sandboxId, wrapperId);
+    await markRouteReady(sessionStub, wrapper, sessionId);
+    await settleCaptures(wrapper);
+    return {
+      sessionId,
+      sandboxId,
+      sessionStub,
+      wrapper,
+      scope: { ownerId: USER_ID, organizationId: ORG_ID, scopeId: worktreeId },
+    };
+  }
+
+  it('relays a bound wrapper scan to the session caller', async () => {
+    const { sessionStub, wrapper } = await readySession('wr_preview_ok');
+
+    const pending = sessionStub.listPreviewServices();
+    const frame = await awaitFrame(wrapper, 'preview.list');
+    wrapper.send({
+      type: 'preview.result',
+      requestId: frame.requestId,
+      ok: true,
+      result: { services: [{ port: 5173, name: 'Next.js' }] },
+    });
+
+    await expect(pending).resolves.toEqual({
+      services: [{ port: 5173, name: 'Next.js' }],
+      status: 'running',
+    });
+    wrapper.close();
+  });
+
+  it('surfaces a post-send timeout as an error instead of not_ready', async () => {
+    const { sandboxId, wrapper, scope } = await readySession('wr_preview_timeout');
+    const sandboxStub = sandboxes.getByName(sandboxId);
+    await runInDurableObject(sandboxStub, instance => {
+      instance.controlRequestTimeoutMs = 25;
+    });
+
+    const assertion = expect(
+      runInDurableObject(sandboxStub, instance => instance.previewServices(scope))
+    ).rejects.toThrow('Preview service discovery timed out');
+    await awaitFrame(wrapper, 'preview.list');
+
+    await assertion;
+    wrapper.close();
+  });
+
+  it('surfaces a wrapper scan error', async () => {
+    const { sandboxId, wrapper, scope } = await readySession('wr_preview_error');
+    const sandboxStub = sandboxes.getByName(sandboxId);
+
+    const assertion = expect(
+      runInDurableObject(sandboxStub, instance => instance.previewServices(scope))
+    ).rejects.toThrow('Preview service scan failed (scan_failed)');
+    const frame = await awaitFrame(wrapper, 'preview.list');
+    wrapper.send({
+      type: 'preview.result',
+      requestId: frame.requestId,
+      ok: false,
+      error: { code: 'scan_failed', message: 'denied', retryable: true },
+    });
+
+    await assertion;
     wrapper.close();
   });
 });

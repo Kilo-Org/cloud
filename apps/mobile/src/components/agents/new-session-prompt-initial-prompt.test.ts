@@ -7,11 +7,16 @@ import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { NewSessionPromptControls as renderPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { Text as renderText } from '@/components/ui/text';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 import '@/i18n';
 import * as ReactI18next from 'react-i18next';
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const keyboardMotion = vi.hoisted(() => ({ value: 0 }));
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  useKeyboardMotionProgress: () => keyboardMotion,
+}));
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
   {
@@ -51,6 +56,9 @@ vi.mock('react', async () => {
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
+    // Without a renderer a previous value cannot be cached, so every call
+    // recomputes — the same result, just uncached.
+    useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useRef: vi.fn(<T>(initial: T) => {
       const ref: React.RefObject<T> = { current: initial };
       return ref;
@@ -88,8 +96,13 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
+  createAnimatedComponent: (component: unknown) => component,
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
+  // The composer's top fade resizes on the UI thread; there is none here, so
+  // the style factory runs once and the shared value is a plain box.
+  useAnimatedStyle: (factory: () => object) => factory(),
+  useSharedValue: <T>(value: T) => ({ value }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -121,25 +134,6 @@ vi.mock('@/components/ui/accessible-status', () => ({
 
 vi.mock('@/components/agents/chat-toolbar', () => ({
   ChatToolbar: 'ChatToolbar',
-}));
-
-/** Captures the options the prompt hands the height-measuring hook. */
-const textHeightOptions = vi.hoisted(() => ({
-  current: null as Record<string, unknown> | null,
-}));
-
-vi.mock('@/components/agents/use-text-height', () => ({
-  useTextHeight: (options: Record<string, unknown>) => {
-    textHeightOptions.current = options;
-    return {
-      height: 48,
-      maxHeight: 160,
-      measureElement: null,
-      reset: vi.fn(),
-      setNativeContentHeight: vi.fn(),
-      setText: vi.fn(),
-    };
-  },
 }));
 
 const voiceInputAvailable = vi.hoisted(() => ({ current: false }));
@@ -183,11 +177,15 @@ vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
   },
 }));
 
-vi.mock('@/lib/share-prefill', () => ({
-  useSharePrefill: () => {
-    // no-op hook
+const sharePrefillControl = vi.hoisted(() => ({
+  current: null as null | {
+    failed: boolean;
+    retry: () => void;
+    dismiss: () => void;
   },
 }));
+
+vi.mock('@/lib/share-prefill', () => ({ useSharePrefill: () => sharePrefillControl.current }));
 
 vi.mock('@/lib/voice-input/use-voice-input', () => ({
   useVoiceInput: () => ({
@@ -318,11 +316,48 @@ function defaultProps() {
 
 describe('NewSessionPrompt initialPrompt seed', () => {
   beforeEach(() => {
+    sharePrefillControl.current = {
+      failed: false,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
     voiceInputAvailable.current = false;
     returnSendsMessage.current = false;
     layoutDirection.isRTL = false;
     dimensions.current = { fontScale: 1, height: 800, scale: 1, width: 400 };
-    textHeightOptions.current = null;
+    keyboardMotion.value = 0;
+  });
+
+  it('shows the prefill failure row with retry and discard only when delivery failed', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    const failedControl = {
+      failed: true,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
+    sharePrefillControl.current = failedControl;
+
+    const { SharePrefillFailure } = await import('./share-prefill-failure');
+
+    // eslint-disable-next-line new-cap -- called as plain function, matching repo test convention
+    const failed = NewSessionPrompt({ ...defaultProps(), shareId: 'share-1' });
+    const row = findElementByType(failed, SharePrefillFailure);
+    if (!row) {
+      throw new Error('prefill failure row did not render');
+    }
+    (row.onRetry as () => void)();
+    (row.onDismiss as () => void)();
+    expect(failedControl.retry).toHaveBeenCalledTimes(1);
+    expect(failedControl.dismiss).toHaveBeenCalledTimes(1);
+
+    sharePrefillControl.current = {
+      failed: false,
+      retry: vi.fn<() => void>(),
+      dismiss: vi.fn<() => void>(),
+    };
+    // eslint-disable-next-line new-cap -- called as plain function, matching repo test convention
+    const delivered = NewSessionPrompt({ ...defaultProps(), shareId: 'share-1' });
+    expect(findElementByType(delivered, SharePrefillFailure)).toBeNull();
   });
 
   it.each(TEXT_DIRECTIONS)(
@@ -406,6 +441,27 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(textInputProps!.defaultValue).toBeUndefined();
   });
 
+  it.each([
+    ['an entry that must still pick a repository', false],
+    ['an entry that is already configured', true],
+  ])('takes focus on arrival for %s only when the host allows it', async (_case, allow) => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionPrompt({
+      ...defaultProps(),
+      autoFocusOnMount: allow,
+    }) as Node;
+
+    const textInputProps = findElementByType(element, 'TextInput');
+    expect(textInputProps).not.toBeNull();
+    // The keyboard the input raises on arrival is what shrinks the form frame,
+    // so this prop is the whole behaviour: false leaves the configuration on
+    // screen and the input focuses on a tap instead.
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(textInputProps!.autoFocus).toBe(allow);
+  });
+
   it('pastes clipboard text at the reported caret, not at the draft end', async () => {
     const { NewSessionPrompt } = await import('./new-session-prompt');
 
@@ -453,35 +509,36 @@ describe('NewSessionPrompt initialPrompt seed', () => {
   });
 
   it.each([
-    { isCreating: false, attachmentMax: 5, voiceAvailable: false, paperclipDisabled: false },
-    { isCreating: false, attachmentMax: 0, voiceAvailable: true, paperclipDisabled: true },
-    { isCreating: true, attachmentMax: 5, voiceAvailable: true, paperclipDisabled: true },
+    { isCreating: false, attachmentMax: 5, paperclipDisabled: false },
+    { isCreating: false, attachmentMax: 0, paperclipDisabled: true },
+    { isCreating: true, attachmentMax: 5, paperclipDisabled: true },
   ])('preserves control availability and disabled states for %j', async options => {
     const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
-    const { isCreating, attachmentMax, voiceAvailable, paperclipDisabled } = options;
-    voiceInputAvailable.current = voiceAvailable;
+    const { isCreating, attachmentMax, paperclipDisabled } = options;
     const element = renderPrompt({ ...defaultProps(), isCreating, attachmentMax });
 
-    expect(
-      findElementByType(
-        element,
-        'Pressable',
-        ReactI18next.getI18n().t('agentChat.composer.addAttachment')
-      )
-    ).toMatchObject({
+    const paperclip = findElementByType(
+      element,
+      'Pressable',
+      ReactI18next.getI18n().t('agentChat.composer.addAttachment')
+    );
+    expect(paperclip).toMatchObject({
       disabled: paperclipDisabled,
       accessibilityState: { disabled: paperclipDisabled },
-      // 31.5pt frame (h-9 at NativeWind's 14pt rem) + 8.25pt per side = 48dp,
-      // Android's minimum (WCAG 2.5.8 AA).
-      hitSlop: { top: 8.25, bottom: 8.25, left: 8.25, right: 8.25 },
+      // A control-size audit reads the pressable's own rect, so the shared
+      // 48dp box is the target and no slop is added on top of it.
+      className: expect.stringContaining(ICON_TARGET_BOX_CLASS),
     });
+    expect(paperclip?.hitSlop).toBeUndefined();
     expect(findElementByType(element, ComposerPasteButton)).toMatchObject({ disabled: isCreating });
-    expect(findElementByType(element, VoiceInputButton)).toEqual(
-      voiceAvailable ? expect.objectContaining({ disabled: isCreating, size: 'lg' }) : null
-    );
-    expect(findElementByType(element, VoiceInputStatus)).toEqual(
-      voiceAvailable ? { status: 'idle' } : null
-    );
+    // The microphone is part of the row whether or not the OS recognizer
+    // answers available; a tap says why it cannot start.
+    expect(findElementByType(element, VoiceInputButton)).toMatchObject({
+      disabled: isCreating,
+      fullTarget: true,
+      size: 'lg',
+    });
+    expect(findElementByType(element, VoiceInputStatus)).toEqual({ status: 'idle' });
   });
 
   it('keeps the newline button between the voice status and voice button', async () => {
@@ -548,16 +605,52 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(errorIndex).toBeLessThan(inputIndex);
   });
 
-  it('keeps the three-line floor at a large font scale', async () => {
+  it('gives the input the three-line floor at a large font scale', async () => {
     const { NewSessionPrompt } = await import('./new-session-prompt');
     // Before the host reports a frame, the floor is the preferred three lines
     // at the scaled line height: 24 * 2 * 3 + 16 = 160.
     dimensions.current = { ...dimensions.current, fontScale: 2, height: 500 };
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    NewSessionPrompt(defaultProps());
+    const element = NewSessionPrompt(defaultProps()) as Node;
+    const input = findElementByType(element, 'TextInput');
 
-    expect(textHeightOptions.current).toMatchObject({ minHeight: 160 });
-    expect(textHeightOptions.current?.minHeight).not.toBe(64);
+    expect(input?.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ height: 160 })])
+    );
+  });
+
+  it('interpolates from the compact closed preference to the typing preference', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    for (const { progress, height } of [
+      { progress: -0.1, height: 40 },
+      { progress: 0, height: 40 },
+      { progress: 0.5, height: 64 },
+      { progress: 1, height: 88 },
+      { progress: 1.1, height: 88 },
+    ]) {
+      keyboardMotion.value = progress;
+      const element = renderPrompt({
+        ...defaultProps(),
+        lineCount: 3,
+        keyboardClosedLineCount: 1,
+      }) as Node;
+      const input = findElementByType(element, 'TextInput');
+
+      expect(input?.style).toEqual(expect.arrayContaining([expect.objectContaining({ height })]));
+    }
+  });
+
+  it('keeps at least one full line when native keyboard progress exceeds its destination', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    keyboardMotion.value = 1.1;
+    const element = renderPrompt({
+      ...defaultProps(),
+      lineCount: 1,
+      keyboardClosedLineCount: 3,
+    }) as Node;
+    const input = findElementByType(element, 'TextInput');
+
+    expect(input?.style).toEqual(expect.arrayContaining([expect.objectContaining({ height: 40 })]));
   });
 });

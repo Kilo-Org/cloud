@@ -24,8 +24,15 @@ import {
 
 export type { RemoteModelCatalogV1 } from './schemas';
 
-/** Delivered error string an old CLI returns for a sessionless `list_models`. */
-const INVALID_LIST_MODELS_COMMAND = 'invalid list_models command';
+/**
+ * Delivered error strings that mean the CLI cannot serve `list_models` at all:
+ * an old CLI rejects the unknown command, and a newer CLI rejects a malformed
+ * request body. Both repeat identically on retry.
+ */
+const UNSUPPORTED_DELIVERED_ERRORS = [
+  'unknown command: list_models',
+  'invalid list_models command',
+];
 
 /**
  * Relay codes whose failure is transient for this connection. Every other
@@ -56,10 +63,10 @@ export type InstanceModelCatalogResult =
  * - Resolved but outside the strict schema → `{ ok: false, reason: 'invalid' }`.
  * - Resolved but the strict parse throws unexpectedly → `{ ok: false,
  *   reason: 'transport' }`; the parse never escapes the helper.
- * - Rejected with the old-CLI `invalid list_models command` string or a
+ * - Rejected with an old-CLI unknown-command or invalid-request string, or a
  *   non-retryable relay code → `{ ok: false, reason: 'unsupported' }`.
- * - Rejected with a retryable relay code or a transport-level failure →
- *   `{ ok: false, reason: 'transport' }`.
+ * - Rejected with any other delivered string, a retryable relay code, or a
+ *   transport-level failure → `{ ok: false, reason: 'transport' }`.
  *
  * A `transport` outcome carries the caught failure as `cause`, so a caller
  * that reports it can attach what actually went wrong.
@@ -79,7 +86,7 @@ export async function listInstanceModels(
     });
   } catch (error) {
     if (error instanceof CommandDeliveredError) {
-      return error.message === INVALID_LIST_MODELS_COMMAND
+      return UNSUPPORTED_DELIVERED_ERRORS.includes(error.message)
         ? { ok: false, reason: 'unsupported' }
         : { ok: false, reason: 'transport', cause: error };
     }

@@ -33,6 +33,32 @@ async function readJsonBody(request: Request) {
 const FINAL_ANSWER =
   '\n\nIMPORTANT: Your final message must contain ONLY the answer in the exact requested format - no explanations, no preamble, no extra words.';
 
+describe('parseContainerRunResponse token usage', () => {
+  it('exposes separate token categories to CLI consumers', () => {
+    const result = parseContainerRunResponse(
+      {
+        exitCode: 0,
+        durationMs: 12,
+        stderrTail: '',
+        stdoutLines: [
+          JSON.stringify({
+            type: 'step_finish',
+            part: { tokens: { input: 11, cache: { read: 22 }, output: 33, reasoning: 44 } },
+          }),
+        ],
+      },
+      Date.now(),
+      'candidate/model'
+    );
+    expect(result).toMatchObject({
+      inputTokens: 11,
+      cachedInputTokens: 22,
+      outputTokens: 33,
+      reasoningTokens: 44,
+    });
+  });
+});
+
 describe('runDeciderCaseViaCli prompt', () => {
   async function sentPrompt(benchCase: (typeof DECIDER_CASES)[number]) {
     const fetch = vi.fn(async (_request: Request) =>

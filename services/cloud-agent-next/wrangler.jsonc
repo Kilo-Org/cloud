@@ -10,7 +10,16 @@
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
-  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "rules": [
+    { "type": "Text", "globs": ["**/*.sql"], "fallthrough": true },
+    {
+      "type": "Data",
+      "globs": [
+        "**/wrapper/dist/control-plane-wrapper.js?binary",
+        "**/wrapper/control-plane-supervisor.sh?binary",
+      ],
+    },
+  ],
   "workers_dev": true,
   "dev": {
     "port": 8794,
@@ -64,31 +73,21 @@
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
-    "CREDENTIAL_CONTAINMENT_ENABLED": "true",
     "TOOL_CGROUP_RESERVE_MB": "2048",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
     "TOOL_CGROUP_SERVER_CPU_WEIGHT": "75",
-    "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "true",
-    "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "f1a848ca-bade-48d8-a5ad-1042d08651e6",
-    "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
     "CONTAINER_BILLING_HEARTBEAT_SECONDS": "300",
-    "RUNTIME_ISOLATION_ENABLED": "true",
     "SANDBOX_SELECTION_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55",
-    "CONTAINER_REPO_SNAPSHOT_IDS": "",
-    "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
+    "WORKSPACE_SNAPSHOT_ORG_IDS": "",
+    "WORKSPACE_SNAPSHOT_USER_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
     "PREVIEW_HOST_SUFFIX": "cloud-agent.kiloapps.ai",
-    "PREVIEW_ENABLED_IDS": "*",
-    "VERCEL_SANDBOX_ORG_IDS": "",
-    "VERCEL_PROJECT_ID": "",
-    "VERCEL_TEAM_ID": "",
-    "VERCEL_SANDBOX_SNAPSHOT_ID": "",
-    "VERCEL_SANDBOX_RUNTIME_BUILD_ID": "",
+    "BYOC_VERCEL_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
     "VERCEL_SANDBOX_RUNTIME": "node24",
-    "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
-    "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
-    "CODE_REVIEW_CONTAINERS_ORG_IDS": "*",
+    "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "300000",
+    "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
   },
   "placement": { "mode": "smart" },
+  "ai": { "binding": "AI" },
   /**
    * Bindings
    * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
@@ -178,111 +177,12 @@
       "bucket_name": "kilocode-sessions",
     },
   ],
-  // SandboxSmall and SandboxCodeReview receive no traffic: every non-contained sandbox runs
-  // in Sandbox. SandboxDIND remains for stop/delete of persisted devcontainer sessions.
-  // Remove retired applications/bindings only after verifying drain and external bindings.
-  // The containment classes that carry live traffic request the platform maximum 20 GB disk,
-  // so large repository checkouts are not bounded by the class's vCPU/memory tier. The
-  // non-containment classes have no live instances and keep their lower tiers.
+  // Native Cloudflare Containers is the only sandbox runtime. The retired
+  // SDK-backed sandbox classes keep no container or binding; their historical
+  // migrations and no-op tombstones stay so stored instances and scheduled
+  // alarms remain valid. Drain every retired sandbox before deploying this
+  // configuration.
   "containers": [
-    {
-      "class_name": "Sandbox",
-      "image": "./Dockerfile",
-      "instance_type": {
-        "vcpu": 4,
-        "memory_mib": 12288,
-        "disk_mb": 20000,
-      },
-      "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
-      },
-      "max_instances": 40,
-      "rollout_active_grace_period": 1800,
-    },
-    {
-      "class_name": "SandboxSmall",
-      "image": "./Dockerfile",
-      "instance_type": {
-        "vcpu": 2,
-        "memory_mib": 6144,
-        "disk_mb": 10000,
-      },
-      "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
-      },
-      "max_instances": 5,
-      "rollout_active_grace_period": 1800,
-    },
-    {
-      "class_name": "SandboxDIND",
-      "image": "./Dockerfile.dind",
-      "instance_type": {
-        "vcpu": 2,
-        "memory_mib": 6144,
-        "disk_mb": 10000,
-      },
-      "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
-      },
-      "max_instances": 5,
-      "rollout_active_grace_period": 1800,
-    },
-    {
-      "class_name": "SandboxCodeReview",
-      "image": "./Dockerfile",
-      "instance_type": {
-        "vcpu": 1,
-        "memory_mib": 4096,
-        "disk_mb": 8000,
-      },
-      "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
-      },
-      "max_instances": 5,
-      "rollout_active_grace_period": 1800,
-    },
-    {
-      "class_name": "SandboxContainment",
-      "image": "./Dockerfile",
-      "instance_type": {
-        "vcpu": 4,
-        "memory_mib": 12288,
-        "disk_mb": 20000,
-      },
-      "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
-      },
-      "max_instances": 300,
-      "rollout_active_grace_period": 1800,
-    },
-    {
-      "class_name": "SandboxSmallContainment",
-      "image": "./Dockerfile",
-      "instance_type": {
-        "vcpu": 2,
-        "memory_mib": 6144,
-        "disk_mb": 20000,
-      },
-      "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
-      },
-      "max_instances": 1500,
-      "rollout_active_grace_period": 1800,
-    },
-    {
-      "class_name": "SandboxCodeReviewContainment",
-      "image": "./Dockerfile",
-      "instance_type": {
-        "vcpu": 1,
-        "memory_mib": 4096,
-        "disk_mb": 20000,
-      },
-      "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
-      },
-      "max_instances": 1500,
-      "rollout_active_grace_period": 1800,
-    },
     {
       "class_name": "SandboxContainers",
       "scheduling_policy": "durable_object",
@@ -290,41 +190,13 @@
       "images": {
         "app": {
           "dockerfile": "./Dockerfile.containers",
-          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.1" },
+          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
         },
       },
     },
   ],
   "durable_objects": {
     "bindings": [
-      {
-        "class_name": "Sandbox",
-        "name": "Sandbox",
-      },
-      {
-        "class_name": "SandboxSmall",
-        "name": "SandboxSmall",
-      },
-      {
-        "class_name": "SandboxDIND",
-        "name": "SandboxDIND",
-      },
-      {
-        "class_name": "SandboxCodeReview",
-        "name": "SandboxCodeReview",
-      },
-      {
-        "class_name": "SandboxContainment",
-        "name": "SandboxContainment",
-      },
-      {
-        "class_name": "SandboxSmallContainment",
-        "name": "SandboxSmallContainment",
-      },
-      {
-        "class_name": "SandboxCodeReviewContainment",
-        "name": "SandboxCodeReviewContainment",
-      },
       {
         "class_name": "StreamTicketNonceDO",
         "name": "STREAM_TICKET_NONCE_DO",
@@ -344,6 +216,14 @@
       {
         "class_name": "SandboxContainers",
         "name": "SANDBOX_CONTAINERS",
+      },
+      {
+        "class_name": "EnvironmentBuild",
+        "name": "ENVIRONMENT_BUILD",
+      },
+      {
+        "class_name": "VercelSnapshotBuild",
+        "name": "VERCEL_SNAPSHOT_BUILD",
       },
     ],
   },
@@ -396,6 +276,28 @@
       "new_sqlite_classes": ["SandboxContainers"],
       "tag": "v11",
     },
+    {
+      "new_sqlite_classes": ["EnvironmentBuild"],
+      "tag": "v12",
+    },
+    {
+      "new_sqlite_classes": ["VercelSnapshotBuild"],
+      "tag": "v13",
+    },
+    {
+      "tag": "v14",
+      "deleted_classes": ["CloudAgentSession"],
+    },
+    {
+      "tag": "v15",
+      "deleted_classes": [
+        "Sandbox",
+        "SandboxSmall",
+        "SandboxDIND",
+        "SandboxCodeReview",
+        "SandboxCodeReviewContainment",
+      ],
+    },
   ],
   /**
    * Hyperdrive Bindings
@@ -406,14 +308,6 @@
       "binding": "HYPERDRIVE",
       "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
-    },
-  ],
-  "kv_namespaces": [
-    {
-      "binding": "SHARED_SANDBOX_OVERRIDES",
-    },
-    {
-      "binding": "REPO_SNAPSHOTS",
     },
   ],
 
@@ -466,14 +360,6 @@
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],
-      "kv_namespaces": [
-        {
-          "binding": "SHARED_SANDBOX_OVERRIDES",
-        },
-        {
-          "binding": "REPO_SNAPSHOTS",
-        },
-      ],
       "vars": {
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
@@ -488,25 +374,14 @@
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
-        "PER_SESSION_SANDBOX_ORG_IDS": "*",
-        "CREDENTIAL_CONTAINMENT_ENABLED": "false",
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
-        "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
-        "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
-        "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "",
-        "CODE_REVIEW_CONTAINERS_ORG_IDS": "",
-        "RUNTIME_ISOLATION_ENABLED": "true",
         "SANDBOX_SELECTION_IDS": "*",
-        "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
-        "PREVIEW_ENABLED_IDS": "*",
-        "VERCEL_SANDBOX_ORG_IDS": "",
-        "VERCEL_PROJECT_ID": "",
-        "VERCEL_TEAM_ID": "",
-        "VERCEL_SANDBOX_SNAPSHOT_ID": "",
-        "VERCEL_SANDBOX_RUNTIME_BUILD_ID": "",
+        "WORKSPACE_SNAPSHOT_ORG_IDS": "",
+        "WORKSPACE_SNAPSHOT_USER_IDS": "",
+        "BYOC_VERCEL_IDS": "",
         "VERCEL_SANDBOX_RUNTIME": "node24",
-        "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
-        "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
+        "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "300000",
+        "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
       },
       "services": [
         {
@@ -548,87 +423,6 @@
         },
       ],
       "containers": [
-        // A local sandbox holds about 1.5 GiB. The small classes the e2e matrix boots
-        // are capped to what a 12 GiB Docker VM holds beside the stack, not to the
-        // deployed e2e Worker's 20.
-        {
-          "class_name": "Sandbox",
-          "image": "./Dockerfile.dev",
-          "instance_type": "standard-4",
-          "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
-          },
-          "max_instances": 10,
-          "rollout_active_grace_period": 60,
-        },
-        {
-          "class_name": "SandboxSmall",
-          "image": "./Dockerfile.dev",
-          "instance_type": "standard-4",
-          "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
-          },
-          "max_instances": 6,
-          "rollout_active_grace_period": 60,
-        },
-        {
-          "class_name": "SandboxDIND",
-          "image": "./Dockerfile.dind",
-          "instance_type": "standard-3",
-          "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
-          },
-          "max_instances": 2,
-          "rollout_active_grace_period": 60,
-        },
-        {
-          "class_name": "SandboxCodeReview",
-          "image": "./Dockerfile.dev",
-          "instance_type": {
-            "vcpu": 1,
-            "memory_mib": 4096,
-            "disk_mb": 8000,
-          },
-          "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
-          },
-          "max_instances": 2,
-          "rollout_active_grace_period": 60,
-        },
-        {
-          "class_name": "SandboxContainment",
-          "image": "./Dockerfile.dev",
-          "instance_type": "standard-4",
-          "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
-          },
-          "max_instances": 10,
-          "rollout_active_grace_period": 60,
-        },
-        {
-          "class_name": "SandboxSmallContainment",
-          "image": "./Dockerfile.dev",
-          "instance_type": "standard-4",
-          "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
-          },
-          "max_instances": 6,
-          "rollout_active_grace_period": 60,
-        },
-        {
-          "class_name": "SandboxCodeReviewContainment",
-          "image": "./Dockerfile.dev",
-          "instance_type": {
-            "vcpu": 1,
-            "memory_mib": 4096,
-            "disk_mb": 8000,
-          },
-          "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
-          },
-          "max_instances": 2,
-          "rollout_active_grace_period": 60,
-        },
         {
           "class_name": "SandboxContainers",
           "scheduling_policy": "durable_object",
@@ -636,41 +430,13 @@
           "images": {
             "app": {
               "dockerfile": "./Dockerfile.containers",
-              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.1" },
+              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
             },
           },
         },
       ],
       "durable_objects": {
         "bindings": [
-          {
-            "class_name": "Sandbox",
-            "name": "Sandbox",
-          },
-          {
-            "class_name": "SandboxSmall",
-            "name": "SandboxSmall",
-          },
-          {
-            "class_name": "SandboxDIND",
-            "name": "SandboxDIND",
-          },
-          {
-            "class_name": "SandboxCodeReview",
-            "name": "SandboxCodeReview",
-          },
-          {
-            "class_name": "SandboxContainment",
-            "name": "SandboxContainment",
-          },
-          {
-            "class_name": "SandboxSmallContainment",
-            "name": "SandboxSmallContainment",
-          },
-          {
-            "class_name": "SandboxCodeReviewContainment",
-            "name": "SandboxCodeReviewContainment",
-          },
           {
             "class_name": "StreamTicketNonceDO",
             "name": "STREAM_TICKET_NONCE_DO",
@@ -690,6 +456,14 @@
           {
             "class_name": "SandboxContainers",
             "name": "SANDBOX_CONTAINERS",
+          },
+          {
+            "class_name": "EnvironmentBuild",
+            "name": "ENVIRONMENT_BUILD",
+          },
+          {
+            "class_name": "VercelSnapshotBuild",
+            "name": "VERCEL_SNAPSHOT_BUILD",
           },
         ],
       },

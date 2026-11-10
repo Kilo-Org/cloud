@@ -92,6 +92,8 @@ describe('DeviceAuthClient layout', () => {
         code: 'ABC-123',
         viewerToken: 'v',
         isAppMode: true,
+        requestingClient: null,
+        pendingLink: null,
         user,
       })
     );
@@ -128,6 +130,92 @@ describe('DeviceAuthClient layout', () => {
     const html = renderClient({ name: 'Test User', email: 'test@example.com', imageUrl: '' });
 
     expect(html).toContain('class="text-2xl font-bold tracking-wider break-all"');
+  });
+});
+
+describe('DeviceAuthClient requesting app', () => {
+  const requestingClient = {
+    clientId: 'client-abc',
+    clientName: 'Claude Desktop',
+    redirectOrigin: 'https://client.test',
+  };
+
+  const renderClient = (client: typeof requestingClient | null) =>
+    renderToStaticMarkup(
+      React.createElement(DeviceAuthClient, {
+        code: 'ABC-123',
+        viewerToken: 'v',
+        isAppMode: false,
+        requestingClient: client,
+        pendingLink: null,
+        user: { name: 'Test User', email: 'test@example.com', imageUrl: '' },
+      })
+    );
+
+  /** The Authorize button is the primary action on the card. */
+  const authorizeButton = (html: string): string =>
+    html.slice(html.lastIndexOf('<button'), html.indexOf('</button>', html.lastIndexOf('<button')));
+
+  test('names the app, its redirect origin, and its client id', () => {
+    const html = renderClient(requestingClient);
+
+    expect(html).toContain('Requesting app');
+    expect(html).toContain('Claude Desktop');
+    expect(html).toContain('Redirects to');
+    expect(html).toContain('https://client.test');
+    expect(html).toContain('Client ID');
+    expect(html).toContain('client-abc');
+    // The block reports what the requester said; it does not claim verification.
+    expect(html).toContain('These details come from the app that started this request.');
+    expect(html).toContain('I expect this connection and recognize the destination above.');
+  });
+
+  test('keeps the approval disabled until the app is confirmed', () => {
+    const html = renderClient(requestingClient);
+
+    expect(authorizeButton(html)).toContain('disabled=""');
+    expect(html).toContain('Confirm the requesting app above to authorize it.');
+    expect(html).toContain('for="confirm-requesting-client"');
+    expect(html).toMatch(/type="checkbox"[^>]*id="confirm-requesting-client"/);
+    expect(html).not.toContain('checked=""');
+  });
+
+  test('renders the plain approval when the request names no app', () => {
+    const html = renderClient(null);
+
+    expect(html).not.toContain('Requesting app');
+    expect(html).not.toContain('Confirm the requesting app');
+    expect(authorizeButton(html)).not.toContain('disabled=""');
+  });
+});
+
+describe('DeviceAuthClient pending link', () => {
+  const renderWithPendingLink = () =>
+    renderToStaticMarkup(
+      React.createElement(DeviceAuthClient, {
+        code: 'ABC-123',
+        viewerToken: 'v',
+        isAppMode: false,
+        requestingClient: null,
+        pendingLink: { provider: 'github', email: 'octo@example.com', displayName: 'octocat' },
+        user: { name: 'Test User', email: 'test@example.com', imageUrl: '' },
+      })
+    );
+
+  const authorizeButton = (html: string): string =>
+    html.slice(html.lastIndexOf('<button'), html.indexOf('</button>', html.lastIndexOf('<button')));
+
+  test('names the pending identity and offers both choices with none preselected', () => {
+    const html = renderWithPendingLink();
+
+    expect(html).toContain('This app also asks to add GitHub (octocat) to your account');
+    expect(html).toContain('Approve and add it');
+    expect(html).toContain('Approve without adding it');
+    expect(html).toContain('id="pending-link-add"');
+    expect(html).toContain('id="pending-link-skip"');
+    expect(html).not.toContain('checked=""');
+    expect(authorizeButton(html)).toContain('disabled=""');
+    expect(html).toContain('Choose whether to add the sign-in method above to authorize.');
   });
 });
 

@@ -1,17 +1,17 @@
 import type { Part } from '@kilocode/app-shared/opencode';
 import type { MessageInfo } from '../types';
 import type { SessionStorage } from './types';
+import { forgetMessageVersions, forgetPartVersion, storageVersions } from './versions';
 import {
   EMPTY_PARTS,
-  applyTextDelta,
+  appendPartTextChunks,
   clonePart,
   createReadonlyPartView,
-  createSeedTextPart,
   forgetPartUpdateTime,
-  insertPartSorted,
   insertSorted,
   isSupportedDeltaField,
   notify,
+  publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
@@ -27,7 +27,7 @@ function createMemoryStorage(): SessionStorage {
 
   const subscribers = new Map<string, Set<() => void>>();
 
-  return {
+  const storage: SessionStorage = {
     upsertMessage(info) {
       const existing = messages.get(info.id);
       messages.set(info.id, info);
@@ -47,14 +47,13 @@ function createMemoryStorage(): SessionStorage {
       return messages.get(messageId);
     },
 
-    upsertPart(messageId, part, eventTime) {
+    upsertPart(messageId, part, eventTime, authoritative) {
       const arr = parts.get(messageId) ?? [];
       parts.set(
         messageId,
-        upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence)
+        upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence, authoritative)
       );
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     applyPartDelta(messageId, partId, field, delta) {
@@ -63,43 +62,24 @@ function createMemoryStorage(): SessionStorage {
       }
 
       const arr = parts.get(messageId);
-
-      if (!arr) {
-        // First delta for this message — bootstrap a minimal text part
-        parts.set(messageId, [createSeedTextPart(messageId, partId, delta)]);
-        partsSnapshot.set(messageId, null);
-        notify(subscribers, `parts:${messageId}`);
+      const nextArr = appendPartTextChunks(arr, messageId, partId, [delta]);
+      if (nextArr === arr) {
         return;
       }
-      const idx = arr.findIndex(p => p.id === partId);
-      const existing = idx >= 0 ? arr[idx] : undefined;
-      if (!existing) {
-        // Part not yet known for this message — create it with the delta as seed
-        parts.set(messageId, insertPartSorted(arr, createSeedTextPart(messageId, partId, delta)));
-        partsSnapshot.set(messageId, null);
-        notify(subscribers, `parts:${messageId}`);
-        return;
-      }
-
-      const updatedPart = applyTextDelta(existing, delta);
-      if (updatedPart === existing) {
-        return;
-      }
-      const nextArr = [...arr];
-      nextArr[idx] = updatedPart;
       parts.set(messageId, nextArr);
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     deletePart(messageId, partId) {
+      forgetPartVersion(storage, messageId, partId);
       const arr = parts.get(messageId);
       if (!arr) return;
-      const filtered = arr.filter(p => p.id !== partId);
-      parts.set(messageId, filtered);
+      parts.set(
+        messageId,
+        arr.filter(p => p.id !== partId)
+      );
       forgetPartUpdateTime(partEvidence, messageId, partId);
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     getParts(messageId) {
@@ -128,6 +108,7 @@ function createMemoryStorage(): SessionStorage {
     },
 
     clear() {
+      storageVersions.delete(storage);
       const existingMessageIds = [...messageIds];
       const existingPartMessageIds = [...parts.keys()];
 
@@ -147,6 +128,7 @@ function createMemoryStorage(): SessionStorage {
     },
 
     deleteMessage(messageId) {
+      forgetMessageVersions(storage, messageId);
       // A part delta can create parts before the message row (see
       // `applyPartDelta`), so part state is dropped regardless of the row.
       const hadMessage = messages.delete(messageId);
@@ -169,6 +151,7 @@ function createMemoryStorage(): SessionStorage {
       notify(subscribers, 'messageIds');
     },
   };
+  return storage;
 }
 
 export { createMemoryStorage };

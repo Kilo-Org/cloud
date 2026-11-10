@@ -12,7 +12,16 @@ import {
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { and, eq, sql } from 'drizzle-orm';
-import { createOrganization, addUserToOrganization, getOrganizationMembers } from './organizations';
+import {
+  findOrganizationMemberBalanceRow,
+  findOrganizationMemberRole,
+} from '@kilocode/worker-utils/account-access';
+import {
+  createOrganization,
+  addUserToOrganization,
+  getOrganizationMembers,
+  markOrganizationAsDeleted,
+} from './organizations';
 import {
   getBalanceForOrganizationUser,
   ingestOrganizationTokenUsage,
@@ -94,6 +103,39 @@ describe('Organization Usage Functions', () => {
       const result = await getBalanceForOrganizationUser(organization.id, nonMember.id);
 
       expect(result.balance).toBe(0);
+    });
+
+    test('resolves a role and a balance row only for an organization that is still live', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Test Org', user.id, 100000);
+
+      await expect(findOrganizationMemberRole(db, organization.id, user.id)).resolves.toBe('owner');
+      await expect(
+        findOrganizationMemberBalanceRow(db, organization.id, user.id)
+      ).resolves.not.toBeNull();
+
+      await markOrganizationAsDeleted(organization.id);
+
+      await expect(findOrganizationMemberRole(db, organization.id, user.id)).resolves.toBeNull();
+      await expect(
+        findOrganizationMemberBalanceRow(db, organization.id, user.id)
+      ).resolves.toBeNull();
+    });
+
+    test('returns no balance for an organization that is no longer live', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Test Org', user.id, 100000);
+
+      await expect(getBalanceForOrganizationUser(organization.id, user.id)).resolves.toMatchObject({
+        balance: 0.1,
+      });
+
+      await markOrganizationAsDeleted(organization.id);
+
+      const result = await getBalanceForOrganizationUser(organization.id, user.id);
+
+      expect(result.balance).toBe(0);
+      expect(result.settings).toEqual({});
     });
 
     test('should return 0 balance for billing_manager role', async () => {
@@ -205,10 +247,7 @@ describe('Organization Usage Functions', () => {
     test('processes a credit that expired before the cut-off and reports the reduced balance', async () => {
       const { owner, organization } = await createOrganizationWithDueCredit();
 
-      const result = await getBalanceForOrganizationUser(organization.id, owner.id, {
-        now,
-        expiryJitterHours: 0,
-      });
+      const result = await getBalanceForOrganizationUser(organization.id, owner.id, { now });
       await drainAfterCallbacks();
 
       expect(result.balance).toBe(0);
@@ -645,7 +684,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 30000, // $0.03 usage
       });
@@ -674,7 +713,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 50000, // $0.05 usage (equal to limit)
       });
@@ -703,7 +742,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 75000, // $0.075 usage (exceeds limit)
       });
@@ -734,7 +773,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 60000, // $0.06 usage (exceeds limit)
       });
@@ -767,7 +806,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 10000, // $0.01 usage (allowance remains)
       });
@@ -798,7 +837,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE - INTERVAL '1 day'`, // Yesterday
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date - INTERVAL '1 day'`, // Yesterday
         limit_type: 'daily',
         microdollar_usage: 100000, // $0.10 usage (exceeds limit, but from yesterday)
       });
@@ -806,7 +845,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 10000, // $0.01 usage (below limit)
       });
@@ -839,7 +878,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user1.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 60000, // $0.06 usage (exceeds user1's limit)
       });
@@ -847,7 +886,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user2.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 20000, // $0.02 usage (below user2's limit)
       });
@@ -875,7 +914,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: org1.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 60000, // $0.06 usage (exceeds org1's limit)
       });
@@ -883,7 +922,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: org2.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 20000, // $0.02 usage (below org2's limit)
       });
@@ -905,7 +944,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 0, // Zero usage
       });
@@ -932,7 +971,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 1, // 1 microdollar usage
       });
@@ -944,6 +983,36 @@ describe('Organization Usage Functions', () => {
       expect(result.balance).toBe(-0.000001); // -1 microdollar = -0.000001 USD (0 - 1)
     });
 
+    test('should return a real zero daily usage as 0, not null', async () => {
+      const owner = await insertTestUser();
+      const zeroUsageMember = await insertTestUser();
+      const noUsageRowMember = await insertTestUser();
+
+      const organization = await createTestOrganization('Test Org', owner.id, 100000, {}, false);
+      await addUserToOrganization(organization.id, zeroUsageMember.id, 'member');
+      await addUserToOrganization(organization.id, noUsageRowMember.id, 'member');
+
+      await updateOrganizationUserLimit(organization.id, zeroUsageMember.id, 5); // $5.00 limit
+
+      await db.insert(organization_user_usage).values({
+        organization_id: organization.id,
+        kilo_user_id: zeroUsageMember.id,
+        usage_date: sql`CURRENT_DATE`, // Today
+        limit_type: 'daily',
+        microdollar_usage: 0, // Row exists, nothing spent
+      });
+
+      const members = await getOrganizationMembers(organization.id);
+      const zeroUsage = members.find(m => m.status === 'active' && m.id === zeroUsageMember.id);
+      const noUsageRow = members.find(m => m.status === 'active' && m.id === noUsageRowMember.id);
+
+      // A row with exactly 0 must reach the consumer as 0 so it can render
+      // "$0.00 / $5.00"; only a missing row is unknown.
+      expect(zeroUsage?.dailyUsageLimitUsd).toBe(5);
+      expect(zeroUsage?.currentDailyUsageUsd).toBe(0);
+      expect(noUsageRow?.currentDailyUsageUsd).toBeNull();
+    });
+
     test('should handle null limit (unlimited) correctly', async () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 100000);
@@ -953,7 +1022,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 50000, // $0.05 usage
       });
@@ -1064,7 +1133,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 10000, // $0.01 usage
       });
@@ -1100,7 +1169,7 @@ describe('Organization Usage Functions', () => {
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
-        usage_date: sql`CURRENT_DATE`, // Today
+        usage_date: sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date`, // Today
         limit_type: 'daily',
         microdollar_usage: 5000, // $0.005 usage
       });

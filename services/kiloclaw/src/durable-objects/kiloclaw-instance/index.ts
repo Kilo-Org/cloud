@@ -759,9 +759,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   /**
    * Emit an analytics event with common DO dimensions baked in.
-   * Follows gastown's Omit<> pattern — callers provide only the
-   * event-specific fields; userId, delivery, and machine context
-   * are always filled from this.s.
+   * Callers provide only the event-specific fields; userId, delivery,
+   * and machine context are always filled from this.s.
    */
   private emitEvent(
     data: Omit<

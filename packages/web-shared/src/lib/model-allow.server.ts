@@ -1,10 +1,12 @@
 import 'server-only';
-import { getKiloExclusiveInferenceProviders } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   KILO_AUTO_MODEL_PREFIX,
   normalizeModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { findCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import {
+  findCustomLlm,
+  getPublicCustomLlmInferenceProviders,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -52,6 +54,16 @@ export async function isModelRestrictionExempt(
   return directByokModel.provider !== null && directByokModel.model !== null;
 }
 
+/**
+ * Providers a model is pinned to regardless of the snapshot: those a public
+ * custom LLM declares. Undefined when the snapshot decides.
+ */
+export async function getModelInferenceProviders(
+  modelId: string
+): Promise<ReadonlySet<string> | undefined> {
+  return (await getPublicCustomLlmInferenceProviders(modelId)) ?? undefined;
+}
+
 export function hasActiveModelRestrictions(restrictions: ModelRestrictions): boolean {
   return restrictions.providerAllowList !== undefined || restrictions.modelDenyList.length > 0;
 }
@@ -73,7 +85,7 @@ export function createAllowPredicateFromProviderAllowList(
       return false;
     }
     const providerSlugs =
-      getKiloExclusiveInferenceProviders(modelId) ?? (await providerLookup(modelId));
+      (await getModelInferenceProviders(modelId)) ?? (await providerLookup(modelId));
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));

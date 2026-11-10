@@ -213,9 +213,7 @@ describe('finding documents', () => {
       'personal'
     );
 
-    expect(document.id).toBe(
-      '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1'
-    );
+    expect(document.id).toBe('/(app)/security-agent/personal/findings/finding-1');
     expect(document.description).toBe('acme/api · critical');
     expect(document.keywords).toEqual(['acme/api', 'critical']);
     expect(document.route).toBe('kiloapp://security-agent/personal/findings/finding-1');
@@ -227,7 +225,7 @@ describe('finding documents', () => {
       'org-1'
     );
 
-    expect(document.id).toBe('/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/finding-2');
+    expect(document.id).toBe('/(app)/security-agent/org-1/findings/finding-2');
   });
 
   it('omits a missing severity from the description', () => {
@@ -483,6 +481,54 @@ describe('planSystemSearchUpdate', () => {
   });
 });
 
+const LEGACY_FINDING_ID = '/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/finding-1';
+
+describe('ids indexed before the finding route moved', () => {
+  it('resolves to the screen the app shows now', () => {
+    expect(systemSearchHrefFromId(LEGACY_FINDING_ID)).toBe(
+      '/(app)/security-agent/org-1/findings/finding-1'
+    );
+  });
+
+  it('still names the source whose enumeration may remove it', () => {
+    expect(systemSearchSourceKeysOfId(LEGACY_FINDING_ID)).toEqual([
+      systemSearchSourceKey('findings', 'org-1'),
+    ]);
+  });
+
+  it('hands the OS the same link the current id carries', () => {
+    expect(systemSearchDeeplinkFromId(LEGACY_FINDING_ID)).toBe(
+      'kiloapp://security-agent/org-1/findings/finding-1'
+    );
+  });
+
+  it('is removed and replaced once its source is enumerated', () => {
+    const legacy: SystemSearchDocument = {
+      id: LEGACY_FINDING_ID,
+      title: 'SQL injection',
+      description: 'acme/api · critical',
+      keywords: ['acme/api'],
+      route: 'kiloapp://security-agent/org-1/findings/finding-1',
+      // A fingerprint written before the move names no source, so the id alone
+      // decides which scope may remove it.
+      fingerprint: '{}',
+    };
+    const current = findingSearchDocument(
+      { id: 'finding-1', title: 'SQL injection', severity: 'critical', repo_full_name: 'acme/api' },
+      'org-1'
+    );
+
+    const plan = planSystemSearchUpdate({
+      indexed: [legacy],
+      documents: [current],
+      observedSources: new Set([systemSearchSourceKey('findings', 'org-1')]),
+    });
+
+    expect(plan.remove).toEqual([LEGACY_FINDING_ID]);
+    expect(plan.add).toEqual([current]);
+  });
+});
+
 describe('systemSearchSourceKeysOfId', () => {
   it('reads the scope out of each indexed id shape', () => {
     expect(systemSearchSourceKeysOfId('/(app)/agent-chat/sess-1?organizationId=org-1')).toEqual([
@@ -497,9 +543,9 @@ describe('systemSearchSourceKeysOfId', () => {
     expect(systemSearchSourceKeysOfId('/(app)/pr-review/gitlab/group/repo/12')).toEqual([
       systemSearchSourceKey('pullRequests', 'gitlab'),
     ]);
-    expect(
-      systemSearchSourceKeysOfId('/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/f-2')
-    ).toEqual([systemSearchSourceKey('findings', 'org-1')]);
+    expect(systemSearchSourceKeysOfId('/(app)/security-agent/org-1/findings/f-2')).toEqual([
+      systemSearchSourceKey('findings', 'org-1'),
+    ]);
   });
 
   it('returns no source for an identifier this section did not issue', () => {
@@ -513,7 +559,7 @@ describe('systemSearchHrefFromId', () => {
     const ids = [
       '/(app)/agent-chat/sess-1?organizationId=org-1',
       '/(app)/pr-review/octocat/hello-world/42',
-      '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1',
+      '/(app)/security-agent/personal/findings/finding-1',
     ];
 
     for (const id of ids) {
@@ -534,14 +580,8 @@ describe('systemSearchHrefFromId', () => {
     expect(systemSearchHrefFromId('/(app)/agent-chat/sess-1/extra')).toBeNull();
     expect(systemSearchHrefFromId('/(app)/pr-review/../../settings')).toBeNull();
     expect(systemSearchHrefFromId('/(app)/pr-review/a/../b')).toBeNull();
-    expect(
-      systemSearchHrefFromId(
-        '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/f-1/../f-2'
-      )
-    ).toBeNull();
-    expect(
-      systemSearchHrefFromId('/(app)/(tabs)/(3_profile)/security-agent/personal/nope/f-1')
-    ).toBeNull();
+    expect(systemSearchHrefFromId('/(app)/security-agent/personal/findings/f-1/../f-2')).toBeNull();
+    expect(systemSearchHrefFromId('/(app)/security-agent/personal/nope/f-1')).toBeNull();
   });
 
   it('accepts every id the builders produce', () => {
@@ -565,11 +605,9 @@ describe('systemSearchDeeplinkFromId', () => {
     expect(systemSearchDeeplinkFromId('/(app)/pr-review/octocat/hello-world/42')).toBe(
       'kiloapp://pr-review/octocat/hello-world/42'
     );
-    expect(
-      systemSearchDeeplinkFromId(
-        '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1'
-      )
-    ).toBe('kiloapp://security-agent/personal/findings/finding-1');
+    expect(systemSearchDeeplinkFromId('/(app)/security-agent/personal/findings/finding-1')).toBe(
+      'kiloapp://security-agent/personal/findings/finding-1'
+    );
   });
 
   it('returns null for an unrecognised identifier', () => {

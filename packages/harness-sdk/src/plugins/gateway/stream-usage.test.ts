@@ -3,25 +3,28 @@ import { expect, it } from 'vitest';
 import type { ApiKind } from '../../core/catalog.js';
 import { ModelClient } from '../../core/model.js';
 import { fakeFetch, sampleRequest, sse } from './fake.js';
+import { readCached } from './wire/usage.js';
 import { testGateway } from './test-gateway.js';
 
 const served = 'anthropic/claude-sonnet-4.6';
 const requested = 'kilo-auto/balanced';
 
 const framesFor = (kind: ApiKind, costs: object = {}): readonly unknown[] => {
+  const { inconsistent, ...rest } = costs as { inconsistent?: boolean };
+  const totals = inconsistent === true ? { input: 5, cached: 1000 } : { input: 10, cached: 7 };
   if (kind === 'messages') {
     return [
       {
         type: 'message_start',
         message: {
           model: served,
-          usage: { input_tokens: 3, cache_read_input_tokens: 7, ...costs },
+          usage: { input_tokens: 3, cache_read_input_tokens: 7, ...rest },
         },
       },
       {
         type: 'message_delta',
         delta: { stop_reason: 'end_turn' },
-        usage: { output_tokens: 2, ...costs },
+        usage: { output_tokens: 2, ...rest },
       },
     ];
   }
@@ -32,10 +35,10 @@ const framesFor = (kind: ApiKind, costs: object = {}): readonly unknown[] => {
         type: 'response.completed',
         response: {
           usage: {
-            input_tokens: 10,
-            input_tokens_details: { cached_tokens: 7 },
+            input_tokens: totals.input,
+            input_tokens_details: { cached_tokens: totals.cached },
             output_tokens: 2,
-            ...costs,
+            ...rest,
           },
         },
       },
@@ -46,10 +49,10 @@ const framesFor = (kind: ApiKind, costs: object = {}): readonly unknown[] => {
     {
       choices: [],
       usage: {
-        prompt_tokens: 10,
-        prompt_tokens_details: { cached_tokens: 7 },
+        prompt_tokens: totals.input,
+        prompt_tokens_details: { cached_tokens: totals.cached },
         completion_tokens: 2,
-        ...costs,
+        ...rest,
       },
     },
   ];
@@ -124,6 +127,24 @@ it.each<ApiKind>(['chat_completions', 'messages', 'responses'])(
     expect(done).toMatchObject({ model: served, usage: { cost: 0.000_012 } });
   }
 );
+
+it.each<ApiKind>(['chat_completions', 'responses'])(
+  'keeps the derived non-cached count non-negative when the cached count exceeds the input total for %s',
+  async kind => {
+    const frames = framesFor(kind, { inconsistent: true });
+    const { done } = await collect(kind, frames);
+
+    expect(done?.kind === 'done' ? done.usage : undefined).toMatchObject({
+      inputTokens: 0,
+      outputTokens: 2,
+      cacheReadTokens: 1000,
+    });
+  }
+);
+
+it('floors the derived non-cached count of both OpenAI shapes at zero', () => {
+  expect(readCached(5, 2, 1000)).toMatchObject({ inputTokens: 0, cacheReadTokens: 1000 });
+});
 
 it('ignores malformed model metadata while retaining valid usage', async () => {
   const { done } = await collect('chat_completions', [

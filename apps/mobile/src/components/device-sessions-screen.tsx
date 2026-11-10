@@ -12,8 +12,11 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { isolateBidiText } from '@/lib/bidi';
 import {
@@ -40,8 +43,8 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
   const signedIn = formatDate(parseTimestamp(session.created_at), i18n.language);
 
   return (
-    <View className="flex-row items-start gap-3 rounded-lg bg-secondary p-3">
-      <Smartphone size={18} color={colors.secondaryForeground} />
+    <View className="flex-row items-center gap-3 rounded-lg bg-secondary px-4 py-3">
+      <IconTile icon={Smartphone} tint={NEUTRAL_TINT} />
       <View className="min-w-0 flex-1">
         <View className="flex-row flex-wrap items-center gap-2">
           <Text className="text-sm font-medium" numberOfLines={1}>
@@ -62,12 +65,18 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
           })}
         </Text>
       </View>
+      {/* The control box hugs its 16 pt glyph: a 44 dp box centred the glyph,
+          14 dp inside the card's 10.5 dp padding, while the leading tile sat
+          on that padding and the card read lopsided. At 28 dp the glyph's
+          outer edge is 6 dp inside the card's 14 dp padding, and 9 dp of hit
+          slop per side reaches 46 dp, so pixel rounding cannot drop the target
+          under 44 dp. */}
       <Pressable
         onPress={() => {
           onPress(session);
         }}
         disabled={disabled}
-        hitSlop={8}
+        hitSlop={9}
         accessibilityRole="button"
         accessibilityLabel={
           session.isCurrent
@@ -77,7 +86,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
                 signedIn,
               })
         }
-        className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center active:opacity-70"
+        className="min-h-[28px] min-w-[28px] shrink-0 items-center justify-center active:opacity-70"
       >
         <LogOut size={16} color={colors.destructive} />
       </Pressable>
@@ -165,6 +174,7 @@ export function DeviceSessionsScreen() {
         action={
           <Button
             variant="outline"
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               router.back();
             }}
@@ -178,22 +188,28 @@ export function DeviceSessionsScreen() {
     body = (
       <DetailScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-6 pt-4"
+        contentContainerClassName="gap-6 px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {state === 'loading' ? (
           <View className="gap-3">
             {[0, 1, 2].map(index => (
-              <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-                <Skeleton className="h-[18px] w-[18px] rounded" />
+              <View
+                key={index}
+                className="flex-row items-center gap-3 rounded-lg bg-secondary px-4 py-3"
+              >
+                {/* The leading cell reserves the loaded row's 30 dp IconTile
+                    frame, so the title starts at the same x and the row keeps
+                    the same height when the sessions arrive. */}
+                <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
                 <View className="flex-1 gap-1.5">
                   <Skeleton className="h-5 w-28" />
                   <Skeleton className="h-4 w-48" />
                 </View>
-                {/* Reserve the sign-out control's final 44x44pt box so the
+                {/* Reserve the sign-out control's final 28x28pt box so the
                     loaded row is the same height as its skeleton and the list
                     does not jump when sessions arrive. The glyph stays 16pt. */}
-                <View className="min-h-[44px] min-w-[44px] items-center justify-center">
+                <View className="min-h-[28px] min-w-[28px] items-center justify-center">
                   <Skeleton className="h-4 w-4 rounded" />
                 </View>
               </View>

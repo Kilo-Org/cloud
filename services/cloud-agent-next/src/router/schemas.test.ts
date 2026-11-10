@@ -4,6 +4,7 @@ import {
   sandboxAllocationSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  AdoptWorktreeBaseInput,
   ExecutionResponse,
   GetMessageResultInput,
   GetMessageResultOutput,
@@ -15,6 +16,7 @@ import {
   SendMessageV2Input,
   StartSessionOutput,
   StartSessionInput,
+  SyncWorktreeBranchInput,
   branchNameSchema,
 } from './schemas.js';
 import { parseCanonicalBitbucketCloneUrl } from '../types.js';
@@ -22,10 +24,6 @@ import { parseCanonicalBitbucketCloneUrl } from '../types.js';
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const validSessionId = 'workspace_12345678-1234-1234-1234-123456789012';
 const validKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
-const validImages = {
-  path: '123e4567-e89b-12d3-a456-426614174000',
-  files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-};
 const validAttachments = {
   path: '123e4567-e89b-12d3-a456-426614174000',
   files: ['123e4567-e89b-12d3-a456-426614174001.csv'],
@@ -50,6 +48,29 @@ const baseStartInput = {
   },
   repository: { type: 'github' as const, repo: 'acme/repo' },
 };
+
+describe('GetSessionOutput runtime agents', () => {
+  it('preserves picker visibility without removing agents used for delegation', () => {
+    const runtimeAgents = [
+      { slug: 'primary', name: 'Primary', mode: 'primary', hidden: false, disable: false },
+      { slug: 'subagent', name: 'Subagent', mode: 'subagent' },
+      { slug: 'hidden', name: 'Hidden', mode: 'all', hidden: true },
+      { slug: 'disabled', name: 'Disabled', disable: true },
+      { slug: 'legacy', name: 'Legacy' },
+    ];
+
+    const response = GetSessionOutput.parse({
+      sessionId: validSessionId,
+      userId: 'user_test',
+      execution: null,
+      timestamp: 1,
+      version: 1,
+      runtimeAgents,
+    });
+
+    expect(response.runtimeAgents).toEqual(runtimeAgents);
+  });
+});
 
 describe('grouped unified session input contracts', () => {
   it('accepts an optional operation key on start for any client origin', () => {
@@ -93,6 +114,25 @@ describe('grouped unified session input contracts', () => {
         replayed: 'true',
       }).success
     ).toBe(false);
+  });
+
+  it.each([
+    { egressAudit: false },
+    { egressAudit: true },
+    { egressMode: 'unrestricted', egressAudit: false },
+    { egressMode: 'unrestricted', egressAudit: true },
+    { egressMode: 'allowlist', egressAudit: false },
+    { egressMode: 'allowlist', egressAudit: true },
+  ])('preserves audit settings at grouped and legacy boundaries: %j', policy => {
+    expect(StartSessionInput.parse({ ...baseStartInput, runtime: policy }).runtime).toEqual(policy);
+    const legacy = PrepareSessionInput.parse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      ...policy,
+    });
+    expect(legacy.egressAudit).toBe(policy.egressAudit);
+    expect(legacy.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+    expect(legacy.egressAllowlist).toBeUndefined();
   });
 
   it.each(
@@ -141,6 +181,8 @@ describe('grouped unified session input contracts', () => {
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'deny-all' },
     { egressMode: null },
+    { egressMode: 'allowlist', egressAudit: null },
+    { egressMode: 'allowlist', egressAudit: 'true' },
   ])('rejects ambiguous or unsupported egress policies: %j', policy => {
     const grouped = StartSessionInput.safeParse({ ...baseStartInput, runtime: policy });
     const legacy = PrepareSessionInput.safeParse({
@@ -207,7 +249,6 @@ describe('grouped unified session input contracts', () => {
     const input = {
       message: {
         prompt: 'Create the first turn',
-        images: validImages,
         id: validMessageId,
       },
       agent: {
@@ -279,27 +320,6 @@ describe('grouped unified session input contracts', () => {
         message: { prompt: 'Read this document', attachments: validAttachments },
       }).message.attachments
     ).toEqual(validAttachments);
-  });
-
-  it('continues accepting legacy images and rejects ambiguous grouped attachment payloads', () => {
-    expect(
-      SendMessageInput.safeParse({
-        cloudAgentSessionId: validSessionId,
-        message: { prompt: 'Read the image', images: validImages },
-      }).success
-    ).toBe(true);
-    expect(
-      StartSessionInput.safeParse({
-        ...baseStartInput,
-        message: { prompt: 'ambiguous', images: validImages, attachments: validAttachments },
-      }).success
-    ).toBe(false);
-    expect(
-      SendMessageInput.safeParse({
-        cloudAgentSessionId: validSessionId,
-        message: { prompt: 'ambiguous', images: validImages, attachments: validAttachments },
-      }).success
-    ).toBe(false);
   });
 
   it('preserves the grouped send payload shape', () => {
@@ -399,15 +419,15 @@ describe('sandbox preset input boundaries', () => {
   );
 
   it.each(['small', 'large'] as const)(
-    'rejects unsupported BYOC %s rather than allocating Kilo compute',
+    'rejects retired Kilo-paid Vercel %s requests',
     instanceType => {
-      const sandboxAllocation = { provider: { id: 'vercel', account: 'byoc' }, instanceType };
+      const sandboxAllocation = { provider: { id: 'vercel', account: 'kilo' }, instanceType };
       for (const result of [
         PrepareSessionInput.safeParse({ ...prepare, sandboxAllocation }),
         StartSessionInput.safeParse({ ...baseStartInput, runtime: { sandboxAllocation } }),
       ]) {
         expect(result.success).toBe(false);
-        if (!result.success) expect(result.error.message).toContain('BYOC');
+        if (!result.success) expect(result.error.message).toContain('byoc');
       }
     }
   );
@@ -645,7 +665,7 @@ describe('legacy live attachment input compatibility', () => {
     ).toBe(false);
   });
 
-  it('accepts document attachments on prepareSession while retaining images', () => {
+  it('accepts document attachments on prepareSession', () => {
     const basePrepareInput = {
       prompt: 'Summarize this document',
       mode: 'code',
@@ -656,16 +676,6 @@ describe('legacy live attachment input compatibility', () => {
     expect(
       PrepareSessionInput.safeParse({ ...basePrepareInput, attachments: validAttachments }).success
     ).toBe(true);
-    expect(
-      PrepareSessionInput.safeParse({ ...basePrepareInput, images: validImages }).success
-    ).toBe(true);
-    expect(
-      PrepareSessionInput.safeParse({
-        ...basePrepareInput,
-        attachments: validAttachments,
-        images: validImages,
-      }).success
-    ).toBe(false);
   });
 });
 
@@ -811,26 +821,46 @@ describe('sendMessageV2 input compatibility', () => {
     });
   });
 
-  it('continues accepting legacy images and rejects ambiguous prompt attachments', () => {
+  it('accepts optional command mode, model, and variant overrides', () => {
+    const result = SendMessageV2Input.safeParse({
+      cloudAgentSessionId: validSessionId,
+      messageId: validMessageId,
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        variant: 'thinking',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data).toMatchObject({
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        variant: 'thinking',
+      },
+    });
+  });
+
+  it('rejects custom mode on a command payload without appendSystemPrompt', () => {
     expect(
       SendMessageV2Input.safeParse({
         cloudAgentSessionId: validSessionId,
-        payload: { type: 'prompt', ...basePromptInput },
-        images: validImages,
-      }).success
-    ).toBe(true);
-    expect(
-      SendMessageV2Input.safeParse({
-        cloudAgentSessionId: validSessionId,
-        payload: { type: 'prompt', ...basePromptInput },
-        attachments: validAttachments,
-        images: validImages,
+        payload: { type: 'command', command: 'compact', arguments: '', mode: 'custom' },
       }).success
     ).toBe(false);
   });
 
   it('rejects attachment descriptors on nested command payloads', () => {
-    for (const descriptor of [{ images: validImages }, { attachments: validAttachments }]) {
+    for (const descriptor of [{ attachments: validAttachments }]) {
       expect(
         SendMessageV2Input.safeParse({
           cloudAgentSessionId: validSessionId,
@@ -1186,5 +1216,120 @@ describe('legacy V2 output schema keeps executionId compatibility', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe('stacked workspace inputs', () => {
+  const baseSha = 'a'.repeat(40);
+  const parentWorktreeId = 'worktree_12345678-1234-4123-8123-123456789012';
+
+  it('accepts stacked fields on the flat prepare input', () => {
+    const parsed = PrepareSessionInput.parse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      baseBranch: 'feat/parent',
+      baseSha,
+      parentWorktreeId,
+    });
+    expect(parsed).toMatchObject({
+      baseBranch: 'feat/parent',
+      baseSha,
+      parentWorktreeId,
+    });
+  });
+
+  it('accepts stacked fields on the grouped start input', () => {
+    const parsed = StartSessionInput.parse({
+      ...baseStartInput,
+      baseBranch: 'feat/parent',
+      baseSha,
+      parentWorktreeId,
+    });
+    expect(parsed).toMatchObject({ baseBranch: 'feat/parent', baseSha, parentWorktreeId });
+  });
+
+  it('rejects baseBranch combined with an upstream branch at either boundary', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        baseBranch: 'feat/parent',
+        upstreamBranch: 'feat/parent',
+      }).success
+    ).toBe(false);
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: { type: 'github', repo: 'acme/repo', branch: 'feat/parent' },
+        baseBranch: 'feat/parent',
+      }).success
+    ).toBe(false);
+  });
+
+  it('requires baseBranch when baseSha or parentWorktreeId is present', () => {
+    for (const input of [
+      { ...basePromptInput, githubRepo: 'acme/repo', baseSha },
+      { ...basePromptInput, githubRepo: 'acme/repo', parentWorktreeId },
+    ]) {
+      expect(PrepareSessionInput.safeParse(input).success).toBe(false);
+    }
+    expect(StartSessionInput.safeParse({ ...baseStartInput, baseSha }).success).toBe(false);
+    expect(StartSessionInput.safeParse({ ...baseStartInput, parentWorktreeId }).success).toBe(
+      false
+    );
+  });
+
+  it('rejects a malformed commit SHA', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        baseBranch: 'feat/parent',
+        baseSha: 'abc123',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('worktree branch operation additions', () => {
+  const baseSha = 'a'.repeat(40);
+
+  it('accepts the current fork point on sync as it already does on restack', () => {
+    expect(
+      SyncWorktreeBranchInput.parse({
+        cloudAgentSessionId: validSessionId,
+        baseBranch: 'main',
+        upstreamSha: baseSha,
+      })
+    ).toEqual({
+      cloudAgentSessionId: validSessionId,
+      baseBranch: 'main',
+      upstreamSha: baseSha,
+    });
+  });
+
+  it('accepts an adoptWorktreeBase request with an exact worktree and commit', () => {
+    expect(
+      AdoptWorktreeBaseInput.parse({
+        cloudAgentSessionId: validSessionId,
+        expectedWorktreeId: 'worktree_12345678-1234-4123-8123-123456789012',
+        baseBranch: 'main',
+        baseSha,
+      })
+    ).toMatchObject({ baseBranch: 'main', baseSha });
+  });
+
+  it('rejects a malformed worktree or commit on adoptWorktreeBase', () => {
+    const valid = {
+      cloudAgentSessionId: validSessionId,
+      expectedWorktreeId: 'worktree_12345678-1234-4123-8123-123456789012',
+      baseBranch: 'main',
+      baseSha,
+    };
+    expect(
+      AdoptWorktreeBaseInput.safeParse({ ...valid, expectedWorktreeId: 'worktree_nope' }).success
+    ).toBe(false);
+    expect(AdoptWorktreeBaseInput.safeParse({ ...valid, baseSha: 'abc' }).success).toBe(false);
+    expect(AdoptWorktreeBaseInput.safeParse({ ...valid, baseBranch: '' }).success).toBe(false);
   });
 });

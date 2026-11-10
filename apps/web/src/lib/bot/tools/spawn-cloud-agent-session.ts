@@ -1,45 +1,88 @@
 import {
   createCloudAgentNextClient,
+  createCloudAgentNextClientForModel,
+  InsufficientCreditsError,
+  type CloudAgentNextClient,
   type AgentMode,
   type PrepareSessionInput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import {
+  refusedBeforeAdmission,
+  workerRefusalStatus,
+} from '@/lib/cloud-agent-next/release-refused-send';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { RunSessionInput } from '@/lib/cloud-agent-next/run-session';
+import { INSUFFICIENT_CREDITS_RESPONSE } from '@/lib/cloud-agent-next/run-session';
 import {
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
   getGitLabInstanceUrlForOrganization,
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
+  getGitLabProjectAccessForRequester,
+  validateGitLabRepoAccessForOrganization,
+  validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import {
+  GitLabInstanceUrlError,
+  normalizeGitLabInstanceUrl,
+} from '@/lib/integrations/platforms/gitlab/instance-url';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
+import { linkUploadedAttachments, releaseRefusedAttachments } from '@/lib/bot/attachments';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
+import { deriveBotCallbackToken } from '@/lib/bot/callback-token';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
-import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
 import z from 'zod';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import { getGitHubIntegrationById } from '@/lib/integrations/db/platform-integrations';
-
-/**
- * Derive a per-request callback token so the dedicated callback HMAC secret
- * is never stored in session metadata (which is visible via getSession).
- */
-function deriveBotCallbackToken(botRequestId: string): string {
-  return createHmac('sha256', CALLBACK_TOKEN_SECRET)
-    .update(`bot-callback:${botRequestId}`)
-    .digest('hex');
-}
+import { authorizeGitHubRepository } from '@/lib/bot/github-repository-permission';
 
 function buildBotCallbackUrl(botRequestId: string, currentStep: number | undefined): string {
   const url = new URL(`/api/internal/bot-session-callback/${botRequestId}`, APP_URL);
   url.searchParams.set('currentStep', String(parseBotCallbackStep(String(currentStep ?? 0))));
   return url.toString();
 }
+
+/**
+ * A stored GitLab instance URL that fails policy normalization cannot work on
+ * retry, so the reply must name the connection a user has to fix. The account
+ * connection and the integration's own connection are separate settings with
+ * separate owners.
+ */
+class GitLabConnectionUrlError extends Error {
+  constructor(
+    readonly connection: 'account' | 'integration',
+    options?: { cause?: unknown }
+  ) {
+    super(`GitLab ${connection} connection has an invalid instance URL`, options);
+    this.name = 'GitLabConnectionUrlError';
+  }
+}
+
+function normalizeStoredGitLabInstanceUrl(
+  instanceUrl: string,
+  connection: 'account' | 'integration'
+): string {
+  try {
+    return normalizeGitLabInstanceUrl(instanceUrl);
+  } catch (error) {
+    throw new GitLabConnectionUrlError(connection, { cause: error });
+  }
+}
+
+const GITLAB_INVALID_INSTANCE_RESPONSE: Record<'account' | 'integration', string> = {
+  account:
+    'Error: The GitLab connection on your account has an invalid instance URL. Update your GitLab connection in your Kilo Code settings.',
+  integration:
+    "Error: The GitLab connection for this integration has an invalid instance URL. Update the integration's GitLab connection in Kilo Code settings.",
+};
 
 /**
  * Result from spawning a Cloud Agent session
@@ -77,7 +120,7 @@ export const spawnCloudAgentInputSchema = z.object({
     ),
 });
 
-type SpawnCloudAgentInput = z.infer<typeof spawnCloudAgentInputSchema>;
+export type SpawnCloudAgentInput = z.infer<typeof spawnCloudAgentInputSchema>;
 
 /**
  * Spawn a Cloud Agent session and collect the results.
@@ -96,6 +139,14 @@ export default async function spawnCloudAgentSession(
     chatPlatform?: string;
     currentStep?: number;
     attachments?: CloudAgentAttachments;
+    /** Linked Kilo user the caller authenticates as; selects the balance-check client for org payers. */
+    payerUserId?: string;
+    /** Linked Kilo user that triggered this bot run; authorizes repository access. */
+    requesterUserId?: string;
+    /** GitHub login of the account that triggered this bot run. */
+    actorLogin?: string;
+    /** Repository of the conversation the bot was mentioned in. */
+    threadRepository?: string | null;
   }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
@@ -115,13 +166,35 @@ export default async function spawnCloudAgentSession(
   let prepareInput: PrepareSessionInput;
   const mode: AgentMode = args.mode;
   const chatPlatform = options?.chatPlatform ?? 'slack';
+  const payerUserId = options?.payerUserId;
   const callbackTarget = {
     url: buildBotCallbackUrl(botRequestId, options?.currentStep),
-    headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
+    headers: { 'X-Bot-Callback-Token': await deriveBotCallbackToken(botRequestId) },
   };
 
   if (!args.githubRepo && !args.gitlabProject) {
     return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
+  }
+
+  // The repository authorization below must read the same connection the
+  // session will use, so resolve the purpose first.
+  const githubAccessPurpose =
+    options?.chatPlatform === 'slack' && platformIntegration.platform === 'slack'
+      ? 'agent'
+      : 'workflow';
+
+  if (args.githubRepo) {
+    const targetAuthorization = await authorizeGitHubRepository({
+      platformIntegration,
+      repository: args.githubRepo,
+      threadRepository: options?.threadRepository,
+      actorLogin: options?.actorLogin,
+      requesterUserId: options?.requesterUserId,
+      purpose: githubAccessPurpose,
+    });
+    if (!targetAuthorization.allowed) {
+      return { response: targetAuthorization.markdown };
+    }
   }
 
   let prompt = args.prompt;
@@ -140,6 +213,83 @@ export default async function spawnCloudAgentSession(
     if (!gitLabActorUserId) {
       return { response: 'Error: No acting user is configured for this GitLab organization.' };
     }
+
+    // Resolve the project through the connection's inventory, as the GitHub
+    // branch of this tool resolves the repository through its connection
+    // inventory. An organization-owned integration first requires the
+    // requesting account to reach the project through its own GitLab
+    // connection: the org connection later supplies only the session
+    // credential, not the authorization. Runs without a requesting account
+    // name no project.
+    let projectResolved: boolean;
+    try {
+      if (owner.type === 'org') {
+        if (!options?.requesterUserId) {
+          return {
+            response:
+              "Error: That GitLab project is not available through this account's GitLab integration.",
+          };
+        }
+        // A project path means the same thing only on the instance the
+        // session will clone from, so a requester whose own connection lives
+        // elsewhere gets a verdict, never a cross-instance lookup.
+        const [requesterInstanceUrl, orgInstanceUrl] = await Promise.all([
+          getGitLabInstanceUrlForUser(options.requesterUserId),
+          getGitLabInstanceUrlForOrganization(owner.id),
+        ]);
+        if (
+          normalizeStoredGitLabInstanceUrl(requesterInstanceUrl, 'account') !==
+          normalizeStoredGitLabInstanceUrl(orgInstanceUrl, 'integration')
+        ) {
+          return {
+            response:
+              "Error: That GitLab project is not available through this account's GitLab integration.",
+          };
+        }
+        const requesterAccess = await getGitLabProjectAccessForRequester(
+          options.requesterUserId,
+          args.gitlabProject
+        );
+        if (requesterAccess.outcome !== 'allowed') {
+          return {
+            response:
+              "Error: That GitLab project is not available through this account's GitLab integration.",
+          };
+        }
+        projectResolved = await validateGitLabRepoAccessForOrganization(
+          owner.id,
+          gitLabActorUserId,
+          args.gitlabProject
+        );
+      } else {
+        projectResolved = await validateGitLabRepoAccessForUser(owner.id, args.gitlabProject);
+      }
+    } catch (error) {
+      // A stored instance URL that fails policy normalization cannot start
+      // working on retry, so it gets its own non-retryable answer instead of
+      // the retry message meant for provider and transport failures. The
+      // answer names the connection whose URL failed.
+      if (error instanceof GitLabConnectionUrlError) {
+        return { response: GITLAB_INVALID_INSTANCE_RESPONSE[error.connection] };
+      }
+      if (error instanceof GitLabInstanceUrlError) {
+        return { response: GITLAB_INVALID_INSTANCE_RESPONSE.integration };
+      }
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session-gitlab-project' },
+        extra: { botRequestId, ownerType: owner.type },
+      });
+      return {
+        response: 'Error: Could not verify access to that GitLab project. Please try again.',
+      };
+    }
+    if (!projectResolved) {
+      return {
+        response:
+          "Error: That GitLab project is not available through this account's GitLab integration.",
+      };
+    }
+
     // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
     const gitlabToken =
       owner.type === 'org'
@@ -187,10 +337,6 @@ export default async function spawnCloudAgentSession(
       return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
     }
 
-    const githubAccessPurpose =
-      options?.chatPlatform === 'slack' && platformIntegration.platform === 'slack'
-        ? 'agent'
-        : 'workflow';
     const repository = await resolveGitHubRepositoryForOwner(
       owner,
       args.githubRepo,
@@ -224,16 +370,59 @@ export default async function spawnCloudAgentSession(
     };
   }
 
-  const client = createCloudAgentNextClient(authToken, { skipBalanceCheck: true });
+  // Mirror the web router: free and BYOK-billable models skip the worker-side
+  // $1 balance minimum (they cost the payer nothing); paid models use the
+  // default client so the balance middleware gates initiate.
+  let client: CloudAgentNextClient;
+  try {
+    const eligibility = await computeCloudAgentNextBalanceCheckEligibility({
+      fromDb: db,
+      user: { id: payerUserId ?? owner.id },
+      modelId: model,
+      organizationId: kilocodeOrganizationId,
+    });
+    client = createCloudAgentNextClientForModel(authToken, eligibility);
+  } catch (error) {
+    console.error('[KiloBot] Failed to resolve balance-check eligibility:', error);
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session' },
+      extra: { botRequestId, model },
+    });
+    // Fail closed: the default client keeps the balance check enabled.
+    client = createCloudAgentNextClient(authToken);
+  }
 
   let cloudAgentSessionId: string;
   let kiloSessionId: string;
+
+  // Link this message's attachment rows before the worker can accept the
+  // session, so the reaper keeps their objects while a session references them.
+  // A row that is already gone fails the dispatch instead of starting a session
+  // with a missing attachment.
+  const attachmentUserId = payerUserId ?? owner.id;
+  let linkedAttachmentKeys: string[] = [];
+  try {
+    linkedAttachmentKeys = await linkUploadedAttachments(attachmentUserId, options?.attachments);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { response: `Error: ${message}` };
+  }
 
   try {
     const prepared = await client.prepareSession(prepareInput);
     cloudAgentSessionId = prepared.cloudAgentSessionId;
     kiloSessionId = prepared.kiloSessionId;
   } catch (error) {
+    // The worker registers or starts the session before it answers, so only an
+    // answer that proves it refused this prepare leaves no session behind. A
+    // timeout, a request the caller closed, or a 5xx proves nothing: the session
+    // may exist and still reference these rows, so those keep them linked.
+    if (refusedBeforeAdmission(workerRefusalStatus(error))) {
+      await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
+    }
+    if (error instanceof InsufficientCreditsError) {
+      return { response: INSUFFICIENT_CREDITS_RESPONSE };
+    }
     const message = error instanceof Error ? error.message : String(error);
     return { response: `Error preparing Cloud Agent: ${message}` };
   }
@@ -243,6 +432,20 @@ export default async function spawnCloudAgentSession(
       cloudAgentSessionId,
     });
   } catch (error) {
+    // An answer that proves the worker refused this initiate before it admitted
+    // the turn means no session consumes these uploads, so the rows go back to
+    // 'pending' for a retried tool call and the run-level cleanup. A transport
+    // failure, a timeout or a 5xx proves nothing, because the worker may have
+    // accepted the turn, so those keep the rows linked and their objects intact.
+    if (refusedBeforeAdmission(workerRefusalStatus(error))) {
+      await releaseRefusedAttachments(attachmentUserId, options?.attachments, linkedAttachmentKeys);
+    }
+    if (error instanceof InsufficientCreditsError) {
+      // The session record exists at this point; release it promptly with a
+      // best-effort cleanup so it does not linger until periodic expiry.
+      void Promise.resolve(client.cleanupSession?.(cloudAgentSessionId)).catch(() => {});
+      return { response: INSUFFICIENT_CREDITS_RESPONSE };
+    }
     const message = error instanceof Error ? error.message : String(error);
     return {
       response: `Error initiating Cloud Agent: ${message}`,

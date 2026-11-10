@@ -1,4 +1,4 @@
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema, type ContentBlock } from '@modelcontextprotocol/sdk/types.js';
 import { Effect } from 'effect';
 import { withServer, type Connection } from './connection.js';
 import { type RemoteMcpClientDeps } from './deps.js';
@@ -28,11 +28,11 @@ interface RemoteMcpTool {
 interface RemoteMcpClient {
   /** The tools the server offers, as of this call. */
   readonly tools: Effect.Effect<readonly RemoteMcpTool[], RemoteMcpError>;
-  /** One call, answered with the text the server sent. */
+  /** One call, answered whole: what the model reads and what a view renders. */
   readonly call: (
     name: string,
     args: Readonly<Record<string, unknown>>
-  ) => Effect.Effect<string, RemoteMcpError>;
+  ) => Effect.Effect<RemoteMcpCallResult, RemoteMcpError>;
   /** One resource, read off the same server under the same deadline as a call. */
   readonly resource: (uri: string) => Effect.Effect<RemoteMcpResource, RemoteMcpError>;
 }
@@ -62,6 +62,23 @@ const discovered = (
 const textOf = (content: readonly { readonly type: string; readonly text?: string }[]): string =>
   content.flatMap(part => (typeof part.text === 'string' ? [part.text] : [])).join('\n');
 
+/**
+ * One call, answered whole.
+ *
+ * The model reads `text`, because a model reads words. `content` and
+ * `structuredContent` are the server's own answer, kept because a host that
+ * draws the call's MCP Apps view renders those and cannot get them back from
+ * the text: the view receives the tool result as the protocol defines it.
+ */
+interface RemoteMcpCallResult {
+  /** The text parts, joined: what the model reads. */
+  readonly text: string;
+  /** The content blocks the server answered with, as it wrote them. */
+  readonly content: readonly ContentBlock[];
+  /** The structured result the server wrote, for a view that renders it. */
+  readonly structuredContent: Readonly<Record<string, unknown>> | undefined;
+}
+
 /** One call, and what the server refused about it. */
 interface Asked {
   readonly name: string;
@@ -72,7 +89,7 @@ const called = (
   connection: Connection,
   server: RemoteMcpServer,
   asked: Asked
-): Effect.Effect<string, RemoteMcpError> =>
+): Effect.Effect<RemoteMcpCallResult, RemoteMcpError> =>
   Effect.tryPromise({
     try: async () => {
       const { name, args } = asked;
@@ -87,7 +104,7 @@ const called = (
          */
         throw new RemoteMcpError({ serverId: server.id, kind: 'protocol', cause: text });
       }
-      return text;
+      return { text, content: result.content, structuredContent: result.structuredContent };
     },
     catch: cause => (cause instanceof RemoteMcpError ? cause : failed(server, cause)),
   });
@@ -133,5 +150,11 @@ const remoteMcpClient = (server: RemoteMcpServer, deps: RemoteMcpClientDeps): Re
     ),
 });
 
-export type { RemoteMcpClient, RemoteMcpClientDeps, RemoteMcpResource, RemoteMcpTool };
+export type {
+  RemoteMcpCallResult,
+  RemoteMcpClient,
+  RemoteMcpClientDeps,
+  RemoteMcpResource,
+  RemoteMcpTool,
+};
 export { defaultCallTimeoutMs, remoteMcpClient };

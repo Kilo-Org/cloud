@@ -3,7 +3,7 @@ import {
   RUNTIME_CONTRACT_KEY,
   readRuntimeContract,
 } from '../../src/control-plane/sandbox/runtime-contract.js';
-import { runInDurableObject, env, reset } from 'cloudflare:test';
+import { createExecutionContext, runInDurableObject, env, reset } from 'cloudflare:test';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import jwt from 'jsonwebtoken';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -19,6 +19,8 @@ import {
   issueRuntimeCredentialProxyHandle,
 } from '../../src/runtime-credential-proxy.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorization-persistence.js';
+import worker from '../../src/server.js';
+import { markHistoryHydrated } from '../../src/control-plane/session/history-hydration.js';
 import {
   addAcceptedHandleSync,
   digestRuntimeProxyHandle,
@@ -27,11 +29,11 @@ import {
 } from '../../src/control-plane/sandbox/accepted-handles.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
-import type { AgentSandboxProvider } from '../../src/types.js';
+import type { AgentSandboxProvider, Env } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import {
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -44,7 +46,7 @@ const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDB
 
 const USER_ID = 'user_123';
 const OTHER_USER_ID = 'user_other';
-const ORG_ID = 'org_123';
+const ORG_ID = '11111111-1111-4111-8111-111111111111';
 const WORKER_URL = 'https://control.test';
 const SECRET = env.NEXTAUTH_SECRET as string;
 
@@ -173,8 +175,7 @@ async function installSandbox(
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL,
       KILOCODE_BACKEND_BASE_URL: WORKER_URL,
       KILO_OPENROUTER_BASE: WORKER_URL,
@@ -213,7 +214,10 @@ async function createSession(input: {
       turn: { type: 'prompt', prompt: 'hello' },
       agent: { mode: 'code', model: 'test/model' },
     },
-    sandboxSelection: { provider: 'vercel' },
+    sandboxSelection: {
+      provider: 'vercel',
+      byoc: { organizationId: ORG_ID, credentialId: '22222222-2222-4222-8222-222222222222' },
+    },
     ...(input.seal ? { runtimeAuthorizationSeal: input.seal } : {}),
   });
   return sessionStub;
@@ -248,7 +252,7 @@ async function createSharedScope(
 ) {
   const worktreeId = `worktree_${crypto.randomUUID()}`;
   const creatorId = newSessionId();
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, creatorId);
+  const sandboxId = await generateSandboxId(creatorId);
   const provider = createProvider();
   const sandbox = await installSandbox(sandboxId, provider);
 

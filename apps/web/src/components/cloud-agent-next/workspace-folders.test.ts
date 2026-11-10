@@ -16,6 +16,7 @@ const folderC = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const worktreeA = `worktree_${folderA}`;
 const worktreeB = `worktree_${folderB}`;
 const hiddenWorktree = `worktree_${folderC}`;
+const standaloneSession = `workspace_${folderC}`;
 
 function makeSession(id: string, overrides: Partial<StoredSession> = {}): StoredSession {
   return {
@@ -39,9 +40,33 @@ function makeGroup(worktreeId: string, cloudId = `workspace_${folderA}`): Sideba
 
 function makeFolders(): WorkspaceFolder[] {
   return [
-    { id: folderA, name: 'Product', color: 'blue', worktreeIds: [worktreeA, hiddenWorktree] },
-    { id: folderB, name: 'Research', color: 'purple', worktreeIds: [] },
-    { id: folderC, name: 'Backlog', color: 'default', worktreeIds: [] },
+    {
+      id: folderA,
+      name: 'Product',
+      color: 'blue',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
+      worktreeIds: [worktreeA, hiddenWorktree],
+    },
+    {
+      id: folderB,
+      name: 'Research',
+      color: 'purple',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
+      worktreeIds: [],
+    },
+    {
+      id: folderC,
+      name: 'Backlog',
+      color: 'default',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
+      worktreeIds: [],
+    },
   ];
 }
 
@@ -136,6 +161,30 @@ describe('workspace folder drops', () => {
     ).toEqual({ type: 'move-worktree', worktreeId: worktreeA, folderId: null });
   });
 
+  it('does not offer a smart folder as a workspace or session drop target', () => {
+    const folders = makeFolders().map(folder =>
+      folder.id === folderB
+        ? { ...folder, kind: 'smart' as const, smartPreset: 'needs_you' as const }
+        : folder
+    );
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'worktree', id: worktreeA },
+        folderTarget(folderB),
+        folders,
+        visibleWorktrees
+      )
+    ).toBeNull();
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: 'workspace_00000000-0000-4000-8000-000000000001' },
+        folderTarget(folderB),
+        folders,
+        visibleWorktrees
+      )
+    ).toBeNull();
+  });
+
   it('ignores cancelled, external, stale and no-op workspace drops', () => {
     const drag = { type: 'worktree', id: worktreeA } as const;
     expect(
@@ -159,6 +208,36 @@ describe('workspace folder drops', () => {
     expect(
       getWorkspaceFolderDropAction(
         { type: 'worktree', id: worktreeB },
+        { type: 'ungrouped' },
+        makeFolders(),
+        visibleWorktrees
+      )
+    ).toBeNull();
+  });
+
+  it('files a dragged session onto a folder and rejects unknown folder targets', () => {
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: standaloneSession },
+        folderTarget(folderB),
+        makeFolders(),
+        visibleWorktrees
+      )
+    ).toEqual({ type: 'move-session', sessionId: standaloneSession, folderId: folderB });
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: standaloneSession },
+        folderTarget('missing'),
+        makeFolders(),
+        visibleWorktrees
+      )
+    ).toBeNull();
+  });
+
+  it('ignores a dragged session dropped on Ungrouped', () => {
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: standaloneSession },
         { type: 'ungrouped' },
         makeFolders(),
         visibleWorktrees

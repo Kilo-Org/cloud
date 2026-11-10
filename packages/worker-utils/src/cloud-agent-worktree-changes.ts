@@ -31,13 +31,37 @@ const baseRefSchema = z
   .min(1)
   .max(1024)
   .refine(ref => !ref.startsWith('-') && !ref.includes('\0'), 'Invalid comparison ref');
+export const worktreeChangesBaseRefFallbackSchema = z
+  .object({
+    requested: baseRefSchema,
+    used: baseRefSchema,
+  })
+  .strict();
+
 export const worktreeChangesComparisonSchema = z
   .object({
     baseRef: baseRefSchema,
     mergeBase: commitSchema,
     head: commitSchema,
+    baseRefFallback: worktreeChangesBaseRefFallbackSchema.optional(),
   })
   .strict();
+
+export const worktreeChangesRemoteDivergenceSchema = z
+  .object({
+    ahead: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    behind: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
+
+export const worktreeChangesScopeSchema = z.enum(['uncommitted', 'against-base-branch']);
+
+export function worktreeFileIdentity(file: {
+  path: string;
+  scope?: z.infer<typeof worktreeChangesScopeSchema>;
+}): string {
+  return file.scope === undefined ? file.path : `${file.scope}\0${file.path}`;
+}
 
 export const worktreeChangesFileSchema = z
   .object({
@@ -52,6 +76,7 @@ export const worktreeChangesFileSchema = z
         'Expected a repository-relative path'
       ),
     status: z.enum(['added', 'modified', 'deleted']),
+    scope: worktreeChangesScopeSchema.optional(),
     additions: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     deletions: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     tracked: z.boolean(),
@@ -70,6 +95,7 @@ export const worktreeChangesCaptureRequestSchema = z
 const captureFields = {
   revision: worktreeChangesRevisionSchema,
   comparison: worktreeChangesComparisonSchema,
+  remoteDivergence: worktreeChangesRemoteDivergenceSchema.optional(),
   files: z.array(worktreeChangesFileSchema).max(MAX_WORKTREE_CHANGES_FILES),
   truncated: z.boolean(),
 };
@@ -77,6 +103,10 @@ const captureFields = {
 export const worktreeChangesCaptureSchema = z
   .object(captureFields)
   .strict()
+  .refine(
+    capture => new Set(capture.files.map(worktreeFileIdentity)).size === capture.files.length,
+    'Worktree summary identities must be unique'
+  )
   .refine(
     capture =>
       new TextEncoder().encode(JSON.stringify(capture)).byteLength <= MAX_WORKTREE_CHANGES_BYTES,
@@ -100,6 +130,32 @@ const legacyWorktreeChangesSnapshotSchema = z
     'Saved worktree summary exceeds the size limit'
   );
 
+const MAX_WORKTREE_REPOSITORIES = 100;
+
+/**
+ * One repository of a multi-repository environment's saved snapshot. `path` is
+ * the repository directory below the session directory (the leaf, or `''` when
+ * the repository is the session directory itself), so a file belongs to the
+ * repository with the longest `path` that prefixes it.
+ */
+const savedWorktreeChangesRepositorySchema = z
+  .object({
+    path: z
+      .string()
+      .max(4096)
+      .refine(
+        path =>
+          path === '' ||
+          (!path.includes('\0') &&
+            path.split('/').every(part => part !== '' && part !== '.' && part !== '..')),
+        'Expected a path below the session directory'
+      ),
+    repoFullName: z.string().min(1).max(500),
+    comparison: worktreeChangesComparisonSchema,
+    truncated: z.boolean(),
+  })
+  .strict();
+
 const savedWorktreeChangesSnapshotSchema = z
   .object({
     schemaVersion: z.literal(WORKTREE_CHANGES_SCHEMA_VERSION),
@@ -108,14 +164,34 @@ const savedWorktreeChangesSnapshotSchema = z
     comparison: worktreeChangesComparisonSchema,
     files: z.array(savedWorktreeChangesFileSchema).max(MAX_WORKTREE_CHANGES_FILES),
     truncated: z.boolean(),
+    /**
+     * Only the snapshot of a multi-repository (V2) environment has this; a V1
+     * snapshot is saved without the key. A reader that does not know the key
+     * rejects the snapshot (the schema is strict), so deploy this reader before
+     * any Worker can write multi-repository snapshots.
+     */
+    repositories: z
+      .array(savedWorktreeChangesRepositorySchema)
+      .min(1)
+      .max(MAX_WORKTREE_REPOSITORIES)
+      .optional(),
   })
   .strict()
   .refine(
-    snapshot => new Set(snapshot.files.map(file => file.path)).size === snapshot.files.length,
-    'Saved worktree summary paths must be unique'
+    snapshot => new Set(snapshot.files.map(worktreeFileIdentity)).size === snapshot.files.length,
+    'Saved worktree summary identities must be unique'
+  )
+  .refine(
+    snapshot =>
+      snapshot.repositories === undefined ||
+      new Set(snapshot.repositories.map(repository => repository.path)).size ===
+        snapshot.repositories.length,
+    'Saved worktree repository paths must be unique'
   );
 
 export type WorktreeChangesSnapshot = z.infer<typeof savedWorktreeChangesSnapshotSchema>;
+
+const worktreeTextEncoder = new TextEncoder();
 
 export function finalizeWorktreeChangesSnapshot(
   candidate: unknown
@@ -123,20 +199,47 @@ export function finalizeWorktreeChangesSnapshot(
   const parsed = savedWorktreeChangesSnapshotSchema.safeParse(candidate);
   if (!parsed.success) return null;
 
-  for (let length = parsed.data.files.length; length >= 0; length--) {
-    const snapshot = {
-      ...parsed.data,
-      files: parsed.data.files.slice(0, length),
-      truncated: parsed.data.truncated || length !== parsed.data.files.length,
-    };
-    if (
-      new TextEncoder().encode(JSON.stringify(snapshot)).byteLength <= MAX_WORKTREE_CHANGES_BYTES
-    ) {
-      return snapshot;
+  const { files } = parsed.data;
+  const asSnapshot = (length: number, truncated: boolean): WorktreeChangesSnapshot => ({
+    ...parsed.data,
+    files: files.slice(0, length),
+    truncated,
+  });
+  const sizeOf = (value: unknown) => worktreeTextEncoder.encode(JSON.stringify(value)).byteLength;
+
+  const complete = asSnapshot(files.length, parsed.data.truncated);
+  if (sizeOf(complete) <= MAX_WORKTREE_CHANGES_BYTES) return complete;
+  if (files.length === 0) return null;
+
+  // Every shorter prefix reports `truncated: true`, and an array element serializes exactly
+  // like the standalone value, so one measurement of the file-less snapshot plus one per file
+  // sizes any prefix: the fixed part, the summed element bytes, and one comma per separator.
+  // The measurement already carries the four bytes of `truncated: true`, and `false` costs one
+  // byte more, which only the complete snapshot above can use.
+  const filelessBytes = sizeOf(asSnapshot(0, true));
+  const cumulativeBytes = [0];
+  let cumulative = 0;
+  for (const file of files) {
+    cumulative += sizeOf(file);
+    cumulativeBytes.push(cumulative);
+  }
+  const truncatedBytes = (length: number): number =>
+    filelessBytes + cumulativeBytes[length] + Math.max(length - 1, 0);
+
+  if (truncatedBytes(0) > MAX_WORKTREE_CHANGES_BYTES) return null;
+
+  let fitting = 0;
+  let exceeding = files.length - 1;
+  while (fitting < exceeding) {
+    const middle = Math.ceil((fitting + exceeding) / 2);
+    if (truncatedBytes(middle) <= MAX_WORKTREE_CHANGES_BYTES) {
+      fitting = middle;
+    } else {
+      exceeding = middle - 1;
     }
   }
 
-  return null;
+  return asSnapshot(fitting, true);
 }
 
 export const worktreeChangesSnapshotSchema = z.unknown().transform((value, context) => {
@@ -184,6 +287,7 @@ export const worktreeFileRecordSchema = z
     schemaVersion: z.literal(WORKTREE_FILE_SCHEMA_VERSION),
     revision: worktreeChangesRevisionSchema,
     path: worktreeChangesFileSchema.shape.path,
+    scope: worktreeChangesScopeSchema.optional(),
     diff: z.discriminatedUnion('status', [
       z
         .object({
@@ -227,21 +331,50 @@ export const worktreeFileRecordSchema = z
     'Worktree file record exceeds the size limit'
   );
 
+export const worktreeRecoverySchema = z
+  .object({
+    files: z
+      .array(
+        z
+          .object({
+            path: worktreeChangesFileSchema.shape.path,
+            status: worktreeChangesFileSchema.shape.status,
+            patch: z.string().optional(),
+          })
+          .strict()
+      )
+      .max(MAX_WORKTREE_CHANGES_FILES),
+  })
+  .strict()
+  .refine(
+    value => new Set(value.files.map(file => file.path)).size === value.files.length,
+    'Recovery paths must be unique'
+  )
+  .refine(
+    value =>
+      new TextEncoder().encode(JSON.stringify(value)).byteLength <= MAX_WORKTREE_CHANGES_BYTES,
+    'Worktree recovery exceeds the size limit'
+  );
+
+export type WorktreeRecovery = z.infer<typeof worktreeRecoverySchema>;
+
 export const worktreeSnapshotCaptureSchema = z
   .object({
     summary: worktreeChangesCaptureSchema,
     files: z.array(worktreeFileRecordSchema).max(MAX_WORKTREE_CHANGES_FILES),
+    recovery: worktreeRecoverySchema.optional(),
   })
   .strict()
   .refine(({ summary, files }) => {
     if (files.length !== summary.files.length) return false;
-    const listedFiles = new Map(summary.files.map(file => [file.path, file]));
+    const listedFiles = new Map(summary.files.map(file => [worktreeFileIdentity(file), file]));
     if (listedFiles.size !== summary.files.length) return false;
     const paths = new Set<string>();
     return files.every(file => {
-      const listed = listedFiles.get(file.path);
-      if (!listed || paths.has(file.path) || file.revision !== summary.revision) return false;
-      paths.add(file.path);
+      const identity = worktreeFileIdentity(file);
+      const listed = listedFiles.get(identity);
+      if (!listed || paths.has(identity) || file.revision !== summary.revision) return false;
+      paths.add(identity);
       return (
         file.content.status === 'unavailable' ||
         file.content.source === (listed.status === 'deleted' ? 'deleted-original' : 'current')
@@ -257,6 +390,7 @@ export const worktreeSnapshotCaptureSchema = z
 export const worktreeFileQuerySchema = z
   .object({
     path: worktreeChangesFileSchema.shape.path,
+    scope: worktreeChangesScopeSchema.optional(),
     expectedRevision: worktreeChangesRevisionSchema,
   })
   .strict();
@@ -287,6 +421,8 @@ export const getWorktreeFileOutputSchema = z.discriminatedUnion('status', [
 export type WorktreeChangesFile = z.infer<typeof worktreeChangesFileSchema>;
 export type WorktreeChangesCaptureRequest = z.infer<typeof worktreeChangesCaptureRequestSchema>;
 export type WorktreeChangesCapture = z.infer<typeof worktreeChangesCaptureSchema>;
+export type WorktreeChangesBaseRefFallback = z.infer<typeof worktreeChangesBaseRefFallbackSchema>;
+export type WorktreeChangesRemoteDivergence = z.infer<typeof worktreeChangesRemoteDivergenceSchema>;
 export type GetWorktreeChangesOutput = z.infer<typeof getWorktreeChangesOutputSchema>;
 export type RefreshWorktreeChangesOutput = z.infer<typeof refreshWorktreeChangesOutputSchema>;
 export type WorktreeFileOmissionReason = z.infer<typeof worktreeFileOmissionReasonSchema>;

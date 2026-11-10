@@ -13,14 +13,11 @@ import { CATALOG_JSON_PATH } from './catalog';
 import {
   SKILL_BYTE_LIMIT,
   SKILL_MD_PATH,
-  censusCatalog,
-  readCatalogRows,
+  censusAreas,
+  readCatalogPaths,
   renderCensus,
   renderSkill,
-  type SkillCatalogRow,
 } from './skill';
-
-const fixtureRow = (path: string, kind: string): SkillCatalogRow => ({ path, kind });
 
 /**
  * A real catalog row also carries a summary and tags. The fixtures carry
@@ -31,219 +28,81 @@ const SENTINEL_SUMMARY = 'Sentinel summary that must never reach the skill.';
 const SENTINEL_TAG = 'sentineltag';
 
 /** The catalog on disk is an object keyed by path; mirror that shape. */
-const catalogJson = (rows: SkillCatalogRow[]): string =>
+const catalogJson = (paths: string[]): string =>
   JSON.stringify(
     Object.fromEntries(
-      rows.map(row => [
-        row.path,
-        { kind: row.kind, summary: SENTINEL_SUMMARY, tags: [SENTINEL_TAG] },
-      ])
+      paths.map(path => [path, { kind: 'query', summary: SENTINEL_SUMMARY, tags: [SENTINEL_TAG] }])
     )
   );
 
 /** Minimal template: the census block plus a marker before it. */
 const TEMPLATE = 'HEADER\n\n{{CENSUS}}\n';
 
-/** Split a markdown row on unescaped pipes and drop the outer empty cells. */
-function cells(line: string): string[] {
-  const result: string[] = [];
-  let buffer = '';
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
-    if (char === '\\' && line[i + 1] === '|') {
-      buffer += '\\|';
-      i += 1;
-      continue;
-    }
-    if (char === '|') {
-      result.push(buffer);
-      buffer = '';
-      continue;
-    }
-    buffer += char;
-  }
-  result.push(buffer);
-  if (result.length >= 2 && result[0]?.trim() === '') result.shift();
-  if (result.length >= 1 && result[result.length - 1]?.trim() === '') result.pop();
-  return result;
-}
-
-const isSeparatorRow = (line: string): boolean => {
-  const trimmed = line.trim();
-  return /\|/.test(trimmed) && /-/.test(trimmed) && /^[\s|:-]+$/.test(trimmed);
-};
-
 describe('mcp-catalog skill', () => {
-  describe('censusCatalog', () => {
-    it('counts totals and the per-prefix query/mutation split', () => {
-      const census = censusCatalog([
-        fixtureRow('alpha.a', 'query'),
-        fixtureRow('alpha.b', 'mutation'),
-        fixtureRow('beta.c', 'query'),
-      ]);
-      expect(census.total).toBe(3);
-      expect(census.queries).toBe(2);
-      expect(census.mutations).toBe(1);
-      const alpha = census.prefixes.find(prefix => prefix.name === 'alpha');
-      expect(alpha).toMatchObject({ total: 2, queries: 1, mutations: 1 });
-      const beta = census.prefixes.find(prefix => prefix.name === 'beta');
-      expect(beta).toMatchObject({ total: 1, queries: 1, mutations: 0 });
-    });
-
-    it('orders prefixes by total descending then name ascending', () => {
-      const census = censusCatalog([
-        fixtureRow('a.x', 'query'),
-        fixtureRow('a.y', 'query'),
-        fixtureRow('b.z', 'query'),
-        fixtureRow('c.w', 'query'),
-        fixtureRow('c.v', 'query'),
-        fixtureRow('d.q', 'query'),
-      ]);
-      // a and c tie at 2 (a first), then b and d tie at 1 (b first).
-      expect(census.prefixes.map(prefix => prefix.name)).toEqual(['a', 'c', 'b', 'd']);
-    });
-
-    it('emits sub-areas only for prefixes with two or more buckets', () => {
-      const census = censusCatalog([
-        fixtureRow('alpha.direct', 'query'),
-        fixtureRow('alpha.one.a', 'query'),
-        fixtureRow('bar.only.x', 'query'),
-        fixtureRow('bar.only.y', 'mutation'),
-      ]);
-      const alpha = census.prefixes.find(prefix => prefix.name === 'alpha');
-      const bar = census.prefixes.find(prefix => prefix.name === 'bar');
-      // alpha has the direct bucket plus `alpha.one`; bar has a single bucket.
-      expect(alpha?.subAreas.map(subArea => subArea.label)).toEqual(['alpha', 'alpha.one']);
-      expect(bar?.subAreas).toEqual([]);
-    });
-
-    it('sorts sub-area rows by total descending then name ascending', () => {
-      const census = censusCatalog([
-        fixtureRow('alpha.big.a', 'query'),
-        fixtureRow('alpha.big.b', 'query'),
-        fixtureRow('alpha.small.c', 'mutation'),
-      ]);
-      expect(census.prefixes[0]?.subAreas).toEqual([
-        { label: 'alpha.big', total: 2 },
-        { label: 'alpha.small', total: 1 },
-      ]);
+  describe('censusAreas', () => {
+    it('collects the distinct first path segments, sorted alphabetically', () => {
+      expect(censusAreas(['beta.a', 'alpha.a', 'beta.b.c'])).toEqual(['alpha', 'beta']);
     });
   });
 
   describe('renderCensus', () => {
-    it('renders one counts-only table with the totals above it', () => {
-      const rendered = renderCensus(
-        censusCatalog([fixtureRow('alpha.a', 'query'), fixtureRow('alpha.b', 'query')])
-      );
-      expect(rendered).toContain(
-        '**2 procedures** — **2 queries**, **0 mutations** — under **1 prefixes**.'
-      );
-      expect(rendered).toContain('| Prefix | Procedures | Queries | Mutations |');
-      expect(rendered).toContain('| `alpha` | 2 | 2 | 0 |');
-    });
-
-    it('escapes a pipe in a path key so it cannot break the table', () => {
-      const rendered = renderCensus(censusCatalog([fixtureRow('al|pha.a', 'query')]));
-      expect(rendered).toContain('| `al\\|pha` | 1 | 1 | 0 |');
-    });
-
-    it('renders the direct bucket as (direct) and the rest as second segments', () => {
-      const rendered = renderCensus(
-        censusCatalog([fixtureRow('alpha.direct', 'query'), fixtureRow('alpha.one.a', 'query')])
-      );
-      expect(rendered).toContain('- `alpha.*` — 2: `(direct)` 1, `one` 1');
-    });
-
-    it('emits no sub-areas section when no prefix has two buckets', () => {
-      const rendered = renderCensus(
-        censusCatalog([fixtureRow('alpha.one.a', 'query'), fixtureRow('alpha.one.b', 'query')])
-      );
-      expect(rendered).not.toContain('### Sub-areas');
-    });
-
-    it('renders unpadded tables: exact separators and one-space content cells', () => {
-      const rendered = renderCensus(
-        censusCatalog([
-          fixtureRow('alpha.direct', 'query'),
-          fixtureRow('alpha.one.a', 'mutation'),
-          fixtureRow('beta.q', 'query'),
-        ])
-      );
-      for (const line of rendered.split('\n')) {
-        if (!line.trimStart().startsWith('|') || !line.trimEnd().endsWith('|')) continue;
-        if (isSeparatorRow(line)) {
-          for (const cell of cells(line.trim())) {
-            expect(['---', ':---', '---:', ':---:']).toContain(cell);
-          }
-          continue;
-        }
-        for (const cell of cells(line.trim())) {
-          if (cell.trim() === '') continue;
-          expect(cell.startsWith(' ') && cell.endsWith(' ')).toBe(true);
-          expect(cell.startsWith('  ')).toBe(false);
-          expect(cell.endsWith('  ')).toBe(false);
-        }
-      }
+    it('renders one bullet per area, with no counts', () => {
+      expect(renderCensus(['beta.b', 'alpha.a', 'alpha.b'])).toBe('- `alpha`\n- `beta`');
     });
   });
 
   describe('renderSkill', () => {
     it('is byte-identical across renders and independent of input order', () => {
-      const rows = [
-        fixtureRow('alpha.a', 'query'),
-        fixtureRow('alpha.b', 'mutation'),
-        fixtureRow('beta.c', 'query'),
-      ];
-      const json = catalogJson(rows);
+      const paths = ['alpha.a', 'alpha.b', 'beta.c'];
+      const json = catalogJson(paths);
       expect(renderSkill(json, TEMPLATE)).toBe(renderSkill(json, TEMPLATE));
-      expect(renderCensus(censusCatalog([...rows].reverse()))).toBe(
-        renderCensus(censusCatalog(rows))
+      expect(renderCensus([...paths].reverse())).toBe(renderCensus(paths));
+    });
+
+    it('adds exactly one line when a new area appears', () => {
+      expect(renderSkill(catalogJson(['alpha.a']), TEMPLATE)).toBe('HEADER\n\n- `alpha`\n');
+      expect(renderSkill(catalogJson(['alpha.a', 'beta.b']), TEMPLATE)).toBe(
+        'HEADER\n\n- `alpha`\n- `beta`\n'
       );
+    });
+
+    // The reason the census carries names and no counts: two pull requests that
+    // each add procedures inside existing areas must generate the same bytes, so
+    // the second one merges without a conflict on the generated file.
+    it('stays byte-identical when procedures are added inside existing areas', () => {
+      const before = renderSkill(catalogJson(['alpha.a', 'beta.b']), TEMPLATE);
+      const after = renderSkill(
+        catalogJson(['alpha.a', 'alpha.c.d', 'beta.b', 'beta.e']),
+        TEMPLATE
+      );
+      expect(after).toBe(before);
     });
 
     it('preserves dollar replacement sequences in path keys', () => {
-      const rows = [
-        fixtureRow('$&alpha.a', 'query'),
-        fixtureRow('$$5beta.b', 'mutation'),
-        fixtureRow("$'gamma.c", 'query'),
-      ];
-      const census = renderCensus(censusCatalog(rows));
+      const paths = ['$&alpha.a', '$$5beta.b', "$'gamma.c"];
+      const census = renderCensus(paths);
       // A replacer function is required: `$&`, `$$` and `$'` in the census would
       // otherwise be expanded by String.prototype.replace.
-      expect(renderSkill(catalogJson(rows), TEMPLATE)).toBe(`HEADER\n\n${census}\n`);
-    });
-
-    it('changes the census when a path is added, because the catalog drives it', () => {
-      const rows = [fixtureRow('alpha.a', 'query')];
-      const before = censusCatalog(rows);
-      const after = censusCatalog([...rows, fixtureRow('alpha.b', 'mutation')]);
-      expect(after.total).toBe(before.total + 1);
-      expect(after.prefixes[0]?.total).toBe(2);
-      expect(after.prefixes[0]?.mutations).toBe(1);
-      expect(renderSkill(catalogJson(rows), TEMPLATE)).not.toBe(
-        renderSkill(catalogJson([...rows, fixtureRow('alpha.b', 'mutation')]), TEMPLATE)
-      );
+      expect(renderSkill(catalogJson(paths), TEMPLATE)).toBe(`HEADER\n\n${census}\n`);
     });
 
     it('carries no catalog summary or tag into the skill', () => {
-      const rows = [fixtureRow('alpha.a', 'query'), fixtureRow('beta.b', 'mutation')];
+      const paths = ['alpha.a', 'beta.b'];
       // The sentinels ride in the catalog text, so this fails if the generator
       // ever copies a row's summary or tags into the skill again.
-      const rendered = renderSkill(catalogJson(rows), TEMPLATE);
+      const rendered = renderSkill(catalogJson(paths), TEMPLATE);
       expect(rendered).not.toContain(SENTINEL_SUMMARY);
       expect(rendered).not.toContain(SENTINEL_TAG);
     });
 
     it('contains no timestamp, year or sha-like token', () => {
-      const rendered = renderSkill(catalogJson([fixtureRow('alpha.a', 'query')]), TEMPLATE);
+      const rendered = renderSkill(catalogJson(['alpha.a']), TEMPLATE);
       expect(rendered).not.toMatch(/\b\d{4}\b/);
       expect(rendered).not.toMatch(/\b[0-9a-f]{40}\b/i);
     });
 
     it('throws when the template has no {{CENSUS}} token', () => {
-      expect(() =>
-        renderSkill(catalogJson([fixtureRow('alpha.a', 'query')]), '# no token\n')
-      ).toThrow(/CENSUS/);
+      expect(() => renderSkill(catalogJson(['alpha.a']), '# no token\n')).toThrow(/CENSUS/);
     });
 
     it('throws when the catalog has zero rows, naming the catalog as the source of truth', () => {
@@ -251,15 +110,15 @@ describe('mcp-catalog skill', () => {
       try {
         const empty = join(dir, 'empty.json');
         writeFileSync(empty, '{}\n');
-        expect(() => readCatalogRows(empty)).toThrow(/zero rows/);
-        expect(() => readCatalogRows(empty)).toThrow(/source of truth/);
+        expect(() => readCatalogPaths(empty)).toThrow(/zero rows/);
+        expect(() => readCatalogPaths(empty)).toThrow(/source of truth/);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
     });
 
     it('throws naming the path when the catalog cannot be read', () => {
-      expect(() => readCatalogRows(join(tmpdir(), 'mcp-skill-missing-catalog.json'))).toThrow(
+      expect(() => readCatalogPaths(join(tmpdir(), 'mcp-skill-missing-catalog.json'))).toThrow(
         /mcp-skill-missing-catalog\.json/
       );
     });
@@ -269,8 +128,8 @@ describe('mcp-catalog skill', () => {
       try {
         const broken = join(dir, 'broken.json');
         writeFileSync(broken, '{"alpha.a": ');
-        expect(() => readCatalogRows(broken)).toThrow(/not valid JSON/);
-        expect(() => readCatalogRows(broken)).toThrow(/source of truth/);
+        expect(() => readCatalogPaths(broken)).toThrow(/not valid JSON/);
+        expect(() => readCatalogPaths(broken)).toThrow(/source of truth/);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
@@ -288,18 +147,17 @@ describe('mcp-catalog skill', () => {
       expect(Buffer.byteLength(committed())).toBeLessThan(SKILL_BYTE_LIMIT);
     });
 
-    it('keeps the census to counts, with no gloss or tag column', () => {
+    it('lists the areas as bullets with no counts, so catalog edits do not churn it', () => {
       const skill = committed();
-      expect(skill).toContain('| Prefix | Procedures | Queries | Mutations |');
+      const areas = skill.slice(skill.indexOf('## Areas'));
+      const bullets = areas.split('\n').filter(line => line.startsWith('- '));
+      expect(bullets).toContain('- `organizations`');
+      expect(bullets).toContain('- `kiloclaw`');
+      // A name only: no count, no gloss, no second-segment breakdown.
+      expect(bullets.every(line => /^- `[A-Za-z][A-Za-z0-9]*`$/.test(line))).toBe(true);
+      expect(areas).not.toContain('| Prefix |');
       expect(skill).not.toContain('Gloss');
       expect(skill).not.toContain('Key terms');
-    });
-
-    it('lists the largest area’s sub-areas as one comma-joined line', () => {
-      const line = committed()
-        .split('\n')
-        .find(entry => entry.startsWith('- `organizations.*` — '));
-      expect(line).toMatch(/^- `organizations\.\*` — \d+: `kiloclaw` \d+, `cloudAgentNext` \d+, /);
     });
 
     it('declares discovery frontmatter naming the MCP triggers', () => {

@@ -40,11 +40,16 @@ export {
   MAX_IMPORT_ARCHIVE_EXPANDED_BYTES,
   MAX_IMPORT_ENCODED_LENGTH,
   MAX_IMPORT_ENTRY_EXPANDED_BYTES,
+  MAX_IMPORT_INSTRUCTION_GLOB_LENGTH,
+  MAX_IMPORT_INSTRUCTION_GLOB_WILDCARDS,
+  MAX_IMPORT_INSTRUCTION_GLOBS,
   MAX_IMPORT_REQUEST_BODY_BYTES,
   MAX_IMPORT_ZIP_BYTES,
 } from './limits';
 
 export { parseLocalConfigArchive } from './parse';
+
+export { LIMIT_UNIT, overLimitMessage, overTotalMessage } from '../contracts/limit-copy';
 
 export {
   IMPORT_CATEGORIES,

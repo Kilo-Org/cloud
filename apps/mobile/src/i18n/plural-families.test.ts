@@ -11,6 +11,7 @@ import {
   DYNAMIC_COUNTED_KEYS,
   findCountlessFamilies,
   findUnlistedDynamicCalls,
+  findUnparsedFiles,
   NO_AGREEMENT,
 } from '../../../../tools/i18n/check-plurals.mjs';
 import { i18n } from '@/i18n';
@@ -91,6 +92,137 @@ describe('plural families', () => {
       expect(collectDynamicCountedCalls(root)).toEqual(['dynamicKey']);
       // The fixture expression is not in the allowlist, so the audit reports it.
       expect(findUnlistedDynamicCalls(root)).toEqual(['dynamicKey']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('collects a counted key whose arguments carry comments', () => {
+    const root = mkdtempSync(join(tmpdir(), 'check-plurals-'));
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'fixture.ts'),
+      [
+        `t('fixture.blockCommentBeforeComma' /* one, two */, { count: 1 });`,
+        `t('fixture.blockCommentAfterComma', /* one, two */ { count: 2 });`,
+        "t('fixture.lineCommentAfterComma', // one, two\n  { count: 3 });",
+      ].join('\n')
+    );
+    try {
+      expect(collectCountedKeys(root)).toEqual([
+        'fixture.blockCommentAfterComma',
+        'fixture.blockCommentBeforeComma',
+        'fixture.lineCommentAfterComma',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reads counted options from property-key position only', () => {
+    const root = mkdtempSync(join(tmpdir(), 'check-plurals-'));
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'fixture.ts'),
+      [
+        // A value that names a count is not an option of the call.
+        `t('fixture.valueOnly', { label: count });`,
+        `t('fixture.arrowBody', { format: () => count });`,
+        `t('fixture.nestedArgument', { label: fmt({ count }) });`,
+        // A literal key in key position is an option, quoted or not.
+        `t('fixture.quotedKey', { 'count': n });`,
+        // Shorthand names the option too.
+        `t('fixture.shorthand', { count });`,
+        `t('fixture.trailingShorthand', { label: x, count });`,
+        // A bracket or a name inside a string value stays text.
+        `t('fixture.stringBracket', { label: 'a (b', count: 1 });`,
+        `t('fixture.stringComma', { label: 'a, count: x' });`,
+      ].join('\n')
+    );
+    try {
+      expect(collectCountedKeys(root)).toEqual([
+        'fixture.quotedKey',
+        'fixture.shorthand',
+        'fixture.stringBracket',
+        'fixture.trailingShorthand',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reads a counted call through its type argument', () => {
+    const root = mkdtempSync(join(tmpdir(), 'check-plurals-'));
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'fixture.ts'),
+      "t<'fixture.typed'>('fixture.typed', { count: 1 });\n"
+    );
+    try {
+      expect(collectCountedKeys(root)).toEqual(['fixture.typed']);
+      expect(collectDynamicCountedCalls(root)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('counts a call whose options hold a nested template but not a computed key', () => {
+    const root = mkdtempSync(join(tmpdir(), 'check-plurals-'));
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'fixture.ts'),
+      [
+        `t(\`fixture.nestedTemplate\`, { count: 1, label: \`\${x}\` });`,
+        // A computed key named like an option is an expression, not an option:
+        // the object has no plain `count` key, so the call is not counted.
+        `t('fixture.computedKey', { [count]: 3 });`,
+      ].join('\n')
+    );
+    try {
+      expect(collectCountedKeys(root)).toEqual(['fixture.nestedTemplate']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('names a dynamic template key by the source it is written as', () => {
+    const root = mkdtempSync(join(tmpdir(), 'check-plurals-'));
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'fixture.ts'), `t(\`\${prefix}.count\`, { count: 1 });\n`);
+    try {
+      expect(collectCountedKeys(root)).toEqual([]);
+      expect(collectDynamicCountedCalls(root)).toEqual([`\`\${prefix}.count\``]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not count a call written in a comment or a string', () => {
+    const root = mkdtempSync(join(tmpdir(), 'check-plurals-'));
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'fixture.ts'),
+      [
+        `// t('fixture.inComment', { count: 1 });`,
+        'const s = "t(\'fixture.inString\', { count: 1 })";',
+      ].join('\n')
+    );
+    try {
+      expect(collectCountedKeys(root)).toEqual([]);
+      expect(collectDynamicCountedCalls(root)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reports a source file the parser refuses', () => {
+    const root = mkdtempSync(join(tmpdir(), 'check-plurals-'));
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'broken.ts'), 'const a = ;\n');
+    try {
+      expect(findUnparsedFiles(root)).toEqual([
+        expect.stringMatching(/broken\.ts:1: cannot parse: /),
+      ]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

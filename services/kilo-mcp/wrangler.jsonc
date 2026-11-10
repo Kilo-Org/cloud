@@ -60,6 +60,20 @@
     },
   ],
 
+  // Per-account allowance for the semantic half of search (the Workers AI
+  // embedding and the Vectorize query). Each search request spends one unit
+  // keyed by the grant's Kilo user; once the allowance is spent, search answers
+  // from the bundled catalog and runs neither binding call. Counts are
+  // approximate and per Cloudflare location, as the binding documents. 60
+  // requests a minute covers an agent's search-then-call loop.
+  "ratelimits": [
+    {
+      "name": "SEARCH_RATE_LIMITER",
+      "namespace_id": "1005",
+      "simple": { "limit": 60, "period": 60 },
+    },
+  ],
+
   "vars": {
     "WEB_BASE_URL": "https://app.kilo.ai",
     // Server-side PostHog capture key (src/analytics.ts). It is a worker var,
@@ -116,6 +130,16 @@
       // Local dev/tests simulate KV; `wrangler dev` ignores the id. Deploying
       // the dev worker remotely (not done by CI) would need a real dev id.
       "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+      // Bindings are not inherited by an environment, so the search allowance
+      // is declared here too; the dev worker keeps its own counter namespace
+      // by using a separate id.
+      "ratelimits": [
+        {
+          "name": "SEARCH_RATE_LIMITER",
+          "namespace_id": "1006",
+          "simple": { "limit": 60, "period": 60 },
+        },
+      ],
     },
   },
 }

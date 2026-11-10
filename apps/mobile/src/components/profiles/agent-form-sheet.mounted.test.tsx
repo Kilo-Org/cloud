@@ -1,29 +1,50 @@
-import { createElement } from 'react';
+/* eslint-disable max-lines -- keeps the mounted agent form behavior and refused-save scroll checks together */
+import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
-import { type AgentSource } from '@/components/profiles/profile-agents-model';
+import { type AgentSource, PERMISSION_TOOLS } from '@/components/profiles/profile-agents-model';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   useAvailableModels: vi.fn(),
   onSave: vi.fn(),
   onClose: vi.fn(),
   confirm: vi.fn(),
+  scrollTo: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: (...args: unknown[]) => h.useAvailableModels(...args),
   thinkingEffortLabel: (variant: string) => variant,
 }));
-vi.mock('react-native', () => ({
-  View: 'View',
-  ScrollView: 'ScrollView',
-  Pressable: 'Pressable',
-  Switch: 'Switch',
-}));
+// A mock factory is hoisted above this file's imports, so React comes in through a
+// dynamic import there (the pattern this suite's harness already relies on). The
+// stub exposes `scrollTo`, which a refused Save drives, so tests can observe it.
+vi.mock('react-native', async () => {
+  const {
+    createElement: createMockElement,
+    forwardRef,
+    useImperativeHandle,
+  } = await import('react');
+  return {
+    Platform: { OS: 'ios' },
+    useColorScheme: () => 'light',
+    View: 'View',
+    Pressable: 'Pressable',
+    Switch: 'Switch',
+    ScrollView: forwardRef(function ScrollViewStub(
+      props: { children?: ReactNode },
+      ref: Ref<{ scrollTo: typeof h.scrollTo }>
+    ) {
+      useImperativeHandle(ref, () => ({ scrollTo: h.scrollTo }));
+      return createMockElement('ScrollView', props, props.children);
+    }),
+  };
+});
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -99,6 +120,22 @@ function pressDone(root: ReactTestInstance): void {
   });
 }
 
+/** A host stub's layout prop, read from the renderer's untyped props. */
+type ContainerLayout = (event: { nativeEvent: { layout: { y: number } } }) => void;
+
+/** Register a field block's offset the way the scroll view reports it after layout. */
+function layoutField(root: ReactTestInstance, label: string, y: number): void {
+  const handler: unknown = findField(root, label).props.containerOnLayout;
+  if (typeof handler !== 'function') {
+    throw new TypeError(`field ${label} has no layout handler`);
+  }
+  // Checked to be a function above; the stub props carry no call signature.
+  const onLayout = handler as ContainerLayout;
+  act(() => {
+    onLayout({ nativeEvent: { layout: { y } } });
+  });
+}
+
 function pressCancel(root: ReactTestInstance): void {
   const onCancel = voidHandler(findOne(root, 'SheetHeader').props.onCancel);
   act(() => {
@@ -139,9 +176,14 @@ function modelOption(id: string, variants: string[]) {
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountSheet(agent: AgentSource | null, existingSlugs: readonly string[] = []) {
+function mountSheet(
+  agent: AgentSource | null,
+  existingSlugs: readonly string[] = [],
+  draftScope?: string
+) {
   return renderWithProviders(
     createElement(AgentFormSheet, {
+      draftScope,
       agent,
       existingSlugs,
       organizationId: undefined,
@@ -159,6 +201,7 @@ function mountSheet(agent: AgentSource | null, existingSlugs: readonly string[] 
 describe('AgentFormSheet parity fields', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     h.useAvailableModels.mockReturnValue({ models: [] });
   });
 
@@ -167,7 +210,30 @@ describe('AgentFormSheet parity fields', () => {
 
     expect(findField(renderer.root, 'Max steps')).toBeTruthy();
     expect(findField(renderer.root, 'Temperature')).toBeTruthy();
-    expect(findField(renderer.root, 'top_p')).toBeTruthy();
+    expect(findField(renderer.root, 'Top P')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('reaches a screen reader as one named switch per tool, with no duplicate text stop', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    for (const tool of PERMISSION_TOOLS) {
+      // The visible name is painted only: the switch beside it carries the name
+      // and the state, so a screen reader meets each tool once.
+      const labelTexts = findAll(renderer.root, 'Text').filter(
+        node => node.props.children === tool
+      );
+      expect(labelTexts).toHaveLength(1);
+      expect(labelTexts[0]?.props).toMatchObject({
+        accessible: false,
+        importantForAccessibility: 'no',
+      });
+      const switches = findAll(renderer.root, 'Switch').filter(
+        node => node.props.accessibilityLabel === tool
+      );
+      expect(switches).toHaveLength(1);
+    }
 
     unmount();
   });
@@ -205,7 +271,7 @@ describe('AgentFormSheet parity fields', () => {
 
     changeText(renderer.root, 'Max steps', '50');
     changeText(renderer.root, 'Temperature', '0.2');
-    changeText(renderer.root, 'top_p', '0.95');
+    changeText(renderer.root, 'Top P', '0.95');
     pressDone(renderer.root);
 
     expect(h.onSave).toHaveBeenCalledTimes(1);
@@ -256,6 +322,23 @@ describe('AgentFormSheet parity fields', () => {
     unmount();
   });
 
+  it('refuses an over-long description inline and keeps the sheet open', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    changeText(renderer.root, 'Agent description', 'd'.repeat(2001));
+    layoutField(renderer.root, 'Agent name', 120);
+    layoutField(renderer.root, 'Agent description', 280);
+    pressDone(renderer.root);
+
+    expect(h.onSave).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Agent description').props.error).toBe(
+      'Use at most 2000 characters'
+    );
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 268, animated: true });
+
+    unmount();
+  });
+
   it('closes without asking when nothing changed', async () => {
     const { renderer, unmount } = await mountSheet(agentSource());
 
@@ -263,6 +346,20 @@ describe('AgentFormSheet parity fields', () => {
 
     expect(h.onClose).toHaveBeenCalledTimes(1);
     expect(h.confirm).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('refuses a non-ASCII slug with the character rule instead of calling it empty', async () => {
+    const { renderer, unmount } = await mountSheet(agentSource());
+
+    changeText(renderer.root, 'Agent slug', 'नमूना एजेंट स्लग');
+    pressDone(renderer.root);
+
+    expect(h.onSave).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Agent slug').props.error).toBe(
+      'Slug must start with a lowercase ASCII letter and use only ASCII lowercase letters, digits, and dashes, up to 50 characters'
+    );
 
     unmount();
   });
@@ -305,5 +402,90 @@ describe('AgentFormSheet parity fields', () => {
     expect(h.onClose).not.toHaveBeenCalled();
 
     unmount();
+  });
+});
+
+describe('AgentFormSheet refused save', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.useAvailableModels.mockReturnValue({ models: [] });
+  });
+
+  it('scrolls to the slug field when it is missing', async () => {
+    const { renderer, unmount } = await mountSheet(null);
+    layoutField(renderer.root, 'Agent slug', 240);
+
+    pressDone(renderer.root);
+
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 228, animated: true });
+    expect(h.onSave).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('scrolls to the name field when the slug is valid but the name is not', async () => {
+    const { renderer, unmount } = await mountSheet(null);
+    changeText(renderer.root, 'Agent slug', 'quality-review');
+    layoutField(renderer.root, 'Agent name', 520);
+
+    pressDone(renderer.root);
+
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 508, animated: true });
+    expect(h.onSave).not.toHaveBeenCalled();
+
+    unmount();
+  });
+});
+
+describe('AgentFormSheet draft', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.useAvailableModels.mockReturnValue({ models: [] });
+  });
+
+  it('restores every typed field when the sheet is mounted again', async () => {
+    const first = await mountSheet(null, [], 'profiles:agents:test');
+    changeText(first.renderer.root, 'Agent slug', 'portal-agent');
+    changeText(first.renderer.root, 'Agent name', 'Portal agent');
+    changeText(first.renderer.root, 'System prompt', 'You answer the portal');
+    changeText(first.renderer.root, 'Max steps', '12');
+    first.unmount();
+
+    const second = await mountSheet(null, [], 'profiles:agents:test');
+    expect(findField(second.renderer.root, 'Agent slug').props.defaultValue).toBe('portal-agent');
+    expect(findField(second.renderer.root, 'Agent name').props.defaultValue).toBe('Portal agent');
+    expect(findField(second.renderer.root, 'System prompt').props.defaultValue).toBe(
+      'You answer the portal'
+    );
+    expect(findField(second.renderer.root, 'Max steps').props.defaultValue).toBe('12');
+    second.unmount();
+  });
+
+  it('saves the restored draft, so a remount never loses what was typed', async () => {
+    const first = await mountSheet(null, [], 'profiles:agents:test');
+    changeText(first.renderer.root, 'Agent slug', 'portal-agent');
+    changeText(first.renderer.root, 'Agent name', 'Portal agent');
+    first.unmount();
+
+    const second = await mountSheet(null, [], 'profiles:agents:test');
+    pressDone(second.renderer.root);
+
+    expect(h.onSave.mock.calls[0]?.[0]).toMatchObject({
+      slug: 'portal-agent',
+      name: 'Portal agent',
+    });
+    second.unmount();
+  });
+
+  it('a mount without a draft scope starts empty again', async () => {
+    const first = await mountSheet(null, [], 'profiles:agents:test');
+    changeText(first.renderer.root, 'Agent slug', 'portal-agent');
+    first.unmount();
+
+    const second = await mountSheet(null);
+    expect(findField(second.renderer.root, 'Agent slug').props.defaultValue).toBe('');
+    second.unmount();
   });
 });

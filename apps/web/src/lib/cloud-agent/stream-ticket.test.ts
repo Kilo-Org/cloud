@@ -6,10 +6,14 @@ type DecodedTicket = jwt.JwtPayload & {
   type: string;
   purpose?: string;
   userId: string;
-  cloudAgentSessionId: string;
+  cloudAgentSessionId?: string;
+  worktreeId?: string;
   organizationId?: string;
   port?: number;
 };
+
+const WORKSPACE_ID = 'workspace_12345678-1234-4234-9234-123456789abc';
+const WORKTREE_ID = 'worktree_12345678-1234-4234-9234-123456789abc';
 
 function decode(ticket: string): DecodedTicket {
   return jwt.decode(ticket) as DecodedTicket;
@@ -20,7 +24,7 @@ describe('signPreviewTicket', () => {
     const before = Math.floor(Date.now() / 1000);
     const { ticket, expiresAt } = signPreviewTicket({
       userId: 'user_1',
-      cloudAgentSessionId: 'workspace_1',
+      cloudAgentSessionId: WORKSPACE_ID,
       port: 5173,
     });
 
@@ -29,7 +33,7 @@ describe('signPreviewTicket', () => {
     expect(decoded.purpose).toBe('preview');
     expect(decoded.port).toBe(5173);
     expect(decoded.userId).toBe('user_1');
-    expect(decoded.cloudAgentSessionId).toBe('workspace_1');
+    expect(decoded.cloudAgentSessionId).toBe(WORKSPACE_ID);
     expect(decoded.organizationId).toBeUndefined();
     expect(decoded.exp).toBeDefined();
     expect(decoded.iat).toBeDefined();
@@ -51,15 +55,52 @@ describe('signPreviewTicket', () => {
     ).toThrow();
   });
 
+  it('mints a worktree target without a session id', () => {
+    const { ticket } = signPreviewTicket({
+      userId: 'user_1',
+      worktreeId: WORKTREE_ID,
+      port: 5173,
+    });
+
+    const decoded = decode(ticket);
+    expect(decoded.aud).toBe('cloud-agent-preview');
+    expect(decoded.purpose).toBe('preview');
+    expect(decoded.port).toBe(5173);
+    expect(decoded.worktreeId).toBe(WORKTREE_ID);
+    expect(decoded.cloudAgentSessionId).toBeUndefined();
+  });
+
   it('carries the organization when one is supplied', () => {
     const { ticket } = signPreviewTicket({
       userId: 'user_1',
-      cloudAgentSessionId: 'workspace_1',
+      cloudAgentSessionId: WORKSPACE_ID,
       port: 5173,
       organizationId: 'org_1',
     });
 
     expect(decode(ticket).organizationId).toBe('org_1');
+  });
+
+  it('returns an expiry that equals the token expiry when the clock advances during signing', () => {
+    let calls = 0;
+    const now = jest.spyOn(Date, 'now').mockImplementation(() => {
+      calls += 1;
+      return 1_800_000_000_000 + calls * 1_000;
+    });
+
+    try {
+      const { ticket, expiresAt } = signPreviewTicket({
+        userId: 'user_1',
+        cloudAgentSessionId: WORKSPACE_ID,
+        port: 5173,
+      });
+
+      const decoded = decode(ticket);
+      expect(decoded.exp! - decoded.iat!).toBe(60);
+      expect(expiresAt).toBe(decoded.exp);
+    } finally {
+      now.mockRestore();
+    }
   });
 });
 

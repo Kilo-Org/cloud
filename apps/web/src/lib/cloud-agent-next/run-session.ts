@@ -5,6 +5,7 @@ import { createWebSocketManager } from './websocket-manager';
 import { createEventProcessor, type ProcessedMessage } from './processor';
 import type { CloudAgentEvent, StreamError } from './event-types';
 import type { CloudAgentNextClient } from './cloud-agent-client';
+import { InsufficientCreditsError } from './cloud-agent-client';
 import type { PrepareSessionInput } from './cloud-agent-client';
 
 /**
@@ -70,6 +71,13 @@ export function extractTextFromMessage(message: ProcessedMessage): string {
     .trim();
 }
 
+/**
+ * User-facing reply used on every chat surface when the payer's balance fails
+ * the worker-side minimum and no session is started.
+ */
+export const INSUFFICIENT_CREDITS_RESPONSE =
+  'Cannot start a Cloud Agent session: this account or organization has insufficient credits. ' +
+  'Add credits in Kilo Code settings and try again.';
 /** Input for runSessionToCompletion */
 export type RunSessionInput = {
   /** An already-constructed CloudAgentNextClient (caller owns auth / balance-check config). */
@@ -130,6 +138,14 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
     sessionId = prepared.cloudAgentSessionId;
     kiloSessionId = prepared.kiloSessionId;
   } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      console.error(`${logPrefix} Insufficient credits: session not started`);
+      return {
+        response: INSUFFICIENT_CREDITS_RESPONSE,
+        hasError: true,
+        statusMessages,
+      };
+    }
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`${logPrefix} Error preparing session:`, msg, error);
     return {
@@ -153,6 +169,20 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
     });
     streamUrl = initiated.streamUrl;
   } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      console.error(`${logPrefix} Insufficient credits: session not started`);
+      // The session record exists at this point; release it promptly with a
+      // best-effort cleanup so it does not linger until periodic expiry.
+      if (sessionId) {
+        void Promise.resolve(client.cleanupSession?.(sessionId)).catch(() => {});
+      }
+      return {
+        response: INSUFFICIENT_CREDITS_RESPONSE,
+        sessionId,
+        hasError: true,
+        statusMessages,
+      };
+    }
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`${logPrefix} Error initiating session:`, msg, error);
     return {

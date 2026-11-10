@@ -1,41 +1,69 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Switch, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { briefingMoney } from './briefing-card';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
+import { briefingMoney } from '@/lib/agent-briefing-format';
 import {
   briefingEstimateUnavailableKey,
-  parseBriefingSafeguards,
+  parseBriefingSafeguardInput,
 } from '@/lib/agent-briefing-state';
+import { formatNumber } from '@/lib/format';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
 
 type ContextPreference = BriefingPreferences['contexts'][number];
 
+/**
+ * Six decimals cover a whole second (1/60 min) and a single microdollar. No
+ * grouping, so the value the field shows parses back without an ambiguous
+ * group separator.
+ */
+const SAFEGUARD_INPUT_FORMAT: Intl.NumberFormatOptions = {
+  maximumFractionDigits: 6,
+  useGrouping: false,
+};
+
+/**
+ * A disclosure names the limit to the nearest hundredth of a minute, so a
+ * duration that is not a whole number of minutes reads as `0.13`, not as the
+ * full quotient. Locale formatting supplies the decimal separator.
+ */
+const SAFEGUARD_DISCLOSURE_FORMAT: Intl.NumberFormatOptions = { maximumFractionDigits: 2 };
+
 export function BriefingContextSettings({
   preference,
   defaultModel,
+  timezone,
 }: {
   readonly preference: ContextPreference;
   readonly defaultModel: string;
+  readonly timezone: string;
 }) {
   const { t, i18n } = useTranslation();
   const trpc = useTRPC();
   const client = useQueryClient();
   const offline = useOfflineBannerState();
+  const locale = i18n.resolvedLanguage ?? i18n.language;
   const organizationId = preference.context.organizationId ?? undefined;
   const catalog = useAvailableModels(organizationId);
   const [model, setModel] = useState(preference.model);
-  const duration = useRef(String(preference.maxDurationSeconds / 60));
-  const spend = useRef(String(preference.maxSpendMicrodollars / 1_000_000));
+  const duration = useRef(
+    formatNumber(preference.maxDurationSeconds / 60, locale, SAFEGUARD_INPUT_FORMAT)
+  );
+  const spend = useRef(
+    formatNumber(preference.maxSpendMicrodollars / 1_000_000, locale, SAFEGUARD_INPUT_FORMAT)
+  );
   const [limits, setLimits] = useState({
     maxDurationSeconds: preference.maxDurationSeconds,
     maxSpendMicrodollars: preference.maxSpendMicrodollars,
@@ -70,7 +98,7 @@ export function BriefingContextSettings({
                     item.context.id === preference.context.id
                       ? {
                           ...item,
-                          aiEnabled: input.aiEnabled,
+                          enabled: input.enabled,
                           model: input.model ?? item.model,
                           maxDurationSeconds: input.maxDurationSeconds ?? item.maxDurationSeconds,
                           maxSpendMicrodollars:
@@ -82,6 +110,9 @@ export function BriefingContextSettings({
               : data
         );
         return { previous };
+      },
+      onSuccess: () => {
+        announcingToast.success(t('agentBriefing.saved'));
       },
       onError: (_error, _input, context) => {
         for (const [key, value] of context?.previous ?? []) {
@@ -95,7 +126,7 @@ export function BriefingContextSettings({
     })
   );
   const updateLimits = () => {
-    const next = parseBriefingSafeguards(Number(duration.current), Number(spend.current));
+    const next = parseBriefingSafeguardInput(duration.current, spend.current, locale);
     setValid(next !== null);
     if (next !== null) {
       setLimits(next);
@@ -117,7 +148,7 @@ export function BriefingContextSettings({
       t('agentBriefing.paidDisclosure', {
         estimate: briefingMoney(quote.estimatedCostMicrodollars, i18n.language),
         maximum: briefingMoney(quote.maximumCostMicrodollars, i18n.language),
-        minutes: quote.maxDurationSeconds / 60,
+        minutes: formatNumber(quote.maxDurationSeconds / 60, locale, SAFEGUARD_DISCLOSURE_FORMAT),
       }),
       [
         { text: t('common.cancel'), style: 'cancel' },
@@ -126,7 +157,9 @@ export function BriefingContextSettings({
           onPress: () => {
             update.mutate({
               organizationId,
-              aiEnabled: true,
+              enabled: true,
+              timezone,
+              language: locale,
               model,
               ...limits,
               estimateToken: quote.estimateToken,
@@ -139,20 +172,26 @@ export function BriefingContextSettings({
   return (
     <View className="gap-4 rounded-2xl border border-border bg-card p-4">
       <Text className="font-semibold">
-        {t('agentBriefing.contextSettings', { context: contextName })}
+        {t('agentBriefing.scheduledContextSettings', { context: contextName })}
       </Text>
-      <Text className="text-sm text-muted-foreground">{t('agentBriefing.aiHint')}</Text>
+      <Text className="text-sm text-muted-foreground">
+        {t('agentBriefing.scheduledContextHint')}
+      </Text>
       <View className="flex-row items-center justify-between gap-3">
-        <Text className="min-w-0 flex-1 text-sm">{t('agentBriefing.aiOptIn')}</Text>
+        <Text className="min-w-0 flex-1 text-sm">{t('agentBriefing.scheduledContextEnabled')}</Text>
         <Switch
-          value={preference.aiEnabled}
+          value={preference.enabled}
           disabled={offline || update.isPending}
-          accessibilityLabel={t('agentBriefing.contextSettings', { context: contextName })}
+          accessibilityLabel={t('agentBriefing.scheduledContextEnabled')}
+          accessibilityState={{
+            checked: preference.enabled,
+            disabled: offline || update.isPending,
+          }}
           onValueChange={next => {
             if (next) {
               void enable();
             } else {
-              update.mutate({ organizationId, aiEnabled: false });
+              update.mutate({ organizationId, enabled: false, timezone, language: locale });
             }
           }}
         />
@@ -163,6 +202,9 @@ export function BriefingContextSettings({
         options={catalog.models}
         isLoading={catalog.isLoading}
         disabled={offline || update.isPending}
+        // The brief's context stores a model slug only, so the picker must not
+        // offer a thinking effort it would have to drop.
+        acceptsVariant={false}
         onSelect={id => {
           setModel(id);
         }}
@@ -208,7 +250,9 @@ export function BriefingContextSettings({
             updateLimits();
           }}
         />
-        <Text className="text-xs text-muted-foreground">{t('agentBriefing.safeguardHint')}</Text>
+        <Text className="text-xs text-muted-foreground">
+          {t('agentBriefing.snapshotSafeguards')}
+        </Text>
         {!valid ? (
           <Text className="text-sm text-destructive">{t('agentBriefing.invalidSafeguards')}</Text>
         ) : null}
@@ -229,6 +273,7 @@ export function BriefingContextSettings({
         <Button
           variant="ghost"
           size="sm"
+          className={STATE_ACTION_CLASS}
           onPress={() => {
             void estimate.refetch();
           }}
@@ -249,7 +294,7 @@ export function BriefingContextSettings({
           void enable();
         }}
       >
-        <Text>{t(preference.aiEnabled ? 'common.save' : 'agentBriefing.enable')}</Text>
+        <Text>{t(preference.enabled ? 'common.save' : 'agentBriefing.enable')}</Text>
       </Button>
     </View>
   );

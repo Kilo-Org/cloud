@@ -1,6 +1,7 @@
 import 'server-only';
 import { DISCORD_BOT_TOKEN } from '@kilocode/web-shared/lib/config.server';
 import { captureException } from '@sentry/nextjs';
+import { sanitizeForDelimiters } from '@/lib/bot/platforms/shared';
 import { buildDiscordApiUrl, parseDiscordSnowflake } from './discord-id';
 
 export type DiscordEventContext = {
@@ -219,14 +220,14 @@ export function formatDiscordConversationContextForPrompt(
 
   if (context.channel) {
     const channelLabel = context.channel.name
-      ? `#${context.channel.name}`
+      ? `#${sanitizeForDelimiters(context.channel.name)}`
       : getChannelTypeLabel(context.channel.type);
 
     lines.push(
       `- Channel: ${channelLabel} (id: ${context.channel.id}, type: ${getChannelTypeLabel(context.channel.type)})`
     );
     if (context.channel.topic) {
-      lines.push(`- Channel topic: ${truncate(context.channel.topic, 400)}`);
+      lines.push(`- Channel topic: ${sanitizeForDelimiters(truncate(context.channel.topic, 400))}`);
     }
   } else {
     lines.push(`- Channel: (id: ${eventContext.channelId})`);
@@ -235,17 +236,17 @@ export function formatDiscordConversationContextForPrompt(
   if (context.recentMessages.length > 0) {
     lines.push('\nRecent channel messages (most recent first):');
     for (const msg of context.recentMessages) {
-      const userPart = msg.userId ? `<@${msg.userId}>` : 'unknown-user';
-      const text = truncate(msg.content.replace(/\s+/g, ' ').trim(), 400);
+      const userPart = msg.userId ? `<@${sanitizeForDelimiters(msg.userId)}>` : 'unknown-user';
+      const text = sanitizeForDelimiters(truncate(msg.content.replace(/\s+/g, ' ').trim(), 400));
       if (text) {
-        lines.push(`- [${msg.timestamp}] ${userPart}: ${text}`);
+        lines.push(`- [${sanitizeForDelimiters(msg.timestamp)}] ${userPart}: ${text}`);
       }
     }
   }
 
   if (context.errors.length > 0) {
     lines.push('\nNote: Some Discord context could not be fetched:');
-    lines.push(...context.errors.map(e => `- ${e}`));
+    lines.push(...context.errors.map(e => `- ${sanitizeForDelimiters(e)}`));
   }
 
   return lines.join('\n');

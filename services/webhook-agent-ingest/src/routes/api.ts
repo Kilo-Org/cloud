@@ -1,3 +1,4 @@
+import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
 /**
  * API Routes (internal API key auth required)
  *
@@ -17,7 +18,11 @@ import { clampRequestLimit } from '../util/constants';
 import { decodeUserIdFromPath, encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 import { sandboxAllocationSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import { validateCronExpression, enforcesMinimumInterval, isValidTimezone } from '../util/cron';
-import type { ScheduledInvocationResult } from '../dos/TriggerDO';
+import type {
+  ScheduledInvocationResult,
+  TriggerConfigResponse,
+  TriggerConfig,
+} from '../dos/TriggerDO';
 
 const api = new Hono<HonoContext>();
 
@@ -192,7 +197,8 @@ export const TriggerConfigInput = z
       .optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
-    profileId: z.string().uuid().optional(),
+    profileId: z.string().uuid().nullable().optional(),
+    bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().optional(),
     condenseOnComplete: z.boolean().optional(),
     webhookAuth: z
@@ -206,6 +212,16 @@ export const TriggerConfigInput = z
     cronTimezone: z.string().max(50).optional().default('UTC'),
   })
   .superRefine((data, ctx) => {
+    if (
+      data.bodySchema != null &&
+      (data.targetType !== 'cloud_agent' || data.activationMode !== 'webhook')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Body validation is only available for Cloud Agent webhooks',
+        path: ['bodySchema'],
+      });
+    }
     if (data.executionUserId !== undefined) {
       if (data.targetType !== 'cloud_agent') {
         ctx.addIssue({
@@ -279,12 +295,6 @@ export const TriggerConfigInput = z
           message: 'model is required for cloud_agent triggers',
           path: ['model'],
         });
-      if (!data.profileId)
-        ctx.addIssue({
-          code: 'custom',
-          message: 'profileId is required for cloud_agent triggers',
-          path: ['profileId'],
-        });
     }
     if (data.targetType === 'kiloclaw_chat') {
       if (!data.kiloclawInstanceId)
@@ -321,7 +331,8 @@ export const TriggerConfigUpdateInput = z
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
     promptTemplate: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
-    profileId: z.string().uuid().optional(),
+    profileId: z.string().uuid().nullable().optional(),
+    bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().nullable().optional(),
     condenseOnComplete: z.boolean().nullable().optional(),
     webhookAuth: z
@@ -441,7 +452,7 @@ async function handleGetTrigger(c: RouteContext, namespace: string, triggerId: s
   try {
     const config = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.getConfigForResponse(),
+      async (stub): Promise<TriggerConfigResponse | null> => await stub.getConfigForResponse(),
       'getConfigForResponse'
     );
 
@@ -519,12 +530,19 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
     // First check if trigger exists
     const existingConfig = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.getConfig(),
+      async (stub): Promise<TriggerConfig | null> => await stub.getConfig(),
       'getConfig'
     );
 
     if (!existingConfig) {
       return c.json(resError('Trigger not found'), 404);
+    }
+
+    if (
+      updates.bodySchema != null &&
+      (existingConfig.targetType !== 'cloud_agent' || existingConfig.activationMode !== 'webhook')
+    ) {
+      return c.json(resError('Body validation is only available for Cloud Agent webhooks'), 400);
     }
 
     if (existingConfig.targetType === 'kiloclaw_chat' && updates.sandboxAllocation !== undefined) {
@@ -552,7 +570,7 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
     // Return updated config (without encryptedSecrets)
     const updatedConfig = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.getConfigForResponse(),
+      async (stub): Promise<TriggerConfigResponse | null> => await stub.getConfigForResponse(),
       'getConfigForResponse'
     );
 

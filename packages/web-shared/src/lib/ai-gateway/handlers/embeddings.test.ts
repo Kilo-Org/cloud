@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import type { User } from '@kilocode/db/schema';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
@@ -14,21 +14,33 @@ import {
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { decide, type DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { captureException } from '@sentry/nextjs';
 
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureException: jest.fn(),
+}));
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
   after: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server');
-jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn(),
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
+  decide: jest.fn(),
+  releaseDecideLease: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn(),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
   getEmbeddingProvider: jest.fn(),
-}));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-  isFreeModel: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
   mapModelIdToVercel: jest.fn(),
@@ -129,6 +141,48 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     }
   });
 
+  it('never forwards a custom LLM id for anonymous callers', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    await insertCustomLlmForTest('stealth/embedding-custom-model');
+    try {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(
+        makeRequest({ model: 'stealth/embedding-custom-model' })
+      );
+
+      expect(response.status).toBe(404);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    } finally {
+      await deleteCustomLlmForTest('stealth/embedding-custom-model');
+    }
+  });
+
+  it('returns the authorization response for a refused account', async () => {
+    const authFailedResponse = NextResponse.json(
+      { success: false as const, error: 'Access denied (R1)' },
+      { status: 403 }
+    );
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse,
+      authorizationRefused: true,
+      organizationId: undefined,
+    });
+
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      makeRequest({ model: 'acme/embedding-free:free' })
+    );
+
+    expect(response).toBe(authFailedResponse);
+    expect(response.status).toBe(403);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
   it('forwards personal request privacy with other provider fields', async () => {
     const provider = { data_collection: 'deny', zdr: true, only: ['openai'], sort: 'latency' };
     const { handleEmbeddingsRequest } = await import('./embeddings');
@@ -183,6 +237,24 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(getUpstreamBody().provider).toEqual({ only: ['azure'], data_collection: 'allow' });
   });
 
+  it('limits organization BYOK keys to the allowed providers', async () => {
+    setUserAuth({ data_collection: 'allow', provider_allow_list: ['openai'] });
+    const eligibleProviderRoutes = new Set(['openai']);
+    mockedResolveModelDecision.mockResolvedValue({
+      ...allowedModelDecision,
+      decision: { allowed: true, eligibleProviderRoutes },
+    });
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    await handleEmbeddingsRequest(makeRequest());
+
+    expect(mockedGetEmbeddingProvider).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.anything(),
+      expect.any(String),
+      eligibleProviderRoutes
+    );
+  });
+
   it('preserves request zdr through group provider overrides', async () => {
     setUserAuth({ data_collection: 'allow', provider_allow_list: ['openai', 'azure'] });
     mockedResolveModelDecision.mockResolvedValue({
@@ -200,6 +272,25 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       data_collection: 'allow',
       zdr: false,
     });
+  });
+
+  it('answers malformed JSON without reporting the body to Sentry', async () => {
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      new NextRequest('http://localhost:3000/api/gateway/embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+        body: '{"model": "secret-prompt',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Malformed JSON',
+      error_type: ProxyErrorType.invalid_request,
+    });
+    expect(captureException).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it.each([{ data_collection: 'invalid' }, { zdr: 'true' }])(
@@ -246,6 +337,46 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
       is_free: false,
       user_byok: true,
+    });
+  });
+
+  describe('bouncer wiring', () => {
+    function verdict(fields: Partial<DecideResponse>): DecideResponse {
+      return { enforced: false, flags: [], spendWatch: false, ...fields } as DecideResponse;
+    }
+
+    it('rejects an enforced verdict before the upstream call', async () => {
+      jest.mocked(decide).mockResolvedValue(verdict({ enforced: true, code: 'restricted' }));
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(decide).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares the decide id with usage and does not attribute the billing fallback feature', async () => {
+      jest.mocked(decide).mockResolvedValue(verdict({ spendWatch: true }));
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(decide).toHaveBeenCalledTimes(1);
+      const decided = jest.mocked(decide).mock.calls[0]?.[0];
+      expect(decided).toMatchObject({ tier: 'paid', accountId: 'user:user-123', ip: '127.0.0.1' });
+      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].bouncer).toEqual({
+        requestId: decided?.requestId,
+        occurredAt: expect.any(Date),
+        accountId: 'user:user-123',
+        clientIp: '127.0.0.1',
+        clientAttributed: false,
+        requestedLogprobs: false,
+        samples: null,
+        promptSimHash: null,
+        spendWatch: true,
+      });
     });
   });
 });

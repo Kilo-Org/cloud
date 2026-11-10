@@ -53,6 +53,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
   Platform: { OS: 'ios' },
+  Keyboard: { dismiss: vi.fn() },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -60,7 +61,10 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
-vi.mock('./tool-card-image-cache', () => ({ useToolCardImageUri: () => undefined }));
+vi.mock('./tool-card-image-cache', () => ({
+  isToolCardImagePending: () => false,
+  useToolCardImageUri: () => undefined,
+}));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));
@@ -249,19 +253,22 @@ function radio(
   root: TestRenderer.ReactTestInstance,
   label: string
 ): TestRenderer.ReactTestInstance | undefined {
+  // This suite mounts iOS, where `radioItemA11y` renders each choice as a
+  // button whose state rides the selected trait.
   return findByType(root, 'Pressable').find(
     node =>
-      propOf(node, 'accessibilityRole') === 'radio' && propOf(node, 'accessibilityLabel') === label
+      propOf(node, 'accessibilityRole') === 'button' &&
+      propOf(node, 'accessibilityState') !== undefined &&
+      propOf(node, 'accessibilityLabel') === label
   );
 }
 
-// A React Native radio reports its current choice through `checked`, not
-// `selected` — see `radioItemA11y` in @/components/ui/radio-group.
+/** Whether the radio row for `label` is the current choice. */
 function radioSelected(root: TestRenderer.ReactTestInstance, label: string): boolean {
   const state = propOf(radio(root, label), 'accessibilityState') as
-    | { checked: boolean }
+    | { selected: boolean }
     | undefined;
-  return state?.checked === true;
+  return state?.selected === true;
 }
 
 function pressRadio(root: TestRenderer.ReactTestInstance, label: string): void {
@@ -525,6 +532,39 @@ describe('PartDetailSheet mounted', () => {
     });
     expect(radiogroup(renderer.root)).toBeTruthy();
     expect(radioSelected(renderer.root, 'Scroll')).toBe(true);
+
+    await unmount(renderer);
+  });
+
+  it('keeps the text mode while the sheet leaves and resets it when the dismissal reports', async () => {
+    const part = makeBashPart('bash-1', 'echo hi');
+    const renderer = await mountSheet(part);
+    await act(async () => {
+      await Promise.resolve();
+      pressRadio(renderer.root, 'Scroll');
+    });
+    expect(radioSelected(renderer.root, 'Scroll')).toBe(true);
+
+    // visible -> false only starts the native leave animation: the sheet
+    // keeps showing this presentation's mode while it leaves.
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(sheetElement(part, false));
+    });
+    expect(radioSelected(renderer.root, 'Scroll')).toBe(true);
+
+    await act(async () => {
+      await Promise.resolve();
+      (propOf(findByType(renderer.root, 'BottomSheet')[0], 'onDismiss') as () => void)();
+    });
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    // The next presentation starts fresh on Wrap.
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(sheetElement(part, true));
+    });
+    expect(radioSelected(renderer.root, 'Wrap')).toBe(true);
 
     await unmount(renderer);
   });

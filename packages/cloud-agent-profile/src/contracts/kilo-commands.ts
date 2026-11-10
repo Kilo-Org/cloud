@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { overLimitMessage } from './limit-copy';
 
 export const MAX_PROFILE_KILO_COMMANDS = 50;
 export const MAX_KILO_COMMAND_NAME_LENGTH = 50;
@@ -11,6 +12,18 @@ export const BUILTIN_COMMAND_NAMES = new Set([
   'local-review',
   'local-review-uncommitted',
 ]);
+
+/**
+ * Ids a client may send to reorder a profile's commands: a command list can
+ * never hold more than the profile bound, and repeating an id makes the
+ * requested position ambiguous.
+ */
+export const kiloCommandReorderIdsSchema = z
+  .array(z.uuid())
+  .max(MAX_PROFILE_KILO_COMMANDS)
+  .refine(ids => new Set(ids).size === ids.length, {
+    message: 'Command IDs must be unique',
+  });
 
 const COMMAND_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
 
@@ -34,7 +47,7 @@ export const kiloCommandCreateInputSchema = z.object({
     .min(1)
     .max(
       MAX_KILO_COMMAND_TEMPLATE_LENGTH,
-      `Command template exceeds ${MAX_KILO_COMMAND_TEMPLATE_LENGTH} bytes`
+      overLimitMessage('Command template', MAX_KILO_COMMAND_TEMPLATE_LENGTH)
     ),
   agent: z.string().optional(),
   model: z.string().optional(),
@@ -49,7 +62,7 @@ export const kiloCommandUpdateInputSchema = z.object({
     .min(1)
     .max(
       MAX_KILO_COMMAND_TEMPLATE_LENGTH,
-      `Command template exceeds ${MAX_KILO_COMMAND_TEMPLATE_LENGTH} bytes`
+      overLimitMessage('Command template', MAX_KILO_COMMAND_TEMPLATE_LENGTH)
     )
     .optional(),
   agent: z.string().nullable().optional(),

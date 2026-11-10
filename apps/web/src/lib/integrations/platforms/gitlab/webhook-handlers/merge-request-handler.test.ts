@@ -63,7 +63,7 @@ import {
   shouldSkipUpdateForMergeCommit,
 } from '@/lib/integrations/platforms/gitlab/webhook-handlers/merge-request-handler';
 import type { MergeRequestPayload } from '@/lib/integrations/platforms/gitlab/webhook-schemas';
-import type { PlatformIntegration } from '@kilocode/db/schema';
+import type { GitLabWebhookIntegration } from '@/lib/integrations/db/platform-integrations';
 
 function mergeRequestPayload(overrides: Partial<MergeRequestPayload> = {}): MergeRequestPayload {
   return {
@@ -106,16 +106,19 @@ function mergeRequestPayload(overrides: Partial<MergeRequestPayload> = {}): Merg
   } as MergeRequestPayload;
 }
 
-function platformIntegration(overrides: Partial<PlatformIntegration> = {}): PlatformIntegration {
+function platformIntegration(
+  overrides: Partial<GitLabWebhookIntegration> = {}
+): GitLabWebhookIntegration {
   return {
     id: '8b2ff443-8396-4b07-99ae-7015789da7dd',
     owned_by_organization_id: 'f2aa36d7-9c1b-4db9-ae4a-a4492618796d',
     owned_by_user_id: null,
     kilo_requester_user_id: null,
-    platform_installation_id: '98765',
-    metadata: { gitlab_instance_url: 'https://gitlab.example.com' },
+    integration_status: 'active',
+    suspended_at: null,
+    webhook_secret: 'test-webhook-secret',
     ...overrides,
-  } as PlatformIntegration;
+  };
 }
 
 beforeEach(() => {
@@ -198,7 +201,10 @@ describe('handleMergeRequestCodeReview', () => {
     mockGetBotUserId.mockResolvedValue('bot-user-1');
     mockGetAgentConfigForOwner.mockResolvedValue({
       is_enabled: true,
-      config: {},
+      config: {
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [123],
+      },
     });
     mockCancelSupersededReviewsForPR.mockResolvedValue([
       {
@@ -309,7 +315,10 @@ describe('handleMergeRequestCodeReview', () => {
     mockGetBotUserId.mockResolvedValue('bot-user-1');
     mockGetAgentConfigForOwner.mockResolvedValue({
       is_enabled: true,
-      config: {},
+      config: {
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [123],
+      },
     });
     mockFindActiveReviewsForPR.mockResolvedValue(['review-1']);
     mockIsMergeCommit.mockResolvedValue(true);
@@ -329,7 +338,10 @@ describe('handleMergeRequestCodeReview', () => {
     mockGetBotUserId.mockResolvedValue('bot-user-1');
     mockGetAgentConfigForOwner.mockResolvedValue({
       is_enabled: true,
-      config: {},
+      config: {
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [123],
+      },
     });
     mockFindActiveReviewsForPR.mockResolvedValue(['review-1', 'review-2']);
     mockCancelActiveCodeReviewsById.mockResolvedValue([
@@ -394,7 +406,10 @@ describe('handleMergeRequestCodeReview', () => {
     mockGetBotUserId.mockResolvedValue('bot-user-1');
     mockGetAgentConfigForOwner.mockResolvedValue({
       is_enabled: true,
-      config: {},
+      config: {
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [123],
+      },
     });
     mockFindActiveReviewsForPR.mockResolvedValue(['review-1', 'review-2']);
     mockUpdateReviewHeadShaAndCheckRun.mockRejectedValue(new Error('unique conflict'));
@@ -412,5 +427,93 @@ describe('handleMergeRequestCodeReview', () => {
     expect(mockSetCommitStatus).not.toHaveBeenCalled();
     expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
     expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('does not review a project outside the selection when the stored config says "all"', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {
+        repository_selection_mode: 'all',
+        selected_repository_ids: [],
+      },
+    });
+
+    const response = await handleMergeRequestCodeReview(
+      mergeRequestPayload(),
+      platformIntegration()
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
+  });
+
+  it('does not review a project outside the selection when the stored mode is missing', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+
+    const response = await handleMergeRequestCodeReview(
+      mergeRequestPayload(),
+      platformIntegration()
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
+  });
+
+  it('reviews a manually added project when the stored config says "all"', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {
+        repository_selection_mode: 'all',
+        selected_repository_ids: [],
+        manually_added_repositories: [
+          { id: 123, name: 'widgets', full_name: 'acme/widgets', private: false },
+        ],
+      },
+    });
+
+    const response = await handleMergeRequestCodeReview(
+      mergeRequestPayload(),
+      platformIntegration()
+    );
+
+    expect(response.status).toBe(202);
+    expect(mockCreateCodeReview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repoFullName: 'acme/widgets',
+        platformProjectId: 123,
+      })
+    );
+  });
+
+  it('reviews a project in the selection when the stored config says "all"', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {
+        repository_selection_mode: 'all',
+        selected_repository_ids: [123],
+      },
+    });
+
+    const response = await handleMergeRequestCodeReview(
+      mergeRequestPayload(),
+      platformIntegration()
+    );
+
+    expect(response.status).toBe(202);
+    expect(mockCreateCodeReview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repoFullName: 'acme/widgets',
+        platformProjectId: 123,
+      })
+    );
   });
 });

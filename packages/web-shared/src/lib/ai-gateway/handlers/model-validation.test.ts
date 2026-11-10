@@ -6,6 +6,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { handleModelValidationRequest } from './model-validation';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -16,10 +17,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  listUsableCustomRouters: jest.fn(),
+}));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetDirectByokModelsForUser = jest.mocked(getDirectByokModelsForUser);
+const mockedListUsableCustomRouters = jest.mocked(listUsableCustomRouters);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -57,6 +62,7 @@ describe('POST /api/openrouter/models/validate', () => {
     } as never);
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [makeModel('available/model')] });
     mockedGetDirectByokModelsForUser.mockResolvedValue([]);
+    mockedListUsableCustomRouters.mockResolvedValue([]);
   });
 
   test('confirms a Kilo-eligible catalog model', async () => {
@@ -68,6 +74,12 @@ describe('POST /api/openrouter/models/validate', () => {
       adminOnly: false,
       expectedAudience: KILO_GATEWAY_AUDIENCE,
     });
+  });
+
+  test('validates against the catalog for the request country', async () => {
+    await handleModelValidationRequest(request('available/model', { 'x-vercel-ip-country': 'CU' }));
+
+    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU' });
   });
 
   test('does not expose details for an unavailable model', async () => {
@@ -115,6 +127,23 @@ describe('POST /api/openrouter/models/validate', () => {
     });
   });
 
+  test('returns a service failure when a personal router cannot be loaded', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'router-owner' },
+      organizationId: null,
+      authFailedResponse: null,
+    } as never);
+    mockedListUsableCustomRouters.mockRejectedValue(new Error('database unavailable'));
+
+    const response = await handleModelValidationRequest(request('kilo-auto/custom/efficient'));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Failed to validate model',
+      message: 'Error from model catalog',
+    });
+  });
+
   test('rejects an invalid body without reading a catalog', async () => {
     const response = await handleModelValidationRequest(
       new NextRequest('http://localhost:3000/api/openrouter/models/validate', {
@@ -124,6 +153,27 @@ describe('POST /api/openrouter/models/validate', () => {
     );
 
     expect(response.status).toBe(400);
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
     expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+  });
+
+  test('rejects malformed JSON before authentication or catalog reads', async () => {
+    const response = await handleModelValidationRequest(
+      new NextRequest('http://localhost:3000/api/openrouter/models/validate', {
+        method: 'POST',
+        body: '{not json',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid JSON body' });
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+  });
+
+  test('matches the trimmed model ID', async () => {
+    const response = await handleModelValidationRequest(request('  available/model  '));
+
+    await expect(response.json()).resolves.toEqual({ valid: true });
   });
 });

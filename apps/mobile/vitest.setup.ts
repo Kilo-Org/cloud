@@ -1,5 +1,14 @@
 import { vi } from 'vitest';
 
+// The live system font scale comes from a local Expo module, and the test
+// projects have no Expo runtime (importing `expo` fails on its ESM resolution).
+// The value the app ships at a default scale is all a rendered tree needs; a
+// suite that needs another one can register its own mock, which wins.
+vi.mock('@/lib/font-scale/native-font-scale', () => ({
+  readLiveFontScale: () => null,
+  subscribeToFontScale: () => null,
+}));
+
 /** The subset of keyboard state the app reads through `useKeyboardState`. */
 type KeyboardStateSnapshot = {
   height: number;
@@ -53,6 +62,7 @@ vi.mock('react-native-keyboard-controller', () => ({
   KeyboardProvider: 'KeyboardProvider',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   KeyboardChatScrollView: 'KeyboardChatScrollView',
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   useKeyboardState: (selector?: (state: KeyboardStateSnapshot) => unknown) => {
     const snapshot: KeyboardStateSnapshot = {
       height: 0,
@@ -62,6 +72,11 @@ vi.mock('react-native-keyboard-controller', () => ({
     };
     return selector ? selector(snapshot) : snapshot;
   },
+}));
+
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  KeyboardMotionProvider: 'KeyboardMotionProvider',
+  useKeyboardMotionProgress: () => ({ value: 0 }),
 }));
 
 // `react-native-enriched-markdown` and `react-native-webview` are native views.

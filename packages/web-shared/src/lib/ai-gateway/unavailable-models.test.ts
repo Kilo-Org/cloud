@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   familyHasUnavailableFreeModel,
   getUnavailableModelIds,
@@ -23,9 +24,9 @@ beforeAll(async () => {
 });
 
 describe('unavailable models', () => {
-  test('combines the stored list with the hardcoded gemma free model', async () => {
+  test("always includes Auto Small's internal free fallback alongside the stored list", async () => {
     expect([...(await getUnavailableModelIds())]).toEqual([
-      'google/gemma-4-26b-a4b-it:free',
+      AUTO_SMALL_TARGET_MODELS.free,
       'apodex/apodex-1.1-mini:free',
       'google/gemma-4-31b-it:free',
       'qwen/qwen3.8-27b:free',
@@ -36,8 +37,8 @@ describe('unavailable models', () => {
   test('keeps exact matching for request rejection', async () => {
     expect(await isUnavailableModel('apodex/apodex-1.1-mini:free')).toBe(true);
     expect(await isUnavailableModel('apodex/apodex-1.1-mini')).toBe(false);
-    expect(await isUnavailableModel('google/gemma-4-26b-a4b-it:free')).toBe(true);
-    expect(await isUnavailableModel('google/gemma-4-26b-a4b-it')).toBe(false);
+    expect(await isUnavailableModel(AUTO_SMALL_TARGET_MODELS.free)).toBe(true);
+    expect(await isUnavailableModel(AUTO_SMALL_TARGET_MODELS.paid)).toBe(false);
     expect(await isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);
     expect(await isUnavailableModel('google/gemma-4-31b-it')).toBe(false);
     expect(await isUnavailableModel('qwen/qwen3.8-27b:free')).toBe(true);
@@ -83,7 +84,7 @@ describe('readUnavailableModelIds', () => {
     expect(await readUnavailableModelIds()).toEqual([]);
   });
 
-  test('reads only the unavailable_models column, without the hardcoded model', async () => {
+  test("reads only the stored list, without Auto Small's internal free fallback", async () => {
     await db.insert(ai_gateway_config).values({
       preferred_models: { models: ['provider/b'] },
       unavailable_models: { models: ['provider/c:free'] },

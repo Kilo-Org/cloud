@@ -3,8 +3,10 @@ export * from './session-live-summary';
 export * from './cloud-agent-session-scope';
 export * from './cloud-agent-worktree-scope';
 export * from './public-worktree-projection';
+export * from './session-share';
 export * from './message-id';
 export * from './kilo-session-id';
+export * from './cloud-agent-billing';
 
 export const DEFAULT_SESSION_TITLE_PATTERN =
   /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -12,3 +14,4 @@ export const DEFAULT_SESSION_TITLE_PATTERN =
 export function isDefaultSessionTitle(title: string | null | undefined): boolean {
   return title == null || DEFAULT_SESSION_TITLE_PATTERN.test(title);
 }
+export * from './kilo2-conversation';

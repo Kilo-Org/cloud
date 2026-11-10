@@ -7,12 +7,13 @@ import {
   agent_environment_profile_repo_bindings,
   agent_environment_profiles,
   cloud_agent_sandbox_allocation_settings,
+  cloud_agent_user_settings,
   type Organization,
   type User,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   getSandboxAllocationRequest,
   getSandboxAllocationProvider,
   SELECTABLE_SANDBOX_ALLOCATIONS,
@@ -86,6 +87,9 @@ describe('cloud-agent-settings router', () => {
   afterEach(async () => {
     const userIds = [ownerUser.id, memberUser.id, otherUser.id];
     await db
+      .delete(cloud_agent_user_settings)
+      .where(inArray(cloud_agent_user_settings.kilo_user_id, userIds));
+    await db
       .delete(cloud_agent_sandbox_allocation_settings)
       .where(
         or(
@@ -117,7 +121,9 @@ describe('cloud-agent-settings router', () => {
       const caller = await createCallerForUser(ownerUser.id);
       const profileId = await insertProfile({ type: 'user', id: ownerUser.id }, 'Personal');
 
-      await caller.cloudAgentSettings.setContextAllocation({ allocation: 'cloudflare-single' });
+      await caller.cloudAgentSettings.setContextAllocation({
+        allocation: 'cloudflare-containers-standard-3',
+      });
       await caller.cloudAgentSettings.setRepositorySettings({
         repoFullName: 'Acme/Web',
         platform: 'github',
@@ -127,7 +133,7 @@ describe('cloud-agent-settings router', () => {
 
       const result = await caller.cloudAgentSettings.get({});
       expect(result.canManage).toBe(true);
-      expect(result.contextAllocation).toBe('cloudflare-single');
+      expect(result.contextAllocation).toBe('cloudflare-containers-standard-3');
       expect(result.repositories).toEqual([
         {
           repositoryFullName: 'acme/web',
@@ -142,13 +148,52 @@ describe('cloud-agent-settings router', () => {
     test('does not leak another user settings', async () => {
       const ownerCaller = await createCallerForUser(ownerUser.id);
       await ownerCaller.cloudAgentSettings.setContextAllocation({
-        allocation: 'cloudflare-single',
+        allocation: 'cloudflare-containers-standard-3',
       });
 
       const otherCaller = await createCallerForUser(otherUser.id);
       const result = await otherCaller.cloudAgentSettings.get({});
       expect(result.contextAllocation).toBeNull();
       expect(result.repositories).toEqual([]);
+      expect(result.builtinAgents).toEqual({});
+    });
+
+    test('sets user-scoped built-in agent overrides', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const saved = await caller.cloudAgentSettings.setBuiltinAgents({
+        agents: {
+          explore: { model: 'kilo/anthropic/claude-haiku-4.5' },
+          compaction: { model: 'kilo/anthropic/claude-haiku-4.5' },
+          plan: { disable: true },
+        },
+      });
+
+      expect(saved.agents).toEqual({
+        explore: { model: 'kilo/anthropic/claude-haiku-4.5' },
+        compaction: { model: 'kilo/anthropic/claude-haiku-4.5' },
+        plan: { disable: true },
+      });
+      expect((await caller.cloudAgentSettings.get({})).builtinAgents).toEqual(saved.agents);
+    });
+
+    test('built-in agent overrides stay user-scoped in an organization context', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+      await caller.cloudAgentSettings.setBuiltinAgents({
+        agents: { explore: { model: 'kilo/anthropic/claude-haiku-4.5' } },
+      });
+
+      const result = await caller.cloudAgentSettings.get({ organizationId: organization.id });
+      expect(result.builtinAgents).toEqual({
+        explore: { model: 'kilo/anthropic/claude-haiku-4.5' },
+      });
+    });
+
+    test('rejects disabling an agent that Cloud Agent requires', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.cloudAgentSettings.setBuiltinAgents({ agents: { code: { disable: true } } })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
     test('rejects an allocation the owner is not offered', async () => {
@@ -158,7 +203,9 @@ describe('cloud-agent-settings router', () => {
       });
       const caller = await createCallerForUser(ownerUser.id);
       await expect(
-        caller.cloudAgentSettings.setContextAllocation({ allocation: 'cloudflare-single' })
+        caller.cloudAgentSettings.setContextAllocation({
+          allocation: 'cloudflare-containers-standard-3',
+        })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
@@ -182,7 +229,9 @@ describe('cloud-agent-settings router', () => {
       const caller = await createCallerForUser(ownerUser.id);
       const profileId = await insertProfile({ type: 'user', id: ownerUser.id }, 'Personal');
 
-      await caller.cloudAgentSettings.setContextAllocation({ allocation: 'cloudflare-single' });
+      await caller.cloudAgentSettings.setContextAllocation({
+        allocation: 'cloudflare-containers-standard-3',
+      });
       await caller.cloudAgentSettings.setContextAllocation({ allocation: null });
       expect((await caller.cloudAgentSettings.get({})).contextAllocation).toBeNull();
 
@@ -190,7 +239,7 @@ describe('cloud-agent-settings router', () => {
         repoFullName: 'acme/web',
         platform: 'github',
         profileId,
-        allocation: 'cloudflare-shared',
+        allocation: 'cloudflare-containers-standard-4',
       });
 
       await caller.cloudAgentSettings.setRepositorySettings({
@@ -207,11 +256,11 @@ describe('cloud-agent-settings router', () => {
         repoFullName: 'acme/web',
         platform: 'github',
         profileId: null,
-        allocation: 'cloudflare-shared',
+        allocation: 'cloudflare-containers-standard-4',
       });
       row = (await caller.cloudAgentSettings.get({})).repositories[0];
       expect(row.profileId).toBeNull();
-      expect(row.allocation).toBe('cloudflare-shared');
+      expect(row.allocation).toBe('cloudflare-containers-standard-4');
     });
 
     test('removing both empty fields deletes the whole row atomically', async () => {
@@ -222,7 +271,7 @@ describe('cloud-agent-settings router', () => {
         repoFullName: 'acme/web',
         platform: 'github',
         profileId,
-        allocation: 'cloudflare-shared',
+        allocation: 'cloudflare-containers-standard-4',
       });
 
       await caller.cloudAgentSettings.setRepositorySettings({
@@ -249,7 +298,7 @@ describe('cloud-agent-settings router', () => {
           repoFullName: 'acme/web',
           platform: 'github',
           profileId: foreignProfileId,
-          allocation: 'cloudflare-shared',
+          allocation: 'cloudflare-containers-standard-4',
         })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
@@ -317,7 +366,7 @@ describe('cloud-agent-settings router', () => {
       await expect(
         memberCaller.cloudAgentSettings.setContextAllocation({
           organizationId: organization.id,
-          allocation: 'cloudflare-single',
+          allocation: 'cloudflare-containers-standard-3',
         })
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 
@@ -326,7 +375,7 @@ describe('cloud-agent-settings router', () => {
           organizationId: organization.id,
           repoFullName: 'acme/web',
           platform: 'github',
-          allocation: 'cloudflare-single',
+          allocation: 'cloudflare-containers-standard-3',
         })
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 
@@ -340,26 +389,30 @@ describe('cloud-agent-settings router', () => {
 
       await ownerCaller.cloudAgentSettings.setContextAllocation({
         organizationId: organization.id,
-        allocation: 'cloudflare-single',
+        allocation: 'cloudflare-containers-standard-3',
       });
       expect(
         (await ownerCaller.cloudAgentSettings.get({ organizationId: organization.id }))
           .contextAllocation
-      ).toBe('cloudflare-single');
+      ).toBe('cloudflare-containers-standard-3');
     });
 
     test('personal and organization settings stay separate', async () => {
       const caller = await createCallerForUser(ownerUser.id);
-      await caller.cloudAgentSettings.setContextAllocation({ allocation: 'cloudflare-single' });
+      await caller.cloudAgentSettings.setContextAllocation({
+        allocation: 'cloudflare-containers-standard-3',
+      });
       await caller.cloudAgentSettings.setContextAllocation({
         organizationId: organization.id,
-        allocation: 'cloudflare-shared',
+        allocation: 'cloudflare-containers-standard-4',
       });
 
-      expect((await caller.cloudAgentSettings.get({})).contextAllocation).toBe('cloudflare-single');
+      expect((await caller.cloudAgentSettings.get({})).contextAllocation).toBe(
+        'cloudflare-containers-standard-3'
+      );
       expect(
         (await caller.cloudAgentSettings.get({ organizationId: organization.id })).contextAllocation
-      ).toBe('cloudflare-shared');
+      ).toBe('cloudflare-containers-standard-4');
     });
 
     test('rejects binding a profile owned by a different scope', async () => {
@@ -390,7 +443,7 @@ describe('cloud-agent-settings router', () => {
       await caller.cloudAgentSettings.setRepositorySettings({
         repoFullName: 'acme/allocation-only',
         platform: 'gitlab',
-        allocation: 'cloudflare-single',
+        allocation: 'cloudflare-containers-standard-3',
       });
 
       const rows = (await caller.cloudAgentSettings.get({})).repositories;
@@ -400,7 +453,7 @@ describe('cloud-agent-settings router', () => {
       ]);
       expect(rows[0]).toMatchObject({
         profileId: null,
-        allocation: 'cloudflare-single',
+        allocation: 'cloudflare-containers-standard-3',
       });
       expect(rows[1]).toMatchObject({ profileId, profileName: 'Bound', allocation: null });
     });
@@ -453,14 +506,14 @@ describe('cloud-agent-settings router', () => {
       const caller = await createCallerForUser(ownerUser.id);
       const result = await caller.cloudAgentSettings.get({});
       const gitlabVercel = result.capabilitiesByPlatform.gitlab.options.find(
-        option => getKiloSandboxAllocation(option.allocation) === 'vercel-small'
+        option => getSandboxAllocation(option.allocation) === 'vercel-small'
       );
       expect(gitlabVercel?.repositoryUnavailableReason).toBe(
         'Vercel sandboxes support GitHub repositories only'
       );
       expect(gitlabVercel?.unavailableReason).toBeUndefined();
       const githubVercel = result.capabilitiesByPlatform.github.options.find(
-        option => getKiloSandboxAllocation(option.allocation) === 'vercel-small'
+        option => getSandboxAllocation(option.allocation) === 'vercel-small'
       );
       expect(githubVercel?.repositoryUnavailableReason).toBeUndefined();
     });

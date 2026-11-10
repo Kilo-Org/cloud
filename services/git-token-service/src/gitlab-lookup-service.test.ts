@@ -28,10 +28,21 @@ describe('buildAuthorizedGitLabIntegrationQuery', () => {
   it('requires an active personal integration owned by the requesting user', () => {
     const query = buildAuthorizedGitLabIntegrationQuery(db, params).toSQL();
 
-    expect(query.sql).toMatch(/"platform_integrations"\."owned_by_user_id" = \$\d+/);
-    expect(query.sql).not.toMatch(/"platform_integrations"\."id" = \$\d+/);
+    expect(query.sql).toMatch(/"platform_integrations"."owned_by_user_id" = \$\d+/);
+    expect(query.sql).not.toMatch(/"platform_integrations"."id" = \$\d+/);
     expect(query.sql.toLowerCase()).not.toContain('limit');
     expect(query.params).toContain(params.userId);
+  });
+
+  it('resolves credentials only for an active integration', () => {
+    const query = buildAuthorizedGitLabIntegrationQuery(
+      db,
+      params,
+      '123e4567-e89b-12d3-a456-426614174011'
+    ).toSQL();
+
+    expect(query.sql).toMatch(/"platform_integrations"."integration_status" = \$\d+/);
+    expect(query.params).toContain('active');
   });
 
   it('requires organization ownership and membership for organization integrations', () => {

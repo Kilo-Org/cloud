@@ -132,7 +132,14 @@ jest.mock('@/components/ui/dialog', () => ({
   DialogHeader: ({ children }: { children: React.ReactNode }) => createElement('div', {}, children),
   DialogTitle: ({ children }: { children: React.ReactNode }) => createElement('h2', {}, children),
 }));
-jest.mock('@/components/cloud-agent/ProfileSelector', () => ({ ProfileSelector: () => null }));
+jest.mock('@/components/cloud-agent/ProfileSelector', () => ({
+  ProfileSelector: ({ onProfileSelect }: { onProfileSelect: (profileId: string) => void }) =>
+    createElement(
+      'button',
+      { type: 'button', onClick: () => onProfileSelect('replacement-profile') },
+      'select-profile'
+    ),
+}));
 jest.mock('@/components/cloud-agent/RepoProfileBindingsDialog', () => ({
   RepoProfileBindingsDialog: () => null,
 }));
@@ -150,7 +157,40 @@ jest.mock('@/components/shared/RepositoryCombobox', () => ({
       'select-repository'
     ),
 }));
-jest.mock('@/components/shared/ModeCombobox', () => ({ ModeCombobox: () => null }));
+jest.mock('@/components/shared/ModeCombobox', () => ({
+  LEGACY_MODE_OPTIONS: ['architect', 'code', 'ask', 'debug', 'orchestrator'].map(value => ({
+    value,
+    label: value,
+    description: value,
+  })),
+  ModeCombobox: ({
+    value,
+    onValueChange,
+    options,
+    disabled,
+  }: {
+    value: string;
+    onValueChange: (value: string) => void;
+    options: { value: string; label: string }[];
+    disabled?: boolean;
+  }) =>
+    createElement(
+      'div',
+      { 'data-agent-mode': value },
+      options.map(option =>
+        createElement(
+          'button',
+          {
+            key: option.value,
+            type: 'button',
+            disabled,
+            onClick: () => onValueChange(option.value),
+          },
+          option.label
+        )
+      )
+    ),
+}));
 jest.mock('@/components/shared/ModelCombobox', () => ({
   ModelCombobox: ({
     onValueChange,
@@ -378,6 +418,129 @@ describe('TriggerForm variants', () => {
     return { container: dom.container, onSubmit, allProps };
   }
 
+  it.each(['architect', 'code', 'ask', 'debug', 'orchestrator', 'plan', 'build'])(
+    'round-trips built-in agent %s without custom-agent guidance',
+    mode => {
+      const { container, onSubmit } = render({
+        initialData: { ...initialData(), mode },
+      });
+      expect(container.querySelector(`[data-agent-mode="${mode}"]`)).not.toBeNull();
+      expect(container.querySelector('#customAgentSlug')).toBeNull();
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode }));
+    }
+  );
+
+  it.each(['plan', 'build'])('resets custom-agent state when edit data changes to %s', mode => {
+    const { container, allProps, onSubmit } = render({
+      initialData: { ...initialData(), mode: 'foreman' },
+    });
+    act(() =>
+      root?.render(
+        createElement(TriggerForm, {
+          ...allProps,
+          initialData: { ...initialData(), mode },
+        })
+      )
+    );
+    expect(container.querySelector(`[data-agent-mode="${mode}"]`)).not.toBeNull();
+    expect(container.querySelector('#customAgentSlug')).toBeNull();
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode }));
+  });
+
+  it.each(['webhook', 'scheduled'] as const)(
+    'submits a custom agent with a selected profile for a %s trigger',
+    activationMode => {
+      const { container, onSubmit } = render({
+        mode: 'create',
+        initialData: initialData(undefined, activationMode),
+      });
+      click(container, 'Custom agent');
+      submit(container);
+      expect(onSubmit).not.toHaveBeenCalled();
+      const input = container.querySelector<HTMLInputElement>('#customAgentSlug');
+      if (!input) throw new Error('custom agent input missing');
+      expect(container.textContent).toContain('.kilo/agent/foreman.md');
+      expect(container.textContent).toContain('selected profile');
+      changeValue(input, 'foreman');
+      click(container, 'select-profile');
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'foreman',
+          profileId: 'replacement-profile',
+          activationMode,
+        })
+      );
+    }
+  );
+
+  it.each(['webhook', 'scheduled'] as const)(
+    'round-trips a saved custom agent when editing a %s trigger',
+    activationMode => {
+      const { container, onSubmit } = render({
+        initialData: { ...initialData(undefined, activationMode), mode: 'foreman' },
+      });
+      expect(container.querySelector('[data-agent-mode="__custom_agent__"]')).not.toBeNull();
+      expect(container.querySelector<HTMLInputElement>('#customAgentSlug')?.value).toBe('foreman');
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode: 'foreman' }));
+    }
+  );
+
+  it.each(['Foreman', 'bad_slug', '../foreman', '1foreman', 'custom', 'f'.repeat(51)])(
+    'rejects malformed or reserved custom agent %s',
+    slug => {
+      const { container, onSubmit } = render({});
+      click(container, 'Custom agent');
+      const input = container.querySelector<HTMLInputElement>('#customAgentSlug');
+      if (!input) throw new Error('custom agent input missing');
+      changeValue(input, slug);
+      expect(input.getAttribute('aria-invalid')).toBe('true');
+      expect(container.querySelector('#customAgentError')).not.toBeNull();
+      submit(container);
+      expect(onSubmit).not.toHaveBeenCalled();
+    }
+  );
+
+  it('switches a saved custom agent back to a built-in mode', () => {
+    const { container, onSubmit } = render({
+      initialData: { ...initialData(), mode: 'foreman' },
+    });
+    click(container, 'code');
+    expect(container.querySelector('#customAgentSlug')).toBeNull();
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode: 'code' }));
+  });
+
+  it('preserves the slug when reselecting Custom agent', () => {
+    const { container, onSubmit } = render({
+      initialData: { ...initialData(), mode: 'foreman' },
+    });
+    click(container, 'Custom agent');
+    expect(container.querySelector<HTMLInputElement>('#customAgentSlug')?.value).toBe('foreman');
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode: 'foreman' }));
+  });
+
+  it('resets the custom agent slug when edit data changes', () => {
+    const { container, allProps, onSubmit } = render({
+      initialData: { ...initialData(), mode: 'foreman' },
+    });
+    act(() =>
+      root?.render(
+        createElement(TriggerForm, {
+          ...allProps,
+          initialData: { ...initialData(), mode: 'reviewer-2' },
+        })
+      )
+    );
+    expect(container.querySelector<HTMLInputElement>('#customAgentSlug')?.value).toBe('reviewer-2');
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mode: 'reviewer-2' }));
+  });
+
   it('does not offer creator mode for personal triggers', () => {
     const { container } = render({ mode: 'create' });
     expect(container.textContent).not.toContain('Organization bot');
@@ -428,6 +591,44 @@ describe('TriggerForm variants', () => {
     click(container, 'Organization bot');
     submit(container);
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ runAsCreator: true }));
+  });
+
+  it.each(['profile-1', undefined])(
+    'preserves another creators profile setting %s without offering replacement profiles',
+    profileId => {
+      const { container, onSubmit } = render({
+        organizationId: 'org-1',
+        initialData: {
+          ...initialData('high', 'scheduled'),
+          executionUserId: 'another-creator',
+          profileId,
+        },
+      });
+
+      expect(container.textContent).not.toContain('select-profile');
+      expect(container.textContent).toContain(
+        profileId ? 'Saved creator profile (unchanged)' : 'Use defaults'
+      );
+      expect(container.textContent).toContain('Only the trigger creator can change');
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ profileId: undefined }));
+    }
+  );
+
+  it('allows the creator to change their personal profile', () => {
+    const { container, onSubmit } = render({
+      organizationId: 'org-1',
+      initialData: {
+        ...initialData('high', 'scheduled'),
+        executionUserId: 'oauth/github/creator',
+      },
+    });
+
+    click(container, 'select-profile');
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ profileId: 'replacement-profile' })
+    );
   });
 
   it.each(['webhook', 'scheduled'] as const)(

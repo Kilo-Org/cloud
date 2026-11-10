@@ -130,7 +130,7 @@ export const gitlabRouter = createTRPCRouter({
       return { success: false, message: 'Integration not found' };
     }
 
-    return gitlabService.disconnectGitLabIntegration(owner);
+    return gitlabService.disconnectGitLabIntegration(owner, ctx.user.id);
   }),
 
   refreshRepositories: baseProcedure
@@ -187,6 +187,13 @@ export const gitlabRouter = createTRPCRouter({
       );
     }),
 
+  /**
+   * List branches for one project of a connected GitLab integration. The
+   * project must be in the integration's cached repository set: the service
+   * resolves the integration for the caller's owner, refuses a project
+   * outside that set before any token is minted, and fetches with the
+   * integration's canonical project path.
+   */
   listBranches: baseProcedure
     .input(
       z.object({

@@ -1,4 +1,10 @@
-import { createElement, type ElementType, type ReactNode } from 'react';
+import {
+  createElement,
+  type ElementType,
+  type ReactNode,
+  useEffect,
+  useSyncExternalStore,
+} from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,6 +45,8 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Modal: (props: { visible?: boolean; children?: ReactNode }) =>
     props.visible ? createElement('Modal', null, props.children) : null,
   Platform: { OS: 'android' },
@@ -59,6 +67,34 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
+}));
+
+// The context picker closes itself when the owning screen loses focus, so the
+// suite can drive that blur through this store.
+const pickerFocus = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const subscribe = (notify: () => void) => {
+    listeners.add(notify);
+    return () => {
+      listeners.delete(notify);
+    };
+  };
+  return {
+    focused: true,
+    setFocused(next: boolean) {
+      pickerFocus.focused = next;
+      for (const notify of listeners) {
+        notify();
+      }
+    },
+    subscribe,
+  };
+});
+vi.mock('expo-router', () => ({
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    const focused = useSyncExternalStore(pickerFocus.subscribe, () => pickerFocus.focused);
+    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+  },
 }));
 
 const Text = 'Text' as ElementType;
@@ -85,6 +121,15 @@ function texts(ui: RenderWithProvidersResult) {
 function line(ui: RenderWithProvidersResult) {
   const nodes = ui.renderer.root.findAll(node => node.props.accessibilityHint === 'Select account');
   return nodes[0] as ReactTestInstance | undefined;
+}
+
+/** The selected state an account action button carries, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (typeof state !== 'object' || state === null || !('selected' in state)) {
+    return undefined;
+  }
+  return typeof state.selected === 'boolean' ? state.selected : undefined;
 }
 
 async function press(node: ReactTestInstance) {
@@ -122,8 +167,8 @@ describe('PrReviewContextLine', () => {
       key === ORGANIZATION_PERSONAL_STORAGE_KEY ? 'personal' : null
     );
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('For Personal'));
-    expect(texts(ui)).toContain('For Personal');
+    await waitFor(() => texts(ui).includes('For your personal account'));
+    expect(texts(ui)).toContain('For your personal account');
   });
 
   it('switches organization through the picker sheet', async () => {
@@ -137,9 +182,13 @@ describe('PrReviewContextLine', () => {
     }
     await press(control);
 
-    // The sheet is open: the picker rows render with radio roles.
+    // The sheet is open: every account row is an action button that reports
+    // whether it is the current account.
     const rows = ui.renderer.root.findAll(
-      node => node.type === Pressable && node.props.accessibilityRole === 'radio'
+      node =>
+        node.type === Pressable &&
+        node.props.accessibilityRole === 'button' &&
+        selectedState(node) !== undefined
     );
     expect(rows.map(row => row.props.accessibilityLabel)).toEqual(['Personal', 'Acme', 'Umbrella']);
 
@@ -155,7 +204,7 @@ describe('PrReviewContextLine', () => {
   it('renders plain text with no chevron when there is nothing to switch to', async () => {
     list.mockResolvedValue([]);
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('For Personal'));
+    await waitFor(() => texts(ui).includes('For your personal account'));
     expect(line(ui)).toBeUndefined();
     expect(ui.renderer.root.findAllByType(ChevronDown)).toHaveLength(0);
   });
@@ -199,7 +248,7 @@ describe('PrReviewContextLine', () => {
   it('offers a retry on the personal scope when the memberships query fails', async () => {
     list.mockRejectedValue(new Error('list failed'));
     const ui = await mount();
-    await waitFor(() => texts(ui).includes('For Personal'));
+    await waitFor(() => texts(ui).includes('For your personal account'));
     const retry = ui.renderer.root.find(node => node.props.accessibilityLabel === 'Retry');
     list.mockResolvedValue([ORG_A, ORG_B]);
     await press(retry);

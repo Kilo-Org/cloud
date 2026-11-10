@@ -10,6 +10,7 @@
 // the draft so the user can retry without retyping.
 
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -259,7 +260,7 @@ export function PrConversationCommentComposer({
       if (userId) {
         void clearDraft(userId, commentDraftKey);
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       // The mutation hook announces success for a11y; its settle invalidation
       // renders the posted comment in the discussion behind the sheet.
       onDismiss();

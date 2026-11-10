@@ -1,19 +1,14 @@
 'use client';
 
 /**
- * Database-Backed Session Atoms
+ * Session Atoms
  *
- * Jotai atoms for managing CLI sessions stored in the database (cli_sessions table).
- * These atoms enable cross-device session access, proper persistence, and integration
- * with the Kilocode ecosystem.
- *
- * Architecture:
- * - DB (cli_sessions + R2) = Source of truth for historical sessions
- * - IndexedDB (via jotai-minidb) = Client-side cache with message storage
- * - SSE stream = Real-time messages during active chat
+ * Jotai atoms and types for CLI sessions listed in the database (cli_sessions
+ * and cli_sessions_v2 tables). The database is the source of truth for
+ * historical sessions; nothing about a session is cached in the browser.
  *
  * ⚠️ CLIENT-SIDE ONLY ⚠️
- * This module uses IndexedDB which is only available in browser environments.
+ * These atoms use jotai and are only meaningful in the browser.
  * DO NOT import this file in:
  * - Server components
  * - API routes
@@ -21,8 +16,6 @@
  */
 
 import { atom } from 'jotai';
-import { MiniDb } from 'jotai-minidb';
-import type { StoredMessage, ResumeConfig } from '../types';
 import type { AssociatedPr } from '../utils/github-pr-link';
 import { extractRepoFromGitUrl } from '../utils/git-utils';
 
@@ -31,116 +24,13 @@ import { extractRepoFromGitUrl } from '../utils/git-utils';
 export { extractRepoFromGitUrl };
 
 /**
- * Organization context for a session
- */
-export type OrgContext = {
-  organizationId: string;
-};
-
-/**
- * Session data stored in IndexedDB
- * Contains all the information needed to display and resume a session
- */
-export type IndexedDbSessionData = {
-  /** Local session ID (UUID) - used as the key in IndexedDB */
-  sessionId: string;
-
-  /** Cloud agent session ID (agent_xxx format) - set when connected to cloud */
-  cloudAgentSessionId: string | null;
-
-  /**
-   * Session data version for format detection.
-   * - Version 1 (or undefined): Legacy CloudMessage[] format (for server-side integrations)
-   * - Version 2+: StoredMessage[] format (info + parts)
-   */
-  version?: number;
-
-  /**
-   * Messages in StoredMessage format.
-   * Each message has info (metadata) and parts (content array).
-   *
-   * Note: For version 1 sessions, this will contain CloudMessage[] and should
-   * be detected using isOldSessionFormat() before rendering.
-   */
-  messages: StoredMessage[];
-
-  /**
-   * High water mark - the DB's updated_at timestamp (in unix milliseconds) from the most recent
-   * session_synced SSE event or from initial session load. Used for staleness detection:
-   * if the DB's current updated_at is newer than this value, the session is stale.
-   */
-  highWaterMark: number;
-
-  /** Timestamp when this session was loaded from DB (client time, for debugging) */
-  loadedFromDbAt: string | null;
-
-  /** Session title (user-provided or auto-generated) */
-  title: string | null;
-
-  /** Git URL of the repository */
-  gitUrl: string | null;
-
-  /** Repository in owner/repo format */
-  repository: string | null;
-
-  /** Organization context if applicable */
-  orgContext: OrgContext | null;
-
-  /** Whether org context has been confirmed by user */
-  orgContextConfirmed: boolean;
-
-  /** Resume configuration for restarting the session */
-  resumeConfig: ResumeConfig | null;
-
-  /** When the session was created */
-  createdAt: string;
-
-  /** When the session was last updated */
-  updatedAt: string;
-
-  /** Last mode used for this session (from DB) */
-  lastMode: string | null;
-
-  /** Last model used for this session (from DB) */
-  lastModel: string | null;
-};
-
-/** Lazily initialized session store instance */
-let _sessionStore: MiniDb<IndexedDbSessionData> | null = null;
-
-/**
- * Get the IndexedDB store for cloud agent sessions.
- *
- * Uses jotai-minidb for reactive IndexedDB access with Jotai integration.
- * Sessions are keyed by their sessionId (UUID).
- *
- * The store is created lazily on first access to avoid SSR issues
- * (IndexedDB is only available in browser environments).
- *
- * @returns The MiniDb session store instance
- * @throws Error if called in server-side context
- */
-function getSessionStore(): MiniDb<IndexedDbSessionData> {
-  if (typeof window === 'undefined') {
-    throw new Error(
-      '[db-session-atoms] Cannot access IndexedDB store: not available in server-side context.'
-    );
-  }
-
-  if (!_sessionStore) {
-    _sessionStore = new MiniDb<IndexedDbSessionData>({
-      name: 'kilocode-cloud-sessions',
-    });
-  }
-
-  return _sessionStore;
-}
-
-/**
  * API session type - matches the shape returned by cli-sessions-router.list (V1)
  * Dates are returned as strings from the tRPC API
  */
 type ApiSession = {
+  latest_run_status?: 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted' | null;
+  latest_run_failure_kind?: 'failed' | 'system_interrupted' | null;
+  latest_run_terminal_at?: string | null;
   session_id: string;
   title: string | null;
   git_url: string | null;
@@ -150,6 +40,7 @@ type ApiSession = {
   created_on_platform: string | null;
   created_at: string;
   updated_at: string;
+  last_activity_at?: string | null;
   last_mode?: string | null;
   last_model?: string | null;
   version: number;
@@ -164,6 +55,9 @@ type ApiSession = {
  * Database session type - with Date objects for convenient manipulation
  */
 export type DbSession = {
+  latest_run_status?: ApiSession['latest_run_status'];
+  latest_run_failure_kind?: ApiSession['latest_run_failure_kind'];
+  latest_run_terminal_at?: ApiSession['latest_run_terminal_at'];
   session_id: string;
   title: string | null;
   git_url: string | null;
@@ -173,6 +67,7 @@ export type DbSession = {
   created_on_platform: string | null;
   created_at: Date;
   updated_at: Date;
+  last_activity_at?: Date | null;
   last_mode: string | null;
   last_model: string | null;
   version: number;
@@ -187,6 +82,9 @@ export type DbSession = {
  * V2 sidebar sessions include git/platform/org/parent/status fields from cli_sessions_v2.
  */
 export type DbSessionV2 = {
+  latest_run_status?: ApiSession['latest_run_status'];
+  latest_run_failure_kind?: ApiSession['latest_run_failure_kind'];
+  latest_run_terminal_at?: ApiSession['latest_run_terminal_at'];
   session_id: string;
   title: string | null;
   cloud_agent_session_id: string | null;
@@ -198,6 +96,7 @@ export type DbSessionV2 = {
   parent_session_id: string | null;
   created_at: Date;
   updated_at: Date;
+  last_activity_at?: Date | null;
   version: number;
   status: string | null;
   status_updated_at: Date | null;
@@ -222,6 +121,7 @@ export function apiSessionToDbSession(apiSession: ApiSession): DbSession | DbSes
     last_model: apiSession.last_model ?? null,
     created_at: new Date(apiSession.created_at),
     updated_at: new Date(apiSession.updated_at),
+    last_activity_at: apiSession.last_activity_at ? new Date(apiSession.last_activity_at) : null,
     status_updated_at: apiSession.status_updated_at ? new Date(apiSession.status_updated_at) : null,
     associatedPr: apiSession.associatedPr ?? null,
   };
@@ -275,85 +175,6 @@ export const recentSessionsAtom = atom(get => {
   if (isLoading) return [];
   return get(dbSessionsAtom);
 });
-
-/**
- * Current session's IndexedDB data (reactive)
- * This holds the full session data including messages from IndexedDB
- */
-const currentIndexedDbSessionAtom = atom<IndexedDbSessionData | null>(null);
-
-/**
- * Update org context in IndexedDB
- *
- * Called when user confirms or changes the organization context for a session.
- *
- * @param payload - Session ID, orgContext, and confirmation flag
- */
-export const updateOrgContextAtom = atom(
-  null,
-  async (
-    get,
-    set,
-    payload: {
-      sessionId: string;
-      orgContext: OrgContext | null;
-      orgContextConfirmed: boolean;
-    }
-  ): Promise<void> => {
-    const { sessionId, orgContext, orgContextConfirmed } = payload;
-
-    const currentSession = get(currentIndexedDbSessionAtom);
-    if (currentSession && currentSession.sessionId === sessionId) {
-      const updatedSession: IndexedDbSessionData = {
-        ...currentSession,
-        orgContext,
-        orgContextConfirmed,
-        updatedAt: new Date().toISOString(),
-      };
-      set(currentIndexedDbSessionAtom, updatedSession);
-    }
-
-    if (typeof window !== 'undefined') {
-      try {
-        const store = getSessionStore();
-        const existingData = get(store.item(sessionId));
-        if (existingData) {
-          const updatedData: IndexedDbSessionData = {
-            ...existingData,
-            orgContext,
-            orgContextConfirmed,
-            updatedAt: new Date().toISOString(),
-          };
-          await set(store.setMany, [[sessionId, updatedData]]);
-        }
-      } catch (error) {
-        // Error updating IndexedDB - org context still updated in memory
-        console.error('[db-session-atoms] Error updating org context in IndexedDB:', error);
-      }
-    }
-  }
-);
-
-/**
- * Action atom for deleting a session from IndexedDB.
- *
- * Used when deleting sessions from the UI.
- *
- * @param sessionId - The session ID to delete
- */
-export const deleteSessionFromStoreAtom = atom(
-  null,
-  async (_get, set, sessionId: string): Promise<void> => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      const store = getSessionStore();
-      await set(store.delete, sessionId);
-    } catch (error) {
-      console.error('[db-session-atoms] Error deleting session from IndexedDB:', error);
-    }
-  }
-);
 
 /**
  * Format a date for display in the session list

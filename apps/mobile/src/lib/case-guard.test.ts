@@ -40,6 +40,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/use-new-session-repos.ts': 'repo key normalization',
   'lib/organization-invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
+  'lib/document-preview.ts': 'document MIME and file-extension normalization',
   'lib/agent-profile-forms.ts': 'environment-variable key normalization',
   'lib/chat/remote-mcp-store.ts': 'callable-name slug normalization',
   'lib/chat/backend-request.ts': 'HTTP header-name normalization',
@@ -47,10 +48,12 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/chat/backend-url.ts': 'hostname comparison',
   'lib/chat/gguf-catalog.ts': 'file-extension comparison',
   'lib/chat/hf-catalog.ts': 'SPDX id lookup key',
+  'lib/chat/hf-quant-size.ts': 'quantization-family normalization for a size table',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',
   'lib/pr-review/diff/navigator-file-filter.ts': 'search folding',
+  'lib/pr-review/merge/merge-blocked-reasons.ts': 'merge-method wire-code lookup key',
   'lib/pr-review/merge/merge-result-banner-store.ts': 'review-key composition',
   'lib/pr-review/viewed-files.ts': 'viewed-file key composition',
   'lib/pr-review/provider-pr-url.ts': 'URL scheme/host comparison',
@@ -59,7 +62,6 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/share/share-destination-list.tsx': 'search folding',
   'components/pr-review/discussion/comment-row.tsx': 'login comparison',
   'components/pr-review/discussion/pr-review-discussion-list.tsx': 'login comparison',
-  'components/pr-review/merge/pr-merge-section-parts.tsx': 'merge-method key normalization',
   'components/pr-review/pr-review-submit-view.ts': 'login comparison',
   'components/agents/attachment-picker.ts': 'file-extension/mime normalization',
   'components/agents/code-block-model.ts': 'language-identifier normalization',
@@ -79,6 +81,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/profiles/kilo-command-form-sheet.tsx': 'slash-command name normalization',
   'components/profiles/repo-bindings-model.ts': 'repository full-name search and comparison',
   'app/(app)/kiloclaw/[instance-id]/settings/model-list.tsx': 'model search folding',
+  'lib/url-authority.ts': 'URL scheme and hostname normalization',
 };
 
 /** The `.toUpperCase(` / `.toLowerCase(` call the class is about. */

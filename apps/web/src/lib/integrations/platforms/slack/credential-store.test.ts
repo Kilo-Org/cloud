@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 
 const testKeyPair = generateKeyPairSync('rsa', {
@@ -97,6 +97,75 @@ describe('writeSlackCredential', () => {
     const stored = await getSlackCredentialByIntegrationId(integrationId);
     if (!stored) throw new Error('Expected a stored credential');
     expect(decryptSlackBotToken(stored, owner)).toBe('xoxb-first-token');
+  });
+
+  it('writes credentials in the supplied installation transaction', async () => {
+    await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
+    const rollback = new Error('Rollback test transaction');
+
+    await expect(
+      db.transaction(async tx => {
+        const [integration] = await tx
+          .insert(platform_integrations)
+          .values({
+            owned_by_user_id: userId,
+            platform: 'slack',
+            integration_type: 'oauth',
+            platform_installation_id: teamId,
+            platform_account_id: teamId,
+            platform_account_login: 'Test Workspace',
+            integration_status: 'active',
+          })
+          .returning();
+        const written = await writeSlackCredential(
+          {
+            integrationId: integration.id,
+            slackTeamId: teamId,
+            owner,
+            botToken: 'test-installation-token',
+          },
+          tx
+        );
+
+        const [stored] = await tx
+          .select()
+          .from(slack_oauth_credentials)
+          .where(eq(slack_oauth_credentials.id, written.id));
+        expect(stored.platform_integration_id).toBe(integration.id);
+        integrationId = integration.id;
+        throw rollback;
+      })
+    ).rejects.toBe(rollback);
+
+    expect(await getSlackCredentialByIntegrationId(integrationId)).toBeNull();
+  });
+
+  it('commits the installation after a credential savepoint failure', async () => {
+    await db.transaction(async tx => {
+      await expect(
+        writeSlackCredential(
+          {
+            integrationId: randomUUID(),
+            slackTeamId: teamId,
+            owner,
+            botToken: 'test-installation-token',
+          },
+          tx
+        )
+      ).rejects.toMatchObject({ cause: { code: '23503' } });
+
+      await tx
+        .update(platform_integrations)
+        .set({ platform_account_login: 'Saved Workspace' })
+        .where(eq(platform_integrations.id, integrationId));
+    });
+
+    const [stored] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integrationId));
+    expect(stored.platform_account_login).toBe('Saved Workspace');
+    expect(await getSlackCredentialByIntegrationId(integrationId)).toBeNull();
   });
 
   it('bumps credential_version on replacement and keeps the new token readable', async () => {

@@ -3,7 +3,6 @@ import {
   getSecurityAnalysisDetailPresentation,
   getSecurityFindingAnalysisState,
 } from '@kilocode/app-shared/security-agent';
-import { useRouter } from 'expo-router';
 import { ExternalLink, ScanSearch } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -27,12 +26,18 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
+import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
 import { formatNumber } from '@/lib/format';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type SecurityAnalysis } from '@/lib/security-agent';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
+import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import {
+  getAnalysisCapacityBlockedHint,
   getSecurityAnalysisDetailDescription,
   getSecurityAnalysisDetailTitle,
 } from '@/lib/security-agent-copy';
@@ -56,12 +61,13 @@ export function FindingAnalysisPanel({
   isError,
   onRetry,
 }: Readonly<FindingAnalysisPanelProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { i18n, t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const capacity = useSecurityAnalysisCapacity(scope);
   const startAnalysis = useStartSecurityAnalysis(scope);
+  const now = useRelativeTimeNow();
 
   if (isLoading && !analysis) {
     return (
@@ -103,6 +109,11 @@ export function FindingAnalysisPanel({
   );
   const triage = analysis.analysis?.triage;
   const sandbox = analysis.analysis?.sandboxAnalysis;
+  const analyzedAt = sandbox ? parseTimestamp(sandbox.analysisAt) : null;
+  const analyzedLabel =
+    analyzedAt === null || Number.isNaN(analyzedAt.getTime())
+      ? t('securityAgent.analysis.notRecorded')
+      : timeAgo(analyzedAt, undefined, now);
   const presentationTitle = getSecurityAnalysisDetailTitle(analysisState);
   const presentationDescription = getSecurityAnalysisDetailDescription(analysisState, {
     analysisError: analysis.error,
@@ -111,6 +122,10 @@ export function FindingAnalysisPanel({
     triageReasoning: triage?.needsSandboxReasoning,
   });
   const technicalMarkdown = firstNonEmpty(sandbox?.rawMarkdown, analysis.analysis?.rawMarkdown);
+  // The model slug is an identifier, so its row names a left-to-right run; the
+  // fallback below is copy and keeps the interface direction. Both read this
+  // one value so they cannot drift apart.
+  const analysisModel = firstNonEmpty(sandbox?.modelUsed, analysis.analysis?.analysisModel);
   const uniqueLocations = sandbox ? [...new Set(sandbox.usageLocations)] : [];
   const exploitabilityReasoning = sandbox
     ? firstNonEmpty(sandbox.summary, sandbox.exploitabilityReasoning)
@@ -135,14 +150,10 @@ export function FindingAnalysisPanel({
   const canStartAnalysis =
     findingOpen && (analysisState === 'not-analyzed' || analysisState === 'failed');
   const canRestartAnalysis = findingOpen && analysis.status === 'running';
-  const hasCapacity =
-    capacity.runningCount !== undefined &&
-    capacity.concurrencyLimit !== undefined &&
-    capacity.runningCount < capacity.concurrencyLimit;
-  // "Capacity full" is only ever true after a successful count — while
-  // loading or on error, `hasCapacity` is false too (so the button stays
-  // disabled), but neither of those states means it's actually full.
-  const capacityConfirmedFull = !capacity.isLoading && !capacity.isError && !hasCapacity;
+  // A completed analysis whose finding changed since offers no start or restart
+  // action above, so the stale blocker would read as unfixable on this tab too.
+  const needsAnalysisRefresh = remediationNeedsAnalysisRefresh(analysis);
+  const hasCapacity = capacity.state === 'available';
 
   const handleStartAnalysis = () => {
     startAnalysis.mutate({
@@ -183,11 +194,12 @@ export function FindingAnalysisPanel({
         </Text>
       </View>
 
-      {canStartAnalysis || canRestartAnalysis ? (
+      {canStartAnalysis || canRestartAnalysis || needsAnalysisRefresh ? (
         <View className="gap-2">
           {canStartAnalysis ? (
             <Button
               disabled={startAnalysis.isPending || !hasCapacity}
+              accessibilityHint={getAnalysisCapacityBlockedHint(capacity.state)}
               onPress={handleStartAnalysis}
             >
               {startAnalysis.isPending ? (
@@ -200,24 +212,11 @@ export function FindingAnalysisPanel({
               </Text>
             </Button>
           ) : null}
-          {canStartAnalysis && capacityConfirmedFull ? (
-            <Text variant="muted" className="text-xs">
-              {t('securityAgent.analysis.capacityFull')}
-            </Text>
-          ) : null}
-          {canStartAnalysis && capacity.isError ? (
-            <View className="flex-row items-center gap-2">
-              <Text variant="muted" className="text-xs">
-                {t('securityAgent.analysis.couldNotCheckCapacity')}
-              </Text>
-              <Pressable
-                onPress={() => void capacity.refetch()}
-                accessibilityRole="button"
-                accessibilityLabel={t('common.retry')}
-              >
-                <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
-              </Pressable>
-            </View>
+          {canStartAnalysis ? (
+            <AnalysisCapacityNotice
+              state={capacity.state}
+              onRetry={() => void capacity.refetch()}
+            />
           ) : null}
           {canRestartAnalysis ? (
             <Button
@@ -231,6 +230,9 @@ export function FindingAnalysisPanel({
               <Text>{t('securityAgent.analysis.restartAnalysis')}</Text>
             </Button>
           ) : null}
+          {needsAnalysisRefresh ? (
+            <AnalysisRerunAction scope={scope} findingId={findingId} />
+          ) : null}
         </View>
       ) : null}
 
@@ -238,7 +240,7 @@ export function FindingAnalysisPanel({
         <Pressable
           className="flex-row items-center justify-center gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
           onPress={() => {
-            router.push(sessionHref);
+            pushOnce(sessionHref);
           }}
         >
           <ExternalLink size={14} color={colors.mutedForeground} />
@@ -254,10 +256,12 @@ export function FindingAnalysisPanel({
             <KvRow
               label={t('securityAgent.analysis.triageConfidence')}
               value={formatConfidence(triage.confidence)}
+              valueFace="text"
             />
             <KvRow
               label={t('securityAgent.analysis.suggestedAction')}
               value={formatSuggestedAction(triage.suggestedAction)}
+              valueFace="text"
               last
             />
           </View>
@@ -280,23 +284,24 @@ export function FindingAnalysisPanel({
             <KvRow
               label={t('securityAgent.analysis.exploitable')}
               value={formatExploitable(sandbox.isExploitable)}
+              valueFace="text"
             />
             <KvRow
               label={t('securityAgent.analysis.suggestedAction')}
               value={formatSuggestedAction(sandbox.suggestedAction)}
+              valueFace="text"
             />
             <KvRow
               label={t('common.model')}
-              value={firstNonEmpty(
-                sandbox.modelUsed,
-                analysis.analysis?.analysisModel,
-                t('securityAgent.analysis.notRecorded')
-              )}
+              value={firstNonEmpty(analysisModel, t('securityAgent.analysis.notRecorded'))}
+              valueFace={analysisModel === '' ? 'text' : 'mono'}
+              valueDirection={analysisModel === '' ? undefined : 'ltr'}
               selectable
             />
             <KvRow
               label={t('securityAgent.analysis.analyzed')}
-              value={timeAgo(parseTimestamp(sandbox.analysisAt))}
+              value={analyzedLabel}
+              valueFace="text"
               last
               selectable
             />
@@ -330,7 +335,13 @@ export function FindingAnalysisPanel({
               defaultExpanded={uniqueLocations.length <= 2}
             >
               {uniqueLocations.map(location => (
-                <Text key={location} variant="mono" className="text-xs" selectable>
+                <Text
+                  key={location}
+                  variant="mono"
+                  className="text-xs"
+                  selectable
+                  style={LTR_TEXT_DIRECTION}
+                >
                   {location}
                 </Text>
               ))}

@@ -18,12 +18,24 @@ import {
   type SessionAttachPayload,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
-import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
+import {
+  CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  RESERVED_ENV_VAR_PREFIXES,
+  SYSTEM_GIT_CONFIG_ENV,
+  isStrippedGitConfigEnvVar,
+} from '../../../src/shared/runtime-environment.js';
 import { kiloServerEnvForOrigin } from '../../../src/shared/kilo-server-env.js';
 import { type WrapperKiloClient } from '../kilo-api.js';
 
 export type WorktreeKiloAuth = NonNullable<SessionAttachPayload['kilo']>;
 type RuntimeIsolation = 'directory-shared' | 'per-session';
+
+/**
+ * Reserved name of the workspace-owned built-in Cloud Agent MCP server. It
+ * carries a rotating workspace credential, not user configuration, so it is
+ * excluded from workspace-profile MCP sets and from MCP drift comparison.
+ */
+export const WORKSPACE_MCP_SERVER_NAME = 'kilo-cloud-agent';
 
 export type WorktreeKiloRuntime = {
   readonly identity?: SessionRequestIdentity;
@@ -81,17 +93,25 @@ export function buildWorktreeKiloEnvironment(
   const isRuntimeOwned = (name: string): boolean =>
     reserved.has(name) ||
     name === 'HOME' ||
-    name.startsWith('XDG_') ||
-    name.startsWith('KILO') ||
-    name.startsWith('OPENCODE');
+    RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
 
   for (const [name, value] of Object.entries(inherited)) {
-    if (value !== undefined && !isRuntimeOwned(name) && !INHERITED_GIT_CREDENTIALS.has(name)) {
+    if (
+      value !== undefined &&
+      !isRuntimeOwned(name) &&
+      !INHERITED_GIT_CREDENTIALS.has(name) &&
+      !isStrippedGitConfigEnvVar(name)
+    ) {
       env[name] = value;
     }
   }
   for (const [name, value] of Object.entries(environment)) {
-    if (!isRuntimeOwned(name) || BITBUCKET_METADATA_ENV_VARS.has(name)) env[name] = value;
+    if (
+      (!isRuntimeOwned(name) || BITBUCKET_METADATA_ENV_VARS.has(name)) &&
+      !isStrippedGitConfigEnvVar(name)
+    ) {
+      env[name] = value;
+    }
   }
 
   let config = JSON.stringify({
@@ -113,12 +133,13 @@ export function buildWorktreeKiloEnvironment(
           mcp: {
             ...Object.fromEntries(
               Object.entries(mcp ?? {}).filter(
-                ([name]) => name !== GITHUB_REVIEW_MCP_SERVER_NAME && name !== 'kilo-cloud-agent'
+                ([name]) =>
+                  name !== GITHUB_REVIEW_MCP_SERVER_NAME && name !== WORKSPACE_MCP_SERVER_NAME
               )
             ),
             ...(runtimeConfig?.cloudAgentMcp
               ? {
-                  'kilo-cloud-agent': {
+                  [WORKSPACE_MCP_SERVER_NAME]: {
                     type: 'remote',
                     url: runtimeConfig.cloudAgentMcp.url,
                     oauth: false,
@@ -163,6 +184,11 @@ export function buildWorktreeKiloEnvironment(
         }
       : {}),
     KILO_DISABLE_AUTOUPDATE: 'true',
+    // Backstop for a layout change or a non-symlinked gh-stack install: the
+    // agent's terminals are real TTYs, so `gh` and gh-stack would otherwise run
+    // their update checks and call the GitHub API with the session token.
+    GH_NO_EXTENSION_UPDATE_NOTIFIER: '1',
+    GH_STACK_NO_UPDATE_NOTIFIER: '1',
     KILO_DISABLE_CODEBASE_INDEXING: 'vscode-no-workspace',
     KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
     KILO_DEBUG_SESSION_INGEST: '1',
@@ -176,5 +202,11 @@ export function buildWorktreeKiloEnvironment(
     KILO_SESSION_INGEST_URL: kilo.targets.sessionIngestBaseUrl,
     KILO_CONFIG_CONTENT: config,
     OPENCODE_CONFIG_CONTENT: config,
+    // Every process in the sandbox authenticates git through the platform's
+    // read-only helper: the wrapper's own clone/fetch, the Kilo CLI and the
+    // workspace terminal. The credential itself lives in the per-session record,
+    // never in `origin`. Pinned last so profile values cannot displace it.
+    ...SYSTEM_GIT_CONFIG_ENV,
+    GIT_TERMINAL_PROMPT: '0',
   };
 }

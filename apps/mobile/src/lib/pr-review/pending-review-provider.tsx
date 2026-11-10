@@ -101,6 +101,13 @@ export function providerPendingReviewDraftKey(ref: ProviderPrRef): string {
 
 type PendingReviewContextValue = {
   items: PendingReviewItem[];
+  /**
+   * True once nothing is still going to load into the queue: the stored draft
+   * for this account and PR has settled, or there is no persisted queue to
+   * read. A sheet that paints its body from the queue waits for it, so the
+   * first body frame already carries the rows the queue holds.
+   */
+  hydrated: boolean;
   addComment: (item: PendingReviewItem) => void;
   updateComment: (id: string, body: string) => void;
   removeComment: (id: string) => void;
@@ -159,6 +166,10 @@ export function PendingReviewProvider({
     hydrationGenerationRef.current += 1;
     const generation = hydrationGenerationRef.current;
     if (!userId || !draftEntityKey) {
+      // Memory-only queue: no read will ever start, so the empty queue is
+      // already final. Without this a body that waits for hydration would
+      // wait for a load that never runs.
+      setHydrated(true);
       return undefined;
     }
     void (async () => {
@@ -254,8 +265,8 @@ export function PendingReviewProvider({
   }, [userId, draftEntityKey]);
 
   const value = useMemo<PendingReviewContextValue>(
-    () => ({ items, addComment, updateComment, removeComment, removeComments, clear }),
-    [items, addComment, updateComment, removeComment, removeComments, clear]
+    () => ({ items, hydrated, addComment, updateComment, removeComment, removeComments, clear }),
+    [items, hydrated, addComment, updateComment, removeComment, removeComments, clear]
   );
 
   return <PendingReviewContext value={value}>{children}</PendingReviewContext>;

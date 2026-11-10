@@ -17,7 +17,9 @@ export default async function OrganizationCloudChatPage({ params, searchParams }
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
 
-  const result = await getAuthorizedOrgContext(organizationId);
+  const result = await getAuthorizedOrgContext(organizationId, undefined, {
+    surface: 'server-component',
+  });
   if (!result.success) {
     if (result.nextResponse.status === 401) {
       redirect(await signInUrlWithCallbackPath());

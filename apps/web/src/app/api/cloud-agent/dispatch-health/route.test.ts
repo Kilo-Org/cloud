@@ -2,6 +2,15 @@ import { NextRequest } from 'next/server';
 
 const mockCaptureException = jest.fn();
 const mockEvaluateDispatchHealth = jest.fn();
+const MONITOR_TOKEN = 'test-dispatch-monitor-token';
+let mockDispatchHealthSecret = MONITOR_TOKEN;
+
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
+  get CLOUD_AGENT_DISPATCH_HEALTH_SECRET() {
+    return mockDispatchHealthSecret;
+  },
+}));
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
@@ -20,27 +29,62 @@ import { CLOUD_AGENT_DISPATCH_RUNBOOK_URL } from '@/lib/cloud-agent/dispatch-hea
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { GET } from './route';
 
-const HEALTH_CHECK_KEY = 'kilo-cloud-agent-dispatch-health-check';
+const ENDPOINT_URL = 'http://localhost:3000/api/cloud-agent/dispatch-health';
 
-function makeRequest(key: string | null): NextRequest {
-  const url =
-    key === null
-      ? 'http://localhost:3000/api/cloud-agent/dispatch-health'
-      : `http://localhost:3000/api/cloud-agent/dispatch-health?key=${key}`;
-  return new NextRequest(url, { method: 'GET' });
+function makeRequest(token: string | null = MONITOR_TOKEN): NextRequest {
+  return new NextRequest(ENDPOINT_URL, {
+    method: 'GET',
+    headers: token === null ? {} : { Authorization: `Bearer ${token}` },
+  });
+}
+
+function makeLegacyKeyRequest(key: string): NextRequest {
+  return new NextRequest(`${ENDPOINT_URL}?key=${key}`, { method: 'GET' });
 }
 
 describe('GET /api/cloud-agent/dispatch-health', () => {
   beforeEach(() => {
     mockCaptureException.mockReset();
     mockEvaluateDispatchHealth.mockReset();
+    mockDispatchHealthSecret = MONITOR_TOKEN;
   });
 
-  it('rejects requests with no key without querying the database', async () => {
+  it('refuses every caller when the configured secret is empty', async () => {
+    mockDispatchHealthSecret = '';
+    const transactionSpy = jest.spyOn(db, 'transaction');
+
+    try {
+      const response = await GET(makeRequest('any-token'));
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      await expect(response.json()).resolves.toEqual({ healthy: false });
+      expect(transactionSpy).not.toHaveBeenCalled();
+    } finally {
+      transactionSpy.mockRestore();
+    }
+  });
+
+  it('rejects requests with no authorization header without querying the database', async () => {
     const transactionSpy = jest.spyOn(db, 'transaction');
 
     try {
       const response = await GET(makeRequest(null));
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      await expect(response.json()).resolves.toEqual({ healthy: false });
+      expect(transactionSpy).not.toHaveBeenCalled();
+    } finally {
+      transactionSpy.mockRestore();
+    }
+  });
+
+  it('rejects requests with a wrong bearer token without querying the database', async () => {
+    const transactionSpy = jest.spyOn(db, 'transaction');
+
+    try {
+      const response = await GET(makeRequest('wrong-token'));
 
       expect(response.status).toBe(401);
       await expect(response.json()).resolves.toEqual({ healthy: false });
@@ -50,11 +94,11 @@ describe('GET /api/cloud-agent/dispatch-health', () => {
     }
   });
 
-  it('rejects requests with the wrong key without querying the database', async () => {
+  it('refuses a token supplied only through the query string', async () => {
     const transactionSpy = jest.spyOn(db, 'transaction');
 
     try {
-      const response = await GET(makeRequest('wrong-key'));
+      const response = await GET(makeLegacyKeyRequest(MONITOR_TOKEN));
 
       expect(response.status).toBe(401);
       await expect(response.json()).resolves.toEqual({ healthy: false });
@@ -72,9 +116,10 @@ describe('GET /api/cloud-agent/dispatch-health', () => {
     });
 
     try {
-      const response = await GET(makeRequest(HEALTH_CHECK_KEY));
+      const response = await GET(makeRequest());
 
       expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
       await expect(response.json()).resolves.toEqual({
         healthy: true,
         alerts: [],
@@ -115,7 +160,7 @@ describe('GET /api/cloud-agent/dispatch-health', () => {
       .mockImplementation(async callback => callback({ execute } as never));
 
     try {
-      const response = await GET(makeRequest(HEALTH_CHECK_KEY));
+      const response = await GET(makeRequest());
 
       expect(response.status).toBe(200);
       expect(events).toEqual(['execute', 'detector', 'execute']);
@@ -134,7 +179,7 @@ describe('GET /api/cloud-agent/dispatch-health', () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation();
 
     try {
-      const response = await GET(makeRequest(HEALTH_CHECK_KEY));
+      const response = await GET(makeRequest());
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -189,7 +234,7 @@ describe('GET /api/cloud-agent/dispatch-health', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
     try {
-      const response = await GET(makeRequest(HEALTH_CHECK_KEY));
+      const response = await GET(makeRequest());
 
       expect(response.status).toBe(503);
       await expect(response.json()).resolves.toEqual({

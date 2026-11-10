@@ -115,9 +115,9 @@ export function RepositoryOverridesSection({
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 id={headingId} className="text-sm font-medium">
+        <h4 id={headingId} className="text-sm font-medium">
           Repository overrides
-        </h3>
+        </h4>
         <RepositoryPicker
           organizationId={organizationId}
           listed={repositories}

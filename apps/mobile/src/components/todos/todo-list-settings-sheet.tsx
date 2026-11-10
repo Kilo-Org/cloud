@@ -8,13 +8,15 @@ import { ModeSelector } from '@/components/agents/mode-selector';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { PickerSheet } from '@/components/picker-sheet';
-import { QueryError } from '@/components/query-error';
+import { NameField } from '@/components/todos/list-settings-name-field';
+import { ListSettingsPendingSheet } from '@/components/todos/list-settings-pending-sheet';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import { useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
+import { reportNothing, useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   TODO_LIST_EMOJI_MAX_LENGTH,
@@ -22,35 +24,44 @@ import {
   todoListGitUrl,
   todoListRepoSelection,
 } from '@/lib/todos/todo-model';
+import { todoListPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 
 type ListSettingsFormProps = {
   list: TodoList | null;
   organizationId: string | null;
+  /** `'back'` returns to the sheet that opened this one instead of opening the new list. */
+  afterCreate: 'open' | 'back';
 };
 
 function FieldLabel({ children }: Readonly<{ children: string }>) {
   return <Text className="text-sm font-medium text-foreground">{children}</Text>;
 }
 
-function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormProps>) {
+function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSettingsFormProps>) {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { create, update } = useTodoListMutations(organizationId);
+  const { create, update } = useTodoListMutations(organizationId, reportNothing);
   const scope = organizationId ?? undefined;
   const { repositories, recents, groups } = useNewSessionRepos({ organizationId: scope });
   const { models, isLoading: isLoadingModels } = useAvailableModels(scope);
 
   const nameRef = useRef(list?.name ?? '');
   const emojiRef = useRef(list?.emoji ?? '');
+  // The first render's stored text: `defaultValue` must not follow the cached
+  // list, or a failed update rolling back would overwrite what the user typed.
+  const [storedName] = useState(list?.name ?? '');
+  const [storedEmoji] = useState(list?.emoji ?? '');
   const [hasName, setHasName] = useState(Boolean(list?.name.trim()));
   const [gitUrl, setGitUrl] = useState(list?.gitUrl ?? null);
   const [mode, setMode] = useState(list?.mode ?? null);
   const [model, setModel] = useState(list?.model ?? null);
   const [variant, setVariant] = useState(list?.variant ?? null);
-  const saving = create.isPending;
+  const [saveFailed, setSaveFailed] = useState(false);
+  const savingRef = useRef(false);
+  const saving = create.isPending || update.isPending;
 
   const { requestClose, dialog } = useSheetDismissGuard({
     isDirty: () =>
@@ -83,33 +94,45 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
     }, [])
   );
 
-  function save() {
-    const name = nameRef.current.trim();
-    if (name.length === 0) {
+  async function save() {
+    const trimmedName = nameRef.current.trim();
+    if (trimmedName.length === 0 || savingRef.current) {
       return;
     }
-    const emoji = emojiRef.current.trim();
+    const trimmedEmoji = emojiRef.current.trim();
     const fields = {
-      name,
-      emoji: emoji.length > 0 ? emoji : null,
+      name: trimmedName,
+      emoji: trimmedEmoji.length > 0 ? trimmedEmoji : null,
       gitUrl,
       mode,
       model,
       variant,
     };
-    if (list) {
-      update.mutate({ id: list.id, ...fields });
-      router.back();
-      return;
-    }
-    create.mutate(
-      { organizationId, ...fields },
-      {
-        onSuccess: () => {
+    savingRef.current = true;
+    setSaveFailed(false);
+    try {
+      // An existing list updates in place; a new one is created in the route's
+      // context. Either way the sheet closes only once the write succeeded.
+      if (list) {
+        await update.mutateAsync({ id: list.id, ...fields });
+        router.back();
+      } else {
+        const created = await create.mutateAsync({ organizationId, ...fields });
+        if (afterCreate === 'back') {
           router.back();
-        },
+        } else {
+          // Replace the form sheet with the created list: Back from the list then
+          // lands on the lists view the sheet was opened from.
+          router.replace(todoListPath(created.id));
+        }
       }
-    );
+    } catch {
+      // The fields and the sheet stay, so the user can retry in place; the
+      // status line below the fields is this save's only error surface.
+      setSaveFailed(true);
+    } finally {
+      savingRef.current = false;
+    }
   }
 
   return (
@@ -117,7 +140,9 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
       <PickerSheet
         title={list ? t('todos.listSettings.title') : t('todos.lists.newList')}
         doneLabel={t('common.save')}
-        onDone={save}
+        onDone={() => {
+          void save();
+        }}
         onCancel={requestClose}
         disabled={saving}
         doneDisabled={!hasName || saving}
@@ -127,7 +152,7 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
             <View className="w-20 gap-2">
               <FieldLabel>{t('todos.listSettings.emoji')}</FieldLabel>
               <Input
-                defaultValue={list?.emoji ?? ''}
+                defaultValue={storedEmoji}
                 onChangeText={text => {
                   emojiRef.current = text;
                 }}
@@ -138,20 +163,20 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
             </View>
             <View className="min-w-0 flex-1 gap-2">
               <FieldLabel>{t('todos.listSettings.name')}</FieldLabel>
-              <Input
-                defaultValue={list?.name ?? ''}
+              <NameField
+                defaultValue={storedName}
                 autoFocus={!list}
                 onChangeText={text => {
                   nameRef.current = text;
                   const next = text.trim().length > 0;
                   setHasName(current => (current === next ? current : next));
                 }}
-                onSubmitEditing={save}
-                returnKeyType="done"
+                onSubmitEditing={() => {
+                  void save();
+                }}
                 maxLength={TODO_LIST_NAME_MAX_LENGTH}
                 placeholder={t('todos.listSettings.namePlaceholder')}
                 accessibilityLabel={t('todos.listSettings.name')}
-                className="rounded-lg border border-border bg-secondary text-base text-foreground"
               />
             </View>
           </View>
@@ -206,6 +231,7 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
                 variant={variant ?? ''}
                 options={models}
                 isLoading={isLoadingModels}
+                acceptsVariant
                 onSelect={(modelId, nextVariant) => {
                   setModel(modelId);
                   setVariant(nextVariant || null);
@@ -214,6 +240,14 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
             </View>
           </View>
           {saving ? <ActivityIndicator color={colors.mutedForeground} /> : null}
+          <AccessibleStatus
+            message={
+              saveFailed
+                ? t(list ? 'todos.listSettings.saveFailed' : 'todos.lists.createFailed')
+                : null
+            }
+            className="text-sm"
+          />
         </View>
       </PickerSheet>
       {dialog}
@@ -229,38 +263,40 @@ function ListSettingsForm({ list, organizationId }: Readonly<ListSettingsFormPro
 export function TodoListSettingsSheet({
   listId,
   organizationId,
-}: Readonly<{ listId: string | null; organizationId: string | null }>) {
+  afterCreate = 'open',
+}: Readonly<{
+  listId: string | null;
+  organizationId: string | null;
+  afterCreate?: 'open' | 'back';
+}>) {
   const router = useRouter();
-  const { t } = useTranslation();
   const lists = useTodoLists(organizationId, listId !== null);
 
   if (listId === null) {
-    return <ListSettingsForm list={null} organizationId={organizationId} />;
+    return (
+      <ListSettingsForm list={null} organizationId={organizationId} afterCreate={afterCreate} />
+    );
   }
   const list = lists.data?.find(candidate => candidate.id === listId);
   if (list) {
-    return <ListSettingsForm key={list.id} list={list} organizationId={organizationId} />;
+    return (
+      <ListSettingsForm
+        key={list.id}
+        list={list}
+        organizationId={organizationId}
+        afterCreate={afterCreate}
+      />
+    );
   }
   return (
-    <PickerSheet
-      title={t('todos.listSettings.title')}
+    <ListSettingsPendingSheet
+      isError={lists.isError}
+      isFetching={lists.isFetching}
+      isSuccess={lists.isSuccess}
+      onRetry={() => void lists.refetch()}
       onDone={() => {
         router.back();
       }}
-      scrollable={false}
-      expired={lists.isSuccess}
-    >
-      {lists.isError ? (
-        <QueryError
-          onRetry={() => void lists.refetch()}
-          isRetrying={lists.isFetching}
-          placement="top"
-        />
-      ) : (
-        <View className="items-center py-8">
-          <ActivityIndicator />
-        </View>
-      )}
-    </PickerSheet>
+    />
   );
 }

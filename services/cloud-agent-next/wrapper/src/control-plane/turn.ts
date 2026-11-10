@@ -1,7 +1,9 @@
 import {
   assistantFailureMessage,
   classifyAssistantFailure,
+  executionStoppedMessage,
   isAssistantInterrupt,
+  missingAgentSlug,
   type AssistantFailureClassification,
 } from '../../../src/shared/assistant-failure.js';
 import {
@@ -17,14 +19,19 @@ import type { ControlDiagnosticReporter } from '../../../src/shared/control-diag
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { slashCommandCatalogStatus } from '../../../src/shared/slash-commands.js';
 import { runAutoCommit } from '../auto-commit.js';
-import {
-  DEFAULT_CONDENSE_TIMEOUT_MS,
-  summarizeWithTimeout,
-  type CondenseResult,
-} from '../condense-on-complete.js';
+import { autoCommitFailure, autoCommitRoots } from './auto-commit-roots.js';
+import { isEnvironmentRoot, routeRoots, type RouteRoot } from './workspace-roots.js';
+import { DEFAULT_CONDENSE_TIMEOUT_MS, type CondenseResult } from '../condense-on-complete.js';
 import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js';
+import { isDirectoryRewriteActive } from '../control/worktree-operations.js';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
-import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
+import {
+  activitySessionId,
+  type HarnessActivity,
+  type HarnessActivityEvent,
+} from './harness-activity.js';
+import { kiloActivity } from './kilo-message-activity.js';
+import type { Harness } from './harness.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
 import { isUnresponsiveRestart, type KiloRestartInfo } from './kilo-runtime.js';
 import type {
@@ -56,12 +63,12 @@ export type TurnTimers = ControlPlaneTimers['wrapper'];
 export type TurnKiloRuntime = {
   readonly directory: string;
   readonly env: Record<string, string>;
-  readonly client: WrapperKiloClient;
-  ensure(): Promise<WrapperKiloClient>;
+  readonly client: Harness;
+  ensure(): Promise<Harness>;
   isSuspected(): boolean;
   isRestarting(): boolean;
   isUnavailable(): boolean;
-  isRetiredClient(client: WrapperKiloClient): boolean;
+  isRetiredClient(client: Harness): boolean;
   sessionState(id: string): ReturnType<SessionSupervisor['state']>;
   refreshActivity(): Promise<void>;
   applyPendingCredentials?(canRestart: () => boolean): Promise<boolean>;
@@ -87,7 +94,7 @@ export type TurnManagerDeps = {
   materializeAttachments?: typeof materializeMessageAttachments;
   runAutoCommit?: typeof runAutoCommit;
   runCondense?: (input: {
-    kiloClient: WrapperKiloClient;
+    kiloClient: Harness;
     kiloSessionId: string;
     directory: string;
     model: string;
@@ -158,6 +165,8 @@ type TurnRoute = {
   sessionId: string;
   kiloSessionId: string;
   directory: string;
+  /** The git roots: one at the directory, or one for each repository of a V2 environment. */
+  roots: RouteRoot[];
   runtimeKey: string;
   createdOnPlatform?: string;
   githubReviewTarget?: ControlPlaneRouteSpec['githubReviewTarget'];
@@ -266,15 +275,26 @@ export function createTurnManager(deps: TurnManagerDeps) {
   const condense =
     deps.runCondense ??
     ((input: {
-      kiloClient: WrapperKiloClient;
+      kiloClient: Harness;
       kiloSessionId: string;
       directory: string;
       model: string;
       signal?: AbortSignal;
-    }) => summarizeWithTimeout({ ...input, directory: input.directory }));
+    }) =>
+      input.kiloClient.condense({
+        sessionId: input.kiloSessionId,
+        directory: input.directory,
+        model: input.model,
+        signal: input.signal,
+      }));
 
   const routes = new Map<string, TurnRoute>();
+  const routeSpecs = new Map<string, ControlPlaneRouteSpec>();
   const turns = new Map<string, Turn>();
+  const interruptedFinalizations = new Map<
+    string,
+    { route: TurnRoute; abort: AbortController; done: Promise<void> }
+  >();
   const turnByKiloSession = new Map<string, string>();
   const childRoots = new Map<string, string>();
   /** Runtime keys whose Kilo is held under memory pressure (`onRuntimeMemoryHold`). */
@@ -426,7 +446,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   function canRestartRuntime(runtimeKeyValue: string): boolean {
-    return turnsForRuntimeKey(runtimeKeyValue).length === 0;
+    return (
+      turnsForRuntimeKey(runtimeKeyValue).length === 0 &&
+      ![...interruptedFinalizations.values()].some(
+        entry => entry.route.runtimeKey === runtimeKeyValue
+      )
+    );
   }
 
   function queueState(route: TurnRoute): QueueState {
@@ -477,13 +502,13 @@ export function createTurnManager(deps: TurnManagerDeps) {
           const agent = turn.prompts.at(-1)?.payload.agent;
           turn.submittedSinceIdle = true;
           turn.deferredCompletion = undefined;
-          await runtime.client.sendPromptAsync({
+          await runtime.client.submit({
             sessionId: route.kiloSessionId,
             directory: route.directory,
             messageId: createMessageId(),
             prompt: PUBLICATION_RECOVERY_PROMPT,
             ...(agent?.mode ? { agent: agent.mode } : {}),
-            ...(agent?.model ? { model: { providerID: 'kilo', modelID: agent.model } } : {}),
+            ...(agent?.model ? { model: agent.model } : {}),
             ...(agent?.variant ? { variant: agent.variant } : {}),
             signal,
           });
@@ -540,6 +565,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
    * Parking behind it keeps dispatch order equal to receipt order; the next drain re-chains both.
    */
   function mustPark(turn: Turn, pending: PendingPrompt): boolean {
+    if (interruptedFinalizations.has(turn.route.sessionId)) return true;
     if (queueState(turn.route) === 'queue') return true;
     for (const earlier of turn.prompts) {
       if (earlier === pending) return false;
@@ -610,7 +636,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         // Now handed to Kilo. The mark lives on the prompt, so a resubmission of
         // the same messageId cannot outrun the receipt count.
         markDispatched(turn, pending);
-        await client.sendPromptAsync({
+        await client.submit({
           sessionId: route.kiloSessionId,
           directory: route.directory,
           signal: pending.abort.signal,
@@ -621,7 +647,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
             : { variant: pending.payload.agent.variant }),
           ...(message.prompt === undefined ? {} : { prompt: message.prompt }),
           ...(message.parts === undefined ? {} : { parts: message.parts }),
-          ...(model === undefined ? {} : { model: { providerID: 'kilo', modelID: model } }),
+          ...(pending.payload.context === undefined ? {} : { context: pending.payload.context }),
+          ...(model === undefined ? {} : { model }),
         });
       } else if (pending.payload.turn.command === 'compact') {
         if (model === undefined) throw new Error('Compact requires a model');
@@ -631,11 +658,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
         pending.nativeClose = nativeClose;
         markDispatched(turn, pending);
         try {
-          const summarized = await client.summarizeSession({
+          const summarized = await client.compact({
             sessionId: route.kiloSessionId,
             directory: route.directory,
             signal: pending.abort.signal,
-            model: { modelID: model },
+            model,
           });
           if (!summarized) throw new Error('Session summarization failed');
           if (!isCurrent()) return;
@@ -653,7 +680,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         }
       } else {
         markDispatched(turn, pending);
-        await client.sendCommand({
+        await client.command({
           sessionId: route.kiloSessionId,
           directory: route.directory,
           signal: pending.abort.signal,
@@ -664,14 +691,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
           ...(pending.payload.agent.variant === undefined
             ? {}
             : { variant: pending.payload.agent.variant }),
-          ...(model === undefined ? {} : { model: { providerID: 'kilo', modelID: model } }),
+          ...(model === undefined ? {} : { model }),
         });
       }
     } catch (error) {
       // A restart cancels the retired dispatch and resubmits the batch; that
       // cancellation must not fail the resubmitted turn.
       if (!isCurrent() && isCancelledBy(error, dispatchSignal)) return;
-      if (runtime.isRetiredClient(client) && isKiloServerUnreachableError(error)) return;
+      if (runtime.isRetiredClient(client) && client.isUnavailableError(error)) return;
       throw error;
     }
     if (isCurrent()) {
@@ -701,11 +728,18 @@ export function createTurnManager(deps: TurnManagerDeps) {
       turn.inbox.push(pending);
       return;
     }
+    // A branch rewrite owns the checkout: park the prompt until it finishes.
+    if (isDirectoryRewriteActive(route.directory)) {
+      turn.inbox.push(pending);
+      return;
+    }
     chainSubmit(turn, pending);
   }
 
   function drainInbox(turn: Turn): void {
     if (turn.inbox.length === 0) return;
+    if (interruptedFinalizations.has(turn.route.sessionId)) return;
+    if (isDirectoryRewriteActive(turn.route.directory)) return;
     const state = queueState(turn.route);
     if (state === 'queue') return;
     if (state === 'unavailable') {
@@ -720,7 +754,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     const runtime = deps.runtimes.get(route.runtimeKey);
     if (runtime === undefined) return;
     try {
-      await runtime.client.abortSession({
+      await runtime.client.interrupt({
         sessionId: route.kiloSessionId,
         directory: route.directory,
         signal: AbortSignal.timeout(10_000),
@@ -751,26 +785,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
       log(`turn: answer with no runtime for ${sessionId}`);
       return;
     }
-    let client: WrapperKiloClient;
+    let client: Harness;
     try {
       client = runtime.client;
     } catch {
       return;
     }
     try {
-      if (reply.action === 'permission') {
-        await client.answerPermission(
-          reply.permissionId,
-          reply.response,
-          reply.message,
-          true,
-          route.directory
-        );
-      } else if (reply.action === 'reject') {
-        await client.rejectQuestion(reply.questionId, route.directory);
-      } else {
-        await client.answerQuestion(reply.questionId, reply.answers, route.directory);
-      }
+      await client.answer({ reply, directory: route.directory, interactive: true });
     } catch (error) {
       log(`turn: answer failed - ${error instanceof Error ? error.message : String(error)}`);
       return;
@@ -828,15 +850,61 @@ export function createTurnManager(deps: TurnManagerDeps) {
     }
   }
 
+  async function finalizeInterruptedTurn(turn: Turn, stopped: Promise<boolean>): Promise<void> {
+    if (!turn.prompts.some(entry => entry.payload.finalization?.autoCommit)) return;
+    const { sessionId, runtimeKey: key, kiloSessionId } = turn.route;
+    if (interruptedFinalizations.has(sessionId)) return;
+    const abort = new AbortController();
+    const done = Promise.withResolvers<void>();
+    interruptedFinalizations.set(sessionId, { route: turn.route, abort, done: done.promise });
+    const cancelled = Promise.withResolvers<never>();
+    const onAbort = () => cancelled.reject(abort.signal.reason);
+    abort.signal.addEventListener('abort', onAbort, { once: true });
+    const timer = scheduler.setTimeout(
+      () => abort.abort(new Error('interruption auto-commit timed out')),
+      DEFAULT_CONDENSE_TIMEOUT_MS
+    );
+    try {
+      if (!(await Promise.race([stopped, cancelled.promise]))) {
+        emitWarning(sessionId, 'Auto-commit skipped: agent cancellation was not confirmed');
+        return;
+      }
+      abort.signal.throwIfAborted();
+      const runtime = deps.runtimes.get(key);
+      if (
+        queueState(turn.route) !== 'ready' ||
+        runtime?.sessionState(kiloSessionId) !== undefined
+      ) {
+        emitWarning(sessionId, 'Auto-commit skipped: agent is not idle and available');
+        return;
+      }
+      await runAutoCommitStep(turn, abort.signal);
+    } catch {
+      emitWarning(sessionId, 'Auto-commit after interruption was cancelled or failed');
+    } finally {
+      scheduler.clearTimeout(timer);
+      abort.signal.removeEventListener('abort', onAbort);
+      interruptedFinalizations.delete(sessionId);
+      const next = turns.get(sessionId);
+      if (next) {
+        for (const pending of next.prompts) pending.deliveryResumedAt = now();
+        if (!abort.signal.aborted) drainInbox(next);
+      }
+      maybeApplyPendingCredentials(key);
+      done.resolve();
+    }
+  }
+
   async function runAutoCommitStep(turn: Turn, signal: AbortSignal): Promise<void> {
     if (!turn.prompts.some(entry => entry.payload.finalization?.autoCommit)) return;
     if (queueState(turn.route) === 'queue') return;
     const runtime = deps.runtimes.get(turn.route.runtimeKey);
     if (runtime === undefined) return;
     const sessionId = turn.route.sessionId;
-    try {
-      await autoCommit({
-        workspacePath: turn.route.directory,
+    const outcomes = await autoCommitRoots({
+      roots: turn.route.roots,
+      autoCommit,
+      options: {
         kiloClient: runtime.client,
         messageId: turn.assistantMessageId ?? lastReceivedMessageId(turn),
         userMessageId: lastReceivedMessageId(turn),
@@ -854,12 +922,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
             },
           ]);
         },
-      });
-    } catch (error) {
-      emitWarning(
-        sessionId,
-        `Auto-commit failed: ${error instanceof Error ? error.message : String(error)}`
-      );
+      },
+    });
+    for (const outcome of outcomes) {
+      const failure = autoCommitFailure(outcome);
+      if (failure === undefined) continue;
+      const { root } = outcome;
+      const repository = isEnvironmentRoot(root) ? ` (${root.repoFullName})` : '';
+      emitWarning(sessionId, `Auto-commit failed${repository}: ${failure}`);
     }
   }
 
@@ -899,16 +969,17 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return childRoots.get(kiloSessionId);
   }
 
-  function emittingRoute(event: KiloFeedEvent): TurnRoute | undefined {
-    const key = event.runtimeKey;
+  /** `createdParentId` is the parent a `session.created` event reports. */
+  function emittingRoute(
+    key: string | undefined,
+    eventSessionId: string | undefined,
+    createdParentId?: string
+  ): TurnRoute | undefined {
     if (key === undefined) return undefined;
     const direct = routes.get(key);
     if (direct !== undefined) return direct;
     const knownRoot =
-      resolveRootKiloSession(eventKiloSessionId(event.properties)) ??
-      (event.type === 'session.created'
-        ? resolveRootKiloSession(childFromSessionCreated(event.properties)?.parentId)
-        : undefined);
+      resolveRootKiloSession(eventSessionId) ?? resolveRootKiloSession(createdParentId);
     const knownSessionId = knownRoot === undefined ? undefined : turnByKiloSession.get(knownRoot);
     const knownRoute = knownSessionId === undefined ? undefined : routes.get(knownSessionId);
     if (knownRoute?.runtimeKey === key) return knownRoute;
@@ -962,6 +1033,168 @@ export function createTurnManager(deps: TurnManagerDeps) {
     }
   }
 
+  /**
+   * One observation from a runtime feed. `event` is a control event, forwarded to
+   * the Session DO; `activity` is the harness's CLI-neutral evidence of model work.
+   */
+  function observeFeed(
+    source: { runtimeKey?: string },
+    eventSessionId: string | undefined,
+    event: KiloFeedEvent | undefined,
+    activity: HarnessActivity[]
+  ): void {
+    // Kilo is back (or the feed resumed): drain anything waiting for it.
+    for (const turn of turns.values()) {
+      if (turn.inbox.length > 0) drainInbox(turn);
+    }
+    if (event && SYNTHETIC_KILO_EVENTS.has(event.type)) return;
+    if (event?.type === 'session.created') registerChild(event);
+    let root = resolveRootKiloSession(eventSessionId);
+    // A descendant's reported parent may name another route in the same
+    // worktree; the runtime that emitted it is authoritative. Route roots keep
+    // their own identity so a runtime never captures another route's events.
+    const emitting = emittingRoute(
+      source.runtimeKey,
+      eventSessionId,
+      event?.type === 'session.created'
+        ? childFromSessionCreated(event.properties)?.parentId
+        : undefined
+    );
+    const isRouteRoot = eventSessionId !== undefined && turnByKiloSession.has(eventSessionId);
+    if (emitting !== undefined && !isRouteRoot && root !== emitting.kiloSessionId) {
+      root = emitting.kiloSessionId;
+    }
+    if (root === undefined) return;
+    const sessionId = turnByKiloSession.get(root);
+    if (sessionId === undefined) return;
+    const route = routes.get(sessionId);
+    if (route === undefined) return;
+    if (event !== undefined && !forwardControlEvent(route, sessionId, root, eventSessionId, event))
+      return;
+    const turn = turns.get(sessionId);
+    if (turn === undefined) return;
+    if (event?.type === 'session.turn.open' && eventSessionId === root)
+      turn.deferredCompletion = undefined;
+    const gateResult = event ? gateResultFromProperties(event.properties) : undefined;
+    if (gateResult !== undefined) turn.gateResult = gateResult;
+    refreshActivity(route.runtimeKey);
+    if (eventSessionId !== root) return;
+    for (const pending of turn.prompts) {
+      if (!pending.dispatched) continue;
+      if (
+        event?.type === 'session.turn.open' ||
+        activity.some(
+          item => item.type === 'message' && item.message.id === pending.payload.messageId
+        )
+      ) {
+        pending.nativeObserved = true;
+      }
+    }
+    // A previous execution's cancellation can arrive after abort's HTTP reply
+    // and after the next prompt was dispatched. Wait for evidence of that prompt.
+    if (turn.prompts.every(entry => !entry.nativeObserved)) {
+      // Missing agents fail in Kilo's preprocessing, before a message or turn can be observed.
+      const missingAgent =
+        event?.type === 'session.error' ? missingAgentSlug(event.properties.error) : undefined;
+      if (
+        event !== undefined &&
+        missingAgent !== undefined &&
+        turn.prompts.some(entry => entry.dispatched && entry.payload.agent.mode === missingAgent)
+      ) {
+        onKiloError(turn, event.properties);
+      }
+      return;
+    }
+    if (event) turn.publication?.observe(event.type);
+    for (const item of activity) turn.publication?.observeActivity(item);
+    for (const item of activity)
+      if (item.type === 'message' && item.message.role === 'assistant')
+        turn.assistantMessageId = item.message.id;
+    if (event === undefined) return;
+    if (event.type === 'session.turn.close') {
+      const nativeState = deps.runtimes.get(route.runtimeKey)?.sessionState(root);
+      if (nativeState !== undefined) {
+        if (event.properties.reason === 'completed') {
+          turn.deferredCompletion = {
+            nativeRuntimeId: nativeState.nativeRuntimeId,
+            execution: nativeState.execution,
+            lastMessageId: lastReceivedMessageId(turn),
+          };
+        }
+        return;
+      }
+      if (event.properties.reason === 'completed') {
+        for (const pending of turn.prompts) pending.nativeClose?.resolve();
+      }
+    }
+    observeRootEvent(turn, event.type, event.properties);
+  }
+
+  /**
+   * Applies route policy to one control event and forwards it to the Session DO.
+   * Returns false when the event is consumed here and must not reach the turn.
+   */
+  function forwardControlEvent(
+    route: TurnRoute,
+    sessionId: string,
+    root: string,
+    eventSessionId: string | undefined,
+    event: KiloFeedEvent
+  ): boolean {
+    if (route.createdOnPlatform === 'code-review') {
+      if (event.type === 'question.asked' && typeof event.properties.id === 'string') {
+        if (!route.automaticQuestions.has(event.properties.id)) {
+          route.automaticQuestions.add(event.properties.id);
+          void rejectReviewQuestion(route, event.properties.id);
+        }
+        return false;
+      }
+      if (
+        (event.type === 'question.replied' || event.type === 'question.rejected') &&
+        typeof event.properties.requestID === 'string' &&
+        route.automaticQuestions.delete(event.properties.requestID)
+      )
+        return false;
+      const status = event.properties.status;
+      if (
+        event.type === 'session.status' &&
+        isRecord(status) &&
+        (status.type === 'question' || status.type === 'permission')
+      )
+        return false;
+    }
+    if (
+      event.type === 'session.turn.open' &&
+      eventSessionId === root &&
+      deps.runtimes.get(route.runtimeKey)?.sessionState(root)?.activity !== 'stopping'
+    )
+      route.deadlineRuntimeId = undefined;
+    if (
+      event.type === 'session.error' &&
+      route.deadlineRuntimeId === event.nativeRuntimeId &&
+      isAssistantInterrupt(event.properties.error)
+    )
+      return false;
+    if (event.type === 'permission.replied' && typeof event.properties.requestID === 'string') {
+      if (route.automaticPermissions.delete(event.properties.requestID)) return false;
+    }
+    if (event.type === 'permission.asked' && typeof event.properties.id === 'string') {
+      const reply = automaticPermissionReply(route.createdOnPlatform, event.properties);
+      if (reply !== undefined) {
+        if (!route.automaticPermissions.has(event.properties.id)) {
+          route.automaticPermissions.add(event.properties.id);
+          void answerAutomaticPermission(route, event, reply);
+        }
+        return false;
+      }
+    }
+    emitEvents(sessionId, [{ type: event.type, properties: event.properties }]);
+    if (event.type === 'session.deleted' && eventSessionId !== root) {
+      if (eventSessionId !== undefined) childRoots.delete(eventSessionId);
+    }
+    return true;
+  }
+
   function tick(): void {
     for (const turn of [...turns.values()]) {
       if (queueState(turn.route) === 'unavailable') {
@@ -970,6 +1203,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }
       drainInbox(turn);
       refreshSerializedWaits(turn);
+      if (interruptedFinalizations.has(turn.route.sessionId)) {
+        for (const pending of turn.prompts) pending.deliveryResumedAt = now();
+      }
       const pending = turn.prompts.find(entry => deliveryExpired(turn, entry));
       if (pending && turn.phase !== 'finalizing') {
         pending.abort.abort(new Error('Prompt delivery timed out'));
@@ -982,7 +1218,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
     const child = childFromSessionCreated(event.properties);
     if (child === undefined) return;
     const parentRoot =
-      emittingRoute(event)?.kiloSessionId ?? resolveRootKiloSession(child.parentId);
+      emittingRoute(event.runtimeKey, eventKiloSessionId(event.properties), child.parentId)
+        ?.kiloSessionId ?? resolveRootKiloSession(child.parentId);
     if (parentRoot === undefined) return;
     childRoots.set(child.childId, parentRoot);
   }
@@ -1010,13 +1247,15 @@ export function createTurnManager(deps: TurnManagerDeps) {
       try {
         const runtime = deps.runtimes.get(route.runtimeKey);
         if (runtime === undefined) throw new Error('Kilo runtime unavailable');
-        const success = await runtime.client.answerPermission(
-          permissionId,
-          reply.response,
-          reply.response === 'reject' ? reply.message : undefined,
-          undefined,
-          route.directory
-        );
+        const success = await runtime.client.answer({
+          directory: route.directory,
+          reply: {
+            action: 'permission',
+            permissionId,
+            response: reply.response,
+            ...(reply.response === 'reject' ? { message: reply.message } : {}),
+          },
+        });
         if (!success) throw new Error('Permission reply was not accepted');
         return;
       } catch (error) {
@@ -1049,7 +1288,13 @@ export function createTurnManager(deps: TurnManagerDeps) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const runtime = deps.runtimes.get(route.runtimeKey);
-        if (!runtime || !(await runtime.client.rejectQuestion(questionId, route.directory)))
+        if (
+          !runtime ||
+          !(await runtime.client.answer({
+            directory: route.directory,
+            reply: { action: 'reject', questionId },
+          }))
+        )
           throw new Error('Question rejection was not accepted');
         return;
       } catch {
@@ -1074,7 +1319,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     if (route === undefined) return;
     const runtime = deps.runtimes.get(route.runtimeKey);
     if (runtime === undefined || runtime.isRestarting() || runtime.isUnavailable()) return;
-    let client: WrapperKiloClient;
+    let client: Harness;
     try {
       client = runtime.client;
     } catch {
@@ -1128,6 +1373,40 @@ export function createTurnManager(deps: TurnManagerDeps) {
   return {
     canRestartRuntime,
 
+    async cancelInterruptedFinalizations(directory: string): Promise<void> {
+      const pending = [...interruptedFinalizations.values()].filter(
+        entry => entry.route.directory === directory
+      );
+      for (const entry of pending) entry.abort.abort(new Error('worktree deleted'));
+      await Promise.all(pending.map(entry => entry.done));
+    },
+
+    /**
+     * True while any live turn (including a sibling) uses this directory, or an
+     * interrupted turn's auto-commit still runs there after the turn was reset.
+     */
+    hasActiveTurnInDirectory(directory: string): boolean {
+      for (const turn of turns.values()) {
+        if (turn.route.directory === directory) return true;
+      }
+      for (const entry of interruptedFinalizations.values()) {
+        if (entry.route.directory === directory) return true;
+      }
+      return false;
+    },
+
+    /** The registered route spec, used for managed git args and the expected branch. */
+    routeSpec(sessionId: string): ControlPlaneRouteSpec | undefined {
+      return routeSpecs.get(sessionId);
+    },
+
+    /** Admission resumes after a branch rewrite releases the directory. */
+    resumeDirectory(directory: string): void {
+      for (const turn of turns.values()) {
+        if (turn.route.directory === directory) drainInbox(turn);
+      }
+    },
+
     credentialsInstalled(runtimeKeyValue: string): void {
       maybeApplyPendingCredentials(runtimeKeyValue);
     },
@@ -1141,6 +1420,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         sessionId: spec.sessionId,
         kiloSessionId: spec.kiloSessionId,
         directory: spec.directory,
+        roots: routeRoots(spec),
         runtimeKey: runtimeKey(spec),
         createdOnPlatform: spec.createdOnPlatform,
         githubReviewTarget: spec.githubReviewTarget,
@@ -1149,10 +1429,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
         automaticQuestions: existing?.automaticQuestions ?? new Set(),
       };
       routes.set(spec.sessionId, route);
+      routeSpecs.set(spec.sessionId, spec);
       turnByKiloSession.set(spec.kiloSessionId, spec.sessionId);
     },
 
     release(sessionId: string): void {
+      interruptedFinalizations.get(sessionId)?.abort.abort(new Error('session released'));
       const route = routes.get(sessionId);
       if (route !== undefined) {
         turnByKiloSession.delete(route.kiloSessionId);
@@ -1161,6 +1443,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         }
       }
       routes.delete(sessionId);
+      routeSpecs.delete(sessionId);
       turns.get(sessionId)?.publication?.dispose();
       turns.delete(sessionId);
       stopTickIfIdle();
@@ -1171,6 +1454,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     abort(sessionId: string): void {
+      interruptedFinalizations.get(sessionId)?.abort.abort(new Error('aborted'));
       const route = routes.get(sessionId);
       if (route !== undefined) void abortKilo(route);
       const turn = turns.get(sessionId);
@@ -1184,125 +1468,16 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     observeKiloEvent(event: KiloFeedEvent): void {
-      // Kilo is back (or the feed resumed): drain anything waiting for it.
-      for (const turn of turns.values()) {
-        if (turn.inbox.length > 0) drainInbox(turn);
-      }
-      if (SYNTHETIC_KILO_EVENTS.has(event.type)) return;
-      const eventSessionId = eventKiloSessionId(event.properties);
-      if (event.type === 'session.created') registerChild(event);
-      let root = resolveRootKiloSession(eventSessionId);
-      // A descendant's reported parent may name another route in the same
-      // worktree; the runtime that emitted it is authoritative. Route roots keep
-      // their own identity so a runtime never captures another route's events.
-      const emitting = emittingRoute(event);
-      const isRouteRoot = eventSessionId !== undefined && turnByKiloSession.has(eventSessionId);
-      if (emitting !== undefined && !isRouteRoot && root !== emitting.kiloSessionId) {
-        root = emitting.kiloSessionId;
-      }
-      if (root === undefined) return;
-      const sessionId = turnByKiloSession.get(root);
-      if (sessionId === undefined) return;
-      const route = routes.get(sessionId);
-      if (route === undefined) return;
-      if (route.createdOnPlatform === 'code-review') {
-        if (event.type === 'question.asked' && typeof event.properties.id === 'string') {
-          if (!route.automaticQuestions.has(event.properties.id)) {
-            route.automaticQuestions.add(event.properties.id);
-            void rejectReviewQuestion(route, event.properties.id);
-          }
-          return;
-        }
-        if (
-          (event.type === 'question.replied' || event.type === 'question.rejected') &&
-          typeof event.properties.requestID === 'string' &&
-          route.automaticQuestions.delete(event.properties.requestID)
-        )
-          return;
-        const status = event.properties.status;
-        if (
-          event.type === 'session.status' &&
-          isRecord(status) &&
-          (status.type === 'question' || status.type === 'permission')
-        )
-          return;
-      }
-      if (
-        event.type === 'session.turn.open' &&
-        eventSessionId === root &&
-        deps.runtimes.get(route.runtimeKey)?.sessionState(root)?.activity !== 'stopping'
-      )
-        route.deadlineRuntimeId = undefined;
-      if (
-        event.type === 'session.error' &&
-        route.deadlineRuntimeId === event.nativeRuntimeId &&
-        isAssistantInterrupt(event.properties.error)
-      )
-        return;
-      if (event.type === 'permission.replied' && typeof event.properties.requestID === 'string') {
-        if (route.automaticPermissions.delete(event.properties.requestID)) return;
-      }
-      if (event.type === 'permission.asked' && typeof event.properties.id === 'string') {
-        const reply = automaticPermissionReply(route.createdOnPlatform, event.properties);
-        if (reply !== undefined) {
-          if (!route.automaticPermissions.has(event.properties.id)) {
-            route.automaticPermissions.add(event.properties.id);
-            void answerAutomaticPermission(route, event, reply);
-          }
-          return;
-        }
-      }
-      emitEvents(sessionId, [{ type: event.type, properties: event.properties }]);
-      if (event.type === 'session.deleted' && eventSessionId !== root) {
-        if (eventSessionId !== undefined) childRoots.delete(eventSessionId);
-      }
-      const turn = turns.get(sessionId);
-      if (turn === undefined) return;
-      if (event.type === 'session.turn.open' && eventSessionId === root)
-        turn.deferredCompletion = undefined;
-      const gateResult = gateResultFromProperties(event.properties);
-      if (gateResult !== undefined) turn.gateResult = gateResult;
-      refreshActivity(route.runtimeKey);
-      if (eventSessionId !== root) return;
-      const info = event.properties.info;
-      for (const pending of turn.prompts) {
-        if (!pending.dispatched) continue;
-        if (
-          event.type === 'session.turn.open' ||
-          (event.type === 'message.updated' &&
-            isRecord(info) &&
-            info.id === pending.payload.messageId)
-        ) {
-          pending.nativeObserved = true;
-        }
-      }
-      // A previous execution's cancellation can arrive after abort's HTTP reply
-      // and after the next prompt was dispatched. Wait for evidence of that prompt.
-      if (turn.prompts.every(entry => !entry.nativeObserved)) return;
-      turn.publication?.observe(event.type, event.properties);
-      if (event.type === 'session.turn.close') {
-        const nativeState = deps.runtimes.get(route.runtimeKey)?.sessionState(root);
-        if (nativeState !== undefined) {
-          if (event.properties.reason === 'completed') {
-            turn.deferredCompletion = {
-              nativeRuntimeId: nativeState.nativeRuntimeId,
-              execution: nativeState.execution,
-              lastMessageId: lastReceivedMessageId(turn),
-            };
-          }
-          return;
-        }
-        if (event.properties.reason === 'completed') {
-          for (const pending of turn.prompts) pending.nativeClose?.resolve();
-        }
-      }
-      if (event.type === 'message.updated') {
-        const info = event.properties.info;
-        if (isRecord(info) && info.role === 'assistant' && typeof info.id === 'string') {
-          turn.assistantMessageId = info.id;
-        }
-      }
-      observeRootEvent(turn, event.type, event.properties);
+      observeFeed(
+        event,
+        eventKiloSessionId(event.properties),
+        event,
+        kiloActivity(event.type, event.properties)
+      );
+    },
+
+    observeActivity(event: HarnessActivityEvent): void {
+      observeFeed(event, activitySessionId(event.activity), undefined, [event.activity]);
     },
 
     onRuntimeRestart(info: KiloRestartInfo & { key: string }): void {
@@ -1367,10 +1542,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             properties: {
               sessionID: execution.sessionId,
               reason: failure,
-              error:
-                failure === 'agent_unresponsive'
-                  ? 'Execution stopped because Kilo was not responding and was restarted. You can continue in this chat.'
-                  : 'Execution stopped because the agent restarted. You can continue in this chat.',
+              error: executionStoppedMessage(failure),
             },
           },
         ]);
@@ -1416,7 +1588,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
       identity: ExecutionIdentity,
       reason: ExecutionFailure,
       retry: ExecutionRetry | undefined,
-      key: string
+      key: string,
+      stopped: Promise<boolean>
     ): void {
       const root = [identity.sessionId, ...(identity.ancestorSessionIds ?? [])]
         .map(resolveRootKiloSession)
@@ -1438,6 +1611,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       const failure = retry ? retryFailure(retry) : undefined;
       if (turn) {
         turn.stepAbort?.abort(new Error(reason));
+        void finalizeInterruptedTurn(turn, stopped);
         if (failure) {
           sendOutcome(turn, 'failed', failure.safeMessage, {
             assistantReason: failure.reason,
@@ -1451,11 +1625,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             properties: {
               sessionID: identity.sessionId,
               reason,
-              error: failure
-                ? `Execution stopped while the model request kept retrying: ${failure.safeMessage}. You can continue in this chat.`
-                : reason === 'no_progress'
-                  ? 'Execution stopped because it made no progress. You can continue in this chat.'
-                  : 'Execution stopped because it reached its time limit. You can continue in this chat.',
+              error: executionStoppedMessage(reason, failure?.safeMessage),
             },
           },
         ]);
@@ -1463,17 +1633,20 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     hasPendingWork(): boolean {
-      return [...turns.values()].some(
-        turn =>
-          turn.phase === 'finalizing' ||
-          turn.prompts.some(
-            entry =>
-              !entry.nativeObserved &&
-              // The live native execution running the serialized command owns compute,
-              // including sleeping while that command waits on the user.
-              !blockedBySerializedCommand(turn, entry) &&
-              !deliveryExpired(turn, entry)
-          )
+      return (
+        interruptedFinalizations.size > 0 ||
+        [...turns.values()].some(
+          turn =>
+            turn.phase === 'finalizing' ||
+            turn.prompts.some(
+              entry =>
+                !entry.nativeObserved &&
+                // The live native execution running the serialized command owns compute,
+                // including sleeping while that command waits on the user.
+                !blockedBySerializedCommand(turn, entry) &&
+                !deliveryExpired(turn, entry)
+            )
+        )
       );
     },
 
@@ -1482,6 +1655,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
     tick,
 
     shutdown(): void {
+      for (const entry of interruptedFinalizations.values()) {
+        entry.abort.abort(new Error('wrapper shutting down'));
+      }
       if (tickHandle === undefined) return;
       scheduler.clearInterval(tickHandle);
       tickHandle = undefined;

@@ -1,8 +1,10 @@
 /* eslint-disable max-lines -- the screen keeps every existing detail section plus the read-only transcript slot */
 
 import * as Haptics from 'expo-haptics';
-import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { notificationHaptic } from '@/lib/haptics';
+import { type Href } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -14,11 +16,14 @@ import {
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
 import {
+  findingsEmptyCopyKey,
   flattenCouncilFindings,
+  reviewCancellationLabel,
   reviewFailureLabel,
   selectRetryAction,
 } from '@/components/code-reviewer/review-detail-helpers';
 import { ReviewSpectatorSheet } from '@/components/code-reviewer/review-spectator-sheet';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import {
   CouncilSection,
   FindingCard,
@@ -26,7 +31,7 @@ import {
   MetaRow,
 } from '@/components/code-reviewer/review-detail-sections';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -38,7 +43,10 @@ import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { isPersonal, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
+import { trpcErrorVariant } from '@/lib/trpc-error';
+import { useTRPC } from '@/lib/trpc';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const FINDINGS_PAGE_SIZE = 20;
@@ -50,7 +58,9 @@ function confirmRetry(onConfirm: () => void) {
     [
       { text: i18n.t('common.cancel'), style: 'cancel' },
       { text: i18n.t('common.retry'), onPress: onConfirm },
-    ]
+    ],
+    // Android back dismisses, which equals Cancel: no retrigger starts.
+    { cancelable: true }
   );
 }
 
@@ -58,13 +68,27 @@ export function ReviewDetailScreen({
   scope,
   reviewId,
 }: Readonly<{ scope: string; reviewId: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
+  // One shared minute clock for every relative label on the screen, so the
+  // timestamps stay current while the review is polled and a row here reads the
+  // same age as the same review's row in the list.
+  const now = useRelativeTimeNow();
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
+  // Set before `mutate` and released when the request settles. The mutation's own
+  // `isPending` only flips after `mutate` returns, so a confirmation that arrives
+  // twice — a double-tapped alert button, or the screen button pressed again
+  // before the pending render lands — would otherwise send a second retrigger
+  // that the server rejects with BAD_REQUEST.
+  const retryInFlight = useRef(false);
   const [visibleCount, setVisibleCount] = useState(FINDINGS_PAGE_SIZE);
+  // The review whose transcript is open, `null` while none is. Keying it by the
+  // review id closes an open transcript by itself when the route moves to another
+  // review, without an effect that would also fire on a plain re-render.
+  const [transcriptReviewId, setTranscriptReviewId] = useState<string | null>(null);
   const loadedReview = data?.success ? data.review : undefined;
   // Only a retriggerable automatic review needs the reviewer config. Bitbucket
   // is org-only, and a personal Bitbucket query would throw in toPersonalPlatform.
@@ -76,6 +100,25 @@ export function ReviewDetailScreen({
     !(isPersonal(scope) && reviewPlatform === 'bitbucket');
   const reviewConfig = useReviewConfig(scope, reviewPlatform, { enabled: configQueryEnabled });
 
+  // The in-app pull-request reader is gated on the user's own GitHub
+  // authorization, and a Code Reviewer user can own a review without one. The
+  // read is the stored status, not a GitHub call. It is enabled from the same
+  // URL-derived provider the button decides on, never the review row's column,
+  // so a row whose column disagrees with its URL still decides on one source.
+  const openPrDestination = useMemo(
+    () => resolveCodeReviewerOpenPrDestination(loadedReview?.pr_url ?? ''),
+    [loadedReview?.pr_url]
+  );
+  const needsGitHubAuthorization =
+    isPersonal(scope) &&
+    openPrDestination.kind === 'in-app' &&
+    openPrDestination.platform === 'github';
+  const trpc = useTRPC();
+  const githubAuthorization = useQuery({
+    ...trpc.githubApps.getUserAuthorization.queryOptions(),
+    enabled: needsGitHubAuthorization,
+  });
+
   function confirmCancel(onConfirm: () => void) {
     confirm({
       title: i18n.t('codeReviewer.reviewDetail.cancelTitle'),
@@ -86,10 +129,41 @@ export function ReviewDetailScreen({
     });
   }
 
+  function requestRetry() {
+    if (retryInFlight.current) {
+      return;
+    }
+    retryInFlight.current = true;
+    retriggerReview.mutate(
+      { reviewId },
+      {
+        onSuccess: () => {
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
+        },
+        onSettled: () => {
+          retryInFlight.current = false;
+        },
+      }
+    );
+  }
+
+  // One header for every state. The eyebrow is the review's repository, which
+  // only the payload knows, so its line is reserved from the first frame: the
+  // title above the body must not move when the review lands — nor when a
+  // refetch drops it back to loading, nor on the error branches that paint the
+  // same header.
+  const header = (
+    <ReviewerHeader
+      title={t('codeReviewer.reviewDetail.title')}
+      eyebrow={loadedReview?.repo_full_name}
+      reserveEyebrow
+    />
+  );
+
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
+        {header}
         <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
             <Skeleton className="h-14 w-full rounded-lg" />
@@ -111,7 +185,7 @@ export function ReviewDetailScreen({
     if (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
+          {header}
           <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
           {dialog}
         </View>
@@ -119,9 +193,9 @@ export function ReviewDetailScreen({
     }
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
+        {header}
         <QueryError
-          variant="server"
+          variant={trpcErrorVariant(error)}
           title={t('codeReviewer.reviewDetail.couldNotLoad')}
           onRetry={() => void refetch()}
           isRetrying={isFetching}
@@ -151,12 +225,31 @@ export function ReviewDetailScreen({
   const gateThreshold = (
     review.manual_config as { agentConfig?: { gate_threshold?: string } } | null
   )?.agentConfig?.gate_threshold;
+  // A cancelled or interrupted row explains its outcome in the reader's own
+  // words; only a failure or an unmapped diagnostic keeps the raw message.
+  const cancellationLabel = reviewCancellationLabel(t, {
+    status: review.status,
+    errorMessage: review.error_message,
+    terminalReason: review.terminal_reason,
+    platformLabel: reviewerPlatformLabel(review.platform),
+  });
+  // The single message the conclusion block renders: the cancellation sentence,
+  // the failure copy, or a diagnostic we have no copy for.
+  const reviewMessage =
+    cancellationLabel ??
+    (review.status === 'failed'
+      ? reviewFailureLabel(t, review.error_message, review.terminal_reason)
+      : review.error_message);
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.reviewDetail.title')} eyebrow={review.repo_full_name} />
+      {header}
       <ReviewSpectatorSheet
         key={reviewId}
+        visible={transcriptReviewId === reviewId}
+        onClose={() => {
+          setTranscriptReviewId(null);
+        }}
         reviewId={reviewId}
         status={review.status}
         prTitle={review.pr_title}
@@ -174,22 +267,28 @@ export function ReviewDetailScreen({
           <Text className="text-base font-medium">{review.pr_title}</Text>
           <Text variant="muted" className="text-xs">
             {t('codeReviewer.reviewDetail.byline', {
-              repo: review.repo_full_name,
               number: review.pr_number,
               author: review.pr_author,
             })}
           </Text>
         </Animated.View>
 
-        {/* Conclusion: the outcome leads — status first, then the failure reason. */}
+        {/* Conclusion: the outcome leads — status first, then the reason. */}
         <View className="gap-2">
           <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
-          {review.status === 'failed' || review.error_message ? (
-            <View className="rounded-lg bg-danger-tile-bg p-3">
-              <Text className="text-xs text-destructive" numberOfLines={4}>
-                {review.status === 'failed'
-                  ? reviewFailureLabel(t, review.error_message, review.terminal_reason)
-                  : review.error_message}
+          {reviewMessage ? (
+            <View
+              className={cn(
+                'rounded-lg p-3',
+                cancellationLabel ? 'bg-secondary' : 'bg-danger-tile-bg'
+              )}
+            >
+              <Text
+                variant={cancellationLabel ? 'muted' : undefined}
+                className={cn('text-xs', !cancellationLabel && 'text-destructive')}
+                numberOfLines={4}
+              >
+                {reviewMessage}
               </Text>
             </View>
           ) : null}
@@ -199,13 +298,13 @@ export function ReviewDetailScreen({
         <View className="gap-2">
           <Text className="text-sm font-medium">{t('common.findings')}</Text>
           {visibleFindings.length === 0 ? (
-            <Text variant="muted" className="text-xs">
-              {t(
-                review.status === 'failed'
-                  ? 'codeReviewer.reviewDetail.findingsUnavailable'
-                  : 'codeReviewer.reviewDetail.noFindings'
-              )}
-            </Text>
+            // The empty result sits in the same card as every other section's
+            // body, so an ended review reads as a filled section, not a caption.
+            <View className="rounded-lg bg-secondary p-4">
+              <Text variant="muted" className="text-xs">
+                {t(findingsEmptyCopyKey(review.status))}
+              </Text>
+            </View>
           ) : (
             <View className="gap-2">
               {visibleFindings.map((finding, index) => (
@@ -228,11 +327,11 @@ export function ReviewDetailScreen({
         {/* Council: decision plus specialist names/votes as text. */}
         {review.council_result ? <CouncilSection councilResult={review.council_result} /> : null}
 
-        {/* Gate: check-run presence, review status, and threshold when set. */}
+        {/* Gate: check-run presence and threshold when set. The review status is
+            the conclusion above, so the card never repeats it. */}
         <GateSection
           checkRunId={review.check_run_id}
           checkRunRedacted={review.rawIdsRedacted}
-          statusLabel={meta.label}
           gateThreshold={gateThreshold}
         />
 
@@ -245,18 +344,22 @@ export function ReviewDetailScreen({
             {review.model ? <MetaRow label={t('common.model')} value={review.model} /> : null}
             <MetaRow
               label={t('codeReviewer.reviewDetail.created')}
-              value={timeAgo(parseTimestamp(review.created_at))}
+              value={timeAgo(parseTimestamp(review.created_at), undefined, now)}
             />
             {review.started_at ? (
               <MetaRow
                 label={t('codeReviewer.reviewDetail.started')}
-                value={timeAgo(parseTimestamp(review.started_at))}
+                value={timeAgo(parseTimestamp(review.started_at), undefined, now)}
               />
             ) : null}
             {review.completed_at ? (
               <MetaRow
-                label={t('common.completed')}
-                value={timeAgo(parseTimestamp(review.completed_at))}
+                label={t(
+                  review.status === 'completed'
+                    ? 'common.completed'
+                    : 'codeReviewer.reviewDetail.reviewEnded'
+                )}
+                value={timeAgo(parseTimestamp(review.completed_at), undefined, now)}
               />
             ) : null}
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
@@ -277,17 +380,23 @@ export function ReviewDetailScreen({
           </View>
         </View>
 
-        {/* Actions. */}
+        {/* Actions. The pull request is the screen's primary action, so it takes
+            the filled primary style; every other action stays secondary. */}
         <View className="gap-3">
           <Button
-            variant="secondary"
             onPress={() => {
-              if (isPersonal(scope)) {
-                const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);
-                if (destination.kind === 'in-app') {
-                  router.push(destination.href);
-                  return;
-                }
+              // A github.com pull request reads in the app only with the user's
+              // own GitHub authorization; without it that route is the Connect
+              // wall, so the pull request opens in the browser instead. A
+              // pending or failed read keeps that fallback. Other providers
+              // keep their in-app route, whose own gate owns their connection.
+              if (
+                isPersonal(scope) &&
+                openPrDestination.kind === 'in-app' &&
+                (!needsGitHubAuthorization || githubAuthorization.data?.connected === true)
+              ) {
+                pushOnce(openPrDestination.href);
+                return;
               }
               void openExternalUrl(review.pr_url, {
                 label: t('common.pullRequest'),
@@ -297,6 +406,18 @@ export function ReviewDetailScreen({
             {/* i18n-dup-ok: agentChat.prBadge.open names a pull request's open state;
                 this key is the verb CTA — cs/pl/be translate the two apart. */}
             <Text>{t('common.openPullRequest')}</Text>
+          </Button>
+
+          {/* The transcript is a secondary way to read the same review, so it
+              sits beside the primary action and never above the title. */}
+          <Button
+            variant="secondary"
+            accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
+            onPress={() => {
+              setTranscriptReviewId(reviewId);
+            }}
+          >
+            <Text>{t('agentChat.session.transcriptAccessibility')}</Text>
           </Button>
 
           {canCancel ? (
@@ -309,7 +430,7 @@ export function ReviewDetailScreen({
                     { reviewId },
                     {
                       onSuccess: () => {
-                        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                        notificationHaptic(Haptics.NotificationFeedbackType.Warning);
                       },
                     }
                   );
@@ -323,18 +444,13 @@ export function ReviewDetailScreen({
           {retryAction === 'retry' ? (
             <Button
               variant="secondary"
+              loading={retriggerReview.isPending}
               disabled={retriggerReview.isPending}
               onPress={() => {
-                confirmRetry(() => {
-                  retriggerReview.mutate(
-                    { reviewId },
-                    {
-                      onSuccess: () => {
-                        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      },
-                    }
-                  );
-                });
+                if (retriggerReview.isPending) {
+                  return;
+                }
+                confirmRetry(requestRetry);
               }}
             >
               <Text>{t('codeReviewer.reviewDetail.retryReview')}</Text>
@@ -349,9 +465,7 @@ export function ReviewDetailScreen({
               <Button
                 variant="secondary"
                 onPress={() => {
-                  router.push(
-                    `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${review.platform}` as Href
-                  );
+                  pushOnce(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
                 }}
               >
                 <Text>{t('codeReviewer.reviewDetail.fixSettings')}</Text>

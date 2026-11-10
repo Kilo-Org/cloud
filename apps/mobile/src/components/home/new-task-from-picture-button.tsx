@@ -5,6 +5,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { View } from 'react-native';
 
 import { pickAgentPicture } from '@/components/agents/attachment-picker';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { Button } from '@/components/ui/button';
 import { Camera } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -29,6 +30,7 @@ export function NewTaskFromPictureButton({
   organizationId,
 }: Readonly<NewTaskFromPictureButtonProps>) {
   const router = useRouter();
+  const { beginNewSessionNavigation } = useNewSessionNavigator();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const themedSheet = useThemedActionSheetOptions();
@@ -37,12 +39,15 @@ export function NewTaskFromPictureButton({
 
   const openComposerWithPicture = useCallback(
     (candidates: AgentAttachmentCandidate[]) => {
+      if (candidates.length === 0 || !beginNewSessionNavigation()) {
+        return;
+      }
       const href = stagePictureForNewSession({ candidates, organizationId });
       if (href !== null) {
         router.push(href as Href);
       }
     },
-    [organizationId, router]
+    [beginNewSessionNavigation, organizationId, router]
   );
 
   // Android can recreate the Activity while the camera or the picker is open,
@@ -88,7 +93,18 @@ export function NewTaskFromPictureButton({
 
   return (
     <View className="mx-4">
-      <Button variant="secondary" size="lg" className="w-full" onPress={handlePress}>
+      {/* The filled neutral action paints `--secondary-fill`, which the dark
+          scheme lifts to stay apart from an outlined control on a sheet's card.
+          This button sits on the near-black page beside the filled primary, so
+          there it takes the raised card pair the Explore rows below it use: the
+          `--secondary` surface with the hairline edge, so the container reads as
+          a button. The transparent light edge keeps the light fill unchanged. */}
+      <Button
+        variant="secondary"
+        size="lg"
+        className="w-full border border-transparent dark:border-neutral-700 dark:bg-secondary"
+        onPress={handlePress}
+      >
         <Camera size={18} color={colors.secondaryForeground} />
         <Text className="shrink text-center font-semibold">{t('home.newTaskFromPicture')}</Text>
       </Button>

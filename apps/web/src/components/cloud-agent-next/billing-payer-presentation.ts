@@ -4,7 +4,9 @@ import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 
 export type BillingPayerPresentation = {
   payerName: string;
-  action?: { href: string; label: string; memberGuidance?: boolean };
+  action?: { href: string; label: string };
+  /** The viewer cannot pay for this organization; the banner names who can. */
+  memberGuidance?: boolean;
 };
 
 export function billingPayerPresentation(
@@ -29,18 +31,16 @@ export function billingPayerPresentation(
   if (!organization || failure.payer.type !== 'org' || failure.payer.id !== organization.id) {
     return { payerName: failure.payer.type === 'org' ? 'This organization' : 'Your account' };
   }
+  if (!canRecoverWithCredits) {
+    return { payerName: organization.name };
+  }
+  // Billing surfaces are gated on the organization billing roles, so a plain member gets no
+  // navigation target: the banner names the roles that can add credits instead.
+  if (!canManageOrganizationBilling(organization.role)) {
+    return { payerName: organization.name, memberGuidance: true };
+  }
   return {
     payerName: organization.name,
-    ...(canRecoverWithCredits
-      ? {
-          action: canManageOrganizationBilling(organization.role)
-            ? { href: `/organizations/${organization.id}`, label: 'Add organization credits' }
-            : {
-                href: `/organizations/${organization.id}/payment-details`,
-                label: 'View organization billing',
-                memberGuidance: true,
-              },
-        }
-      : {}),
+    action: { href: `/organizations/${organization.id}`, label: 'Add organization credits' },
   };
 }

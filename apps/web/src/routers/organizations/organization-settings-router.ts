@@ -2,7 +2,6 @@ import {
   getOrganizationById,
   mutateOrganizationSettings,
   setOrganizationRecommendationsDigestEnabled,
-  updateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
@@ -10,6 +9,7 @@ import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
   organizationAdminMutationProcedure,
+  organizationMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { listAvailableModelsProcedure } from '@kilocode/web-shared/routers/organizations/organization-available-models-procedure';
 import { TRPCError } from '@trpc/server';
@@ -22,6 +22,12 @@ import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/or
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { OrganizationDataRegionSchema } from '@kilocode/db/schema-types';
+import {
+  isOrganizationFeatureEnabled,
+  readOrganizationFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
@@ -102,6 +108,21 @@ function createDefaultModelDiffMessage(
   }
 
   return 'Updated default model';
+}
+
+/**
+ * Creates the audit message for a change to the organization data collection policy
+ */
+function createDataCollectionMessage(
+  dataCollection: OrganizationSettings['data_collection']
+): string {
+  if (dataCollection === 'allow') {
+    return 'Data collection: allowed';
+  }
+  if (dataCollection === 'deny') {
+    return 'Data collection: denied';
+  }
+  return 'Data collection: follow extension setting';
 }
 
 function assertOrganizationAutoRouteCount(routes: Record<string, string>): void {
@@ -218,9 +239,12 @@ async function validateOrganizationDefaultReplacement(
   );
   let availableModels: Awaited<ReturnType<typeof getAvailableModelsForOrganization>>;
   try {
-    availableModels = await getAvailableModelsForOrganization(organization.id, {
-      type: 'defaultAccess',
-    });
+    availableModels = await getAvailableModelsForOrganization(
+      organization.id,
+      { type: 'defaultAccess' },
+      'member',
+      { countryCode: null }
+    );
   } catch {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -306,8 +330,113 @@ const SettingsResponseSchema = z.object({
   settings: z.custom<OrganizationSettings>(),
 });
 
+const UpdateGatewaySettingsInputSchema = OrganizationIdInputSchema.extend({
+  disable_openrouter: z.boolean().optional(),
+  disable_vercel_ai_gateway: z.boolean().optional(),
+  data_region: OrganizationDataRegionSchema.nullable().optional(),
+});
+
+const GatewaySettingsResponseSchema = z.object({
+  available: z.boolean(),
+  disable_openrouter: z.boolean(),
+  disable_vercel_ai_gateway: z.boolean(),
+  data_region: OrganizationDataRegionSchema.nullable(),
+});
+
+async function isGatewaySettingsAvailable(organizationId: string) {
+  return isOrganizationFeatureEnabled(
+    await readOrganizationFeatures(db),
+    'gateway_settings',
+    organizationId
+  );
+}
+
+function createGatewaySettingsDiffMessage(
+  oldSettings: OrganizationSettings,
+  newSettings: OrganizationSettings
+): string {
+  const changes: string[] = [];
+  if (!!oldSettings.disable_openrouter !== !!newSettings.disable_openrouter) {
+    changes.push(`OpenRouter ${newSettings.disable_openrouter ? 'disabled' : 'enabled'}`);
+  }
+  if (!!oldSettings.disable_vercel_ai_gateway !== !!newSettings.disable_vercel_ai_gateway) {
+    changes.push(
+      `Vercel AI Gateway ${newSettings.disable_vercel_ai_gateway ? 'disabled' : 'enabled'}`
+    );
+  }
+  if ((oldSettings.data_region ?? null) !== (newSettings.data_region ?? null)) {
+    changes.push(
+      `Data region: ${newSettings.data_region ? ORGANIZATION_DATA_REGION_NAMES[newSettings.data_region] : 'Global'}`
+    );
+  }
+  return changes.length > 0
+    ? `Updated gateway settings: ${changes.join('; ')}`
+    : 'Updated gateway settings: no changes';
+}
+
 export const organizationsSettingsRouter = createTRPCRouter({
   listAvailableModels: listAvailableModelsProcedure,
+
+  getGatewaySettings: organizationMemberProcedure
+    .output(GatewaySettingsResponseSchema)
+    .query(async ({ input }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      return {
+        available: await isGatewaySettingsAvailable(input.organizationId),
+        disable_openrouter: organization.settings.disable_openrouter ?? false,
+        disable_vercel_ai_gateway: organization.settings.disable_vercel_ai_gateway ?? false,
+        data_region: organization.settings.data_region ?? null,
+      };
+    }),
+
+  updateGatewaySettings: organizationAdminMutationProcedure
+    .input(UpdateGatewaySettingsInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, disable_openrouter, disable_vercel_ai_gateway, data_region } = input;
+      if (!(await isGatewaySettingsAvailable(organizationId))) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Gateway settings are not available for this organization.',
+        });
+      }
+
+      const updatedSettings = await db.transaction(async tx => {
+        let previousSettings: OrganizationSettings = {};
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          async organization => {
+            previousSettings = organization.settings;
+            const settingsUpdate: OrganizationSettings = { ...organization.settings };
+            if (disable_openrouter !== undefined) {
+              settingsUpdate.disable_openrouter = disable_openrouter;
+            }
+            if (disable_vercel_ai_gateway !== undefined) {
+              settingsUpdate.disable_vercel_ai_gateway = disable_vercel_ai_gateway;
+            }
+            if (data_region !== undefined) {
+              settingsUpdate.data_region = data_region;
+            }
+            return settingsUpdate;
+          },
+          tx
+        );
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: createGatewaySettingsDiffMessage(previousSettings, settings),
+          organization_id: organizationId,
+          tx,
+        });
+        return settings;
+      });
+      return { settings: updatedSettings };
+    }),
 
   updateAllowLists: organizationAdminMutationProcedure
     .input(UpdateAllowListsInputSchema)
@@ -698,7 +827,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
   updateDataCollection: organizationBillingMutationProcedure
     .input(UpdateDataCollectionInputSchema)
     .output(SettingsResponseSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { organizationId, dataCollection } = input;
 
       const existingOrg = await getOrganizationById(organizationId);
@@ -709,10 +838,29 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Update the data collection setting
-      const updatedSettings = await updateOrganizationSettings(organizationId, {
-        ...existingOrg.settings,
-        data_collection: dataCollection,
+      const updatedSettings = await db.transaction(async tx => {
+        let previousDataCollection: OrganizationSettings['data_collection'];
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousDataCollection = organization.settings?.data_collection ?? null;
+            return { ...organization.settings, data_collection: dataCollection };
+          },
+          tx
+        );
+        // An unset value and an explicit null both follow the extension setting.
+        if ((dataCollection ?? null) !== previousDataCollection) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: createDataCollectionMessage(dataCollection),
+            organization_id: organizationId,
+            tx,
+          });
+        }
+        return settings;
       });
 
       return {
@@ -746,24 +894,31 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Merge with existing settings
-      const currentSettings = existingOrg.settings || {};
-      const updatedSettings = await updateOrganizationSettings(organizationId, {
-        ...currentSettings,
-        projects_ui_enabled,
-      });
+      const updatedSettings = await db.transaction(async tx => {
+        let previousValue: boolean | undefined;
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousValue = organization.settings?.projects_ui_enabled;
+            return { ...organization.settings, projects_ui_enabled };
+          },
+          tx
+        );
 
-      // Create audit log if the value changed
-      if (currentSettings.projects_ui_enabled !== projects_ui_enabled) {
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
-          organization_id: organizationId,
-        });
-      }
+        if (previousValue !== projects_ui_enabled) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
+            organization_id: organizationId,
+            tx,
+          });
+        }
+
+        return settings;
+      });
 
       return {
         settings: updatedSettings,
@@ -784,41 +939,49 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      const currentSettings = existingOrg.settings || {};
-      let updatedSettings: OrganizationSettings;
+      const updatedSettings = await db.transaction(async tx => {
+        let previousSettings: OrganizationSettings = {};
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            previousSettings = organization.settings || {};
+            if (!enabled) {
+              // Remove the fields when disabled
+              const {
+                minimum_balance: _mb,
+                minimum_balance_alert_email: _mbae,
+                ...rest
+              } = previousSettings;
+              return rest;
+            }
+            return {
+              ...previousSettings,
+              minimum_balance,
+              minimum_balance_alert_email,
+            };
+          },
+          tx
+        );
 
-      if (enabled) {
-        updatedSettings = await updateOrganizationSettings(organizationId, {
-          ...currentSettings,
-          minimum_balance,
-          minimum_balance_alert_email,
-        });
-      } else {
-        // Remove the fields when disabled
-        const {
-          minimum_balance: _mb,
-          minimum_balance_alert_email: _mbae,
-          ...rest
-        } = currentSettings;
-        updatedSettings = await updateOrganizationSettings(organizationId, rest);
-      }
+        const wasEnabled =
+          previousSettings.minimum_balance !== undefined &&
+          previousSettings.minimum_balance_alert_email !== undefined;
+        if (enabled !== wasEnabled || enabled) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: enabled
+              ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
+              : 'Minimum balance alert: disabled',
+            organization_id: organizationId,
+            tx,
+          });
+        }
 
-      // Create audit log
-      const wasEnabled =
-        currentSettings.minimum_balance !== undefined &&
-        currentSettings.minimum_balance_alert_email !== undefined;
-      if (enabled !== wasEnabled || enabled) {
-        await createAuditLog({
-          action: 'organization.settings.change',
-          actor_email: ctx.user.google_user_email,
-          actor_id: ctx.user.id,
-          actor_name: ctx.user.google_user_name,
-          message: enabled
-            ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
-            : 'Minimum balance alert: disabled',
-          organization_id: organizationId,
-        });
-      }
+        return settings;
+      });
 
       return {
         settings: updatedSettings,

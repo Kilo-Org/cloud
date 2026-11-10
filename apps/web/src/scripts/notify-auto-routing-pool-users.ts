@@ -12,8 +12,19 @@ const requireFromScript = createRequire(__filename);
 
 function report(result: PoolNotificationResult, cutoverAt: string) {
   console.log(JSON.stringify({ ...result, cutoverAt }));
-  if (result.ambiguous > 0 || result.failed > 0 || result.followupRequired > 0)
+  if (
+    result.ambiguous > 0 ||
+    result.failed > 0 ||
+    result.followupRequired > 0 ||
+    (result.mode === 'send' && result.remaining > 0)
+  ) {
     process.exitCode = 1;
+  }
+  if (result.mode === 'send' && result.remaining > 0 && Date.parse(cutoverAt) <= Date.now()) {
+    console.error(
+      'Cutover reached; no further notices were attempted. Retain this campaign and reconcile unknown outcomes. Review a future campaign for pending or confirmed not_sent targets only; exclude sent and unknown targets.'
+    );
+  }
 }
 
 async function main() {

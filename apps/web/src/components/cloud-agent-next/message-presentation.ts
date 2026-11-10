@@ -12,6 +12,7 @@ export function groupConversationMessages(
   commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]> = new Map()
 ): StoredMessage[][] {
   const groups: StoredMessage[][] = [];
+  const messageIds = new Set(messages.map(message => message.info.id));
 
   for (const message of messages) {
     const previousGroup = groups.at(-1);
@@ -22,7 +23,10 @@ export function groupConversationMessages(
       isAssistantMessage(previous.info) &&
       isAssistantMessage(message.info) &&
       previous.info.sessionID === message.info.sessionID &&
-      previous.info.parentID === message.info.parentID &&
+      // A native turn can answer a Kilo-written prompt that the live feed never shows.
+      // Only a prompt present in the transcript starts a new turn.
+      (previous.info.parentID === message.info.parentID ||
+        !messageIds.has(message.info.parentID)) &&
       previous.info.error == null &&
       message.info.error == null &&
       !commitsAfterMessage.has(previous.info.id) &&

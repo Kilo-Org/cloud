@@ -53,7 +53,12 @@ describe('applyBlockingCardAppearance', () => {
     const ref: RefObject<HostInstance | null> = { current: null };
     const presentation = getBlockingCardPresentationForKind({
       kind: 'question',
-      submissionError: { kind: 'retryable', message: 'Try again', action: 'answer' },
+      submissionError: {
+        kind: 'retryable',
+        message: 'Try again',
+        action: 'answer',
+        permissionResponse: null,
+      },
     });
 
     const cleanup = applyBlockingCardAppearance(presentation, ref, deps);

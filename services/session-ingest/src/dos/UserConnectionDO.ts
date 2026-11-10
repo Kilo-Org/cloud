@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
 import { hoistedAttentionChanges, hoistedChildAttention } from './child-attention';
+import { isNeedsInputStatus } from './session-ingest-attention';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import { refreshGlanceableSessions } from '../remote-session-notifications';
 import { prUrlMatchesGitUrl } from '../ingest/metadata';
@@ -92,6 +93,11 @@ type WSAttachment =
       // in-memory map or hibernation reconstruction — keeps the response
       // fresh and avoids stale instance rows on restart.
       instance?: Instance;
+      // Rows the frame budget shed from the list above. Present only while the
+      // live list is larger than one attachment can hold, and the reason a
+      // command for one of those rows can arrive with no known owner until the
+      // next heartbeat restores the full list.
+      sessionsTrimmed?: number;
     }
   | {
       role: 'web';
@@ -103,6 +109,8 @@ type WSAttachment =
       // access rechecks against current session membership.
       kiloUserId?: string;
     };
+
+type CliAttachment = Extract<WSAttachment, { role: 'cli' }>;
 
 // Type re-export so test files and other internal callers can reference the
 // connection-row shape from a single place.
@@ -124,6 +132,74 @@ export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
 // serialized PendingCommandEntry framing overhead while preserving enough
 // payload for most retry scenarios.
 export const MAX_DURABLE_RESULT_BYTES = 120 * 1024;
+
+/**
+ * workerd rejects a socket attachment above this size, and the failed write
+ * stores nothing. A heartbeat that trips it never reaches `heartbeat_ack`, so
+ * the CLI's 30 s inactivity watchdog reconnects and the session loses its
+ * owning socket until the next heartbeat.
+ */
+const ATTACHMENT_FRAME_LIMIT_BYTES = 16_384;
+
+/**
+ * Persisted CLI attachment budget. Measured against workerd: a row list whose
+ * JSON text is 17,097 bytes still clones into 16,384, so the JSON measurement
+ * overestimates structured clone for these repeated-key rows. Seven eighths of
+ * the frame keeps a margin for a longer string value and still persists most
+ * rows; the write ladder covers any remaining overshoot.
+ */
+const CLI_ATTACHMENT_BUDGET_BYTES = (ATTACHMENT_FRAME_LIMIT_BYTES * 7) / 8;
+
+const ATTACHMENT_CAPACITY_ERROR = /^A WebSocket 'attachment' cannot be larger than \d+ bytes\./;
+
+function isAttachmentCapacityError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.name === 'Error' &&
+    ATTACHMENT_CAPACITY_ERROR.test(error.message)
+  );
+}
+
+function attachmentBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
+/**
+ * Keep the session rows that fit the budget, in the CLI's order. Attention
+ * rows fit first: a pending approval or question must survive a hibernation
+ * wake, including the root row that surfaces a subagent raise. The in-memory
+ * list stays complete, so every reader and broadcast is unaffected; a wake
+ * before the next heartbeat (≤10 s on every CLI) sees the shorter snapshot
+ * instead of no snapshot at all.
+ */
+function fitCliAttachment(
+  attachment: CliAttachment,
+  budgetBytes: number
+): { readonly attachment: CliAttachment; readonly droppedSessions: number } {
+  if (attachmentBytes(attachment) <= budgetBytes) {
+    return { attachment, droppedSessions: 0 };
+  }
+  const attentionIds = new Set(hoistedChildAttention(attachment.sessions).keys());
+  for (const session of attachment.sessions) {
+    if (isNeedsInputStatus(session.status)) attentionIds.add(session.id);
+  }
+  const keep = new Set<number>();
+  let bytes = attachmentBytes({ ...attachment, sessions: [] });
+  for (const attentionFirst of [true, false]) {
+    attachment.sessions.forEach((session, index) => {
+      if (attentionIds.has(session.id) !== attentionFirst) return;
+      const cost = attachmentBytes(session) + (keep.size === 0 ? 0 : 1);
+      if (bytes + cost > budgetBytes) return;
+      bytes += cost;
+      keep.add(index);
+    });
+  }
+  const sessions = attachment.sessions.filter((_session, index) => keep.has(index));
+  return {
+    attachment: { ...attachment, sessions },
+    droppedSessions: attachment.sessions.length - sessions.length,
+  };
+}
 
 // Maximum allowed mutationId length used as a durable storage key prefix.
 const MAX_MUTATION_ID_LENGTH = 128;
@@ -330,12 +406,21 @@ export class UserConnectionDO extends DurableObject<Env> {
   private static readonly CLI_ABSENCE_ATTENTION_RESET_MS = CLI_ABSENCE_ATTENTION_RESET_MS;
   /** Backoff before retrying a clear whose SessionIngestDO delegate failed. */
   private static readonly ATTENTION_RESET_RETRY_BACKOFF_MS = 5_000;
+  /**
+   * Longest a command waits for the next heartbeat to restore the owner of a
+   * session the attachment budget shed. Every CLI heartbeats every 10 s.
+   */
+  private static readonly TRIMMED_OWNER_WAIT_MS = 12_000;
 
   // Which CLI connection owns each session
   private sessionOwners = new Map<string, string>();
+  // Last reported attachment shape per CLI connection, so a steady trim logs once
+  private trimReport = new Map<string, string>();
+  // Commands waiting for a heartbeat to restore the owner of a shed session
+  private ownerWaiters = new Map<string, Set<(owned: boolean) => void>>();
   // Which web sockets want events for a session
   private webSubscriptions = new Map<string, Set<WebSocket>>();
-  // Sessions per CLI connection (from heartbeat)
+  // Live session snapshots from heartbeats and authoritative status notifications.
   private connectionSessions = new Map<string, HeartbeatSession[]>();
   // Protocol version per CLI connection (from heartbeat); absent = legacy CLI
   private connectionProtocolVersion = new Map<string, string | undefined>();
@@ -388,11 +473,21 @@ export class UserConnectionDO extends DurableObject<Env> {
     let webCount = 0;
     let sessionCount = 0;
 
-    for (const ws of this.ctx.getWebSockets()) {
+    const sockets = this.ctx.getWebSockets();
+    const openCliConnectionIds = new Set<string>();
+    for (const ws of sockets) {
+      if (ws.readyState !== WebSocket.OPEN) continue;
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      if (attachment?.role === 'cli') openCliConnectionIds.add(attachment.connectionId);
+    }
+    for (const ws of sockets) {
       const attachment = ws.deserializeAttachment() as WSAttachment | null;
       if (!attachment) continue;
 
       if (attachment.role === 'cli') {
+        if (ws.readyState !== WebSocket.OPEN && openCliConnectionIds.has(attachment.connectionId)) {
+          continue;
+        }
         cliCount++;
         const { connectionId, sessions, protocolVersion, capabilities } = attachment;
         this.connectionSessions.set(connectionId, sessions);
@@ -405,7 +500,10 @@ export class UserConnectionDO extends DurableObject<Env> {
         const heartbeatAt = attachment.heartbeatAt ?? Date.now();
         this.lastHeartbeatAt.set(connectionId, heartbeatAt);
         if (attachment.heartbeatAt === undefined) {
-          ws.serializeAttachment({ ...attachment, heartbeatAt });
+          // A hibernated attachment may predate the frame budget: stamping it
+          // must not throw inside state reconstruction. The list is only what
+          // the DO already knew, so it cannot clear a trim marker.
+          this.persistCliAttachment(ws, { ...attachment, heartbeatAt }, false);
         }
       } else {
         if (attachment.replaced) continue;
@@ -732,6 +830,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       // on is answerable again, so the absence window is over.
       this.cancelPendingAttentionReset(session.id);
     }
+    this.settleOwnerWaiters();
 
     // Offline rename catch-up: re-emit stored renames whose heartbeat title still
     // differs; delete entries once the CLI title matches (self-cleaning).
@@ -752,7 +851,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    const updatedAttachment: WSAttachment = {
+    const updatedAttachment: CliAttachment = {
       role: 'cli',
       connectionId,
       sessions,
@@ -762,32 +861,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       kiloUserId: attachment.kiloUserId,
       ...(instance ? { instance } : {}),
     };
-    try {
-      ws.serializeAttachment(updatedAttachment);
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        error.name !== 'Error' ||
-        !/^A WebSocket 'attachment' cannot be larger than 16384 bytes\.'attachment' was \d+ bytes\.$/.test(
-          error.message
-        ) ||
-        !instance ||
-        (instance.kind === undefined &&
-          instance.startedAt === undefined &&
-          instance.gitBranch === undefined)
-      ) {
-        throw error;
-      }
-      // The native regression verifies this capacity error and failed-write atomicity.
-      // Retry the current heartbeat in the old metadata-free form, never a stale one.
-      // Remove only after old producers/attachments retire and enriched heartbeats
-      // have proven native capacity safety.
-      const legacyInstance = { ...instance };
-      delete legacyInstance.kind;
-      delete legacyInstance.startedAt;
-      delete legacyInstance.gitBranch;
-      ws.serializeAttachment({ ...updatedAttachment, instance: legacyInstance });
-    }
+    this.persistCliAttachment(ws, updatedAttachment, true);
 
     if (attachment.kiloUserId) {
       const changedSessionIds = new Set<string>();
@@ -1570,8 +1644,16 @@ export class UserConnectionDO extends DurableObject<Env> {
     let targetCli: WebSocket | undefined;
 
     if (msg.sessionId && msg.connectionId) {
-      targetCli = this.findCliByConnectionId(msg.connectionId);
-      if (this.sessionOwners.get(msg.sessionId) !== msg.connectionId || !targetCli) {
+      const sessionId = msg.sessionId;
+      const connectionId = msg.connectionId;
+      // Viewers send both fields, so a shed row arrives here with no owner at
+      // all. Wait for the heartbeat that restores it before reporting a change;
+      // a different owner is still rejected at once.
+      if (!this.sessionOwners.has(sessionId)) {
+        await this.waitForTrimmedOwner(sessionId, connectionId);
+      }
+      targetCli = this.findCliByConnectionId(connectionId);
+      if (this.sessionOwners.get(sessionId) !== connectionId || !targetCli) {
         this.sendToWeb(ws, {
           type: 'response',
           id: msg.id,
@@ -1583,6 +1665,12 @@ export class UserConnectionDO extends DurableObject<Env> {
       targetCli = this.findCliByConnectionId(msg.connectionId);
     } else if (msg.sessionId) {
       targetCli = this.findCliForSession(msg.sessionId);
+      if (!targetCli) {
+        const sessionId = msg.sessionId;
+        if (await this.waitForTrimmedOwner(sessionId)) {
+          targetCli = this.findCliForSession(sessionId);
+        }
+      }
     } else {
       const cliSockets = this.ctx.getWebSockets('cli');
       targetCli = cliSockets[0];
@@ -1938,6 +2026,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.connectionProtocolVersion.delete(connectionId);
     this.connectionCapabilities.delete(connectionId);
     this.lastHeartbeatAt.delete(connectionId);
+    this.trimReport.delete(connectionId);
 
     console.log('CLI socket disconnected', {
       connectionId,
@@ -2295,6 +2384,12 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
+  /**
+   * Persist authoritative status into the owning socket's live snapshot before
+   * fanout, so a subsequent list read or hibernation sees the same transition.
+   * Heartbeats have no status version: later heartbeats remain admissible, and
+   * notifications retain their existing arrival-order semantics.
+   */
   async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {
     this.ensureState();
     const parsed = SessionEventPayloadSchema.parse(event);
@@ -2303,12 +2398,76 @@ export class UserConnectionDO extends DurableObject<Env> {
       event: parsed.type,
       data: parsed.data,
     };
+    const rootStatusEvents: WebInboundMessage[] = [];
+    if (parsed.type === 'session.status.updated') {
+      const data = parsed.data;
+      const sessionId = 'session' in data ? data.session.sessionId : data.sessionId;
+      const owner = this.sessionOwners.get(sessionId);
+      const socket = this.ctx.getWebSockets('cli').find(ws => {
+        if (ws.readyState !== WebSocket.OPEN) return false;
+        const attachment = ws.deserializeAttachment() as WSAttachment | null;
+        return attachment?.role === 'cli' && attachment.connectionId === owner;
+      });
+      const attachment = socket?.deserializeAttachment() as WSAttachment | null | undefined;
+      if (socket && attachment?.role === 'cli') {
+        const previousRootStatuses = new Map(
+          this.aggregateSessions().map(session => [session.id, session.status])
+        );
+        const previous = this.connectionSessions.get(attachment.connectionId) ?? [];
+        const status = data.status ?? ('session' in data ? data.session.status : null) ?? '';
+        const sessions = previous.map(session => {
+          if (session.id !== sessionId) return session;
+          const { scheduledAt: _previousScheduledAt, ...rest } = session;
+          const scheduledAt =
+            data.scheduledAt ?? ('session' in data ? data.session.scheduledAt : null);
+          return {
+            ...rest,
+            status,
+            ...(status === 'scheduled' && scheduledAt ? { scheduledAt } : {}),
+          };
+        });
+        this.persistCliAttachment(socket, { ...attachment, sessions }, false);
+        this.connectionSessions.set(attachment.connectionId, sessions);
+
+        const currentRoots = this.aggregateSessions();
+        const effectiveRootStatus = currentRoots.find(session => session.id === sessionId)?.status;
+        if (effectiveRootStatus !== undefined && effectiveRootStatus !== status) {
+          msg.data = {
+            ...data,
+            status: effectiveRootStatus,
+            statusUpdatedAt: null,
+            ...('session' in data
+              ? { session: { ...data.session, status: effectiveRootStatus, statusUpdatedAt: null } }
+              : {}),
+          };
+        }
+        for (const root of currentRoots) {
+          const previousStatus = previousRootStatuses.get(root.id);
+          if (root.id === sessionId || previousStatus === root.status) continue;
+          rootStatusEvents.push({
+            type: 'system',
+            event: 'session.status.updated',
+            data: {
+              source: 'v2',
+              sessionId: root.id,
+              previousStatus: previousStatus ?? null,
+              status: root.status,
+              ...(root.status === 'scheduled' && root.scheduledAt
+                ? { scheduledAt: root.scheduledAt }
+                : {}),
+              statusUpdatedAt: null,
+              changedAt: data.changedAt,
+            },
+          });
+        }
+      }
+    }
 
     let delivered = 0;
-    const json = JSON.stringify(msg);
+    const messages = [msg, ...rootStatusEvents].map(message => JSON.stringify(message));
     for (const ws of this.activeWebSockets()) {
       try {
-        ws.send(json);
+        for (const json of messages) ws.send(json);
         delivered++;
       } catch (err) {
         console.warn('notifySessionEvent: skipping failed web socket:', err);
@@ -2366,6 +2525,131 @@ export class UserConnectionDO extends DurableObject<Env> {
       ws.send(JSON.stringify(msg));
     } catch (err) {
       console.warn('sendToWeb failed:', err);
+    }
+  }
+
+  /**
+   * Resolve every command waiting for a heartbeat to restore a shed owner.
+   * Called once per heartbeat, after the ownership map is updated.
+   */
+  private settleOwnerWaiters(): void {
+    for (const [sessionId, waiters] of this.ownerWaiters) {
+      if (!this.sessionOwners.has(sessionId)) continue;
+      this.ownerWaiters.delete(sessionId);
+      for (const settle of waiters) settle(true);
+    }
+  }
+
+  /**
+   * A trimmed attachment holds fewer rows than the live heartbeat, so a command
+   * for a shed row finds no owner until the next heartbeat restores it. Wait for
+   * that heartbeat instead of failing the command. Only a connection that
+   * reports a trim can be missing a live session, so every other unowned id
+   * still fails immediately. Pass `connectionId` to require that specific
+   * connection, which is the shape a viewer sends.
+   */
+  private waitForTrimmedOwner(sessionId: string, connectionId?: string): Promise<boolean> {
+    if (this.sessionOwners.has(sessionId)) return Promise.resolve(true);
+    const trimmed = this.ctx.getWebSockets('cli').some(ws => {
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      return (
+        attachment?.role === 'cli' &&
+        attachment.sessionsTrimmed !== undefined &&
+        (connectionId === undefined || attachment.connectionId === connectionId)
+      );
+    });
+    if (!trimmed) return Promise.resolve(false);
+
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const settle = (owned: boolean) => {
+      clearTimeout(timer);
+      const waiters = this.ownerWaiters.get(sessionId);
+      waiters?.delete(settle);
+      if (waiters?.size === 0) this.ownerWaiters.delete(sessionId);
+      resolve(owned);
+    };
+    const timer = setTimeout(() => settle(false), UserConnectionDO.TRIMMED_OWNER_WAIT_MS);
+    let waiters = this.ownerWaiters.get(sessionId);
+    if (!waiters) {
+      waiters = new Set();
+      this.ownerWaiters.set(sessionId, waiters);
+    }
+    waiters.add(settle);
+    return promise;
+  }
+
+  /**
+   * Persist the CLI attachment without ever letting a write failure escape: a
+   * throw skips the acknowledgement and every broadcast that follows it, and
+   * the CLI then reconnects on its inactivity watchdog. Shed payload instead,
+   * keeping the acknowledgement and the live in-memory state.
+   *
+   * `complete` says whether this list is the CLI's whole live list. Only then
+   * can a write that sheds nothing clear `sessionsTrimmed`; a write built from
+   * what the DO already knows (a status event, or a hibernation stamp) says
+   * nothing about rows it never held, so it keeps the marker.
+   */
+  private persistCliAttachment(ws: WebSocket, attachment: CliAttachment, complete: boolean): void {
+    const fitted = fitCliAttachment(attachment, CLI_ATTACHMENT_BUDGET_BYTES);
+    // The trim is steady state for a busy connection, so report it on a change
+    // of shape rather than once per heartbeat.
+    const signature = `${fitted.attachment.sessions.length}/${fitted.droppedSessions}`;
+    if (this.trimReport.get(attachment.connectionId) !== signature) {
+      this.trimReport.set(attachment.connectionId, signature);
+      if (fitted.droppedSessions > 0) {
+        console.warn('Trimmed the CLI socket attachment to the frame budget', {
+          connectionId: attachment.connectionId,
+          sessions: attachment.sessions.length,
+          persistedSessions: fitted.attachment.sessions.length,
+          droppedSessions: fitted.droppedSessions,
+        });
+      }
+    }
+    // A status event or hibernation stamp spreads the socket's previous
+    // attachment and holds only the rows the DO knows, so an inherited marker
+    // must survive it: the CLI may still own rows this write never saw.
+    const { sessionsTrimmed: inheritedTrim, ...rest } = fitted.attachment;
+    const marker = fitted.droppedSessions > 0 ? fitted.droppedSessions : inheritedTrim;
+    const keepMarker = (marker ?? 0) > 0 && (fitted.droppedSessions > 0 || !complete);
+    const value: CliAttachment = keepMarker ? { ...rest, sessionsTrimmed: marker } : rest;
+    try {
+      ws.serializeAttachment(value);
+      return;
+    } catch (error) {
+      if (!isAttachmentCapacityError(error)) {
+        console.error('Failed to persist the CLI socket attachment', {
+          connectionId: attachment.connectionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+    }
+
+    // The JSON measurement overestimates clone for the row shapes measured above,
+    // but a shape with long or multi-byte values can undercount it. Metadata
+    // alone is small next to the frame limit, so this nearly always fits.
+    const { sessions: _sessions, ...metadata } = value;
+    try {
+      ws.serializeAttachment({
+        ...metadata,
+        sessions: [],
+        sessionsTrimmed: attachment.sessions.length,
+      });
+      console.error(
+        'CLI socket attachment exceeded the frame after trimming; dropped every session',
+        {
+          connectionId: attachment.connectionId,
+          sessions: attachment.sessions.length,
+        }
+      );
+    } catch (error) {
+      // The previous attachment is still stored (a failed write is atomic),
+      // and the next heartbeat retries the whole list.
+      console.error('CLI socket attachment is unsaveable even without sessions', {
+        connectionId: attachment.connectionId,
+        limitBytes: ATTACHMENT_FRAME_LIMIT_BYTES,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

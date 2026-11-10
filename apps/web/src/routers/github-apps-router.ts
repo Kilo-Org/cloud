@@ -1,4 +1,14 @@
 import 'server-only';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
+import {
+  GitHubIdentityConflictError,
+  GitHubIdentityPreconditionSchema,
+} from '@kilocode/db/github-identity';
+import {
+  connectProvidedGitHubToken,
+  ProvidedGitHubTokenInputSchema,
+  ProvidedGitHubTokenError,
+} from '@/lib/integrations/platforms/github/provided-token';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
 import * as githubAppsService from '@/lib/integrations/github-apps-service';
@@ -6,6 +16,7 @@ import {
   findIntegrationByInstallationId,
   getIntegrationForOwner,
   getGitHubIntegrationById,
+  getPrimaryGitHubIntegrationForOrganization,
   upsertPlatformIntegrationForOwner,
   updateRepositoriesForIntegration,
   syncIntegrationInstallationDetails,
@@ -58,6 +69,13 @@ import {
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
+
+const PROVIDED_TOKEN_ERROR_CODES = {
+  connection_conflict: 'CONFLICT',
+  invalid_token: 'BAD_REQUEST',
+  rate_limited: 'TOO_MANY_REQUESTS',
+  temporarily_unavailable: 'BAD_GATEWAY',
+} as const satisfies Record<ProvidedGitHubTokenError['reason'], TRPCError['code']>;
 
 export const githubAppsRouter = createTRPCRouter({
   disconnectConnection: baseProcedure
@@ -169,13 +187,27 @@ export const githubAppsRouter = createTRPCRouter({
       url.searchParams.set('code_challenge_method', 'S256');
       return { authorizationUrl: url.toString() };
     }),
-  // List all integrations
+  // Display contract shared by personal and organization integration pickers.
   listIntegrations: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
     }
     const owner = resolveOwner(ctx, input?.organizationId);
-    return githubAppsService.listIntegrations(owner);
+    const integrations = await githubAppsService.listIntegrations(owner);
+    return integrations.map(integration => ({
+      id: integration.id,
+      platform: integration.platform,
+      integration_status: integration.integration_status,
+      platform_account_id: integration.platform_account_id,
+      platform_account_login: integration.platform_account_login,
+      repository_access: integration.repository_access,
+      repositories: integration.repositories,
+      repositories_synced_at: integration.repositories_synced_at,
+      suspended_at: integration.suspended_at,
+      installed_at: integration.installed_at,
+      created_at: integration.created_at,
+      updated_at: integration.updated_at,
+    }));
   }),
 
   listOrganizationInstallations: baseProcedure
@@ -233,7 +265,7 @@ export const githubAppsRouter = createTRPCRouter({
                     : 'needs_attention';
             const canCancel =
               status === 'pending' &&
-              (ctx.user.is_admin ||
+              ((ctx.user.is_admin && !isSupportAccessEnabled()) ||
                 role === 'owner' ||
                 role === 'admin' ||
                 integration.kilo_requester_user_id === ctx.user.id);
@@ -256,7 +288,9 @@ export const githubAppsRouter = createTRPCRouter({
               canDisconnect:
                 canManageConnections && status !== 'disconnected' && status !== 'pending',
               canUninstall:
-                (ctx.user.is_admin || role === 'owner' || role === 'admin') &&
+                ((ctx.user.is_admin && !isSupportAccessEnabled()) ||
+                  role === 'owner' ||
+                  role === 'admin') &&
                 (await canUninstallGitHubInstallation(integration)),
               canCancel,
               modelSlug: (metadata?.model_slug as string) || null,
@@ -267,9 +301,9 @@ export const githubAppsRouter = createTRPCRouter({
       };
     }),
 
-  getUserAuthorization: baseProcedure.query(async ({ ctx }) => {
-    return getGitHubUserAuthorizationStatus(ctx.user.id);
-  }),
+  getUserAuthorization: baseProcedure.query(({ ctx }) =>
+    getGitHubUserAuthorizationStatus(ctx.user.id)
+  ),
 
   connectUserAuthorization: baseProcedure.mutation(async ({ ctx }) => {
     const authorization = await getGitHubUserAuthorizationStatus(ctx.user.id);
@@ -286,7 +320,10 @@ export const githubAppsRouter = createTRPCRouter({
         message: 'GitHub App is not configured',
       });
     }
-    const { state, codeChallenge } = await createGitHubUserAuthorizationState(ctx.user.id);
+    const { state, codeChallenge } = await createGitHubUserAuthorizationState(ctx.user.id, {
+      authorizationId: authorization.authorizationId,
+      credentialVersion: authorization.credentialVersion,
+    });
     const authorizeUrl = new URL('https://github.com/login/oauth/authorize');
     authorizeUrl.searchParams.set('client_id', credentials.clientId);
     authorizeUrl.searchParams.set(
@@ -299,10 +336,41 @@ export const githubAppsRouter = createTRPCRouter({
     return { authorizationUrl: authorizeUrl.toString() };
   }),
 
-  disconnectUserAuthorization: baseProcedure.mutation(async ({ ctx }) => {
-    await disconnectGitHubUserAuthorization(ctx.user.id);
-    return { success: true };
-  }),
+  disconnectUserAuthorization: baseProcedure
+    .input(GitHubIdentityPreconditionSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await disconnectGitHubUserAuthorization(ctx.user.id, input);
+      } catch (error) {
+        if (error instanceof GitHubIdentityConflictError)
+          throw new TRPCError({ code: 'CONFLICT', message: 'connection_conflict' });
+        throw error;
+      }
+      return { success: true };
+    }),
+
+  provideUserToken: baseProcedure
+    .use(async ({ next }) => {
+      const result = await next();
+      if (!result.ok && result.error.cause instanceof z.ZodError) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'invalid_github_token_request' });
+      }
+      return result;
+    })
+    .input(ProvidedGitHubTokenInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const result = await connectProvidedGitHubToken(ctx.user.id, input);
+        if (result.status !== 'connected')
+          throw new TRPCError({ code: 'CONFLICT', message: result.status });
+        return result;
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        const reason =
+          error instanceof ProvidedGitHubTokenError ? error.reason : 'temporarily_unavailable';
+        throw new TRPCError({ code: PROVIDED_TOKEN_ERROR_CODES[reason], message: reason });
+      }
+    }),
 
   getAppType: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
@@ -326,13 +394,16 @@ export const githubAppsRouter = createTRPCRouter({
         input.organizationId ? ORGANIZATION_MANAGE_ROLES : undefined
       );
       if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
-        const integrations = await githubAppsService.listIntegrations(owner);
-        // A locally disconnected connection has relinquished its slot and
-        // must not block starting a fresh installation.
-        const hasActiveIntegration = integrations.some(
-          integration => !integration.github_disconnected_at
-        );
-        if (hasActiveIntegration) {
+        // The single-installation slot belongs to the organization's live
+        // workflow connection. Anything else still leaves the slot free to
+        // start an installation from: a pending request awaiting a GitHub
+        // organization admin's approval carries no installation id yet, and a
+        // suspended association is a connection GitHub will not serve until it
+        // is restored, so neither is a reason to refuse the install page. A
+        // locally disconnected row keeps relinquishing its slot, which the
+        // connection's health predicate already expresses.
+        const workflowConnection = await getPrimaryGitHubIntegrationForOrganization(owner.id);
+        if (workflowConnection) {
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'This organization already has a GitHub installation',
@@ -449,12 +520,16 @@ export const githubAppsRouter = createTRPCRouter({
         return {
           hasPending: false,
           pendingOrganizationId: null,
+          pendingIntegrationId: null,
         };
       }
 
       return {
         hasPending: true,
         pendingOrganizationId: pendingInstallation.owned_by_organization_id,
+        // Names the exact pending row this response describes, so a cancel is
+        // pinned to it instead of to whichever pending row matches the owner.
+        pendingIntegrationId: pendingInstallation.id,
       };
     }),
 
@@ -533,43 +608,36 @@ export const githubAppsRouter = createTRPCRouter({
       return githubAppsService.listBranches(owner, input.integrationId, input.repositoryFullName);
     }),
 
-  // Cancel pending installation
+  // Cancel one pending installation request, named by its integration id so a
+  // user with several pending requests cancels the one the client displayed.
   cancelPendingInstallation: baseProcedure
     .input(
-      z
-        .object({
-          organizationId: z.string().uuid().optional(),
-          integrationId: z.string().uuid().optional(),
-        })
-        .optional()
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        integrationId: z.string().uuid(),
+      })
     )
     .mutation(async ({ ctx, input }) => {
-      let role: Awaited<ReturnType<typeof ensureOrganizationAccess>> | null = null;
-      if (input?.organizationId) {
-        role = await ensureOrganizationAccess(ctx, input.organizationId);
-        if (!input.integrationId) {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Integration ID is required' });
-        }
+      const role = input.organizationId
+        ? await ensureOrganizationAccess(ctx, input.organizationId)
+        : null;
+      const owner = resolveOwner(ctx, input.organizationId);
+      const integration = await getGitHubIntegrationById(owner, input.integrationId);
+      if (!integration) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Pending installation not found' });
       }
-      const owner = resolveOwner(ctx, input?.organizationId);
-      if (input?.integrationId) {
-        const integration = await getGitHubIntegrationById(owner, input.integrationId);
-        if (!integration) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Pending installation not found' });
-        }
-        const canCancel =
-          !input.organizationId ||
-          ctx.user.is_admin ||
-          role === 'owner' ||
-          role === 'admin' ||
-          integration.kilo_requester_user_id === ctx.user.id;
-        if (!canCancel) {
-          throw new TRPCError({ code: 'FORBIDDEN', message: 'Cannot cancel this request' });
-        }
+      const canCancel =
+        !input.organizationId ||
+        (ctx.user.is_admin && !isSupportAccessEnabled()) ||
+        role === 'owner' ||
+        role === 'admin' ||
+        integration.kilo_requester_user_id === ctx.user.id;
+      if (!canCancel) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Cannot cancel this request' });
       }
-      const result = await githubAppsService.cancelPendingInstallation(owner, input?.integrationId);
+      const result = await githubAppsService.cancelPendingInstallation(owner, input.integrationId);
 
-      if (input?.organizationId) {
+      if (input.organizationId) {
         await createAuditLog({
           organization_id: input.organizationId,
           action: 'organization.settings.change',

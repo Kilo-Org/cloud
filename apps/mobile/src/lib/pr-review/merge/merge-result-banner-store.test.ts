@@ -1,14 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
+
 import {
   __resetMergePartialSuccessStoreForTests,
   clearMergePartialSuccess,
   consumeMergePartialSuccess,
-  type PrRef,
   setMergePartialSuccess,
 } from './merge-result-banner-store';
 
-const ref: PrRef = { owner: 'octocat', repo: 'hello', number: 1 };
+const ref: ProviderPrTriple = { owner: 'octocat', repo: 'hello', number: 1 };
 
 afterEach(() => {
   __resetMergePartialSuccessStoreForTests();
@@ -28,9 +29,9 @@ describe('merge partial-success banner store', () => {
   });
 
   it('keeps entries isolated per PR (owner/repo/number)', () => {
-    const a: PrRef = { owner: 'octocat', repo: 'hello', number: 1 };
-    const b: PrRef = { owner: 'octocat', repo: 'hello', number: 2 };
-    const c: PrRef = { owner: 'octocat', repo: 'world', number: 1 };
+    const a: ProviderPrTriple = { owner: 'octocat', repo: 'hello', number: 1 };
+    const b: ProviderPrTriple = { owner: 'octocat', repo: 'hello', number: 2 };
+    const c: ProviderPrTriple = { owner: 'octocat', repo: 'world', number: 1 };
 
     setMergePartialSuccess(a, { reason: 'for a' });
     setMergePartialSuccess(b, { reason: 'for b' });
@@ -51,8 +52,8 @@ describe('merge partial-success banner store', () => {
   });
 
   it('clearMergePartialSuccess removes a specific entry without affecting siblings', () => {
-    const a: PrRef = { owner: 'octocat', repo: 'hello', number: 1 };
-    const b: PrRef = { owner: 'octocat', repo: 'hello', number: 2 };
+    const a: ProviderPrTriple = { owner: 'octocat', repo: 'hello', number: 1 };
+    const b: ProviderPrTriple = { owner: 'octocat', repo: 'hello', number: 2 };
 
     setMergePartialSuccess(a, { reason: 'a' });
     setMergePartialSuccess(b, { reason: 'b' });

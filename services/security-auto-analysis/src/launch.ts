@@ -116,6 +116,13 @@ type StartSecurityAnalysisParams = {
   callbackTokenSecret: string;
   forceSandbox?: boolean;
   retrySandboxOnly?: boolean;
+  /**
+   * True when the caller already claimed the per-finding lease (the web
+   * admission reservation flipped the finding to `pending` before the command
+   * was submitted). The lease step is skipped because it only grants from
+   * `NULL`/`completed`/`failed`.
+   */
+  preReserved?: boolean;
   lifecycleClaim: AnalysisStartLifecycleClaim;
 };
 
@@ -173,7 +180,10 @@ export async function startSecurityAnalysis(
   }
   const findingDataSnapshot = buildSecurityFindingAnalysisInput(finding);
 
-  const leaseAcquired = await tryAcquireAnalysisStartLease(params.db, params.findingId);
+  const preReserved = params.preReserved === true;
+  const leaseAcquired = preReserved
+    ? true
+    : await tryAcquireAnalysisStartLease(params.db, params.findingId);
   if (!leaseAcquired) {
     if (finding.status !== 'open') {
       return {

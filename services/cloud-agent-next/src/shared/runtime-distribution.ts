@@ -1,10 +1,23 @@
 export const RUNTIME_DISTRIBUTION = {
   nodeMajor: '24',
-  bun: '1.3.14',
+  bun: '1.4.4',
   pnpm: '12.14.0',
   glab: '1.124.0',
-  gh: '2.102.0',
+  gh: '2.103.3',
+  ghStack: '0.3.0',
+  ghStackSha256: '957e822cfa7e435cd84a297cd96c419b58e51e3ac58be249762c24bd9e45099b',
 } as const;
+
+/**
+ * `gh` discovers extensions under `$XDG_DATA_HOME/gh/extensions` by the
+ * directory name, with the executable inside carrying the same name. The
+ * binary is baked outside the runtime HOME (which is per-worktree and starts
+ * empty) and symlinked into the runtime HOME at session preparation.
+ */
+export const GH_STACK_EXTENSION_NAME = 'gh-stack';
+export const GH_STACK_EXTENSIONS_ROOT = '/usr/local/lib/gh-extensions';
+export const GH_STACK_EXTENSION_PATH = `${GH_STACK_EXTENSIONS_ROOT}/${GH_STACK_EXTENSION_NAME}`;
+export const GH_STACK_INSTALL_PATH = `${GH_STACK_EXTENSION_PATH}/${GH_STACK_EXTENSION_NAME}`;
 
 export type WrapperBundle = {
   readonly entry: string;
@@ -38,7 +51,20 @@ export const WRAPPER_BUNDLES: readonly WrapperBundle[] = [
     installName: 'kilocode-control-plane-wrapper.js',
     executable: false,
   },
+  {
+    entry: 'src/environment-builder/main.ts',
+    distName: 'environment-builder.js',
+    installName: 'kilocode-environment-builder.js',
+    executable: false,
+  },
 ];
+
+/**
+ * The Bun binary that runs a bundle as a container's main process. It is an
+ * absolute path so the main-process identity check can match `/proc/1/cmdline`
+ * exactly; both images install Bun there.
+ */
+export const RUNTIME_BUN_PATH = '/usr/local/bin/bun';
 
 export const CONTROL_PLANE_SUPERVISOR = {
   wrapperPath: 'control-plane-supervisor.sh',

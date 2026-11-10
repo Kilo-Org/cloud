@@ -16,12 +16,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import jwt from 'jsonwebtoken';
+const JWT_TOKEN_VERSION = 3;
 import { eq, or } from 'drizzle-orm';
 import { computeDatabaseUrl, createDrizzleClient, kilocode_users, sql } from '@kilocode/db';
 
 export const DRIVER_USER_EMAIL_SUFFIX = '@cloud-agent-next-e2e.example.com';
 export const FUNDED_DRIVER_BALANCE_MICRODOLLARS = 10_000_000;
-const JWT_TOKEN_VERSION = 3;
 
 /**
  * Parse a `.dev.vars` file — same format as `.env`, with `KEY=value` pairs.
@@ -84,7 +84,7 @@ export function loadRepoEnvFiles(servicePackageDir: string): void {
 export type TestUser = {
   id: string;
   email: string;
-  api_token_pepper: string;
+  api_token_pepper: string | null;
 };
 
 /**
@@ -181,7 +181,7 @@ export async function loadExistingUserByEmail(
     return {
       id: row.id,
       email: row.email ?? email,
-      api_token_pepper: row.api_token_pepper ?? '',
+      api_token_pepper: row.api_token_pepper,
     };
   } finally {
     await driver.pool.end().catch(() => {});
@@ -192,25 +192,32 @@ export type MintedTokens = {
   apiToken: string;
 };
 
-/**
- * Mint a Kilo user JWT for tRPC authentication. Mirrors
- * `packages/web-shared/src/lib/tokens.ts:generateApiToken` but with a short expiry
- * since the driver is ephemeral.
- */
+/** Mint the Cloud Agent control token that authorizes local E2E runtime creation. */
 export function mintApiToken(
-  user: { id: string; api_token_pepper?: string },
+  user: { id: string; api_token_pepper?: string | null },
   nextAuthSecret: string | undefined,
-  expiresInSeconds = 60 * 60
+  expiresInSeconds = 60 * 60,
+  organizationId?: string
 ): string {
   if (!nextAuthSecret) {
     throw new Error('mintApiToken requires NEXTAUTH_SECRET for local JWT minting');
   }
+  const pepper = user.api_token_pepper ?? null;
   return jwt.sign(
     {
       env: 'development',
       kiloUserId: user.id,
-      ...(user.api_token_pepper ? { apiTokenPepper: user.api_token_pepper } : {}),
+      ...(organizationId ? { organizationId } : {}),
+      apiTokenPepper: pepper,
       version: JWT_TOKEN_VERSION,
+      aud: 'cloud-agent-next',
+      tokenPurpose: 'human-api',
+      credentialExchange: false,
+      runtimeAdmission: {
+        source: 'user',
+        authorizationUserId: user.id,
+        authorizationPepper: pepper,
+      },
       tokenSource: 'cloud-agent',
     },
     nextAuthSecret,

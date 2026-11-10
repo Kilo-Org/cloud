@@ -4,7 +4,10 @@ import {
   CustomLlmDefinitionSchema,
   type GoogleServiceAccountKey,
 } from '@kilocode/db/schema-types';
-import { getGoogleServiceAccountAccessToken } from './google-service-account';
+import {
+  getGoogleServiceAccountAccessToken,
+  MAX_CACHED_AUTH_CLIENTS,
+} from './google-service-account';
 
 jest.mock('google-auth-library');
 
@@ -127,6 +130,21 @@ describe('getGoogleServiceAccountAccessToken', () => {
     });
   });
 
+  it('accepts a key with only the fields needed to sign token requests', async () => {
+    const getAccessToken = jest.fn(async () => 'gcp-token');
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+    const credentials = {
+      client_email: 'direct-byok@example-project.iam.gserviceaccount.com',
+      private_key: 'private-key-four',
+    };
+
+    await expect(getGoogleServiceAccountAccessToken(credentials)).resolves.toBe('gcp-token');
+    expect(mockGoogleAuth).toHaveBeenCalledWith({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+  });
+
   it('reuses the Google auth client so its access token cache remains effective', async () => {
     const getAccessToken = jest.fn(async () => 'cached-token');
     mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
@@ -137,6 +155,52 @@ describe('getGoogleServiceAccountAccessToken', () => {
 
     expect(mockGoogleAuth).toHaveBeenCalledTimes(1);
     expect(getAccessToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps recent clients cached up to the configured capacity', async () => {
+    const getAccessToken = jest.fn(async () => 'bounded-token');
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+    const credentials = Array.from({ length: MAX_CACHED_AUTH_CLIENTS + 5 }, (_, index) =>
+      serviceAccount(`capacity-key-${index}`)
+    );
+
+    for (const credential of credentials) {
+      await getGoogleServiceAccountAccessToken(credential);
+    }
+    expect(mockGoogleAuth).toHaveBeenCalledTimes(credentials.length);
+
+    mockGoogleAuth.mockClear();
+    for (const credential of credentials.slice(-MAX_CACHED_AUTH_CLIENTS)) {
+      await getGoogleServiceAccountAccessToken(credential);
+    }
+    expect(mockGoogleAuth).not.toHaveBeenCalled();
+
+    await getGoogleServiceAccountAccessToken(credentials[0]);
+    expect(mockGoogleAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it('evicts the least recently used client rather than the oldest insertion', async () => {
+    const getAccessToken = jest.fn(async () => 'lru-token');
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+    const credentials = Array.from({ length: MAX_CACHED_AUTH_CLIENTS }, (_, index) =>
+      serviceAccount(`lru-key-${index}`)
+    );
+    for (const credential of credentials) {
+      await getGoogleServiceAccountAccessToken(credential);
+    }
+
+    await getGoogleServiceAccountAccessToken(credentials[0]);
+    const newest = serviceAccount('lru-key-newest');
+    await getGoogleServiceAccountAccessToken(newest);
+
+    mockGoogleAuth.mockClear();
+    for (const credential of [credentials[2], credentials[0], newest]) {
+      await getGoogleServiceAccountAccessToken(credential);
+    }
+    expect(mockGoogleAuth).not.toHaveBeenCalled();
+
+    await getGoogleServiceAccountAccessToken(credentials[1]);
+    expect(mockGoogleAuth).toHaveBeenCalledTimes(1);
   });
 
   it('fails when Google returns no access token', async () => {

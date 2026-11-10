@@ -1,8 +1,9 @@
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Switch, View } from 'react-native';
+import { View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
@@ -14,10 +15,12 @@ import {
 } from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
+import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -91,7 +94,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       },
       {
         onSuccess: () => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
           router.back();
         },
       }
@@ -106,7 +109,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
           accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
           value={enabled}
           onValueChange={value => {
-            void Haptics.selectionAsync();
+            selectionHaptic();
             setEnabled(value);
             revalidate(value, thresholdRef.current, emailsRef.current);
             clearSaveError();
@@ -190,7 +193,10 @@ export function LowBalanceAlertSheet() {
   // forever) falling through to OrganizationBoundary below.
   if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
     return (
-      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+      >
         <Skeleton className="h-[52px] rounded-lg" />
         <View className="gap-1.5">
           <Skeleton className="h-3.5 w-28 rounded" />
@@ -201,7 +207,7 @@ export function LowBalanceAlertSheet() {
           <Skeleton className="h-11 rounded-md" />
         </View>
         <Skeleton className="h-11 rounded-md" />
-      </ScrollView>
+      </SheetScrollView>
     );
   }
   if (organizationId == null || org == null) {
@@ -229,7 +235,7 @@ export function LowBalanceAlertSheet() {
   }
 
   return (
-    <ScrollView
+    <SheetScrollView
       className="flex-1 bg-background"
       contentContainerClassName="px-6 gap-6 pb-8 pt-4"
       automaticallyAdjustKeyboardInsets
@@ -245,6 +251,6 @@ export function LowBalanceAlertSheet() {
           settings={orgWithMembers.data.settings}
         />
       )}
-    </ScrollView>
+    </SheetScrollView>
   );
 }

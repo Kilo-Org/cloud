@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import {
   BENCHMARK_CONTAINER_BUDGET,
   DEFAULT_AUTO_ROUTER,
@@ -69,10 +71,6 @@ import {
 import { parseAdminResponse } from './admin-fetch';
 import { SchedulerConfigCard } from './SchedulerConfigCard';
 import { useSystemOneModelOptions } from './system-one-models';
-
-// ---------------------------------------------------------------------------
-// Pure helpers (exported for unit tests)
-// ---------------------------------------------------------------------------
 
 export function formatAccuracy(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
@@ -218,10 +216,6 @@ export function policyOverridesFromForm(
   return Object.keys(overrides).length > 0 ? overrides : null;
 }
 
-// ---------------------------------------------------------------------------
-// Model picker helpers (exported for unit tests)
-// ---------------------------------------------------------------------------
-
 /** Pins a saved model id that is absent from the eligible catalog so it stays selectable. */
 export function pinnedModelFor(id: string): ModelOption {
   return { id, name: id };
@@ -276,17 +270,13 @@ export function effortCoverageForModel(
   return `${supported} · ${measured} of ${efforts.length} measured${outstanding.length > 0 ? ` · ${outstanding.join(', ')}` : ''}`;
 }
 
-// ---------------------------------------------------------------------------
-// Fetch helpers
-// ---------------------------------------------------------------------------
-
 async function fetchBenchmarkConfig(router: AutoRouter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-config?router=${router}`);
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-config?router=${router}`);
   return parseAdminResponse(response, BenchmarkConfigResponseSchema);
 }
 
 async function saveBenchmarkConfig(config: BenchmarkConfig) {
-  const response = await fetch('/admin/api/auto-routing/benchmark-config', {
+  const response = await adminFetch('/admin/api/auto-routing/benchmark-config', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(config),
@@ -320,7 +310,7 @@ export function runTypeLabel(run: Pick<BenchmarkRun, 'kind' | 'purpose'>): strin
 async function fetchBenchmarkRuns(filter: RunFilter, router: AutoRouter) {
   const query = new URLSearchParams(runFilterQuery(filter).replace(/^\?/, ''));
   query.set('router', router);
-  const response = await fetch(`/admin/api/auto-routing/benchmark-runs?${query}`);
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-runs?${query}`);
   return parseAdminResponse(response, BenchmarkRunsResponseSchema);
 }
 
@@ -335,7 +325,7 @@ async function startBenchmarkRun({
   queue: BenchmarkQueueSelector;
   router: AutoRouter;
 }) {
-  const response = await fetch('/admin/api/auto-routing/benchmark-runs', {
+  const response = await adminFetch('/admin/api/auto-routing/benchmark-runs', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ kind, force, queue, router }),
@@ -344,12 +334,12 @@ async function startBenchmarkRun({
 }
 
 async function fetchBenchmarkRegistry(router: AutoRouter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-registry?router=${router}`);
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-registry?router=${router}`);
   return parseAdminResponse(response, BenchmarkRegistryResponseSchema);
 }
 
 async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector, router: AutoRouter) {
-  const response = await fetch('/admin/api/auto-routing/benchmark-registry', {
+  const response = await adminFetch('/admin/api/auto-routing/benchmark-registry', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ scope, router }),
@@ -358,16 +348,14 @@ async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector, router: A
 }
 
 async function fetchBenchmarkRoutingTable(router: AutoRouter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-routing-table?router=${router}`);
+  const response = await adminFetch(
+    `/admin/api/auto-routing/benchmark-routing-table?router=${router}`
+  );
   return parseAdminResponse<BenchmarkRoutingTableResponse>(
     response,
     BenchmarkRoutingTableResponseSchema
   );
 }
-
-// ---------------------------------------------------------------------------
-// Local form state type for decider model rows
-// ---------------------------------------------------------------------------
 
 type DeciderModelRow = BenchmarkPlatformModel;
 
@@ -499,10 +487,6 @@ export function formStateToConfig(
     updatedBy: base?.updatedBy ?? null,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Config editor sub-component
-// ---------------------------------------------------------------------------
 
 function ConfigSectionHeading({ title, description }: { title: string; description: string }) {
   return (
@@ -1165,10 +1149,6 @@ function BenchmarkConfigEditor({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Run summaries expandable table
-// ---------------------------------------------------------------------------
-
 function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
   const isDecider = run.kind === 'decider';
 
@@ -1251,10 +1231,6 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
     </TableRow>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Runs table
-// ---------------------------------------------------------------------------
 
 function statusBadgeVariant(
   status: BenchmarkRun['status']
@@ -1368,10 +1344,6 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Routing table view
-// ---------------------------------------------------------------------------
 
 function RoutingTableSummary({ table }: { table: BenchmarkRoutingTableResponse['table'] }) {
   if (!table) return null;
@@ -1495,10 +1467,6 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
   );
 }
 
-// ---------------------------------------------------------------------------
-// Registry summary
-// ---------------------------------------------------------------------------
-
 const REGISTRY_STATUSES = ['pending', 'running', 'ready', 'failed'] as const;
 
 function RegistrySummary({
@@ -1555,10 +1523,6 @@ function RegistrySummary({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main exported section component
-// ---------------------------------------------------------------------------
-
 export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   const queryClient = useQueryClient();
   const [forceRerun, setForceRerun] = useState(false);
@@ -1612,7 +1576,6 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     queryFn: () => fetchBenchmarkRuns('all', router),
   });
 
-  // Poll runs every 30s while any run is 'running'
   const hasRunningRun = allRunsQuery.data?.runs.some(r => r.status === 'running') ?? false;
   const refetchRuns = runsQuery.refetch;
   const refetchAllRuns = allRunsQuery.refetch;
@@ -1760,7 +1723,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
           <CardContent className="flex flex-col gap-3 p-4 pt-0">
             <p className="text-muted-foreground text-xs">
               Measurements and published tables are isolated for the selected router. Classifier
-              measurements are shared. Custom owner pools use the efficient router only.
+              measurements are shared.
             </p>
             {registryQuery.isLoading ? (
               <Skeleton className="h-20 w-full" />

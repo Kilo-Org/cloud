@@ -9,8 +9,6 @@ import {
 
 const families = {
   'cloud-agent-next': 'CLOUD_AGENT_RESOURCE_TOKENS_ENABLED',
-  gastown: 'GASTOWN_RESOURCE_TOKENS_ENABLED',
-  wasteland: 'WASTELAND_RESOURCE_TOKENS_ENABLED',
   chat: 'CHAT_RESOURCE_TOKENS_ENABLED',
   'delegated-resource': 'DELEGATED_RESOURCE_TOKENS_ENABLED',
   'workflow-gateway': 'WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED',

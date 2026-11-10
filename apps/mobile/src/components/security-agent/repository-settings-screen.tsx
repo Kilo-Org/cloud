@@ -4,7 +4,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { FolderGit2 } from '@/components/ui/icons';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ import { toast } from 'sonner-native';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { classifyListBody } from '@/lib/query/list-body-state';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
@@ -22,6 +24,7 @@ import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
@@ -57,7 +60,7 @@ function RepositorySettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.repositories')} />
+      <ScreenHeader className="px-6" title={t('common.repositories')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-lg" />
@@ -74,24 +77,26 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
   const save = useSaveSecurityAgentConfig(scope);
+  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<FlattenedSecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
   // in-progress edits.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setMode(config.data.repositorySelectionMode);
     setSelectedIds(config.data.selectedRepositoryIds);
-  }, [config.data]);
+  }, [baseline, config.data]);
 
   // The repositories screen stays reachable while the agent is disabled so a
   // user with integration repos but no effective selection can pick repos and
@@ -101,19 +106,22 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const valid = mode === 'all' || selectedIds.length > 0;
   const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
+    setBaseline(previous => ({ ...previous, ...patch }));
   };
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
     valid,
-    onSave: handleSave,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
   });
 
   // Selection is a Set for O(1) row lookups: the row renderer would otherwise
@@ -178,10 +186,72 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const showRepositoryStates = mode === 'selected';
   const hasRepositories = (repositories.data?.length ?? 0) > 0;
   // A loading, failed, or not-yet-fetched repository query must not read as
-  // zero repositories. While an enabled query is paused (offline first load)
-  // it is neither loading nor errored and `data` is still undefined, which is
-  // not the settled "No repositories" state the Manage access CTA is for.
-  const repositoriesEmpty = repositories.data?.length === 0;
+  // zero repositories. Only a delivered read may claim the list is empty: a
+  // read paused by lost connectivity delivered nothing and names the
+  // connection with Retry instead.
+  const repositoriesBody = classifyListBody({
+    rowCount: repositories.data?.length ?? 0,
+    hasDeliveredData: repositories.data !== undefined,
+    isError: repositories.isError,
+    isFetching: repositories.isFetching,
+    fetchStatus: repositories.fetchStatus,
+    connectivityKnown,
+  });
+  const repositoriesFailed =
+    repositoriesBody.status === 'error' ||
+    (repositoriesBody.status === 'rows' && repositories.isError);
+
+  // An empty grant is the one repository state that is not about the mode: with
+  // nothing accessible there is nothing to select and nothing to sync whichever
+  // mode is stored, and widening the app's access is the only way out. Naming it
+  // only in `selected` mode left the disabled agent's "Select repositories" row
+  // landing on a screen whose only controls were the two mode choices. Only the
+  // classifier's delivered-empty answer reaches the section in `all` mode, so a
+  // cached `[]` under a failed read cannot render a label with no control.
+  const showRepositorySection = showRepositoryStates || repositoriesBody.status === 'empty';
+
+  // The GitHub settings page is where installation access is widened on the
+  // web, and `openExternalUrl` resolves when that page closes — on both
+  // platforms it awaits the browser's own dismissal (a launch it could not open
+  // is toasted by that helper and still resolves). Reading the repository list
+  // again on that return edge is what makes a grant show up here: without it the
+  // cached empty answer stays fresh for the whole stale window, and the disabled
+  // agent's enable rule counts exactly these repositories.
+  //
+  // The mint is only the hand-off token. An organization's mint needs
+  // `ORGANIZATION_MANAGE_ROLES` (`owner`/`admin`), which is narrower than this
+  // screen's `canManage` (`canManageOrganizationBilling` admits
+  // `billing_manager`), and `ensureOrganizationAccess` refuses the role with
+  // `UNAUTHORIZED`; an organization whose installation cannot take a second one
+  // is refused with `FORBIDDEN`. Both are ordinary states here, and both are
+  // exactly the empty-grant case this screen exists for. The web page mints
+  // its own state for the signed-in user, so any organization refusal falls
+  // back to the plain settings URL instead of leaving the control inert — the
+  // same rule the Code Reviewer's GitHub recovery control applies. A personal
+  // mint failure has no such page-level fallback to reach, so it keeps the
+  // toast.
+  const manageAccess = async () => {
+    const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
+    const open = async (url: string) => {
+      await openExternalUrl(url, {
+        label: t('securityAgent.repositories.githubAppSettings'),
+      });
+    };
+    try {
+      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+        organizationId: orgId ?? undefined,
+        returnTo: '/cloud/sessions',
+      });
+      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token));
+    } catch {
+      if (!orgId) {
+        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
+        return;
+      }
+      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId));
+    }
+    await repositories.refetch();
+  };
 
   // Everything above the rows (permission note, mode choice, and — in selected
   // mode — the loading / error / empty branches) rides on the list header so
@@ -210,50 +280,52 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         ))}
       </RadioGroup>
 
-      {showRepositoryStates && (
+      {showRepositorySection && (
         <View className="mt-6">
-          <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-            {t('common.repositories')}
-          </Text>
-          {repositories.isLoading && (
+          {/* The empty state's own title already says "No repositories", so a
+              section label above it only repeats the screen title. */}
+          {repositoriesBody.status === 'empty' ? null : (
+            <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
+              {t('common.repositories')}
+            </Text>
+          )}
+          {repositoriesBody.status === 'loading' && (
             <View className="gap-3 pt-2">
               <Skeleton className="h-12 w-full rounded-lg" />
               <Skeleton className="h-12 w-full rounded-lg" />
             </View>
           )}
-          {repositories.isError && (
+          {repositoriesFailed && (
             <QueryError
-              variant="server"
+              variant={
+                repositoriesBody.status === 'error' && repositoriesBody.cause === 'offline'
+                  ? 'offline'
+                  : 'server'
+              }
               placement="top"
               title={t('common.couldNotLoadRepositories')}
               onRetry={() => void repositories.refetch()}
               isRetrying={repositories.isFetching}
             />
           )}
-          {!repositories.isLoading && !repositories.isError && repositoriesEmpty ? (
+          {repositoriesBody.status === 'empty' ? (
             <EmptyState
               placement="top"
               icon={FolderGit2}
               title={t('securityAgent.repositories.noRepositories')}
               description={t('securityAgent.repositories.noRepositoriesDescription')}
+              iconContainerClassName="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card dark:border-input dark:bg-secondary"
               action={
                 <Button
-                  variant="outline"
+                  className={STATE_ACTION_CLASS}
+                  // Widening the grant is the only way out of this state, and
+                  // the header's Save is quiet while the screen has nothing to
+                  // save. The action therefore carries the filled primary
+                  // style instead of an outlined one that recedes into the
+                  // page beside it.
+                  variant="default"
                   onPress={() => {
-                    void (async () => {
-                      const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
-                      try {
-                        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-                          organizationId: orgId ?? undefined,
-                          returnTo: '/cloud/sessions',
-                        });
-                        await openExternalUrl(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token), {
-                          label: t('securityAgent.repositories.githubAppSettings'),
-                        });
-                      } catch {
-                        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
-                      }
-                    })();
+                    void manageAccess();
                   }}
                 >
                   <Text>{t('securityAgent.repositories.manageAccess')}</Text>
@@ -289,6 +361,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('common.repositories')}
         onBack={onBack}
         headerRight={

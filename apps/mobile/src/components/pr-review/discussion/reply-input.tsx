@@ -347,7 +347,7 @@ export function ReplyInput({
           }}
           multiline
           textAlignVertical="top"
-          className="min-h-16 rounded-md border border-input bg-background pl-3 pr-3 py-2 text-sm leading-5 text-foreground"
+          className="min-h-16 rounded-md border border-input bg-background pl-3 pr-3 py-2 text-sm leading-[1.25rem] text-foreground"
         />
       ) : null}
       {inlineError && inlineErrorKind !== 'reconnect' ? (

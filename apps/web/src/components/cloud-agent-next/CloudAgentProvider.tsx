@@ -21,8 +21,12 @@ import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-clie
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { toFetchedSessionData } from './fetched-session-data';
 import { usePostHog } from 'posthog-js/react';
-import { fetchWebSessionSnapshotPage } from './session-page-adapter';
+import {
+  fetchWebCloudSessionSnapshotPage,
+  fetchWebSessionSnapshotPage,
+} from './session-page-adapter';
 import type { CloudAgentApi } from '@kilocode/cloud-agent-sdk/transport';
+import { cloudAgentSessionIdSchema, kiloSessionIdSchema } from '@kilocode/cloud-agent-sdk/schemas';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { createWorktreeReviewSend, type WorktreeReviewSendApi } from './worktree-review-send';
 import { MarkdownParseCacheProvider } from './markdown-parse-cache';
@@ -32,8 +36,15 @@ const ManagerContext = createContext<SessionManager | null>(null);
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
 const CloudAgentContext = createContext<WorktreeReviewSendApi | null>(null);
 
+/** Historical and child transcripts must not inherit live interaction handlers. */
+export function ReadOnlyCloudAgentBoundary({ children }: { children: ReactNode }) {
+  return <ManagerContext.Provider value={null}>{children}</ManagerContext.Provider>;
+}
+
 type CloudAgentProviderProps = {
   children: ReactNode;
+  /** The signed-in user: the transcript cache is keyed per user. */
+  userId: string;
   organizationId?: string;
 };
 
@@ -63,7 +74,7 @@ function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePa
   };
 }
 
-export function CloudAgentProvider({ children, organizationId }: CloudAgentProviderProps) {
+export function CloudAgentProvider({ children, userId, organizationId }: CloudAgentProviderProps) {
   const storeRef = useRef(createStore());
   const trpcClient = useRawTRPCClient();
   const trpc = useTRPC();
@@ -71,6 +82,10 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
   const posthog = usePostHog();
   const posthogRef = useRef(posthog);
   posthogRef.current = posthog;
+  // The transcript cache reads this on every access, so each operation uses
+  // the user and account context of the current render.
+  const transcriptScopeRef = useRef(transcriptCacheScope(userId, organizationId ?? null));
+  transcriptScopeRef.current = transcriptCacheScope(userId, organizationId ?? null);
 
   const sharedConnectionRef = useRef<ReturnType<typeof createUserWebConnection> | null>(null);
   if (!SESSION_INGEST_WS_URL) {
@@ -100,7 +115,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       payload: input.payload,
       autoCommit: true,
       messageId: input.messageId,
-      attachments: input.attachments ?? input.images,
+      attachments: input.attachments,
       expectedWorktreeId: input.expectedWorktreeId
         ? cloudAgentWorktreeIdSchema.parse(input.expectedWorktreeId)
         : undefined,
@@ -139,10 +154,11 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
     });
   }
   if (managerRef.current === null) {
-    // Deterministic, so the server can seed it for the first paint of an open chat.
+    // Deterministic per user and account context, so the server can seed it for
+    // the first paint of an open chat.
     const transcriptCache = createWebSessionTranscriptCache(
       queryClient,
-      transcriptCacheScope(organizationId ?? null)
+      () => transcriptScopeRef.current
     );
     managerRef.current = createSessionManager({
       store: storeRef.current,
@@ -155,7 +171,9 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           return {
             type: 'cloud-agent',
             kiloSessionId,
-            cloudAgentSessionId: fetchedSession.cloud_agent_session_id as CloudAgentSessionId,
+            cloudAgentSessionId: cloudAgentSessionIdSchema.parse(
+              fetchedSession.cloud_agent_session_id
+            ),
           };
         }
         try {
@@ -173,7 +191,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
             return {
               type: 'cloud-agent',
               kiloSessionId,
-              cloudAgentSessionId: session.cloud_agent_session_id as CloudAgentSessionId,
+              cloudAgentSessionId: cloudAgentSessionIdSchema.parse(session.cloud_agent_session_id),
             };
           }
         } catch {
@@ -217,8 +235,18 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       },
 
       fetchSnapshotPage: (id, options) => fetchWebSessionSnapshotPage(trpcClient, id, options),
+      fetchCloudSnapshotPage: (id, options) =>
+        fetchWebCloudSessionSnapshotPage(trpcClient, id, { ...options, organizationId }),
+      fetchCloudSession: sessionId =>
+        organizationId
+          ? trpcClient.organizations.cloudAgentNext.getSession.query({
+              cloudAgentSessionId: sessionId,
+              organizationId,
+            })
+          : trpcClient.cloudAgentNext.getSession.query({ cloudAgentSessionId: sessionId }),
       readCachedSnapshotPage: transcriptCache.read,
       writeCachedSnapshotPage: transcriptCache.write,
+      invalidateCachedSnapshotPage: transcriptCache.invalidate,
 
       userWebConnection: sharedConnection,
 
@@ -323,8 +351,8 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
             })
           : await trpcClient.cloudAgentNext.prepareSession.mutate(castInput);
         return {
-          cloudAgentSessionId: result.cloudAgentSessionId as CloudAgentSessionId,
-          kiloSessionId: result.kiloSessionId as KiloSessionId,
+          cloudAgentSessionId: cloudAgentSessionIdSchema.parse(result.cloudAgentSessionId),
+          kiloSessionId: kiloSessionIdSchema.parse(result.kiloSessionId),
         };
       },
 
@@ -355,14 +383,6 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           networkMode: 'always',
         });
         return toFetchedSessionData(kiloSessionId, sessionResult);
-      },
-
-      onKiloSessionCreated: (kiloSessionId: KiloSessionId) => {
-        if (typeof window !== 'undefined') {
-          const url = new URL(window.location.href);
-          url.searchParams.set('sessionId', kiloSessionId);
-          window.history.replaceState(window.history.state, '', url.toString());
-        }
       },
 
       onRemoteSessionOpened: ({ kiloSessionId }) => {

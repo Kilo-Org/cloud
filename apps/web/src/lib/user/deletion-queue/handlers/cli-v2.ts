@@ -2,11 +2,15 @@ import { and, eq, notExists, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import type { UserDeletionTaskProgress } from '@kilocode/db/schema-types';
-import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import {
+  INTERNAL_API_SECRET,
+  SESSION_INGEST_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { SESSION_INGEST_USER_DELETION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { SESSION_SYNC_WORKER_URL } from '@/lib/web-config.server';
 import { userIdKeyedAbsenceOutcome } from '@/lib/user/deletion-queue/deletion-subject';
 import type {
   DeletionHandlerContext,
@@ -25,6 +29,7 @@ import {
 } from '@/lib/user/deletion-queue/handlers/common';
 
 const childSessions = alias(cli_sessions_v2, 'cli_sessions_v2_child');
+const SESSION_SYNC_ERASURE_ACCEPTED = 'session-sync:accepted';
 
 async function loadLeafSessions(userId: string) {
   return db
@@ -71,6 +76,7 @@ async function anySessionExists(userId: string): Promise<boolean> {
 type LeafDeleteResult =
   | { kind: 'deleted' }
   | { kind: 'conflict' }
+  | { kind: 'worktree_deleting' }
   | { kind: 'failed'; outcome: DeletionHandlerOutcome };
 
 async function deleteLeafSession(
@@ -95,7 +101,12 @@ async function deleteLeafSession(
   });
   if ('outcome' in result) return { kind: 'failed', outcome: result.outcome };
 
-  if (result.response.status === 409) return { kind: 'conflict' };
+  if (result.response.status === 409) {
+    const body = await readJsonUnknown(result.response);
+    return isRecord(body) && body.error === 'worktree_deleting'
+      ? { kind: 'worktree_deleting' }
+      : { kind: 'conflict' };
+  }
   if (!result.response.ok && result.response.status !== 404) {
     return { kind: 'failed', outcome: classifyResponse(result.response) };
   }
@@ -143,13 +154,40 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
   const userId = request.user_id;
   if (!userId) return { kind: 'needs_attention', errorCode: 'legacy_identity_unresolved' };
 
-  if (!SESSION_INGEST_WORKER_URL) return configurationMissing();
+  if (!SESSION_INGEST_WORKER_URL || !SESSION_SYNC_WORKER_URL || !INTERNAL_API_SECRET) {
+    return configurationMissing();
+  }
+
+  let progress = step.progress_json;
+  const stop = continueIfLowTime(context, progress);
+  if (stop) return stop;
+
+  if (progress.provider_ref !== SESSION_SYNC_ERASURE_ACCEPTED) {
+    const result = await deletionFetch(
+      context,
+      `${SESSION_SYNC_WORKER_URL}/internal/users/${encodeURIComponent(userId)}/erase`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Internal-Secret': INTERNAL_API_SECRET,
+        },
+      }
+    );
+    if ('outcome' in result) return withProgress(result.outcome, progress);
+    if (result.response.status !== 202) {
+      return withProgress(classifyResponse(result.response), progress);
+    }
+
+    progress = {
+      ...progress,
+      provider_ref: SESSION_SYNC_ERASURE_ACCEPTED,
+    };
+  }
 
   const token = generateBoundedInternalServiceToken(userId, {
     expiresIn: 5 * 60,
     audience: SESSION_INGEST_USER_DELETION_AUDIENCE,
   });
-  let progress = step.progress_json;
 
   while (true) {
     const stop = continueIfLowTime(context, progress);
@@ -160,9 +198,7 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
       if (await anySessionExists(userId)) {
         return { kind: 'needs_attention', errorCode: 'cyclic_session_graph', progress };
       }
-      return (progress.processed_count ?? 0) === 0
-        ? { kind: 'not_applicable' }
-        : { kind: 'succeeded', progress };
+      return { kind: 'succeeded', progress };
     }
 
     const results = await Promise.all(
@@ -171,6 +207,7 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
 
     let firstFailure: DeletionHandlerOutcome | null = null;
     let sawConflict = false;
+    let worktreeRefusals = 0;
     for (const result of results) {
       if (result.kind === 'deleted') {
         progress = incrementProcessed(progress);
@@ -180,11 +217,25 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
         sawConflict = true;
         continue;
       }
+      if (result.kind === 'worktree_deleting') {
+        worktreeRefusals += 1;
+        continue;
+      }
       if (!firstFailure) firstFailure = result.outcome;
     }
 
     if (firstFailure) return withProgress(firstFailure, progress);
-    if (sawConflict) {
+    // A batch the worktree guard refused entirely made no progress, so it takes
+    // the bounded retry path and reaches attention if that deletion stalls.
+    if (worktreeRefusals === results.length) {
+      return {
+        kind: 'retry',
+        errorCode: 'session_worktree_deleting',
+        httpStatusClass: '4xx',
+        progress,
+      };
+    }
+    if (sawConflict || worktreeRefusals > 0) {
       return { kind: 'continue', progress };
     }
   }

@@ -2,6 +2,7 @@ import {
   heartbeatIdempotencyKey,
   heartbeatAckSchema,
   nonRetryableSkuAdmissionCodes,
+  nonRetryableAdmissionCodes,
   recordAckSchema,
   recordStartResultSchema,
   startIdempotencyKey,
@@ -26,7 +27,8 @@ export type ContainerUsageClientOptions = {
 };
 
 export type ClientUsageContext = Omit<UsageContext, 'service'>;
-export type ClientRecordStartInput = ClientUsageContext & { startEpochMs: number };
+export type ClientRecordStartInput = ClientUsageContext &
+  Pick<RecordStartInput, 'startEpochMs' | 'enforceCapacity'>;
 export type ClientRecordHeartbeatInput = Omit<
   RecordHeartbeatInput,
   'service' | 'idempotencyKey' | 'context'
@@ -68,6 +70,22 @@ function delay(milliseconds: number): Promise<void> {
 }
 
 /**
+ * The meter returned a response that violates the shared usage contract.
+ * Retrying cannot fix a deterministic schema mismatch, so the client raises it
+ * once instead of consuming the transport retry budget.
+ */
+export class ContainerUsageContractError extends Error {
+  constructor(
+    readonly method: 'recordStart' | 'recordHeartbeat' | 'recordStop',
+    cause: unknown
+  ) {
+    super(`Container usage ${method} response violates the usage contract`);
+    this.name = 'ContainerUsageContractError';
+    this.cause = cause;
+  }
+}
+
+/**
  * True only for an admission rejection that cannot succeed on retry until SKU
  * configuration changes. Budget admission (`insufficient_credits`) is excluded
  * at the type level.
@@ -80,6 +98,16 @@ export function isNonRetryableSkuAdmissionError(
   return (
     error instanceof ContainerUsageAdmissionError &&
     (nonRetryableSkuAdmissionCodes as readonly string[]).includes(error.code)
+  );
+}
+
+/** Admission rejections that need configuration repair rather than transport retries. */
+export function isNonRetryableAdmissionError(
+  error: unknown
+): error is ContainerUsageAdmissionError & { code: (typeof nonRetryableAdmissionCodes)[number] } {
+  return (
+    error instanceof ContainerUsageAdmissionError &&
+    (nonRetryableAdmissionCodes as readonly string[]).includes(error.code)
   );
 }
 
@@ -117,22 +145,24 @@ export class ContainerUsageClient {
 
   async recordStart(input: ClientRecordStartInput): Promise<RecordAck> {
     const request = this.startRequest(input);
-    const result = await this.withRetry(async () =>
-      recordStartResultSchema.parse(await this.binding.recordStart(request))
-    );
+    const response = await this.withRetry(() => this.binding.recordStart(request));
+    const result = recordStartResultSchema.safeParse(response);
     if (!result.success) {
+      throw new ContainerUsageContractError('recordStart', result.error);
+    }
+    if (!result.data.success) {
       throw new ContainerUsageAdmissionError(
-        result.error.code,
-        result.error.message,
-        result.error.code === 'insufficient_credits'
+        result.data.error.code,
+        result.data.error.message,
+        result.data.error.code === 'insufficient_credits'
           ? {
-              remainingMicrodollars: result.error.remainingMicrodollars,
-              minimumRequiredMicrodollars: result.error.minimumRequiredMicrodollars,
+              remainingMicrodollars: result.data.error.remainingMicrodollars,
+              minimumRequiredMicrodollars: result.data.error.minimumRequiredMicrodollars,
             }
           : undefined
       );
     }
-    return result.ack;
+    return result.data.ack;
   }
 
   async recordHeartbeat(input: ClientRecordHeartbeatInput): Promise<HeartbeatAck> {
@@ -147,9 +177,12 @@ export class ContainerUsageClient {
       ),
       context: { ...input.context, service: this.service },
     } satisfies RecordHeartbeatInput;
-    return await this.withRetry(async () =>
-      heartbeatAckSchema.parse(await this.binding.recordHeartbeat(request))
-    );
+    const response = await this.withRetry(() => this.binding.recordHeartbeat(request));
+    const parsed = heartbeatAckSchema.safeParse(response);
+    if (!parsed.success) {
+      throw new ContainerUsageContractError('recordHeartbeat', parsed.error);
+    }
+    return parsed.data;
   }
 
   async recordStop(input: ClientRecordStopInput): Promise<RecordAck> {
@@ -159,9 +192,12 @@ export class ContainerUsageClient {
       idempotencyKey: stopIdempotencyKey(this.service, input.instanceId, input.startEpochMs),
       context: { ...input.context, service: this.service },
     } satisfies RecordStopInput;
-    return await this.withRetry(async () =>
-      recordAckSchema.parse(await this.binding.recordStop(request))
-    );
+    const response = await this.withRetry(() => this.binding.recordStop(request));
+    const parsed = recordAckSchema.safeParse(response);
+    if (!parsed.success) {
+      throw new ContainerUsageContractError('recordStop', parsed.error);
+    }
+    return parsed.data;
   }
 
   private async withRetry<T>(operation: () => Promise<T>): Promise<T> {

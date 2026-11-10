@@ -35,6 +35,7 @@ import {
   isStringDraft,
   loadDraft,
   NEW_SESSION_DRAFT_KEY,
+  newSessionRepositoryDraftKey,
   prCommentDraftKey,
   prConversationCommentDraftKey,
   prMergeDraftKey,
@@ -45,6 +46,7 @@ import {
   saveDraft,
   securityDismissDraftKey,
 } from './drafts';
+import { forgetShapeMismatchesForTests } from './draft-read-report';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { inFlightSaveCount } from '@/lib/hooks/save-chain';
 /* eslint-enable import/first */
@@ -94,6 +96,7 @@ beforeEach(() => {
   kvStore.clear();
   nextUpdatedAt = 1;
   resetDraftTimersForTests();
+  forgetShapeMismatchesForTests();
   kvMock.getItem.mockImplementation(
     async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
   );
@@ -125,6 +128,11 @@ describe('draft scope and entity keys', () => {
     expect(securityDismissDraftKey('personal', 'finding-1')).toBe(
       'security-dismiss:personal:finding-1'
     );
+  });
+
+  it('scopes the new-session repository draft to the organization', () => {
+    expect(newSessionRepositoryDraftKey(null)).toBe('agent-composer:new:repository:personal');
+    expect(newSessionRepositoryDraftKey('org-1')).toBe('agent-composer:new:repository:org-1');
   });
 
   it('builds the merge, reply, and comment draft entity keys', () => {
@@ -448,28 +456,32 @@ describe('size cap', () => {
 });
 
 describe('unsupported serialization boundary', () => {
-  it('does not throw and reports Sentry for a circular value without scheduling a write', async () => {
+  it('does not throw on a circular value, reports Sentry when the debounce fires, and writes nothing', async () => {
     vi.useFakeTimers();
     const circular: Record<string, unknown> = {};
     circular.self = circular;
     expect(() => {
       saveDraft('u1', 'k', circular);
     }).not.toThrow();
+    // Serialization is the debounced write's own work, so the report lands
+    // when that write would have: the keystroke that scheduled it pays nothing.
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
         tags: { 'error.subsystem': 'drafts', 'error.operation': 'write' },
       })
     );
-    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(kvMock.setItem).not.toHaveBeenCalled();
   });
 
-  it('does not throw and reports Sentry for an undefined value without scheduling a write', async () => {
+  it('does not throw on an undefined value, reports Sentry when the debounce fires, and writes nothing', async () => {
     vi.useFakeTimers();
     expect(() => {
       saveDraft('u1', 'k', undefined);
     }).not.toThrow();
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
@@ -477,7 +489,6 @@ describe('unsupported serialization boundary', () => {
         fingerprint: ['draft-write-unsupported-value'],
       })
     );
-    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(kvMock.setItem).not.toHaveBeenCalled();
   });
 
@@ -538,6 +549,81 @@ describe('shape validation', () => {
       level: 'warning',
       tags: { 'error.subsystem': 'drafts', 'error.operation': 'read' },
       fingerprint: ['draft-read-shape-mismatch'],
+    });
+  });
+});
+
+describe('unloadable entry handling', () => {
+  it('removes a value that is not valid JSON, so the next load reports nothing', async () => {
+    seedStoredValue('draft:u1', 'k', 'not-json{{{');
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(false);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a value that fails its shape guard and reports it once per process', async () => {
+    seedStoredValue('draft:u1', 'k', '42');
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    // Valid JSON that another build can read: it may be that build's draft, so
+    // a failed load here must not discard it.
+    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(true);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(kvMock.removeItem).not.toHaveBeenCalled();
+  });
+
+  it('reports a mismatch again after a write replaced the stored value', async () => {
+    seedStoredValue('draft:u1', 'k', '42');
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+
+    saveDraft('u1', 'k', 'repaired');
+    await flushDraft('u1', 'k');
+    seedStoredValue('draft:u1', 'k', '7');
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+  });
+
+  it('removes a value over the size cap', async () => {
+    seedStoredValue('draft:u1', 'k', `"${'x'.repeat(DRAFT_MAX_BYTES + 1)}"`);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(kvStore.has(storageKey('draft:u1', 'k'))).toBe(false);
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a draft written after the failed read', async () => {
+    let reads = 0;
+    kvMock.getItem.mockImplementation(async () => {
+      reads += 1;
+      return reads === 1 ? 'not-json{{{' : '"newer"';
+    });
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+
+    expect(kvMock.removeItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the read report and the removal failure as separate events', async () => {
+    seedStoredValue('draft:u1', 'k', 'not-json{{{');
+    // A persistent implementation, not a `Once` queue: a change that skips the
+    // removal must not leave a queued rejection for the next case.
+    kvMock.removeItem.mockRejectedValue(new Error('store busy'));
+
+    await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
+
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+    expect(Sentry.captureException).toHaveBeenLastCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'drafts', 'error.operation': 'clear' },
     });
   });
 });

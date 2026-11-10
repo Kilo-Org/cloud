@@ -4,17 +4,17 @@ import type { createStore } from 'jotai';
 import type { Part } from '@kilocode/app-shared/opencode';
 import type { MessageInfo } from '../types';
 import type { SessionStorage } from './types';
+import { forgetMessageVersions, forgetPartVersion, storageVersions } from './versions';
 import {
   EMPTY_PARTS,
-  applyTextDeltas,
+  appendPartTextChunks,
   clonePart,
   createReadonlyPartView,
-  createSeedTextPart,
   forgetPartUpdateTime,
-  insertPartSorted,
   insertSorted,
   isSupportedDeltaField,
   notify,
+  publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
@@ -75,27 +75,10 @@ function createJotaiStorage(
 
   /** Apply one publication's worth of buffered chunks to a single part. */
   function applyBufferedDeltaBatch(messageId: string, partId: string, chunks: string[]): void {
-    const arr = partsMap.get(messageId);
-    if (!arr) {
-      partsMap.set(messageId, [createSeedTextPart(messageId, partId, chunks.join(''))]);
-      return;
-    }
-    const idx = arr.findIndex(p => p.id === partId);
-    const existing = idx >= 0 ? arr[idx] : undefined;
-    if (!existing) {
-      partsMap.set(
-        messageId,
-        insertPartSorted(arr, createSeedTextPart(messageId, partId, chunks.join('')))
-      );
-      return;
-    }
-    const updatedPart = applyTextDeltas(existing, chunks);
-    if (updatedPart === existing) {
-      return;
-    }
-    const nextArr = [...arr];
-    nextArr[idx] = updatedPart;
-    partsMap.set(messageId, nextArr);
+    partsMap.set(
+      messageId,
+      appendPartTextChunks(partsMap.get(messageId), messageId, partId, chunks)
+    );
   }
 
   /**
@@ -133,8 +116,7 @@ function createJotaiStorage(
     }
     bumpPartsRevision();
     for (const messageId of touched) {
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     }
   }
 
@@ -144,7 +126,7 @@ function createJotaiStorage(
     schedule(flushPendingDeltas);
   }
 
-  return {
+  const storage: JotaiSessionStorage = {
     atoms: {
       messageIds: messageIdsAtom,
       messages: messagesAtom,
@@ -175,14 +157,19 @@ function createJotaiStorage(
       return store.get(messagesAtom).get(messageId);
     },
 
-    upsertPart(messageId, part, eventTime) {
+    upsertPart(messageId, part, eventTime, authoritative) {
       flushPendingDeltas();
       const arr = partsMap.get(messageId) ?? [];
-      const nextArr = upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence);
+      const nextArr = upsertPartDroppingStaleSyntheticParts(
+        arr,
+        part,
+        eventTime,
+        partEvidence,
+        authoritative
+      );
       partsMap.set(messageId, nextArr);
       bumpPartsRevision();
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     applyPartDelta(messageId, partId, field, delta) {
@@ -210,15 +197,17 @@ function createJotaiStorage(
     },
 
     deletePart(messageId, partId) {
+      forgetPartVersion(storage, messageId, partId);
       flushPendingDeltas();
       const arr = partsMap.get(messageId);
       if (!arr) return;
-      const filtered = arr.filter(p => p.id !== partId);
-      partsMap.set(messageId, filtered);
+      partsMap.set(
+        messageId,
+        arr.filter(p => p.id !== partId)
+      );
       forgetPartUpdateTime(partEvidence, messageId, partId);
       bumpPartsRevision();
-      partsSnapshot.set(messageId, null);
-      notify(subscribers, `parts:${messageId}`);
+      publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
 
     getParts(messageId) {
@@ -252,6 +241,7 @@ function createJotaiStorage(
     },
 
     clear() {
+      storageVersions.delete(storage);
       flushPendingDeltas();
       const existingMessageIds = store.get(messageIdsAtom);
       const existingPartMessageIds = [...partsMap.keys()];
@@ -273,6 +263,7 @@ function createJotaiStorage(
     },
 
     deleteMessage(messageId) {
+      forgetMessageVersions(storage, messageId);
       flushPendingDeltas();
       // A buffered delta can create parts before the message row (see
       // `applyPartDelta`), so part state is dropped regardless of the row.
@@ -304,6 +295,7 @@ function createJotaiStorage(
       notify(subscribers, 'messageIds');
     },
   };
+  return storage;
 }
 
 export { createJotaiStorage };

@@ -1,11 +1,12 @@
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   sandboxAllocationInputSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   clientKiloSessionIdSchema,
+  cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
@@ -26,7 +27,6 @@ import {
   CallbackTargetSchema,
   AttachmentsSchema,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
-  ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
   RuntimeAgentSchema,
@@ -38,7 +38,10 @@ import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/me
 import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
 import { SandboxStatusSessionIdSchema } from '../shared/sandbox-status.js';
+import { GetEgressAuditInputSchema } from '../shared/egress-audit.js';
 
+export { GetEgressAuditResponseSchema as GetEgressAuditOutput } from '../shared/egress-audit.js';
+export type { GetEgressAuditResponse } from '../shared/egress-audit.js';
 export { SandboxStatusSnapshotSchema as GetSandboxStatusOutput } from '../shared/sandbox-status.js';
 export type { SandboxStatusSnapshot as GetSandboxStatusResponse } from '../shared/sandbox-status.js';
 
@@ -52,7 +55,6 @@ export {
   CallbackTargetSchema,
   AttachmentsSchema,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
-  ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
   RuntimeAgentSchema,
@@ -61,10 +63,27 @@ export {
 
 export const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
 
+/** A resolved git commit: SHA-1 (40) or SHA-256 (64) lowercase hex. */
+export const commitShaSchema = z
+  .string()
+  .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/, 'Expected a 40 or 64 character hex commit SHA');
+
+const StackedWorkspaceFields = {
+  baseBranch: branchNameSchema
+    .optional()
+    .describe('Branch the new working branch is created from and the pull request base'),
+  baseSha: commitShaSchema
+    .optional()
+    .describe('Exact commit the new working branch starts from, resolved server-side'),
+  parentWorktreeId: cloudAgentWorktreeIdSchema
+    .optional()
+    .describe('Parent worktree this workspace is stacked on'),
+};
+
 const ManagedSandboxAllocationInput = sandboxAllocationInputSchema.transform((request, ctx) => {
-  const allocation = getKiloSandboxAllocation(request);
+  const allocation = getSandboxAllocation(request);
   if (allocation === undefined) {
-    ctx.addIssue({ code: 'custom', message: 'BYOC sandbox allocation is not available' });
+    ctx.addIssue({ code: 'custom', message: 'Sandbox allocation is not available' });
     return z.NEVER;
   }
   return allocation;
@@ -95,49 +114,29 @@ export function isBuiltinMode(slug: string): boolean {
 }
 
 export type Attachments = z.infer<typeof AttachmentsSchema>;
-export type Images = z.infer<typeof ImagesSchema>;
 
 const AttachmentFieldsSchema = {
   attachments: AttachmentsSchema.optional().describe(
     'Optional file attachments to download from R2 to the sandbox'
   ),
-  images: ImagesSchema.optional().describe(
-    'Legacy optional image attachments to download from R2 to the sandbox'
-  ),
 };
-
-function rejectAmbiguousAttachments(
-  data: { attachments?: unknown; images?: unknown },
-  ctx: z.RefinementCtx
-): void {
-  if (data.attachments !== undefined && data.images !== undefined) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['attachments'],
-      message: 'Provide attachments or legacy images, not both',
-    });
-  }
-}
 
 /**
  * Reject a prompt that is empty or whitespace-only when there are no
- * `attachments.files` and no `images.files`. Command turns have no prompt and
- * must skip this rule at the call site.
+ * `attachments.files`. Command turns have no prompt and must skip this rule at
+ * the call site.
  */
 function rejectEmptyPromptWithoutAttachments(
   data: {
     prompt?: unknown;
     attachments?: { files?: unknown[] } | undefined;
-    images?: { files?: unknown[] } | undefined;
   },
   ctx: z.RefinementCtx,
   path: (string | number)[] = ['prompt']
 ): void {
   const prompt = typeof data.prompt === 'string' ? data.prompt : '';
   if (prompt.trim().length > 0) return;
-  const hasFiles =
-    (data.attachments?.files?.length ?? 0) > 0 || (data.images?.files?.length ?? 0) > 0;
-  if (hasFiles) return;
+  if ((data.attachments?.files?.length ?? 0) > 0) return;
   ctx.addIssue({ code: 'custom', path, message: 'Prompt is required' });
 }
 
@@ -192,6 +191,13 @@ export const CommandSendPayload = z.object({
   command: z.string().min(1, 'Command name is required'),
   /** Verbatim args. Kilo expands $1/$2/$ARGUMENTS server-side. */
   arguments: z.string().default(''),
+  mode: ModeSlugSchema.optional(),
+  model: modelIdSchema.optional(),
+  variant: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .optional(),
 });
 
 export const SendMessageV2Payload = z.discriminatedUnion('type', [
@@ -337,27 +343,33 @@ export const SendMessageV2Input = z
     SendMessageV2CommandPayloadInput,
   ])
   .superRefine((input, ctx) => {
-    rejectAmbiguousAttachments(input, ctx);
     if ('payload' in input) {
       if (input.payload.type === 'command') {
-        if (input.attachments !== undefined || input.images !== undefined) {
+        if (input.attachments !== undefined) {
           ctx.addIssue({
             code: 'custom',
             path: ['attachments'],
             message: 'Attachments cannot be attached to slash commands',
           });
         }
+        if (input.payload.mode === 'custom') {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['payload', 'mode'],
+            message: 'custom mode requires appendSystemPrompt (use prepareSession/updateSession)',
+          });
+        }
         return;
       }
       rejectEmptyPromptWithoutAttachments(
-        { prompt: input.payload.prompt, attachments: input.attachments, images: input.images },
+        { prompt: input.payload.prompt, attachments: input.attachments },
         ctx,
         ['payload', 'prompt']
       );
       return;
     }
     rejectEmptyPromptWithoutAttachments(
-      { prompt: input.prompt, attachments: input.attachments, images: input.images },
+      { prompt: input.prompt, attachments: input.attachments },
       ctx,
       ['prompt']
     );
@@ -440,6 +452,31 @@ export const CloseTerminalOutput = z.object({
 });
 
 /**
+ * The environment the client selected: its id, and the branch of each
+ * additional repository of a multi-repository environment. The server checks
+ * both against the owner and the launch repository.
+ */
+const requestedEnvironmentSchema = z
+  .object({
+    id: z.string().uuid(),
+    repositories: z
+      .array(
+        z
+          .object({
+            repoFullName: z.string().min(1).max(500),
+            branch: branchNameSchema.optional(),
+          })
+          .strict()
+      )
+      .max(100)
+      .optional(),
+  })
+  .strict()
+  .describe(
+    'Repository environment the client selected. The server verifies it belongs to the owner and contains the launch repository.'
+  );
+
+/**
  * Input schema for prepareSession endpoint.
  * Creates a session in "prepared" state for later initiation.
  * Used by backend-to-backend flows.
@@ -450,8 +487,20 @@ export const CloseTerminalOutput = z.object({
  * stable `operationKey`, and forbids any synthetic initial turn fields.
  */
 const PrepareSessionSharedFields = {
-  allowSubagentSessions: z.boolean().optional(),
   githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
+  allowUserAuthorization: z
+    .boolean()
+    .optional()
+    .describe(
+      'Allow resolving GitHub credentials with the session user’s own authorization when available'
+    ),
+  requestedEnvironment: requestedEnvironmentSchema.optional(),
+  requireEnvironmentChoice: z
+    .literal(true)
+    .optional()
+    .describe(
+      'Set by a client that can ask its user to choose. Several matching environments then fail the start with a conflict; without it they resolve to no environment.'
+    ),
   mode: ModeSlugSchema.describe(
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
   ),
@@ -542,6 +591,7 @@ const PrepareSessionSharedFields = {
   upstreamBranch: branchNameSchema
     .optional()
     .describe('Optional upstream branch to checkout during session initialization'),
+  ...StackedWorkspaceFields,
   autoCommit: z
     .boolean()
     .optional()
@@ -573,14 +623,13 @@ const PrepareSessionSharedFields = {
     .uuid()
     .optional()
     .describe('Profile ID to resolve (repo binding + default still apply on top)'),
-
   ...AttachmentFieldsSchema,
   createdOnPlatform: z
     .string()
     .max(100)
     .optional()
     .describe('Platform that created this session (e.g. slack, code-review)'),
-  clientProvenance: z.enum(['browser', 'mobile']).optional(),
+  clientProvenance: z.enum(['browser', 'mobile', 'agent-manager']).optional(),
   shallow: z
     .boolean()
     .optional()
@@ -683,6 +732,27 @@ export const PrepareSessionInput = z
     path: ['githubRepo'],
   })
   .superRefine((data, ctx) => {
+    if (data.baseBranch !== undefined && data.upstreamBranch !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['baseBranch'],
+        message: 'baseBranch cannot be combined with upstreamBranch',
+      });
+    }
+    if (data.baseSha !== undefined && data.baseBranch === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['baseSha'],
+        message: 'baseSha requires baseBranch',
+      });
+    }
+    if (data.parentWorktreeId !== undefined && data.baseBranch === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['parentWorktreeId'],
+        message: 'parentWorktreeId requires baseBranch',
+      });
+    }
     if (data.sandboxAllocation !== undefined && data.devcontainer) {
       ctx.addIssue({
         code: 'custom',
@@ -703,6 +773,14 @@ export const PrepareSessionInput = z
         code: 'custom',
         path: ['githubIntegrationId'],
         message: 'GitHub integration identity is only valid for GitHub repositories',
+      });
+    }
+
+    if (data.allowUserAuthorization === true && data.githubRepo === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['allowUserAuthorization'],
+        message: 'GitHub user authorization is only valid for GitHub repositories',
       });
     }
 
@@ -787,7 +865,6 @@ export const PrepareSessionInput = z
       });
     }
   })
-  .superRefine(rejectAmbiguousAttachments)
   .refine(requiresAppendSystemPrompt, {
     message: 'appendSystemPrompt is required when mode is custom',
     path: ['appendSystemPrompt'],
@@ -798,6 +875,9 @@ export const PrepareSessionInput = z
 export const PrepareSessionOutput = z.object({
   cloudAgentSessionId: z.string().describe('The generated cloud-agent session ID'),
   kiloSessionId: z.string().describe('The Kilo CLI session ID'),
+  worktreeId: cloudAgentWorktreeIdSchema
+    .optional()
+    .describe('Use this ID to stack another worker workspace on this session.'),
   replayed: z
     .boolean()
     .optional()
@@ -912,14 +992,11 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
 export const StartSessionInput = z
   .object({
     operationKey: z.string().uuid().optional(),
-    allowSubagentSessions: z.boolean().optional(),
-    message: z
-      .object({
-        prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
-        ...AttachmentFieldsSchema,
-        id: MessageIdSchema.optional(),
-      })
-      .superRefine(rejectAmbiguousAttachments),
+    message: z.object({
+      prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
+      ...AttachmentFieldsSchema,
+      id: MessageIdSchema.optional(),
+    }),
     agent: z.object({
       mode: ModeSlugSchema,
       model: modelIdSchema,
@@ -937,6 +1014,7 @@ export const StartSessionInput = z
       })
       .optional(),
     repository: RepositoryInputSchema,
+    ...StackedWorkspaceFields,
     profile: ProfileInputSchema,
     runtime: egressPolicySchema
       .safeExtend({
@@ -956,7 +1034,30 @@ export const StartSessionInput = z
     message: 'appendSystemPrompt is required when mode is custom',
     path: ['agent', 'mode'],
   })
-  .superRefine(validateModeAgainstInlineRuntimeAgentsGrouped);
+  .superRefine(validateModeAgainstInlineRuntimeAgentsGrouped)
+  .superRefine((data, ctx) => {
+    if (data.baseBranch !== undefined && data.repository.branch !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['baseBranch'],
+        message: 'baseBranch cannot be combined with repository.branch',
+      });
+    }
+    if (data.baseSha !== undefined && data.baseBranch === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['baseSha'],
+        message: 'baseSha requires baseBranch',
+      });
+    }
+    if (data.parentWorktreeId !== undefined && data.baseBranch === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['parentWorktreeId'],
+        message: 'parentWorktreeId requires baseBranch',
+      });
+    }
+  });
 
 /** Output schema for the `start` endpoint. */
 export const StartSessionOutput = z.object({
@@ -984,10 +1085,9 @@ export const SendMessageInput = z
         ...AttachmentFieldsSchema,
         id: MessageIdSchema.nullish(),
       })
-      .superRefine(rejectAmbiguousAttachments)
       .superRefine((message, ctx) =>
         rejectEmptyPromptWithoutAttachments(
-          { prompt: message.prompt, attachments: message.attachments, images: message.images },
+          { prompt: message.prompt, attachments: message.attachments },
           ctx
         )
       ),
@@ -1041,6 +1141,11 @@ export const GetSessionInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to retrieve'),
 });
 
+export const GetEgressAuditInput = GetEgressAuditInputSchema.extend({
+  cloudAgentSessionId: sessionIdSchema,
+  limit: z.number().int().min(1).max(100).default(50),
+}).strict();
+
 export const GetSandboxStatusInput = z
   .object({
     cloudAgentSessionId: SandboxStatusSessionIdSchema,
@@ -1052,11 +1157,39 @@ export const WorktreeFileInput = worktreeFileQuerySchema.extend({
   cloudAgentSessionId: sessionIdSchema,
 });
 
+export const SyncWorktreeBranchInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema,
+    baseBranch: branchNameSchema.optional(),
+    upstreamSha: commitShaSchema.optional(),
+  })
+  .strict();
+
+export const RestackWorktreeBranchInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema,
+    baseBranch: branchNameSchema.optional(),
+    upstreamSha: commitShaSchema.optional(),
+  })
+  .strict();
+
+export const AdoptWorktreeBaseInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema,
+    expectedWorktreeId: cloudAgentWorktreeIdSchema,
+    baseBranch: branchNameSchema,
+    baseSha: commitShaSchema,
+  })
+  .strict();
+
+export const AdoptWorktreeBaseOutput = z.object({ success: z.literal(true) }).strict();
+
 export {
   getWorktreeChangesOutputSchema as GetWorktreeChangesOutput,
   getWorktreeFileOutputSchema as GetWorktreeFileOutput,
   refreshWorktreeChangesOutputSchema as RefreshWorktreeChangesOutput,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+export { worktreeBranchOperationResultSchema as WorktreeBranchOperationOutput } from '../shared/worktree-git-operations.js';
 
 /** Customer-safe, no-wake compute billing status for an existing session. */
 export const GetComputeBillingStatusOutput = z.object({
@@ -1140,8 +1273,28 @@ export const ExecutionStatusSchema = z
 export const GetSessionOutput = z.object({
   sessionId: z.string().describe('Cloud-agent session ID'),
   kiloSessionId: z.string().optional().describe('Kilo CLI session ID'),
+  title: z.string().nullable().optional(),
+  associatedPr: z
+    .object({
+      url: z.string(),
+      number: z.number(),
+      state: z.string(),
+      title: z.string().nullable(),
+      headSha: z.string().nullable(),
+      lastSyncedAt: z.string().datetime(),
+      platform: z.string().optional(),
+      reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
+      reviewDecisionPending: z.boolean(),
+    })
+    .nullable()
+    .optional(),
+  totalCostMicrodollars: z.number().finite().nonnegative().nullable().optional(),
+  createdOnPlatform: z.string().nullable().optional(),
+  profileId: z.string().nullable().optional(),
+  updateCursor: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   userId: z.string().describe('Owner user ID'),
   orgId: z.string().optional().describe('Organization ID if applicable'),
+  environmentId: z.string().uuid().optional().describe('Environment used to create the workspace'),
   sandboxId: z
     .string()
     .optional()
@@ -1163,11 +1316,27 @@ export const GetSessionOutput = z.object({
     .nullable()
     .optional()
     .describe('Cloud-agent session scope ID for a grouped worktree session (null when no group)'),
+  parentCloudAgentSessionId: z
+    .string()
+    .optional()
+    .describe('Canonical parent Cloud Agent session ID when this session was spawned by a parent'),
 
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),
   gitUrl: z.string().optional().describe('Generic git URL'),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional().describe('Git platform type'),
+  githubIntegrationId: z
+    .string()
+    .optional()
+    .describe('GitHub integration ID selected for this repository (no credentials)'),
+  bitbucketWorkspaceUuid: z
+    .string()
+    .optional()
+    .describe('Bitbucket workspace UUID selected for this repository'),
+  bitbucketRepositoryUuid: z
+    .string()
+    .optional()
+    .describe('Bitbucket repository UUID selected for this repository'),
 
   prompt: z.string().optional().describe('Task prompt'),
   mode: z.string().optional().describe('Execution mode (built-in or custom slug)'),
@@ -1182,6 +1351,9 @@ export const GetSessionOutput = z.object({
       z.object({
         slug: z.string(),
         name: z.string(),
+        mode: z.enum(['primary', 'subagent', 'all']).optional(),
+        hidden: z.boolean().optional(),
+        disable: z.boolean().optional(),
         /** Optional model override so the chat UI can lock its model picker. */
         model: z.string().optional(),
         /** Optional thinking-effort variant override so the chat UI can lock its variant picker. */
@@ -1190,7 +1362,7 @@ export const GetSessionOutput = z.object({
     )
     .optional()
     .describe(
-      'Custom agents available on this session (slug + name, plus optional model and thinking-effort overrides)'
+      'Custom agents installed on this session, including picker visibility and model overrides'
     ),
 
   execution: ExecutionStatusSchema,
@@ -1239,6 +1411,16 @@ export const GetMessageResultInput = z
   .object({
     cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
     messageId: MessageIdSchema.describe('Exact submitted message ID to inspect'),
+    expectedWorktreeId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Optional expected worktree identity for a scoped Cloud Agent parent'),
+    organizationId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Organization pinned by a scoped Cloud Agent parent authority'),
   })
   .strict();
 
@@ -1317,38 +1499,6 @@ export const GetMessageResultOutput = z
   });
 
 export type GetMessageResultResponse = z.infer<typeof GetMessageResultOutput>;
-
-export const GetLatestAssistantMessageInput = z.object({
-  cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
-});
-
-export const AssistantMessageInfoSchema = z
-  .object({
-    id: z.string().describe('Assistant message ID'),
-    role: z.literal('assistant'),
-  })
-  .passthrough();
-
-export const AssistantMessagePartSchema = z
-  .object({
-    id: z.string().describe('Message part ID'),
-    messageID: z.string().describe('Parent message ID'),
-  })
-  .passthrough();
-
-export const LatestAssistantMessageSchema = z.object({
-  eventId: z.number().describe('Stored event ID for the message.updated event'),
-  timestamp: z.number().describe('Stored event timestamp in milliseconds'),
-  info: AssistantMessageInfoSchema,
-  parts: z.array(AssistantMessagePartSchema),
-});
-
-export const GetLatestAssistantMessageOutput = z.object({
-  cloudAgentSessionId: sessionIdSchema,
-  message: LatestAssistantMessageSchema.nullable(),
-});
-
-export type GetLatestAssistantMessageResponse = z.infer<typeof GetLatestAssistantMessageOutput>;
 
 /**
  * Compatibility response schema for public send/V2 endpoints.

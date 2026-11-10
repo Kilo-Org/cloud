@@ -22,6 +22,12 @@ import {
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
   baseSendMessageNextSchema,
+  baseGetStackedWorkspaceSourceNextSchema,
+  baseStackedWorkspaceSourceNextOutputSchema,
+  baseSyncWorktreeBranchNextSchema,
+  baseRestackWorktreeBranchNextSchema,
+  baseCreatePreviewNextSchema,
+  basePreviewOptionsNextSchema,
 } from './cloud-agent-next-schemas';
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
@@ -278,6 +284,44 @@ describe('baseGetSessionNextOutputSchema', () => {
     expect(response).not.toHaveProperty('parentSessionId');
     expect(response).not.toHaveProperty('cloudAgentSessionScopeId');
   });
+
+  it('preserves runtime agent visibility metadata for the chat picker', () => {
+    const runtimeAgents = [
+      { slug: 'primary', name: 'Primary', mode: 'primary', hidden: false, disable: false },
+      { slug: 'subagent', name: 'Subagent', mode: 'subagent' },
+      { slug: 'hidden', name: 'Hidden', mode: 'all', hidden: true },
+      { slug: 'disabled', name: 'Disabled', disable: true },
+      { slug: 'legacy', name: 'Legacy' },
+    ];
+
+    expect(
+      baseGetSessionNextOutputSchema.parse({ ...baseSession, runtimeAgents }).runtimeAgents
+    ).toEqual(runtimeAgents);
+  });
+
+  it('preserves safe DO-native metadata fields used by session detail UIs', () => {
+    const metadata = {
+      title: 'DO title',
+      associatedPr: {
+        url: 'https://github.com/Kilo-Org/cloud/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Preserve metadata',
+        headSha: 'a'.repeat(40),
+        lastSyncedAt: '2026-10-19T21:00:00.000Z',
+        platform: 'github',
+        reviewDecision: 'approved',
+        reviewDecisionPending: false,
+      },
+      totalCostMicrodollars: 350_000,
+      createdOnPlatform: 'extension',
+      profileId: 'profile-1',
+    };
+    expect(baseGetSessionNextOutputSchema.parse({ ...baseSession, ...metadata })).toEqual({
+      ...baseSession,
+      ...metadata,
+    });
+  });
 });
 
 describe('baseWorktreeChangesNextSchema', () => {
@@ -318,8 +362,14 @@ describe('baseWorktreeFileNextSchema', () => {
     expect(baseWorktreeFileNextSchema.parse(input)).toEqual(input);
   });
 
+  it.each(['uncommitted', 'against-base-branch'])('preserves optional %s file scope', scope => {
+    expect(baseWorktreeFileNextSchema.parse({ ...input, scope })).toEqual({ ...input, scope });
+  });
+
   it.each([
     { path: '' },
+    { scope: 'committed' },
+    { scope: null },
     { path: '/absolute' },
     { path: '../outside' },
     { path: 'src/../outside' },
@@ -638,6 +688,18 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     expect(result.success).toBe(true);
   });
 
+  it('drops a client environmentId: the server resolves the environment from the repository', () => {
+    const result = personalPrepareSessionNextSchema.parse({
+      githubRepo: 'acme/repo',
+      prompt: 'Use environment',
+      mode: 'code',
+      model: 'kilo/test-model',
+      environmentId: '123e4567-e89b-12d3-a456-426614174099',
+    });
+
+    expect(result).not.toHaveProperty('environmentId');
+  });
+
   it('does not accept client provenance from public session preparation input', () => {
     const result = basePrepareSessionNextSchema.parse({
       githubRepo: 'acme/repo',
@@ -660,6 +722,7 @@ describe('send-time attachment filenames', () => {
   };
   const sendInput = {
     cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc',
+    messageId: 'msg_123456789abc123456789ABCDE',
     payload: { type: 'prompt', prompt: '', mode: 'code', model: 'kilo/test-model' },
   };
   const attachmentsWith = (extension: string) => ({
@@ -757,6 +820,23 @@ describe('prepare session sandbox selection', () => {
     model: 'kilo/test-model',
   };
   const organizationInput = { ...baseInput, organizationId: MESSAGE_UUID };
+  it.each([
+    { egressAudit: false },
+    { egressAudit: true },
+    { egressMode: 'unrestricted', egressAudit: false },
+    { egressMode: 'unrestricted', egressAudit: true },
+    { egressMode: 'allowlist', egressAudit: false },
+    { egressMode: 'allowlist', egressAudit: true },
+  ])('preserves personal and organization audit opt-ins: %j', policy => {
+    for (const parsed of [
+      personalPrepareSessionNextSchema.parse({ ...baseInput, ...policy }),
+      organizationPrepareSessionNextSchema.parse({ ...organizationInput, ...policy }),
+    ]) {
+      expect(parsed.egressAudit).toBe(policy.egressAudit);
+      expect(parsed.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+      expect(parsed.egressAllowlist).toBeUndefined();
+    }
+  });
   it.each([[], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'preserves canonical API-only policy %j',
     ({ egressAllowlist }) => {
@@ -798,6 +878,8 @@ describe('prepare session sandbox selection', () => {
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'deny-all' },
     { egressMode: null },
+    { egressMode: 'allowlist', egressAudit: null },
+    { egressMode: 'allowlist', egressAudit: 'true' },
   ])('rejects ambiguous or unsupported egress policies: %j', policy => {
     expect(personalPrepareSessionNextSchema.safeParse({ ...baseInput, ...policy }).success).toBe(
       false
@@ -877,8 +959,8 @@ describe('prepare session sandbox selection', () => {
     { vcpus: 4 },
     { provider: { id: 'cloudflare', account: 'byoc' }, instanceType: 'single' },
     { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'small' },
-    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'single' },
-    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'single' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
     { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
   ])('rejects an invalid sandbox allocation: %j', sandboxAllocation => {
     expect(
@@ -948,10 +1030,10 @@ describe('prepare session sandbox selection', () => {
       cloneFromKiloSessionId: KILO_SESSION_ID,
       autoInitiate: true,
       operationKey: MESSAGE_UUID,
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     };
     expect(personalPrepareSessionNextSchema.parse(personalClone).sandboxAllocation).toEqual(
-      getSandboxAllocationRequest('cloudflare-single')
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
     );
     expect(
       personalPrepareSessionNextSchema.safeParse({ ...personalClone, prompt: 'Not allowed' })
@@ -964,10 +1046,10 @@ describe('prepare session sandbox selection', () => {
       cloneFromKiloSessionId: KILO_SESSION_ID,
       autoInitiate: true,
       operationKey: MESSAGE_UUID,
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     };
     expect(organizationPrepareSessionNextSchema.parse(cloneInput).sandboxAllocation).toEqual(
-      getSandboxAllocationRequest('cloudflare-single')
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
     );
     expect(
       organizationPrepareSessionNextSchema.safeParse({ ...cloneInput, prompt: 'Not allowed' })
@@ -995,5 +1077,139 @@ describe('baseCancelQueuedMessageNextSchema', () => {
     expect(
       baseCancelQueuedMessageNextSchema.safeParse({ messageId: VALID_MESSAGE_ID }).success
     ).toBe(false);
+  });
+});
+
+describe('stacked workspace schemas', () => {
+  const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+  const base = {
+    prompt: 'Create a stacked session',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+
+  it('allows stackOnWorktreeId to be the only repository source', () => {
+    expect(
+      personalPrepareSessionNextSchema.safeParse({
+        ...base,
+        stackOnWorktreeId: worktreeId,
+      }).success
+    ).toBe(true);
+  });
+
+  it('still requires a repository when there is no parent', () => {
+    expect(personalPrepareSessionNextSchema.safeParse(base).success).toBe(false);
+  });
+
+  it('allows a parent with a repository that the router then verifies', () => {
+    expect(
+      personalPrepareSessionNextSchema.safeParse({
+        ...base,
+        stackOnWorktreeId: worktreeId,
+        githubRepo: 'acme/repo',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects an upstream branch with a parent', () => {
+    expect(
+      personalPrepareSessionNextSchema.safeParse({
+        ...base,
+        stackOnWorktreeId: worktreeId,
+        upstreamBranch: 'other',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a base branch and an upstream branch together', () => {
+    expect(
+      personalPrepareSessionNextSchema.safeParse({
+        ...base,
+        githubRepo: 'acme/repo',
+        baseBranch: 'feat',
+        upstreamBranch: 'other',
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts only the session id for sync and restack', () => {
+    expect(
+      baseSyncWorktreeBranchNextSchema.safeParse({
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      }).success
+    ).toBe(true);
+    expect(
+      baseRestackWorktreeBranchNextSchema.safeParse({
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        baseBranch: 'main',
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts only a worktree id for the read-only source query', () => {
+    expect(baseGetStackedWorkspaceSourceNextSchema.safeParse({ worktreeId }).success).toBe(true);
+    expect(
+      baseGetStackedWorkspaceSourceNextSchema.safeParse({ worktreeId, prompt: 'no' }).success
+    ).toBe(false);
+  });
+
+  it('round-trips the read-only stacked source output', () => {
+    expect(
+      baseStackedWorkspaceSourceNextOutputSchema.parse({
+        worktreeId,
+        repository: 'acme/repo',
+        gitUrl: 'https://github.com/acme/repo.git',
+        platform: 'github',
+        branch: 'feat-parent',
+        prNumber: 7,
+        basePushed: false,
+        githubIntegrationId: null,
+        providerInput: { githubRepo: 'acme/repo', githubIntegrationId: null },
+      })
+    ).toMatchObject({ worktreeId, basePushed: false });
+  });
+});
+
+describe('preview target schemas', () => {
+  const WORKTREE_ID = 'worktree_12345678-1234-4234-9234-123456789abc';
+  const WORKSPACE_ID = 'workspace_12345678-1234-4234-9234-123456789abc';
+
+  it('accepts a worktree target or a standalone session target', () => {
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ worktreeId: WORKTREE_ID, port: 5173 }).success
+    ).toBe(true);
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ cloudAgentSessionId: WORKSPACE_ID, port: 5173 })
+        .success
+    ).toBe(true);
+  });
+
+  it('requires exactly one target', () => {
+    expect(baseCreatePreviewNextSchema.safeParse({ port: 5173 }).success).toBe(false);
+    expect(
+      baseCreatePreviewNextSchema.safeParse({
+        worktreeId: WORKTREE_ID,
+        cloudAgentSessionId: WORKSPACE_ID,
+        port: 5173,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects malformed targets', () => {
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ worktreeId: 'worktree_1', port: 5173 }).success
+    ).toBe(false);
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ cloudAgentSessionId: 'agent_1', port: 5173 }).success
+    ).toBe(false);
+  });
+
+  it('carries the route organization alongside a target', () => {
+    expect(
+      basePreviewOptionsNextSchema.safeParse({
+        worktreeId: WORKTREE_ID,
+        organizationId: '11111111-1111-4111-8111-111111111111',
+      }).success
+    ).toBe(true);
   });
 });

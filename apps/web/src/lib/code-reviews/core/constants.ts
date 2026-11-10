@@ -26,6 +26,10 @@ export const CODE_REVIEW_MD_CONVERSION_FLAG = 'code-review-md-conversion';
 export const REVIEW_MD_CONVERSION_RATE_LIMIT = 30;
 export const REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS = 60 * 60;
 
+/** Max review fix sessions a single actor may start per rolling window (abuse cap). */
+export const REVIEW_FIX_SESSION_RATE_LIMIT = 30;
+export const REVIEW_FIX_SESSION_RATE_WINDOW_SECONDS = 60 * 60;
+
 // ============================================================================
 // Pagination
 // ============================================================================
@@ -35,6 +39,17 @@ export const DEFAULT_LIST_LIMIT = 50;
 export const MAX_LIST_LIMIT = 100;
 
 export const DEFAULT_LIST_OFFSET = 0;
+
+// ============================================================================
+// Existing Inline Comments
+// ============================================================================
+
+/**
+ * Characters of each existing inline comment body kept in review state and rendered in the
+ * duplicate-detection table of the review prompt. The provider adapters and the prompt share this
+ * ceiling so the reviewer sees as much of a prior finding as the lookup keeps.
+ */
+export const MAX_INLINE_COMMENT_BODY_CHARS = 500;
 
 // ============================================================================
 // GitHub Webhook Events

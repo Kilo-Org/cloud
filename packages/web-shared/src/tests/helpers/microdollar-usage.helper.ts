@@ -40,6 +40,7 @@ function defineDefaultUsageStats(): MicrodollarUsageStats {
 
 function defineDefaultContextInfo(): UsageContextInfo {
   return {
+    id: randomUUID(),
     kilo_user_id: `test-user-${randomUUID()}`,
     organization_id: null,
     http_x_forwarded_for: 'nobody',
@@ -69,6 +70,7 @@ function defineDefaultContextInfo(): UsageContextInfo {
     mode: null,
     auto_model: null,
     reasoning_setting: null,
+    inference_region: null,
     ttfb_ms: null,
     abuse_delay: null,
     abuse_downgraded_from: null,
@@ -122,12 +124,14 @@ export function createMockUsageContext(
     machine_id: null,
     user_byok: false,
     is_free: false,
+    custom_llm_pricing: null,
     has_tools: false,
     feature: 'vscode-extension',
     session_id: null,
     mode: null,
     auto_model: null,
     reasoning_setting: null,
+    inference_region: null,
     ttfb_ms: null,
   };
 }

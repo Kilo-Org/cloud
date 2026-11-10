@@ -148,6 +148,8 @@ pnpm dev:env
 
 The setup covers: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `POSTGRES_URL`, `CALLBACK_TOKEN_SECRET`, `BYOK_ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, `STRIPE_SECRET_KEY`, and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
 
+It also provisions the credential-envelope keypairs that the code-review providers need. The GitHub user-token and Bitbucket/GitLab platform-credential envelopes each keep a public half in the web app and a private half in `git-token-service`, so setup generates a local 4096-bit RSA keypair for each one that is unconfigured and writes the key ID plus both halves into `.env.local`; `pnpm dev:env` copies the private halves into the Worker's `.dev.vars`. Values that already exist are kept, read from `.env.local` first and from the Worker's `.dev.vars` second, so re-running setup neither rotates a keypair the Worker already stored credentials under nor drops a half that lives only in the Worker file. Without a complete pair the web app still reports a connected provider, but every review read answers 503 from the Worker.
+
 These changes will allow you to do local testing with a fake account.
 
 #### c. Add or rotate shared web environment variables
@@ -160,9 +162,9 @@ pnpm web:env set EXAMPLE_API_TOKEN
 
 Prerequisites:
 
-- Sign in with `vercel login` and have access to the projects in the `kilocode` scope.
+- Sign in with `pnpm exec vercel login` and have access to the projects in the `kilocode` scope.
 - Install the 1Password CLI and have write access to the `Kilo Web ENV Production` vault. If needed, the CLI prompts you to sign in with Touch ID.
-- Have `pnpm` available; the command runs the pinned Vercel CLI with `pnpm dlx`.
+- Run `pnpm install --frozen-lockfile` in the checkout first. The command uses the workspace Vercel CLI via `pnpm exec vercel`; verify access with `pnpm exec vercel whoami --scope kilocode --format=json`.
 
 The command asks whether the variable is sensitive, defaulting to yes. Sensitive Production and Staging values use Vercel's sensitive type, while Development remains encrypted but exportable through `vercel env pull`. The Production and Staging values are also stored in one concealed, exact-name item in `Kilo Web ENV Production`: Production uses the built-in `password` field and Staging uses `password (staging)`. Either field can be created before the other. The item's notes identify the local user and computer that last updated it.
 
@@ -222,6 +224,7 @@ pnpm dev:start
 ```
 
 This generates the local environment files and launches a tmux dashboard with the Next.js app and local infrastructure. It does not run database migrations.
+It also starts `git-token-service`, because every code-review read and write resolves the caller's GitHub, GitLab or Bitbucket credential through that Worker; without it the web app reports a connected provider while the review inbox and overview fail as a service outage.
 Port offset selection is automatic by default, keeping secondary worktrees from colliding with the root checkout. This setup order assumes no port conflicts; if startup selects a different offset, run `pnpm test:db` again in another terminal in the same worktree.
 When the Stripe CLI is installed, the command also starts the Stripe webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 
@@ -242,6 +245,168 @@ pnpm test
 This runs the web, web environment, and local development-tool tests. They
 should pass against the local PostgreSQL database.
 
+### Watchwood signup shadow
+
+Watchwood collects browser evidence before authentication and records advisory assessments when the web app reaches new-account creation.
+Existing Turnstile and Bouncer decisions remain authoritative.
+Native account creation does not participate.
+
+Collection is disabled until all Watchwood variables in `ENVIRONMENT.md` are configured.
+There are no database migrations or required production changes for a disabled deployment.
+Before activation, confirm that the OpenAI organization and its dedicated key have access to Watchwood.
+The owner configures shared values with:
+
+```bash
+pnpm web:env set WATCHWOOD_ORG_ID
+pnpm web:env set WATCHWOOD_API_KEY
+pnpm web:env set WATCHWOOD_SHADOW_ENABLED
+```
+
+Set the enabled value to exact `true`, then redeploy.
+The browser receives only the organization and a server-generated signup identity.
+The server sends the token and trusted client IP to OpenAI, without email or phone signals.
+Production assessments require Vercel's trusted client-IP header.
+Production without Vercel skips assessment rather than trusting caller-supplied forwarding headers.
+Only local development and tests use the forwarded-header fallback.
+Turnstile verification signs a separate trusted-IP claim for Watchwood; existing authentication fields retain their behavior.
+Watchwood skips older proofs without that claim instead of changing authentication admission.
+Tokens remain transient; signed, HttpOnly cookies carry the signup identity and assessment through authentication redirects.
+The optional SDK device cookie stays disabled.
+
+The browser allows at most two seconds for shadow submission.
+After the mount request reports collection disabled, submission skips Watchwood without another request.
+An unresolved configuration request retains the bounded fail-open path.
+The server allows one second for body reads, Redis budgets, and the upstream check.
+It retries an upstream server error once and does not retry client errors.
+Upstream redirects count as errors and are never followed.
+Missing tokens, blocked scripts, invalid responses, unavailable services, and high risk scores do not refuse signup.
+Redis budgets limit assessments per verified Turnstile context and client IP; exhausted budgets reduce coverage, not signup admission.
+Each budget increment sets its expiry atomically.
+
+Logs named `[auth] Watchwood signup attempt` describe assessment coverage, failures, scores, and latency.
+Logs named `[auth] Watchwood signup shadow` correlate new-account attempts with existing signup outcomes through `operationId`.
+Both events carry `shadow: true` and `enforced: false`.
+The risk score ranges from zero to one; it is not a probability.
+Do not interpret a missing assessment as a low score.
+Observe coverage, conversion, latency, and confirmed abuse before proposing enforcement.
+To disable collection, set `WATCHWOOD_SHADOW_ENABLED` to `false` and redeploy.
+
+### CLI session storage verification
+
+After migrating the local database, run the session-copy and account-cleanup
+regressions with:
+
+```bash
+pnpm --filter web exec jest --runInBand src/routers/cli-sessions-router.test.ts src/lib/r2/cli-sessions.test.ts src/lib/user/deletion-queue/handlers/cli-v1.test.ts
+```
+
+Share publication refreshes a stable link with the current session snapshot.
+The blob URL columns identify the current copy folder. `pending_copy_ids`
+records folders awaiting deletion; later publication and deletion lifecycle
+calls retry that work before admitting another copy. Publication copies the
+blobs first and then writes the row in a short transaction, runs one copy at a
+time per account in an instance, and a fork of a shared link attaches its copy
+only while the link still points at the folder that was copied, copying again
+when it does not. Deleting a link records its folders in `pending_copy_ids`,
+deletes those objects, and removes the row only once no publication recorded a
+newer folder.
+
+For migration verification, run `pnpm drizzle:verify-bootstrap` to apply the
+complete chain to a disposable empty database. Also verify an upgrade from the
+base branch's migration chain with existing session and share rows: `is_fork`
+is backfilled from `forked_from`, `pending_copy_ids` defaults to an empty list,
+and `IDX_shared_cli_sessions_kilo_user_id` must be valid after the concurrent
+index build. Run `pnpm drizzle check` and `pnpm drizzle generate` to confirm the
+journal and schema agree after synchronizing the branch with `main`.
+
+
+### Credit expiration checks
+
+Single-account expiration locks the primary account before reading its credit transactions.
+It returns current usage, acquired credits, and the next expiration.
+Balance callers use these fields together.
+Closure checks follow the unique original-transaction link.
+The canonical database reconciler remains unconditional by default.
+Lazy balance checks opt into `onlyIfDue`.
+Forced checks pass `{ force: true }`, including checks with no expiration hint.
+
+Use synthetic accounts and a local PostgreSQL database for expiration checks.
+
+```bash
+pnpm test:db
+pnpm --filter web exec env NODE_ENV=test jest --runInBand \
+  ../../packages/web-shared/src/lib/creditExpiration.test.ts \
+  ../../packages/web-shared/src/lib/creditExpirationOrg.test.ts \
+  ../../packages/web-shared/src/lib/creditExpiration.concurrent.test.ts \
+  ../../packages/web-shared/src/lib/paidCreditAccounting.test.ts \
+  ../../packages/web-shared/src/lib/balance-funding.test.ts \
+  ../../packages/web-shared/src/lib/creditAdjustments.test.ts \
+  ../../packages/web-shared/src/lib/organizations/organization-usage.test.ts \
+  src/tests/profile-balance.test.ts \
+  src/lib/recomputeNextCreditExpiration.test.ts \
+  src/routers/organizations/organization-router.test.ts
+```
+
+### Native build artifacts
+
+Native build tooling verifies artifact provenance before installation or build reuse.
+Installation accepts successful, completed native workflow runs from the repository itself.
+Push builds must originate from the default branch.
+Manual builds must match the consumer commit, or `GITHUB_SHA` when the gate runs in CI.
+Pull-request artifacts do not qualify for installation.
+The pull-request gate can reuse a successful artifact from that same pull request and head repository.
+Trusted push and manual artifacts remain available for gate reuse.
+Pull-request artifact reuse requires a recorded pull-request association.
+Fork runs without that association require a fresh build.
+
+The native fingerprint includes the artifact trust revision.
+This revision changes remote artifact names and local cache keys.
+Each platform requires a fresh trusted build after this change.
+Existing worktrees must receive the tooling update before they use remote artifacts.
+
+Require a remote iOS build without permitting a local compilation fallback:
+
+```bash
+KILO_REMOTE_NATIVE=required pnpm dev:mobile:ios build <udid>
+```
+
+### iOS app actions
+
+App Intents and the session entity compile in the app target, not the static Expo pod.
+Their Swift sources live in `apps/mobile/modules/kilo-app-actions/ios/AppIntents`.
+The prebuild plugin copies those sources into the app and adds them to its existing Sources phase.
+The pod keeps the catalog and dispatcher; the app delegate installs the typed visible-session publisher before React starts.
+The podspec excludes the app-target sources, so each declaration compiles once.
+
+### Mobile PR review entry
+
+The PR review entry screen keeps the account picker beside the title.
+Recent reviews use separate cards with wrapping titles and repository details.
+Long-press a recent card to open its removal confirmation; failed reviews retain Retry.
+Screen readers expose the same Remove action without requiring the gesture.
+
+Use an isolated backend, a loopback mobile API URL, and `SKIP_STRIPE_API=true` for the native fixture:
+
+```bash
+pnpm dev:seed app:mobile-pr-entry
+```
+
+Sign in with the returned fake account, then open its `deepLink`.
+The fixture seeds local recent reviews and renders the real entry screen.
+The seed provides short and long organization names without connecting providers.
+Use `emptyDeepLink` for empty history.
+The fixture requires a development build and refuses non-loopback API URLs or accounts outside the reserved example domain.
+Keep optional analytics off and avoid billing surfaces; the seed creates no Stripe customer.
+
+### Mobile Profile credits
+
+Balance reads preserve the expiry note and purchase action across loading, failed, and ready states.
+The failed state shows a localized retry action with a complete spoken failure label.
+The note remains readable to screen readers without intercepting the retry touch area.
+Balance and expiry amounts stay masked until the stored privacy preference loads.
+
+An empty credit block list shows no expiring credits, not an error.
+
 ## Common Development Commands
 
 | Command | Description |
@@ -257,7 +422,7 @@ should pass against the local PostgreSQL database.
 | `pnpm lint` | Lint all source files |
 | `pnpm format` | Format all supported files with oxfmt |
 | `pnpm format:changed` | Format only files changed since `main` |
-| `pnpm validate` | Run the root typecheck, lint, and test scripts |
+| `pnpm validate` | Run the root typecheck, lint, and test scripts, then the dependency cycle check |
 | `pnpm drizzle migrate` | Apply pending database migrations |
 | `pnpm drizzle generate` | Generate a new migration after schema changes |
 | `pnpm drizzle:verify-bootstrap` | Create a temporary empty database and verify `pnpm drizzle migrate` bootstraps it cleanly |
@@ -523,6 +688,13 @@ Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 
 
 The Next.js dev script reads `REDIS_URL` and `UPSTASH_REDIS_REST_URL` from the shell, then from the env files, and falls back to `redis://localhost:6379` and `http://localhost:8079`. It also exports `UPSTASH_REDIS_REST_TOKEN=example_token` for the shared `@upstash/redis` REST helper; `REDIS_URL` serves Chat SDK state because `@chat-adapter/state-redis` uses the Redis TCP protocol.
 
+## Admin webhook inspection
+
+Webhook request records and request logs use the session-viewer permission contract
+(`is_admin` and `can_view_sessions`). Local admin fixtures used to inspect these
+records must have both flags enabled. This applies to personal and organization
+triggers.
+
 ## First credit-pack purchase email
 
 The backend schedules one marketing email after the first production credit-pack purchase, across Apple and Google combined.
@@ -585,24 +757,69 @@ git lfs pull
 
 ## Agent morning briefings
 
-The mobile Home briefing summarizes overnight coding sessions separately for Personal and each organization.
-Users configure a saved timezone, night start, shared night-end/morning-start, and morning end.
-Dismissal restores live status across devices; report history remains available.
+Morning briefings are scheduled snapshot digests for explicitly enabled Personal and organization contexts.
+Reading preferences does not enable a context or create a schedule.
+Users configure a timezone, night start, morning start, morning end, model, and finite generation budgets.
+Notifications require a separate opt-in.
 
-The backend owns scheduling, report revisions, optional paid summaries, and notification dispatch.
-AI summaries and briefing notifications require separate opt-ins.
-Summary settings include a model override and finite generation time and spend limits.
+The morning scheduler captures recent session metadata once for each enabled context.
+The snapshot contains current status, verified pull request links, available session summaries, and a bounded final-response excerpt.
+It describes the latest available state at capture time, not an exact historical reconstruction.
+Counts describe selected sessions, not exhaustive overnight totals.
+Reports show the capture time and disclose selection limits.
+They do not report overnight spending or infer success from an idle session.
+
+Session ingestion stores one redacted completed-response excerpt per eligible session.
+Streaming fragments, reasoning, and tool output do not become briefing excerpts.
+A newer completed response replaces the previous excerpt.
+Context changes and account deletion clear the excerpt.
+The collector does not maintain a separate event ledger or an evidence retry queue.
+
+The scheduler saves bounded, immutable evidence in `agent_briefing_snapshots`.
+The summary worker atomically claims each due report and generates its summary asynchronously.
+Report reads do not refresh evidence, scan transcripts, or start generation.
+The structured digest remains available while generation runs or fails.
+Saved content requires current context and referenced-session access.
+Reports expire through the existing retention policy.
+Manual creation, historical period selection, preparation drafts, and manual summary retries are not available.
+
+Pricing estimates use the model picker's configured provider prices and the stored target for model aliases.
+The gateway preserves bounded-request price ceilings and model access checks.
+Each charged retry retains a distinct usage receipt with its committed or queued delivery state.
+A usage identifier marks an attempt the gateway billed, including an answer the caller never received.
+The summary worker stops a transient retry when it observes that identifier.
+A delayed receipt can still permit another charged attempt; this check does not enforce a cumulative spending ceiling.
+Settlement waits for every recorded receipt, within the existing delivery window.
+A later receipt reopens settlement after an earlier attempt settled.
+The displayed cost sums usage rows once, including rows delivered after another attempt.
+Tiered custom pricing uses the highest tier reachable from the request’s bounded input length.
 The default summary model is `~deepseek/deepseek-flash-latest`.
-Pricing estimates and gateway spend checks resolve latest-model aliases through the stored catalog target.
-An alias remains unavailable when its target is missing or has no usable pricing.
-The gateway rejects an alias request if provider routing selects a different target from the priced catalog target.
-The structured report remains available when generation fails or reaches a limit.
-
-Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
-The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.
-Legacy activity remains readable with partial coverage; unknown values must not appear as confirmed zeroes.
 
 The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
 They use the existing cron authorization, database, gateway, and notification configuration.
-Local verification must use an isolated database and fake accounts.
-Use a local notification sink and fixture inference provider to avoid real pushes or upstream charges.
+Use `pnpm dev:seed app:agent-briefing --help` for the scheduled snapshot fixture.
+Run local verification with an isolated database, fake accounts, and local notification and inference fixtures.
+
+### Cutover deployment
+
+The generated migration creates the snapshot store and removes the obsolete event and report stores.
+The existing deployment workflow applies migrations before promoting web and worker code.
+Do not apply this destructive cutover while an older producer or summary worker can use the retired stores.
+Disable the old briefing cron jobs and settle outstanding briefing usage before retiring the old report store.
+Quiesce old event producers before the migration, then deploy the matching web, gateway, notification, and session-ingest code.
+Enable contexts explicitly after deployment.
+Do not treat an unshipped user interface as proof that its ingestion code is inactive.
+
+### Summary retry rollout
+
+The gateway marks a refusal that replaces an already-accounted answer.
+The summary worker must not retry that refusal.
+The repeat guard reads the usage identifier the deployed gateway already writes for a billed attempt, so it adds no gateway behavior.
+The scheduled workflow promotes the gateway marker producer before the matching web retry consumer.
+Web promotion requires successful gateway staging and promotion, or both gateway jobs skipped.
+A failed, cancelled, or mismatched gateway rollout blocks web promotion.
+Manual deployments must use the same producer-first order.
+
+Charge accounting retains the deployed receipt fields in `chargeAccounting.generations`.
+Charged attempts share a generation identifier but retain distinct usage identifiers and delivery states.
+An older reader therefore retains every attempt when it reconciles or rewrites the accounting record.

@@ -134,4 +134,27 @@ describe('now-ticker-store', () => {
     const replacement = getNowTicker(1000);
     expect(replacement).not.toBe(ticker);
   });
+
+  it('keeps a registration younger than one interval that nobody subscribed to yet', () => {
+    // Every component of one commit reads the registry during the same render
+    // pass, before any of them subscribes. They must all get one ticker.
+    const first = getNowTicker(60_000);
+    vi.setSystemTime(BASE_TIME + 30_000);
+
+    expect(getNowTicker(60_000)).toBe(first);
+  });
+
+  it('replaces a registration a discarded render left behind', () => {
+    // A render React discarded before commit read the clock and left a
+    // registration with no listener. Reusing it would serve that old instant
+    // until the first tick, so the next mount starts from a fresh one.
+    const abandoned = getNowTicker(60_000);
+    expect(abandoned.getSnapshot()).toBe(BASE_TIME);
+
+    vi.setSystemTime(BASE_TIME + 5 * 60_000);
+    const fresh = getNowTicker(60_000);
+
+    expect(fresh).not.toBe(abandoned);
+    expect(fresh.getSnapshot()).toBe(BASE_TIME + 5 * 60_000);
+  });
 });

@@ -26,7 +26,14 @@ export const CONTROL_PLANE_SANDBOX_PERMISSION = {
 /**
  * Only interactive Cloud Agent clients have a person who can answer a question
  * or a CLI-enforced human approval. Every other origin runs unattended.
+ *
+ * `agent-manager` is the authenticated IDE/Agent Manager Session Host, which
+ * supervises a local user session and can answer questions.
  */
 export function isInteractiveSessionOrigin(createdOnPlatform: string | undefined): boolean {
-  return createdOnPlatform === 'cloud-agent-web' || createdOnPlatform === 'desktop';
+  return (
+    createdOnPlatform === 'cloud-agent-web' ||
+    createdOnPlatform === 'desktop' ||
+    createdOnPlatform === 'agent-manager'
+  );
 }

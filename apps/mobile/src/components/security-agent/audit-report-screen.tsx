@@ -10,11 +10,16 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
+import {
+  eventEvidenceLines,
+  SEVERITY_LABEL_KEYS,
+} from '@/components/security-agent/audit-report-copy';
+import { ReportSummary } from '@/components/security-agent/audit-report-summary';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatCalendarDate, formatDate } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -23,20 +28,6 @@ type AuditReportResponse = RouterOutputs['securityAgent']['getAuditReport'];
 type SecurityAgentAuditReport = Extract<AuditReportResponse, { status: 'ok' }>['report'];
 type SecurityFindingAuditSection = SecurityAgentAuditReport['findings'][number];
 type SecurityAgentAuditReportActor = SecurityFindingAuditSection['events'][number]['actor'];
-
-const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
-
-// Literal keys, never a template: the catalog check scans the source for the
-// keys a lookup passes on, and a computed key is invisible to it.
-const SEVERITY_LABEL_KEYS = {
-  critical: 'common.critical',
-  high: 'securityAgent.sla.high',
-  medium: 'securityAgent.sla.medium',
-  low: 'securityAgent.sla.low',
-  // A finding whose severity the scanner never reported. The SLA policy has no
-  // row for it, so reuse the finding-details word.
-  unknown: 'common.unknown',
-} as const;
 
 const MASKED_ACTOR_LABEL_KEYS = {
   kilo_admin: 'securityAgent.auditReport.actorMaskedKiloAdmin',
@@ -135,14 +126,21 @@ function AuditReportSkeleton() {
   );
 }
 
+// The report's window is a UTC calendar range. `start` is an instant rendered in
+// UTC; `displayEnd` is a date-only calendar day, not an instant, so its calendar
+// components are formatted as they are. The header and the empty state both
+// render these values through `periodUtc`, so neither can describe the window in
+// the reader's own calendar days without saying which zone it is.
+function reportPeriod(report: SecurityAgentAuditReport) {
+  return {
+    start: formatDate(parseTimestamp(report.period.start), i18n.language, { timeZone: 'UTC' }),
+    end: formatCalendarDate(report.period.displayEnd, i18n.language),
+  };
+}
+
 function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
   const { t } = useTranslation();
-  const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
-    timeZone: 'UTC',
-  });
-  const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
-    timeZone: 'UTC',
-  });
+  const { start, end } = reportPeriod(report);
   const generatedAt = formatUtcTimestamp(report.generatedAt);
 
   return (
@@ -154,42 +152,6 @@ function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>
       <Text variant="muted" className="text-xs">
         {t('securityAgent.auditReport.generated', { generatedAt })}
       </Text>
-    </View>
-  );
-}
-
-function SummaryCount({ label, value }: Readonly<{ label: string; value: number }>) {
-  return (
-    <View className="min-w-16">
-      <Text className="text-lg font-semibold tabular-nums">
-        {formatNumber(value, i18n.language)}
-      </Text>
-      <Text variant="muted" className="text-xs">
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function ReportSummary({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
-  const { t } = useTranslation();
-  return (
-    <View className="gap-3 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">{t('securityAgent.auditReport.summary')}</Text>
-      <View className="flex-row flex-wrap gap-x-6 gap-y-2">
-        <SummaryCount label={t('common.findings')} value={report.summary.findingCount} />
-        <SummaryCount
-          label={t('securityAgent.auditReport.events')}
-          value={report.summary.activityCount}
-        />
-        {SEVERITY_ORDER.map(severity => (
-          <SummaryCount
-            key={severity}
-            label={t(SEVERITY_LABEL_KEYS[severity])}
-            value={report.summary.bySeverity[severity]}
-          />
-        ))}
-      </View>
     </View>
   );
 }
@@ -210,6 +172,11 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
         {finding.events.map(event => (
           <View key={event.id} className="gap-0.5">
             <Text className="text-sm">{eventLabel(event.action, event.label)}</Text>
+            {eventEvidenceLines(event, t).map(line => (
+              <Text key={line} variant="muted" className="text-xs">
+                {line}
+              </Text>
+            ))}
             <Text variant="muted" className="text-xs">
               {formatUtcTimestamp(event.occurredAt)} · {actorLabel(event.actor, t)}
             </Text>
@@ -226,23 +193,32 @@ function AuditReportView({
 }: Readonly<{ report: SecurityAgentAuditReport; onRetry?: () => void }>) {
   const { t } = useTranslation();
   if (report.findings.length === 0) {
-    const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
-      timeZone: 'UTC',
-    });
-    const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
-      timeZone: 'UTC',
-    });
+    const period = reportPeriod(report);
     // Explorer security-audit finding 3: CenteredState's measured path painted
     // the icon bubble but collapsed the copy, so the screen owns the layout and
     // EmptyState renders its plain content (`placement="static"`).
+    // The heading says there is no recorded activity; the only other datum the
+    // empty state has is the window, so `periodUtc` states it once, with the
+    // invariant UTC marker, at the same size the non-empty header uses. A
+    // second sentence saying the same thing in words was removed: it restated
+    // the heading and pointed at this line. The owner line is the header's
+    // first line, so an empty report identifies whose window it covers instead
+    // of leaving that to the screen the reader came from.
     return (
-      <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
-        <EmptyState
-          placement="static"
-          icon={FileText}
-          title={t('securityAgent.auditReport.noActivity')}
-          description={t('securityAgent.auditReport.noActivityDescription', { start, end })}
-        />
+      <TabScreenScrollView className="flex-1" contentContainerClassName="grow">
+        <Text className="px-6 pt-4 text-sm font-medium">{report.owner.displayName}</Text>
+        <View className="grow justify-center">
+          <EmptyState
+            placement="static"
+            icon={FileText}
+            title={t('securityAgent.auditReport.noActivity')}
+            description={
+              <Text variant="muted" className="text-xs text-center">
+                {t('securityAgent.auditReport.periodUtc', period)}
+              </Text>
+            }
+          />
+        </View>
       </TabScreenScrollView>
     );
   }
@@ -257,7 +233,7 @@ function AuditReportView({
         />
       ) : null}
       <ReportHeader report={report} />
-      <ReportSummary report={report} />
+      <ReportSummary summary={report.summary} />
       {report.findings.map(finding => (
         <FindingSection key={finding.findingId} finding={finding} />
       ))}
@@ -280,7 +256,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.auditReport.title')} showBackButton />
+      <ScreenHeader className="px-6" title={t('securityAgent.auditReport.title')} showBackButton />
 
       {query.isLoading && <AuditReportSkeleton />}
 

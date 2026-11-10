@@ -89,6 +89,7 @@ describe('adminPreferredProviderOrderRouter', () => {
         unavailable_models: null,
         vercel_model_id_overrides: null,
         preferred_provider_order: config,
+        custom_pricing: null,
       },
     ]);
   });

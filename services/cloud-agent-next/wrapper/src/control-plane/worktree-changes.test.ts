@@ -9,6 +9,7 @@ import {
   createControlPlaneWorktreeChanges,
   type ControlPlaneWorktreeChangesDeps,
 } from './worktree-changes.js';
+import { WorktreeGitError } from '../control/worktree-git-operations.js';
 
 const session = {
   sessionId: 'workspace_x',
@@ -26,7 +27,10 @@ const SNAPSHOT = { summary: SUMMARY, files: [] } as unknown as WorktreeSnapshotC
 
 function harness(
   overrides: Partial<
-    Pick<ControlPlaneWorktreeChangesDeps, 'captureSnapshot' | 'captureChanges' | 'isPrepared'>
+    Pick<
+      ControlPlaneWorktreeChangesDeps,
+      'captureSnapshot' | 'captureChanges' | 'isPrepared' | 'gitContext' | 'refreshRemotes'
+    >
   > = {}
 ) {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -150,6 +154,92 @@ describe('control-plane wrapper worktree changes', () => {
         requestId: 'req-3',
         ok: false,
         error: { code: 'capture_failed', message: 'git failed', retryable: true },
+      },
+    ]);
+  });
+
+  it('refreshes the base with the prepared environment and adds its fallback', async () => {
+    const calls: Array<{
+      payload: SessionGitSummaryPayload;
+      environment: unknown;
+    }> = [];
+    const { adapter, frames } = harness({
+      gitContext: () => ({ directory: '/workspace/x', env: { HOME: '/home/x' } }),
+      refreshRemotes: async (_executor, request) => ({
+        request: { ...request, baseRef: 'refs/remotes/origin/main' },
+        baseRefFallback: {
+          requested: 'refs/remotes/origin/gone',
+          used: 'refs/remotes/origin/main',
+        },
+      }),
+      captureSnapshot: async (_directory, payload, environment) => {
+        calls.push({ payload, environment });
+        return {
+          summary: {
+            ...SUMMARY,
+            comparison: { ...SUMMARY.comparison, baseRef: 'refs/remotes/origin/main' },
+          },
+          files: [],
+        };
+      },
+    });
+
+    await adapter.handle({
+      type: 'worktree.snapshot',
+      requestId: 'req-refresh',
+      session,
+      payload: { revision: 1, baseRef: 'refs/remotes/origin/gone' },
+    });
+
+    expect(calls[0]?.payload.baseRef).toBe('refs/remotes/origin/main');
+    expect(calls[0]?.environment).toEqual({ env: { HOME: '/home/x' } });
+    expect(frames).toMatchObject([
+      {
+        type: 'worktree.result',
+        requestId: 'req-refresh',
+        ok: true,
+        result: {
+          summary: {
+            comparison: {
+              baseRef: 'refs/remotes/origin/main',
+              baseRefFallback: {
+                requested: 'refs/remotes/origin/gone',
+                used: 'refs/remotes/origin/main',
+              },
+            },
+          },
+        },
+      },
+    ]);
+  });
+
+  it('reports a retryable error instead of capturing when the refresh fetch fails', async () => {
+    let captured = 0;
+    const { adapter, frames } = harness({
+      gitContext: () => ({ directory: '/workspace/x', env: { HOME: '/home/x' } }),
+      refreshRemotes: async () => {
+        throw new WorktreeGitError('fetch failed', 'git_network_failed', true);
+      },
+      captureSnapshot: async () => {
+        captured += 1;
+        return SNAPSHOT;
+      },
+    });
+
+    await adapter.handle({
+      type: 'worktree.snapshot',
+      requestId: 'req-network',
+      session,
+      payload: { revision: 1 },
+    });
+
+    expect(captured).toBe(0);
+    expect(frames).toEqual([
+      {
+        type: 'worktree.result',
+        requestId: 'req-network',
+        ok: false,
+        error: { code: 'git_network_failed', message: 'fetch failed', retryable: true },
       },
     ]);
   });

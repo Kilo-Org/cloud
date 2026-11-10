@@ -12,7 +12,7 @@ import {
   customRouterModelId,
   isCustomRouterModelId,
   type AutoRouter,
-  type CustomRouterScope,
+  type OwnerType,
 } from '@kilocode/auto-routing-contracts';
 
 export type AutoModelPricing = {
@@ -105,6 +105,7 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
 
 export const AUTO_SMALL_TARGET_MODELS = {
   paid: GEMMA_4_26B_A4B_IT_ID,
+  // Internal-only, Kilo-funded alias served through the paid target, unavailable for direct requests.
   free: GEMMA_4_26B_A4B_IT_FREE_ID,
 } as const;
 
@@ -139,7 +140,7 @@ export const AUTO_MODELS = [
 ];
 
 export function customRouterAutoModel(router: {
-  scope: CustomRouterScope;
+  scope: OwnerType;
   slug: string;
   name: string;
   baseRouter: AutoRouter;

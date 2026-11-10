@@ -2,7 +2,13 @@ import { describe, expect, test } from 'vitest';
 import { kiloCommandCreateInputSchema } from '../contracts/kilo-commands';
 import { collectImportItems, parseLocalConfigArchive, type ImportPreview } from './index';
 import { buildRepresentativeImportArchive, buildStoredZip, buildZip } from './test-fixtures';
-import { MAX_IMPORT_ENTRY_EXPANDED_BYTES } from './limits';
+import {
+  MAX_IMPORT_CONFIG_NESTING_DEPTH,
+  MAX_IMPORT_ENTRY_EXPANDED_BYTES,
+  MAX_IMPORT_INSTRUCTION_GLOB_LENGTH,
+  MAX_IMPORT_INSTRUCTION_GLOB_WILDCARDS,
+  MAX_IMPORT_INSTRUCTION_GLOBS,
+} from './limits';
 
 function parseFiles(files: Record<string, string | Uint8Array>): ImportPreview {
   return parseLocalConfigArchive(buildZip(files));
@@ -170,15 +176,28 @@ describe('parseLocalConfigArchive', () => {
     expect(preview.config.skills.length).toBe(51);
   });
 
-  test('rejects an oversized skill companion', () => {
+  test('rejects an oversized skill companion and names the unit it measures', () => {
     const preview = parseFiles({
       'skills/big/SKILL.md': '# Big',
       'skills/big/huge.md': 'c'.repeat(100_001),
     });
     const issue = preview.issues.find(candidate => candidate.code === 'skill-files-invalid');
     expect(issue?.field).toBe('files');
-    expect(issue?.message).toContain('exceeds');
+    expect(issue?.message).toBe('Skill companion file huge.md exceeds 100000 characters');
+    // Both contracts reject the same map; the user sees one problem, not one
+    // row per nested file key.
+    expect(preview.issues.filter(candidate => candidate.category === 'skills')).toHaveLength(1);
     expect(preview.config.skills).toEqual([]);
+  });
+
+  test('describes a schema failure without naming an internal contract', () => {
+    const preview = parseFiles({ 'command/template.md': `---\n---\n${'e'.repeat(100_001)}` });
+
+    const issue = preview.issues.find(candidate => candidate.code === 'command-template-invalid');
+    expect(issue?.message).toBe('Command template exceeds 100000 characters');
+    for (const candidate of preview.issues) {
+      expect(candidate.message).not.toContain('contract:');
+    }
   });
 
   test('reports a skill bundle without a SKILL.md manifest', () => {
@@ -191,6 +210,9 @@ describe('parseLocalConfigArchive', () => {
     const preview = parseFiles({ 'instructions/cloud-agent.md': 'Body' });
     const issue = preview.issues.find(candidate => candidate.code === 'instruction-invalid');
     expect(issue?.field).toBe('name');
+    expect(issue?.path).toBe('instructions/cloud-agent.md');
+    expect(issue?.message).toContain('"cloud-agent"');
+    expect(issue?.message).toContain('instructions/cloud-agent.md');
     expect(issue?.message).toContain('Cloud-Agent');
     expect(preview.config.instructions).toEqual([]);
   });
@@ -198,6 +220,41 @@ describe('parseLocalConfigArchive', () => {
   test('slugifies nested instruction paths into a safe rules filename', () => {
     const preview = parseFiles({ 'instructions/team/style.md': 'Body' });
     expect(preview.config.instructions).toEqual([{ name: 'team-style', content: 'Body' }]);
+  });
+
+  test('imports an instruction file whose name has no ASCII characters', () => {
+    const preview = parseFiles({ 'instructions/使用说明.md': 'Body' });
+    expect(preview.issues).toEqual([]);
+    expect(preview.config.instructions).toEqual([
+      { name: expect.stringMatching(/^instruction-[0-9a-f]{8}$/), content: 'Body' },
+    ]);
+  });
+
+  test('imports accented and ASCII instruction files that used to share one name', () => {
+    const preview = parseFiles({
+      'instructions/café-notes.md': 'Accented body',
+      'instructions/caf-notes.md': 'ASCII body',
+    });
+    expect(preview.issues).toEqual([]);
+    const contents = new Map(
+      preview.config.instructions.map(instruction => [instruction.name, instruction.content])
+    );
+    expect(contents.get('caf-notes')).toBe('ASCII body');
+    const accented = [...contents.keys()].find(name => name !== 'caf-notes');
+    expect(accented).toMatch(/^cafe-notes-[0-9a-f]{8}$/);
+    expect(contents.get(accented ?? '')).toBe('Accented body');
+  });
+
+  test('derives one identity for a non-Latin instruction matched by a directory and a glob', () => {
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: ['instructions/*.md'] }),
+      'instructions/使用说明.md': 'Body',
+    });
+    expect(issueCodes(preview)).not.toContain('duplicate-definition');
+    expect(preview.hasErrors).toBe(false);
+    expect(preview.config.instructions).toEqual([
+      { name: expect.stringMatching(/^instruction-[0-9a-f]{8}$/), content: 'Body' },
+    ]);
   });
 
   test('rejects duplicate definitions with both sources named', () => {
@@ -254,6 +311,43 @@ describe('parseLocalConfigArchive', () => {
     expect(preview.issues.some(issue => issue.code === 'invalid-config-json')).toBe(true);
     expect(preview.config.agents.map(agent => agent.slug)).toEqual(['reviewer']);
     expect(preview.hasErrors).toBe(true);
+  });
+
+  test('names the syntax error and its position instead of a parser code and an offset', () => {
+    const preview = parseFiles({
+      'kilo.json': '{\n  "agent": {\n    "reviewer" {}\n  }\n}',
+      'agent/reviewer.md': 'Review.',
+    });
+
+    const issue = preview.issues.find(candidate => candidate.code === 'invalid-config-json');
+    expect(issue?.message).toBe('Could not parse kilo.json: ColonExpected at line 3, column 16');
+    expect(preview.config.agents.map(agent => agent.slug)).toEqual(['reviewer']);
+  });
+
+  test('points at both lines of a duplicate property', () => {
+    const preview = parseFiles({
+      'kilo.json':
+        '{\n  "agent": {\n    "triage": {"prompt": "a"},\n    "triage": {"prompt": "b"}\n  }\n}',
+    });
+
+    const issue = preview.issues.find(candidate => candidate.code === 'duplicate-definition');
+    expect(issue?.message).toBe(
+      'Duplicate property "agent.triage" at line 3, column 5 and line 4, column 5 in kilo.json; import is ambiguous'
+    );
+    expect(preview.config.agents).toEqual([]);
+  });
+
+  test('positions every duplicate property in a config full of repeats', () => {
+    const lines = ['{'];
+    for (let index = 0; index < 200; index += 1) lines.push('  "agent": {},');
+    lines.push('  "x": 1', '}');
+    const preview = parseFiles({ 'kilo.json': lines.join('\n') });
+
+    const issues = preview.issues.filter(candidate => candidate.code === 'duplicate-definition');
+    expect(issues).toHaveLength(199);
+    expect(issues.at(-1)?.message).toBe(
+      'Duplicate property "agent" at line 2, column 3 and line 201, column 3 in kilo.json; import is ambiguous'
+    );
   });
 
   test('ignores remote instruction URLs and globs that match no files', () => {
@@ -444,6 +538,62 @@ describe('parseLocalConfigArchive', () => {
     expect(preview.hasErrors).toBe(true);
   });
 
+  test('reports a config past the nesting limit instead of throwing', () => {
+    // 20000 object levels fit inside the 1 MiB per-entry limit and are deeper
+    // than the JSONC parser's own recursion can take.
+    const deep = `${'{"a":'.repeat(20_000)}1${'}'.repeat(20_000)}`;
+    expect(deep.length).toBeLessThan(MAX_IMPORT_ENTRY_EXPANDED_BYTES);
+
+    const preview = parseFiles({ 'kilo.json': deep, 'agent/reviewer.md': 'Review.' });
+
+    expect(preview.issues).toEqual([
+      expect.objectContaining({
+        code: 'invalid-config-json',
+        category: 'config',
+        path: 'kilo.json',
+      }),
+    ]);
+    expect(preview.issues[0]?.message).toContain(String(MAX_IMPORT_CONFIG_NESTING_DEPTH));
+    expect(preview.hasErrors).toBe(true);
+    expect(preview.config.agents.map(agent => agent.slug)).toEqual(['reviewer']);
+  });
+
+  test('reports deeply nested arrays inside a config past the nesting limit', () => {
+    const deep = `${'['.repeat(20_000)}${']'.repeat(20_000)}`;
+    const preview = parseFiles({ 'kilo.json': deep, 'agent/reviewer.md': 'Review.' });
+
+    expect(preview.issues.map(issue => issue.code)).toEqual(['invalid-config-json']);
+    expect(preview.config.agents.map(agent => agent.slug)).toEqual(['reviewer']);
+  });
+
+  test('accepts a config nested to the import limit and rejects the next level', () => {
+    const nest = (depth: number) => `${'{"a":'.repeat(depth)}1${'}'.repeat(depth)}`;
+    // `{"agent":{` is two levels, so the value nests to `depth - 2`.
+    const atLimit = `{"agent":{"n":${nest(MAX_IMPORT_CONFIG_NESTING_DEPTH - 2)}}}`;
+    expect(parseFiles({ 'kilo.json': atLimit }).issues).toEqual([]);
+
+    const overLimit = `{"agent":{"n":${nest(MAX_IMPORT_CONFIG_NESTING_DEPTH - 1)}}}`;
+    expect(parseFiles({ 'kilo.json': overLimit }).issues.map(issue => issue.code)).toEqual([
+      'invalid-config-json',
+    ]);
+  });
+
+  test('does not count braces inside strings or comments as nesting', () => {
+    const braces = '{\\"a\\":['.repeat(200);
+    const preview = parseFiles({
+      'kilo.json': `{${'// {[{[{\n'.repeat(200)}/* }]}]}]{ */"note":"${braces}"}`,
+    });
+    expect(preview.issues).toEqual([]);
+  });
+
+  test('reports duplicate properties inside array elements with their index path', () => {
+    const preview = parseFiles({
+      'kilo.json': '{"agent":{"list":[{"prompt":"A","prompt":"B"}]}}',
+    });
+    const issue = preview.issues.find(candidate => candidate.code === 'duplicate-definition');
+    expect(issue?.message).toContain('"agent.list.0.prompt"');
+  });
+
   test('reports malformed config sections instead of silently skipping them', () => {
     const preview = parseFiles({
       'kilo.json': JSON.stringify({ agent: [], command: 'bad', instructions: 42 }),
@@ -559,5 +709,103 @@ describe('parseLocalConfigArchive', () => {
       'instructions',
       'skills',
     ]);
+  });
+});
+
+describe('instruction glob import limits', () => {
+  test('drops an over-long glob and keeps the other globs', () => {
+    const longGlob = `${'a'.repeat(MAX_IMPORT_INSTRUCTION_GLOB_LENGTH)}.md`;
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: [longGlob, 'rules/*.md'] }),
+      'rules/style.md': 'Body',
+    });
+
+    expect(preview.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'instruction-glob-limit',
+        category: 'config',
+        path: 'kilo.json',
+        field: 'instructions.0',
+      })
+    );
+    expect(preview.hasErrors).toBe(true);
+    expect(preview.config.instructions).toEqual([{ name: 'rules-style', content: 'Body' }]);
+  });
+
+  test('drops a glob with too many star tokens and keeps the other globs', () => {
+    const starryGlob = `${'**/'.repeat(MAX_IMPORT_INSTRUCTION_GLOB_WILDCARDS + 1)}AGENTS.md`;
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: [starryGlob, 'docs/*.md'] }),
+      'docs/style.md': 'Body',
+    });
+
+    expect(preview.issues).toContainEqual(
+      expect.objectContaining({ code: 'instruction-glob-limit', field: 'instructions.0' })
+    );
+    expect(preview.config.instructions).toEqual([{ name: 'docs-style', content: 'Body' }]);
+  });
+
+  test('does not echo an over-long glob in full into the issue message', () => {
+    const longGlob = `rules/${'a'.repeat(4096)}.md`;
+    const preview = parseFiles({ 'kilo.json': JSON.stringify({ instructions: [longGlob] }) });
+
+    const issue = preview.issues.find(candidate => candidate.code === 'instruction-glob-limit');
+    expect(issue?.message).toContain('rules/aaaa');
+    expect(issue?.message).not.toContain('a'.repeat(200));
+    expect(issue?.message.length).toBeLessThan(300);
+  });
+
+  test('reads at most the allowed number of instruction globs', () => {
+    const globs = Array.from({ length: MAX_IMPORT_INSTRUCTION_GLOBS + 3 }, () => 'AGENTS.md');
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: globs }),
+      'AGENTS.md': 'Body',
+    });
+
+    expect(issueCodes(preview)).toContain('instruction-globs-exceeded');
+    expect(preview.config.instructions).toEqual([{ name: 'agents', content: 'Body' }]);
+  });
+
+  test('applies instruction globs within the import limit', () => {
+    const glob = `${'*a'.repeat(15)}*.md`;
+    const files: Record<string, string> = {
+      'kilo.json': JSON.stringify({ instructions: Array.from({ length: 8 }, () => glob) }),
+    };
+    for (let index = 0; index < 3; index += 1) {
+      files[`${'a'.repeat(80)}p${index}.md`] = 'Body';
+    }
+
+    const preview = parseFiles(files);
+    expect(preview.issues).toEqual([]);
+    expect(preview.config.instructions).toHaveLength(3);
+  });
+
+  test('skips instruction globs when the archive is over the import limit', () => {
+    const glob = `${'*a'.repeat(15)}*.md`;
+    const files: Record<string, string> = {
+      'kilo.json': JSON.stringify({ instructions: Array.from({ length: 32 }, () => glob) }),
+      'instructions/style.md': 'Directory body',
+    };
+    for (let index = 0; index < 12; index += 1) {
+      files[`${'a'.repeat(5000)}p${index}.md`] = 'Body';
+    }
+
+    const preview = parseFiles(files);
+    expect(preview.issues).toContainEqual(
+      expect.objectContaining({ code: 'instruction-globs-exceeded', field: 'instructions' })
+    );
+    expect(preview.config.instructions).toEqual([{ name: 'style', content: 'Directory body' }]);
+  });
+
+  test('parses an archive whose instruction glob spans many directories', () => {
+    const deepPath = Array.from({ length: 40 }, (_, index) => `d${index}`).join('/');
+    const glob = `${'**/'.repeat(12)}NEVER-EXIST.md`;
+    const started = performance.now();
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: [glob] }),
+      [`${deepPath}/other.md`]: 'Body',
+    });
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(preview.config.instructions).toEqual([]);
   });
 });

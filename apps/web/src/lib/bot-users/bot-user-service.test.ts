@@ -1,10 +1,15 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { randomUUID } from 'crypto';
-import { ensureInternalBotUser, InternalBotUnusableError } from './bot-user-service';
+import {
+  ensureBotUserForOrg,
+  ensureInternalBotUser,
+  InternalBotUnusableError,
+} from './bot-user-service';
+import { generateBotUserId } from './types';
 
 async function membershipsOf(userId: string) {
   return db
@@ -128,5 +133,46 @@ describe('ensureInternalBotUser', () => {
     await expect(
       ensureInternalBotUser({ slug: '-Bad', displayName: 'x', organizationId: org.id })
     ).rejects.toThrow('Invalid internal bot slug');
+  });
+});
+
+describe('ensureBotUserForOrg', () => {
+  it('creates one bot user and one membership when two first calls race', async () => {
+    const owner = await insertTestUser();
+    const org = await createTestOrganization('Product bots', owner.id, 0);
+    const botId = generateBotUserId(org.id, 'code-review');
+
+    // Two live pool connections, so both calls read before either one inserts.
+    await Promise.all([db.execute(sql`select 1`), db.execute(sql`select 1`)]);
+
+    const results = await Promise.all([
+      ensureBotUserForOrg(org.id, 'code-review'),
+      ensureBotUserForOrg(org.id, 'code-review'),
+    ]);
+
+    expect(results.map(user => user.id)).toEqual([botId, botId]);
+    const users = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, botId));
+    expect(users).toHaveLength(1);
+    expect(await membershipsOf(botId)).toEqual([
+      expect.objectContaining({ organization_id: org.id, role: 'member' }),
+    ]);
+  });
+
+  it.each([
+    ['blocked_at', { blocked_at: '2026-10-01T00:00:00.000Z' }],
+    ['blocked_reason', { blocked_reason: 'soft-deleted' }],
+  ])('rejects an existing bot whose %s is set', async (_label, overrides) => {
+    const owner = await insertTestUser();
+    const org = await createTestOrganization('Product bots', owner.id, 0);
+    const botId = generateBotUserId(org.id, 'code-review');
+    await insertTestUser({ id: botId, is_bot: true, ...overrides });
+
+    await expect(ensureBotUserForOrg(org.id, 'code-review')).rejects.toThrow(
+      `Cannot use blocked bot user ${botId}`
+    );
+    expect(await membershipsOf(botId)).toHaveLength(0);
   });
 });

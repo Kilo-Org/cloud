@@ -7,7 +7,13 @@ import {
   classifyCloudAgentFailure,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { describe, expect, it } from 'vitest';
-import { assistantErrorDetail } from '../shared/assistant-failure.js';
+import { assistantErrorDetail, missingAgentSlug } from '../shared/assistant-failure.js';
+import type { AssistantMessage } from '@kilocode/sdk/v2';
+import { sdkAssistantErrorSchema } from '@kilocode/session-ingest-contracts';
+import {
+  projectSafeSdkAssistantError,
+  projectSafeSessionError,
+} from '../shared/assistant-failure.js';
 import {
   SAFE_FAILURE_MESSAGE_MAX_LENGTH,
   SafeFailureProjectionSchema,
@@ -23,6 +29,54 @@ import {
 const NESTED_PROVIDER_TIMEOUT_BODY = '{"type":"error","error":{"type":"timeout","code":504}}';
 
 describe('projectSafeAssistantError', () => {
+  it('preserves a specific missing-agent failure without exposing the CLI agent list', () => {
+    const error = {
+      name: 'UnknownError',
+      data: {
+        message: 'Agent not found: "foreman". Available agents: code, private-agent-name',
+      },
+    };
+    const message = 'Agent "foreman" was not found in the repository or profile';
+    expect(classifyAssistantFailure(error)).toMatchObject({
+      reason: 'invalid_request',
+      safeMessage: message,
+    });
+    expect(projectSafeAssistantError(error)).toBe(message);
+    expect(projectSafeAssistantError(message)).toBe(message);
+    expect(classifyAssistantFailure(message)).toEqual(classifyAssistantFailure(error));
+    expect(projectSafeSessionError(error, undefined)).toBe(message);
+    expect(projectSafeSdkAssistantError(error)).toEqual({
+      name: 'UnknownError',
+      data: { message },
+    });
+    expect(projectSafeAssistantError(projectSafeSdkAssistantError(error))).toBe(message);
+    expect(projectSafeAssistantError(`[BYOK] ${message}`)).toBe(`[BYOK] ${message}`);
+    expect(
+      projectSafeAssistantError({ name: 'UnknownError', data: { message: 'opaque failure' } })
+    ).toBe('Assistant request failed');
+  });
+
+  it.each(['a', 'a'.repeat(50)])('preserves a bounded missing-agent slug: %s', slug => {
+    const error = `Agent not found: "${slug}". Available agents: private-agent-name`;
+    const message = `Agent "${slug}" was not found in the repository or profile`;
+    expect(missingAgentSlug(error)).toBe(slug);
+    expect(projectSafeAssistantError(error)).toBe(message);
+    expect(projectSafeSessionError(message, undefined)).toBe(message);
+    expect(projectSafeAssistantError(message)).not.toContain('private-agent-name');
+  });
+
+  it.each(['', 'Foreman', 'fore_man', 'a'.repeat(51), 'foreman\npoison'])(
+    'does not expose a malformed or oversized missing-agent slug: %j',
+    slug => {
+      const raw = `Agent not found: "${slug}". Available agents: private-agent-name`;
+      const canonical = `Agent "${slug}" was not found in the repository or profile`;
+      for (const error of [raw, canonical]) {
+        expect(missingAgentSlug(error)).toBeUndefined();
+        expect(projectSafeAssistantError(error)).toBe('Assistant request failed');
+      }
+    }
+  );
+
   it.each([
     [
       'string',
@@ -251,6 +305,194 @@ describe('projectSafeAssistantError', () => {
   });
 });
 
+describe('projectSafeSdkAssistantError', () => {
+  it.each([
+    [
+      'ProviderAuthError',
+      { providerID: 'poison-provider' },
+      {
+        name: 'ProviderAuthError',
+        data: { providerID: 'unknown', message: 'Assistant request was not authorized' },
+      },
+    ],
+    [
+      'UnknownError',
+      { ref: 'poison-reference' },
+      { name: 'UnknownError', data: { message: 'Assistant request failed' } },
+    ],
+    [
+      'MessageOutputLengthError',
+      {},
+      { name: 'MessageOutputLengthError', data: { message: 'The model output limit was reached' } },
+    ],
+    [
+      'MessageAbortedError',
+      {},
+      { name: 'MessageAbortedError', data: { message: 'The message was interrupted by the user' } },
+    ],
+    [
+      'StructuredOutputError',
+      { retries: 3 },
+      {
+        name: 'StructuredOutputError',
+        data: { message: 'The model response did not match the required format', retries: 3 },
+      },
+    ],
+    [
+      'ContextOverflowError',
+      {},
+      { name: 'ContextOverflowError', data: { message: 'The model context limit was exceeded' } },
+    ],
+    [
+      'ContentFilterError',
+      {},
+      {
+        name: 'UnknownError',
+        data: { message: 'The model provider blocked the response under its content policy' },
+      },
+    ],
+    [
+      'APIError',
+      { statusCode: 429, isRetryable: true },
+      {
+        name: 'APIError',
+        data: { message: 'Assistant request was rate limited', statusCode: 429, isRetryable: true },
+      },
+    ],
+    [
+      'APIError',
+      { statusCode: 402, isRetryable: false },
+      {
+        name: 'APIError',
+        data: {
+          message: 'Assistant request failed: insufficient credits',
+          statusCode: 402,
+          isRetryable: false,
+        },
+      },
+    ],
+  ] as const)(
+    'emits only safe SDK fields for %s without losing classification',
+    (name, data, expected) => {
+      for (const prefix of ['', '[BYOK] ']) {
+        const source = {
+          name,
+          message: 'poison-outer-message',
+          data: {
+            ...data,
+            message: `${prefix}Unrecognized failure poison-message`,
+            responseHeaders: { authorization: 'Bearer poison-header', cookie: 'poison-cookie' },
+            responseBody: 'poison-body',
+            metadata: { token: 'poison-metadata' },
+            extra: 'poison-extra',
+          },
+          extra: 'poison-outer-extra',
+        };
+        const safeError: AssistantMessage['error'] = projectSafeSdkAssistantError(source);
+
+        expect(safeError).toEqual({
+          ...expected,
+          data: { ...expected.data, message: `${prefix}${expected.data.message}` },
+        });
+        expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+        expect(classifyAssistantFailure(safeError)).toEqual(classifyAssistantFailure(source));
+        expect(projectSafeSdkAssistantError(safeError)).toEqual(safeError);
+        expect(JSON.stringify(safeError)).not.toContain('poison');
+      }
+    }
+  );
+
+  it.each([undefined, null, '429', 99, 600, 429.5, NaN, Infinity, -Infinity, {}, []])(
+    'drops malformed API status %s without inventing retry semantics',
+    statusCode => {
+      const safeError = projectSafeSdkAssistantError({
+        name: 'APIError',
+        data: { message: 'poison-message', statusCode, isRetryable: false },
+      });
+
+      expect(safeError).toEqual({
+        name: 'APIError',
+        data: { message: 'Assistant request failed', isRetryable: false },
+      });
+      expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+    }
+  );
+
+  it.each([undefined, null, 'true', 1, {}, []])(
+    'falls back safely for invalid API retryability %j while retaining the failure cause',
+    isRetryable => {
+      const safeError = projectSafeSdkAssistantError({
+        name: 'APIError',
+        data: { message: 'poison-message', statusCode: 429, isRetryable },
+      });
+
+      expect(safeError).toEqual({
+        name: 'UnknownError',
+        data: { message: 'Assistant request was rate limited' },
+      });
+      expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+    }
+  );
+
+  it.each([undefined, null, '3', -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    'does not forward invalid structured-output retry counts %s',
+    retries => {
+      const safeError = projectSafeSdkAssistantError({
+        name: 'StructuredOutputError',
+        data: { message: 'poison-message', retries },
+      });
+
+      expect(safeError).toEqual({
+        name: 'UnknownError',
+        data: { message: 'The model response did not match the required format' },
+      });
+      expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+    }
+  );
+
+  it.each([
+    false,
+    0,
+    'poison-message',
+    [],
+    {},
+    {
+      name: 'FutureError',
+      data: { message: 'poison-message', statusCode: 402, isRetryable: true },
+    },
+    { name: ['APIError'], data: { statusCode: 402, isRetryable: true } },
+    { name: 'APIError', data: null },
+    { name: 'APIError', data: [{ statusCode: 402, isRetryable: true }] },
+    { name: 'APIError', data: 'poison-message' },
+  ])('normalizes unknown or malformed input into a safe SDK error: %j', source => {
+    const safeError = projectSafeSdkAssistantError(source);
+
+    expect(safeError).toEqual({
+      name: 'UnknownError',
+      data: { message: 'Assistant request failed' },
+    });
+    expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+  });
+
+  it.each(['user-interrupt poison-message', { name: 'MessageAbortedError', data: null }])(
+    'preserves interruption in a valid envelope even for incomplete SDK input: %j',
+    source => {
+      const safeError = projectSafeSdkAssistantError(source);
+
+      expect(safeError).toEqual({
+        name: 'MessageAbortedError',
+        data: { message: 'The message was interrupted by the user' },
+      });
+      expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+      expect(isAssistantInterrupt(safeError)).toBe(true);
+    }
+  );
+
+  it.each([null, undefined])('omits absent SDK errors: %s', source => {
+    expect(projectSafeSdkAssistantError(source)).toBeUndefined();
+  });
+});
+
 describe('projectSafeFailure', () => {
   it('projects structured fields while omitting raw failure text', () => {
     const durableState = {
@@ -330,6 +572,13 @@ describe('projectSafeFailure', () => {
     expect(SafeFailureProjectionSchema.parse(failure)).toEqual(failure);
   });
 
+  it('names a blocked account instead of a generic failure', () => {
+    expect(projectSafeFailure({ failureCode: 'account_blocked' })).toEqual({
+      code: 'account_blocked',
+      message: 'This account is blocked.',
+    });
+  });
+
   it('describes no-output failures as a lack of execution progress during the watchdog window', () => {
     expect(projectSafeFailure({ failureCode: 'wrapper_no_output' })?.message).toBe(
       'Agent wrapper made no execution progress during the watchdog window'
@@ -340,6 +589,8 @@ describe('projectSafeFailure', () => {
     ['git_clone_timeout', 'Repository clone timed out'],
     ['git_authentication_failed', 'Repository authentication failed'],
     ['setup_command_failed', 'Setup command failed'],
+    ['workspace_snapshot_start_failed', 'Workspace snapshot could not be restored'],
+    ['environment_snapshot_required', 'Environment snapshot is required but unavailable'],
     ['workspace_setup_unknown', 'Workspace setup failed'],
   ] as const)('derives an allowlisted message for %s', (failureSubtype, message) => {
     expect(projectSafeFailure({ failureCode: 'workspace_setup_failed', failureSubtype })).toEqual({

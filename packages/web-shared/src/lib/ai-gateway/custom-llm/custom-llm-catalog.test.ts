@@ -1,7 +1,10 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/globals';
 import { custom_llm2 } from '@kilocode/db/schema';
+import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { captureException } from '@sentry/nextjs';
 import {
   findCustomLlm,
+  getPublicCustomLlmInferenceProviders,
   isCustomLlm,
   requireCustomLlmsById,
   resetCustomLlmCacheForTest,
@@ -11,15 +14,22 @@ import {
   customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
+const mockedCaptureException = jest.mocked(captureException);
 
 describe('custom LLM catalog', () => {
   beforeAll(async () => {
-    await insertCustomLlmForTest('Acme/Model');
+    await insertCustomLlmForTest('Acme/Public-Model', publicCustomLlmDefinition(['acme']));
+    await insertCustomLlmForTest('acme/private-model');
   });
 
   afterAll(async () => {
-    await deleteCustomLlmForTest('Acme/Model');
+    await deleteCustomLlmForTest('Acme/Public-Model');
+    await deleteCustomLlmForTest('acme/private-model');
   });
 
   afterEach(() => {
@@ -27,9 +37,11 @@ describe('custom LLM catalog', () => {
     resetCustomLlmCacheForTest();
   });
 
-  test('finds custom LLMs by id regardless of case or prefix', async () => {
-    await expect(findCustomLlm('acme/model')).resolves.toMatchObject({ public_id: 'Acme/Model' });
-    await expect(isCustomLlm('ACME/MODEL')).resolves.toBe(true);
+  test('finds custom LLMs by id regardless of case', async () => {
+    await expect(findCustomLlm('acme/public-model')).resolves.toMatchObject({
+      public_id: 'Acme/Public-Model',
+    });
+    await expect(isCustomLlm('ACME/PRIVATE-MODEL')).resolves.toBe(true);
     await expect(isCustomLlm('kilo-internal/unknown')).resolves.toBe(false);
   });
 
@@ -59,12 +71,51 @@ describe('custom LLM catalog', () => {
       throw new Error('database unavailable');
     });
 
-    await expect(isCustomLlm('acme/model')).resolves.toBe(false);
+    await expect(isCustomLlm('acme/public-model')).resolves.toBe(false);
     await expect(requireCustomLlmsById()).rejects.toThrow('custom LLM catalog could not be read');
     expect(select).toHaveBeenCalledTimes(1);
 
     clock.mockReturnValue(now + 5_000);
-    await expect(isCustomLlm('acme/model')).resolves.toBe(true);
+    await expect(isCustomLlm('acme/public-model')).resolves.toBe(true);
     expect(select).toHaveBeenCalledTimes(2);
+  });
+
+  test('pins only public custom LLMs to their declared providers', async () => {
+    await expect(getPublicCustomLlmInferenceProviders('acme/public-model')).resolves.toEqual(
+      new Set(['acme'])
+    );
+    await expect(getPublicCustomLlmInferenceProviders('acme/private-model')).resolves.toBeNull();
+    await expect(getPublicCustomLlmInferenceProviders('openai/gpt-4o')).resolves.toBeNull();
+  });
+
+  test('reports a malformed row as an error and keeps serving the valid rows', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedCaptureException.mockClear();
+    await insertCustomLlmForTest('acme/malformed-model', {
+      internal_id: 'upstream-model',
+    } as unknown as CustomLlmDefinition);
+    try {
+      await expect(isCustomLlm('acme/public-model')).resolves.toBe(true);
+      await expect(findCustomLlm('acme/malformed-model')).resolves.toBeNull();
+      expect(errorLog).toHaveBeenCalledWith(
+        'Failed to parse custom llm definition',
+        'acme/malformed-model',
+        expect.anything()
+      );
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockedCaptureException).toHaveBeenCalledWith(expect.anything(), {
+        tags: { source: 'custom_llm_catalog' },
+        extra: { public_id: 'acme/malformed-model' },
+      });
+
+      // The catalog refreshes every minute, so the same row parses again and logs
+      // again; Sentry receives it once for the row until the report window passes.
+      resetCustomLlmCacheForTest();
+      await expect(findCustomLlm('acme/malformed-model')).resolves.toBeNull();
+      expect(errorLog).toHaveBeenCalledTimes(2);
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    } finally {
+      await deleteCustomLlmForTest('acme/malformed-model');
+    }
   });
 });

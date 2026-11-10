@@ -1,23 +1,34 @@
 /** Builds the grouped metadata used by control-plane session registration. */
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
-import { serializeSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
-import { deriveSharedSandboxId } from '../sandbox-id.js';
+import { sessionReferenceOf, type EnvironmentScope } from '../environment-build/reference.js';
+import {
+  isLegacySharedSandboxWorkspace,
+  serializeSessionMetadata,
+  type SessionMetadata,
+} from '../persistence/session-metadata.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import { BUILTIN_AGENT_MODES } from '../schema.js';
+import { isRepositoryAgentOrigin } from '../shared/agent-modes.js';
 import type {
   AgentSelection,
   ExecutionTurnSubmission,
   SessionFinalization,
 } from '../execution/types.js';
+import { launchRepositoryIdentity } from './environment-launch.js';
 import type { SessionRepositoryRequest } from './session-requests.js';
+import { withStackedWorkspaceInstruction } from './stacked-workspace-instruction.js';
 
 export type GroupedRegisterSessionInput = {
   allowSubagentSessions?: boolean;
   parentCloudAgentSessionId?: string;
+  /** Parent worktree for a stacked workspace; persisted on the workspace. */
+  parentWorktreeId?: NonNullable<SessionMetadata['workspace']>['parentWorktreeId'];
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
   runtimeAuthorizationSeal?: string;
   clone?: SessionMetadata['clone'];
+  /** Server-only continuation marker; never client-controlled. */
+  continuation?: boolean;
   /** Omitted for a clone-only create: no synthetic initial turn is registered. */
   message?: {
     initialMessageId?: string;
@@ -28,20 +39,26 @@ export type GroupedRegisterSessionInput = {
   };
   repository?: SessionRepositoryRequest;
   profile?: SessionProfileBundle;
+  /** The environment scope preflight authorized; registration adds the branch of each V2 repository. */
+  environment?: EnvironmentScope;
+  /** The additional-repository branches the client requested for the environment. */
+  requestedEnvironmentRepositories?: { repoFullName: string; branch?: string }[];
   finalization?: SessionFinalization;
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
     NonNullable<SessionMetadata['workspace']>,
     | 'sandboxId'
-    | 'sandboxRoute'
     | 'sandboxKind'
+    | 'parentWorktreeId'
     | 'sandboxProvider'
+    | 'sandboxProviderBinding'
     | 'shallow'
     | 'credentialContainment'
     | 'devcontainerRequested'
     | 'sandboxAllocation'
     | 'egressMode'
     | 'egressAllowlist'
+    | 'egressAudit'
   >;
 };
 
@@ -60,6 +77,9 @@ function repositoryMetadataFromRegistrationInput(
         type: 'github',
         repo: repository.repo,
         githubAccessPurpose: repository.githubAccessPurpose ?? 'workflow',
+        ...(repository.allowUserAuthorization === undefined
+          ? {}
+          : { allowUserAuthorization: repository.allowUserAuthorization }),
         ...(repository.githubIntegrationId
           ? { githubIntegrationId: repository.githubIntegrationId }
           : {}),
@@ -67,6 +87,8 @@ function repositoryMetadataFromRegistrationInput(
           ? { pullRequestNumber: repository.pullRequestNumber }
           : {}),
         upstreamBranch: repository.branch,
+        ...(repository.baseBranch === undefined ? {} : { baseBranch: repository.baseBranch }),
+        ...(repository.baseSha === undefined ? {} : { baseSha: repository.baseSha }),
       };
     case 'gitlab':
       return {
@@ -74,6 +96,8 @@ function repositoryMetadataFromRegistrationInput(
         url: repository.url,
         platform: 'gitlab',
         upstreamBranch: repository.branch,
+        ...(repository.baseBranch === undefined ? {} : { baseBranch: repository.baseBranch }),
+        ...(repository.baseSha === undefined ? {} : { baseSha: repository.baseSha }),
       };
     case 'bitbucket':
       return {
@@ -84,6 +108,8 @@ function repositoryMetadataFromRegistrationInput(
         repositoryUuid: repository.repositoryUuid,
         bitbucketIntegrationId: repository.bitbucketIntegrationId,
         upstreamBranch: repository.branch,
+        ...(repository.baseBranch === undefined ? {} : { baseBranch: repository.baseBranch }),
+        ...(repository.baseSha === undefined ? {} : { baseSha: repository.baseSha }),
       };
     case 'git':
       return {
@@ -91,35 +117,26 @@ function repositoryMetadataFromRegistrationInput(
         url: repository.url,
         token: repository.token,
         upstreamBranch: repository.branch,
+        ...(repository.baseBranch === undefined ? {} : { baseBranch: repository.baseBranch }),
+        ...(repository.baseSha === undefined ? {} : { baseSha: repository.baseSha }),
       };
   }
 
   throw new Error('repository.type must be github, gitlab, bitbucket, or git');
 }
 
-export async function validateSharedSandboxRouteAssignment(workspace: {
-  sandboxId?: string;
-  sandboxRoute?: NonNullable<SessionMetadata['workspace']>['sandboxRoute'];
-}): Promise<string | null> {
-  const route = workspace.sandboxRoute;
-  if (!route) return null;
-  try {
-    const expectedSandboxId = route.suffix
-      ? await deriveSharedSandboxId(route.routeKey, route.suffix)
-      : route.routeKey;
-    return workspace.sandboxId === expectedSandboxId
-      ? null
-      : 'Shared sandbox assignment does not match its route suffix';
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
-}
-
 export function validateModeAgainstRuntimeAgents(
   metadata: SessionMetadata,
   mode = metadata.agent?.mode
 ): string | null {
-  if (!mode || BUILTIN_AGENT_MODES.has(mode)) return null;
+  // Only internal automation can stamp the Worker-owned billing origin.
+  const { billingOrigin, createdOnPlatform } = metadata.identity;
+  if (
+    !mode ||
+    BUILTIN_AGENT_MODES.has(mode) ||
+    (billingOrigin === createdOnPlatform && isRepositoryAgentOrigin(billingOrigin))
+  )
+    return null;
 
   const knownSlugs = new Set((readProfileBundle(metadata).runtimeAgents ?? []).map(a => a.slug));
   if (knownSlugs.has(mode)) return null;
@@ -156,6 +173,43 @@ function initialMessageFromRegistration(
 }
 
 /**
+ * The environment reference a session stores: the authorized scope, and for a V2
+ * environment the branch each repository resolved to. A V2 reference needs the
+ * launch repository to tell it from the additional ones.
+ */
+function environmentReferenceFromRegistration(
+  input: Pick<
+    GroupedRegisterSessionInput,
+    'environment' | 'repository' | 'requestedEnvironmentRepositories'
+  >,
+  generatedBranch: string
+):
+  | { ok: true; reference: SessionMetadata['environment'] | undefined }
+  | { ok: false; error: string } {
+  const scope = input.environment;
+  if (scope === undefined) return { ok: true, reference: undefined };
+  if (scope.repositories === undefined) {
+    return { ok: true, reference: scope };
+  }
+  const launch = input.repository ? launchRepositoryIdentity(input.repository) : undefined;
+  if (launch === undefined) {
+    return {
+      ok: false,
+      error: 'Invalid metadata: a multi-repository environment needs a launch repository',
+    };
+  }
+  return {
+    ok: true,
+    reference: sessionReferenceOf(scope, {
+      generatedBranch,
+      launch,
+      launchBranch: input.repository?.branch,
+      requested: input.requestedEnvironmentRepositories ?? [],
+    }),
+  };
+}
+
+/**
  * Builds and validates the grouped `SessionMetadata` a registration persists.
  * The error strings match the legacy `registerSession` rejections exactly so the
  * Worker maps a rejection to the same failure as before.
@@ -164,9 +218,10 @@ export async function buildSessionMetadataFromRegistration(
   input: GroupedRegisterSessionInput,
   now = Date.now()
 ): Promise<BuildSessionMetadataResult> {
-  const routeAssignmentError = await validateSharedSandboxRouteAssignment(input.workspace ?? {});
-  if (routeAssignmentError) {
-    return { ok: false, error: `Invalid metadata: ${routeAssignmentError}` };
+  // Every sandbox serves one workspace: a registration never places a session
+  // on a retired shared sandbox.
+  if (isLegacySharedSandboxWorkspace(input.workspace)) {
+    return { ok: false, error: 'Invalid metadata: shared sandboxes are retired' };
   }
 
   let repository: SessionMetadata['repository'];
@@ -179,7 +234,17 @@ export async function buildSessionMetadataFromRegistration(
     };
   }
 
+  const generatedBranch = `kilo/${generateBranchSlug()}`;
+  const environment = environmentReferenceFromRegistration(input, generatedBranch);
+  if (!environment.ok) return environment;
+
   const initialMessage = initialMessageFromRegistration(input.message);
+  const branchName = repository?.upstreamBranch ?? generatedBranch;
+  const appendSystemPrompt = withStackedWorkspaceInstruction(
+    input.agent.appendSystemPrompt,
+    repository?.baseBranch,
+    branchName
+  );
   const metadata: SessionMetadata = {
     metadataSchemaVersion: 2,
     allowSubagentSessions: input.allowSubagentSessions ?? false,
@@ -189,21 +254,25 @@ export async function buildSessionMetadataFromRegistration(
     // Metadata without clone remains an empty-session bootstrap; remove
     // this fallback only after old prepared sessions age out.
     clone: input.clone,
+    ...(input.continuation ? { continuation: true as const } : {}),
     repository,
     ...(initialMessage ? { initialMessage } : {}),
     agent: {
       mode: input.agent.mode,
       model: input.agent.model,
       variant: input.agent.variant,
-      appendSystemPrompt: input.agent.appendSystemPrompt,
+      appendSystemPrompt,
     },
     finalization: input.finalization,
     profile: input.profile,
+    ...(environment.reference ? { environment: environment.reference } : {}),
     callback: input.callback,
     workspace: {
       ...input.workspace,
+      ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
       sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
-      branchName: repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`,
+      branchName,
+      ...(environment.reference?.repositories ? { generatedBranchName: generatedBranch } : {}),
     },
     lifecycle: {
       version: now,

@@ -69,6 +69,93 @@ async function createTestSubscription(params: {
   return row;
 }
 
+test.each(['legacy', 'one_year'] as const)(
+  'annual monthly issuance preserves %s term until renewal',
+  async terms => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const { subscriptionId } = await createTestSubscription({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Yearly,
+      startedAt: '2026-06-01T00:00:00.000Z',
+    });
+    await db.transaction(async tx => {
+      const first = await createOrGetIssuanceHeader(tx, {
+        subscriptionId,
+        issueMonth: '2026-06-01',
+        source: KiloPassIssuanceSource.StripeInvoice,
+        stripeInvoiceId: `in_${crypto.randomUUID()}`,
+      });
+      await issueBaseCreditsForIssuance(tx, {
+        subscriptionId,
+        issuanceId: first.issuanceId,
+        kiloUserId: user.id,
+        amountUsd: 19,
+        stripeInvoiceId: `first_${crypto.randomUUID()}`,
+        description: 'Annual first base',
+        paidCredit: { source: 'pass', purchasedAt: '2026-06-01T00:00:00.000Z', terms },
+      });
+      const next = await createOrGetIssuanceHeader(tx, {
+        subscriptionId,
+        issueMonth: '2026-08-01',
+        source: KiloPassIssuanceSource.Cron,
+      });
+      const grant = await issueBaseCreditsForIssuance(tx, {
+        subscriptionId,
+        issuanceId: next.issuanceId,
+        kiloUserId: user.id,
+        amountUsd: 19,
+        stripeInvoiceId: `cron_${crypto.randomUUID()}`,
+        description: 'Annual later base',
+        issuedAt: '2026-08-01T00:00:00.000Z',
+      });
+      const credit = await tx.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.id, grant.creditTransactionId ?? ''),
+      });
+      expect(credit?.paid_credit_policy).toBe(terms);
+      expect(credit?.expiry_date && new Date(credit.expiry_date).toISOString()).toBe(
+        terms === 'one_year' ? '2027-08-01T00:00:00.000Z' : null
+      );
+      const renewal = await createOrGetIssuanceHeader(tx, {
+        subscriptionId,
+        issueMonth: '2027-06-01',
+        source: KiloPassIssuanceSource.StripeInvoice,
+        stripeInvoiceId: `renewal_${crypto.randomUUID()}`,
+      });
+      await issueBaseCreditsForIssuance(tx, {
+        subscriptionId,
+        issuanceId: renewal.issuanceId,
+        kiloUserId: user.id,
+        amountUsd: 19,
+        stripeInvoiceId: `renewal_base_${crypto.randomUUID()}`,
+        description: 'Renewed annual base',
+        paidCredit: { source: 'pass', purchasedAt: '2027-06-01T00:00:00.000Z', terms: 'one_year' },
+      });
+      const renewedMonth = await createOrGetIssuanceHeader(tx, {
+        subscriptionId,
+        issueMonth: '2027-07-01',
+        source: KiloPassIssuanceSource.Cron,
+      });
+      const renewedGrant = await issueBaseCreditsForIssuance(tx, {
+        subscriptionId,
+        issuanceId: renewedMonth.issuanceId,
+        kiloUserId: user.id,
+        amountUsd: 19,
+        stripeInvoiceId: `renewed_cron_${crypto.randomUUID()}`,
+        description: 'Renewed later base',
+        issuedAt: '2027-07-01T00:00:00.000Z',
+      });
+      const renewedCredit = await tx.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.id, renewedGrant.creditTransactionId ?? ''),
+      });
+      expect(renewedCredit?.paid_credit_policy).toBe('one_year');
+      expect(new Date(renewedCredit?.expiry_date ?? '').toISOString()).toBe(
+        '2028-07-01T00:00:00.000Z'
+      );
+    });
+  }
+);
+
 async function createPendingKiloPassReferralReward(params: {
   beneficiaryUserId: string;
   beneficiaryRole?: ImpactReferralBeneficiaryRole;
@@ -322,7 +409,7 @@ test('bonus issuance creates expiry and correct baseline microdollars_used', asy
 
   expect(credit.is_free).toBe(true);
   expect(credit.amount_microdollars).toBe(4_900_000);
-  expect(credit.expiration_baseline_microdollars_used).toBe(123);
+  expect(credit.expiration_baseline_microdollars_used).toBe(0);
   expect(credit.original_baseline_microdollars_used).toBe(123);
 
   const expiry = credit.expiry_date ? new Date(credit.expiry_date) : null;
@@ -497,7 +584,7 @@ test('monthly issuance consumes the oldest pending Kilo Pass referral reward and
     expect.objectContaining({
       is_free: true,
       amount_microdollars: 24_500_000,
-      expiration_baseline_microdollars_used: 123,
+      expiration_baseline_microdollars_used: 0,
       original_baseline_microdollars_used: 123,
     })
   );

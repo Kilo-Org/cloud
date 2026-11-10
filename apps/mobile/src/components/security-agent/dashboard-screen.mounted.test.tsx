@@ -2,27 +2,30 @@
 
 // Dashboard sync-control terminal-state contract: a non-retryable sync outcome
 // (missing-configuration rejection, persistence failure) ends the intent — the
-// hook rotates the operation key, so both sync controls ("Sync now" header
-// button and the "Sync findings" empty-state action) must disable and the
-// inline copy must explain the state. The hook maps every failure onto catalog
-// copy before it reaches the screen, so the banner renders the mapped message;
-// these cases feed the real mapper's output.
-// Retryable failures keep both controls enabled so the user can retry under the
+// hook rotates the operation key, so the header "Sync now" control must disable
+// and the inline copy must explain the state. The hook maps every failure onto
+// catalog copy before it reaches the screen, so the banner renders the mapped
+// message; these cases feed the real mapper's output.
+// Retryable failures keep the control enabled so the user can retry under the
 // same hoisted key.
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 import { i18n } from '@/i18n';
 import {
   mapSecuritySyncOperationError,
   SECURITY_AMBIGUOUS_MESSAGE,
+  SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
 } from '@/lib/security-agent-ledger';
-import { buildLocalizedMetrics, DashboardScreen } from './dashboard-screen';
+import { buildLocalizedMetrics, DashboardLoadingView, DashboardScreen } from './dashboard-screen';
 
-// The ledger module imports the operation-key helpers, whose expo-crypto root
-// import loads a native binding this node project does not have.
+// The security mutation hooks hoist an operation key through
+// `@/lib/operation-key`, whose expo-crypto root import loads a native binding
+// this node project does not have.
 vi.mock('expo-crypto', () => ({ randomUUID: () => '00000000-0000-4000-8000-000000000000' }));
 
 const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(
@@ -41,22 +44,35 @@ const RECONCILE_COPY = vi.hoisted(
 
 const triggerSync = vi.hoisted(() => ({
   mutate: vi.fn(),
+  reset: vi.fn(),
   isPending: false,
   isError: false,
   error: null as Error | null,
 }));
-const config = vi.hoisted(() => ({
-  data: { slaEnabled: true },
+// The server's own view of a running sync for this scope, plus the timestamp
+// of its last read (the dashboard tells a fresh, empty answer from a cached one
+// by comparing it to when it started watching).
+const syncActivity = vi.hoisted(() => ({
+  syncRunning: false,
+  updatedAt: 0,
+  readFailedAt: 0,
 }));
+const config = vi.hoisted(
+  (): { data: { slaEnabled: boolean; repositorySelectionMode?: string } } => ({
+    data: { slaEnabled: true },
+  })
+);
 const dashboardStats = vi.hoisted(() => ({
   isLoading: false,
+  isPending: false,
   isError: false,
-  data: { sla: { overall: { total: 0 } } },
+  data: undefined as Record<string, unknown> | undefined,
   refetch: vi.fn(),
 }));
 const lastSync = vi.hoisted(() => ({
-  data: undefined as { lastSyncTime?: string } | undefined,
+  data: undefined as { lastSyncTime?: string | null } | undefined,
   isError: false,
+  isPending: false,
   refetch: vi.fn(),
 }));
 const repositories = vi.hoisted(() => ({
@@ -65,11 +81,22 @@ const repositories = vi.hoisted(() => ({
   data: [] as unknown[],
   refetch: vi.fn(),
 }));
+// The repositories the shipped scope helper keeps for the current mode. A case
+// narrows this to model a grant that no longer holds the chosen repository.
+const inScopeRepos = vi.hoisted(() => ({ repos: [] as { fullName: string }[] }));
 const capability = vi.hoisted(() => ({
   canManage: false,
+  status: 'allowed' as 'loading' | 'error' | 'denied' | 'allowed',
   isLoading: false,
   isError: false,
   refetch: vi.fn(),
+}));
+const settingsRecovery = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
+}));
+const recoveryStatus = vi.hoisted(() => ({
+  renders: [] as { message?: string; isRetrying: boolean; onRetry: () => void }[],
 }));
 const dismissFailures = vi.hoisted(() => ({
   failures: [] as { findingId: string; lastError: string; retryable: boolean | null }[],
@@ -107,6 +134,17 @@ const focusEffect = vi.hoisted(() => ({
   effect: undefined as (() => void) | undefined,
 }));
 
+// The dashboard navigates to the repository settings from a precondition row.
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+
+// The GitHub handoff the dashboard renders for a connection precondition. The
+// real hook opens a browser; the suite owns only what the row does with it.
+const manageAccess = vi.hoisted(() => ({
+  handlePress: vi.fn(),
+  pending: false,
+  onReturn: undefined as ((opened: boolean) => void) | undefined,
+}));
+
 // Captures the refresh control element the dashboard passes to the scroll view.
 const tabScreen = vi.hoisted(() => ({
   refreshControl: undefined as unknown,
@@ -122,6 +160,24 @@ const retryCards = vi.hoisted(() => ({
   }[],
 }));
 
+// Captures the dashboard-sections props, so a test can assert the stats payload
+// a failure leaves on screen.
+const sectionsProps = vi.hoisted(() => ({
+  props: [] as {
+    data?: unknown;
+    slaEnabled?: boolean;
+    neverSynced?: boolean;
+    emptyGrant?: boolean;
+    emptyGrantAction?: { label: string; pending: boolean; handlePress: () => void } | null;
+  }[],
+}));
+
+// Captures the sections placeholder's props, so a test can assert the loading
+// state stands in for the cards the same owner renders.
+const sectionsSkeletonProps = vi.hoisted(() => ({
+  props: [] as { slaEnabled?: boolean; neverSynced?: boolean }[],
+}));
+
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -133,10 +189,23 @@ vi.mock('@/components/ui/icons', () => ({
   Settings: 'Settings',
   ShieldAlert: 'ShieldAlert',
 }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronRight: 'DirectionalChevronRight',
+}));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => router,
   useFocusEffect: (effect: () => void) => {
     focusEffect.effect = effect;
+  },
+}));
+vi.mock('@/lib/hooks/use-manage-repository-access', () => ({
+  useManageRepositoryAccess: (
+    _scope: string,
+    _platform: string,
+    handlers?: { onReturn?: (opened: boolean) => void }
+  ) => {
+    manageAccess.onReturn = handlers?.onReturn;
+    return { handlePress: manageAccess.handlePress, pending: manageAccess.pending };
   },
 }));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
@@ -159,6 +228,10 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentLastSyncTime: () => lastSync,
   useSecurityAgentRepositories: () => repositories,
   useTriggerSecuritySync: () => triggerSync,
+  useRetrySecurityAgentSettings: () => settingsRecovery,
+}));
+vi.mock('@/lib/hooks/use-security-agent-sync-running', () => ({
+  useSecurityAgentSyncRunning: () => syncActivity,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissFailures: () => dismissFailures,
@@ -166,6 +239,16 @@ vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
 }));
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
   useMutationOutbox: () => outbox,
+}));
+vi.mock('@/components/security-agent/settings-recovery-status', () => ({
+  SettingsRecoveryStatus: (props: {
+    message?: string;
+    isRetrying: boolean;
+    onRetry: () => void;
+  }) => {
+    recoveryStatus.renders.push(props);
+    return null;
+  },
 }));
 vi.mock('@/components/security-agent/security-command-retry-card', () => ({
   SecurityCommandRetryCard: (props: {
@@ -178,17 +261,21 @@ vi.mock('@/components/security-agent/security-command-retry-card', () => ({
     return null;
   },
 }));
-vi.mock('@kilocode/app-shared/security-agent', () => ({
-  buildSecurityDashboardMetrics: sharedMetrics.build,
-  getAnalysisIncompleteCount: (analysis: {
-    triageComplete: number;
-    analyzing: number;
-    notAnalyzed: number;
-    failed: number;
-  }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
-  getSecurityRepositoriesInScope: () => [],
-  isPersonalSecurityScope: (scope: string) => scope === 'personal',
-}));
+vi.mock('@kilocode/app-shared/security-agent', async importOriginal => {
+  const actual = await importOriginal<typeof SecurityAgentModule>();
+  return {
+    ...actual,
+    buildSecurityDashboardMetrics: sharedMetrics.build,
+    getAnalysisIncompleteCount: (analysis: {
+      triageComplete: number;
+      analyzing: number;
+      notAnalyzed: number;
+      failed: number;
+    }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
+    getSecurityRepositoriesInScope: () => inScopeRepos.repos,
+    isPersonalSecurityScope: (scope: string) => scope === 'personal',
+  };
+});
 vi.mock('@/lib/security-agent', () => ({
   getSecurityAgentPath: (scope: string, section: string) => `/security/${scope}/${section}`,
 }));
@@ -197,15 +284,55 @@ vi.mock('@/lib/utils', () => ({
   parseTimestamp: (value: string) => value,
   timeAgo: () => 'recently',
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+// The header the dashboard paints: its title names the scope, the eyebrow the
+// product. Captured per render so a test can assert what a reader reads.
+const headers = vi.hoisted(() => ({
+  props: [] as {
+    title?: string;
+    eyebrow?: string;
+    headerRight?: unknown;
+    headerRightWidth?: number;
+  }[],
+}));
+// The shared membership list the scope title resolves from. The title never
+// fetches it, so the mock only needs the cache key it reads.
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: { title?: string; eyebrow?: string }) => {
+    headers.props.push(props);
+    return null;
+  },
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    organizations: {
+      list: {
+        queryOptions: () => ({ queryKey: ['organizations', 'list'] }),
+      },
+    },
+  }),
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: () => null }));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: () => null,
 }));
 vi.mock('@/components/security-agent/dashboard-sections', () => ({
-  DashboardSections: () => null,
+  DashboardSections: (props: {
+    data?: unknown;
+    slaEnabled?: boolean;
+    neverSynced?: boolean;
+    emptyGrant?: boolean;
+    emptyGrantAction?: { label: string; pending: boolean; handlePress: () => void } | null;
+  }) => {
+    sectionsProps.props.push(props);
+    return null;
+  },
+  DashboardSectionsSkeleton: (props: { slaEnabled?: boolean; neverSynced?: boolean }) => {
+    sectionsSkeletonProps.props.push(props);
+    return null;
+  },
 }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
@@ -218,10 +345,10 @@ vi.mock('@/components/tab-screen', () => ({
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
 
-function renderScreen(): R {
+function renderScreen(scope = 'personal', memberships?: unknown[]): R {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(DashboardScreen, { scope: 'personal' }));
+    ref.current = TestRenderer.create(dashboardTree(scope, memberships));
   });
   const r = ref.current;
   if (!r) {
@@ -230,25 +357,54 @@ function renderScreen(): R {
   return r;
 }
 
-type SyncControlKey = 'securityAgent.dashboard.syncNow' | 'securityAgent.dashboard.syncFindings';
+/** A bare element inside the provider stack `DashboardScreen`'s hooks need. */
+function renderElement(element: ReactElement): R {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  const ref: { current: R | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(
+      createElement(QueryClientProvider, { client: queryClient }, element)
+    );
+  });
+  const r = ref.current;
+  if (!r) {
+    throw new Error('renderer was not created');
+  }
+  return r;
+}
 
+/** The dashboard inside the provider stack it needs, for a first render or an update. */
+function dashboardTree(scope = 'personal', memberships?: unknown[]): ReactElement {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  if (memberships) {
+    // The app-wide membership list the scope title reads, already cached.
+    queryClient.setQueryData(['organizations', 'list'], memberships);
+  }
+  return createElement(
+    QueryClientProvider,
+    { client: queryClient },
+    createElement(DashboardScreen, { scope })
+  );
+}
 function syncButtons(root: I): I[] {
   const syncNow = i18n.t('securityAgent.dashboard.syncNow');
-  const syncFindings = i18n.t('securityAgent.dashboard.syncFindings');
   return root.findAll(
     n =>
       typeof n.type === 'string' &&
       (n.type as string) === 'Pressable' &&
-      (n.props.accessibilityLabel === syncNow || n.props.accessibilityLabel === syncFindings)
+      n.props.accessibilityLabel === syncNow
   );
 }
 
-function findSyncButton(root: I, key: SyncControlKey): I {
-  const label = i18n.t(key);
-  const nodes = syncButtons(root).filter(n => n.props.accessibilityLabel === label);
-  const n = nodes[0];
+function findSyncButton(root: I): I {
+  const label = i18n.t('securityAgent.dashboard.syncNow');
+  const n = syncButtons(root)[0];
   if (!n) {
-    throw new Error(`expected 1 ${label} button, got ${nodes.length}`);
+    throw new Error(`expected 1 ${label} button, got 0`);
   }
   return n;
 }
@@ -270,6 +426,38 @@ function syncDisabledStates(root: I): boolean[] {
   return syncButtons(root).map(n => n.props.disabled as boolean);
 }
 
+function syncDisabled(root: I): boolean {
+  return findSyncButton(root).props.disabled === true;
+}
+
+function syncBusy(root: I): boolean {
+  const state = findSyncButton(root).props.accessibilityState as unknown;
+  return typeof state === 'object' && state !== null && 'busy' in state && state.busy === true;
+}
+
+// The one Button the dashboard renders on its own: the retry beside a failed
+// sync's copy. Every other failure renders through the shared retry card.
+function syncRetries(root: I): I[] {
+  return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
+}
+
+// The one Button the dashboard renders on its own: the retry or the fix action
+// beside a failed sync's copy. Every other failure renders through the shared
+// retry card.
+function syncFailureActions(root: I): I[] {
+  return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
+}
+
+function pressSyncRetry(root: I): void {
+  const retry = syncFailureActions(root)[0];
+  if (!retry) {
+    throw new Error('no sync retry control rendered');
+  }
+  act(() => {
+    (retry.props.onPress as () => void)();
+  });
+}
+
 function renderedTexts(root: I): string[] {
   return root
     .findAll(
@@ -281,18 +469,100 @@ function renderedTexts(root: I): string[] {
     .map(n => n.props.children as string);
 }
 
+/**
+ * A manual-sync rejection from the real server contract: `PRECONDITION_FAILED`
+ * carrying the stable `upstreamCode` the mobile ledger maps onto catalog copy.
+ * The literals are the wire values both sides share.
+ */
+function preconditionError(upstreamCode: string): Error {
+  return mapSecuritySyncOperationError(
+    Object.assign(new Error('server sentence the device cannot translate'), {
+      data: { code: 'PRECONDITION_FAILED', upstreamCode },
+    })
+  );
+}
+
 function dashboardMetric(id: string) {
   return { id, label: '', value: '', detail: '', tone: 'neutral' as const };
 }
 
+describe('DashboardScreen names the scope it acts on', () => {
+  // The dashboard is the enabled landing of one scope. An admin in several
+  // organizations reads whose agent — and whose GitHub app — this one is.
+  it('names the organization the dashboard belongs to', () => {
+    headers.props = [];
+    renderScreen('org_123', [
+      { organizationId: 'org_123', organizationName: 'Drain Labs', role: 'owner' },
+    ]);
+    const header = headers.props.at(-1);
+    expect(header?.title).toBe('Drain Labs');
+    expect(header?.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the personal scope', () => {
+    headers.props = [];
+    renderScreen('personal');
+    const header = headers.props.at(-1);
+    expect(header?.title).toBe('Personal');
+    expect(header?.eyebrow).toBe('Security Agent');
+  });
+
+  it('keeps the header line while the membership list loads', () => {
+    headers.props = [];
+    renderScreen('org_123');
+    const header = headers.props.at(-1);
+    expect(header?.title).toBe('Organization');
+    expect(header?.eyebrow).toBe('Security Agent');
+  });
+});
+
+describe('DashboardScreen before the first sync', () => {
+  beforeEach(() => {
+    dashboardStats.isPending = false;
+    dashboardStats.isError = false;
+    // The dashboard stats always carry repository health; the field decides
+    // whether the repository card can show its own empty state.
+    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    sharedMetrics.build.mockReturnValue([]);
+  });
+
+  // The stored absence of a sync is what paints "Not yet synced" under the
+  // filter. The sections must read that same fact, or an organization that has
+  // never run the agent reports an all-clear it never measured.
+  it('tells the sections nothing has been synced yet', () => {
+    sectionsProps.props = [];
+    lastSync.data = { lastSyncTime: null };
+    renderScreen('org_123');
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
+  });
+
+  it('leaves a synced scope measured', () => {
+    sectionsProps.props = [];
+    lastSync.data = { lastSyncTime: '2026-10-30T12:00:00.000Z' };
+    renderScreen('org_123');
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(false);
+  });
+});
+
 describe('DashboardScreen sync control terminal states', () => {
   beforeEach(() => {
     triggerSync.mutate.mockClear();
+    triggerSync.reset.mockClear();
     triggerSync.isPending = false;
     triggerSync.isError = false;
     triggerSync.error = null;
+    syncActivity.syncRunning = false;
+    syncActivity.updatedAt = 0;
+    syncActivity.readFailedAt = 0;
+    dashboardStats.refetch.mockClear();
+    lastSync.refetch.mockClear();
+    router.push.mockClear();
+    manageAccess.handlePress.mockClear();
+    manageAccess.pending = false;
+    manageAccess.onReturn = undefined;
     config.data = { slaEnabled: true };
     dashboardStats.isLoading = false;
+    dashboardStats.isPending = false;
     dashboardStats.isError = false;
     dashboardStats.data = { sla: { overall: { total: 0 } } };
     lastSync.data = undefined;
@@ -302,6 +572,7 @@ describe('DashboardScreen sync control terminal states', () => {
     repositories.data = [];
     repositories.refetch.mockClear();
     capability.canManage = false;
+    capability.status = 'allowed';
     dismissFailures.failures = [];
     dismissFailures.clear.mockClear();
     dismissFailures.refresh.mockClear();
@@ -313,30 +584,199 @@ describe('DashboardScreen sync control terminal states', () => {
     sharedMetrics.build.mockReturnValue([]);
   });
 
-  it('keeps both sync controls enabled in the happy state', () => {
+  it('keeps the sync control enabled in the happy state', () => {
     const root = renderScreen();
 
-    expect(syncButtons(root.root)).toHaveLength(2);
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
+    expect(syncButtons(root.root)).toHaveLength(1);
+    expect(syncDisabled(root.root)).toBe(false);
   });
 
-  it('keeps both sync controls enabled after a retryable error and shows its copy', () => {
-    triggerSync.isError = true;
-    triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
+  it('presents an in-progress conflict as a running sync instead of a retryable failure', () => {
+    const root = renderScreen();
+    const syncNow = findSyncButton(root.root);
+    act(() => {
+      (syncNow.props.onPress as () => void)();
+    });
+    const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as {
+      onError: (error: unknown) => void;
+    };
+    act(() => {
+      triggerSync.isError = true;
+      triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
+      options.onError(triggerSync.error);
+      root.update(dashboardTree());
+    });
+
+    // The ledger refused a duplicate of a submit that is still in flight, so
+    // the sync is running: the control reports progress and stays disabled, and
+    // the conflict sentence with its colliding Retry is gone.
+    expect(syncDisabled(root.root)).toBe(true);
+    expect(syncBusy(root.root)).toBe(true);
+    expect(renderedTexts(root.root)).not.toContain(IN_PROGRESS_COPY);
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.dashboard.syncing'));
+    expect(syncRetries(root.root)).toHaveLength(0);
+
+    // The run it handed over to becomes visible, then finishes: the controls
+    // return, and the conflict copy still never appears.
+    act(() => {
+      syncActivity.syncRunning = true;
+      syncActivity.updatedAt = Date.now() + 1000;
+      root.update(dashboardTree());
+    });
+    expect(syncDisabled(root.root)).toBe(true);
+
+    act(() => {
+      syncActivity.syncRunning = false;
+      syncActivity.updatedAt = Date.now() + 2000;
+      root.update(dashboardTree());
+    });
+    expect(syncDisabled(root.root)).toBe(false);
+    expect(renderedTexts(root.root)).not.toContain(IN_PROGRESS_COPY);
+    expect(syncRetries(root.root)).toHaveLength(0);
+  });
+
+  it('gives the controls back when a refused duplicate never shows its run', () => {
+    vi.useFakeTimers();
+    try {
+      const root = renderScreen();
+      const syncNow = findSyncButton(root.root);
+      act(() => {
+        (syncNow.props.onPress as () => void)();
+      });
+      const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as {
+        onError: (error: unknown) => void;
+      };
+      act(() => {
+        triggerSync.isError = true;
+        triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
+        options.onError(triggerSync.error);
+        root.update(dashboardTree());
+      });
+      expect(syncDisabled(root.root)).toBe(true);
+
+      // One poll later the server still lists no sync: a submit the screen can
+      // never see must not hold the control, so the watch expires.
+      act(() => {
+        syncActivity.updatedAt = Date.now() + 3000;
+        root.update(dashboardTree());
+      });
+      expect(syncDisabled(root.root)).toBe(true);
+
+      act(() => {
+        vi.advanceTimersByTime(30_000);
+        root.update(dashboardTree());
+      });
+      expect(syncDisabled(root.root)).toBe(false);
+      expect(renderedTexts(root.root)).not.toContain(IN_PROGRESS_COPY);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives the controls back when the sync status cannot be read at all', () => {
+    const root = renderScreen();
+    const syncNow = findSyncButton(root.root);
+    act(() => {
+      (syncNow.props.onPress as () => void)();
+    });
+    const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as { onSuccess: () => void };
+    act(() => {
+      options.onSuccess();
+      root.update(dashboardTree());
+    });
+    expect(syncDisabled(root.root)).toBe(true);
+
+    // Every poll after the accept fails: a run the screen cannot observe must
+    // not hold the control for good.
+    act(() => {
+      syncActivity.readFailedAt = Date.now() + 3000;
+      root.update(dashboardTree());
+    });
+
+    expect(syncDisabled(root.root)).toBe(false);
+  });
+
+  it('gives the controls back when an accepted submit never shows a run', () => {
+    vi.useFakeTimers();
+    try {
+      const root = renderScreen();
+      const syncNow = findSyncButton(root.root);
+      act(() => {
+        (syncNow.props.onPress as () => void)();
+      });
+      const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as { onSuccess: () => void };
+      act(() => {
+        options.onSuccess();
+        root.update(dashboardTree());
+      });
+      expect(syncDisabled(root.root)).toBe(true);
+
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+        root.update(dashboardTree());
+      });
+
+      expect(syncDisabled(root.root)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the run in progress while the server still reports the sync, then refreshes both dashboard reads', () => {
+    syncActivity.syncRunning = true;
+    syncActivity.updatedAt = Date.now();
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([false, false]);
-    expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
+    expect(syncDisabled(root.root)).toBe(true);
+    expect(syncBusy(root.root)).toBe(true);
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.dashboard.syncing'));
+
+    act(() => {
+      syncActivity.syncRunning = false;
+      syncActivity.updatedAt = Date.now() + 10;
+      root.update(dashboardTree());
+    });
+
+    // The sync finished: the controls come back and "Last synced" plus the
+    // repository sync state are refreshed without leaving the screen.
+    expect(syncDisabled(root.root)).toBe(false);
+    expect(renderedTexts(root.root)).not.toContain(i18n.t('securityAgent.dashboard.syncing'));
+    expect(dashboardStats.refetch).toHaveBeenCalledTimes(1);
+    expect(lastSync.refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the translated ambiguous copy under ja and keeps both controls retryable', async () => {
+  it('treats an accepted submit as running until a read taken after it reports no sync', () => {
+    const root = renderScreen();
+    const syncNow = findSyncButton(root.root);
+
+    act(() => {
+      (syncNow.props.onPress as () => void)();
+    });
+    const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as { onSuccess: () => void };
+    act(() => {
+      options.onSuccess();
+      root.update(dashboardTree());
+    });
+
+    // The 202 accepts the command, so the run is still going: a cached empty
+    // answer that predates the submit cannot end the progress state.
+    expect(syncDisabled(root.root)).toBe(true);
+
+    act(() => {
+      syncActivity.updatedAt = Date.now() + 1000;
+      root.update(dashboardTree());
+    });
+
+    expect(syncDisabled(root.root)).toBe(false);
+  });
+  it('renders the translated ambiguous copy under ja and keeps the control retryable', async () => {
     await i18n.changeLanguage('ja');
     try {
       triggerSync.isError = true;
       triggerSync.error = mapSecuritySyncOperationError(new Error(SECURITY_AMBIGUOUS_MESSAGE));
       const root = renderScreen();
 
-      expect(syncDisabledStates(root.root)).toEqual([false, false]);
+      expect(syncDisabled(root.root)).toBe(false);
       expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.mutations.ambiguous'));
       expect(renderedTexts(root.root)).not.toContain(SECURITY_AMBIGUOUS_MESSAGE);
     } finally {
@@ -344,36 +784,347 @@ describe('DashboardScreen sync control terminal states', () => {
     }
   });
 
-  it('disables both sync controls and shows configuration-specific copy after a missing-configuration error', () => {
+  it('disables the sync control and shows configuration-specific copy after a missing-configuration error', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
     // The raw server message is replaced by the state-specific copy.
     expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
   });
 
-  it('disables both sync controls and shows the error copy after another non-retryable error', () => {
+  it('disables the sync control and shows the error copy after another non-retryable error', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
-  it('disables both sync controls while a sync is pending', () => {
+  it('disables the sync control while a sync is pending', () => {
     triggerSync.isPending = true;
     const root = renderScreen();
 
-    expect(syncDisabledStates(root.root)).toEqual([true, true]);
+    expect(syncDisabled(root.root)).toBe(true);
+  });
+
+  it('offers a retry beside a retryable failure and resubmits the current intent', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    const root = renderScreen();
+
+    expect(syncFailureActions(root.root)).toHaveLength(1);
+    expect(syncFailureActions(root.root)[0]?.props.loading).toBe(false);
+
+    pressSyncRetry(root.root);
+
+    expect(triggerSync.mutate).toHaveBeenCalledWith(
+      { repoFullName: undefined },
+      expect.objectContaining({ onSuccess: expect.any(Function) })
+    );
+  });
+
+  it('retries the intent that failed, not the filter selected since', () => {
+    outbox.needsReconcile = [
+      {
+        operationKey: 'kilo-repo-key',
+        fingerprint: 'sync:kilo/repo',
+        scope: 'personal',
+        input: { repoFullName: 'kilo/repo' },
+      },
+    ];
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    const root = renderScreen();
+
+    act(() => {
+      retryCards.cards.find(card => card.lastError === RECONCILE_COPY)?.onRetry?.();
+    });
+    pressSyncRetry(root.root);
+
+    // The card's retry stored the reconcile intent; the inline retry replays it
+    // rather than the (unset) repository filter the screen shows now.
+    expect(triggerSync.mutate).toHaveBeenLastCalledWith(
+      { repoFullName: 'kilo/repo', operationKey: 'kilo-repo-key' },
+      expect.objectContaining({ onSuccess: expect.any(Function) })
+    );
+  });
+
+  it('hides a reconcile row while a sync is in flight, and brings it back after', () => {
+    outbox.needsReconcile = [
+      {
+        operationKey: 'kilo-repo-key',
+        fingerprint: 'sync:kilo/repo',
+        scope: 'personal',
+        input: { repoFullName: 'kilo/repo' },
+      },
+    ];
+    const root = renderScreen();
+    expect(retryCards.cards.map(card => card.lastError)).toContain(RECONCILE_COPY);
+
+    // A run is under way, so the row's "may not have completed" copy and its
+    // same-key retry would contradict the progress state and collide with it.
+    retryCards.cards = [];
+    act(() => {
+      syncActivity.syncRunning = true;
+      syncActivity.updatedAt = Date.now();
+      root.update(dashboardTree());
+    });
+    expect(retryCards.cards.map(card => card.lastError)).not.toContain(RECONCILE_COPY);
+
+    // The run ended: an unfinished row is still the reader's to reconcile.
+    retryCards.cards = [];
+    act(() => {
+      syncActivity.syncRunning = false;
+      syncActivity.updatedAt = Date.now() + 1000;
+      root.update(dashboardTree());
+    });
+    expect(retryCards.cards.map(card => card.lastError)).toContain(RECONCILE_COPY);
+  });
+
+  it('keeps the failure and reports progress on the retry while it runs', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    const root = renderScreen();
+    pressSyncRetry(root.root);
+    // A new attempt clears the mutation's error before it settles.
+    act(() => {
+      triggerSync.isError = false;
+      triggerSync.isPending = true;
+      triggerSync.error = null;
+      root.update(dashboardTree());
+    });
+
+    expect(syncFailureActions(root.root)).toHaveLength(1);
+    expect(syncFailureActions(root.root)[0]?.props.loading).toBe(true);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.serviceUnavailable')
+    );
+    // The pressed control keeps its own spinner visible, and the sentence it is
+    // retrying steps back so it does not read as a fresh failure.
+    expect(syncFailureActions(root.root)[0]?.props.className).toContain('opacity-100');
+    const message = root.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        n.props.children === i18n.t('securityAgent.mutations.serviceUnavailable')
+    )[0];
+    expect(message?.props.className).toContain('text-warn');
+  });
+
+  it('drops the failure row once a retry succeeds', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    const root = renderScreen();
+    pressSyncRetry(root.root);
+    const options = triggerSync.mutate.mock.calls.at(-1)?.[1] as { onSuccess: () => void };
+    act(() => {
+      triggerSync.isError = false;
+      triggerSync.isPending = false;
+      triggerSync.error = null;
+      options.onSuccess();
+      root.update(dashboardTree());
+    });
+
+    expect(syncFailureActions(root.root)).toHaveLength(0);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.mutations.serviceUnavailable')
+    );
+  });
+
+  it('offers no retry for a terminal failure', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
+    const root = renderScreen();
+
+    expect(syncFailureActions(root.root)).toHaveLength(0);
+  });
+
+  it('names a rejection with no repository in scope and opens the repository picker', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen();
+
+    expect(syncDisabledStates(root.root)).toEqual([true]);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+    expect(renderedTexts(root.root)).not.toContain(i18n.t('securityAgent.mutations.actionBlocked'));
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+
+    pressSyncRetry(root.root);
+
+    expect(router.push).toHaveBeenCalledWith('/security/personal/settings/repositories');
+    expect(manageAccess.handlePress).not.toHaveBeenCalled();
+  });
+
+  // A member cannot change repository policy: the repositories screen disables
+  // every mode row for them. The rejection must name who can connect
+  // repositories instead of telling them to choose, and offer nothing to press.
+  it('names who can connect repositories for a reader who cannot change them', () => {
+    capability.status = 'denied';
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositoriesNoManage')
+    );
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+    expect(syncFailureActions(root.root)).toHaveLength(0);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  // The SLA card's repositories link is the dashboard's other route into the
+  // same screen, so a reader who cannot change the policy loses it too.
+  it('leaves the SLA card repository link off for a reader who cannot change them', () => {
+    capability.status = 'denied';
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // The role read decides the sentence. Before it settles the manager copy
+  // stays, because telling a real manager they cannot manage would be wrong.
+  it('keeps the manager sentence while the role read is unresolved', () => {
+    capability.status = 'loading';
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  it('names a broken GitHub connection and hands the reader to the GitHub App page', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_missing_permission');
+    const root = renderScreen();
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncMissingPermission')
+    );
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.repositories.manageAccess'));
+
+    pressSyncRetry(root.root);
+
+    expect(manageAccess.handlePress).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('lets the sync control work again when the dashboard regains focus after a rejection', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen();
+    expect(syncDisabledStates(root.root)).toEqual([true]);
+
+    // Returning from the settings screen: a changed repository selection is a
+    // new intent, so the rejection that described the old one no longer holds.
+    act(() => {
+      focusEffect.effect?.();
+    });
+    expect(triggerSync.reset).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      triggerSync.isError = false;
+      triggerSync.error = null;
+      root.update(dashboardTree('personal'));
+    });
+
+    expect(syncDisabledStates(root.root)).toEqual([false]);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+  });
+
+  it('lets the sync control work again when the GitHub handoff returns', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_integration_inactive');
+    const root = renderScreen();
+    expect(syncDisabledStates(root.root)).toEqual([true]);
+
+    act(() => {
+      manageAccess.onReturn?.(true);
+    });
+    expect(triggerSync.reset).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      triggerSync.isError = false;
+      triggerSync.error = null;
+      root.update(dashboardTree('personal'));
+    });
+
+    expect(syncDisabledStates(root.root)).toEqual([false]);
+  });
+
+  it('keeps the precondition copy when the GitHub handoff never opened a page', () => {
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_integration_inactive');
+    const root = renderScreen();
+
+    act(() => {
+      manageAccess.onReturn?.(false);
+    });
+
+    expect(triggerSync.reset).not.toHaveBeenCalled();
+    expect(syncDisabledStates(root.root)).toEqual([true]);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncIntegrationInactive')
+    );
+  });
+
+  it('keeps the controls down on focus for a terminal failure that is not a precondition', () => {
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
+    const root = renderScreen();
+
+    act(() => {
+      focusEffect.effect?.();
+    });
+
+    expect(triggerSync.reset).not.toHaveBeenCalled();
+    expect(syncDisabledStates(root.root)).toEqual([true]);
+  });
+
+  it('keeps the last risk breakdown on screen while a sync failure is shown', () => {
+    const stats = { sla: { overall: { total: 3, withinSla: 2, overdue: 1 } }, analysis: {} };
+    dashboardStats.data = stats;
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    renderScreen();
+
+    expect(sectionsProps.props.at(-1)?.data).toBe(stats);
   });
 
   it('submits the sync through the header control with the current repo filter', () => {
     const root = renderScreen();
-    const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
+    const syncNow = findSyncButton(root.root);
 
     act(() => {
       (syncNow.props.onPress as () => void)();
@@ -383,6 +1134,169 @@ describe('DashboardScreen sync control terminal states', () => {
       { repoFullName: undefined },
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+  });
+});
+
+describe('DashboardScreen repository card with an empty grant', () => {
+  beforeEach(() => {
+    capability.status = 'allowed';
+    capability.canManage = false;
+    repositories.isLoading = false;
+    repositories.isError = false;
+    repositories.data = [];
+    lastSync.isPending = false;
+    lastSync.data = undefined;
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    dashboardStats.isPending = false;
+    // The dashboard stats always carry repository health; the field decides
+    // whether the repository card can show its own empty state.
+    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    sharedMetrics.build.mockReturnValue([]);
+    sectionsProps.props = [];
+    router.push.mockClear();
+    manageAccess.handlePress.mockClear();
+    manageAccess.pending = false;
+  });
+
+  // A grant that holds nothing leaves the repository card with no data and no
+  // way to fix it from here. A manager's step is the repository settings, where
+  // the policy and the picker both live.
+  it('hands an empty grant its step to the repository settings', () => {
+    renderScreen('org_123');
+    const props = sectionsProps.props.at(-1);
+
+    expect(props?.emptyGrant).toBe(true);
+    expect(props?.emptyGrantAction?.label).toBe(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+
+    act(() => {
+      props?.emptyGrantAction?.handlePress();
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/security/org_123/settings/repositories');
+    expect(manageAccess.handlePress).not.toHaveBeenCalled();
+  });
+
+  // A member cannot change repository policy, so the settings screen would only
+  // tell them so. Their step is the GitHub App page, where the grant itself is
+  // widened — the same control the repositories screen offers them in this state.
+  it('hands a reader who cannot change the policy to the GitHub App page', () => {
+    capability.status = 'denied';
+    const root = renderScreen('org_123');
+    const props = sectionsProps.props.at(-1);
+
+    expect(props?.emptyGrantAction?.label).toBe(i18n.t('securityAgent.repositories.manageAccess'));
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+
+    act(() => {
+      props?.emptyGrantAction?.handlePress();
+    });
+
+    expect(manageAccess.handlePress).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  // A grant that holds repositories has no grant to fix: nothing is pending but
+  // the first sync, so the card keeps its own pending copy and no step.
+  it('leaves a grant that holds repositories without a step', () => {
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    renderScreen('org_123');
+    const props = sectionsProps.props.at(-1);
+
+    expect(props?.emptyGrant).toBe(false);
+    expect(props?.emptyGrantAction).toBeNull();
+  });
+
+  // An unsettled role read keeps the manager path, as the sync rejection does:
+  // telling a real manager they cannot manage would be wrong.
+  it('keeps the manager step while the role read has not settled', () => {
+    capability.status = 'loading';
+    renderScreen('org_123');
+
+    expect(sectionsProps.props.at(-1)?.emptyGrantAction?.label).toBe(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // The repository card below carries the step out of the empty grant, so the
+  // SLA card's link to the same screen would offer one destination twice: the
+  // screen's own rule against repeating an affordance sends it back.
+  it('leaves the same destination to the repository card on an empty grant', () => {
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  it('keeps the SLA card link while the grant holds repositories', () => {
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // The repository card renders only once the sync-status read settles, so
+  // taking this link away before then would leave a screen with an empty grant
+  // and nothing to press.
+  it('keeps the SLA card link until the card that carries the step can render', () => {
+    lastSync.isPending = true;
+    lastSync.data = undefined;
+    dashboardStats.isPending = false;
+    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // A grant narrowed after a sync leaves the card listing the findings already
+  // stored, where it shows no step. The link is the shortcut a manager keeps.
+  it('keeps the SLA card link when stored findings outlive the emptied grant', () => {
+    dashboardStats.data = {
+      sla: { overall: { total: 0 } },
+      repoHealth: [{ repoFullName: 'kilo/repo' }],
+    };
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+});
+
+describe('DashboardScreen capability recovery', () => {
+  beforeEach(() => {
+    capability.status = 'allowed';
+    settingsRecovery.isRetrying = false;
+    settingsRecovery.retry.mockClear();
+    recoveryStatus.renders = [];
+  });
+
+  it('surfaces a failed role read with Retry instead of only dropping the controls', () => {
+    // The entry renders this dashboard from the cached config without waiting for
+    // the role read, so a manager whose read failed must be told why the audit
+    // action is missing rather than reading it as lost access.
+    capability.status = 'error';
+    renderScreen();
+
+    expect(recoveryStatus.renders).toHaveLength(1);
+    expect(recoveryStatus.renders[0]?.message).toBe(
+      i18n.t('securityAgent.settingsOverview.couldNotLoadPermissions')
+    );
+    act(() => recoveryStatus.renders[0]?.onRetry());
+    expect(settingsRecovery.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays silent once the role read resolves', () => {
+    renderScreen();
+    expect(recoveryStatus.renders).toHaveLength(0);
   });
 });
 
@@ -399,6 +1313,7 @@ describe('DashboardScreen repository filter sheet', () => {
     lastSync.refetch.mockReset();
     lastSync.refetch.mockResolvedValue({ isError: false });
     config.data = { slaEnabled: true };
+    inScopeRepos.repos = [];
     sheet.show.mockClear();
     retryCards.cards = [];
   });
@@ -428,6 +1343,70 @@ describe('DashboardScreen repository filter sheet', () => {
     const filter = findFilterControl(root.root);
 
     expect(filter.props.disabled).toBe(true);
+  });
+
+  // The settings overview names a settled empty grant "No repositories", and
+  // this row labels the same scope one tap away: claiming every repository here
+  // would contradict the row above it and send the reader looking for scans
+  // that cannot run.
+  it('names a settled empty grant instead of claiming every repository', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    const root = renderScreen('org_123');
+    const filter = findFilterControl(root.root);
+
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.repositories.noRepositories'));
+    expect(renderedTexts(root.root)).not.toContain(i18n.t('common.allRepositories'));
+    // Nothing in scope leaves no filter to open: its only option would be the
+    // scope it cannot offer.
+    expect(filter.props.disabled).toBe(true);
+  });
+
+  it('keeps the every-repository label while the grant read has not settled', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    repositories.isLoading = true;
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
+  });
+
+  it('keeps the every-repository label while the grant holds repositories', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
+    expect(findFilterControl(root.root).props.disabled).toBe(false);
+  });
+
+  // A filter applied while the repository was in scope outlives the grant that
+  // allowed it. The row would name a repository this dashboard can no longer
+  // show, and the sheet that clears the filter is the control the empty scope
+  // closes, so the filter has to drop by itself.
+  it('drops a filter whose repository left the settled scope', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    inScopeRepos.repos = [{ fullName: 'kilo/repo' }];
+    const root = renderScreen('org_123');
+
+    act(() => {
+      (findFilterControl(root.root).props.onPress as () => void)();
+    });
+    const chooseRepository = sheet.show.mock.calls.at(-1)?.[1] as (index?: number) => void;
+    act(() => {
+      chooseRepository(1);
+    });
+    expect(renderedTexts(root.root)).toContain('kilo/repo');
+
+    // The grant narrows out of band: the settled answer no longer holds it.
+    repositories.data = [];
+    inScopeRepos.repos = [];
+    act(() => {
+      root.update(dashboardTree('org_123'));
+    });
+
+    expect(renderedTexts(root.root)).not.toContain('kilo/repo');
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.repositories.noRepositories'));
+    expect(findFilterControl(root.root).props.disabled).toBe(true);
   });
 
   it('renders a retryable card for a failed repositories fetch and retries on tap', () => {
@@ -488,10 +1467,15 @@ describe('buildLocalizedMetrics', () => {
         notAnalyzed: 1,
         failed: 1,
       },
-      severity: { critical: 2, high: 3 },
+      severity: { critical: 2, high: 3, medium: 1, low: 0 },
       sla: {
-        overall: { total: 10, withinSla: 7, overdue: 3 },
-        bySeverity: { critical: { overdue: 1 }, high: { overdue: 2 } },
+        overall: { total: 10, withinSla: 7, overdue: 5 },
+        bySeverity: {
+          critical: { overdue: 1 },
+          high: { overdue: 2 },
+          medium: { overdue: 1 },
+          low: { overdue: 1 },
+        },
         dueSoon: { total: 4, exploitable: 2 },
         untrackedCount: 5,
       },
@@ -519,11 +1503,201 @@ describe('buildLocalizedMetrics', () => {
       'noDeadline',
     ]);
     expect(analysisMetrics[0]?.value).toBe('1.234');
+    // The open-findings and overdue tiles both break the medium and low counts
+    // into one bucket, so every part of the tile's number is named.
+    expect(analysisMetrics[0]?.detail).toBe('2 kritisch, 3 hoch, 1 mittel und niedrig');
+    expect(slaMetrics[1]?.detail).toBe('1 kritisch, 2 hoch, 2 mittel und niedrig');
     expect(slaMetrics[0]?.value).toMatch(/^70[\s\u00A0\u202F]*%$/);
     expect(analysisMetrics.every(item => item.label.length > 0 && item.detail.length > 0)).toBe(
       true
     );
     expect(slaMetrics.every(item => item.label.length > 0 && item.detail.length > 0)).toBe(true);
+    await i18n.changeLanguage('en');
+  });
+
+  it('keeps the numeric slot a dash while no deadline is tracked', () => {
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 0,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 0, high: 0, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 0, withinSla: 0, overdue: 0 },
+        bySeverity: {
+          critical: { overdue: 0 },
+          high: { overdue: 0 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(['slaCompliance'].map(id => dashboardMetric(id)));
+    const [compliance] = buildLocalizedMetrics(data, true);
+
+    expect(compliance?.value).toBe('—');
+    expect(compliance?.detail).toBe(i18n.t('securityAgent.dashboardMetrics.noDeadlineData'));
+  });
+
+  it('reports no measurement instead of a clean result before the first sync', () => {
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 0,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 0, high: 0, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 0, withinSla: 0, overdue: 0 },
+        bySeverity: {
+          critical: { overdue: 0 },
+          high: { overdue: 0 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(
+      ['openFindings', 'slaCompliance', 'noDeadline'].map(id => dashboardMetric(id))
+    );
+    const metrics = buildLocalizedMetrics(data, true, true);
+
+    // Zero counts and the line that read the zeros as a clean report both
+    // became a dash; the filter row above the tiles states the not-yet-synced
+    // status once, so a tile keeps no detail line to repeat it.
+    expect(metrics.map(metric => metric.value)).toEqual(['—', '—', '—']);
+    expect(metrics.map(metric => metric.detail)).toEqual(['', '', '']);
+    expect(metrics.every(metric => metric.tone === 'neutral')).toBe(true);
+  });
+
+  it('omits the medium & low bucket while no medium or low finding is counted', () => {
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 4,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 2, high: 3, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 10, withinSla: 7, overdue: 3 },
+        bySeverity: {
+          critical: { overdue: 1 },
+          high: { overdue: 2 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        dashboardMetric(id)
+      )
+    );
+    const analysisMetrics = buildLocalizedMetrics(data, false);
+    sharedMetrics.build.mockReturnValueOnce(
+      ['slaCompliance', 'deadlinePassed', 'dueSoon', 'noDeadline'].map(id => dashboardMetric(id))
+    );
+    const slaMetrics = buildLocalizedMetrics(data, true);
+
+    expect(analysisMetrics[0]?.detail).toBe('2 critical, 3 high');
+    expect(slaMetrics[1]?.detail).toBe('1 critical, 2 high');
+  });
+
+  it('shows the placeholder dash for an unmeasured SLA compliance', () => {
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 3,
+        exploitable: 1,
+        needsReview: 1,
+        triageComplete: 1,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 1, high: 1, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 0, withinSla: 0, overdue: 0 },
+        bySeverity: {
+          critical: { overdue: 0 },
+          high: { overdue: 0 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 3,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce([dashboardMetric('slaCompliance')]);
+    const [compliance] = buildLocalizedMetrics(data, true);
+
+    // The value slot carries a placeholder a reader can scan past, never a
+    // sentence set in the numeric style; the detail line says what is missing.
+    expect(compliance?.value).toBe('—');
+    expect(compliance?.detail).toBe(i18n.t('securityAgent.dashboardMetrics.noDeadlineData'));
+  });
+
+  it('agrees a pt-BR breakdown with each of its three numbers', async () => {
+    await i18n.changeLanguage('pt-BR');
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 2,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 1, high: 0, medium: 1, low: 0 },
+      sla: {
+        overall: { total: 2, withinSla: 0, overdue: 2 },
+        bySeverity: {
+          critical: { overdue: 1 },
+          high: { overdue: 0 },
+          medium: { overdue: 1 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        dashboardMetric(id)
+      )
+    );
+    const analysisMetrics = buildLocalizedMetrics(data, false);
+    sharedMetrics.build.mockReturnValueOnce(
+      ['slaCompliance', 'deadlinePassed', 'dueSoon', 'noDeadline'].map(id => dashboardMetric(id))
+    );
+    const slaMetrics = buildLocalizedMetrics(data, true);
+
+    expect(analysisMetrics[0]?.detail).toBe('1 crítico, 0 de nível alto, 1 média/baixa');
+    expect(slaMetrics[1]?.detail).toBe('1 crítico, 0 de nível alto, 1 média/baixa');
     await i18n.changeLanguage('en');
   });
 });
@@ -692,5 +1866,270 @@ describe('DashboardScreen reconcile card states', () => {
     });
 
     expect(outbox.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DashboardScreen pending stats', () => {
+  const resolvedData = {
+    analysis: {
+      total: 3,
+      exploitable: 0,
+      needsReview: 1,
+      triageComplete: 0,
+      analyzing: 0,
+      notAnalyzed: 0,
+      failed: 0,
+    },
+    severity: { critical: 1, high: 1, medium: 0, low: 0 },
+    sla: {
+      overall: { total: 0, withinSla: 0, overdue: 0 },
+      bySeverity: {
+        critical: { overdue: 0 },
+        high: { overdue: 0 },
+        medium: { overdue: 0 },
+        low: { overdue: 0 },
+      },
+      dueSoon: { total: 0, exploitable: 0 },
+      untrackedCount: 0,
+    },
+  };
+
+  // Each case decides for itself whether the sync-status read has settled.
+  beforeEach(() => {
+    lastSync.isPending = false;
+    lastSync.data = undefined;
+    config.data = { slaEnabled: true };
+    sectionsProps.props = [];
+    sectionsSkeletonProps.props = [];
+  });
+
+  /**
+   * The line boxes the loading state paints: three per metric tile, or two
+   * once the sync-status read has said the tiles carry no detail line.
+   */
+  function skeletonBars(root: I): I[] {
+    return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton');
+  }
+
+  /** Every view carrying the metric card's frame, placeholder or loaded. */
+  function tileFrames(root: I): string[] {
+    return root
+      .findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.type as string) === 'View' &&
+          String(n.props.className ?? '').includes('rounded-lg bg-secondary p-3')
+      )
+      .map(n => String(n.props.className));
+  }
+
+  it('paints the metric skeleton while a paused stats read is still pending', () => {
+    // A NetInfo-paused read is pending without fetching, so `isLoading` is
+    // false. The body must still show its loading state instead of an empty
+    // metrics row.
+    dashboardStats.isPending = true;
+    dashboardStats.isLoading = false;
+    dashboardStats.data = undefined;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(tileFrames(root.root)).toHaveLength(4);
+    expect(skeletonBars(root.root)).toHaveLength(12);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboardMetrics.openFindings')
+    );
+  });
+
+  it('draws the pending tiles in the frame the loaded cards use', () => {
+    // The placeholder's height comes from the card's own frame and three line
+    // boxes; a hand-sized bar is what made the tiles taller than the cards they
+    // replaced.
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+    const pending = tileFrames(renderScreen().root);
+
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    sharedMetrics.build.mockReturnValue(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        Object.assign(dashboardMetric(id), { label: id })
+      )
+    );
+    const loaded = tileFrames(renderScreen().root);
+
+    expect(loaded).toHaveLength(4);
+    expect(new Set(pending)).toEqual(new Set(loaded));
+  });
+
+  it('replaces the skeleton with the metric once the read resolves', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.isLoading = false;
+    dashboardStats.data = resolvedData;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(0);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboardMetrics.openFindings')
+    );
+  });
+
+  // `neverSynced` decides whether a tile carries a detail line, so a tile drawn
+  // before that read settles would shrink by a line the moment it resolves and
+  // move everything below it. The tiles wait for the read instead, and the
+  // section cards wait with them: they render below the tiles only once both
+  // reads settle, so their placeholders hold that space until then.
+  it('keeps the tiles in the skeleton state while the sync-status read is pending', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = true;
+    lastSync.data = undefined;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(12);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboardMetrics.openFindings')
+    );
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: false }]);
+    expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('paints the tiles and the link a never-synced scope loads once that read has answered', () => {
+    // The tiles wait for the sync-status read, and a scope that has never
+    // synced drops their detail line and shows the Manage repositories link
+    // under them. When the stats read outlasts that read, the placeholder
+    // already knows both shapes and must hold them: a three-line placeholder
+    // and a missing link moved every card below when the reads resolved.
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+    const bars = skeletonBars(root.root);
+
+    expect(tileFrames(root.root)).toHaveLength(4);
+    // Four two-line tiles, then the link's own box.
+    expect(bars).toHaveLength(9);
+    expect(bars.at(-1)?.props.className).toContain('min-h-[28px]');
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: true }]);
+    expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('keeps the link out of the placeholder while SLA tracking is off', () => {
+    // The link is the empty state's way to the repositories, and a scope
+    // without SLA tracking has no deadline column to explain: the loaded
+    // screen does not draw it either.
+    config.data = { slaEnabled: false };
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(8);
+  });
+
+  it('loads a never-synced scope without the detail line the placeholder dropped', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        Object.assign(dashboardMetric(id), { label: id })
+      )
+    );
+
+    const root = renderScreen();
+
+    expect(skeletonBars(root.root)).toHaveLength(0);
+    expect(tileFrames(root.root)).toHaveLength(4);
+    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
+  });
+
+  it('renders the sections only after the sync-status read settles', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = true;
+    lastSync.data = undefined;
+
+    renderScreen();
+
+    expect(sectionsProps.props).toHaveLength(0);
+  });
+
+  it('drops the sections placeholder once the sections render', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.data = resolvedData;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: '2026-10-01T00:00:00.000Z' };
+
+    const root = renderScreen();
+
+    expect(sectionsProps.props).toHaveLength(1);
+    expect(sectionsSkeletonProps.props).toHaveLength(0);
+    expect(skeletonBars(root.root)).toHaveLength(0);
+  });
+});
+
+describe('DashboardLoadingView frame', () => {
+  // The entry paints this frame while its config read answers, so it has to be
+  // the dashboard's own layout: a placeholder that drops the header actions and
+  // the filter row moves the whole screen when the dashboard replaces it.
+  it('keeps the header actions, the filter row and one skeleton per metric card', () => {
+    capability.canManage = false;
+    headers.props = [];
+
+    const root = renderElement(createElement(DashboardLoadingView, { scope: 'personal' }));
+    const header = headers.props.at(-1);
+    if (!header) {
+      throw new Error('the loading frame rendered no header');
+    }
+    const actions = (
+      header.headerRight as ReactElement<{
+        children: (ReactElement<{ accessibilityLabel?: string }> | null)[];
+      }>
+    ).props.children;
+    const labels = actions
+      .map(action => (action ? action.props.accessibilityLabel : undefined))
+      .filter((label): label is string => label !== undefined);
+
+    expect(header.eyebrow).toBe(i18n.t('common.securityAgent'));
+    expect(labels).toEqual([i18n.t('common.findings'), i18n.t('securityAgent.dashboard.settings')]);
+    expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
+    expect(findSyncButton(root.root).props.disabled).toBe(true);
+    const skeletons = root.root.findAll(
+      n => typeof n.type === 'string' && (n.type as string) === 'Skeleton'
+    );
+    // Four tile slots on the loaded card's own class, each with the card's three
+    // line boxes (label, value, detail), plus the status line's placeholder,
+    // which keeps that line's height until the read lands.
+    expect(
+      root.root.findAll(
+        n => typeof n.type === 'string' && String(n.props.className).includes('w-[47%]')
+      )
+    ).toHaveLength(4);
+    expect(skeletons).toHaveLength(13);
+  });
+
+  // The frame used to end at the metric tiles, so the empty lower half read as
+  // a half-rendered screen and every card below pushed the page down when it
+  // arrived. The sections' own placeholders, at the shape the dashboard paints
+  // them, hold that height until the reads answer.
+  it('holds the sections below the tiles with the dashboard’s own placeholders', () => {
+    sectionsSkeletonProps.props = [];
+
+    renderElement(createElement(DashboardLoadingView, { scope: 'personal' }));
+
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: false }]);
   });
 });

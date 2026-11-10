@@ -3,7 +3,7 @@ ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
 # Bump APT_CACHE_BUST (any value change) to invalidate the base apt layer and
 # pick up the latest chromium / 1password-cli / etc. from Debian + vendor repos.
-ARG APT_CACHE_BUST=2026-10-21
+ARG APT_CACHE_BUST=2026-10-25
 
 FROM debian:trixie-slim AS runtime
 
@@ -237,7 +237,7 @@ RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
     && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
     && rm /tmp/node.tar.xz \
     && npm install --global pnpm@11.1.2 \
-    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.13" \
+    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.4" \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH="/root/.bun/bin:$PATH"
 

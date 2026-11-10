@@ -18,11 +18,20 @@ import {
   eventRowMatchesSidebarFilters,
   eventRowToDbSession,
   getRunningSessionSortTime,
+  getDbSessionActivityTime,
+  getSidebarRunOutcomeAfterStatus,
+  getSidebarSessionStatus,
   getSidebarWorktreeActivity,
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
+  getSidebarWorktreeRefetchInterval,
+  getStoredSessionActivityTime,
   groupSidebarSessions,
   groupSidebarSessionsByDate,
+  groupSidebarWorkspaces,
+  mergeWorkspaceRowDetails,
+  workspaceRowToSidebarDetails,
+  type SidebarWorkspaceListRow,
   mergeWorktreeChatSessions,
   nextPrLinkVerification,
   PR_LINK_ATTEMPT_HISTORY_LIMIT,
@@ -149,6 +158,10 @@ Object.assign(globalThis, { React });
 
 let mockRenderOpenMenus = false;
 
+jest.mock('../hooks/useStackedWorkspaceSource', () => ({
+  useStackedWorkspaceSource: () => ({ source: undefined, isPending: false }),
+}));
+
 jest.mock('next/navigation', () => ({
   usePathname: () => '/cloud/chat',
   useRouter: () => ({ push: jest.fn() }),
@@ -190,6 +203,7 @@ const associatedPr = {
   lastSyncedAt: '2026-01-01T00:00:00.000Z',
   reviewDecision: null,
   reviewDecisionPending: false,
+  observations: null,
   platform: 'github',
 } satisfies NonNullable<StoredSession['associatedPr']>;
 
@@ -205,6 +219,7 @@ function makeDbSession(sessionId: string, updatedAt: string): DbSessionV2 {
     parent_session_id: null,
     created_at: new Date('2026-01-01T00:00:00.000Z'),
     updated_at: new Date(updatedAt),
+    last_activity_at: new Date(updatedAt),
     version: 2,
     status: 'idle',
     status_updated_at: null,
@@ -241,6 +256,9 @@ describe('mergeSidebarFolderSessions', () => {
         id: '33333333-3333-4333-8333-333333333333',
         name: 'Saved',
         color: 'default',
+        kind: 'manual',
+        smartPreset: null,
+        sortMode: 'manual',
         worktreeIds: folder.flatMap(session => (session.worktreeId ? [session.worktreeId] : [])),
       },
     ]);
@@ -300,6 +318,261 @@ function makeEventRow(overrides?: Partial<UserWebSessionEventData<'session.creat
 }
 
 describe('useSidebarSessions live update helpers', () => {
+  it.each(['failed', 'system_interrupted'] as const)(
+    'preserves fetched %s outcome through websocket metadata and status patches',
+    failureKind => {
+      const cached: DbSessionV2 = {
+        ...makeDbSession('ses_root', '2026-01-01T00:00:00.000Z'),
+        latest_run_status: failureKind === 'failed' ? 'failed' : 'interrupted',
+        latest_run_failure_kind: failureKind,
+      };
+      for (const status of ['idle', 'busy', 'question']) {
+        const event = eventRowToDbSession(makeEventRow({ status, title: 'Live title' }));
+        const [updated] = upsertSidebarDbSession([cached], event);
+        expect(updated).toMatchObject({
+          title: 'Live title',
+          status,
+          latest_run_status: cached.latest_run_status,
+          latest_run_failure_kind: failureKind,
+        });
+        expect(dbSessionToStoredSession(updated).latestRunFailureKind).toBe(failureKind);
+        expect(cached.title).toBe('ses_root');
+      }
+    }
+  );
+
+  it('keeps a generated title when an out-of-order placeholder event arrives', () => {
+    const cached: DbSessionV2 = {
+      ...makeDbSession('ses_root', '2026-01-01T00:00:00.000Z'),
+      title: 'Fix login form validation',
+    };
+    const event = eventRowToDbSession(
+      makeEventRow({ title: 'New session - 2026-01-01T00:00:02.000Z' })
+    );
+
+    const [updated] = upsertSidebarDbSession([cached], event);
+
+    expect(updated.title).toBe('Fix login form validation');
+  });
+
+  it.each(['completed', 'queued', 'accepted'] as const)(
+    'clears a previous failure when an authoritative %s outcome arrives',
+    latestRunStatus => {
+      const cached: DbSessionV2 = {
+        ...makeDbSession('ses_root', '2026-01-01T00:00:00.000Z'),
+        latest_run_status: 'failed',
+        latest_run_failure_kind: 'failed',
+      };
+      const next: DbSessionV2 = {
+        ...cached,
+        updated_at: new Date('2026-01-01T00:01:00.000Z'),
+        latest_run_status: latestRunStatus,
+        latest_run_failure_kind: null,
+      };
+      const [updated] = upsertSidebarDbSession([cached], next);
+      expect(updated.latest_run_status).toBe(latestRunStatus);
+      expect(updated.latest_run_failure_kind).toBeNull();
+      expect(getSidebarSessionStatus(dbSessionToStoredSession(updated))).toBe('idle');
+      expect(cached.latest_run_failure_kind).toBe('failed');
+    }
+  );
+
+  it.each(['failed', 'system_interrupted', null, undefined] as const)(
+    'converts persisted failure kind %s to a stored sidebar session',
+    latestRunFailureKind => {
+      expect(
+        dbSessionToStoredSession({
+          ...makeDbSession('ses_root', '2026-01-01T00:00:00.000Z'),
+          latest_run_failure_kind: latestRunFailureKind,
+        }).latestRunFailureKind
+      ).toBe(latestRunFailureKind ?? null);
+    }
+  );
+
+  it.each([
+    { latest_run_status: 'failed' },
+    { latest_run_status: 'interrupted' },
+    { latest_run_failure_kind: 'failed' },
+    { latest_run_failure_kind: 'system_interrupted' },
+  ])('invalidates sidebar equality when only the latest outcome changes: %j', outcome => {
+    const base = {
+      session_id: 'ses_root',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      status: 'idle',
+      status_updated_at: null,
+      latest_run_status: null,
+      latest_run_failure_kind: null,
+    };
+    expect(sessionCacheKey(base)).not.toBe(sessionCacheKey({ ...base, ...outcome }));
+  });
+
+  describe('getSidebarSessionStatus', () => {
+    it.each(['busy', 'retry', 'question', 'permission'])(
+      'overrides stale %s after terminal failure',
+      sessionStatus => {
+        const session = {
+          sessionStatus,
+          sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+          latestRunFailureKind: 'failed' as const,
+          latestRunTerminalAt: '2026-01-03T12:01:00.000Z',
+        };
+        expect(getSidebarSessionStatus(session)).toBe('failed');
+        expect(
+          getSidebarSessionStatus({
+            ...session,
+            sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
+          })
+        ).toBe(sessionStatus);
+      }
+    );
+    it.each(['failed', 'system_interrupted'] as const)(
+      'falls back to %s only when session activity is idle or absent',
+      latestRunFailureKind => {
+        for (const sessionStatus of ['idle', null, undefined]) {
+          expect(getSidebarSessionStatus({ sessionStatus, latestRunFailureKind })).toBe(
+            latestRunFailureKind
+          );
+        }
+        for (const sessionStatus of ['busy', 'retry', 'question', 'permission']) {
+          expect(getSidebarSessionStatus({ sessionStatus, latestRunFailureKind })).toBe(
+            sessionStatus
+          );
+        }
+      }
+    );
+
+    it('leaves idle and missing activity unchanged without a failure', () => {
+      expect(getSidebarSessionStatus({ sessionStatus: 'idle', latestRunFailureKind: null })).toBe(
+        'idle'
+      );
+      expect(getSidebarSessionStatus({ sessionStatus: null })).toBeNull();
+      expect(getSidebarSessionStatus({})).toBeNull();
+    });
+  });
+
+  it.each(['failed', null] as const)(
+    'uses authoritative worktree outcome %s despite equal metadata timestamps',
+    latestRunFailureKind => {
+      const cached = makeStoredSession('ses_root', '2026-01-03T12:00:00.000Z', {
+        latestRunFailureKind: latestRunFailureKind ? null : 'failed',
+      });
+      const authoritative = { ...cached, latestRunFailureKind };
+      expect(getSidebarWorktreeActivity([cached], new Map(), [authoritative]).status).toBe(
+        latestRunFailureKind
+      );
+    }
+  );
+
+  it('shows a terminal failure instead of stale stored and live retry activity', () => {
+    const session = makeStoredSession('ses_root', '2026-01-03T12:00:00.000Z', {
+      sessionStatus: 'retry',
+      sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+      latestRunFailureKind: 'failed',
+      latestRunTerminalAt: '2026-01-03T12:01:00.000Z',
+    });
+    expect(getSidebarWorktreeActivity([session], new Map([['ses_root', 'retry']])).status).toBe(
+      'failed'
+    );
+    expect(
+      getSidebarWorktreeActivity([session], new Map(), [session], {
+        sessionId: 'ses_root',
+        status: 'busy',
+      }).status
+    ).toBe('busy');
+  });
+
+  it.each(['busy', 'retry'])(
+    'preserves live %s after a terminal run without a failure or stored status',
+    status => {
+      const session = makeStoredSession('ses_root', '2026-01-03T12:00:00.000Z', {
+        sessionStatus: null,
+        latestRunFailureKind: null,
+        latestRunTerminalAt: '2026-01-03T12:01:00.000Z',
+      });
+      expect(getSidebarWorktreeActivity([session], new Map([['ses_root', status]])).status).toBe(
+        status
+      );
+    }
+  );
+
+  it.each(['failed', 'system_interrupted'] as const)(
+    'does not restore obsolete %s after a newer busy run returns to idle',
+    failureKind => {
+      const cached: DbSessionV2 = {
+        ...makeDbSession('ses_root', '2026-01-03T12:00:00.000Z'),
+        latest_run_status: failureKind === 'failed' ? 'failed' : 'interrupted',
+        latest_run_failure_kind: failureKind,
+        latest_run_terminal_at: '2026-01-03T12:01:00.000Z',
+      };
+      const [running] = upsertSidebarDbSession(
+        [cached],
+        eventRowToDbSession(
+          makeEventRow({ status: 'busy', statusUpdatedAt: '2026-01-03T12:02:00.000Z' })
+        )
+      );
+      const [completed] = upsertSidebarDbSession(
+        [running],
+        eventRowToDbSession(
+          makeEventRow({ status: 'idle', statusUpdatedAt: '2026-01-03T12:03:00.000Z' })
+        )
+      );
+      expect(completed.latest_run_failure_kind).toBeNull();
+      expect(getSidebarSessionStatus(dbSessionToStoredSession(completed))).toBe('idle');
+      expect(cached.latest_run_failure_kind).toBe(failureKind);
+    }
+  );
+
+  describe('getSidebarRunOutcomeAfterStatus', () => {
+    const failure = {
+      latest_run_status: 'failed' as const,
+      latest_run_failure_kind: 'failed' as const,
+      latest_run_terminal_at: '2026-01-03T12:01:00.000Z',
+    };
+
+    it.each([
+      ['idle', '2026-01-03T12:02:00.000Z'],
+      ['retry', '2026-01-03T12:02:00.000Z'],
+      ['busy', '2026-01-03T12:00:00.000Z'],
+      ['busy', '2026-01-03T12:01:00.000Z'],
+      ['busy', null],
+      ['busy', 'invalid'],
+    ])('preserves a real failure for %s observed at %s', (status, statusUpdatedAt) => {
+      expect(getSidebarRunOutcomeAfterStatus(failure, status, statusUpdatedAt)).toEqual(failure);
+    });
+
+    it('preserves failure when the terminal timestamp is absent or invalid', () => {
+      for (const latest_run_terminal_at of [null, 'invalid']) {
+        const session = { ...failure, latest_run_terminal_at };
+        expect(
+          getSidebarRunOutcomeAfterStatus(session, 'busy', '2026-01-03T12:02:00.000Z')
+        ).toEqual(session);
+      }
+    });
+
+    it('clears the whole cached outcome only after demonstrably newer busy activity', () => {
+      expect(
+        getSidebarRunOutcomeAfterStatus(failure, 'busy', new Date('2026-01-03T12:02:00.000Z'))
+      ).toEqual({
+        latest_run_status: null,
+        latest_run_failure_kind: null,
+        latest_run_terminal_at: null,
+      });
+    });
+
+    it('does not clear an explicitly supplied authoritative failure', () => {
+      const previous: DbSessionV2 = {
+        ...makeDbSession('ses_root', '2026-01-03T12:00:00.000Z'),
+        ...failure,
+      };
+      const incoming: DbSessionV2 = {
+        ...previous,
+        status: 'busy',
+        status_updated_at: new Date('2026-01-03T12:02:00.000Z'),
+      };
+      expect(upsertSidebarDbSession([previous], incoming)[0]).toMatchObject(failure);
+    });
+  });
+
   it('preserves updated_at descending order when patching a visible row', () => {
     const newest = makeDbSession('ses_newest', '2026-01-03T00:00:00.000Z');
     const middle = makeDbSession('ses_middle', '2026-01-02T00:00:00.000Z');
@@ -334,6 +607,7 @@ describe('useSidebarSessions live update helpers', () => {
       lastSyncedAt: '2026-01-01T00:00:00.000Z',
       reviewDecision: 'approved' as const,
       reviewDecisionPending: false,
+      observations: null,
       platform: 'github',
     };
     const cached = {
@@ -400,6 +674,35 @@ describe('useSidebarSessions live update helpers', () => {
     );
   });
 
+  it('updates the session cache key when webhook counts change without session activity', () => {
+    const base = {
+      session_id: 'ses_webhook_counts',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      status: 'idle',
+      status_updated_at: null,
+      associatedPr: {
+        state: 'open',
+        lastSyncedAt: '2026-01-01T00:00:00.000Z',
+        reviewDecision: null,
+        reviewDecisionPending: false,
+        observations: {
+          checks: { total: 2, failed: 0 },
+          unresolvedThreads: null,
+          truncated: false,
+        },
+      },
+    };
+    expect(sessionCacheKey(base)).not.toBe(
+      sessionCacheKey({
+        ...base,
+        associatedPr: {
+          ...base.associatedPr,
+          observations: { ...base.associatedPr.observations, checks: { total: 2, failed: 1 } },
+        },
+      })
+    );
+  });
+
   it('removes deleted rows immediately from the visible list', () => {
     const result = removeSidebarDbSession(
       [
@@ -439,6 +742,7 @@ describe('useSidebarSessions live update helpers', () => {
         lastSyncedAt: '2026-01-01T00:00:00.000Z',
         reviewDecision: 'approved' as const,
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       },
     };
@@ -447,6 +751,53 @@ describe('useSidebarSessions live update helpers', () => {
   });
 
   describe('deriveForegroundSessionStatus', () => {
+    it.each<Partial<ForegroundSessionStatusInput>>([
+      { agentStatus: { type: 'error' } },
+      { cloudStatus: { type: 'error', message: 'Run failed' } },
+    ])('reports failure for an idle foreground error: %j', overrides => {
+      expect(deriveForegroundSessionStatus(makeForegroundSessionStatusInput(overrides))).toBe(
+        'failed'
+      );
+    });
+
+    it('does not warn for a normally interrupted foreground agent', () => {
+      expect(
+        deriveForegroundSessionStatus(
+          makeForegroundSessionStatusInput({
+            agentStatus: { type: 'interrupted' },
+          })
+        )
+      ).toBe('idle');
+    });
+
+    it.each<[Partial<ForegroundSessionStatusInput>, string]>([
+      [{ activePermission: { requestId: 'permission' } }, 'permission'],
+      [{ activeQuestion: { requestId: 'question' } }, 'question'],
+      [{ activity: { type: 'retrying', attempt: 1, message: 'Retrying' } }, 'retry'],
+      [{ activity: { type: 'busy' } }, 'busy'],
+      [{ isStreaming: true }, 'busy'],
+      [{ cloudStatus: { type: 'preparing' } }, 'busy'],
+      [{ cloudStatus: { type: 'finalizing' } }, 'busy'],
+      [
+        {
+          pendingMessages: new Map<string, MessageDeliveryState>([
+            ['message', { status: 'queued' }],
+          ]),
+        },
+        'busy',
+      ],
+    ])('keeps current activity ahead of foreground errors: %j', (overrides, expected) => {
+      expect(
+        deriveForegroundSessionStatus(
+          makeForegroundSessionStatusInput({
+            agentStatus: { type: 'error' },
+            cloudStatus: { type: 'error', message: 'Run failed' },
+            ...overrides,
+          })
+        )
+      ).toBe(expected);
+    });
+
     it('prioritizes permissions over questions, retries, and running work', () => {
       const result = deriveForegroundSessionStatus(
         makeForegroundSessionStatusInput({
@@ -689,6 +1040,146 @@ describe('useSidebarSessions live update helpers', () => {
   });
 
   describe('sidebar worktree grouping', () => {
+    it.each(['failed', 'system_interrupted'] as const)(
+      'ignores an older hidden persisted %s outcome when the latest session is healthy',
+      latestRunFailureKind => {
+        const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
+        const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z', {
+          latestRunFailureKind,
+        });
+        for (const active of [new Map<string, string>(), new Map([['ses_hidden', 'idle']])]) {
+          expect(getSidebarWorktreeActivity([visible], active, [visible, hidden])).toEqual({
+            status: null,
+            statusUpdatedAt: null,
+            isLive: active.size > 0,
+          });
+        }
+        expect(
+          getSidebarWorktreeActivity([visible], new Map(), [visible, hidden], {
+            sessionId: hidden.sessionId,
+            status: 'idle',
+          }).status
+        ).toBeNull();
+        expect(
+          getSidebarWorktreeActivity([visible], new Map([['ses_hidden', 'idle']]), [visible]).status
+        ).toBeNull();
+      }
+    );
+
+    it.each(['failed', 'system_interrupted'] as const)(
+      'includes the latest hidden session persisted %s outcome even with live idle status',
+      latestRunFailureKind => {
+        const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
+        const hidden = makeStoredSession('ses_hidden', '2026-01-03T13:00:00.000Z', {
+          latestRunFailureKind,
+        });
+        for (const authoritative of [
+          [visible, hidden],
+          [hidden, visible],
+        ]) {
+          for (const active of [new Map<string, string>(), new Map([['ses_hidden', 'idle']])]) {
+            expect(getSidebarWorktreeActivity([visible], active, authoritative)).toEqual({
+              status: latestRunFailureKind,
+              statusUpdatedAt: null,
+              isLive: active.size > 0,
+            });
+          }
+        }
+        expect(
+          getSidebarWorktreeActivity([visible], new Map(), [visible, hidden], {
+            sessionId: hidden.sessionId,
+            status: 'idle',
+          }).status
+        ).toBe(latestRunFailureKind);
+        const latest = { ...hidden, latestRunFailureKind: null };
+        expect(
+          getSidebarWorktreeActivity(
+            [visible],
+            new Map([[latest.sessionId, latestRunFailureKind]]),
+            [visible, latest]
+          ).status
+        ).toBe(latestRunFailureKind);
+        expect(
+          getSidebarWorktreeActivity([visible], new Map(), [visible, latest], {
+            sessionId: latest.sessionId,
+            status: 'failed',
+          }).status
+        ).toBe('failed');
+      }
+    );
+
+    it.each(['failed', 'system_interrupted'] as const)(
+      'ignores an older visible %s session when the latest healthy sibling is hidden',
+      status => {
+        const older = makeStoredSession('ses_older', '2026-01-03T12:00:00.000Z', {
+          sessionStatus: status,
+        });
+        const latest = makeStoredSession('ses_latest', '2026-01-03T13:00:00.000Z');
+        for (const sessions of [[older], [older, latest], [latest, older]]) {
+          expect(
+            getSidebarWorktreeActivity(sessions, new Map(), [older, latest]).status
+          ).toBeNull();
+          expect(
+            getSidebarWorktreeActivity(sessions, new Map([[older.sessionId, status]]), [
+              older,
+              latest,
+            ]).status
+          ).toBeNull();
+          expect(
+            getSidebarWorktreeActivity(sessions, new Map(), [older, latest], {
+              sessionId: older.sessionId,
+              status,
+            }).status
+          ).toBeNull();
+        }
+      }
+    );
+
+    it('uses the sidebar session-ID tie-breaker for equally recent failure warnings', () => {
+      const first = makeStoredSession('ses_a', '2026-01-03T12:00:00.000Z', {
+        latestRunFailureKind: 'failed',
+      });
+      const second = makeStoredSession('ses_b', '2026-01-03T12:00:00.000Z');
+      for (const sessions of [
+        [first, second],
+        [second, first],
+      ]) {
+        expect(getSidebarWorktreeActivity(sessions, new Map()).status).toBeNull();
+        expect(
+          getSidebarWorktreeActivity(
+            sessions.map(session => ({ ...session, latestRunFailureKind: 'failed' })),
+            new Map()
+          ).status
+        ).toBe('failed');
+      }
+    });
+
+    it.each(['question', 'permission', 'busy', 'retry'])(
+      'prioritizes sibling %s over a persisted failure regardless of order',
+      status => {
+        const failed = makeStoredSession('ses_failed', '2026-01-03T12:00:00.000Z', {
+          latestRunFailureKind: 'failed',
+        });
+        const active = makeStoredSession('ses_active', '2026-01-03T12:00:00.000Z', {
+          sessionStatus: status,
+        });
+        for (const sessions of [
+          [failed, active],
+          [active, failed],
+        ]) {
+          expect(
+            getSidebarWorktreeActivity(
+              sessions,
+              new Map(),
+              sessions,
+              null,
+              new Date('2026-01-03T12:01:00.000Z').getTime()
+            ).status
+          ).toBe(status);
+        }
+      }
+    );
+
     it('groups siblings before date bucketing so a worktree appears only once', () => {
       const local = (day: number, hour: number) => new Date(2026, 0, day, hour).toISOString();
       const sessions = [
@@ -1261,6 +1752,13 @@ describe('useSidebarSessions live update helpers', () => {
         worktree_shared: {
           name: 'Named worktree',
           defaultTitle: null,
+          branch: null,
+          folderId: null,
+          sidebarPosition: null,
+          parentWorktreeId: null,
+          baseBranch: null,
+          baseSha: null,
+          createdAt: '2026-01-03T12:00:00.000Z',
           prSession: null,
           sessions: [
             {
@@ -1268,11 +1766,72 @@ describe('useSidebarSessions live update helpers', () => {
               sessionStatus: 'busy',
               sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
               updatedAt: '2026-01-03T12:00:00.000Z',
+              latest_run_status: null,
+              latest_run_failure_kind: null,
+              latest_run_terminal_at: null,
             },
           ],
         },
       },
     } satisfies Parameters<typeof patchSidebarWorktreeSessionStatus>[0];
+
+    it('does not revive a hidden chat failure after a newer busy-to-idle transition', () => {
+      const failed = {
+        worktrees: {
+          worktree_shared: {
+            ...initial.worktrees.worktree_shared,
+            sessions: [
+              {
+                ...initial.worktrees.worktree_shared.sessions[0],
+                latest_run_status: 'failed' as const,
+                latest_run_failure_kind: 'failed' as const,
+                latest_run_terminal_at: '2026-01-03T12:01:00.000Z',
+              },
+            ],
+          },
+        },
+      };
+      const running = patchSidebarWorktreeSessionStatus(failed, {
+        sessionId: 'ses_hidden',
+        sessionStatus: 'busy',
+        sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
+      });
+      const completed = patchSidebarWorktreeSessionStatus(running, {
+        sessionId: 'ses_hidden',
+        sessionStatus: 'idle',
+        sessionStatusUpdatedAt: '2026-01-03T12:03:00.000Z',
+      });
+      expect(completed.worktrees.worktree_shared.sessions[0].latest_run_failure_kind).toBeNull();
+      expect(failed.worktrees.worktree_shared.sessions[0].latest_run_failure_kind).toBe('failed');
+    });
+
+    it('does not poll unloaded, empty, or CLI-only worktree batches', () => {
+      expect(getSidebarWorktreeRefetchInterval(undefined)).toBe(false);
+      expect(getSidebarWorktreeRefetchInterval(undefined, true)).toBe(false);
+      expect(getSidebarWorktreeRefetchInterval({ worktrees: {} })).toBe(false);
+      expect(getSidebarWorktreeRefetchInterval(initial)).toBe(false);
+    });
+
+    it('polls a visible Cloud Agent even before its first run telemetry arrives', () => {
+      expect(getSidebarWorktreeRefetchInterval(initial, true)).toBe(SIDEBAR_RECONCILE_DELAY_MS);
+    });
+
+    it('polls hidden chats that have Cloud Agent run telemetry', () => {
+      const data = {
+        worktrees: {
+          worktree_shared: {
+            ...initial.worktrees.worktree_shared,
+            sessions: [
+              {
+                ...initial.worktrees.worktree_shared.sessions[0],
+                latest_run_status: 'completed' as const,
+              },
+            ],
+          },
+        },
+      };
+      expect(getSidebarWorktreeRefetchInterval(data)).toBe(SIDEBAR_RECONCILE_DELAY_MS);
+    });
 
     it('refreshes activity recency even when the stored status has not changed', () => {
       const updated = patchSidebarWorktreeSessionStatus(initial, {
@@ -1519,9 +2078,8 @@ describe('ChatSidebar worktree controls', () => {
       true
     );
 
-    expect(html.includes('Worktree actions for')).toBe(
-      capabilities.create || capabilities.rename || capabilities.remove
-    );
+    expect(html).toContain('Worktree actions for');
+    expect(html).toContain('New stacked workspace');
     expect(html.includes('New chat')).toBe(capabilities.create);
     expect(html.includes('Rename worktree')).toBe(capabilities.rename);
     expect(html.includes('Delete worktree')).toBe(capabilities.remove);
@@ -1716,5 +2274,149 @@ describe('ChatSidebar worktree controls', () => {
     expect(html).not.toContain('Rename worktree');
     expect(html).not.toContain('Delete worktree');
     expect(deletedSessions).toEqual([standalone.sessionId]);
+  });
+});
+
+describe('S0 activity fallback', () => {
+  it('falls back to the creation time, not the update time, when activity is absent', () => {
+    const session = makeStoredSession('ses_idle', '2026-01-09T00:00:00.000Z', {
+      createdAt: '2026-01-02T00:00:00.000Z',
+      lastActivityAt: null,
+    });
+    expect(getStoredSessionActivityTime(session)).toBe(
+      new Date('2026-01-02T00:00:00.000Z').getTime()
+    );
+  });
+
+  it('falls back to created_at for database rows', () => {
+    const session = makeDbSession('ses_idle', '2026-01-09T00:00:00.000Z');
+    expect(
+      getDbSessionActivityTime({
+        ...session,
+        created_at: new Date('2026-01-02T00:00:00.000Z'),
+        last_activity_at: null,
+      })
+    ).toBe(new Date('2026-01-02T00:00:00.000Z').getTime());
+  });
+});
+
+function makeWorkspaceRow(
+  worktreeId: string,
+  overrides: Record<string, unknown> = {}
+): SidebarWorkspaceListRow {
+  return {
+    worktreeId,
+    name: worktreeId,
+    defaultTitle: null,
+    branch: `branch/${worktreeId}`,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    lastActivityAt: '2026-01-02T00:00:00.000Z',
+    folderId: null,
+    sidebarPosition: null,
+    parentWorktreeId: null,
+    baseBranch: null,
+    pr: null,
+    status: {
+      kind: null,
+      sessionStatus: null,
+      statusUpdatedAt: null,
+      latestRunStatus: null,
+      latestRunFailureKind: null,
+      latestRunTerminalAt: null,
+    },
+    chatCount: 0,
+    latestSessionId: `ses_${worktreeId}`,
+    gitUrl: 'https://github.com/kilo/repo',
+    ...overrides,
+  } as unknown as SidebarWorkspaceListRow;
+}
+
+describe('workspace rows independent of the chat list', () => {
+  it('keeps an old open workspace visible and openable through its latest session', () => {
+    const row = makeWorkspaceRow('worktree_old', { name: 'Old workspace' });
+    const [group] = groupSidebarWorkspaces([], mergeWorkspaceRowDetails({}, [row]), [row]);
+
+    expect(group).toMatchObject({
+      type: 'worktree',
+      worktreeId: 'worktree_old',
+      latestSession: { sessionId: 'ses_worktree_old', repository: 'kilo/repo' },
+      details: { name: 'Old workspace' },
+    });
+  });
+
+  it('does not duplicate a worktree that still has a chat in the list', () => {
+    const row = makeWorkspaceRow('worktree_shared');
+    const session = makeStoredSession('ses_visible', '2026-01-03T00:00:00.000Z', {
+      worktreeId: 'worktree_shared',
+    });
+    const groups = groupSidebarWorkspaces([session], mergeWorkspaceRowDetails({}, [row]), [row]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ worktreeId: 'worktree_shared' });
+    expect(groups[0]?.sessions).toHaveLength(1);
+    expect(groups[0]?.latestSession.sessionId).toBe('ses_visible');
+  });
+
+  it('renders stacked children once under their root', () => {
+    const root = makeWorkspaceRow('worktree_root', { branch: 'feature/base' });
+    const child = makeWorkspaceRow('worktree_child', {
+      branch: 'feature/child',
+      parentWorktreeId: 'worktree_root',
+      baseBranch: 'feature/base',
+    });
+    const details = mergeWorkspaceRowDetails({}, [root, child]);
+    const groups = groupSidebarWorkspaces([], details, [root, child]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.worktreeId).toBe('worktree_root');
+    expect(groups[0]?.stackLayers?.map(layer => layer.worktreeId)).toEqual(['worktree_child']);
+  });
+
+  it('merges row metadata without replacing chat-derived sessions', () => {
+    const session = makeStoredSession('ses_visible', '2026-01-03T00:00:00.000Z', {
+      worktreeId: 'worktree_shared',
+    });
+    const merged = mergeWorkspaceRowDetails(
+      {
+        worktree_shared: {
+          name: 'Chat-derived name',
+          defaultTitle: null,
+          prSession: null,
+          sessions: [session],
+        },
+      },
+      [makeWorkspaceRow('worktree_shared', { name: 'Row name', folderId: 'folder-1' })]
+    );
+
+    expect(merged.worktree_shared).toMatchObject({
+      name: 'Chat-derived name',
+      folderId: 'folder-1',
+      sessions: [session],
+    });
+  });
+
+  it('builds a detail row with a PR session for an old workspace', () => {
+    const row = makeWorkspaceRow('worktree_old', {
+      pr: {
+        url: 'https://github.com/kilo/repo/pull/7',
+        number: 7,
+        state: 'open',
+        title: 'Stacked change',
+        headSha: null,
+        baseRef: null,
+        stackNumber: null,
+        stackPosition: null,
+        stackSize: null,
+        lastSyncedAt: '2026-01-02T00:00:00.000Z',
+        reviewDecision: null,
+        reviewDecisionPending: false,
+        platform: 'github',
+      },
+    });
+    const details = workspaceRowToSidebarDetails(row);
+    expect(details.prSession).toMatchObject({
+      sessionId: 'ses_worktree_old',
+      associatedPr: { number: 7, state: 'open' },
+    });
   });
 });

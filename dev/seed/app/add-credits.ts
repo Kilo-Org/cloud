@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import type { SeedResult } from '../index';
 
 const MICRODOLLARS_PER_DOLLAR = 1_000_000;
@@ -229,6 +229,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const options = parseArgs(args);
+  assertLocalSeedDatabase('app:add-credits');
   const db = getSeedDb();
 
   const result = await db.transaction(async tx => {

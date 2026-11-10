@@ -38,9 +38,10 @@ export const activeSessionSchema = z.object({
   /**
    * When this session's status last changed, from
    * `cli_sessions_v2.status_updated_at`, normalized to ISO 8601. Omitted when
-   * the column is NULL, unparseable, or the row was never enriched. The
-   * glanceable snapshot reads it to report how long the longest-waiting agent
-   * has needed input, and Hermes only parses the ISO form.
+   * the column is NULL, unparseable, dates a different status than the resolved
+   * status, or the row was never enriched. The glanceable snapshot reads it to
+   * report how long the longest-waiting agent has needed input, and Hermes only
+   * parses the ISO form.
    */
   statusUpdatedAt: z.string().optional(),
   /**
@@ -165,6 +166,7 @@ type EnrichmentRow = {
   pr_state: string | null;
   pr_title: string | null;
   pr_head_sha: string | null;
+  pr_observations?: unknown;
   pr_last_synced_at: string | null;
   pr_review_decision: string | null;
   review_decision_pending: boolean | null;
@@ -204,6 +206,7 @@ function associatedPrFromRow(row: EnrichmentRow): z.infer<typeof associatedPrSch
       pr_state: row.pr_state,
       pr_title: row.pr_title,
       pr_head_sha: row.pr_head_sha,
+      pr_observations: row.pr_observations,
       pr_last_synced_at: row.pr_last_synced_at,
       pr_review_decision: row.pr_review_decision,
       review_decision_pending: row.review_decision_pending,
@@ -292,8 +295,11 @@ function mapEnrichedHeartbeatSession(
   if (row.last_activity_at != null) {
     mapped.lastActivityAt = row.last_activity_at;
   }
+  delete mapped.statusUpdatedAt;
   const statusUpdatedAt =
-    row.status_updated_at == null ? null : toIsoTimestamp(row.status_updated_at);
+    mapped.status !== row.status || row.status_updated_at == null
+      ? null
+      : toIsoTimestamp(row.status_updated_at);
   if (statusUpdatedAt !== null) {
     mapped.statusUpdatedAt = statusUpdatedAt;
   }
@@ -330,7 +336,9 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
     mapped.lastActivityAt = row.last_activity_at;
   }
   const statusUpdatedAt =
-    row.status_updated_at == null ? null : toIsoTimestamp(row.status_updated_at);
+    mapped.status !== row.status || row.status_updated_at == null
+      ? null
+      : toIsoTimestamp(row.status_updated_at);
   if (statusUpdatedAt !== null) {
     mapped.statusUpdatedAt = statusUpdatedAt;
   }
@@ -385,6 +393,14 @@ export async function listActiveSessions({
   // Normal list callers retain best-effort behavior. Background snapshots
   // require an authoritative read so outages never erase last-known work.
   let parsed: { sessions: ActiveSession[] } = { sessions: [] };
+  /**
+   * The worker read could not answer. The full merge is still built (an empty
+   * heartbeat part is a real part of it), but the caller learns about the read
+   * failure at the end instead of receiving a bare `{ sessions: [] }` — that
+   * body is indistinguishable on the wire from a user with nothing running,
+   * and the tray must not report live work as gone.
+   */
+  let upstreamReadFailed = false;
 
   if (!SESSION_INGEST_WORKER_URL) {
     if (requireCompleteSnapshot) {
@@ -396,6 +412,8 @@ export async function listActiveSessions({
     if (!includeCloudAgentSessions) {
       return { sessions: [] as ActiveSession[] };
     }
+    // An unconfigured source cannot have live CLI rows at all, so the empty
+    // heartbeat part is complete; the cloud merge below still runs.
   } else {
     const token = generateBoundedInternalServiceToken(userId, {
       audience: SESSION_INGEST_AUDIENCE,
@@ -414,19 +432,21 @@ export async function listActiveSessions({
       });
 
       if (!response.ok) {
+        await response.body?.cancel().catch(() => undefined);
         if (requireCompleteSnapshot) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to fetch active sessions',
           });
         }
-        console.warn(
-          `[active-sessions] fetch failed: ${response.status} ${response.statusText}`,
-          await response.text().catch(() => '')
-        );
+        console.warn(`[active-sessions] fetch failed: ${response.status} ${response.statusText}`);
         if (!includeCloudAgentSessions) {
           return { sessions: [] as ActiveSession[] };
         }
+        // The merged answer decides at the end of this function (see
+        // `upstreamReadFailed`): an empty one here would read as "nothing
+        // runs".
+        upstreamReadFailed = true;
       } else {
         const raw = await response.json();
         parsed = activeSessionsResponseSchema.parse(raw);
@@ -443,6 +463,9 @@ export async function listActiveSessions({
       if (!includeCloudAgentSessions) {
         return { sessions: [] as ActiveSession[] };
       }
+      // Same reason as the non-OK branch above: an unreachable worker must not
+      // read as "nothing runs".
+      upstreamReadFailed = true;
     }
   }
 
@@ -481,6 +504,7 @@ export async function listActiveSessions({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -608,6 +632,7 @@ export async function listActiveSessions({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -652,6 +677,17 @@ export async function listActiveSessions({
       }
       // Unfiltered: skip cloud merge, return heartbeat rows as built.
     }
+  }
+
+  // The merged list is built now, so an empty answer is only authoritative
+  // when the worker read succeeded. Snapshot callers already threw on the
+  // failed read above, so this decides the remaining best-effort callers: an
+  // empty merged list is not proof that nothing runs.
+  if (upstreamReadFailed && sessions.length === 0) {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Session ingest is unavailable',
+    });
   }
 
   return { sessions };

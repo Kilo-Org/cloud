@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 /**
  * Terminal state for a route whose params fail runtime validation (bad
@@ -28,6 +29,7 @@ export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
       description={t('invalidRoute.description')}
       action={
         <Button
+          className={STATE_ACTION_CLASS}
           variant="outline"
           onPress={() => {
             router.replace(backTo);

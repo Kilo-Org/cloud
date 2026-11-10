@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { parseTimestamp } from './utils';
+import { timestampMs } from './utils';
 
 /**
  * One durable, privacy-minimal, versioned snapshot for every glanceable
@@ -56,7 +56,7 @@ export const GLANCEABLE_NEEDS_INPUT_STATUSES = ['question', 'permission', 'retry
 export type GlanceableNeedsInputKind = (typeof GLANCEABLE_NEEDS_INPUT_STATUSES)[number];
 
 export const glanceableAgentsSnapshotSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(GLANCEABLE_SNAPSHOT_SCHEMA_VERSION),
   revision: z.number().int().min(1),
   /** ISO 8601 timestamp. */
   updatedAt: z.string(),
@@ -268,19 +268,6 @@ export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow
 }
 
 /**
- * Epoch milliseconds of one session time, or null when it does not parse.
- *
- * A producer hands these rows a JSON timestamp that may arrive in the
- * PostgreSQL form rather than ISO 8601. Hermes cannot parse that form with
- * `Date.parse`, and a silently skipped row drops a real wait, wake, or result
- * fact, so every comparison reads the instant through the shared parser.
- */
-function sessionTimeMs(value: string): number | null {
-  const at = parseTimestamp(value).getTime();
-  return Number.isFinite(at) ? at : null;
-}
-
-/**
  * The earliest `statusUpdatedAt` among the needs-input sessions as an ISO 8601
  * timestamp, or null when none waits or none carried a usable timestamp.
  *
@@ -298,7 +285,7 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
     ) {
       continue;
     }
-    const at = sessionTimeMs(session.statusUpdatedAt);
+    const at = timestampMs(session.statusUpdatedAt);
     if (at === null || (oldest !== null && at >= oldest)) {
       continue;
     }
@@ -322,7 +309,7 @@ export function soonestScheduledAt(sessions: readonly GlanceableSessionRow[]): s
     if (session.status !== 'scheduled' || session.scheduledAt === undefined) {
       continue;
     }
-    const at = sessionTimeMs(session.scheduledAt);
+    const at = timestampMs(session.scheduledAt);
     if (at === null || (soonest !== null && at >= soonest)) {
       continue;
     }
@@ -350,7 +337,7 @@ export function newestGlanceableResult(
     if (session.statusUpdatedAt === undefined) {
       continue;
     }
-    const at = sessionTimeMs(session.statusUpdatedAt);
+    const at = timestampMs(session.statusUpdatedAt);
     if (at === null || (newest !== null && at <= newest)) {
       continue;
     }

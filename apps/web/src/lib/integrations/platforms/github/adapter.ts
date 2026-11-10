@@ -5,7 +5,9 @@ import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/util
 
 import crypto from 'crypto';
 import type { InstallationToken } from '@/lib/integrations/core/types';
+import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
+import { isGitHubOwnerName, isGitHubRepositoryName } from './repository-coordinates';
 import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
 
 export type { GitHubAppType } from './app-selector';
@@ -41,19 +43,34 @@ export async function fetchGitHubInstallationRequests(
   }));
 }
 
+/**
+ * Outcome of authenticating a GitHub App webhook delivery.
+ *
+ * `unconfigured` means the app's webhook secret is absent, so no delivery can be
+ * authenticated on this deployment: an HMAC computed with an empty key is not a
+ * credential, and accepting it would let any caller forge a delivery.
+ */
+export type GitHubWebhookSignatureStatus = 'valid' | 'invalid' | 'unconfigured';
+
 export function verifyGitHubWebhookSignature(
   payload: string,
   signature: string,
   appType: GitHubAppType = 'standard'
-): boolean {
+): GitHubWebhookSignatureStatus {
   const credentials = getGitHubAppCredentials(appType);
+  if (!credentials.webhookSecret) {
+    return 'unconfigured';
+  }
+
   const hmac = crypto.createHmac('sha256', credentials.webhookSecret);
   const digest = 'sha256=' + hmac.update(payload).digest('hex');
 
   try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest))
+      ? 'valid'
+      : 'invalid';
   } catch {
-    return false;
+    return 'invalid';
   }
 }
 
@@ -61,21 +78,26 @@ export async function generateGitHubInstallationToken(
   installationId: string,
   appType: GitHubAppType = 'standard',
   expectedIntegrationId?: string,
-  purpose: 'workflow' | 'agent' | 'management' = 'workflow'
+  purpose: 'workflow' | 'agent' | 'management' = 'workflow',
+  signal?: AbortSignal
 ): Promise<InstallationToken> {
+  signal?.throwIfAborted();
   await assertGitHubInstallationRuntimeAuthorized(
     installationId,
     appType,
     expectedIntegrationId,
     purpose
   );
-  return await generateGitHubInstallationTokenForMaintenance(installationId, appType);
+  signal?.throwIfAborted();
+  return await generateGitHubInstallationTokenForMaintenance(installationId, appType, signal);
 }
 
 export async function generateGitHubInstallationTokenForMaintenance(
   installationId: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  signal?: AbortSignal
 ): Promise<InstallationToken> {
+  signal?.throwIfAborted();
   const credentials = getGitHubAppCredentials(appType);
 
   if (!credentials.appId || !credentials.privateKey) {
@@ -86,6 +108,7 @@ export async function generateGitHubInstallationTokenForMaintenance(
     appId: credentials.appId,
     privateKey: credentials.privateKey,
     installationId,
+    ...(signal ? { request: new Octokit({ request: { signal } }).request } : {}),
   });
 
   const authResult = await auth({ type: 'installation' });
@@ -394,6 +417,8 @@ export async function createPRComment(
 
 /**
  * Checks whether a comment containing the given marker already exists on a PR.
+ * Reads at most MAX_KILO_REVIEW_COMMENT_PAGES pages from both ends of the
+ * comment list and counts comments attributed to the Kilo GitHub App only.
  */
 export async function hasPRCommentWithMarker(
   installationId: string,
@@ -405,34 +430,50 @@ export async function hasPRCommentWithMarker(
 ): Promise<boolean> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const appId = String(getGitHubAppCredentials(appType).appId);
 
-  const comments = await octokit.paginate(octokit.issues.listComments, {
+  const { comments, reachedScanLimit } = await scanPRIssueComments(octokit, owner, repo, prNumber);
+
+  const found = comments.some(
+    c => c.body?.includes(marker) && String(c.performed_via_github_app?.id ?? '') === appId
+  );
+
+  logExceptInTest('[hasPRCommentWithMarker] Scanned comments', {
     owner,
     repo,
-    issue_number: prNumber,
-    per_page: 100,
+    prNumber,
+    scannedComments: comments.length,
+    found,
+    reachedScanLimit,
   });
 
-  return comments.some(c => c.body?.includes(marker));
+  return found;
 }
 
 /**
- * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
+ * Returns the permission string ('admin' | 'maintain' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
  */
-export type CollaboratorPermission = 'admin' | 'write' | 'read' | 'none';
+export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'read' | 'none';
 
-const KNOWN_PERMISSIONS = new Set<string>(['admin', 'write', 'read', 'none']);
+const KNOWN_PERMISSIONS = new Set<string>(['admin', 'maintain', 'write', 'read', 'none']);
 
 export async function getCollaboratorPermissionLevel(
   installationId: string,
   owner: string,
   repo: string,
   username: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  expectedIntegrationId?: string,
+  purpose: 'workflow' | 'agent' = 'workflow'
 ): Promise<CollaboratorPermission | null> {
   try {
-    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const tokenData = await generateGitHubInstallationToken(
+      installationId,
+      appType,
+      expectedIntegrationId,
+      purpose
+    );
     const octokit = new Octokit({ auth: tokenData.token });
 
     const { data } = await octokit.repos.getCollaboratorPermissionLevel({
@@ -565,6 +606,80 @@ export async function exchangeGitHubOAuthCode(
 
 const KILO_REVIEW_COMMENTS_PER_PAGE = 100;
 const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
+const MAX_PR_INLINE_COMMENT_BODY_BYTES = 512 * 1024;
+
+type PRIssueComment = {
+  id: number;
+  body?: string | null;
+  updated_at: string;
+  performed_via_github_app?: { id?: number | string } | null;
+};
+
+/**
+ * Reads pull-request issue comments from both ends of the list within the
+ * MAX_KILO_REVIEW_COMMENT_PAGES budget: the first pages and the last pages.
+ * GitHub returns issue comments oldest first and accepts no ordering
+ * parameter, so a bounded scan has to choose which pages to skip. The comments
+ * Kilo writes once and then maintains in place — the review summary and the
+ * billing notice — stay where they were created, near the oldest end, while
+ * the newest discussion stays at the end; reading only one end would miss one
+ * of them. `reachedScanLimit` reports that older comments were not read.
+ */
+async function scanPRIssueComments(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  prNumber: number
+): Promise<{ comments: PRIssueComment[]; reachedScanLimit: boolean }> {
+  const base = {
+    owner,
+    repo,
+    issue_number: prNumber,
+    per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
+  };
+
+  const firstResponse = await octokit.issues.listComments({ ...base, page: 1 });
+  const lastPage = lastIssueCommentPage(firstResponse.headers.link);
+  const comments: PRIssueComment[] = [...firstResponse.data];
+
+  if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {
+    for (let page = 2; page <= lastPage; page++) {
+      const { data } = await octokit.issues.listComments({ ...base, page });
+      comments.push(...data);
+    }
+    return { comments, reachedScanLimit: false };
+  }
+
+  const pagesAfterTheFirst = MAX_KILO_REVIEW_COMMENT_PAGES - 1;
+  const headPages = Math.ceil(pagesAfterTheFirst / 2);
+  const tailPages = pagesAfterTheFirst - headPages;
+
+  for (let page = 2; page <= 1 + headPages; page++) {
+    const { data } = await octokit.issues.listComments({ ...base, page });
+    comments.push(...data);
+  }
+  for (let page = lastPage - tailPages + 1; page <= lastPage; page++) {
+    const { data } = await octokit.issues.listComments({ ...base, page });
+    comments.push(...data);
+  }
+
+  return { comments, reachedScanLimit: true };
+}
+
+/**
+ * Reads the `rel="last"` page number from a `Link` response header.
+ */
+function lastIssueCommentPage(linkHeader: string | undefined): number {
+  if (!linkHeader) return 1;
+
+  for (const segment of linkHeader.split(',')) {
+    if (!segment.includes('rel="last"')) continue;
+    const page = segment.match(/[?&]page=(\d+)/);
+    if (page) return Number(page[1]);
+  }
+
+  return 1;
+}
 
 /**
  * Looks for the <!-- kilo-review --> marker in issue comments.
@@ -580,27 +695,7 @@ export async function findKiloReviewComment(
   const octokit = new Octokit({ auth: tokenData.token });
   const appId = String(getGitHubAppCredentials(appType).appId);
 
-  const comments: Array<{
-    id: number;
-    body?: string | null;
-    updated_at: string;
-    performed_via_github_app?: { id?: number | string } | null;
-  }> = [];
-  let reachedScanLimit = false;
-
-  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
-    const { data: pageComments } = await octokit.issues.listComments({
-      owner,
-      repo,
-      issue_number: prNumber,
-      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
-      page,
-    });
-    comments.push(...pageComments);
-
-    if (pageComments.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
-    reachedScanLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
-  }
+  const { comments, reachedScanLimit } = await scanPRIssueComments(octokit, owner, repo, prNumber);
 
   logExceptInTest('[findKiloReviewComment] Fetched comments', {
     owner,
@@ -670,7 +765,19 @@ export async function updateKiloReviewComment(
 }
 
 /**
+ * Fields the REST comment type omits but the API returns on every review comment.
+ * `position` is absent, not null, for comments on lines that no longer exist.
+ */
+type ReviewCommentExtras = {
+  position?: number | null;
+  performed_via_github_app?: { id?: number | string | null } | null;
+};
+
+/**
  * Used to detect duplicates and track outdated inline comments.
+ *
+ * `authoredByKilo` reports whether this app identity created the comment, following the same
+ * `performed_via_github_app.id` ownership test `findKiloReviewComment` applies to summaries.
  */
 export async function fetchPRInlineComments(
   installationId: string,
@@ -685,11 +792,13 @@ export async function fetchPRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { login: string };
   }>
 > {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const kiloAppId = String(getGitHubAppCredentials(appType).appId);
 
   const comments: Array<{
     id: number;
@@ -697,34 +806,49 @@ export async function fetchPRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { login: string };
   }> = [];
 
-  let page = 1;
-  const perPage = 100;
+  let reachedPageLimit = false;
+  let reachedByteLimit = false;
+  let storedBodyBytes = 0;
 
-  while (true) {
+  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
     const { data } = await octokit.pulls.listReviewComments({
       owner,
       repo,
       pull_number: prNumber,
-      per_page: perPage,
+      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
       page,
+      // Newest comments first, so a page or byte cap keeps the freshest
+      // duplicate-detection hints and drops the oldest ones.
+      sort: 'created',
+      direction: 'desc',
     });
+    const rows = data as Array<(typeof data)[number] & ReviewCommentExtras>;
 
-    comments.push(
-      ...data.map(c => ({
+    for (const c of rows) {
+      const body = c.body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS);
+      storedBodyBytes += Buffer.byteLength(body);
+      comments.push({
         id: c.id,
         path: c.path,
         line: c.line ?? null,
-        body: c.body,
-        isOutdated: c.position === null, // null position = outdated
+        body,
+        isOutdated: c.position == null,
+        authoredByKilo: String(c.performed_via_github_app?.id ?? '') === kiloAppId,
         user: { login: c.user?.login ?? 'unknown' },
-      }))
-    );
+      });
 
-    if (data.length < perPage) break;
-    page++;
+      if (storedBodyBytes >= MAX_PR_INLINE_COMMENT_BODY_BYTES) {
+        reachedByteLimit = true;
+        break;
+      }
+    }
+
+    if (reachedByteLimit || data.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
+    reachedPageLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
   }
 
   logExceptInTest('[fetchPRInlineComments] Fetched comments', {
@@ -732,6 +856,8 @@ export async function fetchPRInlineComments(
     repo,
     prNumber,
     totalComments: comments.length,
+    reachedPageLimit,
+    reachedByteLimit,
   });
 
   return comments;
@@ -1002,6 +1128,14 @@ export type AssociatedPullRequest = {
   headRepoFullName?: string;
   /** Branch the PR was opened from, as reported by GitHub. */
   headRef?: string;
+  baseSha?: string;
+  /** Branch the PR targets, as reported by GitHub. */
+  baseRef?: string;
+  mergeable?: boolean | null;
+  mergeableState?: string | null;
+  stackNumber?: number | null;
+  stackPosition?: number | null;
+  stackSize?: number | null;
   /**
    * SHAs of the PR's commits. Populated only when the caller passes
    * `includeCommits` and the session SHA is not already the PR head. `undefined`
@@ -1043,15 +1177,39 @@ function getResponseHeader(error: unknown, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function parseRateLimitResetAt(error: unknown): Date {
-  const resetHeader = getResponseHeader(error, 'x-ratelimit-reset');
-  const resetSeconds = resetHeader ? Number(resetHeader) : NaN;
-  if (Number.isFinite(resetSeconds) && resetSeconds > 0) {
-    return new Date(resetSeconds * 1000);
+function retryAfterDeadlineMs(error: unknown, now: number): number | null {
+  const header = getResponseHeader(error, 'retry-after')?.trim();
+  if (!header) return null;
+  // A bare number is a delta in seconds; anything else is an HTTP date.
+  if (/^\d+$/.test(header)) {
+    const seconds = Number(header);
+    return Number.isFinite(seconds) ? now + seconds * 1000 : null;
   }
-  // Fall back to "retry in 60s" if the header is missing/invalid, so callers
-  // always have a usable Date to show.
-  return new Date(Date.now() + 60_000);
+  const timestamp = Date.parse(header);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function primaryResetDeadlineMs(error: unknown): number | null {
+  // The primary reset only applies once the quota is exhausted; otherwise the
+  // future reset of a still-usable quota would over-wait secondary limits.
+  if (getResponseHeader(error, 'x-ratelimit-remaining') !== '0') return null;
+  const resetHeader = getResponseHeader(error, 'x-ratelimit-reset');
+  if (!resetHeader) return null;
+  const resetSeconds = Number(resetHeader);
+  if (!Number.isFinite(resetSeconds) || resetSeconds <= 0) return null;
+  return resetSeconds * 1000;
+}
+
+function parseRateLimitResetAt(error: unknown, now = Date.now()): Date {
+  const deadlines = [retryAfterDeadlineMs(error, now), primaryResetDeadlineMs(error)].filter(
+    (deadline): deadline is number =>
+      deadline !== null && Number.isFinite(new Date(deadline).getTime())
+  );
+  // Retry-After applies to secondary limits; the primary reset applies while
+  // the quota is exhausted. When both apply, wait for the later deadline.
+  // Without a usable signal, wait the documented minimum.
+  if (deadlines.length === 0) return new Date(now + 60_000);
+  return new Date(Math.max(...deadlines));
 }
 
 function getErrorMessage(error: unknown): string {
@@ -1074,10 +1232,10 @@ export function isGitHubRateLimitError(error: unknown): boolean {
   const remaining = getResponseHeader(error, 'x-ratelimit-remaining');
   if (remaining === '0') return true;
   // 403 is overloaded: it can mean rate/abuse limiting OR a plain permission
-  // denial (e.g. installation lacks pull request access). Only treat 403 as
-  // rate-limited when the message indicates so, so that genuine permission
-  // failures are surfaced to the caller.
+  // denial (e.g. installation lacks pull request access). A Retry-After header
+  // is GitHub's secondary-limit signal even when the message omits the phrase.
   if (error.status === 403) {
+    if (getResponseHeader(error, 'retry-after') !== undefined) return true;
     const message = getErrorMessage(error).toLowerCase();
     return (
       message.includes('rate limit') ||
@@ -1086,6 +1244,18 @@ export function isGitHubRateLimitError(error: unknown): boolean {
     );
   }
   return false;
+}
+
+/**
+ * Normalize a GitHub failure into the typed rate-limit error that callers
+ * propagate across refresh legs. Returns `null` when the failure is not a rate
+ * limit, and returns the existing error unchanged when it is already typed so
+ * its deadline is not recomputed or lost.
+ */
+export function toGitHubRateLimitError(error: unknown): GitHubRateLimitError | null {
+  if (error instanceof GitHubRateLimitError) return error;
+  if (!isGitHubRateLimitError(error)) return null;
+  return new GitHubRateLimitError(parseRateLimitResetAt(error));
 }
 
 /**
@@ -1118,6 +1288,12 @@ export async function fetchPullRequestByNumber(params: {
    * `MAX_COMMIT_PAGES`.
    */
   expectedHeadSha?: string | null;
+  /**
+   * Shared deadline for every GitHub request this call makes, including the
+   * installation-token mint. Optional so existing callers keep their current
+   * behaviour.
+   */
+  signal?: AbortSignal;
 }): Promise<AssociatedPullRequest | null> {
   const {
     installationId,
@@ -1127,9 +1303,19 @@ export async function fetchPullRequestByNumber(params: {
     appType,
     includeCommits = false,
     expectedHeadSha = null,
+    signal,
   } = params;
 
-  const tokenData = await generateGitHubInstallationToken(String(installationId), appType);
+  const requestOptions = signal ? { request: { signal } } : {};
+  const tokenData = await generateGitHubInstallationToken(
+    String(installationId),
+    appType,
+    undefined,
+    'workflow',
+    signal
+  ).catch((error: unknown) => {
+    throw toGitHubRateLimitError(error) ?? error;
+  });
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
@@ -1137,6 +1323,7 @@ export async function fetchPullRequestByNumber(params: {
       owner,
       repo,
       pull_number: number,
+      ...requestOptions,
     });
 
     const state: AssociatedPullRequest['state'] =
@@ -1165,6 +1352,7 @@ export async function fetchPullRequestByNumber(params: {
             pull_number: number,
             per_page: COMMITS_PER_PAGE,
             page,
+            ...requestOptions,
           });
           for (const commit of data) {
             if (typeof commit.sha === 'string') commitShas.push(commit.sha);
@@ -1174,6 +1362,11 @@ export async function fetchPullRequestByNumber(params: {
       }
     }
 
+    const stack = (
+      pr as typeof pr & {
+        stack?: { number?: number | null; position?: number | null; size?: number | null } | null;
+      }
+    ).stack;
     return {
       number: pr.number,
       htmlUrl: pr.html_url,
@@ -1185,12 +1378,18 @@ export async function fetchPullRequestByNumber(params: {
       baseRepoFullName: pr.base.repo?.full_name ?? `${owner}/${repo}`,
       headRepoFullName: pr.head.repo?.full_name ?? '',
       headRef: pr.head.ref,
+      baseSha: pr.base.sha,
+      baseRef: pr.base.ref,
+      mergeable: pr.mergeable,
+      mergeableState: pr.mergeable_state,
+      stackNumber: stack?.number ?? null,
+      stackPosition: stack?.position ?? null,
+      stackSize: stack?.size ?? null,
       ...(commitShas ? { commitShas } : {}),
     };
   } catch (error) {
-    if (isGitHubRateLimitError(error)) {
-      throw new GitHubRateLimitError(parseRateLimitResetAt(error));
-    }
+    const rateLimitError = toGitHubRateLimitError(error);
+    if (rateLimitError) throw rateLimitError;
     if (isHttpError(error) && error.status === 404) {
       warnExceptInTest('[fetchPullRequestByNumber] PR not found or repo not accessible', {
         owner,
@@ -1200,6 +1399,103 @@ export async function fetchPullRequestByNumber(params: {
       return null;
     }
     throw error;
+  }
+}
+
+/** One open pull request a recovery sweep may reconsider. */
+export type OpenPullRequest = {
+  number: number;
+  title: string;
+  body: string | null;
+  draft: boolean;
+  htmlUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  authorId: number;
+  authorLogin: string;
+  authorAvatarUrl: string;
+  authorType: string;
+  labels: string[];
+  headSha: string;
+  headRef: string;
+  headRepoFullName: string | null;
+  headRepoCloneUrl: string | null;
+  headRepoHtmlUrl: string | null;
+  baseSha: string;
+  baseRef: string;
+  baseRepoId: number;
+  baseRepoName: string;
+  baseRepoFullName: string;
+};
+
+/**
+ * Lists the most recently updated open pull requests of one repository, newest
+ * first. A recovery sweep reads this to reach a pull request whose review never
+ * started, which no webhook delivery will report again.
+ *
+ * @throws {GitHubRateLimitError} on 403 secondary rate limit.
+ */
+export async function fetchOpenPullRequests(params: {
+  installationId: string;
+  owner: string;
+  repo: string;
+  limit: number;
+  appType?: GitHubAppType;
+  signal?: AbortSignal;
+}): Promise<OpenPullRequest[]> {
+  const { installationId, owner, repo, limit, appType = 'standard', signal } = params;
+
+  const requestOptions = signal ? { request: { signal } } : {};
+  const tokenData = await generateGitHubInstallationToken(
+    installationId,
+    appType,
+    undefined,
+    'workflow',
+    signal
+  ).catch((error: unknown) => {
+    throw toGitHubRateLimitError(error) ?? error;
+  });
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  try {
+    const { data } = await octokit.pulls.list({
+      owner,
+      repo,
+      state: 'open',
+      sort: 'updated',
+      direction: 'desc',
+      per_page: limit,
+      ...requestOptions,
+    });
+
+    return data.map(pull => ({
+      number: pull.number,
+      title: pull.title,
+      body: pull.body ?? null,
+      draft: pull.draft === true,
+      htmlUrl: pull.html_url,
+      createdAt: pull.created_at,
+      updatedAt: pull.updated_at,
+      authorId: pull.user?.id ?? 0,
+      authorLogin: pull.user?.login ?? '',
+      authorAvatarUrl: pull.user?.avatar_url ?? '',
+      authorType: pull.user?.type ?? 'User',
+      labels: pull.labels
+        .map(label => (typeof label === 'string' ? label : (label.name ?? '')))
+        .filter(name => name !== ''),
+      headSha: pull.head.sha,
+      headRef: pull.head.ref,
+      headRepoFullName: pull.head.repo?.full_name ?? null,
+      headRepoCloneUrl: pull.head.repo?.clone_url ?? null,
+      headRepoHtmlUrl: pull.head.repo?.html_url ?? null,
+      baseSha: pull.base.sha,
+      baseRef: pull.base.ref,
+      baseRepoId: pull.base.repo.id,
+      baseRepoName: pull.base.repo.name,
+      baseRepoFullName: pull.base.repo.full_name,
+    }));
+  } catch (error) {
+    throw toGitHubRateLimitError(error) ?? error;
   }
 }
 
@@ -1225,10 +1521,46 @@ function normalizeReviewDecision(decision: string | null | undefined): ReviewDec
   }
 }
 
+/** Largest PR number GitHub's GraphQL `Int` argument can carry. */
+const GRAPHQL_INT_MAX = 2_147_483_647;
+
+/**
+ * An entry the batched query can ask GitHub about: repository coordinates that
+ * follow GitHub's name rules and a PR number inside GraphQL's `Int` range.
+ * Anything else is left out of the request, so one unusable entry cannot fail
+ * the rest of the batch.
+ */
+function isActionableReviewDecisionInput(input: BatchedPrInput): boolean {
+  return (
+    isGitHubOwnerName(input.owner) &&
+    isGitHubRepositoryName(input.repo) &&
+    Number.isInteger(input.number) &&
+    input.number > 0 &&
+    input.number <= GRAPHQL_INT_MAX
+  );
+}
+
+type ReviewDecisionQueryEntry = {
+  /** The caller's key in the returned Map. */
+  callerAlias: string;
+  /** Fixed alias generated here; the only alias the query text carries. */
+  fieldAlias: string;
+  owner: string;
+  repo: string;
+  number: number;
+};
+
 /**
  * Fetches `reviewDecision` for multiple PRs in a single aliased GraphQL query.
  * All PRs must belong to the same installation (one token is generated).
- * Returns a Map from alias → ReviewDecision|null.
+ * Returns a Map from alias → ReviewDecision|null. Entries that are not
+ * actionable (see {@link isActionableReviewDecisionInput}) are absent from the
+ * Map, which callers read as "no review decision".
+ *
+ * Repository coordinates and PR numbers cross the GraphQL boundary as
+ * operation variables, so the document text holds only fixed literals and the
+ * generated `pr<N>` aliases.
+ *
  * @throws {GitHubRateLimitError} on 403 secondary rate limit.
  */
 export async function fetchBatchedReviewDecisions(args: {
@@ -1237,31 +1569,51 @@ export async function fetchBatchedReviewDecisions(args: {
   appType?: GitHubAppType;
 }): Promise<Map<string, ReviewDecision | null>> {
   const { installationId, prs, appType = 'standard' } = args;
-  if (prs.length === 0) return new Map();
+  const result = new Map<string, ReviewDecision | null>();
+
+  const entries: ReviewDecisionQueryEntry[] = prs
+    .filter(isActionableReviewDecisionInput)
+    .map(({ alias, owner, repo, number }, index) => ({
+      callerAlias: alias,
+      fieldAlias: `pr${index}`,
+      owner,
+      repo,
+      number,
+    }));
+  if (entries.length === 0) return result;
 
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
 
-  const fragments = prs
+  const variableDeclarations = entries
+    .map((_, index) => `$owner${index}: String!, $name${index}: String!, $number${index}: Int!`)
+    .join(', ');
+  const fields = entries
     .map(
-      ({ alias, owner, repo, number }) =>
-        `${alias}: repository(owner: "${owner}", name: "${repo}") { pullRequest(number: ${number}) { reviewDecision } }`
+      ({ fieldAlias }, index) =>
+        `${fieldAlias}: repository(owner: $owner${index}, name: $name${index}) { pullRequest(number: $number${index}) { reviewDecision } }`
     )
     .join('\n');
+  const variables: Record<string, string | number> = {};
+  entries.forEach(({ owner, repo, number }, index) => {
+    variables[`owner${index}`] = owner;
+    variables[`name${index}`] = repo;
+    variables[`number${index}`] = number;
+  });
 
   try {
     const response = (await octokit.request('POST /graphql', {
-      query: `{ ${fragments} }`,
+      query: `query(${variableDeclarations}) {\n${fields}\n}`,
+      variables,
     })) as {
       data: {
         data: Record<string, { pullRequest: { reviewDecision: string | null } | null } | null>;
       };
     };
 
-    const result = new Map<string, ReviewDecision | null>();
-    for (const { alias } of prs) {
-      const repoData = response.data.data?.[alias];
-      result.set(alias, normalizeReviewDecision(repoData?.pullRequest?.reviewDecision));
+    for (const { callerAlias, fieldAlias } of entries) {
+      const repoData = response.data.data?.[fieldAlias];
+      result.set(callerAlias, normalizeReviewDecision(repoData?.pullRequest?.reviewDecision));
     }
     return result;
   } catch (error) {
@@ -1275,7 +1627,8 @@ export async function fetchBatchedReviewDecisions(args: {
 /**
  * Fetches the rolled-up `reviewDecision` for a single PR via GitHub's GraphQL API.
  * Returns lowercase values matching our DB enum, or `null` when GitHub returns
- * null (no required reviewers and no review submitted yet).
+ * null (no required reviewers and no review submitted yet). A coordinate or PR
+ * number that is not actionable yields `null` without any request.
  * @throws {GitHubRateLimitError} on 403 secondary rate limit.
  */
 export async function fetchPullRequestReviewDecision(args: {
@@ -1426,45 +1779,89 @@ export async function checkExistingFork(
   }
 }
 
+// How many merges a head may stack before its branch content is treated as unknown.
+const mergeHeadWalkLimit = 10;
+
+export type MergeHeadContent =
+  | Readonly<{ kind: 'not_merge' }>
+  // The heads a review of the merge head can cover: every merge head on its first-parent chain, then
+  // the branch commit the chain ends on, which all of them carry.
+  | Readonly<{ kind: 'review_content'; shas: readonly string[] }>
+  // A merge that takes code from outside the base branch, or a chain that cannot be read.
+  | Readonly<{ kind: 'unreviewed_content' }>;
+
 /**
- * Checks whether a commit is a merge commit (has 2+ parents).
- * Used to skip code reviews triggered by "merge base into feature" pushes.
- * Returns false if the API call fails so the review proceeds (fail-open).
+ * Resolves what a synchronize head carries. A head that stacks merges of the
+ * base branch carries the branch commit its first-parent chain ends on, and each
+ * merge head on that chain carries the same content, so the chain names the
+ * heads a review of any of them covers. A merge whose second parent is not base
+ * content brings in code no branch review covers, and an unreadable chain is
+ * treated the same way, so both fall through to a review instead of a skip.
  */
-export async function isMergeCommit(
-  installationId: string,
-  owner: string,
-  repo: string,
-  commitSha: string,
-  appType: GitHubAppType = 'standard'
-): Promise<boolean> {
+export async function resolveMergeHeadContent(args: {
+  appType: GitHubAppType;
+  baseSha: string;
+  headSha: string;
+  installationId: string;
+  owner: string;
+  repo: string;
+}): Promise<MergeHeadContent> {
   try {
-    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const tokenData = await generateGitHubInstallationToken(args.installationId, args.appType);
     const octokit = new Octokit({ auth: tokenData.token });
+    const shas: string[] = [];
+    let current = args.headSha;
 
-    const { data } = await octokit.git.getCommit({
-      owner,
-      repo,
-      commit_sha: commitSha,
+    for (let depth = 0; depth <= mergeHeadWalkLimit; depth += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- Each parent names the next commit to read.
+      const { data } = await octokit.git.getCommit({
+        owner: args.owner,
+        repo: args.repo,
+        commit_sha: current,
+      });
+      const [firstParent, secondParent] = data.parents;
+      if (data.parents.length < 2) {
+        if (depth === 0) {
+          return { kind: 'not_merge' };
+        }
+        return { kind: 'review_content', shas: shas.concat(current) };
+      }
+      if (firstParent === undefined || secondParent === undefined) {
+        return { kind: 'unreviewed_content' };
+      }
+      // oxlint-disable-next-line no-await-in-loop -- The comparison decides whether this merge is base content.
+      const comparison = await octokit.repos.compareCommits({
+        owner: args.owner,
+        repo: args.repo,
+        base: args.baseSha,
+        head: secondParent.sha,
+      });
+      if (comparison.data.status !== 'behind' && comparison.data.status !== 'identical') {
+        logExceptInTest(
+          '[resolveMergeHeadContent] Merge takes content from outside the base branch',
+          {
+            owner: args.owner,
+            repo: args.repo,
+            sha: current.substring(0, 8),
+            secondParent: secondParent.sha.substring(0, 8),
+            status: comparison.data.status,
+          }
+        );
+        return { kind: 'unreviewed_content' };
+      }
+      shas.push(current);
+      current = firstParent.sha;
+    }
+
+    logExceptInTest('[resolveMergeHeadContent] Merge chain exceeds the walk limit', {
+      owner: args.owner,
+      repo: args.repo,
+      sha: args.headSha.substring(0, 8),
     });
-
-    const result = data.parents.length > 1;
-
-    logExceptInTest('[isMergeCommit] Checked commit parents', {
-      owner,
-      repo,
-      sha: commitSha.substring(0, 8),
-      parentCount: data.parents.length,
-      isMergeCommit: result,
-    });
-
-    return result;
+    return { kind: 'unreviewed_content' };
   } catch (error) {
-    logExceptInTest(
-      '[isMergeCommit] Failed to check commit parents, proceeding with review:',
-      error
-    );
-    return false;
+    logExceptInTest('[resolveMergeHeadContent] Failed to walk the merge chain:', error);
+    return { kind: 'unreviewed_content' };
   }
 }
 
@@ -1486,6 +1883,19 @@ type CheckRunOutput = {
   text?: string;
 };
 
+const checkRunConclusions: Readonly<Record<CheckRunConclusion, true>> = {
+  action_required: true,
+  cancelled: true,
+  failure: true,
+  neutral: true,
+  success: true,
+  timed_out: true,
+};
+
+function isCheckRunConclusion(value: string | null | undefined): value is CheckRunConclusion {
+  return value !== null && value !== undefined && Object.hasOwn(checkRunConclusions, value);
+}
+
 /**
  * Creates a GitHub Check Run on a commit.
  *
@@ -1503,18 +1913,24 @@ export async function createCheckRun(
   options: {
     detailsUrl?: string;
     output?: CheckRunOutput;
+    // Set for a head that is already decided, such as one that carries content a
+    // finished review covered: the run is created completed with that conclusion.
+    conclusion?: CheckRunConclusion;
   } = {},
   appType: GitHubAppType = 'standard'
 ): Promise<number> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const completed = options.conclusion !== undefined;
 
   const { data } = await octokit.checks.create({
     owner,
     repo,
-    name: 'Kilo Code Review',
+    name: CHECK_RUN_NAME,
     head_sha: headSha,
-    status: 'queued',
+    status: completed ? 'completed' : 'queued',
+    ...(options.conclusion ? { conclusion: options.conclusion } : {}),
+    ...(completed ? { completed_at: new Date().toISOString() } : {}),
     ...(options.detailsUrl ? { details_url: options.detailsUrl } : {}),
     ...(options.output ? { output: options.output } : {}),
   });
@@ -1524,9 +1940,74 @@ export async function createCheckRun(
     repo,
     headSha: headSha.substring(0, 8),
     checkRunId: data.id,
+    conclusion: options.conclusion,
   });
 
   return data.id;
+}
+
+/** The check run name the Kilo Code Review creates on a pull request head. */
+const CHECK_RUN_NAME = 'Kilo Code Review';
+
+/**
+ * The id of the latest Kilo Code Review run that already exists on a commit, or
+ * undefined when the commit carries none. A read failure also answers
+ * undefined after it is logged, so the caller cannot tell it from "no run"; the
+ * caller's fallback is a re-gate, and a decided duplicate run answers 422,
+ * which the create path logs and leaves in place.
+ */
+export async function findLatestCheckRunId(
+  installationId: string,
+  owner: string,
+  repo: string,
+  headSha: string,
+  appType: GitHubAppType = 'standard'
+): Promise<number | undefined> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+    const { data } = await octokit.checks.listForRef({
+      owner,
+      repo,
+      ref: headSha,
+      check_name: CHECK_RUN_NAME,
+      filter: 'latest',
+      per_page: 1,
+    });
+    const [latest] = data.check_runs;
+    return latest?.id;
+  } catch (error) {
+    logExceptInTest('[findLatestCheckRunId] Failed to list check runs:', error);
+    return undefined;
+  }
+}
+
+/**
+ * Reads the conclusion a check run finished with, so a later commit that
+ * carries the same reviewed content can be gated with the same verdict.
+ * Returns undefined when the run cannot be read or has no conclusion yet.
+ */
+export async function getCheckRunConclusion(
+  installationId: string,
+  owner: string,
+  repo: string,
+  checkRunId: number,
+  appType: GitHubAppType = 'standard'
+): Promise<CheckRunConclusion | undefined> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+    const { data } = await octokit.checks.get({
+      owner,
+      repo,
+      check_run_id: checkRunId,
+    });
+    const conclusion = data.conclusion ?? undefined;
+    return isCheckRunConclusion(conclusion) ? conclusion : undefined;
+  } catch (error) {
+    logExceptInTest('[getCheckRunConclusion] Failed to read check run:', error);
+    return undefined;
+  }
 }
 
 /**

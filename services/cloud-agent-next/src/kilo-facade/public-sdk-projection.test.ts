@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { projectPrivateWorktreePaths } from '@kilocode/session-ingest-contracts';
+import {
+  projectKnownCloudAgentPath,
+  projectPrivateWorktreePaths,
+} from '@kilocode/session-ingest-contracts';
 import type { KiloSdkStoredMessage } from '../session-ingest-binding.js';
 
 import {
@@ -12,6 +15,19 @@ import {
 const kiloSessionId = 'ses_12345678901234567890123456';
 
 describe('projectPublicStructuredPaths', () => {
+  it.each(['directory', 'cwd', 'root', 'workdir', 'file_path', 'absolutePath', 'movePath'])(
+    'preserves the known workspace suffix for %s, not an unknown absolute path',
+    key => {
+      const directory = `/cloud-agent/sessions/${kiloSessionId}`;
+      expect(
+        projectPublicStructuredPaths({ input: { [key]: '/workspace/app/src' } }, kiloSessionId)
+      ).toEqual({ input: { [key]: `${directory}/src` } });
+      expect(
+        projectPublicStructuredPaths({ input: { [key]: '/private/src' } }, kiloSessionId)
+      ).toEqual({ input: { [key]: directory } });
+    }
+  );
+
   it('redacts only structured local file URI fields without touching text, external URLs or data URLs', () => {
     const value = {
       uri: 'file:///workspace/private/resource.txt',
@@ -56,9 +72,9 @@ describe('projectPublicStructuredPaths', () => {
     ).toEqual({
       files: [
         {
-          path: publicDirectory,
+          path: `${publicDirectory}/a.ts`,
           status: 'modified',
-          patch: `--- ${publicDirectory}\n+++ ${publicDirectory}\n@@ -1 +1 @@\n+Keep /workspace/app/user-text`,
+          patch: `--- ${publicDirectory}/a.ts\n+++ ${publicDirectory}/a.ts\n@@ -1 +1 @@\n+Keep /workspace/app/user-text`,
         },
       ],
     });
@@ -74,7 +90,7 @@ describe('projectPublicStructuredPaths', () => {
         kiloSessionId
       )
     ).toEqual({
-      patch: `--- ${publicDirectory}\t2026-10-19\r\n+++ ${publicDirectory}\r\n@@ -1 +1 @@\r\n+/workspace/app/user-text\r\n`,
+      patch: `--- ${publicDirectory}/a.ts\t2026-10-19\r\n+++ ${publicDirectory}/a.ts\r\n@@ -1 +1 @@\r\n+/workspace/app/user-text\r\n`,
     });
   });
   it.each([
@@ -165,7 +181,7 @@ describe('projectPublicStructuredPaths', () => {
   it('normalizes unknown absolute structured paths but preserves relative paths, public paths and user text', () => {
     const publicDirectory = `/cloud-agent/sessions/${kiloSessionId}`;
     const value = {
-      filepath: '/workspace/app/a.ts',
+      filepath: '/unknown/private/a.ts',
       file: 'C:\\private\\a.ts',
       root: '\\\\private\\share',
       files: ['src/a.ts', '/private/a.ts', `${publicDirectory}/a.ts`],
@@ -181,6 +197,40 @@ describe('projectPublicStructuredPaths', () => {
       root: publicDirectory,
       files: ['src/a.ts', publicDirectory, `${publicDirectory}/a.ts`],
     });
+  });
+});
+
+describe('projectKnownCloudAgentPath', () => {
+  const directory = `/cloud-agent/sessions/${kiloSessionId}`;
+
+  it.each([
+    '/workspace/app',
+    '/workspace/app/sessions/ses_abc',
+    '/workspace/app/worktrees/worktree_abc',
+    '/workspace/user-1/worktrees/worktree_9b1deb4d',
+    '/workspace/org-1/user-1/worktrees/worktree_9b1deb4d',
+    '/workspace/user-1/sessions/ses_abc',
+    '/workspace/org-1/user-1/sessions/sess_abc',
+    '/workspace/user-1/sessions/agent_abc',
+    '/workspace/user-1/sessions/workspace_abc',
+  ])('preserves repo-relative suffixes without root metadata for %s', root => {
+    expect(projectKnownCloudAgentPath(root, directory)).toBe(directory);
+    expect(projectKnownCloudAgentPath(`${root}/src/nested/a.ts`, directory)).toBe(
+      `${directory}/src/nested/a.ts`
+    );
+  });
+
+  it.each([
+    '/workspace/application/src/a.ts',
+    '/workspace/user-1/worktrees/not-a-generated-id/src/a.ts',
+    '/workspace/user-1/sessions/ses_/src/a.ts',
+    '/private/workspace/user-1/worktrees/worktree_abc/src/a.ts',
+    '/workspace/app/../private/a.ts',
+    'Read /workspace/app/src/a.ts',
+    'src/a.ts',
+    'C:\\private\\a.ts',
+  ])('does not infer a workspace from %s', path => {
+    expect(projectKnownCloudAgentPath(path, directory)).toBeUndefined();
   });
 });
 
@@ -207,6 +257,28 @@ describe('projectPrivateWorktreePaths', () => {
       relative: 'src/file.txt',
     });
     expect(value).toEqual(original);
+  });
+
+  it('projects string occurrences with different letter casing', () => {
+    const mixedCase = privateDirectory
+      .split('')
+      .map((char, index) => (index % 2 === 0 ? char.toUpperCase() : char.toLowerCase()))
+      .join('');
+    const value = {
+      text: `Read ${mixedCase}/file.txt`,
+      nested: [null, 1, true, { output: `Created ${mixedCase}/other.txt` }],
+    };
+
+    const projected = projectPrivateWorktreePaths(
+      value,
+      [{ directory: privateDirectory }],
+      publicDirectory
+    );
+
+    expect(projected).toEqual({
+      text: `Read ${publicDirectory}/file.txt`,
+      nested: [null, 1, true, { output: `Created ${publicDirectory}/other.txt` }],
+    });
   });
 
   it.each([
@@ -310,8 +382,7 @@ describe('projectPublicStoredMessage', () => {
         ],
       } satisfies KiloSdkStoredMessage;
       const original = structuredClone(message);
-      const publicFile =
-        cwd === '/workspace/app' ? `${publicDirectory}/native-permission.txt` : publicDirectory;
+      const publicFile = `${publicDirectory}/native-permission.txt`;
       const publicPatch = patch
         .replaceAll('Index: /workspace/app/native-permission.txt', `Index: ${publicFile}`)
         .replaceAll('--- /workspace/app/native-permission.txt', `--- ${publicFile}`)
@@ -341,9 +412,9 @@ describe('projectPublicStoredMessage', () => {
         state: {
           input: { content },
           metadata: {
-            filepath: publicDirectory,
-            diff: publicPatch.replaceAll(publicFile, publicDirectory),
-            filediff: { file: publicDirectory },
+            filepath: publicFile,
+            diff: publicPatch,
+            filediff: { file: publicFile },
           },
         },
       });

@@ -42,55 +42,26 @@ WORKER_URL=http://host.docker.internal:8794
 # Preview subdomain suffix; unset turns preview off (the web app reads it from the Worker).
 # Local dev serves previews from `p<port>-<workspace-uuid-hex>.localhost`.
 PREVIEW_HOST_SUFFIX=localhost
-# Comma-separated user or org IDs shown the preview UI, or `*` for all
-PREVIEW_ENABLED_IDS=*
 
 # Timeout overrides (optional)
 CLI_TIMEOUT_SECONDS=900
 REAPER_INTERVAL_MS=300000
 
-# Per-session Cloudflare sandbox org IDs (optional)
-# Comma-separated list of org IDs that use per-session Cloudflare sandboxes, or `*` for all orgs
-PER_SESSION_SANDBOX_ORG_IDS=
-
-# Code Reviewer sessions use the Cloudflare Containers runtime for these owners.
-# Comma-separated user or org IDs, or `*` for all including personal accounts.
-CODE_REVIEW_CONTAINERS_ORG_IDS=
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 
-# Non-secret rollout control for per-session Kilo runtime isolation.
-RUNTIME_ISOLATION_ENABLED=true
-
-CREDENTIAL_CONTAINMENT_ENABLED=false
-
-# Container repo snapshot IDs (optional)
-# Comma-separated user or org IDs whose isolated control-plane containers start from a saved
-# repository snapshot, or `*` for all. Empty disables it. Needs the REPO_SNAPSHOTS KV
-# binding and only applies to the constant isolated workspace path.
-CONTAINER_REPO_SNAPSHOT_IDS=
-
-# Vercel Sandbox operational configuration (optional)
-# Snapshot/build values must come from a successful `pnpm --filter cloud-agent-next snapshot:vercel`
-# acceptance run. Partial configuration never enables Vercel.
-VERCEL_PROJECT_ID=
-VERCEL_TEAM_ID=
-VERCEL_SANDBOX_SNAPSHOT_ID=
-VERCEL_SANDBOX_RUNTIME_BUILD_ID=
+# Vercel BYOC runtime defaults. Customer credentials and snapshots come from Compute settings.
 VERCEL_SANDBOX_RUNTIME=node24
 VERCEL_SANDBOX_INITIAL_TIMEOUT_MS=300000
 VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
-# Keep `VERCEL_TOKEN` in local secrets/.dev.vars only; never commit a token value.
-# VERCEL_TOKEN=
 
-# Vercel enrollment is the allowlist itself. Empty is off. Comma-separated org
-# IDs, or `*` for every organization and personal accounts. Organizations must
-# also be isolated by PER_SESSION_SANDBOX_ORG_IDS.
-VERCEL_SANDBOX_ORG_IDS=
+# Customer-paid Vercel enrollment. Comma-separated user or organization IDs; empty is off.
+# `*` enrolls both personal accounts and organizations. BYOC sessions use isolated sandboxes.
+BYOC_VERCEL_IDS=
 
-# Cloudflare containers enrollment (optional). Comma-separated organization IDs, or `*` for
-# every organization and personal accounts. Empty is off.
-CLOUDFLARE_CONTAINERS_ORG_IDS=
+# Explicit organization or user IDs allowed to capture and restore registered workspace tail snapshots. No wildcard.
+WORKSPACE_SNAPSHOT_ORG_IDS=
+WORKSPACE_SNAPSHOT_USER_IDS=
 
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App
@@ -123,10 +94,6 @@ R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY=""
 # Sandbox containers reach the host via `host.docker.internal`.
 # @url cloudflare-session-ingest
 KILO_SESSION_INGEST_URL=http://host.docker.internal:8800
-
-# Local debugging only. Set to 1 to log full URLs rejected during Kilo capability
-# redemption. Those URLs can contain tokens; never enable this in a deployed Worker.
-LOG_REJECTED_KILO_URLS=0
 
 # Local dev worker origins allowed to connect to /stream
 # @url nextjs,cloud-agent-next

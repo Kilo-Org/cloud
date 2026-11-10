@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
+import { resolveNewSessionPromptHeight } from './chat-composer-input-height';
 import {
-  resolveNewSessionPromptFrameFit,
-  resolveNewSessionPromptMaxHeight,
+  resolveComposerTopFadeHeight,
+  resolveNewSessionFormFrameHeight,
+  resolveNewSessionPromptLineCount,
   resolveNewSessionPromptMinHeight,
 } from './new-session-prompt-fit';
 
 const LINE_HEIGHT = 24;
 const PREFERRED_LINES = 3;
 const PREFERRED_MIN_HEIGHT = LINE_HEIGHT * PREFERRED_LINES + 16;
-const VERTICAL_PADDING = 16;
 
 const PREFERRED = {
   preferredMinHeight: PREFERRED_MIN_HEIGHT,
@@ -19,9 +20,9 @@ const PREFERRED = {
 
 /**
  * The explorer finding's geometry, in points: the card sat 439px in a 410px
- * frame — its bottom 61px (≈27dp) behind the system bar — with the input at
- * its 3-line floor. The card's own chrome is ~103dp and it starts ~14dp below
- * the frame top.
+ * frame — its bottom 61px (~27dp) behind the system bar — with the input at its
+ * 3-line floor. The card's own chrome is ~103dp and it starts ~14dp below the
+ * frame top.
  */
 const EXPLORER = {
   frameHeight: 178,
@@ -30,39 +31,13 @@ const EXPLORER = {
 } as const;
 
 /**
- * The long-draft geometry of the Run on finding, in points, for the Run on row
- * alone: the card starts 16dp below the frame top, its chrome measures 98dp,
- * and the row (`mt-5` 20 + label 18 + `mb-2` 8 + the 44dp selector) is 89dp.
- * The 339dp frame is the Android emulator's with the keyboard up. The window
- * cap put the input at its 160dp maximum, which fills the frame and cuts the
- * selector when the block under the card is only this row.
+ * The Android emulator's frame with the keyboard up, in points: the card starts
+ * 16dp below the frame top and its chrome measures 98dp.
  */
 const LONG_DRAFT = {
   frameHeight: 339,
   cardTop: 16,
   cardChromeHeight: 98,
-  belowCardHeight: 89,
-} as const;
-
-const WINDOW_MAX_HEIGHT = 160;
-/** One line of air the fit keeps under the Run on block. */
-const CLEARANCE = LINE_HEIGHT;
-
-/**
- * The same finding on the iPhone lane, in points: with the keyboard up the
- * new-session frame measures 256pt tall and the card starts 14pt down, with
- * 101.33pt of card chrome and an 86pt Run on block under it. Whole lines cannot
- * hold the 3-line composer and that block at once, so the cap keeps the floor
- * and lets the block scroll into view. The fallback ignores the block, so this
- * frame gives the same 136pt cap once the Organization section joins the block
- * (the further 80pt only lowers the room in the reserve branch, which is not
- * taken here).
- */
-const IPHONE_KEYBOARD = {
-  frameHeight: 256,
-  cardTop: 14,
-  cardChromeHeight: 101.33,
-  belowCardHeight: 86,
 } as const;
 
 describe('resolveNewSessionPromptMinHeight', () => {
@@ -190,191 +165,165 @@ describe('resolveNewSessionPromptMinHeight', () => {
   });
 });
 
-describe('resolveNewSessionPromptFrameFit', () => {
-  it('returns the whole-line room the frame leaves below the card and the row', () => {
-    // 339 - 16 - 98 - 89 = 136 available, padding 16 -> five 24pt lines: 136.
+describe('the New Session keyboard destination', () => {
+  const frame = {
+    containerY: 118,
+    containerHeight: 756,
+    footerHeight: 221,
+    windowHeight: 874,
+    keyboardVerticalOffset: 0,
+  };
+
+  it('fits the smaller whole-line input before the keyboard reaches its final height', () => {
+    const closed = resolveNewSessionFormFrameHeight({ ...frame, keyboardHeight: 0 });
+    const opened = resolveNewSessionFormFrameHeight({ ...frame, keyboardHeight: 335 });
+    const chrome = { cardTop: 14, cardChromeHeight: 101 };
+
+    expect(closed).toBe(535);
+    expect(opened).toBe(200);
+    expect(resolveNewSessionPromptMinHeight({ ...PREFERRED, ...chrome, frameHeight: closed })).toBe(
+      88
+    );
+    expect(resolveNewSessionPromptMinHeight({ ...PREFERRED, ...chrome, frameHeight: opened })).toBe(
+      64
+    );
+  });
+
+  it('keeps an already padded Android navigation inset out of the keyboard overlap', () => {
     expect(
-      resolveNewSessionPromptFrameFit({
-        ...LONG_DRAFT,
-        lineHeight: LINE_HEIGHT,
-        verticalPadding: VERTICAL_PADDING,
+      resolveNewSessionFormFrameHeight({
+        ...frame,
+        keyboardHeight: 335,
+        keyboardVerticalOffset: -24,
       })
-    ).toBe(136);
+    ).toBe(224);
   });
 
-  it('takes the requested clearance out of that room', () => {
-    const room = resolveNewSessionPromptFrameFit({
-      ...LONG_DRAFT,
-      lineHeight: LINE_HEIGHT,
-      verticalPadding: VERTICAL_PADDING,
-    });
-    const withClearance = resolveNewSessionPromptFrameFit({
-      ...LONG_DRAFT,
-      clearanceHeight: CLEARANCE,
-      lineHeight: LINE_HEIGHT,
-      verticalPadding: VERTICAL_PADDING,
-    });
-
-    // Five lines become four: the clearance is a whole line off the room.
-    expect(room).toBe(5 * LINE_HEIGHT + VERTICAL_PADDING);
-    expect(withClearance).toBe(4 * LINE_HEIGHT + VERTICAL_PADDING);
-  });
-
-  it('never returns fewer than one line, even when the frame cannot fit one', () => {
+  it('subtracts only the keyboard overlap when the form stops above the window bottom', () => {
     expect(
-      resolveNewSessionPromptFrameFit({
-        ...LONG_DRAFT,
-        frameHeight: 120,
-        lineHeight: LINE_HEIGHT,
-        verticalPadding: VERTICAL_PADDING,
+      resolveNewSessionFormFrameHeight({
+        ...frame,
+        containerY: 100,
+        containerHeight: 600,
+        footerHeight: 140,
+        windowHeight: 900,
+        keyboardHeight: 300,
       })
-    ).toBe(LINE_HEIGHT + VERTICAL_PADDING);
+    ).toBe(360);
   });
 
-  it.each([
-    { name: 'an unmeasured frame', overrides: { frameHeight: 0 } },
-    { name: 'a non-finite frame', overrides: { frameHeight: Number.NaN } },
-    { name: 'an unmeasured chrome', overrides: { cardChromeHeight: 0 } },
-    { name: 'an unmeasured row', overrides: { belowCardHeight: Number.NaN } },
-    { name: 'a negative row', overrides: { belowCardHeight: -1 } },
-    { name: 'a non-positive line height', overrides: { lineHeight: 0 } },
-    { name: 'a negative card top', overrides: { cardTop: -1 } },
-  ])('reports $name as unmeasured', ({ overrides }) => {
+  it('never gives the input a negative viewport when the footer fills the available space', () => {
     expect(
-      resolveNewSessionPromptFrameFit({
-        ...LONG_DRAFT,
-        lineHeight: LINE_HEIGHT,
-        verticalPadding: VERTICAL_PADDING,
-        ...overrides,
-      })
-    ).toBeNull();
-  });
-
-  it('reserves nothing below the card when no row is measured', () => {
-    const withRow = resolveNewSessionPromptFrameFit({
-      ...LONG_DRAFT,
-      lineHeight: LINE_HEIGHT,
-      verticalPadding: VERTICAL_PADDING,
-    });
-    const withoutRow = resolveNewSessionPromptFrameFit({
-      ...LONG_DRAFT,
-      belowCardHeight: 0,
-      lineHeight: LINE_HEIGHT,
-      verticalPadding: VERTICAL_PADDING,
-    });
-
-    // Without the row: 339 - 16 - 98 = 225 available, padding 16 -> eight
-    // 24pt lines (208); with the row's 89dp: 136 available -> five lines (136).
-    expect(withoutRow).toBe(LINE_HEIGHT * 8 + VERTICAL_PADDING);
-    expect(withRow).toBe(LINE_HEIGHT * 5 + VERTICAL_PADDING);
+      resolveNewSessionFormFrameHeight({ ...frame, footerHeight: 700, keyboardHeight: 335 })
+    ).toBe(0);
   });
 });
 
-describe('resolveNewSessionPromptMaxHeight', () => {
-  it('keeps the window cap when the frame has room for it', () => {
-    expect(
-      resolveNewSessionPromptMaxHeight({
-        ...LONG_DRAFT,
-        frameHeight: 900,
-        preferredMaxHeight: WINDOW_MAX_HEIGHT,
-        minHeight: PREFERRED_MIN_HEIGHT,
-        lineHeight: LINE_HEIGHT,
-        verticalPadding: VERTICAL_PADDING,
-      })
-    ).toBe(WINDOW_MAX_HEIGHT);
+describe('resolveComposerTopFadeHeight', () => {
+  const LINE = 24;
+
+  it('hides nothing at the top of the field, where no line is cut', () => {
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 0, lineHeight: LINE })).toBe(0);
   });
 
-  it('caps a long draft so the card and the Run on row stay inside the frame', () => {
-    // Precondition: the window-only cap overflows the frame by exactly the
-    // selector sliver the finding reported.
-    expect(
-      LONG_DRAFT.cardTop +
-        LONG_DRAFT.cardChromeHeight +
-        WINDOW_MAX_HEIGHT +
-        LONG_DRAFT.belowCardHeight
-    ).toBeGreaterThan(LONG_DRAFT.frameHeight);
-
-    const capped = resolveNewSessionPromptMaxHeight({
-      ...LONG_DRAFT,
-      preferredMaxHeight: WINDOW_MAX_HEIGHT,
-      minHeight: resolveNewSessionPromptMinHeight({ ...PREFERRED, ...LONG_DRAFT }),
-      lineHeight: LINE_HEIGHT,
-      verticalPadding: VERTICAL_PADDING,
-    });
-
-    expect(capped).toBe(112);
-    expect(capped).toBeLessThan(WINDOW_MAX_HEIGHT);
-    expect(
-      LONG_DRAFT.cardTop + LONG_DRAFT.cardChromeHeight + capped + LONG_DRAFT.belowCardHeight
-    ).toBeLessThanOrEqual(LONG_DRAFT.frameHeight - CLEARANCE);
-  });
-
-  it('keeps the floor and drops the block when the frame cannot hold both', () => {
-    const minHeight = resolveNewSessionPromptMinHeight({ ...PREFERRED, ...IPHONE_KEYBOARD });
-    const capped = resolveNewSessionPromptMaxHeight({
-      ...IPHONE_KEYBOARD,
-      preferredMaxHeight: WINDOW_MAX_HEIGHT,
-      minHeight,
-      lineHeight: LINE_HEIGHT,
-      verticalPadding: VERTICAL_PADDING,
-    });
-
-    // The frame alone still has room for the three-line floor, so the floor
-    // stands and the card alone is capped...
-    expect(minHeight).toBe(PREFERRED_MIN_HEIGHT);
-    expect(capped).toBeGreaterThanOrEqual(minHeight);
-    expect(IPHONE_KEYBOARD.cardTop + IPHONE_KEYBOARD.cardChromeHeight + capped).toBeLessThanOrEqual(
-      IPHONE_KEYBOARD.frameHeight
+  it('covers the fragment the field clips without reaching the line under it', () => {
+    // 1 dp into the line: the fragment is 1 dp of cut glyph tops, and the next
+    // whole line starts 23 dp below the edge, so only 1 dp may be masked.
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 1, lineHeight: LINE })).toBe(1);
+    // 23.9 dp in: the fragment is the last 0.1 dp of a glyph row and the next
+    // whole line begins at 0.1 dp, so a one-line fade would wash a readable
+    // line. The band is what is left of the fragment.
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 23.9, lineHeight: LINE })).toBeCloseTo(
+      0.1,
+      5
     );
-    // ...which is the accepted trade: the Run on block then sits past the
-    // frame's bottom edge and scrolls into view.
-    expect(
-      IPHONE_KEYBOARD.cardTop +
-        IPHONE_KEYBOARD.cardChromeHeight +
-        capped +
-        IPHONE_KEYBOARD.belowCardHeight
-    ).toBeGreaterThan(IPHONE_KEYBOARD.frameHeight);
   });
 
-  it('never caps below the floor the input already renders at', () => {
-    const minHeight = PREFERRED_MIN_HEIGHT;
-    const capped = resolveNewSessionPromptMaxHeight({
-      ...LONG_DRAFT,
-      frameHeight: 200,
-      preferredMaxHeight: WINDOW_MAX_HEIGHT,
-      minHeight,
-      lineHeight: LINE_HEIGHT,
-      verticalPadding: VERTICAL_PADDING,
-    });
-
-    expect(capped).toBe(minHeight);
+  it('never masks more than half a line', () => {
+    for (const intoLine of [6, 12, 18]) {
+      expect(
+        resolveComposerTopFadeHeight({ scrollOffset: intoLine, lineHeight: LINE })
+      ).toBeLessThanOrEqual(LINE / 2);
+    }
+    // The halfway point is where fragment and remaining line are equal.
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 12, lineHeight: LINE })).toBe(12);
   });
 
-  it.each([
-    { name: 'an unmeasured frame', overrides: { frameHeight: 0 } },
-    { name: 'an unmeasured row', overrides: { belowCardHeight: Number.NaN } },
-  ])('keeps the window cap for $name', ({ overrides }) => {
+  it('uses the position inside the current line across several lines of scroll', () => {
+    expect(resolveComposerTopFadeHeight({ scrollOffset: LINE + 4, lineHeight: LINE })).toBe(4);
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 3 * LINE + 20, lineHeight: LINE })).toBe(4);
+  });
+
+  it('treats an unmeasurable line or offset as no fade', () => {
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 8, lineHeight: 0 })).toBe(0);
+    expect(resolveComposerTopFadeHeight({ scrollOffset: Number.NaN, lineHeight: LINE })).toBe(0);
+  });
+});
+
+describe('resolveNewSessionPromptLineCount', () => {
+  const NO_KEYBOARD = { keyboardVisible: false, preferredLines: PREFERRED_LINES } as const;
+
+  it('gives the compact cell the one-line floor and enough room for the picker', () => {
+    // Measured on the design gate's 360x640 compact cell: the repository
+    // picker's bottom edge ended 43.81 points under the form's viewport.
+    const OVERFLOW_BELOW_THE_FOLD = 43.81;
+    const lineCount = resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight: 640 });
+    const returned = PREFERRED_MIN_HEIGHT - resolveNewSessionPromptHeight(LINE_HEIGHT, lineCount);
+
+    expect(lineCount).toBe(1);
+    // The precondition: the preferred floor is what pushed the picker under the
+    // viewport, and the two lines it gives back clear the overflow.
+    expect(returned).toBe(LINE_HEIGHT * 2);
+    expect(returned).toBeGreaterThan(OVERFLOW_BELOW_THE_FOLD);
+  });
+
+  it('keeps the preferred floor from the shortest window that holds the whole form', () => {
+    expect(resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight: 683 })).toBe(1);
+    expect(resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight: 684 })).toBe(
+      PREFERRED_LINES
+    );
+    // The design gate's base and dark cells, and the shipped phones.
+    expect(resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight: 891 })).toBe(
+      PREFERRED_LINES
+    );
+  });
+
+  it('leaves the fit to the shrinking frame while the keyboard is up', () => {
+    // A tall phone with its keyboard up reports a short window; pinning the
+    // composer to one line there would be a regression, not a fit.
     expect(
-      resolveNewSessionPromptMaxHeight({
-        ...LONG_DRAFT,
-        preferredMaxHeight: WINDOW_MAX_HEIGHT,
-        minHeight: PREFERRED_MIN_HEIGHT,
-        lineHeight: LINE_HEIGHT,
-        verticalPadding: VERTICAL_PADDING,
-        ...overrides,
+      resolveNewSessionPromptLineCount({
+        windowHeight: 530,
+        keyboardVisible: true,
+        preferredLines: PREFERRED_LINES,
       })
-    ).toBe(WINDOW_MAX_HEIGHT);
+    ).toBe(PREFERRED_LINES);
   });
 
-  it.each([Number.NaN, 0])('returns an unusable window cap (%s) unchanged', cap => {
+  it('keeps the preferred floor for an unknown window', () => {
+    for (const windowHeight of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight })).toBe(
+        PREFERRED_LINES
+      );
+    }
+  });
+});
+
+describe('the shipped phone geometry with the keyboard up', () => {
+  /**
+   * The Android emulator (1080x2400 at 420dpi) with its keyboard up: the form
+   * frame reports 339pt, the card starts 14pt below the frame top and its own
+   * chrome measures 101.33pt. The floor alone fits, so the composer keeps its
+   * three lines there and a longer draft scrolls inside them.
+   */
+  it('keeps the 3-line floor on a phone frame with the keyboard up', () => {
     expect(
-      resolveNewSessionPromptMaxHeight({
-        ...LONG_DRAFT,
-        preferredMaxHeight: cap,
-        minHeight: PREFERRED_MIN_HEIGHT,
-        lineHeight: LINE_HEIGHT,
-        verticalPadding: VERTICAL_PADDING,
+      resolveNewSessionPromptMinHeight({
+        ...PREFERRED,
+        frameHeight: 339,
+        cardTop: 14,
+        cardChromeHeight: 101.33,
       })
-    ).toBe(cap);
+    ).toBe(PREFERRED_MIN_HEIGHT);
   });
 });

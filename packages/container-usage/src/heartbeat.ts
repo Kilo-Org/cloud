@@ -1,6 +1,15 @@
 import type { Container } from '@cloudflare/containers';
-import type { nonRetryableSkuAdmissionCodes, BudgetVerdict, RecordAck } from './contracts';
-import { isNonRetryableSkuAdmissionError, type ContainerUsageClient } from './client';
+import type {
+  nonRetryableAdmissionCodes,
+  BudgetVerdict,
+  HeartbeatAck,
+  RecordAck,
+} from './contracts';
+import {
+  ContainerUsageContractError,
+  isNonRetryableAdmissionError,
+  type ContainerUsageClient,
+} from './client';
 import {
   clearBillingContext,
   getBillingContext,
@@ -19,7 +28,7 @@ export const DEFAULT_STOPPED_STATE_ABANDON_SECONDS = 60 * 60;
 type BillingContainer = Pick<Container, 'deleteSchedules' | 'getState' | 'schedule'>;
 
 export type BillingGenerationCloseCause = {
-  nonRetryableSkuAdmissionCode: (typeof nonRetryableSkuAdmissionCodes)[number];
+  nonRetryableSkuAdmissionCode: (typeof nonRetryableAdmissionCodes)[number];
 };
 
 export type BillingHeartbeatDependencies = {
@@ -43,7 +52,8 @@ export type BillingHeartbeatDependencies = {
   ) => void | Promise<void>;
   enforceBudgetStop: (
     budget: BudgetVerdict,
-    expected: { generation: string; startEpochMs: number }
+    expected: { generation: string; startEpochMs: number },
+    failureCode?: 'BILLING_UNAVAILABLE'
   ) => Promise<void>;
   onBudgetWarning?: (budget: BudgetVerdict) => Promise<void> | void;
 };
@@ -188,7 +198,7 @@ export function installBillingHeartbeat(
       rethrowAfterReschedule: boolean;
     }
   ): Promise<void> => {
-    if (isNonRetryableSkuAdmissionError(error)) {
+    if (isNonRetryableAdmissionError(error)) {
       const abandoned = await abandonIfCurrent(context, {
         nonRetryableSkuAdmissionCode: error.code,
       });
@@ -405,13 +415,44 @@ export function installBillingHeartbeat(
     }
     try {
       await dependencies.beforeHeartbeatDelivery?.(context);
-      const ack = await dependencies.client.recordHeartbeat({
-        instanceId: context.instanceId,
-        startEpochMs: context.startEpochMs,
-        seq: pendingHeartbeat.seq,
-        usageSinceLast: pendingHeartbeat.usageSinceLast,
-        context: contextForHeartbeat(context),
-      });
+      let ack: HeartbeatAck;
+      try {
+        ack = await dependencies.client.recordHeartbeat({
+          instanceId: context.instanceId,
+          startEpochMs: context.startEpochMs,
+          seq: pendingHeartbeat.seq,
+          usageSinceLast: pendingHeartbeat.usageSinceLast,
+          context: contextForHeartbeat(context),
+        });
+      } catch (error) {
+        if (!(error instanceof ContainerUsageContractError)) throw error;
+        // The meter durably recorded this segment, so the usage is already
+        // settled; only the budget verdict was unreadable. Stopping is the
+        // fail-closed reading of an unverifiable verdict.
+        const current = await getBillingContext(dependencies.storage);
+        if (
+          !current ||
+          !isSameBillingGeneration(current, context) ||
+          current.pendingHeartbeat?.seq !== pendingHeartbeat.seq
+        ) {
+          await rescheduleIfCurrent(context);
+          return;
+        }
+        await updateBillingContext(dependencies.storage, contextAfterPendingHeartbeat(current));
+        await rescheduleIfCurrent(context);
+        await dependencies.enforceBudgetStop(
+          { verdict: 'stop' },
+          {
+            generation: context.generation,
+            startEpochMs: context.startEpochMs,
+          },
+          'BILLING_UNAVAILABLE'
+        );
+        if (!dependencies.deferBudgetStopFinalSettlement) {
+          await recordStopForGeneration({ reason: 'runtime_signal' }, context.generation);
+        }
+        return;
+      }
       const current = await getBillingContext(dependencies.storage);
       if (!current || !isSameBillingGeneration(current, context)) return;
       if (

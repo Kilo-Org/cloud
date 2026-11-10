@@ -225,9 +225,9 @@ describe('POST /api/auth/magic-link', () => {
     await POST(createRequest({ email: 'User@Example.com' }));
     await POST(createRequest({ email: 'user@example.com' }));
 
-    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(4);
     const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
-    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[2]?.[1]?.rateLimitKey;
     expect(firstKey).toEqual(expect.stringMatching(/^magic-link-email:[A-Za-z0-9_-]+$/));
     expect(secondKey).toBe(firstKey);
   });
@@ -237,7 +237,7 @@ describe('POST /api/auth/magic-link', () => {
     await POST(createRequest({ email: 'test+second@googlemail.com' }));
 
     const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
-    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[2]?.[1]?.rateLimitKey;
     expect(secondKey).toBe(firstKey);
   });
 
@@ -273,6 +273,20 @@ describe('POST /api/auth/magic-link', () => {
 
   it('should reject request with missing email', async () => {
     const response = await POST(createRequest({}));
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ success: false, error: 'Invalid request data' });
+    expect(mockVerifyTurnstileJWT).not.toHaveBeenCalled();
+  });
+
+  it('should return 400 for malformed JSON body', async () => {
+    const request = new NextRequest('http://localhost:3000/api/auth/magic-link', {
+      method: 'POST',
+      body: 'not-json{',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(400);

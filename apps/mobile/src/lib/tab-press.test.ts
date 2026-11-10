@@ -30,15 +30,13 @@ describe('isFormSheetRoute', () => {
   });
 
   it('matches a dynamic sheet route by its pattern segments', () => {
-    expect(
-      isFormSheetRoute([...PROFILE_SEGMENTS, 'security-agent', '[scope]', 'dismiss', '[id]'])
-    ).toBe(true);
+    expect(isFormSheetRoute(['(app)', 'security-agent', '[scope]', 'dismiss', '[id]'])).toBe(true);
   });
 
   it('does not match a plain dynamic route that shares the pattern leaf', () => {
-    expect(
-      isFormSheetRoute([...PROFILE_SEGMENTS, 'security-agent', '[scope]', 'findings', '[id]'])
-    ).toBe(false);
+    expect(isFormSheetRoute(['(app)', 'security-agent', '[scope]', 'findings', '[id]'])).toBe(
+      false
+    );
   });
 
   it('does not match a shorter route than the suffix', () => {
@@ -61,7 +59,7 @@ describe('planProfileTabPress', () => {
     expect(
       planProfileTabPress({
         profileFocused: true,
-        segments: [...PROFILE_SEGMENTS, 'security-agent', '[scope]', 'settings', 'automation'],
+        segments: [...PROFILE_SEGMENTS, 'organization', 'members'],
         profileStackIndex: 1,
       })
     ).toBe('reset-to-root');

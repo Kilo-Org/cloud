@@ -28,7 +28,7 @@
     "check:platform": "ttsx --project scripts/tsconfig.json scripts/check-platform.ts",
     "lint": "pnpm -w exec oxlint --config packages/harness-sdk/.oxlintrc.json packages/harness-sdk/src",
     "migrations": "drizzle-kit generate && ttsx --project scripts/tsconfig.json scripts/inline-migrations.ts && pnpm -w exec oxfmt packages/harness-sdk/src/plugins/store/migrations.ts",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "test:e2e": "ttsx e2e/live.ts",
     "test:e2e:all": "ttsx e2e/all.ts",
     "test:e2e:cancel": "ttsx e2e/cancel.ts",
@@ -71,8 +71,8 @@
     "drizzle-kit": "catalog:",
     "openai": "7.36.0",
     "ttsc": "0.33.0",
-    "typescript": "7.0.2",
-    "vitest": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:vitest5"
   },
   "files": [
     "dist",

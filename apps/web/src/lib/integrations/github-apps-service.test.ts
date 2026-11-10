@@ -1,13 +1,31 @@
-import { describe, expect, it } from '@jest/globals';
-import { organizations, platform_integrations } from '@kilocode/db/schema';
+import { beforeEach, describe, expect, it } from '@jest/globals';
+const mockDeleteGitHubInstallation = jest.fn();
+jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+  ...(jest.requireActual('@/lib/integrations/platforms/github/adapter') as object),
+  deleteGitHubInstallation: (...args: unknown[]) => mockDeleteGitHubInstallation(...args),
+  fetchGitHubRepositories: jest.fn(),
+}));
+import { kilocode_users, organizations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
 import {
   getIntegrationForOrganization,
   getIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization,
 } from '@/lib/integrations/db/platform-integrations';
-import { getInstallation, isInstallationGoneError, updateModel } from './github-apps-service';
+import {
+  cancelPendingInstallation,
+  checkUserPendingInstallation,
+  getInstallation,
+  isInstallationGoneError,
+  listRepositories,
+  uninstallApp,
+  updateModel,
+} from './github-apps-service';
+
+const mockFetchGitHubRepositories = jest.mocked(fetchGitHubRepositories);
 
 describe('getInstallation', () => {
   it('prefers a healthy installation when the owner has multiple GitHub rows', async () => {
@@ -204,6 +222,141 @@ describe('updateModel', () => {
   });
 });
 
+describe('pending installation selection', () => {
+  type PendingRow = typeof platform_integrations.$inferInsert;
+
+  function pendingRow(input: { userId: string; accountId: string; createdAt: string }): PendingRow {
+    return {
+      owned_by_user_id: input.userId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: null,
+      integration_status: 'pending',
+      github_app_type: 'standard',
+      platform_account_id: input.accountId,
+      platform_account_login: `target-${input.accountId}`,
+      kilo_requester_user_id: input.userId,
+      installed_at: input.createdAt,
+      created_at: input.createdAt,
+      updated_at: input.createdAt,
+    };
+  }
+
+  async function cleanupUser(userId: string): Promise<void> {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, userId));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+  }
+
+  it('returns the newest pending request regardless of the order rows were written', async () => {
+    const user = await insertTestUser();
+    try {
+      // The older request is written first, so an unordered SELECT returns it.
+      const rows = await db
+        .insert(platform_integrations)
+        .values([
+          pendingRow({
+            userId: user.id,
+            accountId: 'older',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          }),
+          pendingRow({
+            userId: user.id,
+            accountId: 'newer',
+            createdAt: '2026-02-01T00:00:00.000Z',
+          }),
+        ])
+        .returning();
+
+      const [older, newer] = rows;
+
+      await expect(checkUserPendingInstallation(user.id)).resolves.toMatchObject({ id: newer.id });
+
+      // Touching the older row moves it to the end of the heap, flipping the
+      // physical order a second time; the answer must not follow it.
+      await db
+        .update(platform_integrations)
+        .set({ updated_at: '2026-03-01T00:00:00.000Z' })
+        .where(eq(platform_integrations.id, older.id));
+
+      await expect(checkUserPendingInstallation(user.id)).resolves.toMatchObject({ id: newer.id });
+    } finally {
+      await cleanupUser(user.id);
+    }
+  });
+
+  it('breaks equal pending creation times by descending integration id', async () => {
+    const user = await insertTestUser();
+    const [lowerId, higherId] = [crypto.randomUUID(), crypto.randomUUID()].sort();
+    const createdAt = '2026-02-01T00:00:00.000Z';
+    try {
+      await db.insert(platform_integrations).values([
+        {
+          ...pendingRow({ userId: user.id, accountId: 'lower-id', createdAt }),
+          id: lowerId,
+        },
+        {
+          ...pendingRow({ userId: user.id, accountId: 'higher-id', createdAt }),
+          id: higherId,
+        },
+      ]);
+
+      await expect(checkUserPendingInstallation(user.id)).resolves.toMatchObject({ id: higherId });
+
+      await cancelPendingInstallation({ type: 'user', id: user.id }, higherId);
+
+      await expect(checkUserPendingInstallation(user.id)).resolves.toMatchObject({ id: lowerId });
+    } finally {
+      await cleanupUser(user.id);
+    }
+  });
+
+  it('cancels exactly the named pending request and refuses any other id', async () => {
+    const user = await insertTestUser();
+    const otherUser = await insertTestUser();
+    try {
+      const rows = await db
+        .insert(platform_integrations)
+        .values([
+          pendingRow({
+            userId: user.id,
+            accountId: 'first',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          }),
+          pendingRow({
+            userId: user.id,
+            accountId: 'second',
+            createdAt: '2026-02-01T00:00:00.000Z',
+          }),
+        ])
+        .returning();
+      const [first, second] = rows;
+
+      await cancelPendingInstallation({ type: 'user', id: user.id }, first.id);
+
+      const remaining = await db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, user.id));
+      expect(remaining).toEqual([{ id: second.id }]);
+
+      await expect(
+        cancelPendingInstallation({ type: 'user', id: otherUser.id }, second.id)
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+      const stillPending = await db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, user.id));
+      expect(stillPending).toEqual([{ id: second.id }]);
+    } finally {
+      await cleanupUser(user.id);
+      await cleanupUser(otherUser.id);
+    }
+  });
+});
+
 describe('isInstallationGoneError', () => {
   it('should return true for 404 Not Found errors', () => {
     const error = { status: 404, message: 'Not Found' };
@@ -249,5 +402,177 @@ describe('isInstallationGoneError', () => {
 
   it('should return false for number errors', () => {
     expect(isInstallationGoneError(404)).toBe(false);
+  });
+});
+
+describe('listRepositories', () => {
+  type IntegrationRow = typeof platform_integrations.$inferInsert;
+
+  beforeEach(() => {
+    mockFetchGitHubRepositories.mockReset();
+  });
+
+  const providerRepository = {
+    id: 42,
+    name: 'widgets',
+    full_name: 'acme/widgets',
+    private: false,
+    created_at: '2026-05-01T00:00:00.000Z',
+  };
+
+  async function insertIntegration(overrides: Partial<IntegrationRow> = {}) {
+    const user = await insertTestUser();
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: crypto.randomUUID(),
+        integration_status: 'active',
+        repository_access: 'all',
+        ...overrides,
+      })
+      .returning();
+    return { user, row };
+  }
+
+  async function readRow(id: string) {
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, id));
+    return row;
+  }
+
+  async function cleanup(userId: string) {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, userId));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+  }
+
+  it('answers a synced empty snapshot without reading the provider or writing the row', async () => {
+    const { user, row } = await insertIntegration({
+      repositories: [],
+      repositories_synced_at: '2026-10-01T00:00:00.000Z',
+    });
+
+    try {
+      await expect(listRepositories({ type: 'user', id: user.id }, row.id)).resolves.toEqual({
+        repositories: [],
+        syncedAt: row.repositories_synced_at,
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+
+      const after = await readRow(row.id);
+      expect(after?.repositories).toEqual([]);
+      expect(after?.repositories_synced_at).toBe(row.repositories_synced_at);
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+
+  it('reads the provider and stores the new snapshot on an explicit refresh', async () => {
+    const { user, row } = await insertIntegration({
+      repositories: [],
+      repositories_synced_at: '2026-10-01T00:00:00.000Z',
+    });
+    mockFetchGitHubRepositories.mockResolvedValueOnce([providerRepository]);
+
+    try {
+      const result = await listRepositories({ type: 'user', id: user.id }, row.id, true);
+
+      expect(mockFetchGitHubRepositories).toHaveBeenCalledTimes(1);
+      expect(result.repositories).toEqual([providerRepository]);
+
+      const after = await readRow(row.id);
+      expect(after?.repositories).toEqual([providerRepository]);
+      expect(after?.repositories_synced_at).not.toBe(row.repositories_synced_at);
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+
+  it('reads the provider for a row that has never produced a snapshot', async () => {
+    const { user, row } = await insertIntegration({
+      repositories: [],
+      repositories_synced_at: null,
+    });
+    mockFetchGitHubRepositories.mockResolvedValueOnce([providerRepository]);
+
+    try {
+      const result = await listRepositories({ type: 'user', id: user.id }, row.id);
+
+      expect(mockFetchGitHubRepositories).toHaveBeenCalledTimes(1);
+      expect(result.repositories).toEqual([providerRepository]);
+
+      const after = await readRow(row.id);
+      expect(after?.repositories).toEqual([providerRepository]);
+      expect(after?.repositories_synced_at).not.toBeNull();
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+
+  it('answers a non-empty snapshot without reading the provider', async () => {
+    const { user, row } = await insertIntegration({
+      repositories: [providerRepository],
+      repositories_synced_at: '2026-10-01T00:00:00.000Z',
+    });
+
+    try {
+      await expect(listRepositories({ type: 'user', id: user.id }, row.id)).resolves.toEqual({
+        repositories: [providerRepository],
+        syncedAt: row.repositories_synced_at,
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    } finally {
+      await cleanup(user.id);
+    }
+  });
+});
+
+describe('uninstallApp', () => {
+  it('returns a fixed message when the provider rejects the deletion', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub uninstall ${crypto.randomUUID()}` })
+      .returning();
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        github_connection_role: 'workflow',
+        integration_type: 'app',
+        platform_installation_id: crypto.randomUUID(),
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+    const upstreamFailure = new Error('upstream refused for installation install-8f21');
+    mockDeleteGitHubInstallation.mockRejectedValueOnce(upstreamFailure);
+
+    try {
+      await expect(
+        uninstallApp(
+          { type: 'org', id: organization.id },
+          row.id,
+          'user-for-uninstall-test',
+          'user@example.com',
+          'Test User'
+        )
+      ).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to delete GitHub installation',
+      });
+      expect(mockDeleteGitHubInstallation).toHaveBeenCalledWith(
+        row.platform_installation_id,
+        'standard'
+      );
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
   });
 });

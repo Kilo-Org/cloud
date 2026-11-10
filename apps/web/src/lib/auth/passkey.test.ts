@@ -1,23 +1,23 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import {
-  createHash,
-  generateKeyPairSync,
-  randomBytes,
-  randomUUID,
-  sign as cryptoSign,
-  type KeyObject,
-} from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
-import { isoBase64URL, isoCBOR } from '@simplewebauthn/server/helpers';
-import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
+import {
+  buildAuthenticationResponse,
+  buildRegistrationResponse,
+  createTestAuthenticator,
+  type TestAuthenticator,
+} from '@/tests/helpers/webauthn-test-authenticator';
 
 import {
+  kilocode_users,
   passkey_challenges,
   passkey_credentials,
   passkey_sign_in_tickets,
 } from '@kilocode/db/schema';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import {
   cleanupExpiredPasskeySignInTickets,
@@ -36,7 +36,6 @@ import {
 // The relying party the module reads from configuration. The fixtures must be
 // signed for the same values or the library rejects them.
 const rpId = new URL(NEXTAUTH_URL).hostname;
-const rpOrigin = new URL(NEXTAUTH_URL).origin;
 
 // `android:apk-key-hash` origins the native app presents. The release hashes
 // are the unpadded base64url SHA-256 of the fingerprints published in
@@ -51,171 +50,7 @@ const ANDROID_ORIGINS = [ANDROID_UPLOAD_ORIGIN, ANDROID_PLAY_SIGNING_ORIGIN, AND
 const userId = 'oauth/passkey-test-user';
 const otherUserId = 'oauth/passkey-test-other-user';
 const userEmail = 'passkey-test@example.com';
-
-type CborMap = Map<string | number, unknown>;
-
-/** A `Uint8Array` over a plain `ArrayBuffer`, which is what the WebAuthn helpers take. */
-type Bytes = Uint8Array<ArrayBuffer>;
-
-function toBytes(value: Uint8Array): Bytes {
-  return new Uint8Array(value);
-}
-
-function encodeCbor(value: CborMap): Bytes {
-  return new Uint8Array(isoCBOR.encode(value as Parameters<typeof isoCBOR.encode>[0]));
-}
-
-type TestAuthenticator = {
-  credentialId: string;
-  cosePublicKey: Bytes;
-  privateKey: KeyObject;
-  rpIdHash: Uint8Array;
-};
-
-/**
- * A software authenticator: a real P-256 key pair plus the COSE public key a
- * registration ceremony would return, so signatures built here verify against
- * the stored public key exactly like a platform authenticator's would.
- */
-function createTestAuthenticator(authenticatorRpId: string = rpId): TestAuthenticator {
-  const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
-  const jwk = publicKey.export({ format: 'jwk' }) as { x: string; y: string };
-
-  return {
-    credentialId: isoBase64URL.fromBuffer(randomBytes(32)),
-    cosePublicKey: encodeCbor(
-      new Map<string | number, unknown>([
-        [1, 2], // kty: EC2
-        [3, -7], // alg: ES256
-        [-1, 1], // crv: P-256
-        [-2, isoBase64URL.toBuffer(jwk.x)],
-        [-3, isoBase64URL.toBuffer(jwk.y)],
-      ])
-    ),
-    privateKey,
-    rpIdHash: createHash('sha256').update(authenticatorRpId).digest(),
-  };
-}
-
-function buildAuthenticatorData(opts: {
-  rpIdHash: Uint8Array;
-  flags: number;
-  counter: number;
-  credentialId?: Uint8Array;
-  cosePublicKey?: Uint8Array;
-}): Buffer {
-  const counterBytes = Buffer.alloc(4);
-  counterBytes.writeUInt32BE(opts.counter);
-
-  const parts: Buffer[] = [Buffer.from(opts.rpIdHash), Buffer.from([opts.flags]), counterBytes];
-  if (opts.credentialId && opts.cosePublicKey) {
-    const credentialIdLength = Buffer.alloc(2);
-    credentialIdLength.writeUInt16BE(opts.credentialId.byteLength);
-    parts.push(
-      Buffer.alloc(16), // zeroed AAGUID
-      credentialIdLength,
-      Buffer.from(opts.credentialId),
-      Buffer.from(opts.cosePublicKey)
-    );
-  }
-  return Buffer.concat(parts);
-}
-
-function buildClientDataJSON(
-  type: 'webauthn.create' | 'webauthn.get',
-  challenge: string,
-  origin: string
-) {
-  return isoBase64URL.fromUTF8String(JSON.stringify({ type, challenge, origin }));
-}
-
-function buildRegistrationResponse(
-  authenticator: TestAuthenticator,
-  opts: {
-    challenge: string;
-    origin?: string;
-    rpIdHash?: Uint8Array;
-    counter?: number;
-  }
-): RegistrationResponseJSON {
-  const authData = buildAuthenticatorData({
-    rpIdHash: opts.rpIdHash ?? authenticator.rpIdHash,
-    // UP | UV | AT
-    flags: 0x45,
-    counter: opts.counter ?? 0,
-    credentialId: isoBase64URL.toBuffer(authenticator.credentialId),
-    cosePublicKey: authenticator.cosePublicKey,
-  });
-  const attestationObject = encodeCbor(
-    new Map<string | number, unknown>([
-      ['fmt', 'none'],
-      ['attStmt', new Map<string | number, unknown>()],
-      ['authData', authData],
-    ])
-  );
-
-  return {
-    id: authenticator.credentialId,
-    rawId: authenticator.credentialId,
-    type: 'public-key',
-    clientExtensionResults: {},
-    response: {
-      clientDataJSON: buildClientDataJSON(
-        'webauthn.create',
-        opts.challenge,
-        opts.origin ?? rpOrigin
-      ),
-      attestationObject: isoBase64URL.fromBuffer(attestationObject),
-      transports: ['internal'],
-    },
-  };
-}
-
-function buildAuthenticationResponse(
-  authenticator: TestAuthenticator,
-  opts: {
-    challenge: string;
-    counter: number;
-    origin?: string;
-    rpIdHash?: Uint8Array;
-    userHandle?: Uint8Array;
-  }
-): AuthenticationResponseJSON {
-  const clientDataJSON = buildClientDataJSON(
-    'webauthn.get',
-    opts.challenge,
-    opts.origin ?? rpOrigin
-  );
-  const authData = buildAuthenticatorData({
-    rpIdHash: opts.rpIdHash ?? authenticator.rpIdHash,
-    // UP | UV
-    flags: 0x05,
-    counter: opts.counter,
-  });
-  const clientDataHash = createHash('sha256')
-    .update(Buffer.from(isoBase64URL.toBuffer(clientDataJSON)))
-    .digest();
-  const signature = cryptoSign(
-    'sha256',
-    Buffer.concat([authData, clientDataHash]),
-    // WebAuthn ES256 signatures are DER-encoded ECDSA values, which is what
-    // the library unwraps before handing them to WebCrypto.
-    { key: authenticator.privateKey }
-  );
-
-  return {
-    id: authenticator.credentialId,
-    rawId: authenticator.credentialId,
-    type: 'public-key',
-    clientExtensionResults: {},
-    response: {
-      clientDataJSON,
-      authenticatorData: isoBase64URL.fromBuffer(toBytes(authData)),
-      signature: isoBase64URL.fromBuffer(toBytes(signature)),
-      userHandle: opts.userHandle ? isoBase64URL.fromBuffer(toBytes(opts.userHandle)) : undefined,
-    },
-  };
-}
+const SESSION_PEPPER = 'passkey-test-session-pepper';
 
 async function expectRefusal(promise: Promise<unknown>, code: string): Promise<void> {
   const error: unknown = await promise.then(
@@ -273,6 +108,17 @@ describe('passkey', () => {
     await db.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, otherUserId));
     await db.delete(passkey_challenges).where(eq(passkey_challenges.kilo_user_id, userId));
     await db.delete(passkey_challenges).where(eq(passkey_challenges.kilo_user_id, otherUserId));
+    // Registration binds a credential only while the registering session's
+    // pepper is still current on the user row.
+    for (const id of [userId, otherUserId]) {
+      await db
+        .insert(kilocode_users)
+        .values(defineTestUser({ id, web_session_pepper: SESSION_PEPPER }))
+        .onConflictDoUpdate({
+          target: kilocode_users.id,
+          set: { web_session_pepper: SESSION_PEPPER },
+        });
+    }
   });
 
   describe('createRegistrationOptions', () => {
@@ -313,7 +159,8 @@ describe('passkey', () => {
       const credential = await verifyRegistration(
         userId,
         first.challengeId,
-        buildRegistrationResponse(authenticator, { challenge: first.options.challenge })
+        buildRegistrationResponse(authenticator, { challenge: first.options.challenge }),
+        SESSION_PEPPER
       );
 
       const second = await createRegistrationOptions(userId, userEmail);
@@ -331,7 +178,8 @@ describe('passkey', () => {
       const credential = await verifyRegistration(
         userId,
         challengeId,
-        buildRegistrationResponse(authenticator, { challenge: options.challenge })
+        buildRegistrationResponse(authenticator, { challenge: options.challenge }),
+        SESSION_PEPPER
       );
 
       expect(credential.kilo_user_id).toBe(userId);
@@ -351,7 +199,8 @@ describe('passkey', () => {
         verifyRegistration(
           userId,
           challengeId,
-          buildRegistrationResponse(authenticator, { challenge: 'not-the-stored-challenge' })
+          buildRegistrationResponse(authenticator, { challenge: 'not-the-stored-challenge' }),
+          SESSION_PEPPER
         ),
         'WRONG_CHALLENGE'
       );
@@ -364,10 +213,12 @@ describe('passkey', () => {
         challenge: options.challenge,
       });
 
-      await expect(verifyRegistration(userId, challengeId, response)).resolves.toBeDefined();
+      await expect(
+        verifyRegistration(userId, challengeId, response, SESSION_PEPPER)
+      ).resolves.toBeDefined();
 
       await expectRefusal(
-        verifyRegistration(userId, challengeId, response),
+        verifyRegistration(userId, challengeId, response, SESSION_PEPPER),
         'CHALLENGE_ALREADY_USED'
       );
     });
@@ -388,7 +239,8 @@ describe('passkey', () => {
         verifyRegistration(
           userId,
           challengeId,
-          buildRegistrationResponse(authenticator, { challenge })
+          buildRegistrationResponse(authenticator, { challenge }),
+          SESSION_PEPPER
         ),
         'CHALLENGE_EXPIRED'
       );
@@ -401,7 +253,8 @@ describe('passkey', () => {
         verifyRegistration(
           userId,
           randomUUID(),
-          buildRegistrationResponse(authenticator, { challenge: 'anything' })
+          buildRegistrationResponse(authenticator, { challenge: 'anything' }),
+          SESSION_PEPPER
         ),
         'CHALLENGE_EXPIRED'
       );
@@ -418,7 +271,8 @@ describe('passkey', () => {
           buildRegistrationResponse(authenticator, {
             challenge: options.challenge,
             origin: 'https://evil.example',
-          })
+          }),
+          SESSION_PEPPER
         ),
         'VERIFICATION_FAILED'
       );
@@ -435,7 +289,8 @@ describe('passkey', () => {
           buildRegistrationResponse(authenticator, {
             challenge: options.challenge,
             rpIdHash: createHash('sha256').update('api.kilo.ai').digest(),
-          })
+          }),
+          SESSION_PEPPER
         ),
         'VERIFICATION_FAILED'
       );
@@ -449,7 +304,8 @@ describe('passkey', () => {
         verifyRegistration(
           userId,
           challengeId,
-          buildRegistrationResponse(authenticator, { challenge: options.challenge })
+          buildRegistrationResponse(authenticator, { challenge: options.challenge }),
+          SESSION_PEPPER
         ),
         'VERIFICATION_FAILED'
       );
@@ -464,7 +320,8 @@ describe('passkey', () => {
         verifyRegistration(
           otherUserId,
           challengeId,
-          buildRegistrationResponse(authenticator, { challenge: options.challenge })
+          buildRegistrationResponse(authenticator, { challenge: options.challenge }),
+          SESSION_PEPPER
         ),
         'VERIFICATION_FAILED'
       );
@@ -665,7 +522,8 @@ describe('passkey', () => {
       const credential = await verifyRegistration(
         userId,
         challengeId,
-        buildRegistrationResponse(authenticator, { challenge: options.challenge, origin })
+        buildRegistrationResponse(authenticator, { challenge: options.challenge, origin }),
+        SESSION_PEPPER
       );
 
       expect(credential.credential_id).toBe(authenticator.credentialId);
@@ -700,7 +558,8 @@ describe('passkey', () => {
           buildRegistrationResponse(authenticator, {
             challenge: options.challenge,
             origin: 'android:apk-key-hash:not-a-registered-certificate',
-          })
+          }),
+          SESSION_PEPPER
         ),
         'VERIFICATION_FAILED'
       );
@@ -718,7 +577,8 @@ describe('passkey', () => {
             buildRegistrationResponse(authenticator, {
               challenge: options.challenge,
               origin: ANDROID_DEBUG_ORIGIN,
-            })
+            }),
+            SESSION_PEPPER
           ),
           'VERIFICATION_FAILED'
         );
@@ -736,7 +596,8 @@ describe('passkey', () => {
           buildRegistrationResponse(authenticator, {
             challenge: options.challenge,
             origin: ANDROID_UPLOAD_ORIGIN,
-          })
+          }),
+          SESSION_PEPPER
         );
 
         expect(credential.credential_id).toBe(authenticator.credentialId);

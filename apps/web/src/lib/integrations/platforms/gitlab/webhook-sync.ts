@@ -5,6 +5,7 @@ import {
   deleteProjectWebhook,
   findKiloWebhook,
   updateProjectWebhook,
+  GitLabAuthenticationError,
   GitLabWebhookPermissionError,
 } from './adapter';
 
@@ -123,7 +124,9 @@ export async function syncWebhooksForRepositories(
       }
     } catch (error) {
       let errorMessage: string;
-      if (error instanceof GitLabWebhookPermissionError) {
+      if (error instanceof GitLabAuthenticationError) {
+        errorMessage = `GitLab rejected the connected credential: reconnect the GitLab integration, then retry. You can still configure the webhook manually in GitLab.`;
+      } else if (error instanceof GitLabWebhookPermissionError) {
         errorMessage = `Permission denied: You need Maintainer role or higher on this project to configure webhooks automatically. You can still configure the webhook manually in GitLab.`;
       } else {
         errorMessage = error instanceof Error ? error.message : String(error);
@@ -139,6 +142,7 @@ export async function syncWebhooksForRepositories(
         projectId,
         error: errorMessage,
         isPermissionError: error instanceof GitLabWebhookPermissionError,
+        isAuthenticationError: error instanceof GitLabAuthenticationError,
       });
     }
   }

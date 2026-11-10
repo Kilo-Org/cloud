@@ -1,5 +1,8 @@
 import { modelsByProvider } from '@kilocode/db/schema';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type {
+  GatewayModelMap,
+  GatewayModelWithEndpoints,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getSnapshotModelVariantId,
@@ -8,7 +11,6 @@ import {
 import {
   getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsMetadataFromDatabase,
-  type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   normalizeInferenceProviderId,
@@ -32,19 +34,19 @@ export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterRe
 
 type ProviderIndexLoaderOptions = {
   fetchSnapshot: FetchModelsByProviderSnapshot;
-  fetchOpenRouterModels: () => Promise<StoredModelMap>;
-  fetchVercelModels: () => Promise<StoredModelMap>;
+  fetchOpenRouterModels: () => Promise<GatewayModelMap>;
+  fetchVercelModels: () => Promise<GatewayModelMap>;
   ttlMs: number;
   nowMs: () => number;
 };
 
 /**
  * Provider slugs that serve one exact model variant, derived from the gateway
- * endpoint metadata stored at sync time. Endpoint tags have the shape
+ * endpoint metadata stored in the metadata cache. Endpoint tags have the shape
  * `<provider-slug>[/<quantization>]`, so their prefix lives in the same slug
  * namespace as provider allow lists and `provider.only` routing.
  */
-export function getEndpointProviderSlugs(model: StoredModel): Set<string> {
+export function getEndpointProviderSlugs(model: GatewayModelWithEndpoints): Set<string> {
   return new Set(
     model.endpoints.flatMap(endpoint =>
       endpoint.tag ? [normalizeInferenceProviderId(endpoint.tag)] : []
@@ -63,7 +65,7 @@ export function getEndpointProviderSlugs(model: StoredModel): Set<string> {
  */
 export function narrowProviderSlugsToVariant(
   snapshotProviderSlugs: ReadonlySet<string>,
-  variantModel: StoredModel | undefined
+  variantModel: GatewayModelWithEndpoints | undefined
 ): ReadonlySet<string> {
   if (!variantModel) return snapshotProviderSlugs;
   const variantProviderSlugs = getEndpointProviderSlugs(variantModel);
@@ -74,12 +76,23 @@ export function narrowProviderSlugsToVariant(
   return narrowed.size > 0 ? narrowed : snapshotProviderSlugs;
 }
 
+/**
+ * The snapshot providers Kilo's own routes can use. BYOK-only providers serve only an
+ * organization's own catalog-mode keys, which are decided per key provider instead (see
+ * `isModelAllowedForProviderKey`).
+ */
+export function getKiloRouteProviders(
+  snapshot: NormalizedOpenRouterResponse
+): NormalizedOpenRouterResponse['providers'] {
+  return snapshot.providers.filter(provider => !provider.byokOnly);
+}
+
 export function buildModelIdToProviderSlugsIndex(
   snapshot: NormalizedOpenRouterResponse
 ): Map<string, Set<string>> {
   const index = new Map<string, Set<string>>();
 
-  for (const provider of snapshot.providers) {
+  for (const provider of getKiloRouteProviders(snapshot)) {
     for (const model of provider.models) {
       const normalizedModelId = normalizeModelId(model.slug);
       const existing = index.get(normalizedModelId);
@@ -104,7 +117,7 @@ export function buildDataCollectionRequiredModelIds(
   snapshot: NormalizedOpenRouterResponse
 ): Set<string> {
   const trainsOnEveryProvider = new Map<string, boolean>();
-  for (const provider of snapshot.providers) {
+  for (const provider of getKiloRouteProviders(snapshot)) {
     for (const model of provider.models) {
       const modelId = getSnapshotModelVariantId(model);
       trainsOnEveryProvider.set(

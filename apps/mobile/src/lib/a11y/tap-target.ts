@@ -1,4 +1,4 @@
-import { I18nManager } from 'react-native';
+import { I18nManager, Platform } from 'react-native';
 
 // The one place the mobile tap-target geometry lives. Components import these
 // numbers and classes instead of re-spelling them, so the audit floor, the
@@ -35,6 +35,111 @@ export const ICON_TARGET_DP = 48;
 export const ICON_TARGET_BOX_CLASS = 'h-[48px] w-[48px] items-center justify-center';
 
 /**
+ * The minimum an action's own node renders inside a state surface — an empty
+ * or error state's way out. Android's `<Button>` rule is 48dp, and a
+ * control-size audit reads the pressed node's view rect, so the shared
+ * `Button` default frame (`min-h-[44px]`) lands 4dp under it; `hitSlop` widens
+ * the touch region without moving that rect. 48 clears iOS's 44pt on the same
+ * node, so one class serves both platforms and no `Platform` branch is needed.
+ * Explicit px, because NativeWind's rem is 14pt here.
+ */
+export const STATE_ACTION_TARGET_DP = 48;
+
+/** The floor every state surface's action renders, as {@link STATE_ACTION_TARGET_DP}. */
+export const STATE_ACTION_CLASS = 'min-h-[48px]';
+
+/**
+ * The frame an interactive row or segment renders on its own pressable node —
+ * a selection row, a menu row, a disclosure row, a picker row. A row sized by
+ * its content reports that content's height, and `hitSlop` widens the touch
+ * region without moving the rect a control-size audit reads, so the floor has
+ * to be the row's class. The same floor clears Android's button minimum and the
+ * design target on iOS, so one class serves both platforms and no `Platform`
+ * branch is needed. Explicit px, because NativeWind's rem shrinks the
+ * `min-h-11` scale step below both.
+ */
+export const ROW_TARGET_CLASS = 'min-h-[48px]';
+
+/**
+ * The frame a screen header's titled control renders on its own pressable
+ * node — the pressable title and a header title composed of its own content.
+ * A title sized by its text reports that line's height (`text-lg` is 24.8dp),
+ * and `hitSlop` widens the touch region without moving the rect a control-size
+ * audit reads, so the floor has to be the control's own class. 48 keeps the
+ * measured box on Android's button minimum and clears iOS's 44pt on the same
+ * node; the header row is already this tall, so the header height does not
+ * change.
+ */
+export const HEADER_TITLE_TARGET_CLASS = 'min-h-[48px]';
+
+/**
+ * The box a profile row's identity block renders: the item's name and what
+ * qualifies it, declared first in the row. It spans {@link ICON_TARGET_DP}, the
+ * height of the controls beside it, so its frame is the row's leading top
+ * corner rather than a shorter block the taller control boxes start above.
+ * Assistive technology focuses a row from its layout, so a block that starts
+ * higher is reached before those controls. Explicit px, because NativeWind's
+ * rem is 14pt here.
+ */
+export const ROW_IDENTITY_CLASS = 'min-h-[48px] min-w-0 flex-1 justify-center';
+
+/**
+ * The frame a dense interactive row renders when it keeps the group's own
+ * rhythm instead of {@link ROW_TARGET_CLASS}: `py-3` top and bottom plus the
+ * row's 13px value line. Measured on the Android emulator at font scale 1, a
+ * `KvRow` reads 38.9–39.6 dp tall — the rhythm every `KvRow` group already
+ * uses. A list of counts reads as one column, so its rows keep that rhythm
+ * rather than the taller interactive frame.
+ */
+export const DENSE_ROW_FRAME_DP = 39;
+
+/** The frame a dense row renders, as {@link DENSE_ROW_FRAME_DP}. */
+export const DENSE_ROW_FRAME_CLASS = 'min-h-[39px]';
+
+/**
+ * Per-side vertical `hitSlop` of a row on {@link DENSE_ROW_FRAME_DP}:
+ * `39 + 3 + 3 = 45 dp`, past `DESIGN.md:364`'s 44pt design target, so even the
+ * shortest measured frame (38.9 dp) reaches 44.9 dp. Stacked rows share the
+ * boundary between them, so two neighbours' reaches meet instead of leaving a
+ * dead strip, and neither reaches another control.
+ */
+export const DENSE_ROW_HIT_SLOP_DP = 3;
+
+/** The `hitSlop` a row on {@link DENSE_ROW_FRAME_DP} renders, as {@link DENSE_ROW_HIT_SLOP_DP}. */
+export const DENSE_ROW_HIT_SLOP = {
+  top: DENSE_ROW_HIT_SLOP_DP,
+  bottom: DENSE_ROW_HIT_SLOP_DP,
+} as const;
+
+/**
+ * The box a Home section header's text action renders, in dp. It matches the
+ * header's label box, so a row with an action is no taller than a row without
+ * one, and every Home section keeps one gap to the block above it.
+ */
+export const SECTION_ACTION_FRAME_DP = 28;
+
+/** The box a Home section header's text action renders, as {@link SECTION_ACTION_FRAME_DP}. */
+export const SECTION_ACTION_BOX_CLASS = 'min-h-[28px] min-w-[48px]';
+
+/**
+ * Per-side vertical `hitSlop` of a {@link SECTION_ACTION_FRAME_DP} action:
+ * `28 + 9 + 9 = 46 dp`, past the `DESIGN.md:364` 44 dp target even after the
+ * box renders a fraction of a dp short. The header row pads the box by the same
+ * amount ({@link SECTION_HEADER_ROW_PADDING_CLASS}), so the whole reach stays
+ * inside the row and Android delivers every touch in it.
+ */
+export const SECTION_ACTION_HIT_SLOP_DP = 9;
+
+/** The vertical padding of a Home section header row, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
+export const SECTION_HEADER_ROW_PADDING_CLASS = 'py-[9px]';
+
+/** The `hitSlop` a Home section header action renders, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
+export const SECTION_ACTION_HIT_SLOP = {
+  top: SECTION_ACTION_HIT_SLOP_DP,
+  bottom: SECTION_ACTION_HIT_SLOP_DP,
+} as const;
+
+/**
  * The box every icon-only control renders. Its own node carries the target, as
  * a control-size audit measures, and 32pt clears the audit's
  * {@link MIN_TAP_TARGET_DP} floor while fitting the agents header row's
@@ -52,6 +157,16 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
  * `DESIGN.md:364`'s 44pt rather than landing on it.
  */
 export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
+
+/**
+ * Per-side `hitSlop` of the shared `Button`'s compact size (`sm`), whose
+ * `min-h-[36px]` frame stays the visual height. 5, not 4: a 36dp frame at
+ * density 420 renders 35.81dp, and 4 per side then lands on 43.81dp — under
+ * `DESIGN.md:364`'s 44pt, not on it. 36 + 5 + 5 = 46pt keeps a margin on both
+ * axes without the extra band two buttons on a `gap-2` row would each claim at
+ * 6 per side.
+ */
+export const COMPACT_BUTTON_HIT_SLOP = { top: 5, bottom: 5, left: 5, right: 5 } as const;
 
 /**
  * The frame a compact `h-11` control renders, in pt. NativeWind's rem is 14pt
@@ -80,21 +195,91 @@ export function compactControlTargetDp(): number {
 }
 
 /**
+ * The frame the composer's model and mode chips render at `px-3 py-1.5` with
+ * `text-sm`, in pt: NativeWind's rem is 14pt here, so the 17.5pt line box plus
+ * 2 × 5.25pt of padding. Android lays the row out in whole physical pixels, so
+ * that measures 27.81pt there against 28.3pt on iOS; the shorter measurement is
+ * the one the arithmetic has to clear.
+ */
+export const CHIP_FRAME_DP = 27.81;
+
+/**
+ * Per-side vertical `hitSlop` of a {@link CHIP_FRAME_DP} chip:
+ * `27.81 + 8.75 + 8.75 = 45.31pt` (iOS: 28.3 + 17.5 = 45.8pt), which clears
+ * `DESIGN.md:364`'s 44pt target even when Android truncates each fractional
+ * inset — 8.75pt is 22.97px at 2.625px/dp, so 22px per side leaves 44.57pt.
+ * 8.75, not the 8 per side that lands on 43.81pt here, or 8.25 that leaves
+ * 0.31pt of margin — inside the half point the control-size audit itself allows
+ * for pixel rounding. 8.75 is also the composer toolbar row's `py-2.5`, so the
+ * reach fills that row's height exactly instead of extending beyond it.
+ * Vertical only: the chip's own padding and chevron already make it wider than
+ * {@link TOUCH_TARGET_DP}, and a horizontal reach would run into the mode chip
+ * beside it in `chat-toolbar.tsx` and into the paste button's own slop.
+ */
+export const CHIP_HIT_SLOP_DP = 8.75;
+
+/** The `hitSlop` a {@link CHIP_FRAME_DP} chip renders, as {@link CHIP_HIT_SLOP_DP}. */
+export const CHIP_HIT_SLOP = {
+  top: CHIP_HIT_SLOP_DP,
+  bottom: CHIP_HIT_SLOP_DP,
+} as const;
+
+/**
+ * The box a text-only action renders so its own node carries the platform's
+ * minimum touch target: `DESIGN.md:364`'s 44pt on iOS and
+ * {@link ICON_TARGET_DP}'s 48dp on Android. The agents history link is one such
+ * action: its label is a single eyebrow line, so without a box of its own the
+ * node's rect is that line (measured 14.7pt on device) and a control-size audit
+ * reads exactly that rect — `hitSlop` widens the touch region, not the rect.
+ *
+ * Both axes are minimums because a caller drops its hit slop: a short label
+ * (`common.done` in Arabic or Japanese, `chat.messageActions.edit`) is only a
+ * couple of glyphs wide, so a height floor alone would leave the rect under
+ * {@link MIN_TAP_TARGET_DP} horizontally. The label centres in the wider box
+ * (`items-center justify-center`), the same form as the voice-test field's
+ * compact text control, so a long label is untouched.
+ *
+ * Explicit px, because NativeWind's rem is 14pt here: `min-h-11` renders
+ * 38.5pt, under both minimums. They are minimums, not fixed sizes, so a label
+ * scaled by large Dynamic Type still grows the frame. Read at render time
+ * rather than captured in a module constant, so it follows the platform (the
+ * trap `attachment-preview-strip.tsx` documents); the utilities stay spelled
+ * out because NativeWind extracts them from the source text.
+ */
+export function textActionTargetClass(): string {
+  return Platform.OS === 'android' ? 'min-h-[48px] min-w-[48px]' : 'min-h-[44px] min-w-[44px]';
+}
+
+/**
  * The box an inline text link renders. The sign-in legal links sit inside a
  * sentence, so their box is the control-size audit's {@link MIN_TAP_TARGET_DP}
  * floor and the slop carries the reach; a larger box would reflow the prose
  * that should keep `DESIGN.md`'s compact control look.
  *
- * The `-my-[7px]` is the layout-neutral form. The box's 28dp floor is twice
- * the `text-xs` line it sits in (line-height `calc(1 / 0.75)` of 10.5dp = 14dp),
- * so without it the box lifts the whole sentence row to 28dp and centres the
- * glyphs in a taller line. Cancelling `(28 - 14) / 2` on each side leaves the
- * node's own rect at the audit floor while the row keeps a plain text line and
- * one baseline. When the surrounding text is larger than `text-xs`, its line
- * wins over the shorter box outer, so the cancel is safe for either size.
+ * The `-my-[7px]` is the layout-neutral form. It cancels the box's 28dp floor
+ * down to a 14dp outer, so the box can never lift the sentence row to its own
+ * height and centre the glyphs in a taller line; the node's own rect stays at
+ * the audit floor while the row keeps one text line and one baseline. The
+ * sentence itself is `text-sm` ({@link INLINE_LINK_SENTENCE_LINE_DP} 17.5dp), so
+ * the text line is taller than the box's outer and sets the row height, exactly
+ * as it did while the copy was `text-xs`.
+ *
+ * The box therefore overflows its own flex line by
+ * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2` on each side, and a row that
+ * wraps needs {@link INLINE_LINK_LINE_GAP_CLASS} between its lines: wrapped
+ * lines have no gutter of their own, and without it the box on a line reaches
+ * into the prose of the line above it.
  */
 export const INLINE_LINK_BOX_CLASS =
   'min-h-[28px] min-w-[28px] -my-[7px] items-center justify-center';
+
+/**
+ * The line a sentence carrying {@link INLINE_LINK_BOX_CLASS} lays out on, in dp:
+ * `text-sm` at NativeWind's 14dp rem, whose `1.25rem` line-height is 1.4× the
+ * 12.25dp type (`DESIGN.md`'s label step). Everything below measures the box's
+ * overflow against this line rather than assuming the old `text-xs` one.
+ */
+export const INLINE_LINK_SENTENCE_LINE_DP = 17.5;
 
 /**
  * Per-side horizontal `hitSlop` of an inline link pointing at its neighbour.
@@ -122,9 +307,10 @@ export const INLINE_LINK_OUTER_HIT_SLOP_DP = 12;
  * horizontal reach, which spends the sentence's own width, every extra dp of
  * vertical region has to be reserved as free space around the row
  * ({@link INLINE_LINK_ROW_CLASS}). The box's layout-neutral `-my-[7px]` form
- * keeps the sentence on its `text-xs` line while the box's 28dp rect overflows
- * that line by `(28 - 14) / 2 = 7dp` on each side, so each link's vertical
- * region reaches `7 + 8 = 15dp` beyond the line — exactly the free space
+ * keeps the sentence on its `text-sm` line
+ * ({@link INLINE_LINK_SENTENCE_LINE_DP}) while the box's 28dp rect overflows it
+ * by `(28 - 17.5) / 2 = 5.25dp` on each side, so each link's vertical region
+ * reaches `5.25 + 8 = 13.25dp` beyond the line — inside the free space
  * {@link INLINE_LINK_ROW_CLASS} reserves for it.
  */
 export const INLINE_LINK_VERTICAL_HIT_SLOP_DP = 8;
@@ -150,22 +336,65 @@ export function inlineLinkHitSlop(edge: 'start' | 'end') {
 }
 
 /**
+ * The vertical gap a wrapping sentence row keeps between its lines, and its
+ * class. A sentence with an inline link row wraps in long locales, and a link
+ * box's layout-neutral form makes its rect overflow its own flex line by
+ * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 = 5.25dp` on each side.
+ * Without a gap the wrapped lines sit one text line apart, so a box on the
+ * second line reaches up into the first line's prose (and a box on the first
+ * line reaches down into the second). The gap is the next whole dp above that
+ * overflow plus its headroom, so a wrapped line never collides with the box on
+ * the line before it while the two lines still read as one sentence; a sentence
+ * that fits one line never sees it, because a flex row's `gap-y` only separates
+ * wrapped lines.
+ */
+export const INLINE_LINK_LINE_GAP_DP = 7;
+export const INLINE_LINK_LINE_GAP_CLASS = 'gap-y-[7px]';
+
+/**
  * The extra vertical margin the legal sentence row carries, and its class.
  *
  * A legal link's 44pt vertical region reaches
- * `(28 - 14) / 2 + 8 = 15dp` past the `text-xs` line it sits on. The screen's
- * `gap-3` gutter to the Continue button above the row (and to the ghost button
- * below it) is 10.5dp — 4.5dp short — so a region at the full 44pt would reach
- * into the Continue button's frame, and a tap on its bottom strip would open
- * Terms instead of sending the code (an earlier revision capped the region at
- * 3dp to avoid that and lost the target). The row therefore adds 5dp:
- * 10.5 + 5 = 15.5dp of free space each side, which holds the whole 44pt region
- * clear of both neighbours. The row itself still lays out on a `text-xs` line;
- * the margin is the extra gutter the target needs, and it is part of the row's
- * box, not its height.
+ * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 + 8 = 13.25dp` past the text
+ * line it sits on. The screen's `gap-3` gutter to the Continue button above the
+ * row (and to the ghost button below it) is 10.5dp — 2.75dp short — so a region
+ * at the full 44pt would reach into the Continue button's frame, and a tap on
+ * its bottom strip would open Terms instead of sending the code (an earlier
+ * revision capped the region at 3dp to avoid that and lost the target). The row
+ * therefore adds 5dp: 10.5 + 5 = 15.5dp of free space each side, which holds
+ * the whole 44pt region clear of both neighbours. The row itself still lays out
+ * on one text line; the margin is the extra gutter the target needs, and it is
+ * part of the row's box, not its height. The wrapped-line gap
+ * ({@link INLINE_LINK_LINE_GAP_CLASS}) is separate from it: this margin is
+ * outside the row, that gap is between the row's own lines.
  */
 export const INLINE_LINK_ROW_MARGIN_DP = 5;
-export const INLINE_LINK_ROW_CLASS = 'my-[5px]';
+export const INLINE_LINK_ROW_CLASS = 'my-[5px] gap-y-[7px]';
+
+/**
+ * The box a text action renders at the end of a line of copy — the code
+ * reviewer's sync line is its snapshot's age with Refresh at the line's end.
+ *
+ * `sm` draws a 36dp frame, and the line it shares with the copy is one text
+ * line tall (14dp at `text-xs`). A frame that cancels its own layout height and
+ * floats over the line reaches `(36 - 14) / 2 = 11dp` past it, which is more
+ * than the 7dp gap the line keeps above it: the frame then covers the last
+ * 1.9dp of the copy above, and a box collides with a line it does not own. The
+ * 28dp box is the audit floor ({@link MIN_TAP_TARGET_DP}) and reaches
+ * `(28 - 14) / 2 = 7dp` past the line, which that gap absorbs. The vertical
+ * slop carries the rest of the 44pt target, as {@link INLINE_LINK_BOX_CLASS}
+ * does for prose; it is 9dp rather than the inline link's 8dp because a
+ * `min-h-[28px]` box measures 27.8dp on Android, and 8dp a side would then
+ * land a fifth of a dp short of 44. The horizontal side is 5dp for the same
+ * reason: a call site keeps a 36dp minimum width for a short label in another
+ * locale, and that floor can lay out at about 35.81dp, so 4dp a side reached
+ * 43.81dp. 36 + 5 + 5 = 46dp holds the reach past 44 whatever the pixel
+ * rounding does.
+ */
+export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
+
+/** The `hitSlop` {@link LINE_ACTION_BOX_CLASS} renders, reaching past 44dp each way. */
+export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as const;
 
 /**
  * The class an inline-link connector carries so the two links' facing reaches do
@@ -179,6 +408,44 @@ export const INLINE_LINK_ROW_CLASS = 'my-[5px]';
  * connectors centred on the space they reserve.
  */
 export const INLINE_LINK_CONNECTOR_CLASS = 'min-w-[10px] text-center';
+
+/**
+ * The box a legal link renders — the two store links under the credit packs —
+ * rather than a word inside a sentence with a neighbour
+ * {@link INLINE_LINK_BOX_CLASS} has to stay clear of. A link that ends a
+ * sentence uses {@link INLINE_LINK_BOX_CLASS} instead: it sits in the prose, so
+ * it takes the audit floor and the slop rather than a standalone box.
+ *
+ * The whole target is the box, {@link ICON_TARGET_DP} 48dp tall and wide, the
+ * size the control-size audit reads from a node's own rect (Android's
+ * `<Button>` minimum). `hitSlop` cannot reach it: the audit measures the rect,
+ * not the touch region.
+ *
+ * The utilities below are spelled out rather than interpolated from the dp
+ * constants beside them: the class compiler reads class names out of the source
+ * files, so an interpolated name can miss the generated stylesheet and silently
+ * apply nothing. The tests hold the literals to the constants.
+ */
+export const LEGAL_LINK_MIN_DP = 48;
+
+/**
+ * The box two store legal links render in a wrapping row. Both keep their full
+ * {@link LEGAL_LINK_MIN_DP} height in the flow, so the row's lines are 48dp
+ * tall: when a long locale wraps the second link onto its own line the two
+ * boxes sit one gutter apart and can never overlap, so a tap between the lines
+ * opens the link it points at. The footer pays one 48dp line for that, which is
+ * what keeps the geometry honest: a box that cancelled its own height would
+ * reach 17dp into the line below. The links' copy is `text-xs`, a 14dp line.
+ */
+export const LEGAL_LINK_BOX_CLASS = 'min-h-[48px] min-w-[48px] items-center justify-center';
+
+/**
+ * The row the two store legal links share: side by side when they fit, one per
+ * line when a long locale wraps them. `gap-x-4` separates two boxes on one line
+ * (14dp, and no slop points sideways); the boxes' own height separates the
+ * wrapped lines.
+ */
+export const LEGAL_LINK_ROW_CLASS = 'flex-row flex-wrap items-center gap-x-4';
 
 /**
  * The reach a box plus its per-side slop offers. This is the number the tests

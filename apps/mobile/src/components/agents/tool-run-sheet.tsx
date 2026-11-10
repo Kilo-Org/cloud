@@ -29,7 +29,7 @@ export function ToolRunSheet({ visible, parts, onClose, onOpenPart }: Readonly<T
   const { t } = useTranslation();
 
   return (
-    <SessionPageSheet visible={visible} onClose={onClose}>
+    <SessionPageSheet visible={visible} onClose={onClose} dismissible>
       <SheetHeader
         title={t('agentChat.toolRun.sheetTitle')}
         onDone={onClose}

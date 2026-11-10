@@ -1,14 +1,14 @@
 import {
   SESSION_CARD_QUIET_AFTER_MS,
   type SessionLiveActivityContentState,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 
 import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
 import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
 import { formatGlanceableClock, formatGlanceableCount } from './count-format';
-import { type SessionNotificationCard } from './session-notification';
+import { type SessionCardScope, type SessionNotificationCard } from './session-notification';
 
 /**
  * How one session's content maps to the Android notification's system-template
@@ -99,11 +99,12 @@ function planText(content: SessionLiveActivityContentState): string | null {
   if (plan === null || plan === undefined || plan.total <= 0) {
     return null;
   }
-  return [
-    formatGlanceableCount(plan.done),
-    translate('glanceable.planOf'),
-    formatGlanceableCount(plan.total),
-  ].join(' ');
+  // One template, so each language places the two counts where its own grammar
+  // needs them: a bare separator between them cannot be reordered.
+  return i18n.t('glanceable.planProgress', {
+    done: formatGlanceableCount(plan.done),
+    total: formatGlanceableCount(plan.total),
+  });
 }
 
 type QuietFields = Pick<
@@ -147,7 +148,7 @@ function quietFields(content: SessionLiveActivityContentState, now: number): Qui
 /** The system-notification card for one content state. */
 export function buildSessionNotificationCard(
   content: SessionLiveActivityContentState,
-  organizationId: string | null,
+  scope: SessionCardScope,
   now: number = Date.now()
 ): SessionNotificationCard {
   const title = (content.title ?? '').trim();
@@ -161,7 +162,8 @@ export function buildSessionNotificationCard(
   const timed = content.statusKind === 'running' && Number.isFinite(statusSince);
   return {
     sessionId: content.sessionId,
-    organizationId,
+    userId: scope.userId,
+    organizationId: scope.organizationId,
     title: title.length > 0 ? title : translate('common.agent'),
     subText: planText(content),
     // The cost so far, by the app's one cost rule: a small cost is exact or

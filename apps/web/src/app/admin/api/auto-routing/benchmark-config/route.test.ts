@@ -5,9 +5,6 @@ import {
   updateBenchmarkConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import type * as ModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import type * as OpenRouterModule from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
@@ -17,34 +14,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-clie
   getBenchmarkConfig: jest.fn(),
   updateBenchmarkConfig: jest.fn(),
 }));
-
-// Stub the catalog so tests don't depend on any specific provider file.
-// 'test-exclusive/chat-only' maps to a synthetic gateway that lacks Messages support.
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
-  const actual = jest.requireActual<typeof ModelsModule>(
-    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
-  );
-  const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
-    '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
-  );
-  const stubModel: KiloExclusiveModel = {
-    public_id: 'test-exclusive/chat-only',
-    display_name: 'Test chat-only model',
-    description: 'stub for unit tests',
-    context_length: 8192,
-    max_completion_tokens: 4096,
-    flags: [],
-    provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
-    internal_id: 'stub-internal',
-    pricing: null,
-    inference_providers: [],
-  };
-  return {
-    ...actual,
-    findKiloExclusiveModel: (id: string) =>
-      id === 'test-exclusive/chat-only' ? stubModel : actual.findKiloExclusiveModel(id),
-  };
-});
 
 import { GET, PUT } from './route';
 
@@ -141,23 +110,6 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
       }),
       'admin@kilocode.ai'
     );
-  });
-
-  it('rejects with 400 listing decider models not servable on all gateway chat APIs', async () => {
-    const response = await PUT(
-      putRequest({
-        ...validConfig,
-        deciderModels: [{ id: 'openai/gpt-5-mini' }, { id: 'test-exclusive/chat-only' }],
-      })
-    );
-
-    expect(response.status).toBe(400);
-    const body = (await response.json()) as { error: string };
-    expect(body.error).toContain('test-exclusive/chat-only');
-    expect(body.error).toContain('chat_completions');
-    expect(body.error).toContain('responses');
-    expect(body.error).not.toContain('openai/gpt-5-mini (');
-    expect(mockUpdateBenchmarkConfig).not.toHaveBeenCalled();
   });
 
   it('rejects a schema-invalid config with 400', async () => {

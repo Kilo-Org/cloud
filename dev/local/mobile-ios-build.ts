@@ -10,6 +10,7 @@ import {
   SourceSkips,
   type HashSource,
 } from '@expo/fingerprint';
+import { z } from 'zod';
 
 import { hashRootNativeInputs, withNativeBuildSemaphore } from './mobile-native-build';
 import { fetchIosApp, remoteNativeRequired } from './mobile-remote-native';
@@ -95,7 +96,8 @@ export type WithFingerprintLockArgs<T> = {
   key: string;
   lockRoot: string;
   deps: CacheLockDeps;
-  producer: () => Promise<T>;
+  // Producer output is discarded; only the canonical reader defines the result type.
+  producer: () => Promise<unknown>;
   // Called after the lock completes (for both producer and waiter) to
   // read the canonical published result from disk. The result file in
   // the lock directory is only a completion signal; it never carries
@@ -139,8 +141,6 @@ export type CliArgs =
   | { command: 'build'; udid: string }
   | { command: 'prune' };
 
-// ── Fingerprint ──────────────────────────────────────────────────────
-
 // Build the option bag used to compute the native project hash. Only
 // the Expo `extra` section is skipped beyond the library defaults —
 // versions, schemes, bundle ID, plugins, assets, permissions, and
@@ -179,12 +179,22 @@ export function buildFingerprintOptions(): {
   };
 }
 
+// Cache format identity hashed into every key. Bump it when the meaning
+// of a published entry changes, so entries written under the old meaning
+// miss cleanly instead of being trusted: there is no legacy lookup.
+// Format 2 stamps the manifest simulatorSdkVersion from the produced
+// binary; format 1 recorded the receiving host's ambient SDK, which is
+// false metadata for a remote-produced app. Orphaned format 1 entries
+// are never looked up again and age out through normal pruning.
+const CACHE_FORMAT_VERSION = 2;
+
 // Hash the normalized JSON form of the compatibility dimensions with
 // SHA-256. JSON key order is sorted so the key is stable across
 // implementations.
 export function buildCompatibilityKey(dimensions: CompatibilityDimensions): string {
   const ordered = {
     buildMode: dimensions.buildMode,
+    cacheFormatVersion: CACHE_FORMAT_VERSION,
     hostArch: dimensions.hostArch,
     nativeHash: dimensions.nativeHash,
     simulatorSdkVersion: dimensions.simulatorSdkVersion,
@@ -192,8 +202,6 @@ export function buildCompatibilityKey(dimensions: CompatibilityDimensions): stri
   };
   return createHash('sha256').update(JSON.stringify(ordered)).digest('hex');
 }
-
-// ── Cache root ───────────────────────────────────────────────────────
 
 export type ResolveCacheRootArgs = {
   home: string;
@@ -211,8 +219,6 @@ export function resolveCacheRoot(args: ResolveCacheRootArgs): string {
   }
   return path.join(args.home, '.cache/Kilo/mobile-ios-builds');
 }
-
-// ── Artifact checksum ───────────────────────────────────────────────
 
 // Deterministic directory hash. Walks the directory recursively,
 // reading each file in order, and feeds its relative path + contents
@@ -287,8 +293,6 @@ function hashFileChunks(filePath: string, hash: ReturnType<typeof createHash>): 
   });
 }
 
-// ── Manifest validation ──────────────────────────────────────────────
-
 // Strict manifest check. Returns true iff every field is present and
 // well-typed. Bundle ID, key, and build mode must match the
 // requested values. The producer worktree is recorded for audit but
@@ -316,8 +320,6 @@ export function isValidManifest(
   if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString() !== o.createdAt) return false;
   return true;
 }
-
-// ── Cache lookup ─────────────────────────────────────────────────────
 
 // Returns the cached entry iff the manifest is well-formed, the
 // bundle id matches, and the artifact checksum is current. On any
@@ -351,8 +353,6 @@ export async function lookupCache(args: LookupCacheArgs): Promise<LookupCacheRes
   }
   return { manifest, appPath };
 }
-
-// ── Producer lock ────────────────────────────────────────────────────
 
 // Run `producer` under a fingerprint-specific host lock. Exactly one
 // concurrent caller becomes the producer; the rest wait for the
@@ -667,8 +667,6 @@ function defaultProcessIdentity(pid: number): string | undefined {
   }
 }
 
-// ── Simulator claim validation ───────────────────────────────────────
-
 // Read-only validation of a claim recorded by the simulator
 // wrapper. Accepts the caller's current worktree as the exclusive
 // owner; any other recorded worktree is rejected.
@@ -705,16 +703,12 @@ export function validateSimulatorClaim(
   }
 }
 
-// ── Install command ──────────────────────────────────────────────────
-
 export function buildInstallCommand(udid: string, appPath: string): BuildInstallCommand {
   return {
     command: 'xcrun',
     args: ['simctl', 'install', udid, appPath],
   };
 }
-
-// ── Pruning ──────────────────────────────────────────────────────────
 
 export async function pruneCache(args: PruneCacheArgs): Promise<PruneResult> {
   const entriesRoot = path.join(args.env.cacheRoot, 'entries');
@@ -801,8 +795,6 @@ function removeLockArtifacts(lockDir: string): void {
   }
 }
 
-// ── CLI ──────────────────────────────────────────────────────────────
-
 export function parseCliArgs(argv: readonly string[]): CliArgs {
   const [command, ...rest] = argv;
   if (command === 'fingerprint') {
@@ -819,8 +811,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   }
   throw new Error('Usage: pnpm dev:mobile:ios [fingerprint|build <udid>|prune]');
 }
-
-// ── Xcode workspace and build command ───────────────────────────────
 
 // Check that the generated native project exists. Expo generates
 // `apps/mobile/ios/Kilo.xcworkspace` via `npx expo prebuild --platform
@@ -886,6 +876,115 @@ export function buildXcodeBuildCommand(args: {
   };
 }
 
+// A simulator SDK version validated at the executable-output boundary.
+// The branded string is the only SDK value the cache publish path accepts
+// from a producer, so downstream code never re-validates it. All-zero is
+// the unset stamp and is refused. Trailing zero components above
+// major.minor are normalized away, so slices stamped 26.5 and 26.5.0
+// agree on one value.
+export const SimulatorSdkVersionSchema = z
+  .string()
+  .regex(/^\d+(\.\d+)*$/, 'SDK version must be plain dotted numbers')
+  .transform(raw => {
+    const parts = raw.split('.').map(Number);
+    while (parts.length > 2 && parts[parts.length - 1] === 0) parts.pop();
+    return parts.join('.');
+  })
+  .refine(value => value.split('.').some(part => Number(part) !== 0), 'SDK version is unset')
+  .brand<'SimulatorSdkVersion'>();
+
+export type SimulatorSdkVersion = z.infer<typeof SimulatorSdkVersionSchema>;
+
+function parseSimulatorSdkVersion(raw: unknown): SimulatorSdkVersion {
+  const parsed = SimulatorSdkVersionSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error('Invalid simulator SDK version read from built executable');
+  }
+  return parsed.data;
+}
+
+type BuildVersionStamp = {
+  command: string;
+  platform: string | undefined;
+  sdk: SimulatorSdkVersion | undefined;
+};
+
+// Parse the SDK version a built executable was linked against from
+// `vtool -show-build` output. The value comes from the binary's own
+// LC_BUILD_VERSION load commands, never from the receiving host's Xcode:
+// a remote-produced binary keeps its producer SDK whatever xcrun reports
+// on this host. Every architecture slice must carry exactly one stamp,
+// every stamp must be an IOSSIMULATOR LC_BUILD_VERSION (a device or
+// legacy slice mixed into the binary refuses the whole artifact), and
+// all slices must agree on one SDK; anything else throws so the
+// artifact is rejected instead of cached under ambient metadata.
+export function parseExecutableSdkVersion(vtoolOutput: string): SimulatorSdkVersion {
+  const stamps: BuildVersionStamp[] = [];
+  let sections = 0;
+  let sectionHasStamp = true;
+  let sectionStampViolation = false;
+  let current: BuildVersionStamp | undefined;
+  const closeStamp = (): void => {
+    if (current) stamps.push(current);
+    current = undefined;
+  };
+  for (const line of vtoolOutput.split('\n')) {
+    const trimmed = line.trim();
+    if (/\(architecture [^)]+\):$/.test(trimmed)) {
+      closeStamp();
+      if (!sectionHasStamp) sectionStampViolation = true;
+      sections += 1;
+      sectionHasStamp = false;
+      continue;
+    }
+    const commandMatch = trimmed.match(/^cmd (\S+)$/);
+    if (commandMatch) {
+      closeStamp();
+      const command = commandMatch[1];
+      if (command === 'LC_BUILD_VERSION' || command.startsWith('LC_VERSION_MIN')) {
+        current = { command, platform: undefined, sdk: undefined };
+        if (sections > 0 && sectionHasStamp) sectionStampViolation = true;
+        sectionHasStamp = true;
+      }
+      continue;
+    }
+    if (!current) continue;
+    const platformMatch = trimmed.match(/^platform (\S+)$/);
+    if (platformMatch) {
+      if (current.platform !== undefined) {
+        throw new Error('Built executable carries an unreadable build version stamp');
+      }
+      current.platform = platformMatch[1];
+      continue;
+    }
+    const sdkMatch = trimmed.match(/^sdk (\S+)$/);
+    if (sdkMatch) {
+      if (current.sdk !== undefined) {
+        throw new Error('Built executable carries an unreadable build version stamp');
+      }
+      current.sdk = parseSimulatorSdkVersion(sdkMatch[1]);
+    }
+  }
+  closeStamp();
+  if (sectionStampViolation || !sectionHasStamp || stamps.length === 0) {
+    throw new Error('Built executable is missing a build version stamp for an architecture slice');
+  }
+  let sdk: SimulatorSdkVersion | undefined;
+  for (const stamp of stamps) {
+    if (stamp.command !== 'LC_BUILD_VERSION' || stamp.platform !== 'IOSSIMULATOR' || !stamp.sdk) {
+      throw new Error('Built executable does not carry a single IOSSIMULATOR SDK version');
+    }
+    if (sdk !== undefined && sdk !== stamp.sdk) {
+      throw new Error('Built executable does not carry a single IOSSIMULATOR SDK version');
+    }
+    sdk = stamp.sdk;
+  }
+  if (sdk === undefined) {
+    throw new Error('Built executable does not carry a single IOSSIMULATOR SDK version');
+  }
+  return sdk;
+}
+
 // Locate the produced `.app` at the canonical xcodebuild path. Throws
 // if missing — the producer must not silently fall back to a
 // different artifact.
@@ -898,8 +997,6 @@ export function locateProducedApp(derivedDataPath: string): string {
   }
   return app;
 }
-
-// ── Build flow types ────────────────────────────────────────────────
 
 // All side-effecting boundaries the build flow needs. Tests inject
 // stubs; production wires real implementations.
@@ -920,6 +1017,10 @@ export type BuildDeps = {
     nativeHash: string;
   }) => Promise<void>;
   readInfoPlist: (appPath: string, key: string) => string | undefined;
+  // Read the simulator SDK the produced app's executable was linked
+  // against, from the binary itself. The published manifest records this
+  // producer value, never the receiving host's ambient SDK.
+  readExecutableSdkVersion: (appPath: string) => SimulatorSdkVersion;
   install: (udid: string, appPath: string) => void;
   copyDir: (src: string, dest: string) => void;
   mkdtemp: (prefix: string) => string;
@@ -956,8 +1057,6 @@ export type RunPruneDeps = {
   isLockActive?: (record: LockRecord) => boolean;
   write: (chunk: string) => void;
 };
-
-// ── Publish flow ────────────────────────────────────────────────────
 
 // Build, verify, and atomically publish a cache entry. Called as the
 // sole producer inside the fingerprint lock. On entry, the cache is
@@ -1005,12 +1104,18 @@ export async function publishCacheEntry(args: {
         `Produced app has unexpected bundle id "${bundleId}" (expected ${BUNDLE_ID})`
       );
     }
+    // The manifest records the SDK stamped into the produced binary. The
+    // compatibility dimensions carry this host's ambient SDK, which is
+    // the wrong producer metadata for a remote-fetched app and is never
+    // evidence about the binary being published. An unreadable stamp
+    // throws, rejecting the artifact.
+    const simulatorSdkVersion = args.deps.readExecutableSdkVersion(stagingApp);
     const artifactChecksum = await computeArtifactChecksum(stagingApp);
     const manifest: Manifest = {
       key: args.key,
       nativeHash: args.compatibility.nativeHash,
       xcodeBuildVersion: args.compatibility.xcodeBuildVersion,
-      simulatorSdkVersion: args.compatibility.simulatorSdkVersion,
+      simulatorSdkVersion,
       hostArch: args.compatibility.hostArch,
       buildMode: BUILD_MODE,
       bundleId: BUNDLE_ID,
@@ -1067,8 +1172,6 @@ export async function publishCacheEntry(args: {
     }
   }
 }
-
-// ── Build orchestration ─────────────────────────────────────────────
 
 // Run the full `build <udid>` flow. On a cache hit, install without
 // building. On a miss, enter the fingerprint lock; the sole producer
@@ -1229,8 +1332,6 @@ export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
   deps.install(udid, revalidated.appPath);
 }
 
-// ── Fingerprint orchestration ───────────────────────────────────────
-
 // Print sanitized compatibility dimensions and the cache key. No
 // environment values, no source lists, no secrets. Uses the injected
 // `fingerprint` function (which in production calls
@@ -1257,14 +1358,10 @@ export async function runFingerprint(deps: RunFingerprintDeps): Promise<void> {
   deps.write(`${JSON.stringify(sanitized, null, 2)}\n`);
 }
 
-// ── Prune orchestration ─────────────────────────────────────────────
-
 export async function runPrune(deps: RunPruneDeps): Promise<void> {
   const result = await pruneCache({ env: deps.env, isLockActive: deps.isLockActive });
   deps.write(`${JSON.stringify(result, null, 2)}\n`);
 }
-
-// ── Main entry point ─────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const parsed = parseCliArgs(process.argv.slice(2));
@@ -1304,6 +1401,7 @@ async function main(): Promise<void> {
         createProjectHashAsync(root, options as Parameters<typeof createProjectHashAsync>[1]),
       build: productionBuilder,
       readInfoPlist: productionReadInfoPlist,
+      readExecutableSdkVersion: productionReadExecutableSdkVersion,
       install: productionInstall,
       copyDir: productionCopyDir,
       mkdtemp: (prefix: string) => {
@@ -1365,6 +1463,38 @@ function productionPrebuild(mobileRoot: string): void {
     stdio: 'inherit',
     env: { ...process.env, CI: '1' },
   });
+}
+
+// Read the produced executable's own SDK stamp. The executable is the
+// bundle's CFBundleExecutable and must be a plain file inside the app —
+// a missing, escaping, or symlinked name is a mismatched binary and
+// throws. `vtool -show-build` dumps the LC_BUILD_VERSION load command
+// the linker stamped at build time, on the producer that linked it.
+function productionReadExecutableSdkVersion(appPath: string): SimulatorSdkVersion {
+  const executableName = productionReadInfoPlist(appPath, 'CFBundleExecutable');
+  if (
+    !executableName ||
+    executableName.includes('/') ||
+    executableName.includes('\\') ||
+    executableName === '.' ||
+    executableName === '..'
+  ) {
+    throw new Error(
+      `Produced app has no usable CFBundleExecutable "${String(executableName)}" in ${appPath}`
+    );
+  }
+  const executablePath = path.join(appPath, executableName);
+  if (
+    !fs.existsSync(executablePath) ||
+    fs.lstatSync(executablePath).isSymbolicLink() ||
+    !fs.statSync(executablePath).isFile()
+  ) {
+    throw new Error(`Produced app executable is missing or not a plain file: ${executablePath}`);
+  }
+  const raw = execFileSync('xcrun', ['vtool', '-show-build', executablePath], {
+    encoding: 'utf8',
+  });
+  return parseExecutableSdkVersion(raw);
 }
 
 function productionReadInfoPlist(appPath: string, key: string): string | undefined {

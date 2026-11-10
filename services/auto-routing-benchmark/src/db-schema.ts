@@ -14,7 +14,7 @@ import type {
   BenchmarkModelSummary,
   CandidatePricing,
   CustomRouterEntryRef,
-  CustomRouterScope,
+  OwnerType,
   ProductionTokenProfile,
   EffortByComplexity,
   BenchmarkProfileStatus,
@@ -145,6 +145,10 @@ export const modelSummaries = sqliteTable(
     route_key: text('route_key').notNull(),
     accuracy: real('accuracy').notNull(),
     avg_cost_usd: real('avg_cost_usd'),
+    avg_input_tokens: real('avg_input_tokens'),
+    avg_cached_input_tokens: real('avg_cached_input_tokens'),
+    avg_output_tokens: real('avg_output_tokens'),
+    avg_reasoning_tokens: real('avg_reasoning_tokens'),
     avg_latency_ms: real('avg_latency_ms').notNull(),
     p50_latency_ms: real('p50_latency_ms'),
     cases: integer('cases').notNull(),
@@ -171,6 +175,10 @@ export const caseResults = sqliteTable(
     score: real('score').notNull(),
     latency_ms: integer('latency_ms').notNull(),
     cost_usd: real('cost_usd'),
+    input_tokens: integer('input_tokens'),
+    cached_input_tokens: integer('cached_input_tokens'),
+    output_tokens: integer('output_tokens'),
+    reasoning_tokens: integer('reasoning_tokens'),
     error: text('error'),
     // Unused since the System One classifier cutover; kept so old-code upserts
     // during a rolling deploy still succeed.
@@ -240,6 +248,7 @@ export const schedulerChunks = sqliteTable(
     lease_until: integer('lease_until').notNull().default(0),
     available_at: integer('available_at').notNull().default(0),
     attempts: integer('attempts').notNull().default(0),
+    throttle_deferrals: integer('throttle_deferrals').notNull().default(0),
   },
   table => [
     index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
@@ -339,6 +348,7 @@ export const routingTables = sqliteTable('routing_tables', {
   published_at: text('published_at').notNull(),
   generated_at: text('generated_at').notNull(),
   min_accuracy: real('min_accuracy').notNull(),
+  accuracy_noise_band: real('accuracy_noise_band'),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
   production_token_profile: text('production_token_profile', {
@@ -370,6 +380,8 @@ export const routingTableCandidates = sqliteTable(
     variant: text('variant').notNull().default(''),
     pricing: text('pricing', { mode: 'json' }).$type<CandidatePricing>(),
     estimated_request_cost_usd: real('estimated_request_cost_usd'),
+    p50_latency_ms: real('p50_latency_ms'),
+    p50_ttft_ms: real('p50_ttft_ms'),
   },
   table => [primaryKey({ columns: [table.run_id, table.route_key, table.rank] })]
 );
@@ -491,7 +503,7 @@ export const clientProfiles = sqliteTable(
   'client_profiles',
   {
     id: text('id').primaryKey(),
-    owner_type: text('owner_type').$type<CustomRouterScope>().notNull(),
+    owner_type: text('owner_type').$type<OwnerType>().notNull(),
     owner_id: text('owner_id').notNull(),
     router: text('router').$type<AutoRouter>().notNull(),
     entry_kind: text('entry_kind').$type<CustomRouterEntryRef['kind']>().notNull(),
@@ -558,6 +570,28 @@ export const clientCaseResults = sqliteTable(
     revision: integer('revision').notNull().default(0),
     // Grader usage the usage writer has not acknowledged yet; a retried upload resends it.
     pending_grader_usage: text('pending_grader_usage'),
+  },
+  table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
+);
+
+/**
+ * Judged grading claim for one client upload. A case identity has at most one row, and only
+ * the holder of its `token` runs the paid judge, so parallel uploads of the same case cannot
+ * each pay for a grading the usage ledger records once. An expired lease is taken over by
+ * the next upload; the holder removes its row when its grading ends.
+ */
+export const clientCaseGradingClaims = sqliteTable(
+  'client_case_grading_claims',
+  {
+    profile_id: text('profile_id')
+      .notNull()
+      .references(() => clientProfiles.id, { onDelete: 'cascade' }),
+    case_id: text('case_id').notNull(),
+    rep: integer('rep').notNull(),
+    token: text('token').notNull(),
+    // Epoch milliseconds after which a vanished holder's claim no longer blocks a retry.
+    lease_until: integer('lease_until').notNull(),
+    created_at: text('created_at').notNull(),
   },
   table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
 );

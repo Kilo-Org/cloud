@@ -19,7 +19,11 @@ import {
 } from './agent-attachment-types';
 import type * as LocalImageModule from './local-image';
 import { LocalImageError } from './local-image';
-import { type UploadPendingResult, useAgentAttachmentUpload } from './use-agent-attachment-upload';
+import {
+  type AgentAttachmentCandidate,
+  type UploadPendingResult,
+  useAgentAttachmentUpload,
+} from './use-agent-attachment-upload';
 // Tests import pure helpers from their owning module (not the hook barrel).
 
 // ---- Row 3.3 hook-test mocks ----
@@ -418,6 +422,14 @@ async function settle(): Promise<void> {
   await Promise.resolve();
 }
 
+/** Document candidates for a capacity test, named `<prefix><index>.pdf`. */
+function documentCandidates(count: number, prefix: string): AgentAttachmentCandidate[] {
+  return Array.from({ length: count }, (_, index) => ({
+    name: `${prefix}${index}.pdf`,
+    uri: `file:///cache/${prefix}${index}.pdf`,
+  }));
+}
+
 /** Runs `uploadPending` inside `act` and returns the settled, non-undefined result. */
 async function uploadPendingResult(): Promise<Awaited<ReturnType<HookApi['uploadPending']>>> {
   let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
@@ -504,6 +516,281 @@ describe('addCandidates uploads documents at selection (Step 2)', () => {
     );
     expect(toast.warning).toHaveBeenCalledWith('Only adding 1 of 2 files (max 5)');
     translate.mockRestore();
+    renderer.unmount();
+  });
+});
+
+describe('addCandidates — capacity and stored names', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    hoisted.cancel.mockReset();
+    hoisted.fileDelete.mockReset();
+    hoisted.deletedUris.clear();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.warning).mockClear();
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValue(controlled);
+  });
+
+  it('holds the cap when two selections overlap before either commits', async () => {
+    const firstMeasure = Promise.withResolvers<number>();
+    hoisted.measureLocalSize.mockReturnValueOnce(firstMeasure.promise);
+    const renderer = await mountHook();
+
+    let firstAdd: Promise<void> | undefined = undefined;
+    await act(async () => {
+      firstAdd = hookApi().addCandidates(documentCandidates(3, 'a'));
+      await Promise.resolve();
+    });
+
+    // The second selection starts while the first is still measuring, so it
+    // can only see the slots the first one claimed — not the chips.
+    await act(async () => {
+      await hookApi().addCandidates(documentCandidates(3, 'b'));
+    });
+    expect(hookApi().attachments).toHaveLength(2);
+    expect(toast.warning).toHaveBeenCalledWith('Only adding 2 of 3 files (max 5)');
+
+    await act(async () => {
+      firstMeasure.resolve(1024);
+      await firstAdd;
+      await settle();
+    });
+
+    expect(hookApi().attachments).toHaveLength(5);
+    expect(
+      hookApi()
+        .attachments.map(chip => chip.filename)
+        .toSorted()
+    ).toEqual(['a0.pdf', 'a1.pdf', 'a2.pdf', 'b0.pdf', 'b1.pdf']);
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(5);
+
+    // A third selection against the settled composer is refused outright.
+    await act(async () => {
+      await hookApi().addCandidates(documentCandidates(1, 'c'));
+    });
+    expect(hookApi().attachments).toHaveLength(5);
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(5);
+    renderer.unmount();
+  });
+
+  it('keeps only the room left and uploads only those chips when another path filled the strip', async () => {
+    const measure = Promise.withResolvers<number>();
+    hoisted.measureLocalSize.mockReturnValueOnce(measure.promise);
+    const renderer = await mountHook();
+
+    let add: Promise<void> | undefined = undefined;
+    await act(async () => {
+      add = hookApi().addCandidates(documentCandidates(2, 'a'));
+      await Promise.resolve();
+    });
+
+    // Four restored chips land while the selection is still measuring: only
+    // one slot is left when it commits.
+    await act(async () => {
+      hookApi().restoreChips(
+        Array.from({ length: 4 }, (_, index) =>
+          makeAttachment({ id: `r${index}`, filename: `r${index}.pdf` })
+        )
+      );
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(4);
+
+    await act(async () => {
+      measure.resolve(1024);
+      await add;
+      await settle();
+    });
+
+    expect(hookApi().attachments.map(chip => chip.filename)).toEqual([
+      'r0.pdf',
+      'r1.pdf',
+      'r2.pdf',
+      'r3.pdf',
+      'a0.pdf',
+    ]);
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    // The chip that never reached the strip releases its copied file, and the
+    // user is told how many of the selection fit.
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/a1.pdf');
+    expect(toast.warning).toHaveBeenCalledWith('Only adding 1 of 2 files (max 5)');
+    renderer.unmount();
+  });
+
+  it('reports a selection that no longer fits at all instead of dropping it silently', async () => {
+    const measure = Promise.withResolvers<number>();
+    hoisted.measureLocalSize.mockReturnValueOnce(measure.promise);
+    const renderer = await mountHook();
+
+    let add: Promise<void> | undefined = undefined;
+    await act(async () => {
+      add = hookApi().addCandidates(documentCandidates(2, 'a'));
+      await Promise.resolve();
+    });
+
+    // The strip reaches its limit while the selection is still measuring.
+    await act(async () => {
+      hookApi().restoreChips(
+        Array.from({ length: 5 }, (_, index) =>
+          makeAttachment({ id: `r${index}`, filename: `r${index}.pdf` })
+        )
+      );
+      await settle();
+    });
+
+    await act(async () => {
+      measure.resolve(1024);
+      await add;
+      await settle();
+    });
+
+    expect(hookApi().attachments.map(chip => chip.filename)).toEqual([
+      'r0.pdf',
+      'r1.pdf',
+      'r2.pdf',
+      'r3.pdf',
+      'r4.pdf',
+    ]);
+    expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/a0.pdf');
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/a1.pdf');
+    expect(toast.error).toHaveBeenCalledWith('Maximum 5 files allowed');
+    renderer.unmount();
+  });
+
+  it('gives the claimed capacity back when a reset retires the selection', async () => {
+    const measure = Promise.withResolvers<number>();
+    hoisted.measureLocalSize.mockReturnValueOnce(measure.promise);
+    const renderer = await mountHook();
+
+    let add: Promise<void> | undefined = undefined;
+    await act(async () => {
+      add = hookApi().addCandidates(documentCandidates(5, 'a'));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      hookApi().reset();
+      await settle();
+    });
+    await act(async () => {
+      measure.resolve(1024);
+      await add;
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(0);
+
+    // The retired selection must not keep holding its slots.
+    await act(async () => {
+      await hookApi().addCandidates(documentCandidates(5, 'b'));
+    });
+    expect(hookApi().attachments).toHaveLength(5);
+    expect(toast.warning).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('stores one safe segment per picker name and sends it as the original name', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: '../../etc/notes.pdf', uri: 'file:///cache/n1.pdf' },
+        { name: String.raw`C:\Users\me\report.pdf`, uri: 'file:///cache/n2.pdf' },
+        { name: 'dir/..', uri: 'file:///cache/n3.bin' },
+        { name: 'pay\u0000load.pdf', uri: 'file:///cache/n4.pdf' },
+      ]);
+    });
+
+    expect(hookApi().attachments.map(chip => chip.filename)).toEqual([
+      'notes.pdf',
+      'report.pdf',
+      'file.bin',
+      'payload.pdf',
+    ]);
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/notes.pdf' });
+      await settle();
+    });
+    const result = await uploadPendingResult();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.submission?.files.map(file => file.originalName)).toEqual([
+        'notes.pdf',
+        'report.pdf',
+        'file.bin',
+        'payload.pdf',
+      ]);
+    }
+    renderer.unmount();
+  });
+
+  it.each(['.', '..', 'a/..'])('maps the bare dot name %s to the safe fallback', async name => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([{ name, uri: 'file:///cache/dot' }]);
+    });
+    expect(hookApi().attachments.map(chip => chip.filename)).toEqual(['file.bin']);
+    renderer.unmount();
+  });
+
+  it('keeps an over-long stored name inside the sanitizer budget', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: `${'x'.repeat(300)}.pdf`, uri: 'file:///cache/long.pdf' },
+      ]);
+    });
+    const filename = hookApi().attachments[0]?.filename ?? '';
+    expect(filename.endsWith('.pdf')).toBe(true);
+    expect(new TextEncoder().encode(filename).length).toBeLessThanOrEqual(255);
+    renderer.unmount();
+  });
+
+  it('sanitizes restored part names and derives one safe segment for the remote name', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: '../../etc/notes.md',
+          mime: 'text/markdown',
+          url: 'https://r2.example.com/bucket/..',
+        },
+      ]);
+      await settle();
+    });
+    const chip = hookApi().attachments[0];
+    expect(chip?.filename).toBe('notes.md');
+    expect(chip?.remoteFilename).toBe('file.bin');
+    renderer.unmount();
+  });
+
+  it('keeps restoreChips within the cap', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      hookApi().restoreChips(
+        Array.from({ length: 7 }, (_, index) =>
+          makeAttachment({ id: `r${index}`, filename: `r${index}.pdf` })
+        )
+      );
+      await settle();
+    });
+    expect(hookApi().attachments.map(chip => chip.filename)).toEqual([
+      'r0.pdf',
+      'r1.pdf',
+      'r2.pdf',
+      'r3.pdf',
+      'r4.pdf',
+    ]);
     renderer.unmount();
   });
 });
@@ -1752,6 +2039,56 @@ describe('local delivery', () => {
     });
     expect(hoisted.encodeLocalImage).toHaveBeenCalledWith('file:///cache/stripped.jpg');
     expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('encodes a strip of images two at a time and keeps chip order', async () => {
+    const pending: { resolve: (image: { media: string; data: string }) => void }[] = [];
+    hoisted.encodeLocalImage.mockImplementation(() => {
+      const { promise, resolve } = Promise.withResolvers<{ media: string; data: string }>();
+      pending.push({ resolve });
+      return promise;
+    });
+    const renderer = await mountLocal();
+    await act(async () => {
+      await local().addCandidates([
+        { name: 'a.png', uri: 'file:///cache/a.png' },
+        { name: 'b.png', uri: 'file:///cache/b.png' },
+        { name: 'c.png', uri: 'file:///cache/c.png' },
+      ]);
+    });
+    expect(local().attachments.map(chip => chip.status)).toEqual(['local', 'local', 'local']);
+
+    // The send starts here: every chip is a local image, so the read allocates
+    // no chip state until an encode fails.
+    const sending = local().uploadPending();
+    await act(settle);
+    // Two encodes are in flight and the third chip waits for a slot, so the
+    // decoded images held at once do not scale with the strip.
+    expect(hoisted.encodeLocalImage).toHaveBeenCalledTimes(2);
+
+    // Finish the second image first: the strip still reports chip order, and
+    // the third chip starts as soon as a slot frees.
+    pending[1]?.resolve({ media: 'image/jpeg', data: 'B' });
+    await act(settle);
+    expect(hoisted.encodeLocalImage).toHaveBeenCalledTimes(3);
+    pending[2]?.resolve({ media: 'image/jpeg', data: 'C' });
+    pending[0]?.resolve({ media: 'image/jpeg', data: 'A' });
+
+    let result: UploadPendingResult = { ok: false };
+    await act(async () => {
+      result = await sending;
+    });
+    expect(result).toEqual({
+      ok: true,
+      wire: undefined,
+      submission: undefined,
+      images: [
+        { media: 'image/jpeg', data: 'A' },
+        { media: 'image/jpeg', data: 'B' },
+        { media: 'image/jpeg', data: 'C' },
+      ],
+    });
     renderer.unmount();
   });
 

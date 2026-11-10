@@ -1,7 +1,8 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
+import { CardControl } from '@/components/home/adaptive-home-card-frame';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { X } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -15,68 +16,39 @@ import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { briefingSummaryStatusKey, visibleHomeBriefing } from '@/lib/agent-briefing-state';
 import { cn } from '@/lib/utils';
-import { formatNumber } from '@/lib/format';
-import { numberFormat } from '@/lib/intl-cache';
-
-export function briefingMoney(microdollars: number, language: string): string {
-  return numberFormat(language, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 4,
-  }).format(microdollars / 1_000_000);
-}
+import { formatCalendarDate, formatNumber } from '@/lib/format';
 
 export function BriefingScorecard({ report }: { readonly report: BriefingReport }) {
   const { t, i18n } = useTranslation();
   const rows = [
     {
-      label: t(
-        report.kind === 'one_off' ? 'agentBriefing.periodSessions' : 'agentBriefing.sessions'
-      ),
+      label: t('agentBriefing.selectedSessions'),
       amount: report.scorecard.sessions,
-      coverage: report.coverage.activity,
     },
     {
-      label: t('agentBriefing.pullRequests'),
+      label: t('agentBriefing.snapshotPullRequests'),
       amount: report.scorecard.pullRequests,
-      coverage: report.coverage.pullRequests,
     },
     {
-      label: t('agentBriefing.blockers'),
+      label: t('agentBriefing.snapshotBlockers'),
       amount: report.scorecard.blockers,
-      coverage: report.coverage.blockers,
-    },
-    {
-      label: t(report.kind === 'one_off' ? 'agentBriefing.periodSpend' : 'agentBriefing.spend'),
-      amount: report.scorecard.spendMicrodollars,
-      coverage: report.coverage.spend,
-      money: true,
     },
   ];
   return (
     <View className="gap-2 px-4 py-3">
-      {rows.map(row => {
-        let value = t('common.unknown');
-        if (row.coverage !== 'unavailable' && (row.coverage === 'complete' || row.amount > 0)) {
-          value = row.money
-            ? briefingMoney(row.amount, i18n.language)
-            : formatNumber(row.amount, i18n.language);
-        }
-        const displayValue =
-          row.coverage !== 'complete' && row.amount > 0 && row.coverage !== 'unavailable'
-            ? t('agentBriefing.atLeast', { value })
-            : value;
-        return (
-          <View key={row.label} className="min-h-6 flex-row items-center gap-2">
-            <Text className="text-sm font-semibold text-foreground">{displayValue}</Text>
-            <Text numberOfLines={1} className="min-w-0 shrink text-sm text-muted-foreground">
-              {row.label}
-            </Text>
-          </View>
-        );
-      })}
+      {rows.map(row => (
+        <View key={row.label} className="min-h-6 flex-row items-center gap-2">
+          <Text className="text-sm font-semibold text-foreground">
+            {formatNumber(row.amount, i18n.language)}
+          </Text>
+          <Text numberOfLines={1} className="min-w-0 shrink text-sm text-muted-foreground">
+            {row.label}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -94,7 +66,7 @@ export function useHomeBriefing() {
             now,
           })
         : undefined,
-    frameReport: isLoaded ? query.reports.find(report => report.kind !== 'one_off') : undefined,
+    frameReport: isLoaded ? query.reports[0] : undefined,
   };
 }
 
@@ -105,7 +77,7 @@ export function BriefingCard({
   readonly report: BriefingReport;
   readonly embedded?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const offline = useOfflineBannerState();
   const dismissals = useBriefingDismissals();
@@ -117,37 +89,46 @@ export function BriefingCard({
   const hasAiPreview = report.summary.status !== 'disabled';
   const preview = [
     offline ? t('agentBriefing.offline') : null,
-    report.revised ? t('agentBriefing.revised', { revision: report.revision }) : null,
     hasAiPreview ? aiPreview : t('agentBriefing.view'),
-    hasAiPreview ? null : report.localDate,
+    hasAiPreview ? null : formatCalendarDate(report.localDate, i18n.language),
   ]
     .filter(Boolean)
     .join(' · ');
+  const previewLabel = hasAiPreview ? t('agentBriefing.viewWithPreview', { preview }) : preview;
   return (
     <View
       className={cn(
-        'justify-between overflow-hidden rounded-2xl border border-border bg-card',
-        embedded && 'rounded-none border-0 bg-transparent'
+        'overflow-hidden rounded-2xl border border-border bg-card',
+        // `grow` lets the frame's taller layer stretch the card, so no slack is left
+        // below it. The divider then follows the counts at their own padding, and the
+        // summary row takes the height the frame reserves beyond the live card's
+        // fourth count row and centers its content in it, so the counts and the
+        // summary stay evenly spaced inside the card.
+        embedded && 'grow rounded-none border-0 bg-transparent'
       )}
     >
-      <Pressable
+      <CardControl
         accessibilityRole="button"
         accessibilityLabel={t('agentBriefing.view')}
-        className="active:opacity-70"
         onPress={() => {
           router.push(`${BRIEFING_PATH}/${report.id}` as Href);
         }}
       >
         <BriefingScorecard report={report} />
-      </Pressable>
+      </CardControl>
       <View className="h-px bg-border" />
-      <View className="min-h-[68px] flex-row items-center gap-2 px-4 py-3">
-        <Pressable
+      <View
+        className={cn(
+          'flex-row items-center gap-2 px-4 py-3',
+          // Only the stretched card has height to share; outside the frame the row
+          // keeps its content height instead of collapsing to a zero flex basis.
+          embedded && 'flex-1'
+        )}
+      >
+        <CardControl
           accessibilityRole="button"
-          accessibilityLabel={
-            hasAiPreview ? t('agentBriefing.viewWithPreview', { preview }) : preview
-          }
-          className="min-h-[44px] min-w-0 flex-1 flex-row items-center gap-2 active:opacity-70"
+          accessibilityLabel={previewLabel}
+          className="min-h-[44px] min-w-0 flex-1 flex-row items-center gap-2"
           onPress={() => {
             router.push(`${BRIEFING_PATH}/${report.id}` as Href);
           }}
@@ -156,18 +137,21 @@ export function BriefingCard({
             {preview}
           </Text>
           <DirectionalChevronRight size={18} color={colors.foreground} />
-        </Pressable>
-        <Pressable
+        </CardControl>
+        <CardControl
           accessibilityRole="button"
           accessibilityLabel={t('agentBriefing.dismiss')}
-          className="size-11 shrink-0 items-center justify-center rounded-full border border-border bg-secondary active:opacity-70"
+          className={cn(
+            ICON_TARGET_BOX_CLASS,
+            'shrink-0 rounded-full border border-border bg-secondary'
+          )}
           disabled={dismissals.save.isPending}
           onPress={() => {
             dismissals.dismiss(report);
           }}
         >
           <X size={18} color={colors.foreground} />
-        </Pressable>
+        </CardControl>
       </View>
     </View>
   );

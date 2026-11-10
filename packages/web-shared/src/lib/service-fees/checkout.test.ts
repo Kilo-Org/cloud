@@ -1106,3 +1106,60 @@ describe('trusted principal settlement', () => {
     expect(ServiceFeeAssessmentConflictError).toBeDefined();
   });
 });
+
+describe('paid-credit settlement terms', () => {
+  test.each([undefined, 'legacy', 'one_year'])(
+    'preserves captured %s terms rather than settlement clock',
+    async terms => {
+      const purchasedAt = new Date('2026-06-01T00:00:00.000Z');
+      const result = await settleTrustedTopUpCharge({
+        charge: {
+          id: 'ch_policy',
+          amount: 10_500,
+          created: purchasedAt.getTime() / 1000,
+          customer: 'cus_1',
+        },
+        paymentIntent: {
+          id: 'pi_policy',
+          customer: 'cus_1',
+          metadata: { amountCents: '10000', ...(terms ? { paid_credit_policy: terms } : {}) },
+        },
+        deps: deps(createMemoryAssessmentStore(), { now: new Date('2030-01-01T00:00:00.000Z') }),
+      });
+      expect(result.principalMinor).toBe(10_000);
+      expect(result.paidCredit).toEqual({
+        source: 'stripe',
+        purchasedAt,
+        terms: terms === 'one_year' ? 'one_year' : 'legacy',
+      });
+    }
+  );
+
+  test('keeps an invoice initiated under old terms legacy after later payment', async () => {
+    const created = new Date('2026-06-01T00:00:00.000Z');
+    const result = await settleTrustedAutoTopUpInvoice({
+      invoice: {
+        id: 'in_old_policy',
+        customer: 'cus_1',
+        amount_paid: 5000,
+        created: created.getTime() / 1000,
+        status_transitions: {
+          paid_at: new Date('2026-08-01T00:00:00.000Z').getTime() / 1000,
+          finalized_at: null,
+          marked_uncollectible_at: null,
+          voided_at: null,
+        },
+        metadata: { serviceFeePrincipalMinor: '5000', paid_credit_policy: 'legacy' },
+      },
+      chargeId: 'ch_old_policy',
+      flow: 'personal_auto_top_up',
+      deps: deps(createMemoryAssessmentStore()),
+    });
+    expect(result.paidCredit).toEqual({
+      source: 'stripe',
+      purchasedAt: new Date('2026-08-01T00:00:00.000Z'),
+      terms: 'legacy',
+    });
+    expect(result.principalMinor).toBe(5000);
+  });
+});

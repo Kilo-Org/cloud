@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   APP_SCHEME,
+  canonicalSystemSearchId,
   deeplinkPathFromHref,
   FINDING_HREF_PREFIX,
   INDEXED_LINK_PREFIXES,
@@ -37,6 +38,16 @@ describe('isSystemSearchFamilyLink', () => {
       deeplinkPathFromHref(PULL_REQUEST_HREF_PREFIX),
       deeplinkPathFromHref(FINDING_HREF_PREFIX),
     ]);
+  });
+
+  it('maps an id indexed before a route moved to the current prefix', () => {
+    expect(
+      canonicalSystemSearchId('/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/f-1')
+    ).toBe('/(app)/security-agent/org-1/findings/f-1');
+    expect(canonicalSystemSearchId('/(app)/security-agent/personal/findings/f-1')).toBe(
+      '/(app)/security-agent/personal/findings/f-1'
+    );
+    expect(canonicalSystemSearchId('/(app)/agent-chat/ses_1')).toBe('/(app)/agent-chat/ses_1');
   });
 
   it('names the scheme the indexed links carry', () => {

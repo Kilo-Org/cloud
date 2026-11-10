@@ -202,6 +202,8 @@ function waitingAsk(overrides: Partial<WaitingAsk> = {}): WaitingAsk {
     organizationId: null,
     userId: 'u1',
     recordedAt: NOW,
+    statusUpdatedAt: null,
+    boundPermissionId: 'perm_1',
     ...overrides,
   };
 }

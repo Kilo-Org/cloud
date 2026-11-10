@@ -158,11 +158,87 @@ export function numberFormat(locale: string, options: Intl.NumberFormatOptions):
   return format;
 }
 
+/** Memoized answer of the device locale read below; `undefined` until it runs. */
+let deviceDecimalSeparatorValue: string | null | undefined = undefined;
+
+/**
+ * The decimal separator of the device's own number keyboard.
+ *
+ * iOS and Android draw `decimal-pad` with the *device* locale's separator, not
+ * the app language's, so a typed amount can carry the device's character while
+ * the rest of the field follows the active language: a German app language on a
+ * `.` keypad offers only `.`. `expo-localization` reports the first preferred
+ * locale's separator, which is the locale the keypad follows.
+ *
+ * Read lazily: the module is native, so the Node test projects cannot import it
+ * at load time. A runtime that cannot answer reports no separator, which leaves
+ * the language-only behaviour. Memoized because a region change does not reach
+ * an open app on either platform; the field reads it on every keystroke.
+ */
+export function deviceDecimalSeparator(): string | null {
+  if (deviceDecimalSeparatorValue !== undefined) {
+    return deviceDecimalSeparatorValue;
+  }
+  try {
+    // eslint-disable-next-line typescript-eslint/no-require-imports, unicorn/prefer-module -- the native module is absent from the Node test projects, so it cannot be a top-level import
+    const { getLocales } = require('expo-localization') as {
+      getLocales: () => readonly { decimalSeparator: string | null }[];
+    };
+    const separator = getLocales()[0]?.decimalSeparator;
+    deviceDecimalSeparatorValue = separator?.length === 1 ? separator : null;
+  } catch {
+    deviceDecimalSeparatorValue = null;
+  }
+  return deviceDecimalSeparatorValue;
+}
+
+/**
+ * How often the cached date formatters re-check the device time zone. `Intl`
+ * fixes a formatter's zone when it is constructed, so a formatter cached
+ * before the device zone moved writes the old wall clock for the rest of the
+ * process — the session list showed yesterday's clock time for a session whose
+ * detail already read the new zone. A fresh formatter resolves the zone the
+ * device is in now, so one probe per second detects the move and drops the
+ * cached formatters; the next caller builds them in the new zone. The interval
+ * keeps the probe (one formatter construction) away from every format call a
+ * list makes inside that second.
+ */
+const DEVICE_TIME_ZONE_CHECK_MS = 1000;
+
+/** The zone the cached date formatters were built in; `null` before the first check. */
+let cachedDeviceTimeZone: string | null = null;
+let deviceTimeZoneCheckedAt = 0;
+
+/**
+ * Drop the cached date formatters when the device time zone moved. A clock that
+ * stepped backwards reads as a stale check rather than a negative age, so the
+ * next call probes again instead of waiting for the clock to catch up.
+ */
+function dropDateFormattersForNewDeviceZone(): void {
+  const now = Date.now();
+  const sinceLastCheck = now - deviceTimeZoneCheckedAt;
+  if (
+    cachedDeviceTimeZone !== null &&
+    sinceLastCheck >= 0 &&
+    sinceLastCheck < DEVICE_TIME_ZONE_CHECK_MS
+  ) {
+    return;
+  }
+  deviceTimeZoneCheckedAt = now;
+  const zone = new Intl.DateTimeFormat(undefined, {}).resolvedOptions().timeZone;
+  if (zone === cachedDeviceTimeZone) {
+    return;
+  }
+  cachedDeviceTimeZone = zone;
+  dateTimeFormats.clear();
+}
+
 export function dateTimeFormat(
   /** Omitted only to read the device's own resolved options, e.g. its time zone. */
   locale: string | undefined,
   options: Intl.DateTimeFormatOptions
 ): Intl.DateTimeFormat {
+  dropDateFormattersForNewDeviceZone();
   // Through `localeOrEnglish` like every other formatter: this used to carry
   // its own `pt` special case and so missed the `sr` one added beside it.
   const activeLocale = locale === undefined ? undefined : localeOrEnglish(locale);
@@ -258,5 +334,25 @@ export function prewarmIntl(locale: string): void {
   } catch {
     // A prewarm is only a cache fill. Every formatter is built again on demand
     // at the real call site, so a failure must not block the app.
+  }
+}
+
+/**
+ * Install the grapheme segmenter for text a headless surface cuts itself.
+ *
+ * Session card titles, targets and commands are cut on character boundaries
+ * through `@kilocode/session-ingest-contracts`, which reads `Intl.Segmenter`
+ * when the runtime has one. Hermes does not, so a headless process that draws a
+ * widget or a notification before the root layout has run would cut those
+ * strings by code unit and could end one inside an emoji sequence. The widget,
+ * Approve and notification entries apply the stored language before they build
+ * any text, and this fills the same lazy polyfill the foreground path warms.
+ */
+export function prewarmSegmenter(locale: string): void {
+  try {
+    segmenter(locale, { granularity: 'grapheme' });
+  } catch {
+    // A prewarm is only a cache fill: a failed install leaves the cut on its
+    // code unit boundary, which is what a runtime without one has today.
   }
 }

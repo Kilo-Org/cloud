@@ -11,8 +11,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DEFAULT_VERCEL_ROUTING_ENABLED,
+  GatewayConfigInputSchema,
   NOTE_MAX_LENGTH,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { formatZodError } from '@/lib/zod/format-zod-error';
 
 export function RoutingContent() {
   const trpc = useTRPC();
@@ -24,6 +26,7 @@ export function RoutingContent() {
   const [optOutModelsValue, setOptOutModelsValue] = useState('');
   const [noteValue, setNoteValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (data) {
@@ -43,7 +46,7 @@ export function RoutingContent() {
         toast.success('Gateway routing configuration updated');
       },
       onError: error => {
-        toast.error(error.message || 'Failed to update');
+        toast.error(formatZodError(error));
       },
     })
   );
@@ -53,23 +56,20 @@ export function RoutingContent() {
     return trimmed === '' ? null : trimmed;
   }
 
-  function optOutModels() {
-    return [
-      ...new Set(
-        optOutModelsValue
-          .split('\n')
-          .map(model => model.trim())
-          .filter(Boolean)
-      ),
-    ];
-  }
-
   function handleSave() {
-    mutation.mutate({
+    const parsed = GatewayConfigInputSchema.safeParse({
       vercel_routing_enabled: vercelEnabled,
-      vercel_routing_opt_out_models: optOutModels(),
+      vercel_routing_opt_out_models: optOutModelsValue
+        .split('\n')
+        .filter(model => model.trim() !== ''),
       note: noteInput(),
     });
+    if (!parsed.success) {
+      setValidationError(formatZodError(parsed.error));
+      return;
+    }
+    setValidationError(null);
+    mutation.mutate(parsed.data);
   }
 
   if (isLoading) {
@@ -82,12 +82,12 @@ export function RoutingContent() {
     <div className="flex w-full flex-col gap-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Gateway Routing</CardTitle>
+          <CardTitle>Vercel Routing</CardTitle>
           <CardDescription>
-            When on, all free and paid traffic for models available on the Vercel AI Gateway is
-            routed to Vercel. When off, that traffic goes to OpenRouter. Models not available on
-            Vercel, opt-out models, and requests whose provider preferences Vercel cannot satisfy
-            always go to OpenRouter. On by default.
+            When on, non-BYOK chat traffic for models in the Vercel AI Gateway catalog goes to
+            Vercel; otherwise it goes to OpenRouter. Opt-out models, organizations that disabled
+            Vercel, requests with a spend ceiling, and provider preferences Vercel cannot satisfy
+            always use OpenRouter.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -108,20 +108,35 @@ export function RoutingContent() {
             <Label htmlFor="routing-opt-out-models">Opt-out models</Label>
             <Textarea
               id="routing-opt-out-models"
-              aria-describedby="routing-opt-out-models-description"
+              aria-describedby={
+                validationError
+                  ? 'routing-opt-out-models-description routing-opt-out-models-error'
+                  : 'routing-opt-out-models-description'
+              }
+              aria-invalid={validationError ? true : undefined}
               placeholder={'moonshotai/kimi-k3\nprovider/another-model'}
               value={optOutModelsValue}
               onChange={e => {
                 setOptOutModelsValue(e.target.value);
+                setValidationError(null);
                 setHasChanges(true);
               }}
               rows={6}
               className="font-mono text-sm"
             />
             <p id="routing-opt-out-models-description" className="text-muted-foreground text-xs">
-              One model ID per line. Matching is exact after entries are lowercased; matching models
-              are never routed to Vercel. Changes take effect within one minute on warm instances.
+              One model ID per line, matched exactly and case-insensitively. Changes apply within
+              about a minute.
             </p>
+            {validationError && (
+              <pre
+                id="routing-opt-out-models-error"
+                className="bg-destructive/10 text-destructive rounded-md p-3 text-sm whitespace-pre-wrap"
+                role="alert"
+              >
+                {validationError}
+              </pre>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">

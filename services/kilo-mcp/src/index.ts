@@ -1,5 +1,11 @@
 import catalogJson from '../catalog.json';
-import { cloudAgentAuthorityProcedure } from '../../../packages/worker-utils/src/cloud-agent-authority';
+import { cloudAgentAuthorityProcedures } from '../../../packages/worker-utils/src/cloud-agent-authority';
+import {
+  CHILD_SESSION_INSTRUCTIONS,
+  CHILD_SESSION_TOOL_NAMES,
+  childSessionTools,
+  runChildSessionTool,
+} from './child-session-tools';
 import {
   classifyToolError,
   createMcpAnalytics,
@@ -24,7 +30,13 @@ import {
 import { createDefaultHandler } from './oauth/consent';
 import { fetchUserIsAdmin } from './oauth/kilo-pairing';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
-import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
+import {
+  bodyTooLargeResponse,
+  createRefreshReuseHandler,
+  forwardable,
+  isTokenRequest,
+  readTokenBody,
+} from './oauth/refresh-reuse';
 import {
   CLIENT_REGISTRATION_TTL_SECONDS,
   REFRESH_TOKEN_TTL_SECONDS,
@@ -42,6 +54,7 @@ import {
 import {
   DEFAULT_SEARCH_LIMIT,
   MAX_SEARCH_LIMIT,
+  MAX_SEARCH_QUERY_LENGTH,
   noSemanticCandidates,
   searchCatalogDetailed,
 } from './search';
@@ -54,6 +67,7 @@ import {
   type GrantProps,
   type OtpSubmitOutcome,
   type ProtectedRequestsApi,
+  type SearchAllowance,
   type SearchResult,
   type SemanticCandidates,
 } from './types';
@@ -89,7 +103,13 @@ const SERVER_INFO = { name: 'kilo-mcp', title: 'Kilo MCP', version: '1.0.0' } as
  * these and reports everything else as `unknown`, so arbitrary caller text can
  * never reach PostHog.
  */
-const PUBLISHED_TOOL_NAMES = new Set(['search', 'call', 'call_protected', 'submit_otp']);
+const PUBLISHED_TOOL_NAMES = new Set([
+  'search',
+  'call',
+  'call_protected',
+  'submit_otp',
+  ...CHILD_SESSION_TOOL_NAMES,
+]);
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -147,6 +167,7 @@ const TOOLS = [
       properties: {
         query: {
           type: 'string',
+          maxLength: MAX_SEARCH_QUERY_LENGTH,
           description: 'What you want to do, in the words an agent would type.',
         },
         limit: {
@@ -269,6 +290,12 @@ type McpHandlerDeps = {
   /** Vectorize kNN hook; token-only search when omitted. */
   semanticCandidates?: SemanticCandidates;
   /**
+   * Per-account search allowance (the Workers rate-limit binding). Omitted only
+   * by a caller that builds the handler directly (tests), which leaves the
+   * semantic stage ungated.
+   */
+  searchAllowance?: SearchAllowance;
+  /**
    * PostHog emitter for this request (s2). Omitted in tests that do not care
    * about analytics; the handler then uses a no-op emitter so behaviour is
    * unchanged. The emitter is best-effort and can never throw.
@@ -370,23 +397,6 @@ function cappedSearchResults(results: SearchResult[]): { text: string; truncated
   return { text: JSON.stringify({ results: [], truncated: true }), truncated: true };
 }
 
-/**
- * The longest piece of a caller's search query echoed back in the empty-results
- * payload. `searchArgsSchema` gives `query` no length bound, so echoing it
- * verbatim could push the payload past `MAX_RESULT_BYTES`, and the generic cap
- * would cut the structured payload mid-token and leave unparseable JSON. A
- * bounded echo keeps the recovery payload valid JSON and inside the cap.
- */
-const MAX_ECHOED_QUERY_CHARACTERS = 200;
-
-/** Trim a query and bound its length on code-point boundaries for the echo. */
-function boundedQueryEcho(query: string): string {
-  const trimmed = query.trim();
-  const codePoints = [...trimmed];
-  if (codePoints.length <= MAX_ECHOED_QUERY_CHARACTERS) return trimmed;
-  return `${codePoints.slice(0, MAX_ECHOED_QUERY_CHARACTERS).join('')}…`;
-}
-
 /** JSON object guard used only to recover the JSON-RPC `id` from a malformed envelope. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -443,6 +453,38 @@ function lockedRefusal(retryAfterSeconds: number): JsonRpcFailure {
   );
 }
 
+/**
+ * Whether one search request may run the semantic stage, which embeds the query
+ * with Workers AI and queries Vectorize on every call. The request spends one
+ * unit of its account's allowance first; when the allowance is spent, the search
+ * answers from the bundled catalog and runs no Workers AI or Vectorize call. A
+ * failing allowance binding is treated the same way, so search keeps answering
+ * during a platform incident. The key is the grant's Kilo user, never a
+ * caller-supplied value, and no identity is logged.
+ */
+async function semanticStageAllowed(
+  allowance: SearchAllowance | undefined,
+  kiloUserId: string
+): Promise<boolean> {
+  if (!allowance) return true;
+  try {
+    const { success } = await allowance.limit({ key: kiloUserId });
+    if (!success) {
+      console.warn(
+        '[kilo-mcp] search allowance spent for this account; answering without semantic search'
+      );
+    }
+    return success;
+  } catch (error) {
+    console.warn(
+      `[kilo-mcp] search allowance check failed; answering without semantic search: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return false;
+  }
+}
+
 async function runTool(
   name: string,
   args: Record<string, unknown>,
@@ -457,6 +499,10 @@ async function runTool(
   ) {
     throw new JsonRpcFailure(UNAUTHORIZED, 'Cloud Agent authority has expired');
   }
+  // Running clients can retain the old tool list until their next MCP connection.
+  if (auth.cloudAgentAuthority && name !== 'search' && name !== 'call') {
+    return toolResult(await runChildSessionTool({ name, args, auth, ...deps }));
+  }
   if (name === 'search') {
     const parsed = searchArgsSchema.safeParse(args);
     if (!parsed.success) {
@@ -466,19 +512,24 @@ async function runTool(
       );
     }
     const { query, limit } = parsed.data;
+    // One unit of this account's search allowance covers the semantic stage of
+    // this request; the answer below is built from the catalog either way.
+    const semanticCandidates = (await semanticStageAllowed(deps.searchAllowance, auth.kiloUserId))
+      ? (deps.semanticCandidates ?? noSemanticCandidates)
+      : noSemanticCandidates;
     // One pass yields the rows and whether the guarded gate withheld a match, so
     // the empty-state answer below needs no second search: an opted-in grant
     // withholds nothing, and a query with no match anywhere reports `false`.
     const { results, hiddenGuardedMatches } = await searchCatalogDetailed(query, {
       catalog: deps.catalog,
       limit,
-      semanticCandidates: deps.semanticCandidates ?? noSemanticCandidates,
+      semanticCandidates,
       // Fail-closed: only a grant that ticked the admin opt-in sees admin or
       // debug rows.
       includeGuarded: auth.adminEnabled === true,
       ...(auth.cloudAgentAuthority
         ? {
-            allowedPaths: [cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)],
+            allowedPaths: cloudAgentAuthorityProcedures(auth.cloudAgentAuthority),
             cloudAgentAuthority: auth.cloudAgentAuthority,
           }
         : {}),
@@ -498,9 +549,10 @@ async function runTool(
       // the single search pass above, so no second embedding or vector lookup
       // runs while the user is already waiting on an empty answer. Only an admin
       // is told the endpoints exist — a non-admin gets no admin/debug trace.
-      // The echoed query is bounded before serialization — never passed to the
-      // byte cap, which would cut the structured payload into invalid JSON.
-      const message = `No endpoints matched "${boundedQueryEcho(query)}". Refine your query: use fewer or different keywords, or describe the task in plain language.${
+      // `searchArgsSchema` bounds the query length, so echoing it here cannot
+      // push the structured payload into the byte cap, which would cut it into
+      // invalid JSON.
+      const message = `No endpoints matched "${query.trim()}". Refine your query: use fewer or different keywords, or describe the task in plain language.${
         hiddenGuardedMatches && auth.adminEligible === true
           ? ' Some endpoints matching this query are admin or debug endpoints and are hidden for this connection. If you are a Kilo admin, reconnect the Kilo MCP server and tick "Enable admin and debug actions" at sign-in to allow them; admin and debug calls then need a code from your authenticator app.'
           : ''
@@ -724,25 +776,26 @@ async function handleRpcMessage(
           protocolVersion,
           ...(clientName !== undefined ? { clientName } : {}),
         });
-        const childSessionInstructions = auth.cloudAgentAuthority
-          ? ` This session may launch child Cloud Agent sessions. Launch one only when the user explicitly asks you to spin up a new Cloud Agent session. Each child session gets its own sandbox and worktree, so use child sessions to fan out independent tasks. Do not use a child session to explore or work in this worktree; use your own tools here. To launch one, run search first, then call ${cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)} with the child's task. To receive the child's completion, failure or interruption as a new message in this parent session, include callbackTarget: { url: "session:parent" }. Omit callbackTarget when no notification is needed. Do not poll or wait in a tool for a callback; finish your turn and resume when it arrives.`
-          : '';
         return jsonRpcResult(id ?? 0, {
           protocolVersion,
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
-          instructions:
-            (canUseProtectedActions(auth)
+          instructions: auth.cloudAgentAuthority
+            ? `${CHILD_SESSION_INSTRUCTIONS} ${feedback}`
+            : canUseProtectedActions(auth)
               ? `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns. ${feedback}`
-              : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`) +
-            childSessionInstructions,
+              : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`,
         });
       }
       case 'ping':
         return jsonRpcResult(id ?? 0, {});
       case 'tools/list':
         return jsonRpcResult(id ?? 0, {
-          tools: canUseProtectedActions(auth) ? [...TOOLS, ...PROTECTED_TOOLS] : TOOLS,
+          tools: auth.cloudAgentAuthority
+            ? childSessionTools(auth.cloudAgentAuthority)
+            : canUseProtectedActions(auth)
+              ? [...TOOLS, ...PROTECTED_TOOLS]
+              : TOOLS,
         });
       case 'tools/call': {
         const parsed = toolsCallParamsSchema.safeParse(message.params);
@@ -943,6 +996,10 @@ export const apiHandler = {
       catalog,
       webBaseUrl: env.WEB_BASE_URL,
       semanticCandidates: createSemanticCandidates(env),
+      // The per-account allowance for the paid semantic stage. Resolved only
+      // when the binding is present so a handler built without one (tests)
+      // still serves search.
+      ...(env.SEARCH_RATE_LIMITER ? { searchAllowance: env.SEARCH_RATE_LIMITER } : {}),
       analytics,
       ...(protectedRequests ? { protectedRequests } : {}),
     });
@@ -1084,6 +1141,8 @@ export class KiloMcpOAuthStore extends OAuthStore {
     store: this,
     revokeGrant: (grantId, userId) =>
       getOAuthApi(providerOptions, this.env).revokeGrant(grantId, userId),
+    // Built lazily: only a reuse rejection emits, and the factory is pure.
+    analytics: () => createMcpAnalytics({ env: this.env, ctx: this.ctx }),
   });
 
   fetch(request: Request): Promise<Response> {
@@ -1099,8 +1158,10 @@ export class KiloMcpOAuthStore extends OAuthStore {
 }
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    if (isTokenRequest(request)) return getKiloMcpOAuthStoreStub(env).fetch(request);
-    return fetchWithProvider(request, env, ctx);
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (!isTokenRequest(request)) return fetchWithProvider(request, env, ctx);
+    const body = await readTokenBody(request);
+    if (body.kind === 'too_large') return bodyTooLargeResponse(request);
+    return getKiloMcpOAuthStoreStub(env).fetch(forwardable(request, body.body));
   },
 } satisfies ExportedHandler<Env>;

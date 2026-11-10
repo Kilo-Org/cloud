@@ -1,15 +1,16 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
+import type { CustomPricingConfig, CustomPricingTiers } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import {
-  GEMINI_4_ARGON_MODEL_ID,
-  GEMINI_FLASH_CURRENT_MODEL_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { GEMINI_4_ARGON_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,
   calculateCustomCost_mUsd,
+  calculateTieredCost_mUsd,
 } from './custom-pricing';
+import { REPORT_WINDOW_MS } from './report-window';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 
@@ -35,7 +36,7 @@ function makeModel(id: string): OpenRouterModel {
   };
 }
 
-const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd>[1]> = {}) => ({
+const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd>[2]> = {}) => ({
   cost_mUsd: 0,
   inputTokens: 0,
   outputTokens: 0,
@@ -45,10 +46,24 @@ const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd
   ...overrides,
 });
 
+const config = TEST_CUSTOM_PRICING_CONFIG;
+
+const windowTiers: CustomPricingTiers = [
+  {
+    start_context_length: 0,
+    pricing: {
+      prompt_per_million: 1,
+      completion_per_million: 2,
+      input_cache_read_per_million: 0.5,
+      input_cache_write_per_million: 1.5,
+    },
+  },
+];
+
 describe('custom model pricing', () => {
   test('replaces upstream Gemini 3.8 Flash pricing with the promotional rates', () => {
-    const model = applyCustomPricingToModel({
-      ...makeModel(GEMINI_FLASH_CURRENT_MODEL_ID),
+    const model = applyCustomPricingToModel(config, {
+      ...makeModel('google/gemini-3.8-flash'),
       name: 'Google: Gemini 3.8 Flash',
     });
 
@@ -61,14 +76,15 @@ describe('custom model pricing', () => {
     });
     expect(
       calculateCustomCost_mUsd(
-        GEMINI_FLASH_CURRENT_MODEL_ID,
+        config,
+        'google/gemini-3.8-flash',
         makeUsage({ inputTokens: 100, cost_mUsd: 999 })
       )
     ).toBe(Math.round(100 * 0.75));
   });
 
   test('replaces upstream Gemini 4 Argon pricing with the promotional rates', () => {
-    const model = applyCustomPricingToModel({
+    const model = applyCustomPricingToModel(config, {
       ...makeModel(GEMINI_4_ARGON_MODEL_ID),
       name: 'Google: Gemini 4 Argon',
     });
@@ -82,6 +98,7 @@ describe('custom model pricing', () => {
     });
     expect(
       calculateCustomCost_mUsd(
+        config,
         GEMINI_4_ARGON_MODEL_ID,
         makeUsage({
           inputTokens: 1_000,
@@ -99,9 +116,9 @@ describe('custom model pricing', () => {
     modelId => {
       const model = makeModel(modelId);
 
-      expect(applyCustomPricingToModel(model)).toBe(model);
-      expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
-      expect(calculateCustomCost_mUsd(model.id, makeUsage())).toBeUndefined();
+      expect(applyCustomPricingToModel(config, model)).toBe(model);
+      expect(applyCustomPricingToPricing(config, model.id, model.pricing)).toBe(model.pricing);
+      expect(calculateCustomCost_mUsd(config, model.id, makeUsage())).toBeUndefined();
     }
   );
 
@@ -116,10 +133,12 @@ describe('custom model pricing', () => {
         cacheWriteTokens: 30,
       });
 
-      expect(applyCustomPricingToModel(model)).toBe(model);
-      expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
-      expect(calculateCustomCost_mUsd(model.id, usage)).toBeUndefined();
-      expect(calculateCustomCost_mUsd(model.id, { ...usage, cost_mUsd: 123 })).toBeUndefined();
+      expect(applyCustomPricingToModel(config, model)).toBe(model);
+      expect(applyCustomPricingToPricing(config, model.id, model.pricing)).toBe(model.pricing);
+      expect(calculateCustomCost_mUsd(config, model.id, usage)).toBeUndefined();
+      expect(
+        calculateCustomCost_mUsd(config, model.id, { ...usage, cost_mUsd: 123 })
+      ).toBeUndefined();
     }
   );
 
@@ -128,7 +147,8 @@ describe('custom model pricing', () => {
     captureMessageMock.mockClear();
 
     const cost_mUsd = calculateCustomCost_mUsd(
-      GEMINI_FLASH_CURRENT_MODEL_ID,
+      config,
+      'google/gemini-3.8-flash',
       makeUsage({ inputTokens: 10, cacheHitTokens: 20 })
     );
 
@@ -137,15 +157,146 @@ describe('custom model pricing', () => {
       'SUSPICIOUS: negative uncached input tokens for custom pricing',
       expect.objectContaining({
         level: 'error',
-        extra: expect.objectContaining({ model: GEMINI_FLASH_CURRENT_MODEL_ID }),
+        extra: expect.objectContaining({ model: 'google/gemini-3.8-flash' }),
       })
     );
+  });
+
+  test('reports a repeated negative-token anomaly once per model and report window', () => {
+    const captureMessageMock = jest.mocked(captureMessage);
+    captureMessageMock.mockClear();
+    jest.useFakeTimers();
+    const usage = makeUsage({ inputTokens: 10, cacheHitTokens: 20 });
+
+    try {
+      jest.setSystemTime(new Date('2031-01-01T00:00:00Z'));
+      const start = Date.now();
+      expect(calculateTieredCost_mUsd(windowTiers, 'test/window-a', usage)).toBe(10);
+      expect(captureMessageMock).toHaveBeenCalledTimes(1);
+
+      // The same model inside the window is suppressed, whatever the failing usage.
+      jest.setSystemTime(start + 1_000);
+      calculateTieredCost_mUsd(windowTiers, 'test/window-a', { ...usage, inputTokens: 1_000 });
+      calculateTieredCost_mUsd(windowTiers, 'test/window-a', usage);
+      expect(captureMessageMock).toHaveBeenCalledTimes(1);
+
+      // A different model reports independently inside the same window.
+      jest.setSystemTime(start + 1_000);
+      calculateTieredCost_mUsd(windowTiers, 'test/window-b', usage);
+      expect(captureMessageMock).toHaveBeenCalledTimes(2);
+
+      // After the window, the first model reports again.
+      jest.setSystemTime(start + REPORT_WINDOW_MS);
+      calculateTieredCost_mUsd(windowTiers, 'test/window-a', usage);
+      expect(captureMessageMock).toHaveBeenCalledTimes(3);
+      expect(captureMessageMock).toHaveBeenLastCalledWith(
+        'SUSPICIOUS: negative uncached input tokens for custom pricing',
+        expect.objectContaining({
+          level: 'error',
+          extra: expect.objectContaining({ model: 'test/window-a', usage }),
+        })
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('leaves models without custom pricing unchanged', () => {
     const model = makeModel('qwen/another-model');
 
-    expect(applyCustomPricingToModel(model)).toBe(model);
-    expect(calculateCustomCost_mUsd(model.id, makeUsage())).toBeUndefined();
+    expect(applyCustomPricingToModel(config, model)).toBe(model);
+    expect(calculateCustomCost_mUsd(config, model.id, makeUsage())).toBeUndefined();
+  });
+
+  test('applies a configured entry and its context-length tiers', () => {
+    const tieredConfig: CustomPricingConfig = {
+      models: [
+        {
+          model: 'qwen/qwen3.7-max',
+          fallbackOnly: true,
+          pricing: [
+            {
+              start_context_length: 0,
+              pricing: {
+                prompt_per_million: 1,
+                completion_per_million: 2,
+                input_cache_read_per_million: null,
+                input_cache_write_per_million: null,
+              },
+            },
+            {
+              start_context_length: 1_000,
+              pricing: {
+                prompt_per_million: 10,
+                completion_per_million: 20,
+                input_cache_read_per_million: null,
+                input_cache_write_per_million: null,
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const model = makeModel('qwen/qwen3.7-max');
+
+    expect(applyCustomPricingToPricing(tieredConfig, model.id, model.pricing)).toBe(model.pricing);
+    expect(applyCustomPricingToModel(tieredConfig, model)).toBe(model);
+    expect(
+      calculateCustomCost_mUsd(tieredConfig, model.id, makeUsage({ cost_mUsd: 5 }))
+    ).toBeUndefined();
+    expect(calculateCustomCost_mUsd(tieredConfig, model.id, makeUsage({ inputTokens: 999 }))).toBe(
+      999
+    );
+    expect(
+      calculateCustomCost_mUsd(
+        tieredConfig,
+        model.id,
+        makeUsage({ inputTokens: 1_000, outputTokens: 10 })
+      )
+    ).toBe(10_000 + 200);
+    expect(
+      calculateCustomCost_mUsd(tieredConfig, 'google/gemini-3.8-flash', makeUsage())
+    ).toBeUndefined();
+  });
+
+  const promptPricing = (prompt_per_million: number) => ({
+    prompt_per_million,
+    completion_per_million: 0,
+    input_cache_read_per_million: null,
+    input_cache_write_per_million: null,
+  });
+
+  test('requires the first tier to start at zero', () => {
+    const invalidConfig: CustomPricingConfig = {
+      models: [
+        {
+          model: 'vendor/model',
+          pricing: [{ start_context_length: 1, pricing: promptPricing(1) }],
+        },
+      ],
+    };
+
+    expect(() =>
+      calculateCustomCost_mUsd(invalidConfig, 'vendor/model', makeUsage({ inputTokens: 100 }))
+    ).toThrow('The first pricing tier must start at context length 0');
+  });
+
+  test('requires tiers to be ordered by ascending start context length', () => {
+    const invalidConfig: CustomPricingConfig = {
+      models: [
+        {
+          model: 'vendor/model',
+          pricing: [
+            { start_context_length: 0, pricing: promptPricing(1) },
+            { start_context_length: 200, pricing: promptPricing(2) },
+            { start_context_length: 100, pricing: promptPricing(3) },
+          ],
+        },
+      ],
+    };
+
+    expect(() =>
+      calculateCustomCost_mUsd(invalidConfig, 'vendor/model', makeUsage({ inputTokens: 100 }))
+    ).toThrow('Pricing tiers must be ordered by ascending start context length');
   });
 });

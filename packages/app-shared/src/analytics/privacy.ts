@@ -44,7 +44,6 @@ function normalizeKey(key: string): string {
     .toLowerCase();
 }
 
-/** True when a property key names a prohibited data class. */
 export function isProhibitedPropertyKey(key: string): boolean {
   const normalized = normalizeKey(key);
 

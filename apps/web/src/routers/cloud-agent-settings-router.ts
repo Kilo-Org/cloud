@@ -5,29 +5,36 @@ import {
   ORGANIZATION_MANAGE_ROLES,
   canManageOrganization,
 } from '@kilocode/app-shared/organizations';
-import { TRPCError } from '@trpc/server';
+import { cloud_agent_user_settings } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
-  getKiloSandboxAllocation,
   sandboxSelectionCapabilitiesSchema,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  BuiltinAgentSettingsInputSchema,
   canonicalRepoFullName,
   clearContextSandboxAllocation,
+  getBuiltinAgentSettings,
   getSandboxAllocationSettings,
   listBindings,
   removeRepositorySettings,
+  setBuiltinAgentSettings,
   setContextSandboxAllocation,
   setRepositorySettings,
   type ProfileOwner,
   type RepositoryPlatform,
 } from '@kilocode/cloud-agent-profile';
-import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
-import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
+import {
+  assertAllocationOffered,
+  findSandboxOption,
+  getSavedAllocationReason,
+  loadSandboxCapabilities,
+} from '@/lib/cloud-agent-next/sandbox-allocation-offers';
+import { DEFAULT_WORKSPACE_ORDER, workspaceOrderSchema } from '@/lib/cloud-agent/workspace-folders';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import type { User } from '@kilocode/db/schema';
 
 const RepositoryPlatformSchema = z.enum(['github', 'gitlab']);
 
@@ -45,6 +52,7 @@ const CloudAgentSettingsSchema = z.object({
   canManage: z.boolean(),
   contextAllocation: z.string().nullable(),
   contextUnavailableReason: z.string().optional(),
+  builtinAgents: BuiltinAgentSettingsInputSchema,
   repositories: z.array(RepositorySettingsRowSchema),
   capabilities: sandboxSelectionCapabilitiesSchema,
   // Repository-scoped capability views so a GitLab row never offers a
@@ -55,60 +63,12 @@ const CloudAgentSettingsSchema = z.object({
   }),
 });
 
+const WorkspaceOrderSchema = z.object({ workspaceOrder: workspaceOrderSchema });
+
 function ownerFromInput(organizationId: string | undefined, userId: string): ProfileOwner {
   return organizationId
     ? { type: 'organization', id: organizationId }
     : { type: 'user', id: userId };
-}
-
-async function loadCapabilities(
-  user: User,
-  headersList: Headers | undefined,
-  organizationId: string | undefined,
-  repositoryType?: 'github' | 'gitlab' | 'bitbucket' | 'git'
-): Promise<SandboxSelectionCapabilities> {
-  const { token } = await createControlTokenForRequest(user, 'cloud-agent-next', {
-    headers: headersList,
-    ...(organizationId ? { organizationId } : {}),
-    tokenSource: 'cloud-agent',
-  });
-  return createCloudAgentNextClient(token).getSandboxSelectionOptions({
-    ...(organizationId ? { kilocodeOrganizationId: organizationId } : {}),
-    ...(repositoryType ? { repositoryType } : {}),
-  });
-}
-
-function findOption(
-  capabilities: SandboxSelectionCapabilities,
-  allocation: string
-): SandboxSelectionCapabilities['options'][number] | undefined {
-  return capabilities.options.find(
-    option => getKiloSandboxAllocation(option.allocation) === allocation
-  );
-}
-
-function getSavedAllocationReason(
-  capabilities: SandboxSelectionCapabilities,
-  allocation: string,
-  repositoryType?: RepositoryPlatform
-): string | undefined {
-  if (!capabilities.enabled) return 'Sandbox selection is not enabled for this owner';
-  const option = findOption(capabilities, allocation);
-  if (!option) return 'This sandbox allocation is no longer offered';
-  return repositoryType
-    ? (option.repositoryUnavailableReason ?? option.unavailableReason)
-    : option.unavailableReason;
-}
-
-function assertAllocationOffered(
-  capabilities: SandboxSelectionCapabilities,
-  allocation: string,
-  repositoryType?: RepositoryPlatform
-): void {
-  const reason = getSavedAllocationReason(capabilities, allocation, repositoryType);
-  if (reason) {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: reason });
-  }
 }
 
 function toRepositoryPlatform(platform: string): RepositoryPlatform {
@@ -134,10 +94,11 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       const canManage = role ? canManageOrganization(role) : true;
       const owner = ownerFromInput(organizationId, ctx.user.id);
 
-      const [capabilities, settings, bindings] = await Promise.all([
-        loadCapabilities(ctx.user, ctx.headersList, organizationId),
+      const [capabilities, settings, bindings, builtinAgents] = await Promise.all([
+        loadSandboxCapabilities(ctx.user, ctx.headersList, organizationId),
         getSandboxAllocationSettings(db, owner),
         listBindings(db, owner),
+        getBuiltinAgentSettings(db, ctx.user.id),
       ]);
 
       const rows = new Map<string, z.infer<typeof RepositorySettingsRowSchema>>();
@@ -172,7 +133,12 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       const repositoryCapabilities = new Map<RepositoryPlatform, SandboxSelectionCapabilities>();
       await Promise.all(
         repositoryPlatforms.map(async platform => {
-          const caps = await loadCapabilities(ctx.user, ctx.headersList, organizationId, platform);
+          const caps = await loadSandboxCapabilities(
+            ctx.user,
+            ctx.headersList,
+            organizationId,
+            platform
+          );
           repositoryCapabilities.set(platform, caps);
         })
       );
@@ -182,7 +148,10 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
           if (!row.allocation) return row;
           const caps = repositoryCapabilities.get(row.repositoryPlatform) ?? capabilities;
           const ownerReason = getSavedAllocationReason(capabilities, row.allocation);
-          const repositoryReason = findOption(caps, row.allocation)?.repositoryUnavailableReason;
+          const repositoryReason = findSandboxOption(
+            caps,
+            row.allocation
+          )?.repositoryUnavailableReason;
           return {
             ...row,
             ...(ownerReason ? { allocationUnavailableReason: ownerReason } : {}),
@@ -205,6 +174,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         canManage,
         contextAllocation: settings.contextAllocation,
         ...(contextReason ? { contextUnavailableReason: contextReason } : {}),
+        builtinAgents,
         repositories,
         capabilities,
         capabilitiesByPlatform: {
@@ -233,7 +203,11 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         return { success: true };
       }
 
-      const capabilities = await loadCapabilities(ctx.user, ctx.headersList, input.organizationId);
+      const capabilities = await loadSandboxCapabilities(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       assertAllocationOffered(capabilities, input.allocation);
       await setContextSandboxAllocation(db, owner, input.allocation);
       return { success: true };
@@ -266,7 +240,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
             row.repositoryFullName === canonicalRepoFullName(input.repoFullName)
         )?.allocation;
         if (input.allocation !== currentAllocation) {
-          const capabilities = await loadCapabilities(
+          const capabilities = await loadSandboxCapabilities(
             ctx.user,
             ctx.headersList,
             input.organizationId,
@@ -281,6 +255,37 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         allocation: input.allocation ?? null,
       });
       return { success: true };
+    }),
+
+  setBuiltinAgents: baseProcedure
+    .input(z.object({ agents: BuiltinAgentSettingsInputSchema }))
+    .output(z.object({ success: z.boolean(), agents: BuiltinAgentSettingsInputSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const agents = await setBuiltinAgentSettings(db, ctx.user.id, input.agents);
+      return { success: true, agents };
+    }),
+
+  getWorkspaceOrder: baseProcedure.output(WorkspaceOrderSchema).query(async ({ ctx }) => {
+    const [settings] = await db
+      .select({ workspaceOrder: cloud_agent_user_settings.workspace_order })
+      .from(cloud_agent_user_settings)
+      .where(eq(cloud_agent_user_settings.kilo_user_id, ctx.user.id))
+      .limit(1);
+    return { workspaceOrder: settings?.workspaceOrder ?? DEFAULT_WORKSPACE_ORDER };
+  }),
+
+  setWorkspaceOrder: baseProcedure
+    .input(WorkspaceOrderSchema)
+    .output(WorkspaceOrderSchema)
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .insert(cloud_agent_user_settings)
+        .values({ kilo_user_id: ctx.user.id, workspace_order: input.workspaceOrder })
+        .onConflictDoUpdate({
+          target: cloud_agent_user_settings.kilo_user_id,
+          set: { workspace_order: input.workspaceOrder },
+        });
+      return { workspaceOrder: input.workspaceOrder };
     }),
 
   removeRepositorySettings: baseProcedure

@@ -263,6 +263,7 @@ describe('the language write applies the change', () => {
   it.each([
     ['persist-failed', 'could not be saved'],
     ['reload-failed', 'could not restart'],
+    ['restart-skipped', 'could not prepare the restart'],
     ['catalog-failed', 'catalog could not be loaded'],
   ])('refuses to claim success when the apply fails (%s)', async (kind, fragment) => {
     applyLanguagePreference.mockResolvedValue({ kind });

@@ -77,4 +77,27 @@ describe('POST /api/organizations/[id]/models/validate', () => {
     expect(response.status).toBe(400);
     expect(mockedHandleTRPCRequest).not.toHaveBeenCalled();
   });
+
+  test('rejects malformed JSON before invoking organization authorization', async () => {
+    const response = await handleOrganizationModelValidationRequest(
+      new NextRequest('http://localhost:3000/api/organizations/org-1/models/validate', {
+        method: 'POST',
+        body: '{not json',
+      }),
+      { params: Promise.resolve({ id: 'org-1' }) }
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid JSON body' });
+    expect(mockedHandleTRPCRequest).not.toHaveBeenCalled();
+  });
+
+  test('matches the trimmed model ID in the organization catalog', async () => {
+    const response = await handleOrganizationModelValidationRequest(
+      request('  available/model  '),
+      { params: Promise.resolve({ id: 'org-1' }) }
+    );
+
+    await expect(response.json()).resolves.toEqual({ valid: true });
+  });
 });

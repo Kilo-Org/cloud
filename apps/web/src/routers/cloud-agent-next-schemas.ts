@@ -1,15 +1,26 @@
+import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
-import { ParentSessionCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
+import { ParentCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
+import { CloudAgentSafeFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  cloudSessionMetadataSchema,
+  cloudSessionMessagesPageInputSchema,
+  cloudSessionMessagesPageWireSchema,
+} from '@kilocode/cloud-agent-sdk/schemas';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
+import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   clientKiloSessionIdSchema,
+  cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import { worktreeBranchOperationResultSchema } from '@kilocode/worker-utils/cloud-agent-worktree-operations';
 import {
   CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
@@ -19,19 +30,26 @@ import {
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
   CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX,
   CLOUD_AGENT_ATTACHMENT_RELAXED_FILENAME_REGEX,
-  CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-  CLOUD_AGENT_IMAGE_MAX_COUNT,
-  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
 } from '@/lib/cloud-agent/constants';
 import {
   PREVIEW_PORT_MAX,
   PREVIEW_PORT_MIN,
 } from '../../../../services/cloud-agent-next/src/shared/preview-port';
+import {
+  previewTargetSchema,
+  type PreviewTarget,
+} from '../../../../services/cloud-agent-next/src/shared/preview-target';
 
 export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
   SANDBOX_STATUS_DETAIL_MESSAGES,
 } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+export {
+  ListPreviewServicesOutputSchema as baseListPreviewServicesNextOutputSchema,
+  type ListPreviewServicesOutput,
+  type PreviewService,
+} from '../../../../services/cloud-agent-next/src/shared/preview-services';
+export { GetEgressAuditResponseSchema as baseGetEgressAuditNextOutputSchema } from '@kilocode/worker-utils/egress-audit';
 export type {
   SandboxLifecycleStatus,
   SandboxProviderLabel,
@@ -44,26 +62,6 @@ export type {
  *
  * Uses V2 WebSocket-based API only.
  */
-
-const cloudAgentImageFilenameSchema = z
-  .string()
-  .regex(
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(?:png|jpg|webp|gif)$/
-  );
-
-export const cloudAgentImagesSchema = z
-  .object({
-    path: z.uuid(),
-    files: z.array(cloudAgentImageFilenameSchema).min(1).max(CLOUD_AGENT_IMAGE_MAX_COUNT),
-  })
-  .optional();
-
-export const cloudAgentGetImageUploadUrlSchema = z.object({
-  messageUuid: z.uuid(),
-  imageId: z.uuid(),
-  contentType: z.enum(CLOUD_AGENT_IMAGE_ALLOWED_TYPES),
-  contentLength: z.number().int().positive().max(CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES),
-});
 
 const DENIED_EXTENSION_SET = new Set<string>(CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS);
 
@@ -176,17 +174,6 @@ export const cloudAgentGetAttachmentDownloadUrlSchema = z.object({
 });
 
 /**
- * Send-time finalization input for the pending-upload ledger. The object keys
- * are full R2 keys produced by the upload presign; the server scopes the link
- * to the caller's own rows, so the array needs no per-key structure beyond a
- * length cap that reuses the landed attachment-count constant.
- */
-export const cloudAgentLinkPendingUploadsSchema = z.object({
-  messageUuid: z.uuid(),
-  objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
-});
-
-/**
  * Release-time input for the pending-upload ledger. A removed composer file
  * releases its admitted row so it stops consuming the per-message quota. The
  * keys are full R2 keys scoped to the caller; only 'pending' rows are released,
@@ -196,17 +183,13 @@ export const cloudAgentReleasePendingUploadsSchema = z.object({
   objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
 
-function hasOnlyOneAttachmentField(data: { images?: unknown; attachments?: unknown }): boolean {
-  return data.images === undefined || data.attachments === undefined;
-}
-
 /**
  * Agent mode enum - all supported modes.
  * - code, plan, debug, orchestrator, ask: CLI agent modes
  * - build, architect: Backward-compatible aliases (build → code, architect → plan)
  * - custom: Custom mode (requires appendSystemPrompt)
  */
-const messageIdNextSchema = z
+export const messageIdNextSchema = z
   .string()
   .regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/, 'Invalid message ID format');
 
@@ -348,11 +331,14 @@ export const agentModeSendMessageSchema = z
  * Discriminated execution payload for follow-up messages and prepared-session
  * initialization. Mirrors the worker's SendMessageV2Payload schema; both
  * variants ride the same execution pipeline on the cloud-agent-next side.
+ * Free-text fields are bounded by `CLOUD_AGENT_PROMPT_MAX_LENGTH` so both
+ * entry paths enforce one limit: `arguments` expands into the prompt through
+ * `$1`/`$ARGUMENTS`, and `command` stays a bare catalog name.
  */
 export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('prompt'),
-    prompt: z.string().min(1),
+    prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
     mode: agentModeSendMessageSchema,
     model: z.string().min(1),
     variant: z
@@ -364,14 +350,22 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('command'),
     command: z.string().min(1),
-    arguments: z.string().default(''),
+    arguments: z.string().max(CLOUD_AGENT_PROMPT_MAX_LENGTH).default(''),
+    mode: agentModeSendMessageSchema.optional(),
+    model: z.string().min(1).optional(),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
   }),
 ]);
 
 /**
  * Send-only execution payload for follow-up messages. Mirrors
  * `sendMessageNextPayloadSchema` but allows an empty prompt, because a
- * follow-up send may carry attachments or images with no text. Used only by
+ * follow-up send may carry attachments with no text; that is the
+ * only difference, since both paths keep the shared length cap. Used only by
  * `baseSendMessageNextSchema.payload`; prepare `initialPayload` keeps the
  * `.min(1)` prompt via `sendMessageNextPayloadSchema`.
  */
@@ -383,6 +377,28 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
 ]);
 
 /**
+ * The environment the user selected, and the branch of each additional
+ * repository of a multi-repository environment. The worker checks both against
+ * the owner and the launch repository, and validates each branch.
+ */
+const requestedEnvironmentSchema = z
+  .object({
+    id: z.uuid(),
+    repositories: z
+      .array(
+        z
+          .object({
+            repoFullName: z.string().min(1).max(500),
+            branch: z.string().min(1).max(255).optional(),
+          })
+          .strict()
+      )
+      .max(100)
+      .optional(),
+  })
+  .strict();
+
+/**
  * Shared fields for prepareSession. Discriminated on `cloneFromKiloSessionId`:
  * the non-clone variant keeps the required `prompt` and the current optional
  * initial fields, while the clone-only variant requires the source session,
@@ -390,8 +406,7 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
  * initial turn fields.
  */
 const PrepareSessionSharedFields = {
-  allowSubagentSessions: z.boolean().optional(),
-  callbackTarget: ParentSessionCallbackTargetSchema.optional(),
+  callbackTarget: ParentCallbackTargetSchema.optional(),
   // Repository source (mutually exclusive - must provide exactly one)
   githubRepo: z
     .string()
@@ -437,6 +452,15 @@ const PrepareSessionSharedFields = {
     .regex(/^[a-zA-Z]+$/)
     .optional(),
 
+  /** The repository environment the user selected, with branches for its additional repositories. */
+  requestedEnvironment: requestedEnvironmentSchema.optional(),
+  /**
+   * Set by a client that shows an environment picker. When several environments
+   * contain the repository and none is selected, the start then fails and names
+   * them; without it, the session runs with no environment.
+   */
+  requireEnvironmentChoice: z.literal(true).optional(),
+
   /**
    * Optional environment profile id. When omitted, the effective default
    * profile (personal default wins over org default) is used.
@@ -445,14 +469,21 @@ const PrepareSessionSharedFields = {
 
   // Optional configuration
   envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
-  setupCommands: z.array(z.string().max(500)).max(20).optional(),
+  setupCommands: setupCommandsSchema.optional(),
   mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
   runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
   runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),
   upstreamBranch: z.string().optional(),
+  /** Start the new working branch from an existing pushed branch instead of the default. */
+  baseBranch: z.string().min(1).max(256).optional(),
+  /**
+   * Create this workspace on top of another worktree. The server derives the
+   * repository, platform, and integration from that parent; callers cannot
+   * substitute a different repository or base.
+   */
+  stackOnWorktreeId: cloudAgentWorktreeIdSchema.optional(),
   autoCommit: z.boolean().optional(),
   attachments: cloudAgentAttachmentsSchema.optional(),
-  images: cloudAgentImagesSchema,
   devcontainer: z
     .boolean()
     .refine(value => !value, { message: 'Devcontainer support has been retired' })
@@ -460,7 +491,7 @@ const PrepareSessionSharedFields = {
 };
 
 const PrepareSessionNonCloneVariant = z.object({
-  prompt: z.string().min(1).max(100_000),
+  prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
   initialMessageId: messageIdNextSchema.optional(),
   initialPayload: sendMessageNextPayloadSchema.optional(),
   autoInitiate: z.boolean().optional(),
@@ -497,22 +528,39 @@ export const basePrepareSessionNextSchema = z
   .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
   .and(egressPolicySchema)
   .refine(
-    data =>
-      [data.githubRepo, data.gitlabProject, data.bitbucketRepo, data.publicRepoUrl].filter(
-        repository => repository !== undefined
-      ).length === 1,
+    data => {
+      const repositoryCount = [
+        data.githubRepo,
+        data.gitlabProject,
+        data.bitbucketRepo,
+        data.publicRepoUrl,
+      ].filter(repository => repository !== undefined).length;
+      return (
+        repositoryCount === 1 || (repositoryCount === 0 && data.stackOnWorktreeId !== undefined)
+      );
+    },
     {
-      message: 'Must provide exactly one repository source',
+      message: 'Must provide exactly one repository source, or stack on an existing worktree',
       path: ['githubRepo'],
     }
   )
-  .refine(data => data.githubIntegrationId === undefined || data.githubRepo !== undefined, {
-    message: 'GitHub integration requires a GitHub repository',
-    path: ['githubIntegrationId'],
+  .refine(
+    data =>
+      data.githubIntegrationId === undefined ||
+      data.githubRepo !== undefined ||
+      data.stackOnWorktreeId !== undefined,
+    {
+      message: 'GitHub integration requires a GitHub repository',
+      path: ['githubIntegrationId'],
+    }
+  )
+  .refine(data => data.baseBranch === undefined || data.upstreamBranch === undefined, {
+    message: 'Choose either a base branch or an upstream branch, not both',
+    path: ['baseBranch'],
   })
-  .refine(hasOnlyOneAttachmentField, {
-    message: 'Must not provide both attachments and images',
-    path: ['attachments'],
+  .refine(data => data.stackOnWorktreeId === undefined || data.upstreamBranch === undefined, {
+    message: 'A stacked workspace cannot use an upstream branch',
+    path: ['upstreamBranch'],
   });
 
 export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema
@@ -546,9 +594,72 @@ export const organizationPrepareSessionNextSchema = basePrepareSessionNextSchema
 export const basePrepareSessionNextOutputSchema = z.object({
   kiloSessionId: kiloSessionIdSchema,
   cloudAgentSessionId: z.string(),
+  worktreeId: cloudAgentWorktreeIdSchema.optional(),
   /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed: z.boolean().optional(),
 });
+
+export const baseGetStackedWorkspaceSourceNextSchema = z
+  .object({
+    worktreeId: cloudAgentWorktreeIdSchema,
+  })
+  .strict();
+
+export const organizationGetStackedWorkspaceSourceNextSchema =
+  baseGetStackedWorkspaceSourceNextSchema.extend({
+    organizationId: z.uuid(),
+  });
+
+export const stackedWorkspaceProviderInputNextSchema = z
+  .object({
+    githubRepo: z.string().optional(),
+    githubIntegrationId: z.uuid().nullable().optional(),
+    gitlabProject: z.string().optional(),
+    bitbucketRepo: z
+      .object({
+        fullName: z.string(),
+        workspaceUuid: z.uuid(),
+        repositoryUuid: z.uuid(),
+      })
+      .strict()
+      .optional(),
+    publicRepoUrl: z.string().optional(),
+  })
+  .strict();
+
+export const baseStackedWorkspaceSourceNextOutputSchema = z
+  .object({
+    worktreeId: z.string(),
+    repository: z.string(),
+    gitUrl: z.string(),
+    platform: z.enum(['github', 'gitlab', 'bitbucket', 'git']),
+    branch: z.string(),
+    prNumber: z.number().int().nullable(),
+    basePushed: z.boolean(),
+    githubIntegrationId: z.uuid().nullable(),
+    providerInput: stackedWorkspaceProviderInputNextSchema,
+  })
+  .strict();
+
+/**
+ * Sync and Restack are session-only: the caller names the session and the
+ * server derives the branch, base, and upstream. No client-supplied SHA or
+ * branch target is accepted.
+ */
+export const baseSyncWorktreeBranchNextSchema = z
+  .object({
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
+  })
+  .strict();
+
+export const baseRestackWorktreeBranchNextSchema = z
+  .object({
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
+  })
+  .strict();
+
+export const baseSyncWorktreeBranchNextOutputSchema = worktreeBranchOperationResultSchema;
+export const baseRestackWorktreeBranchNextOutputSchema = worktreeBranchOperationResultSchema;
 
 export const baseCreateWorktreeChatNextSchema = z
   .object({
@@ -589,9 +700,14 @@ export const baseSendMessageNextSchema = z
     payload: sendMessageNextSendPayloadSchema,
     expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
     autoCommit: z.boolean().optional(),
-    messageId: messageIdNextSchema.nullish(),
+    /**
+     * Durable user-message identity. The control plane replays a repeated id
+     * instead of admitting a second turn, so a client retry after a failed
+     * response must carry the id of the turn it is retrying; the server cannot
+     * invent one on the client's behalf.
+     */
+    messageId: messageIdNextSchema,
     attachments: cloudAgentAttachmentsSchema.optional(),
-    images: cloudAgentImagesSchema,
   })
   .refine(
     data =>
@@ -599,17 +715,11 @@ export const baseSendMessageNextSchema = z
       controlPlaneSessionIdNextSchema.safeParse(data.cloudAgentSessionId).success,
     { message: 'Worktree review requires a control-plane session', path: ['cloudAgentSessionId'] }
   )
-  .refine(hasOnlyOneAttachmentField, {
-    message: 'Must not provide both attachments and images',
-    path: ['attachments'],
-  })
   .refine(
     data => {
       if (data.payload.type === 'command') return true;
       if (data.payload.prompt.trim().length > 0) return true;
-      const hasFiles =
-        (data.attachments?.files.length ?? 0) > 0 || (data.images?.files.length ?? 0) > 0;
-      return hasFiles;
+      return (data.attachments?.files.length ?? 0) > 0;
     },
     {
       message: 'Prompt is required',
@@ -619,16 +729,67 @@ export const baseSendMessageNextSchema = z
 
 export const baseGetMessageResultNextSchema = z.object({
   cloudAgentSessionId: controlPlaneSessionIdNextSchema,
-  expectedWorktreeId: cloudAgentWorktreeIdSchema,
+  expectedWorktreeId: cloudAgentWorktreeIdSchema
+    .optional()
+    .describe(
+      'Required for ordinary user calls; optional only for delegated Cloud Agent authority.'
+    ),
   messageId: messageIdNextSchema,
 });
 
+const sessionMessageCompletionSourceNextSchema = z.enum([
+  'assistant_message_event',
+  'manual_compact_summarize',
+  'idle_reconciliation',
+  'wrapper_failure',
+  'interrupt',
+  'delivery_failure',
+  'canceled',
+]);
+
+// Mirrors the Worker's public result contract without duplicating its strict
+// validation. Non-strict here keeps web-first deploy rolling reads forward
+// compatible; the Worker remains the authority for the full shape.
 export const baseGetMessageResultNextOutputSchema = z.object({
   cloudAgentSessionId: controlPlaneSessionIdNextSchema,
   messageId: messageIdNextSchema,
   status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
+  createdAt: z.number(),
+  queuedAt: z.number().optional(),
   acceptedAt: z.number().optional(),
+  terminalAt: z.number().optional(),
+  completionSource: sessionMessageCompletionSourceNextSchema.optional(),
+  failure: CloudAgentSafeFailureSchema.extend({ retryable: z.boolean() }).optional(),
+  gateResult: z.enum(['pass', 'fail']).optional(),
+  assistant: z
+    .object({
+      messageId: z.string(),
+      text: z.string().optional(),
+    })
+    .optional(),
 });
+
+export const baseListChildSessionsNextSchema = z
+  .object({
+    limit: z.number().int().min(1).max(50).default(20),
+    cursor: z.uuid().optional(),
+  })
+  .strict();
+
+export const baseListChildSessionsNextOutputSchema = z
+  .object({
+    sessions: z.array(
+      z
+        .object({
+          cloudAgentSessionId: controlPlaneSessionIdNextSchema,
+          initialMessageId: messageIdNextSchema.optional(),
+          worktreeId: cloudAgentWorktreeIdSchema.optional(),
+        })
+        .strict()
+    ),
+    nextCursor: z.uuid().optional(),
+  })
+  .strict();
 
 // Schema for interrupting a session
 export const baseInterruptSessionNextSchema = z.object({
@@ -645,6 +806,13 @@ export const baseCancelQueuedMessageNextSchema = z.object({
 export const baseGetSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
 });
+
+export const baseGetEgressAuditNextSchema = GetEgressAuditInputSchema.extend({
+  cloudAgentSessionId: z.string().regex(SESSION_ID_RE, 'Invalid session ID format'),
+  limit: z.number().int().min(1).max(100).default(50),
+}).strict();
+export const baseGetSessionMessagesPageNextSchema = cloudSessionMessagesPageInputSchema;
+export const baseGetSessionMessagesPageNextOutputSchema = cloudSessionMessagesPageWireSchema;
 
 export const baseGetSandboxStatusNextSchema = z
   .object({
@@ -745,25 +913,45 @@ export const baseCloseTerminalNextOutputSchema = z.object({
   success: z.boolean(),
 });
 
-const previewSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+export const baseListPreviewServicesNextSchema = previewTargetSchema;
 
-export const baseCreatePreviewNextSchema = z.object({
-  cloudAgentSessionId: previewSessionIdSchema,
+const previewRequestSchema = z.object({
   port: z.number().int().min(PREVIEW_PORT_MIN).max(PREVIEW_PORT_MAX),
   /** Where the preview opens; the Worker validates it where it redirects. */
   path: z.string().startsWith('/').max(2048).optional(),
 });
+
+export const baseCreatePreviewNextSchema = z.intersection(
+  previewTargetSchema,
+  previewRequestSchema
+);
 
 export const baseCreatePreviewNextOutputSchema = z.object({
   url: z.url(),
   expiresAt: z.number().int().positive(),
 });
 
-export const basePreviewOptionsNextSchema = z.object({
-  cloudAgentSessionId: previewSessionIdSchema,
-  /** The route's organization; the Worker uses it only to decide whether to show preview. */
-  organizationId: z.uuid().optional(),
-});
+export const basePreviewOptionsNextSchema = z.intersection(
+  previewTargetSchema,
+  z.object({
+    organizationId: z.uuid().optional(),
+  })
+);
+
+/**
+ * The target from a parsed preview input. The shared schema guarantees exactly
+ * one field; this narrows the union for the ownership check and ticket payload.
+ */
+export function previewTargetFromInput(input: {
+  worktreeId?: `worktree_${string}`;
+  cloudAgentSessionId?: `workspace_${string}`;
+}): PreviewTarget | null {
+  if (input.worktreeId !== undefined) return { worktreeId: input.worktreeId };
+  if (input.cloudAgentSessionId !== undefined) {
+    return { cloudAgentSessionId: input.cloudAgentSessionId };
+  }
+  return null;
+}
 
 /** The Worker's answer: its preview hostname with a `{port}` placeholder. */
 export const workerPreviewOptionsSchema = z.discriminatedUnion('enabled', [
@@ -798,11 +986,18 @@ export const baseGetSessionNextOutputSchema = z.object({
   userId: z.string(),
   orgId: z.string().optional(),
   sandboxId: z.string().optional(),
+  environmentId: z.string().uuid().optional(),
+  title: cloudSessionMetadataSchema.shape.title,
+  associatedPr: cloudSessionMetadataSchema.shape.associatedPr,
+  totalCostMicrodollars: cloudSessionMetadataSchema.shape.totalCostMicrodollars,
+  createdOnPlatform: cloudSessionMetadataSchema.shape.createdOnPlatform,
+  profileId: cloudSessionMetadataSchema.shape.profileId,
 
   // Worktree ownership (present only for worktree sessions)
   worktreeId: z.string().nullable().optional(),
   parentSessionId: z.string().nullable().optional(),
   cloudAgentSessionScopeId: z.string().nullable().optional(),
+  parentCloudAgentSessionId: z.string().optional(),
 
   // Repository info (no tokens)
   githubRepo: z.string().optional(),
@@ -818,12 +1013,15 @@ export const baseGetSessionNextOutputSchema = z.object({
   upstreamBranch: z.string().optional(),
   branchName: z.string().optional(),
 
-  /** Custom agents stored on this session (shown in the chat picker). */
+  /** Custom agents stored on this session, including agents excluded from the chat picker. */
   runtimeAgents: z
     .array(
       z.object({
         slug: z.string(),
         name: z.string(),
+        mode: z.enum(['primary', 'subagent', 'all']).optional(),
+        hidden: z.boolean().optional(),
+        disable: z.boolean().optional(),
         /** Optional model override so the chat UI can lock its model picker. */
         model: z.string().optional(),
         /** Optional thinking-effort variant override so the chat UI can lock its variant picker. */

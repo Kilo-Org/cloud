@@ -1,14 +1,20 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
-import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import {
+  apiKeyUpstream,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'nvidia-byok',
-  base_url: 'https://integrate.api.nvidia.com/v1',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+  openrouter_inference_provider_id: 'nvidia',
+  models_dev_id: 'nvidia',
+  ...apiKeyUpstream({
+    apiUrl: 'https://integrate.api.nvidia.com/v1',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
   transformRequest(context) {
     const { request } = context;
     if (request.kind !== 'chat_completions') {
@@ -20,16 +26,5 @@ export default {
     delete request.body.safety_identifier;
     delete request.body.prompt_cache_key;
   },
-  models: cachedEnhancedDirectByokModelList({
-    providerId: 'nvidia-byok',
-    recommendedModels: [
-      {
-        id: 'nvidia/nemotron-3-super-120b-a12b',
-        name: 'Nemotron 3 Super 120B A12B',
-        flags: ['reasoning'],
-        context_length: 262144,
-        max_completion_tokens: 262144,
-      },
-    ],
-  }),
+  models: cachedDirectByokModelList('nvidia-byok'),
 } satisfies DirectByokProvider;

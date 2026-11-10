@@ -21,29 +21,40 @@ import {
 } from '@kilocode/app-shared/moderation';
 
 /**
+ * Maximum lengths enforced on the report metadata this router stores. The caps
+ * cover the longest values the reporting clients send: UUID message ids,
+ * numeric discussion comment ids, provider-prefixed model ids, cloud-agent
+ * session ids, and short client labels such as `mobile`/`apple`.
+ */
+const TARGET_ID_MAX_LENGTH = 255;
+const MODEL_ID_MAX_LENGTH = 200;
+const SESSION_ID_MAX_LENGTH = 255;
+const CONTEXT_VALUE_MAX_LENGTH = 64;
+
+/**
  * Report context is minimized by construction: only `platform` and an optional
  * `storefront` are accepted. `.strict()` rejects any other key (notably a
  * `body`) so a message or comment body can never be persisted.
  */
 const ReportContextSchema = z
   .object({
-    platform: z.string(),
-    storefront: z.string().optional(),
+    platform: z.string().max(CONTEXT_VALUE_MAX_LENGTH),
+    storefront: z.string().max(CONTEXT_VALUE_MAX_LENGTH).optional(),
   })
   .strict();
 
 const ReportContentInput = z.object({
   surface: z.enum(MODERATION_SURFACES),
   targetKind: z.enum(['message', 'comment']),
-  targetId: z.string(),
-  modelId: z.string().nullable().optional(),
-  sessionId: z.string().nullable().optional(),
+  targetId: z.string().max(TARGET_ID_MAX_LENGTH),
+  modelId: z.string().max(MODEL_ID_MAX_LENGTH).nullable().optional(),
+  sessionId: z.string().max(SESSION_ID_MAX_LENGTH).nullable().optional(),
   reason: z.enum(MODERATION_REASONS),
   context: ReportContextSchema,
 });
 
 const ReportUserInput = z.object({
-  targetId: z.string(),
+  targetId: z.string().max(TARGET_ID_MAX_LENGTH),
   reason: z.enum(MODERATION_REASONS),
 });
 

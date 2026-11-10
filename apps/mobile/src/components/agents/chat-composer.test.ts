@@ -342,7 +342,7 @@ vi.mock('@/lib/persist/drafts', () => ({
 }));
 
 vi.mock('@/lib/share-prefill', () => ({
-  useSharePrefill: vi.fn(),
+  useSharePrefill: () => ({ failed: false, retry: () => undefined, dismiss: () => undefined }),
 }));
 
 // The voice hook options (getDraft/onDraftChange) are captured so a test can
@@ -1030,6 +1030,27 @@ describe('ChatComposer slash-command rejection feedback', () => {
       makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
     );
     expect(statusMessage(edited)).toBeNull();
+  });
+});
+
+describe('ChatComposer placeholder visibility', () => {
+  // A draft of zero-width characters draws nothing and cannot be sent, so the
+  // composer must look like an empty one: hiding the hint while Send is dead
+  // left a field with no glyph, no hint and no action.
+  it('keeps the hint for a draft that draws nothing, and drops it once text does', async () => {
+    const props = makeProps({ placeholder: 'Message the agent' });
+    const mounted = await mount(props);
+    expect(findInputRowProps(mounted)?.inputEmpty).toBe(true);
+
+    requireInputRowOnChangeText(mounted)('\u200B\u200B');
+    await settle();
+    const invisible = await rerender(props);
+    expect(findInputRowProps(invisible)?.inputEmpty).toBe(true);
+
+    requireInputRowOnChangeText(invisible)('Ship it');
+    await settle();
+    const visible = await rerender(props);
+    expect(findInputRowProps(visible)?.inputEmpty).toBe(false);
   });
 });
 

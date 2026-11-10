@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as ReactQuery from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { useOrganizationMutations } from './use-organization-mutations';
 
 type MutationOptions = {
@@ -135,7 +136,9 @@ describe('useOrganizationMutations (generation guard + scope)', () => {
     setQueryDataMock.mockClear();
     updateMember?.onError?.(new Error('boom'), { memberId: 'm1', role: 'admin' }, context);
     expect(setQueryDataMock).toHaveBeenCalledTimes(1);
-    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+    // A rejection the app has no explanation for shows the localized generic
+    // line, never the server's own sentence.
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
   });
 
   it('updateMember stays inline (no toast) when silenceUpdateMemberToast is set', async () => {

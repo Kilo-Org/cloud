@@ -454,6 +454,28 @@ test(
 );
 
 test(
+  'retries a transient renewal failure on the post-deploy check',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_FIXTURE_RENEW_FAILURES_AFTER_DEPLOY: '1',
+      BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS: '200',
+    });
+    const result = await state.start();
+    assert.equal(result.code, 0, result.stdout);
+    assert.equal(state.count('deploy_completed'), 1);
+    assert.equal(state.count('renew_after_deploy_transient'), 1);
+    assert.ok(
+      diagnostics(result).some(
+        row =>
+          row.event === 'benchmark_deploy_lease_renewal_retry' && row.reason === 'command_failed'
+      )
+    );
+    released(state);
+  }
+);
+
+test(
   'reports a completed deploy whose lease cannot be confirmed afterwards distinctly',
   { timeout: 15_000 },
   async t => {

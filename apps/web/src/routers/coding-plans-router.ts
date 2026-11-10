@@ -905,9 +905,9 @@ export const codingPlansRouter = createTRPCRouter({
     .input(
       z.object({ inventoryKeyId: z.string().uuid(), apiKey: z.string().trim().min(1).max(500) })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
-        await replaceInventoryCredential(input.inventoryKeyId, input.apiKey);
+        await replaceInventoryCredential(input.inventoryKeyId, input.apiKey, ctx.user.id);
       } catch (error) {
         if (error instanceof CodingPlanInventoryReplacementError) {
           throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });

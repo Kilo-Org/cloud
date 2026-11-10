@@ -1,5 +1,12 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
-import { createElement, type ElementType, type ReactNode, useEffect, useState } from 'react';
+import {
+  createElement,
+  type ElementType,
+  type ReactNode,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -52,6 +59,34 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
+// The picker closes itself when the owning screen loses focus (a deep link or a
+// tab switch under an open sheet), so the suite drives the blur through this
+// store; every suite mounts focused and stays focused otherwise.
+const pickerFocus = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const subscribe = (notify: () => void) => {
+    listeners.add(notify);
+    return () => {
+      listeners.delete(notify);
+    };
+  };
+  return {
+    focused: true,
+    setFocused(next: boolean) {
+      pickerFocus.focused = next;
+      for (const notify of listeners) {
+        notify();
+      }
+    },
+    subscribe,
+  };
+});
+vi.mock('expo-router', () => ({
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    const focused = useSyncExternalStore(pickerFocus.subscribe, () => pickerFocus.focused);
+    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+  },
+}));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: storage.read,
@@ -67,6 +102,8 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
   // The picker's sheet is a native modal; honored like the real one so the
   // closed sheet renders nothing.
@@ -103,10 +140,12 @@ function Surface({
   scope,
   value,
   onSelectionChange,
+  variant,
 }: {
   scope?: ContextDisplayScope;
   value?: string | null;
   onSelectionChange?: (organizationId: string | null) => void;
+  variant?: 'inline' | 'field';
 }) {
   const { organizationId: id } = useOrganization();
   const [, setVersion] = useState(0);
@@ -118,7 +157,7 @@ function Surface({
   return createElement(
     'GlobalScope',
     { id },
-    createElement(ContextControl, { scope, value, onSelectionChange })
+    createElement(ContextControl, { scope, value, onSelectionChange, variant })
   );
 }
 
@@ -127,6 +166,7 @@ async function mount(
     scope?: ContextDisplayScope;
     value?: string | null;
     onSelectionChange?: (organizationId: string | null) => void;
+    variant?: 'inline' | 'field';
   } = {}
 ) {
   const result = await renderWithProviders(createElement(Surface, props), {
@@ -155,16 +195,39 @@ async function press(node: ReactTestInstance) {
   });
 }
 
-/** The open sheet's account rows, in option order, with their a11y state. */
+/** The selected state of an account action button, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (
+    typeof state !== 'object' ||
+    state === null ||
+    !('selected' in state) ||
+    typeof state.selected !== 'boolean'
+  ) {
+    return undefined;
+  }
+  return state.selected;
+}
+
+/** The open sheet's account action buttons, in option order. */
 function rows(ui: Mounted) {
   return ui.renderer.root
-    .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'radio')
+    .findAll(
+      node =>
+        node.type === Pressable &&
+        node.props.accessibilityRole === 'button' &&
+        selectedState(node) !== undefined
+    )
     .map(node => {
+      const selected = selectedState(node);
+      if (selected === undefined) {
+        throw new Error('Account action button is missing its selected state');
+      }
       const checks = node.findAll(child => child.type === Check);
       return {
         label: node.props.accessibilityLabel as string,
         role: node.props.accessibilityRole as string,
-        checked: (node.props.accessibilityState as { checked: boolean }).checked,
+        selected,
         divider:
           typeof node.props.className === 'string' &&
           node.props.className.includes('border-hair-soft'),
@@ -174,8 +237,14 @@ function rows(ui: Mounted) {
     });
 }
 
-function radioRow(ui: Mounted, label: string) {
-  return ui.renderer.root.findByProps({ accessibilityLabel: label, accessibilityRole: 'radio' });
+function accountRow(ui: Mounted, label: string) {
+  return ui.renderer.root.find(
+    node =>
+      node.type === Pressable &&
+      node.props.accessibilityLabel === label &&
+      node.props.accessibilityRole === 'button' &&
+      selectedState(node) !== undefined
+  );
 }
 
 /** The native sheet wrapper of the open picker; its `onClose` is the dismiss. */
@@ -199,7 +268,7 @@ async function openSheet(ui: Mounted) {
 }
 
 async function chooseRow(ui: Mounted, label: string) {
-  await press(radioRow(ui, label));
+  await press(accountRow(ui, label));
 }
 
 beforeEach(() => {
@@ -208,6 +277,7 @@ beforeEach(() => {
   rerender = undefined;
   platform.OS = 'android';
   appearance.colors = { ...DARK_COLORS };
+  pickerFocus.setFocused(true);
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (key: string, value: string) => {
@@ -259,6 +329,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(texts(ui)).toContain(label);
     expect(picker(ui).props.accessibilityLabel).toBe(label);
     expect(picker(ui).findByType(Text).props.numberOfLines).toBe(1);
+    // Memberships of one workspace share their leading words; the label keeps
+    // its tail, which is the part that names the account.
+    expect(picker(ui).findByType(Text).props.ellipsizeMode).toBe('middle');
     expect(picker(ui).props.accessibilityRole).toBe('button');
     expect(picker(ui).props.accessibilityState).toEqual({ busy: false, disabled: false });
     expect(picker(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);
@@ -280,7 +353,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       await openSheet(ui);
       expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
       expect(texts(ui)).toContain('Cancel');
-      await press(choice === 'Cancel' ? cancelRow(ui) : radioRow(ui, choice));
+      await press(choice === 'Cancel' ? cancelRow(ui) : accountRow(ui, choice));
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
@@ -303,20 +376,18 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
   });
 
-  it('separates the rows and exposes the current account through the radio state', async () => {
+  it('exposes account buttons with the current selection state', async () => {
     storage.read.mockResolvedValue('org-a');
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
     await openSheet(ui);
     const opened = rows(ui);
     expect(opened.map(row => row.label)).toEqual(['Personal', name]);
-    // A screen reader hears the current account through `checked`, the app's
-    // radio convention (`ui/radio-group.tsx`), not through icon colour alone.
-    expect(opened.map(row => row.checked)).toEqual([false, true]);
-    expect(opened.map(row => row.role)).toEqual(['radio', 'radio']);
-    // Each account row draws the shared divider, and only the current row
-    // carries the check; Cancel is a plain button with no radio state.
-    expect(opened.map(row => row.divider)).toEqual([true, true]);
+    expect(opened.map(row => row.selected)).toEqual([false, true]);
+    expect(opened.map(row => row.role)).toEqual(['button', 'button']);
+    // Rows divide themselves only: the full rule that closes the list belongs
+    // to the dismiss row's area, not to the last account.
+    expect(opened.map(row => row.divider)).toEqual([true, false]);
     expect(opened.map(row => row.check)).toEqual([false, true]);
     expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
   });
@@ -330,7 +401,7 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     // so the control must not name org-a.
     expect(picker(ui).props.accessibilityLabel).toBe('Personal');
     await openSheet(ui);
-    expect(rows(ui).map(row => row.checked)).toEqual([true, false]);
+    expect(rows(ui).map(row => row.selected)).toEqual([true, false]);
     await chooseRow(ui, name);
     expect(onSelectionChange).toHaveBeenCalledWith('org-a');
   });
@@ -350,11 +421,11 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     // resolves to the first organization, so the picker must mark that row. A
     // stored organization missing from the list recovers to that first
     // membership before the sheet opens, so its row is marked too.
-    { stored: null, checked: name },
-    { stored: 'org-missing', checked: name },
+    { stored: null, selected: name },
+    { stored: 'org-missing', selected: name },
   ])(
     'marks the account the user is actually on when the stored one is missing (stored=$stored)',
-    async ({ stored, checked }) => {
+    async ({ stored, selected }) => {
       storage.read.mockResolvedValue(stored);
       const ui = await mount();
       await waitFor(() => !picker(ui).props.disabled);
@@ -362,9 +433,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
       expect(
         rows(ui)
-          .filter(row => row.checked)
+          .filter(row => row.selected)
           .map(row => row.label)
-      ).toEqual([checked]);
+      ).toEqual([selected]);
     }
   );
 
@@ -374,8 +445,8 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     await waitFor(() => !picker(ui).props.disabled);
     await openSheet(ui);
     expect(
-      rows(ui).map(row => ({ label: row.label, checked: row.checked, check: row.check }))
-    ).toEqual([{ label: 'Personal', checked: true, check: true }]);
+      rows(ui).map(row => ({ label: row.label, selected: row.selected, check: row.check }))
+    ).toEqual([{ label: 'Personal', selected: true, check: true }]);
     expect(texts(ui)).toContain('Cancel');
   });
 
@@ -577,5 +648,63 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(texts(ui)).toContain('Personal');
     expect(picker(ui).props.disabled).toBe(true);
     expect(list).not.toHaveBeenCalled();
+  });
+
+  it('closes the open sheet when the screen loses focus, and keeps it on refocus', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await openSheet(ui);
+    expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+
+    // A deep link or a tab switch blurs the owning screen: the sheet must go
+    // with it instead of covering the screen the person was sent to.
+    await act(() => {
+      pickerFocus.setFocused(false);
+    });
+    expect(rows(ui)).toHaveLength(0);
+    expect(texts(ui)).not.toContain('Cancel');
+
+    // Refocusing the screen (the person came back) must not re-present a sheet
+    // nobody asked for.
+    await act(() => {
+      pickerFocus.setFocused(true);
+    });
+    expect(rows(ui)).toHaveLength(0);
+  });
+
+  it('closes the sheet on blur without changing the account', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const onSelectionChange = vi.fn<(organizationId: string | null) => void>();
+    const ui = await mount({ value: 'org-a', onSelectionChange });
+    await waitFor(() => !picker(ui).props.disabled);
+    await openSheet(ui);
+    // Personal plus the listed membership: the sheet really presented.
+    expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+    await act(() => {
+      pickerFocus.setFocused(false);
+    });
+    expect(rows(ui)).toHaveLength(0);
+    expect(onSelectionChange).not.toHaveBeenCalled();
+    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
+  });
+
+  it('renders the field variant as the stacked form triggers do', async () => {
+    storage.read.mockResolvedValue(null);
+    const ui = await mount({ variant: 'field' });
+    await waitFor(() => !picker(ui).props.disabled);
+    const trigger = picker(ui).props.className as string;
+    // The same bordered, full-width box `InstanceSelector` and `RepoSelector`
+    // render, so one label-value row on the form keeps one shape. The inline
+    // default is a bare row with no box.
+    expect(trigger).toContain('border');
+    expect(trigger).toContain('bg-secondary');
+    expect(trigger).toContain('justify-between');
+    const label = picker(ui).findByType(Text);
+    expect(label.props.className).toContain('flex-1');
+    expect(label.props.className).toContain('text-foreground');
+    const inline = await mount();
+    const inlineTrigger = picker(inline).props.className as string;
+    expect(inlineTrigger).not.toContain('bg-secondary');
   });
 });

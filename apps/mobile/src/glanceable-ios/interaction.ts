@@ -168,8 +168,12 @@ async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
     if (ask !== null) {
       // The republish skips that session's stale tray row only for an ended
       // ask; a `none` outcome leaves the ask as it is, so re-selecting it
-      // keeps the session the card names.
-      await republishAnsweredAsk(ask, result.kind === 'approved' || result.kind === 'gone');
+      // keeps the session the card names, and a replaced request leaves the
+      // session waiting for the live one.
+      await republishAnsweredAsk(
+        ask,
+        result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true)
+      );
     }
     return result;
   } finally {

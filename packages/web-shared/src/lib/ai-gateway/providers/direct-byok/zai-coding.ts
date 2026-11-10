@@ -3,31 +3,26 @@ import {
   isReasoningExplicitlyDisabled,
   replaceReasoningObjectWithReasoningEffort,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import {
+  apiKeyUpstream,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 
 export default {
   id: 'zai-coding',
-  base_url: 'https://api.z.ai/api/coding/paas/v4',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+  openrouter_inference_provider_id: 'z-ai',
+  models_dev_id: 'zai-coding-plan',
+  ...apiKeyUpstream({
+    apiUrl: 'https://api.z.ai/api/coding/paas/v4',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
   transformRequest(context) {
     context.request.body.thinking = {
       type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
     };
     replaceReasoningObjectWithReasoningEffort(context.request);
   },
-  models: cachedEnhancedDirectByokModelList({
-    providerId: 'zai-coding',
-    recommendedModels: [
-      {
-        id: 'glm-5.2',
-        name: 'GLM-5.2',
-        flags: ['reasoning'],
-        context_length: 1000000,
-        max_completion_tokens: 131072,
-      },
-    ],
-  }),
+  models: cachedDirectByokModelList('zai-coding'),
 } satisfies DirectByokProvider;

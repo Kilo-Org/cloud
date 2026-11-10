@@ -15,18 +15,11 @@ import {
 } from 'lucide-react';
 import { displayRepoName, relativeTime } from './agents-format';
 import { useExtensionAgents } from './agents-provider';
-
-const activeSessionsQueryKey = (organizationId: string | null) =>
-  ['agents', 'active-sessions', organizationId] as const;
-
-const sessionHistoryQueryKey = (organizationId: string | null) =>
-  ['agents', 'session-history', organizationId] as const;
-
-const sessionSearchQueryKey = (organizationId: string | null, query: string) =>
-  ['agents', 'session-search', organizationId, query] as const;
-
-// Exported for focused test coverage.
-export { activeSessionsQueryKey, sessionHistoryQueryKey, sessionSearchQueryKey };
+import {
+  activeSessionsQueryKey,
+  sessionHistoryQueryKey,
+  sessionSearchQueryKey,
+} from '@/src/shared/side-panel-query-options';
 
 /**
  * Input for `activeSessions.list`. Both the Active section and the History
@@ -167,7 +160,7 @@ const ActiveSessionsSection = ({
   onOpenSession: (kiloSessionId: string) => void;
   organizationId: string | null;
 }): JSX.Element => {
-  const { trpcClient, userWebConnection } = useExtensionAgents();
+  const { token, trpcClient, userWebConnection } = useExtensionAgents();
   const queryClient = useQueryClient();
   const [connected, setConnected] = useState(() => userWebConnection.isConnected());
   const [showOffline, setShowOffline] = useState(false);
@@ -204,7 +197,9 @@ const ActiveSessionsSection = ({
 
     const unsubs = eventNames.map(event =>
       userWebConnection.onSessionEvent(event, () => {
-        void queryClient.invalidateQueries({ queryKey: activeSessionsQueryKey(organizationId) });
+        void queryClient.invalidateQueries({
+          queryKey: activeSessionsQueryKey({ organizationId, token }),
+        });
       })
     );
 
@@ -213,11 +208,11 @@ const ActiveSessionsSection = ({
         unsub();
       }
     };
-  }, [userWebConnection, queryClient, organizationId]);
+  }, [userWebConnection, queryClient, organizationId, token]);
 
   const { data, error, isError, isLoading, refetch, isRefetching } = useQuery({
     queryFn: () => trpcClient.activeSessions.list.query(activeSessionsListInput(organizationId)),
-    queryKey: activeSessionsQueryKey(organizationId),
+    queryKey: activeSessionsQueryKey({ organizationId, token }),
     refetchInterval: connected ? ACTIVE_POLL_CONNECTED_MS : ACTIVE_POLL_DISCONNECTED_MS,
   });
 
@@ -361,7 +356,7 @@ const HistorySessionsSection = ({
   onOpenSession: (kiloSessionId: string) => void;
   organizationId: string | null;
 }): JSX.Element => {
-  const { trpcClient } = useExtensionAgents();
+  const { token, trpcClient } = useExtensionAgents();
   const [inputValue, setInputValue] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -370,7 +365,7 @@ const HistorySessionsSection = ({
   // Sections consistent on every refetch.
   const { data: activeData } = useQuery({
     queryFn: () => trpcClient.activeSessions.list.query(activeSessionsListInput(organizationId)),
-    queryKey: activeSessionsQueryKey(organizationId),
+    queryKey: activeSessionsQueryKey({ organizationId, token }),
   });
   const activeIds = useMemo(
     () => new Set((activeData?.sessions ?? []).map(session => session.id)),
@@ -404,7 +399,7 @@ const HistorySessionsSection = ({
         organizationId,
         search_string: searchQuery.trim(),
       }),
-    queryKey: sessionSearchQueryKey(organizationId, searchQuery.trim()),
+    queryKey: sessionSearchQueryKey({ organizationId, token }, searchQuery.trim()),
   });
 
   const {
@@ -431,7 +426,7 @@ const HistorySessionsSection = ({
         organizationId,
         ...(pageParam === undefined ? {} : { cursor: pageParam }),
       }),
-    queryKey: sessionHistoryQueryKey(organizationId),
+    queryKey: sessionHistoryQueryKey({ organizationId, token }),
   });
 
   /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-type-assertion -- tRPC infinite query page type is unknown */

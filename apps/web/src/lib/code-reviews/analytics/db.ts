@@ -15,6 +15,10 @@ import type {
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  NON_TERMINAL_CODE_REVIEW_STATUSES,
+  isNonTerminalCodeReviewStatus,
+} from '@/lib/code-reviews/dispatch/dispatch-constants';
 import type { CodeReviewAnalyticsManifestParseResult } from './contracts';
 import { getReviewAnalyticsEnabledFromConfig } from './settings';
 import type { ReviewAnalyticsOwner, ReviewAnalyticsPlatform } from './settings';
@@ -189,7 +193,7 @@ export async function finalizeCompletedCodeReviewWithAnalytics(input: {
       })
       .where(eq(cloud_agent_code_review_attempts.id, attempt.id));
 
-    if (['pending', 'queued', 'running'].includes(review.status)) {
+    if (isNonTerminalCodeReviewStatus(review.status)) {
       const completed = await tx
         .update(cloud_agent_code_reviews)
         .set({
@@ -205,7 +209,7 @@ export async function finalizeCompletedCodeReviewWithAnalytics(input: {
         .where(
           and(
             eq(cloud_agent_code_reviews.id, review.id),
-            inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+            inArray(cloud_agent_code_reviews.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES])
           )
         )
         .returning({ id: cloud_agent_code_reviews.id });

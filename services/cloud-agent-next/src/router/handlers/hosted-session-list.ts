@@ -1,4 +1,5 @@
 import {
+  cloudAgentWorktreeIdSchema,
   sessionIdSchema,
   validateCloudAgentRootSessionsCursor,
 } from '@kilocode/session-ingest-contracts';
@@ -17,10 +18,11 @@ export const listHostedSessionsInput = z
   })
   .strict();
 
-const hostedSessionSummarySchema = z
+export const hostedSessionSummarySchema = z
   .object({
     kiloSessionId: sessionIdSchema,
     cloudAgentSessionId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema.nullable(),
     userId: z.string().min(1),
     organizationId: z.string().nullable(),
     title: z.string().max(512).nullable(),

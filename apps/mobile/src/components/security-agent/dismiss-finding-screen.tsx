@@ -45,8 +45,10 @@ function DismissFindingSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+      <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
       <View className="gap-6 px-6 pt-4">
+        {/* The identity card: p-3 plus a title line and the two meta lines. */}
+        <Skeleton className="h-[86px] w-full rounded-lg" />
         <Skeleton className="h-[224px] w-full rounded-lg" />
         <Skeleton className="h-24 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-md" />
@@ -141,7 +143,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.notFoundTitle')}
@@ -154,7 +156,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (findingQuery.isError && !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
@@ -166,7 +168,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (capability.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
         <QueryError
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
@@ -189,7 +191,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (!capability.canManage) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
@@ -202,7 +204,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (finding.status !== 'open') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
@@ -218,13 +220,27 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
+      <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pb-8 pt-4"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
+        {/* The dismissal is irreversible on GitHub, so the form names its
+            target the way finding-details-panel.tsx does: the title, then the
+            repository, then the package. Every line wraps instead of
+            truncating — a long title must stay readable to confirm the
+            finding. */}
+        <View className="gap-1 rounded-lg bg-secondary p-3">
+          <Text className="text-base font-medium">{finding.title}</Text>
+          <Text variant="muted" className="text-xs">
+            {finding.repo_full_name}
+          </Text>
+          <Text variant="muted" className="text-xs">
+            {finding.package_name} ({finding.package_ecosystem})
+          </Text>
+        </View>
         {findingQuery.isError ? (
           <SettingsRecoveryStatus
             message={t('securityAgent.dismiss.couldNotLoad')}
@@ -253,13 +269,13 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           }}
         />
 
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+        <View className="gap-1.5">
+          <Text className="text-sm font-medium text-muted-foreground">
             {t('securityAgent.dismiss.commentLabel')}
           </Text>
           <TextInput
-            accessibilityLabel={t('securityAgent.dismiss.commentAccessibility')}
-            className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+            accessibilityLabel={t('securityAgent.dismiss.commentLabel')}
+            className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
             multiline
             textAlignVertical="top"
             placeholder={t('securityAgent.dismiss.commentPlaceholder')}

@@ -31,7 +31,7 @@ export function BashToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
     <View className="gap-2">
       {command.length > 0 ? (
         <View className="rounded bg-neutral-100 px-2 py-1 dark:bg-neutral-900">
-          <SelectableText className="font-mono text-xs leading-4 text-foreground">
+          <SelectableText className="font-mono text-xs leading-[1rem] text-foreground">
             {commandText}
           </SelectableText>
         </View>

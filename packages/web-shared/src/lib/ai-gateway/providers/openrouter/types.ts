@@ -8,6 +8,7 @@ import type {
   VertexCredentials,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type Anthropic from '@anthropic-ai/sdk';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
 // Base types for OpenRouter API that don't depend on other lib files
 // This breaks circular dependencies with mistral.ts, minimax.ts, etc.
@@ -17,9 +18,16 @@ export type OpenRouterProviderConfig = {
   sort?: 'price' | 'throughput' | 'latency';
   only?: string[];
   ignore?: string[];
+  /**
+   * `deny` excludes providers that store prompts for feedback or training. Providers may still
+   * store prompts for compliance; only `zdr` excludes all retention.
+   */
   data_collection?: 'allow' | 'deny';
+  /** `true` excludes providers that store prompts at all, so it also excludes training. */
   zdr?: boolean;
   require_parameters?: boolean;
+  allow_fallbacks?: boolean;
+  max_price?: { prompt?: number; completion?: number; request?: number; image?: number };
 };
 
 export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterProviderConfig {
@@ -38,10 +46,13 @@ export type VercelProviderConfig = {
     // https://vercel.com/docs/ai-gateway/models-and-providers/session-affinity
     sessionId?: string;
     sessionAffinity?: boolean;
+    // https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+    inferenceRegion?: { scope: 'zone'; geoRegion: OrganizationDataRegion } | { scope: 'global' };
   };
   anthropic?: AnthropicProviderOptions;
 };
 
+/** True when prompts must not be used for training. Does not mean prompts are not retained. */
 export function isDataCollectionExplicitlyDisallowed(
   provider: OpenRouterProviderConfig | undefined
 ) {
@@ -74,7 +85,7 @@ export type SharedGatewayRequestProperties = {
   provider?: OpenRouterProviderConfig;
   providerOptions?: VercelProviderConfig;
 
-  // OpenRouter specific field we do not support
+  // Forwarded as providerOptions.gateway.models on the Vercel path
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
 
@@ -94,10 +105,18 @@ export type SharedGatewayRequestProperties = {
 export type GatewayResponsesRequest = SharedGatewayRequestProperties &
   OpenAI.Responses.ResponseCreateParams;
 
+// https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
+export type ThinkingBlockBinding = {
+  prefix_mismatch_behavior?: 'error' | 'drop_block';
+  /** Deprecated alias of `prefix_mismatch_behavior`; sending both is rejected. */
+  mismatch_behavior?: 'error' | 'drop_block';
+};
+
 export type GatewayMessagesRequest = SharedGatewayRequestProperties &
   Anthropic.MessageCreateParams & {
     user?: string;
     session_id?: string;
+    thinking?: Anthropic.ThinkingConfigParam & { block_binding?: ThinkingBlockBinding };
   };
 
 /**

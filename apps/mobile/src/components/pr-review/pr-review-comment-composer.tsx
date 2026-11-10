@@ -7,6 +7,7 @@
 
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
+import { impactHaptic, notificationHaptic } from '@/lib/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, ScrollView, type ScrollViewInstance, type TextInput, View } from 'react-native';
@@ -107,7 +108,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   useDraftFlushOnBackground(draftUserId, commentDraftKey, true);
 
   // Edit mode ignores the bridge so editing A never shows B's path/lines.
-  const selection = isEdit ? null : getDiffSelection({ owner, repo, number });
+  const selection = isEdit ? null : getDiffSelection({ owner, repo, number, ref: prRef });
 
   // iOS uncontrolled: ref + defaultValue; no value+state.
   const bodyRef = useRef<string>(initialBody);
@@ -187,7 +188,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (draftUserId) {
       void clearDraft(draftUserId, commentDraftKey);
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     onDismiss();
   }
 
@@ -245,7 +246,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       if (draftUserId) {
         void clearDraft(draftUserId, commentDraftKey);
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       onDismiss();
     } catch {
       // Classified into inlineError by the effect above.
@@ -261,7 +262,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       return;
     }
     pending.updateComment(mode.pendingItemId, trimmed);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     onDismiss();
   }
 
@@ -354,7 +355,6 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
             selection={selection}
             fallbackPath={path}
             fallbackLineLabel={lineRangeLabel}
-            fallbackSide={side}
             preferFallback={isEdit}
           />
           <View className="gap-1">
@@ -368,7 +368,17 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
                 defaultValue={bodyRef.current}
                 onChangeText={handleBodyChange}
               />
-            ) : null}
+            ) : (
+              // Reserve the field's own box while the durable draft loads, so
+              // the footer below does not jump when the field mounts.
+              <View
+                className={
+                  keyboardVisible
+                    ? 'min-h-12 rounded-md border border-transparent'
+                    : 'min-h-14 rounded-md border border-transparent'
+                }
+              />
+            )}
             {showInsertSuggestion ? (
               <Button
                 variant="ghost"

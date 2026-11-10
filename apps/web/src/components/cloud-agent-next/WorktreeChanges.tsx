@@ -2,7 +2,6 @@
 
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -31,6 +30,7 @@ import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { useManager } from './CloudAgentProvider';
 import { WorktreeFilePane } from './WorktreeFilePane';
 import { useSavedWorktreeChanges } from './useSavedWorktreeChanges';
+import { readWorktreeSnapshotMeta } from './worktree-meta';
 import type { WorktreeFileReviewBindings } from './worktree-review-bindings';
 import type { WorktreeFileViewMode } from './workspace-tabs';
 import {
@@ -39,7 +39,10 @@ import {
   deserializeWorktreeChangesViewMode,
   formatWorktreeChangesBaseBranch,
   getWorktreeChangesTotals,
+  getWorktreeChangesFileKey,
   groupWorktreeChangesByDirectory,
+  groupWorktreeChangesByScope,
+  groupWorktreeChangesByRepository,
   preserveNewerWorktreeChanges,
   resolveWorktreeChangesSelection,
   worktreeChangesMessages,
@@ -93,12 +96,14 @@ function ChangeLineCounts({
 }
 
 export function WorktreeChangesButton({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
   open,
   onToggle,
 }: {
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
@@ -109,6 +114,7 @@ export function WorktreeChangesButton({
   const refreshSignal = useAtomValue(manager.atoms.worktreeChangesRefresh);
   const queryClient = useQueryClient();
   const { saved, queryKey } = useSavedWorktreeChanges({
+    userId,
     cloudAgentSessionId,
     organizationId,
     worktreeId,
@@ -177,6 +183,7 @@ export function WorktreeChangesButton({
 }
 
 export function WorktreeChangesView({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
@@ -185,6 +192,7 @@ export function WorktreeChangesView({
   review,
   reviewScope,
 }: {
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
@@ -200,6 +208,7 @@ export function WorktreeChangesView({
   );
   const activeTabRef = useRef<HTMLButtonElement>(null);
   const { saved } = useSavedWorktreeChanges({
+    userId,
     cloudAgentSessionId,
     organizationId,
     worktreeId,
@@ -208,6 +217,7 @@ export function WorktreeChangesView({
   const files = saved.data?.snapshot?.files ?? [];
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const selected = resolveWorktreeChangesSelection(selectedPath, files);
+  const selectedFile = files.find(file => getWorktreeChangesFileKey(file) === selected);
   if (selected !== selectedPath) setSelectedPath(selected);
   const [mode, setMode] = useState<WorktreeFileViewMode>('diff');
   const [mobilePane, setMobilePane] = useState<'list' | 'diff'>('list');
@@ -244,6 +254,7 @@ export function WorktreeChangesView({
         style={{ '--worktree-list-width': `${listWidth}px` } as CSSProperties}
       >
         <WorktreeChanges
+          userId={userId}
           cloudAgentSessionId={cloudAgentSessionId}
           organizationId={organizationId}
           worktreeId={worktreeId}
@@ -281,12 +292,14 @@ export function WorktreeChangesView({
           </Button>
         </div>
         <div className="min-h-0 flex-1">
-          {selected ? (
+          {selectedFile ? (
             <WorktreeFilePane
+              userId={userId}
               cloudAgentSessionId={cloudAgentSessionId}
               organizationId={organizationId}
               worktreeId={worktreeId}
-              path={selected}
+              path={selectedFile.path}
+              scope={selectedFile.scope}
               mode={mode}
               onModeChange={setMode}
               review={review}
@@ -324,7 +337,7 @@ function ChangedFile({
         className={`h-11 w-full min-w-0 justify-start gap-2 rounded-sm px-2 py-0 text-xs font-normal sm:h-7 ${active ? 'bg-secondary' : ''}`}
         title={file.path}
         aria-current={active ? 'true' : undefined}
-        onClick={() => onSelectFile(file.path)}
+        onClick={() => onSelectFile(getWorktreeChangesFileKey(file))}
       >
         <span
           role="img"
@@ -358,6 +371,45 @@ function ChangedFile({
   );
 }
 
+function ChangedFileGroups({
+  groups,
+  onSelectFile,
+  activePath,
+  commentCounts,
+}: {
+  groups: { directory: string; files: WorktreeChangesFile[] }[];
+  onSelectFile: (path: string) => void;
+  activePath?: string;
+  commentCounts?: ReadonlyMap<string, number>;
+}) {
+  if (groups.length === 0) return null;
+  return (
+    <ul aria-label="Changed files" className="space-y-2">
+      {groups.map(({ directory, files }) => (
+        <li key={directory}>
+          <h3 className="text-muted-foreground flex min-w-0 items-center gap-2 px-2 py-1 text-xs font-normal">
+            <span className="min-w-0 flex-1 truncate" title={directory || 'Repository root'}>
+              {directory || 'Repository root'}
+            </span>
+            <span className="shrink-0 font-mono tabular-nums">{files.length}</span>
+          </h3>
+          <ul aria-label={`Files in ${directory || 'repository root'}`}>
+            {files.map(file => (
+              <ChangedFile
+                key={file.path}
+                file={file}
+                onSelectFile={onSelectFile}
+                active={getWorktreeChangesFileKey(file) === activePath}
+                commentCount={commentCounts?.get(getWorktreeChangesFileKey(file)) ?? 0}
+              />
+            ))}
+          </ul>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ChangedFileTree({
   nodes,
   onSelectFile,
@@ -375,8 +427,8 @@ function ChangedFileTree({
         key={`file:${node.path}`}
         file={node.file}
         onSelectFile={onSelectFile}
-        active={node.path === activePath}
-        commentCount={commentCounts?.get(node.path) ?? 0}
+        active={getWorktreeChangesFileKey(node.file) === activePath}
+        commentCount={commentCounts?.get(getWorktreeChangesFileKey(node.file)) ?? 0}
       />
     ) : (
       <Collapsible key={`directory:${node.path}`} asChild defaultOpen>
@@ -413,6 +465,7 @@ function ChangedFileTree({
 }
 
 function WorktreeChanges({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
@@ -424,6 +477,7 @@ function WorktreeChanges({
   activeTabRef,
   commentCounts,
 }: {
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
@@ -438,6 +492,7 @@ function WorktreeChanges({
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const { saved, queryKey } = useSavedWorktreeChanges({
+    userId,
     cloudAgentSessionId,
     organizationId,
     worktreeId,
@@ -458,8 +513,8 @@ function WorktreeChanges({
     },
     retry: false,
   });
-  const attemptedOpeningRefresh = useRef(false);
   const { mutate } = refresh;
+  const attemptedOpeningRefresh = useRef(false);
   useEffect(() => {
     if (!open) {
       attemptedOpeningRefresh.current = false;
@@ -471,11 +526,8 @@ function WorktreeChanges({
   }, [open, saved.isFetchedAfterMount, saved.isFetching, mutate]);
 
   const snapshot = saved.data?.snapshot;
-  const groups = useMemo(
-    () => groupWorktreeChangesByDirectory(snapshot?.files ?? []),
-    [snapshot?.files]
-  );
-  const tree = useMemo(() => buildWorktreeChangesTree(snapshot?.files ?? []), [snapshot?.files]);
+  const snapshotMeta = readWorktreeSnapshotMeta(snapshot);
+  const sections = groupWorktreeChangesByScope(snapshot?.files ?? []);
   const messages = worktreeChangesMessages({
     snapshot,
     savedReadPending: saved.isPending,
@@ -533,48 +585,82 @@ function WorktreeChanges({
             {messages.empty}
           </p>
         )}
-        <TabsContent value="flat" className="m-0">
-          {groups.length > 0 && (
-            <ul aria-label="Changed files" className="space-y-2">
-              {groups.map(({ directory, files }) => (
-                <li key={directory}>
-                  <h3 className="text-muted-foreground flex min-w-0 items-center gap-2 px-2 py-1 text-xs font-normal">
-                    <span
-                      className="min-w-0 flex-1 truncate"
-                      title={directory || 'Repository root'}
-                    >
-                      {directory || 'Repository root'}
-                    </span>
-                    <span className="shrink-0 font-mono tabular-nums">{files.length}</span>
-                  </h3>
-                  <ul aria-label={`Files in ${directory || 'repository root'}`}>
-                    {files.map(file => (
-                      <ChangedFile
-                        key={file.path}
-                        file={file}
-                        onSelectFile={onSelectFile}
-                        active={file.path === activePath}
-                        commentCount={commentCounts?.get(file.path) ?? 0}
-                      />
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          )}
-        </TabsContent>
-        <TabsContent value="tree" className="m-0">
-          {tree.length > 0 && (
-            <ul aria-label="Changed files">
-              <ChangedFileTree
-                nodes={tree}
-                onSelectFile={onSelectFile}
-                activePath={activePath}
-                commentCounts={commentCounts}
-              />
-            </ul>
-          )}
-        </TabsContent>
+        {(['flat', 'tree'] as const).map(layout => (
+          <TabsContent key={layout} value={layout} className="m-0">
+            {snapshot &&
+              sections.map(section => {
+                const groups =
+                  layout === 'flat' ? groupWorktreeChangesByDirectory(section.files) : [];
+                const tree = layout === 'tree' ? buildWorktreeChangesTree(section.files) : [];
+                const repositoryGroups =
+                  layout === 'flat'
+                    ? groupWorktreeChangesByRepository(snapshot, section.files)
+                    : null;
+                return (
+                  <section key={section.label} aria-label={section.label} className="mb-3">
+                    <h2 className="flex items-center justify-between gap-2 px-2 py-2 text-xs font-medium">
+                      {section.label}
+                      <span className="text-muted-foreground font-mono tabular-nums">
+                        {section.files.length}
+                      </span>
+                    </h2>
+                    {section.files.length === 0 && snapshot.files.length > 0 && (
+                      <p className="text-muted-foreground px-2 pb-2 text-xs">No changes.</p>
+                    )}
+                    {layout === 'flat' &&
+                      (repositoryGroups ? (
+                        <div className="space-y-3">
+                          {repositoryGroups.map(group => (
+                            <section key={group.repoFullName} aria-label={group.repoFullName}>
+                              <h3
+                                className="flex min-w-0 items-center gap-2 px-2 py-1 text-xs font-medium"
+                                title={`Changes since the merge base with ${group.baseRef}`}
+                              >
+                                <GitBranch aria-hidden="true" className="size-3 shrink-0" />
+                                <span className="min-w-0 flex-1 truncate">
+                                  {group.repoFullName}
+                                </span>
+                                <span className="text-muted-foreground shrink-0 font-mono font-normal tabular-nums">
+                                  {group.files.length}
+                                </span>
+                              </h3>
+                              {group.truncated && (
+                                <p className="text-muted-foreground px-2 text-xs">
+                                  Partial summary · some files omitted.
+                                </p>
+                              )}
+                              <ChangedFileGroups
+                                groups={groupWorktreeChangesByDirectory(group.files)}
+                                onSelectFile={onSelectFile}
+                                activePath={activePath}
+                                commentCounts={commentCounts}
+                              />
+                            </section>
+                          ))}
+                        </div>
+                      ) : (
+                        <ChangedFileGroups
+                          groups={groups}
+                          onSelectFile={onSelectFile}
+                          activePath={activePath}
+                          commentCounts={commentCounts}
+                        />
+                      ))}
+                    {layout === 'tree' && tree.length > 0 && (
+                      <ul aria-label="Changed files">
+                        <ChangedFileTree
+                          nodes={tree}
+                          onSelectFile={onSelectFile}
+                          activePath={activePath}
+                          commentCounts={commentCounts}
+                        />
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
+          </TabsContent>
+        ))}
       </div>
 
       {(snapshot || messages.notice) && (
@@ -582,12 +668,18 @@ function WorktreeChanges({
           {snapshot && (
             <div className="flex min-w-0 items-center gap-2">
               <GitBranch aria-hidden="true" className="size-3 shrink-0" />
-              <code
-                className="min-w-0 flex-1 truncate"
-                title={`Working tree changes since the merge base with ${snapshot.comparison.baseRef}.\nCaptured HEAD: ${snapshot.comparison.head}\nMerge base: ${snapshot.comparison.mergeBase}`}
-              >
-                Working tree → {formatWorktreeChangesBaseBranch(snapshot.comparison.baseRef)}
-              </code>
+              {snapshot.repositories && snapshot.repositories.length > 1 ? (
+                <span className="min-w-0 flex-1 truncate">
+                  {snapshot.repositories.length} repositories
+                </span>
+              ) : (
+                <code
+                  className="min-w-0 flex-1 truncate"
+                  title={`Uncommitted changes against HEAD and committed changes since the merge base with ${snapshot.comparison.baseRef}.\nCaptured HEAD: ${snapshot.comparison.head}\nMerge base: ${snapshot.comparison.mergeBase}`}
+                >
+                  Base branch: {formatWorktreeChangesBaseBranch(snapshot.comparison.baseRef)}
+                </code>
+              )}
               <time
                 className="shrink-0 whitespace-nowrap"
                 dateTime={snapshot.capturedAt}
@@ -598,6 +690,12 @@ function WorktreeChanges({
             </div>
           )}
           <div role="status" aria-live="polite">
+            {snapshotMeta.baseRefFallback && (
+              <p>
+                Base branch <code>{snapshotMeta.baseRefFallback.requested}</code> no longer exists;
+                comparing with <code>{snapshotMeta.baseRefFallback.used}</code>.
+              </p>
+            )}
             {messages.notice && <p>{messages.notice}</p>}
             {snapshot?.truncated && <p>Partial summary · some files omitted.</p>}
           </div>

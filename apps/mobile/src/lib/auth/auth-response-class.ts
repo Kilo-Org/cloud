@@ -58,7 +58,7 @@ export type AuthResponseClass =
    * pair is dead (a 401 on the refresh route).
    */
   | { readonly kind: 'terminal'; readonly status: number; readonly clearCredential: boolean }
-  /** Retryable: a 429 carries the server's own back-off, if it named one. */
+  /** Retryable: a 408, 429 or 5xx carries the server's own back-off, if it named one. */
   | { readonly kind: 'retry'; readonly status: number; readonly retryAfterMs: number | undefined };
 
 /**
@@ -89,9 +89,10 @@ export function parseRetryAfterMs(
 
 /**
  * Classify a sign-in response. A 401 is terminal (and clears the stored
- * credential on a credential route). A 429 or 5xx is retryable and carries the
- * server's `Retry-After` when it sent one. Every other 4xx — and the 1xx/3xx a
- * sign-in route never returns — is terminal: retrying it cannot change it.
+ * credential on a credential route). A 408, 429 or 5xx is retryable and carries
+ * the server's `Retry-After` when it sent one. Every other 4xx — and the
+ * 1xx/3xx a sign-in route never returns — is terminal: retrying it cannot
+ * change it.
  */
 export function classifyAuthResponse(args: {
   path: string;
@@ -155,15 +156,28 @@ export function claimAuthTerminalFailureReport(route: string, status: number): b
 
 /**
  * Report one terminal sign-in failure, at most once per process, with the
- * stable fingerprint above. Never throws; a no-op until a telemetry sink is
- * installed.
+ * stable fingerprint above. Two answers are expected rather than defects, and
+ * they are filed at warning level: the expiry of the stored credential on the
+ * refresh route, and a 401 on an attempt route, which refuses the code,
+ * ticket, ID token or passkey the attempt presented. Every other terminal
+ * refusal names a defect and stays at error. Same tags and fingerprint either
+ * way, so one route and status keeps one issue and only its severity moves.
+ * Never throws; a no-op until a telemetry sink is installed.
  */
 export function reportAuthTerminalFailure(route: AuthTerminalRoute, status: number): void {
   if (!claimAuthTerminalFailureReport(route, status)) {
     return;
   }
+  // Both expected cases are a 401, and every route reported here is either the
+  // stored credential route or an attempt route: the stored credential's own
+  // expiry ends a session the person renews by signing in, and an attempt
+  // route's 401 refuses the credential the attempt presented (the server's
+  // INVALID_CODE, INVALID_TOKEN, INVALID_TICKET or a PasskeyVerificationError
+  // code), which a mistyped code, a reused ticket or a cancelled ceremony
+  // produces. Any other terminal status names a defect and stays at error.
+  const expectedRefusal = status === 401;
   captureTelemetry({
-    level: 'error',
+    level: expectedRefusal ? 'warning' : 'error',
     error: new Error(`Terminal sign-in failure: ${status} on ${route}`),
     tags: {
       'error.subsystem': 'auth',

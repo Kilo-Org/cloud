@@ -78,7 +78,7 @@ export function GeneralSettingsScreen() {
       <ScreenHeader title={t('preferences.general')} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-3 pt-4"
+        contentContainerClassName="px-4 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-2">
@@ -96,9 +96,20 @@ export function GeneralSettingsScreen() {
         <PreferenceRow
           icon={Brain}
           title={t('preferences.autoExpandThinking')}
-          subtitle={t('preferences.autoExpandThinkingSubtitle')}
+          subtitle={
+            hideThinking
+              ? t('preferences.autoExpandThinkingInactiveSubtitle')
+              : t('preferences.autoExpandThinkingSubtitle')
+          }
+          inactiveSubtitle={
+            hideThinking
+              ? t('preferences.autoExpandThinkingSubtitle')
+              : t('preferences.autoExpandThinkingInactiveSubtitle')
+          }
           value={defaultExpanded}
-          disabled={!reasoningLoaded}
+          // The row states a dependency on the hide-thinking preference, so it
+          // stays inert until both stored values are known.
+          disabled={!reasoningLoaded || !hideThinkingLoaded || hideThinking}
           onValueChange={setDefaultExpanded}
         />
         <PreferenceRow

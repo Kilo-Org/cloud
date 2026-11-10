@@ -10,6 +10,7 @@ import {
   classifyGitLabStatus,
   GitLabApiStatusError,
   GitLabReviewError,
+  gitlabReviewErrorToTrpcError,
   type GitLabReviewOwner,
 } from './gitlab-authorization';
 
@@ -47,7 +48,7 @@ const SELF_MANAGED_ORG: GitLabReviewOwner = {
 
 function integrationRow(overrides: {
   gitlab_instance_url?: string;
-  repositories?: { id: number; name: string; full_name: string; private: boolean }[];
+  repositories?: { id: number | string; name: string; full_name: string; private: boolean }[];
   status?: string;
 }): PlatformIntegration {
   return {
@@ -115,14 +116,15 @@ describe('authorizeProject — owner resolution', () => {
     expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
   });
 
-  it('refuses a non-active integration', async () => {
+  it('refuses a non-active integration as a reconnect, not a missing one', async () => {
     mockGetIntegrationForOwner.mockResolvedValue(
       integrationRow({ gitlab_instance_url: 'https://gitlab.example.com', status: 'suspended' })
     );
 
-    await expect(authorizeProject(SELF_MANAGED_USER, 'group/sub/repo')).rejects.toBeInstanceOf(
-      GitLabReviewError
-    );
+    await expect(authorizeProject(SELF_MANAGED_USER, 'group/sub/repo')).rejects.toMatchObject({
+      name: 'GitLabReviewError',
+      kind: 'reconnect',
+    });
   });
 });
 
@@ -180,6 +182,9 @@ describe('authorizeProject — repository matching', () => {
     const access = await authorizeProject(SELF_MANAGED_USER, 'GROUP/Sub/REPO');
 
     expect(access.projectPath).toBe('group/sub/repo');
+    // The resolved identity travels with the credentials so a caller can
+    // record which connection and repository an action belongs to.
+    expect(access).toMatchObject({ integrationId: 'intg_1', repositoryId: 7 });
   });
 
   it('refuses a prefix or suffix of a nested path (exact full path only)', async () => {
@@ -212,13 +217,33 @@ describe('authorizeProject — repository matching', () => {
 });
 
 describe('authorizeOwner', () => {
-  it('returns token and server-derived instance without a project check', async () => {
+  it('returns token, server-derived instance and the cached repository scope', async () => {
     mockActiveIntegration(integrationRow({ gitlab_instance_url: 'https://gitlab.example.com' }));
 
     const access = await authorizeOwner(SELF_MANAGED_USER);
 
     expect(access.accessToken).toBe('glpat-mock-token');
     expect(access.instanceUrl).toBe('https://gitlab.example.com');
+    // The owner-level read has no project to match, so it carries the whole
+    // catalogue its callers intersect their rows with.
+    expect(access.repositoryFullNames).toEqual(['group/sub/repo', 'group/other']);
+  });
+
+  it('reports an empty scope rather than widening when the catalogue cannot be read', async () => {
+    mockActiveIntegration(
+      integrationRow({
+        repositories: [
+          { id: 'string-id', name: 'repo', full_name: 'group/sub/repo', private: true },
+        ],
+      })
+    );
+
+    const access = await authorizeOwner(SELF_MANAGED_USER);
+
+    // Unreadable ids are the same fail-closed case authorizeProject treats as
+    // "no repository": an owner-level read must not fall back to the whole
+    // instance.
+    expect(access.repositoryFullNames).toEqual([]);
   });
 
   it('applies the same instance-hint guard', async () => {
@@ -270,6 +295,10 @@ describe('classifyGitLabStatus / classifyGitLabError', () => {
     expect(classifyGitLabStatus(403).kind).toBe('forbidden');
     expect(classifyGitLabStatus(409).kind).toBe('stale_head');
     expect(classifyGitLabStatus(409).retryable).toBe(false);
+  });
+
+  it('classifies a rejected credential (401) as reconnect, not a permission refusal', () => {
+    expect(classifyGitLabStatus(401)).toMatchObject({ kind: 'reconnect', retryable: false });
   });
 
   it('classifies 5xx and 429 as retryable', () => {
@@ -340,5 +369,42 @@ describe('classifyGitLabErrorForOwner', () => {
     expect(classifyGitLabErrorForOwner(new TypeError('fetch failed'), SELF_MANAGED_ORG).kind).toBe(
       'retryable'
     );
+  });
+});
+
+describe('gitlabReviewErrorToTrpcError', () => {
+  it.each([
+    ['not_found', 'NOT_FOUND'],
+    ['forbidden', 'FORBIDDEN'],
+    ['reconnect', 'PRECONDITION_FAILED'],
+    ['stale_head', 'CONFLICT'],
+    ['bad_request', 'BAD_REQUEST'],
+    ['retryable', 'BAD_GATEWAY'],
+  ] as const)('maps the %s kind to %s', (kind, code) => {
+    const mapped = gitlabReviewErrorToTrpcError(
+      new GitLabReviewError(kind, 'fixed copy'),
+      SELF_MANAGED_USER
+    );
+
+    expect(mapped.code).toBe(code);
+    expect(mapped.message).toBe('fixed copy');
+  });
+
+  it('classifies before mapping, so an organization 403 is a reconnect', () => {
+    const refusal = new GitLabReviewError('forbidden', 'denied', 403);
+
+    expect(gitlabReviewErrorToTrpcError(refusal, SELF_MANAGED_ORG).code).toBe(
+      'PRECONDITION_FAILED'
+    );
+    expect(gitlabReviewErrorToTrpcError(refusal, SELF_MANAGED_USER).code).toBe('FORBIDDEN');
+  });
+
+  it('passes an intentional tRPC refusal through unchanged', () => {
+    const refusal = new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Draft merge requests are skipped.',
+    });
+
+    expect(gitlabReviewErrorToTrpcError(refusal, SELF_MANAGED_USER)).toBe(refusal);
   });
 });

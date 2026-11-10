@@ -43,7 +43,6 @@ const config: Config = {
     '<rootDir>/../../services/cloud-agent-next/',
     '<rootDir>/../../services/webhook-agent-ingest/',
     '<rootDir>/../../services/session-ingest/',
-    '<rootDir>/../../services/gastown/',
     '<rootDir>/../../services/gmail-push/',
     '<rootDir>/../../services/security-auto-analysis/',
     '<rootDir>/../../services/kiloclaw/',
@@ -56,7 +55,7 @@ const config: Config = {
   ],
   modulePathIgnorePatterns: ['<rootDir>/../../.worktrees/'],
   transformIgnorePatterns: [
-    'node_modules/.pnpm/(?!(@octokit|universal-user-agent|universal-github-app-jwt|before-after-hook|bottleneck|p-limit|yocto-queue|jose@|ai@|@ai-sdk|@standard-schema|@workflow|eventsource-parser|cbor2|@cto\\.af))',
+    'node_modules/.pnpm/(?!(@assistant-ui|assistant-cloud|assistant-stream|radix-ui|zustand|safe-content-frame|nanoid@|@octokit|universal-user-agent|universal-github-app-jwt|before-after-hook|bottleneck|p-limit|yocto-queue|jose@|ai@|@ai-sdk|@standard-schema|@workflow|eventsource-parser|cbor2|@cto\\.af|htmlparser2@|domhandler@|domutils@|dom-serializer@|domelementtype@|entities@))',
   ],
 
   // Parallel execution configuration

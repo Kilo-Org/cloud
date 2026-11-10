@@ -11,6 +11,7 @@ import {
   ManualCodeReviewConfigSchema,
   CodeReviewTypeSchema,
   CodeReviewTriggerSourceSchema,
+  CODE_REVIEW_TERMINAL_REASONS,
 } from '@kilocode/db/schema-types';
 import { CODE_REVIEW_STATUSES } from '@kilocode/app-shared/code-review';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
@@ -24,6 +25,12 @@ import { OwnerSchema, type Owner } from '@/lib/agent-config/core/owner';
  * Code review status enum
  */
 export const CodeReviewStatusSchema = z.enum(CODE_REVIEW_STATUSES);
+
+/**
+ * Code review terminal reason enum, for narrowing a persisted
+ * `cloud_agent_code_reviews.terminal_reason` back to the shared union.
+ */
+export const CodeReviewTerminalReasonSchema = z.enum(CODE_REVIEW_TERMINAL_REASONS);
 
 // ============================================================================
 // GitHub Webhook Schemas
@@ -110,6 +117,13 @@ export const CreateReviewParamsSchema = z.object({
   platform: CodeReviewPlatformSchema.default('github'),
   platformProjectId: z.number().int().positive().optional(),
   manualConfig: ManualCodeReviewConfigSchema.nullable().optional(),
+  /**
+   * Client-generated key for one manual start intent, stable across a retry of
+   * the same draft. The unique index on it makes a repeat insert resolve to the
+   * review the first attempt produced instead of creating a second one. Unset
+   * for webhook-created and keyless manual reviews.
+   */
+  manualOperationKey: z.string().min(1).max(128).optional(),
   // Review type for this run; unset defaults to standard at the insert boundary.
   reviewType: CodeReviewTypeSchema.optional(),
   // Origin of the run (manual vs webhook); optional for legacy/unknown callers.

@@ -19,6 +19,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { passkeysSupported, registerPasskey } from '@/lib/auth/passkey-client';
 import { isShortViewport } from '@/lib/centered-state-layout';
@@ -60,7 +61,13 @@ function InlineFailure({
       <Text accessibilityRole="alert" className="min-w-0 flex-1 text-sm text-muted-foreground">
         {message}
       </Text>
-      <Button variant="outline" size="sm" loading={pending} onPress={onRetry}>
+      <Button
+        variant="outline"
+        size="sm"
+        className={STATE_ACTION_CLASS}
+        loading={pending}
+        onPress={onRetry}
+      >
         <Text>{t('common.retry')}</Text>
       </Button>
     </View>
@@ -157,9 +164,7 @@ export function PasskeysScreen() {
       },
       // Reconcile with the server either way, so a rollback cannot leave a row
       // the server does not have or hide one it does.
-      onSettled: () => {
-        void refetch();
-      },
+      onSettled: () => void refetch(),
     })
   );
 
@@ -297,9 +302,7 @@ export function PasskeysScreen() {
       <InlineFailure
         message={t('profile.passkeysCouldNotLoad')}
         pending={isFetching}
-        onRetry={() => {
-          void refetch();
-        }}
+        onRetry={() => void refetch()}
       />
     );
   }
@@ -312,7 +315,8 @@ export function PasskeysScreen() {
       <View className="gap-3">
         {SKELETON_ROWS.map(index => (
           <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            <Skeleton className="h-[18px] w-[18px] rounded" />
+            {/* Reserves the loaded row's 30 dp IconTile frame. */}
+            <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
             <View className="flex-1 gap-1.5">
               <Skeleton className="h-5 w-28" />
               <Skeleton className="h-4 w-40" />
@@ -336,9 +340,7 @@ export function PasskeysScreen() {
         placement="top"
         title={t('profile.passkeysCouldNotLoad')}
         message={t('profile.passkeysLoadFailed')}
-        onRetry={() => {
-          void refetch();
-        }}
+        onRetry={() => void refetch()}
         isRetrying={isFetching}
       />
     );
@@ -390,7 +392,7 @@ export function PasskeysScreen() {
       <ScreenHeader title={t('profile.passkeysTitle')} />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4"
+        contentContainerClassName="gap-3 px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {body}
@@ -401,7 +403,7 @@ export function PasskeysScreen() {
           the query renders skeletons, no rows, or rows. The notice that
           explains a failed or unavailable add shares the slot, beside the
           control it is about. */}
-      <View className="gap-2 px-6 pt-3" style={{ paddingBottom: tabBarBottomPadding }}>
+      <View className="gap-2 px-4 pt-3" style={{ paddingBottom: tabBarBottomPadding }}>
         {footerNotice}
         {addControl}
       </View>
@@ -412,9 +414,7 @@ export function PasskeysScreen() {
           placeholder={t('profile.passkeyName')}
           initialValue={renameTarget.name ?? ''}
           maxLength={64}
-          onSave={async name => {
-            await rename.mutateAsync({ id: renameTarget.id, name });
-          }}
+          onSave={name => rename.mutateAsync({ id: renameTarget.id, name })}
           onClose={() => {
             setRenameTarget(null);
           }}

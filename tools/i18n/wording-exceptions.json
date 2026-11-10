@@ -98,6 +98,7 @@
     "commit",
     "deleted",
     "dismissed",
+    "files",
     "no changes needed",
     "open",
     "pr opened",
@@ -146,13 +147,22 @@
   ],
   "de": ["block", "manual review", "no changes needed", "open", "open pull request", "pr opened"],
   "el": [
+    "{{count}} open",
+    "archived ({{count}})",
     "balanced",
+    "completed ({{count}})",
     "critical",
     "no changes needed",
+    "none",
     "open",
     "open pull request",
     "pr opened",
-    "remediation blocked"
+    "remediation blocked",
+    "review",
+    "{{displaycount}} failed",
+    "{{displaycount}} passed",
+    "{{displaycount}} skipped",
+    "{{loaded}} of {{total}} files loaded"
   ],
   "es": [
     "analysis failed",
@@ -177,11 +187,13 @@
   ],
   "et": [
     "analysis failed",
+    "block",
     "commit",
     "cost",
     "dismissed",
     "files",
     "manual review",
+    "merge",
     "open",
     "open pull request",
     "pr opened",
@@ -189,6 +201,7 @@
     "reactions",
     "remediation blocked",
     "remediation failed",
+    "search sessions",
     "session exited",
     "starting",
     "tokens"
@@ -305,16 +318,19 @@
     "block",
     "cancelled",
     "deleted",
-    "dismissed",
     "manual review",
     "merge",
     "no changes needed",
+    "only adding {{accepted}} of {{total}} files (max {{max}})",
     "open",
     "open pull request",
     "pr opened",
     "remediation blocked",
     "remediation failed",
-    "superseded"
+    "stopped",
+    "superseded",
+    "{{count}} open",
+    "{{loaded}} of {{total}} files loaded"
   ],
   "he": [
     "completed",
@@ -381,6 +397,7 @@
     "deleted",
     "dismissed",
     "manual review",
+    "merge",
     "open",
     "open pull request",
     "pr opened",
@@ -389,6 +406,8 @@
     "remediation failed",
     "remediation requested",
     "review",
+    "search repositories",
+    "stopped",
     "superseded",
     "tokens"
   ],
@@ -405,7 +424,8 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
-    "superseded"
+    "superseded",
+    "tokens"
   ],
   "is": [
     "dismissed",
@@ -462,6 +482,7 @@
   "kk": [
     "cancelled",
     "dismissed",
+    "files",
     "open",
     "open pull request",
     "pr opened",
@@ -543,6 +564,7 @@
     "analysis failed",
     "commit",
     "dismissed",
+    "files",
     "manual review",
     "no changes needed",
     "open",
@@ -589,12 +611,16 @@
     "block",
     "cancelled",
     "dismissed",
+    "edit",
     "manual review",
     "no changes needed",
+    "none",
+    "open",
     "open pull request",
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "review",
     "superseded"
   ],
   "ms": ["deleted", "dismissed", "open", "open pull request", "review"],
@@ -617,6 +643,7 @@
     "commit",
     "deleted",
     "dismissed",
+    "files",
     "github connection expired",
     "manual review",
     "no changes needed",
@@ -718,16 +745,19 @@
   ],
   "ps": [
     "analysis failed",
+    "block",
     "cancelled",
     "commit",
     "deleted",
     "dismissed",
+    "edit",
     "no changes needed",
     "open",
     "open pull request",
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "search sessions",
     "superseded"
   ],
   "pt": [
@@ -803,6 +833,7 @@
   ],
   "sk": [
     "dismissed",
+    "files",
     "high",
     "manual review",
     "open",
@@ -815,6 +846,7 @@
   ],
   "sl": [
     "dismissed",
+    "files",
     "open",
     "open pull request",
     "pr opened",
@@ -874,6 +906,7 @@
     "copied",
     "deleted",
     "dismissed",
+    "edit",
     "open",
     "open pull request",
     "remediation blocked",
@@ -979,6 +1012,7 @@
     "deleted",
     "dismissed",
     "draft",
+    "files",
     "manual review",
     "no changes needed",
     "open",
@@ -989,6 +1023,7 @@
     "superseded"
   ],
   "zh-Hans": [
+    "block",
     "commit",
     "file",
     "files",

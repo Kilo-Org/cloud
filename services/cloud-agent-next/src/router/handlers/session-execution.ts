@@ -1,6 +1,6 @@
 /**
- * Legacy V2 execution handlers — thin proxies over the shared `queueMessage`
- * helper.
+ * Legacy V2 execution handlers — thin proxies over the shared
+ * `preflightAndQueuePromptMessage` admission helper.
  *
  * `initiateFromKilocodeSessionV2` queues the first message on a session that
  * was registered via `prepareSession`. Callers do not pass a prompt, so the
@@ -12,7 +12,7 @@
  *
  * New callers should prefer the unified `start` / `send` endpoints.
  */
-import { protectedProcedure } from '../auth.js';
+import { protectedProcedure, cloudAgentManagedProcedure } from '../auth.js';
 import { logger, withLogTags } from '../../logger.js';
 import {
   InitiateFromPreparedSessionInput,
@@ -23,7 +23,6 @@ import type { SessionId } from '../../types/ids.js';
 import {
   preflightAndQueuePromptMessage,
   preflightRuntimeAuthorizationRecovery,
-  queueMessage,
 } from '../../session/queue-message.js';
 import {
   admitPreparedInitialMessage,
@@ -88,7 +87,7 @@ export function createSessionExecutionV2Handlers() {
         });
       }),
 
-    sendMessageV2: protectedProcedure
+    sendMessageV2: cloudAgentManagedProcedure
       .input(SendMessageV2Input)
       .output(LegacyExecutionResponse)
       .mutation(async ({ input, ctx }) => {
@@ -124,14 +123,19 @@ export function createSessionExecutionV2Handlers() {
               id: input.messageId ?? undefined,
               command: commandPayload.command,
               arguments: commandPayload.arguments,
-              attachments: input.attachments ?? input.images,
+              attachments: input.attachments,
+            };
+            agent = {
+              mode: commandPayload.mode,
+              model: commandPayload.model,
+              variant: commandPayload.variant,
             };
           } else if (promptPayload) {
             turn = {
               type: 'prompt',
               id: input.messageId ?? undefined,
               prompt: promptPayload.prompt,
-              attachments: input.attachments ?? input.images,
+              attachments: input.attachments,
             };
             agent = {
               mode: promptPayload.mode,
@@ -157,14 +161,11 @@ export function createSessionExecutionV2Handlers() {
             botId: ctx.botId,
             authToken: ctx.authToken,
           };
-          const ack =
-            turn.type === 'prompt'
-              ? await preflightAndQueuePromptMessage(
-                  queuedMessage,
-                  admissionContext,
-                  'sendMessageV2'
-                )
-              : await queueMessage(queuedMessage, admissionContext);
+          const ack = await preflightAndQueuePromptMessage(
+            queuedMessage,
+            admissionContext,
+            'sendMessageV2'
+          );
           return withLegacyExecutionId(ack);
         });
       }),

@@ -57,7 +57,138 @@ function metadata(overrides: Record<string, unknown> = {}) {
 
 const selection = { provider: 'cloudflare' as const };
 
+describe('trusted runtime origin', () => {
+  it.each(['cloud-agent-web', 'cloud-agent', 'code-review', 'agent-manager', undefined])(
+    'preserves the worker origin %s separately from a client web claim',
+    billingOrigin => {
+      const input = metadata({
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+          createdOnPlatform: 'cloud-agent-web',
+          billingOrigin,
+        },
+      });
+      const registration = buildControlPlaneSessionRegistration(input, selection);
+      const parsed = controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      });
+      expect(parsed.credentials).toMatchObject({ createdOnPlatform: 'cloud-agent-web' });
+      expect(parsed.credentials.billingOrigin).toBe(billingOrigin);
+    }
+  );
+});
+
+describe('workspace tail snapshot authority', () => {
+  it('carries a registered workspace from metadata, without inferring one for standalone sessions', () => {
+    const workspaceId = 'worktree_00000000-0000-4000-8000-000000000001';
+    const registered = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          worktreeId: workspaceId,
+        },
+      }),
+      selection
+    );
+    expect(registered.credentials.workspaceId).toBe(workspaceId);
+    expect(registered.credentials.scopeId).toBe(workspaceId);
+    expect(
+      buildControlPlaneSessionRegistration(metadata(), selection).credentials.workspaceId
+    ).toBeUndefined();
+  });
+
+  it('rejects caller-supplied workspace restore provenance at both registration boundaries', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata(), selection);
+    const spec = {
+      ...registration.spec,
+      workspaceSnapshot: {
+        workspaceId: 'worktree_00000000-0000-4000-8000-000000000001',
+        directory: registration.spec.directory,
+        sourceAllocationId: 'source',
+      },
+    };
+    expect(controlPlaneRouteSpecSchema.safeParse(spec).success).toBe(true);
+    expect(controlPlaneRegistrationRouteSpecSchema.safeParse(spec).success).toBe(false);
+    expect(
+      controlPlanePrepareInputSchema.safeParse({ spec, credentials: registration.credentials })
+        .success
+    ).toBe(false);
+  });
+});
+
 describe('egress policy registration', () => {
+  it.each(
+    ([undefined, 'unrestricted', 'allowlist'] as const).flatMap(egressMode =>
+      [
+        { storedAudit: true, selectedAudit: false },
+        { storedAudit: true, selectedAudit: undefined },
+        { storedAudit: false, selectedAudit: true },
+        { storedAudit: undefined, selectedAudit: true },
+      ].map(policy => ({ ...policy, egressMode }))
+    )
+  )('rejects mismatched audit opt-ins: %j', ({ storedAudit, selectedAudit, egressMode }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode,
+        egressAudit: storedAudit,
+      },
+    });
+    expect(() =>
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode,
+        egressAudit: selectedAudit,
+      })
+    ).toThrow('Sandbox selection egress audit does not match session metadata');
+  });
+
+  it.each([undefined, 'unrestricted', 'allowlist'] as const)(
+    'preserves audited %s registration',
+    egressMode => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode,
+          egressAudit: true,
+        },
+      });
+      expect(
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressMode,
+          egressAudit: true,
+        }).sandboxSelection
+      ).toMatchObject({ egressAudit: true });
+    }
+  );
+
+  it.each([
+    { storedAudit: false, selectedAudit: undefined },
+    { storedAudit: undefined, selectedAudit: false },
+  ])('treats false and omitted audit equivalently: %j', ({ storedAudit, selectedAudit }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit: storedAudit,
+      },
+    });
+    expect(
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAudit: selectedAudit,
+      }).sandboxSelection?.egressAudit
+    ).toBe(selectedAudit);
+  });
+
   it.each([[], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'preserves a matching policy %j',
     ({ egressAllowlist }) => {
@@ -156,6 +287,7 @@ describe('egress policy registration', () => {
     { egressMode: 'unrestricted', egressAllowlist: [] },
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'invalid' },
+    { egressMode: 'allowlist', egressAudit: null },
   ])('rejects ambiguous sandbox selection policy %j', policy => {
     expect(
       controlPlaneSandboxSelectionSchema.safeParse({
@@ -167,14 +299,26 @@ describe('egress policy registration', () => {
 
   it.each([
     { provider: 'cloudflare' },
-    { provider: 'vercel' },
+    {
+      provider: 'vercel',
+      byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' },
+    },
     { provider: 'cloudflare-containers', sandboxKind: 'shared' },
     { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
-  ])('restricts only allowlist mode to isolated containers: %j', placement => {
+  ])('restricts allowlist and audit policies to isolated containers: %j', placement => {
     expect(
       controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'allowlist' })
         .success
     ).toBe(false);
+    for (const egressMode of [undefined, 'unrestricted', 'allowlist']) {
+      expect(
+        controlPlaneSandboxSelectionSchema.safeParse({
+          ...placement,
+          egressMode,
+          egressAudit: true,
+        }).success
+      ).toBe(false);
+    }
     expect(
       controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'unrestricted' })
         .success
@@ -258,6 +402,8 @@ describe('migrated origin permissions', () => {
               'gh pr create': 'deny',
               'gh api repos/*/issues/*/comments --input*': 'allow',
               'gh api repos/*/issues/comments/* -X PATCH*': 'allow',
+              'find *-exec*': 'deny',
+              'sort *--compress-program*': 'deny',
             }
       );
       expect(spec.env).toMatchObject({
@@ -299,7 +445,7 @@ describe('runtime authorization admission', () => {
     }
   );
 
-  it('preserves direct SCM admission independently of modern runtime authorization', () => {
+  it('upgrades saved direct selection to mandatory containment', () => {
     const modern = metadata({
       auth: {
         kiloSessionId: 'ses_12345678901234567890123456',
@@ -314,8 +460,8 @@ describe('runtime authorization admission', () => {
     );
     expect(registration.spec.runtimeIsolation).toBe('per-session');
     expect(registration.sandboxSelection?.containment).toMatchObject({
-      kilocode: false,
-      github: false,
+      kilocode: true,
+      github: true,
     });
   });
 
@@ -337,16 +483,16 @@ describe('runtime authorization admission', () => {
     ).toThrow(SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE);
   });
 
-  it('rejects unsupported Vercel direct mode and invalid modern proxy configuration at registration', () => {
+  it('requires containment on Vercel and rejects invalid modern proxy configuration', () => {
     const vercel = metadata({
       workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: 'vercel' },
     });
-    expect(() =>
+    expect(
       buildControlPlaneSessionRegistration(vercel, {
         provider: 'vercel',
         containment: { kilocode: false, github: false },
-      })
-    ).toThrow('Vercel requires credential containment');
+      }).sandboxSelection?.containment
+    ).toMatchObject({ kilocode: true, github: true });
     const modern = metadata({
       auth: {
         kiloSessionId: 'ses_12345678901234567890123456',
@@ -1013,6 +1159,29 @@ describe('profile runtime delivery', () => {
     });
   });
 
+  it('delivers the environment setup command boundary through prepare', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        profile: {
+          setupCommands: ['env-setup', 'inline-setup'],
+          environmentSetupCommandCount: 1,
+        },
+      }),
+      selection
+    );
+
+    expect(registration.spec).toMatchObject({
+      setupCommands: ['env-setup', 'inline-setup'],
+      environmentSetupCommandCount: 1,
+    });
+    expect(
+      controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      }).spec.environmentSetupCommandCount
+    ).toBe(1);
+  });
+
   it('accepts an inherited worktree profile without per-session isolation', () => {
     const registration = buildControlPlaneSessionRegistration(metadata({ profile }), selection);
     expect(
@@ -1031,5 +1200,35 @@ describe('profile runtime delivery', () => {
         ],
       }).success
     ).toBe(false);
+  });
+
+  it('preserves skills.sh references through metadata and wrapper registration', () => {
+    const runtimeSkills = [{ name: 'find-skills', source: 'vercel-labs/skills' }];
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ profile: { runtimeSkills } }),
+      selection
+    );
+    expect(registration.spec.runtimeSkills).toEqual(runtimeSkills);
+    expect(
+      controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      }).spec.runtimeSkills
+    ).toEqual(runtimeSkills);
+  });
+});
+
+describe('continuation marker projection', () => {
+  it('projects the server-only continuation marker into the route spec', () => {
+    const { spec } = buildControlPlaneSessionRegistration(
+      metadata({ continuation: true }),
+      selection
+    );
+    expect(spec.continuation).toBe(true);
+  });
+
+  it('omits the marker for a normal session', () => {
+    const { spec } = buildControlPlaneSessionRegistration(metadata(), selection);
+    expect(spec.continuation).toBeUndefined();
   });
 });

@@ -11,7 +11,7 @@ import {
   oldestNeedsInputSince,
   soonestScheduledAt,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { aggregateLiveActivityRelevance } from '@kilocode/notifications';
+import { aggregateLiveActivityRelevance } from '@kilocode/notifications/schemas';
 
 import { i18n } from '@/i18n';
 import {
@@ -23,7 +23,7 @@ import {
 } from '@/lib/glanceable/followed-sessions';
 import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
 import {
-  getLastGlanceableSnapshot,
+  getGlanceableSnapshotForSignedInScope,
   isGlanceableRestoreSettled,
   isGlanceableRestoreUnavailable,
   restorePersistedGlanceable,
@@ -165,13 +165,14 @@ function translate(key: string): string {
  * True while the recorded ask is one Approve can answer. The count this
  * content state carries includes questions and retried asks, which
  * `runGlanceableApprove` resolves to `none`, so the layout needs this fact to
- * avoid offering a control that cannot act. The read is synchronous and the
- * publisher records the ask before it emits, so the flag matches the counts in
- * the same state.
+ * avoid offering a control that cannot act; an ask with no bound request has
+ * no request to answer, so it cannot act either. The read is synchronous and
+ * the publisher records the ask before it emits, and redraws once the binding
+ * lands, so the flag matches the counts in the same state.
  */
 function isApprovableAskRecorded(): boolean {
   const ask = getWaitingAsk();
-  return ask?.status === 'permission' && ask.isCloudAgent;
+  return ask?.status === 'permission' && ask.isCloudAgent && ask.boundPermissionId !== null;
 }
 
 /**
@@ -505,7 +506,7 @@ export function sweepStrayActivities(): void {
     void endNow();
     return;
   }
-  const snapshot = getLastGlanceableSnapshot();
+  const snapshot = getGlanceableSnapshotForSignedInScope();
   if (snapshot === null && !isGlanceableRestoreSettled()) {
     // The read has not finished yet, so a null snapshot means "unknown", not
     // "nothing can own the surface". This runs at import in the headless push
@@ -603,7 +604,7 @@ let lastSinkContext: GlanceableSinkContext | null = null;
  * unfollow that changes nothing else, so the card has to come back here.
  */
 export function republishAggregateCard(): void {
-  const snapshot = getLastGlanceableSnapshot();
+  const snapshot = getGlanceableSnapshotForSignedInScope();
   if (snapshot === null) {
     return;
   }
@@ -773,7 +774,7 @@ export const iosSink: GlanceableSink = {
  */
 export async function renderStoredSnapshotWithNotice(): Promise<void> {
   await restorePersistedGlanceable();
-  const snapshot = getLastGlanceableSnapshot();
+  const snapshot = getGlanceableSnapshotForSignedInScope();
   if (snapshot === null) {
     return;
   }

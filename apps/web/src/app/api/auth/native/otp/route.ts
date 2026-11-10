@@ -6,6 +6,7 @@ import {
   deleteSignInCode,
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
+import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address';
 import * as z from 'zod';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
@@ -40,10 +41,10 @@ async function enforceResponseFloor(startTime: number): Promise<void> {
  *
  * The response diverges only where the client must act on the outcome: 400
  * INVALID_REQUEST when the body carries no valid email, 429 when the address
- * is rate limited, 403 with ssoOrganizationId (or 503 when the domain's SSO
- * is misconfigured) when the domain requires SSO, and, for an eligible
- * address whose email cannot be sent, 400 INVALID_EMAIL when NeverBounce
- * rejects the address or 500 EMAIL_DELIVERY_FAILED otherwise.
+ * or the caller is rate limited, 403 with ssoOrganizationId (or 503 when the
+ * domain's SSO is misconfigured) when the domain requires SSO, and, for an
+ * eligible address whose email cannot be sent, 400 INVALID_EMAIL when
+ * NeverBounce rejects the address or 500 EMAIL_DELIVERY_FAILED otherwise.
  */
 export const POST = withRestTiming('/api/auth/native/otp', async (request: Request) => {
   const startTime = Date.now();
@@ -62,11 +63,9 @@ export const POST = withRestTiming('/api/auth/native/otp', async (request: Reque
   // Deliver the code so the response does not reveal account existence; the
   // token exchange refuses the signup with a step-up shipped apps can render.
   if (!eligibility.ok && eligibility.errorCode !== 'EMAIL-SIGNUP-DISABLED') {
-    if (eligibility.errorCode === 'INVALID_EMAIL') {
-      await enforceResponseFloor(startTime);
-      return NextResponse.json({ success: true, challengeId: randomUUID() });
-    }
-    if (eligibility.errorCode === 'BLOCKED') {
+    // A rejected address and a blocked domain are deliberately
+    // indistinguishable from an eligible sign-in.
+    if (eligibility.errorCode === 'INVALID_EMAIL' || eligibility.errorCode === 'BLOCKED') {
       await enforceResponseFloor(startTime);
       return NextResponse.json({ success: true, challengeId: randomUUID() });
     }
@@ -83,10 +82,13 @@ export const POST = withRestTiming('/api/auth/native/otp', async (request: Reque
     );
   }
 
-  const { code, challengeId } = await createSignInCode(email);
-  const result = await sendSignInCodeEmail(email, code);
+  // The code is bound to the address it is delivered to, so both use the same
+  // trimmed, lowercased string; a plus suffix or Gmail dots stay part of it.
+  const codeEmail = getDeliveredEmailAddress(email);
+  const { code, challengeId } = await createSignInCode(codeEmail);
+  const result = await sendSignInCodeEmail(codeEmail, code);
   if (!result.sent) {
-    await deleteSignInCode(email, code);
+    await deleteSignInCode(codeEmail, code);
     const neverbounceRejected = result.reason === 'neverbounce_rejected';
     await enforceResponseFloor(startTime);
     return NextResponse.json(

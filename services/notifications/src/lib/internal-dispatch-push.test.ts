@@ -548,7 +548,7 @@ describe('dispatchInternalPushCore', () => {
       badge: null,
       push: {
         title: 'Kilo',
-        body: 'A security finding needs attention',
+        body: 'A security check has an update',
         i18nKey: 'internal.securityLifecycle',
         data: {
           type: 'security_lifecycle',

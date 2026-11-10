@@ -114,6 +114,9 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   setItem: vi.fn(),
 }));
 
+/** The R2 S3 origin every Kilo artifact presign names: the only host the crawl downloads from. */
+const STORAGE_ORIGIN = 'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com';
+
 const USER_ID = 'user-1';
 const T1 = '2026-01-01T00:00:00.000Z';
 const T2 = '2026-01-02T00:00:00.000Z';
@@ -142,7 +145,12 @@ function registerDownloads(h: ReturnType<typeof harness>, files: FileInput[]): v
 /** One stored message carrying a `file` part per artifact id. */
 function messageOf(ids: string[]): { parts: unknown[] } {
   return {
-    parts: ids.map(id => ({ id, mime: 'text/plain', type: 'file', url: `https://x/${id}` })),
+    parts: ids.map(id => ({
+      id,
+      mime: 'text/plain',
+      type: 'file',
+      url: `${STORAGE_ORIGIN}/${id}`,
+    })),
   };
 }
 
@@ -204,7 +212,7 @@ function harness(overrides: Partial<ArtifactMirrorSyncDeps> = {}) {
     mirrorSessionDir: () => new Directory('file:///mirror/sessions'),
     notify,
     now: () => now,
-    presignAttachmentDownload: vi.fn(async () => ({ signedUrl: 'https://x/signed' })),
+    presignAttachmentDownload: vi.fn(async () => ({ signedUrl: `${STORAGE_ORIGIN}/signed` })),
     probeContentLength: vi.fn(async () => null),
     readState: async (scope, key) => store.get(`${scope}/${key}`) ?? null,
     resolveUserId: () => USER_ID,
@@ -330,7 +338,7 @@ describe('syncArtifactMirror crawling', () => {
     h.pages.set('s1', { messages: [], nextCursor: 'c1' });
     await syncArtifactMirror({ deps: h.deps });
 
-    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
     h.pages.set('s1', { messages: [messageOf(['f1'])], nextCursor });
     create.mockImplementationOnce(() => {
       throw new Error('temporary filesystem failure');
@@ -357,7 +365,7 @@ describe('syncArtifactMirror crawling', () => {
   it('keeps a missing browsable container a successful no-op', async () => {
     const h = harness({ mirrorSessionDir: () => null });
     h.sessions.push({ id: 's1', updatedAt: T1 });
-    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
 
     expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
       status: 'synced',
@@ -373,7 +381,7 @@ describe('syncArtifactMirror crawling', () => {
   it('keeps the previous mirror when a download fails and retries it next run', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
-    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
 
     await syncArtifactMirror({ deps: h.deps });
     expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
@@ -382,10 +390,10 @@ describe('syncArtifactMirror crawling', () => {
     // materialized file is skipped, and the second download fails.
     h.sessions[0] = { id: 's1', updatedAt: T2 };
     setFiles(h, 's1', [
-      { id: 'f1', size: 10, url: 'https://x/f1' },
-      { id: 'f2', size: 10, url: 'https://x/f2' },
+      { id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` },
+      { id: 'f2', size: 10, url: `${STORAGE_ORIGIN}/f2` },
     ]);
-    h.downloads.set('https://x/f2', async () => {
+    h.downloads.set(`${STORAGE_ORIGIN}/f2`, async () => {
       throw new Error('offline');
     });
     h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
@@ -397,10 +405,10 @@ describe('syncArtifactMirror crawling', () => {
     });
     expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
     expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(2);
-    expect(h.downloadFile).toHaveBeenCalledWith('https://x/f2', expect.anything());
+    expect(h.downloadFile).toHaveBeenCalledWith(`${STORAGE_ORIGIN}/f2`, expect.anything());
 
     // The retry: the held cursor re-reads the same page and f2 lands.
-    h.downloads.set('https://x/f2', async () => downloaded(10));
+    h.downloads.set(`${STORAGE_ORIGIN}/f2`, async () => downloaded(10));
     h.setNow(NOW + 2 * MIRROR_SYNC_MIN_INTERVAL_MS);
 
     expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
@@ -415,7 +423,7 @@ describe('syncArtifactMirror crawling', () => {
   it('does not re-fetch a session whose crawl is done', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
-    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
 
     await syncArtifactMirror({ deps: h.deps });
     h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
@@ -429,9 +437,9 @@ describe('syncArtifactMirror crawling', () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
     registerDownloads(h, [
-      { id: 'f1', size: 10, url: 'https://x/f1' },
-      { id: 'f2', size: 10, url: 'https://x/f2' },
-      { id: 'f3', size: 10, url: 'https://x/f3' },
+      { id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` },
+      { id: 'f2', size: 10, url: `${STORAGE_ORIGIN}/f2` },
+      { id: 'f3', size: 10, url: `${STORAGE_ORIGIN}/f3` },
     ]);
     // Page one (no cursor) holds the head; page two is reached by its cursor.
     let head = ['f1'];
@@ -454,13 +462,15 @@ describe('syncArtifactMirror crawling', () => {
 
     expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1', 'f2']);
     // The restart re-reads page one but never re-downloads what it already has.
-    expect(h.downloadFile.mock.calls.filter(([url]) => url === 'https://x/f1')).toHaveLength(1);
+    expect(
+      h.downloadFile.mock.calls.filter(([url]) => url === `${STORAGE_ORIGIN}/f1`)
+    ).toHaveLength(1);
   });
 
   it('does not record a retryable failed page as a finished crawl and retries it next run', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
-    registerDownloads(h, [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    registerDownloads(h, [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
     let failure: string | null = 'retryable_failure';
     const getSessionMessagesPage = vi.fn(async () =>
       failure === null
@@ -494,7 +504,7 @@ describe('syncArtifactMirror crawling', () => {
   it('records a terminal failed page as crawled so it stops spending an advance slot', async () => {
     const h = harness();
     h.sessions.push({ id: 'terminal', updatedAt: T1 }, { id: 's2', updatedAt: T1 });
-    registerDownloads(h, [{ id: 'f2', size: 10, url: 'https://x/f2' }]);
+    registerDownloads(h, [{ id: 'f2', size: 10, url: `${STORAGE_ORIGIN}/f2` }]);
     const getSessionMessagesPage = vi.fn(async (input: { session_id: string }) =>
       input.session_id === 'terminal'
         ? { history: { kind: 'invalid_data' } }
@@ -527,7 +537,7 @@ describe('syncArtifactMirror crawling', () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
     setFiles(h, 's1', [
-      { id: 'f1', size: 10, url: 'https://x/f1' },
+      { id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` },
       { id: 'f2', size: 3, url: 'data:text/plain;base64,QUJD' },
     ]);
 
@@ -554,7 +564,7 @@ describe('syncArtifactMirror crawling', () => {
     );
     for (const session of h.sessions) {
       setFiles(h, session.id, [
-        { id: `${session.id}-f1`, size: 10, url: `https://x/${session.id}` },
+        { id: `${session.id}-f1`, size: 10, url: `${STORAGE_ORIGIN}/${session.id}` },
       ]);
     }
 
@@ -570,8 +580,8 @@ describe('syncArtifactMirror crawling', () => {
   it('prunes a session that left the list page', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 }, { id: 's2', updatedAt: T1 });
-    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
-    setFiles(h, 's2', [{ id: 'f2', size: 10, url: 'https://x/f2' }]);
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
+    setFiles(h, 's2', [{ id: 'f2', size: 10, url: `${STORAGE_ORIGIN}/f2` }]);
 
     await syncArtifactMirror({ deps: h.deps });
     expect(sessionIds(h.lastManifest())).toEqual(['s1', 's2']);
@@ -593,10 +603,10 @@ describe('syncArtifactMirror crawling', () => {
       Array.from({ length: 10 }, (_, index) => ({
         id: `n${index}`,
         size: perFile,
-        url: `https://x/n${index}`,
+        url: `${STORAGE_ORIGIN}/n${index}`,
       }))
     );
-    setFiles(h, 'older', [{ id: 'o1', size: perFile, url: 'https://x/o1' }]);
+    setFiles(h, 'older', [{ id: 'o1', size: perFile, url: `${STORAGE_ORIGIN}/o1` }]);
 
     await syncArtifactMirror({ deps: h.deps });
 
@@ -609,7 +619,7 @@ describe('syncArtifactMirror crawling', () => {
   it('discards a run that resolves after a sign-out and writes nothing', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
-    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
     const original = h.getSessionMessagesPage;
     h.deps.getSessionMessagesPage = vi.fn(async (input: { session_id: string }) => {
       setSignOutActive(true);
@@ -625,7 +635,7 @@ describe('syncArtifactMirror crawling', () => {
   it('removes the bytes a download wrote when a sign-out lands inside the download', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
-    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
     // The sign-out lands inside the download await itself, past the fence that
     // gated starting it, so only the post-await fence can stop the bytes that
     // arrive after teardown already deleted the mirror.
@@ -647,7 +657,7 @@ describe('syncArtifactMirror crawling', () => {
   it('keeps the bytes a later generation wrote when a stale download finishes', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
-    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
 
     // The old generation parks inside its download, so the newer generation can
     // finish the same artifact first.
@@ -701,7 +711,7 @@ describe('syncArtifactMirror crawling', () => {
   it('does not signal the provider when a sign-out lands inside the state write', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
-    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
     h.deps.writeState = vi.fn(async () => {
       setSignOutActive(true);
     });

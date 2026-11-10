@@ -16,7 +16,11 @@ import {
   StoreVerificationError,
 } from '@/lib/credits/store-purchase-errors';
 import { STORE_PURCHASE_REFUNDED_MESSAGE } from '@/lib/credits/store-refund';
-import { STORE_CREDIT_PRODUCTS } from '@/lib/credits/store-products';
+import {
+  STORE_CREDIT_PRODUCTS,
+  EXPIRING_GOOGLE_CREDIT_PRODUCTS,
+  getMobileCreditProducts,
+} from '@/lib/credits/store-products';
 import {
   acknowledgeGooglePlayCreditPurchase,
   verifyAppleCreditPurchase,
@@ -37,11 +41,13 @@ const MobileStoreCreditProductSchema = z.object({
   amountUsd: z.number(),
   appleProductId: z.string(),
   googleProductId: z.string(),
+  creditExpiryPolicy: z.enum(['never', 'one_year']).optional(),
 });
 
 const GetMobileStoreProductsOutputSchema = z.object({
   appAccountToken: z.string(),
   products: z.array(MobileStoreCreditProductSchema),
+  recoveryGoogleProductIds: z.array(z.string()).optional(),
 });
 
 const CompleteStoreCreditPurchaseOutputSchema = z.object({
@@ -148,14 +154,19 @@ function mapCreditCompletionError(
 
 export const creditsRouter = createTRPCRouter({
   getMobileStoreProducts: baseProcedure
+    .input(z.object({ supportsCreditExpiry: z.boolean().optional() }).optional())
     .output(GetMobileStoreProductsOutputSchema)
-    .query(({ ctx }) => ({
+    .query(({ ctx, input }) => ({
       appAccountToken: ctx.user.app_store_account_token,
-      products: STORE_CREDIT_PRODUCTS.map(product => ({
+      products: getMobileCreditProducts(input?.supportsCreditExpiry).map(product => ({
         amountUsd: product.amountUsd,
         appleProductId: product.appleProductId,
         googleProductId: product.googleProductId,
+        creditExpiryPolicy: product.creditExpiryPolicy,
       })),
+      recoveryGoogleProductIds: [...STORE_CREDIT_PRODUCTS, ...EXPIRING_GOOGLE_CREDIT_PRODUCTS].map(
+        product => product.googleProductId
+      ),
     })),
 
   completeAppStorePurchase: baseProcedure

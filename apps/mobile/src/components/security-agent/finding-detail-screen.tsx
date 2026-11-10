@@ -13,6 +13,7 @@ import { FindingRemediationPanel } from '@/components/security-agent/finding-rem
 import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boundary';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -25,9 +26,12 @@ import {
   useSecurityDismissDraft,
 } from '@/lib/hooks/use-security-dismiss-draft';
 import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { cn } from '@/lib/utils';
 
 type FindingTab = 'details' | 'analysis' | 'remediation';
@@ -56,6 +60,7 @@ type FindingDetailScreenProps = {
 
 export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetailScreenProps>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const navigation = useNavigation();
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -91,12 +96,15 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
 
   // The back control always renders. With local history it pops normally
   // (findings-list -> finding returns to the list). A push/deep-link open has
-  // no local history, so `router.back()` is a no-op and back replaces the
-  // whole profile-tab subtree with its root instead. The signal is the nested
-  // Stack's own state index, not `router.canGoBack()` (which is recursive and
-  // also reports parent history).
+  // no local history, so `router.back()` is a no-op and back replaces itself
+  // with the scope's findings list, a sibling route in the root stack. The
+  // signal is the nested Stack's own state index, not `router.canGoBack()`
+  // (which is recursive and also reports parent history).
   const handleBack = () => {
-    const target = findingDetailBackTarget(findingDetailHasLocalHistory(navigation.getState()));
+    const target = findingDetailBackTarget(
+      findingDetailHasLocalHistory(navigation.getState()),
+      scope
+    );
     if (target.kind === 'pop') {
       router.back();
     } else {
@@ -131,14 +139,54 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const errorCode = findingQuery.error?.data?.code;
   const notFound = findingQuery.isError && (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN');
 
+  // React Query resets a failed query to pending when its retry starts, so a
+  // condition on `isError` alone tears the failure surface down — and the
+  // progress of the retry the user just asked for — for as long as the request
+  // runs. Hold the surface for the retry of the same finding; another finding's
+  // id never matches, so opening it starts clean. A not-found or forbidden
+  // answer keeps its own state instead of retrying into a generic failure.
+  const loadFailed = findingQuery.isError && !findingQuery.data && !notFound;
+  const [failedFindingId, setFailedFindingId] = useState<string | null>(null);
+  useEffect(() => {
+    if (loadFailed) {
+      setFailedFindingId(findingId);
+    }
+  }, [loadFailed, findingId]);
+  const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
+
+  // The not-found and load-failure states share a header without an eyebrow
+  // line. Neither ever gains a repository, so the title belongs on the back
+  // control's row, centred on the chevron, rather than half a line below it
+  // above a gap no label ever fills.
+  const pendingHeader = (
+    <ScreenHeader
+      className="px-6"
+      title={t('securityAgent.findingDetail.title')}
+      showBackButton
+      onBack={handleBack}
+    />
+  );
+
+  // Loading does gain the repository: the loaded header draws it on an eyebrow
+  // line above the title. The row centres the heading column against the back
+  // control, so that line moves the title down by half its height — 7.6 dp
+  // measured on the Android emulator — in the frame the payload lands. Reserving
+  // the line here puts the title where the payload will leave it, so it holds
+  // still from the first paint instead of being pushed down later.
+  const loadingHeader = (
+    <ScreenHeader
+      className="px-6"
+      title={t('securityAgent.findingDetail.title')}
+      reserveEyebrow
+      showBackButton
+      onBack={handleBack}
+    />
+  );
+
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          title={t('securityAgent.findingDetail.title')}
-          showBackButton
-          onBack={handleBack}
-        />
+        {pendingHeader}
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.notFoundTitle')}
@@ -148,17 +196,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     );
   }
 
-  if (findingQuery.isError && !findingQuery.data) {
+  if (showLoadFailure) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          title={t('securityAgent.findingDetail.title')}
-          showBackButton
-          onBack={handleBack}
-        />
+        {pendingHeader}
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
+          isRetrying={findingQuery.isFetching}
         />
       </View>
     );
@@ -167,11 +212,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          title={t('securityAgent.findingDetail.title')}
-          showBackButton
-          onBack={handleBack}
-        />
+        {loadingHeader}
         <View className="flex-1 gap-3 px-6 pt-4">
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />
@@ -193,22 +234,31 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('securityAgent.findingDetail.title')}
         eyebrow={finding.repo_full_name}
         showBackButton
         onBack={handleBack}
         headerRight={
           canDismiss ? (
-            <Pressable
+            <Button
+              variant="secondary"
+              size="sm"
               onPress={() => {
-                router.push(getSecurityAgentPath(scope, `dismiss/${findingId}`));
+                pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
-              accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dismiss.title')}
-              className="size-11 items-center justify-center active:opacity-70"
+              // A labelled header action is variable width, so it bounds itself
+              // the way the settings Save button does: the label shrinks inside
+              // the cap instead of taking the title's room (see the trailing
+              // cluster note in screen-header.tsx).
+              className="min-w-0 max-w-[140px] shrink"
             >
-              <Ban size={20} color={colors.mutedForeground} />
-            </Pressable>
+              <Ban size={16} color={colors.secondaryForeground} />
+              <Text className="shrink text-center">
+                {t('securityAgent.analysis.action.dismiss')}
+              </Text>
+            </Button>
           ) : undefined
         }
       />
@@ -227,7 +277,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             lastError={dismissFailure}
             retryable={dismissDraft.draft.retryable === true}
             onRetry={() => {
-              router.push(getSecurityAgentPath(scope, `dismiss/${findingId}`));
+              pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
             }}
             onDiscard={() => {
               dismissDraft.clear();
@@ -235,26 +285,29 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           />
         </View>
       ) : null}
-      <View className="flex-row gap-2 px-6 pb-2 pt-1">
+      <View accessibilityRole="tablist" className="flex-row gap-2 px-6 pb-2 pt-1">
         {TABS.map(({ key, labelKey }) => {
           const selected = tab === key;
           return (
             <Pressable
               key={key}
               className={cn(
-                'min-h-11 flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
-                selected ? 'bg-primary' : 'bg-secondary'
+                // The strip is a segmented row: each tab carries the shared
+                // row floor on its own node so a tap anywhere in the tab's
+                // height lands, not just the label line.
+                ROW_TARGET_CLASS,
+                'flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
+                selected ? 'bg-selection' : 'bg-secondary'
               )}
               onPress={() => {
                 setTab(key);
               }}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
+              {...tabEntryA11y({ selected })}
             >
               <Text
                 className={cn(
                   'text-xs font-medium',
-                  selected ? 'text-primary-foreground' : 'text-foreground'
+                  selected ? 'text-selection-foreground' : 'text-foreground'
                 )}
               >
                 {t(labelKey)}

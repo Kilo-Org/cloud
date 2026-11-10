@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- Session-list content and its error/empty surfaces are kept together. */
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useScrollToTop } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -9,6 +9,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NewSessionButton } from '@/components/agents/new-session-button';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
@@ -32,7 +33,8 @@ import { QueryError } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -41,10 +43,11 @@ import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 export const FAB_SIZE = 56;
 export const FAB_MARGIN = 16;
+const REFRESH_STATUS_BAND_HEIGHT = 20;
 
 type AgentSessionListContentProps = {
   /** Post-deletion focus anchor: the screen's always-mounted search input. */
-  searchInputRef: Parameters<typeof moveA11yFocus>[0];
+  searchInputRef: Parameters<typeof requestA11yFocus>[0];
   sections: SessionSection[];
   activeSessionIds: ReadonlySet<string>;
   hasAnySessions: boolean;
@@ -59,6 +62,13 @@ type AgentSessionListContentProps = {
    */
   hasFreshHistory: boolean;
   isFetchingNextPage: boolean;
+  /**
+   * The last next-page request failed. The loaded rows stay, and the list
+   * footer carries the retryable line with its Retry action, so the end of the
+   * list never reads as the end of the history.
+   */
+  isFetchNextPageError: boolean;
+  onRetryNextPage: () => void;
   refetch: () => Promise<void>;
   onRetry: () => void;
   onEndReached: () => void;
@@ -72,11 +82,13 @@ type AgentSessionListContentProps = {
   nonPullRefreshes: number;
   hasActiveQuery: boolean;
   isSearching: boolean;
+  /** True while the driving query fetches — the error body's retry in flight. */
+  isRetrying: boolean;
   /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
   searchQuery: string;
   onClearQuery: () => void;
-  /** Optional no-op accepted for the history screen's call-site compatibility. */
-  onCreateSession?: () => void;
+  /** The no-history body's next step: open the new-session composer. */
+  onCreateSession: () => void;
 };
 
 export function AgentSessionListContent({
@@ -88,6 +100,8 @@ export function AgentSessionListContent({
   isError,
   hasFreshHistory,
   isFetchingNextPage,
+  isFetchNextPageError,
+  onRetryNextPage,
   refetch,
   onRetry,
   onEndReached,
@@ -95,8 +109,10 @@ export function AgentSessionListContent({
   nonPullRefreshes,
   hasActiveQuery,
   isSearching,
+  isRetrying,
   searchQuery,
   onClearQuery,
+  onCreateSession,
 }: Readonly<AgentSessionListContentProps>) {
   const listRef = useRef<FlashListRef<SessionListRow>>(null);
   useScrollToTop(listRef);
@@ -125,13 +141,20 @@ export function AgentSessionListContent({
   // The stored refetch resolves void: a pull failure surfaces through the
   // query error state (showInlineError below), so a settlement is always
   // "accepted" here. Only the feedback budget can fail a history pull.
+  const pullStartedFromHistoryError = useRef(false);
   const pull = usePullRefresh(async () => {
     await refetch();
     return true;
   });
   const { markSettled } = pull;
   const pullBusy = pull.refreshing || pull.busy;
+  // Preserve the full-screen error during a pull only when the pull began there;
+  // an empty-history pull must keep its empty state while the refresh is pending.
+  const errorPullBusy = pullStartedFromHistoryError.current && pullBusy;
+  const errorPullFailed = pullStartedFromHistoryError.current && pull.failed;
   const handleRefresh = () => {
+    pullStartedFromHistoryError.current =
+      (isError || errorPullFailed) && !hasActiveQuery && !hasFreshHistory;
     pull.startPull();
   };
   const handlePullRetry = () => {
@@ -147,10 +170,12 @@ export function AgentSessionListContent({
   }, [nonPullRefreshes, markSettled]);
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
-  // must clear it or the last rows are stuck underneath it. The history list
-  // owns no FAB, so a bottom-only TabBar clearance is the only inset the
-  // content container needs.
-  const tabBarOnlyClearanceStyle = useMemo(() => ({ paddingBottom: tabBarHeight }), [tabBarHeight]);
+  // must clear it or the last rows are stuck underneath it. The top padding
+  // holds the refresh status band at rest; scrolled rows pass under it.
+  const contentInsetStyle = useMemo(
+    () => ({ paddingTop: REFRESH_STATUS_BAND_HEIGHT, paddingBottom: tabBarHeight }),
+    [tabBarHeight]
+  );
 
   // The landscape side insets keep row text clear of the sensor housing
   // (portrait insets are 0, keeping the geometry unchanged). They live on a
@@ -170,7 +195,8 @@ export function AgentSessionListContent({
 
   const surface = selectSessionListContentSurface({
     isLoading,
-    isError,
+    isError: isError || errorPullFailed,
+    isRetrying: isRetrying || errorPullBusy,
     hasAnySessions,
     hasHistoryContent: sections.length > 0,
     hasActiveQuery,
@@ -179,20 +205,22 @@ export function AgentSessionListContent({
 
   const clearQueryAction = useMemo(
     () => (
-      <Button variant="outline" onPress={onClearQuery}>
+      <Button variant="outline" onPress={onClearQuery} className={STATE_ACTION_CLASS}>
         <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
       </Button>
     ),
     [isSearching, onClearQuery, t]
   );
 
-  // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
-  // is pushed the Agents list is frozen. On return, each row re-reads the ack
-  // store via its own `useSyncExternalStore` subscription
-  // (`useSessionAttentionRevision`). Snapshot the attention revision only when
-  // the tab (re)gains focus via `useFocusEffect` (fires after unfreeze) and
-  // pass it as `extraData` so visible cells re-render without remounting the
-  // list — preserving scroll.
+  // The no-history body's next step. It opens the same composer the Agents
+  // tab's "New session" action does, so an empty history never dead-ends at a
+  // message.
+  const createSessionAction = <NewSessionButton onPress={onCreateSession} />;
+
+  // Each row re-reads the ack store through its own `useSyncExternalStore`
+  // subscription (`useSessionAttentionRevision`). The snapshot taken when the
+  // tab regains focus passes back down as `extraData`, so visible cells
+  // re-render on return without remounting the list — preserving scroll.
   const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
   useFocusEffect(
     useCallback(() => {
@@ -284,6 +312,38 @@ export function AgentSessionListContent({
     }
   }, [onEndReached]);
 
+  // A failed next page keeps every loaded row and says so at the end of the
+  // list: the spinner alone ended the list silently, so the last loaded row
+  // read as the end of the history. The retry calls `fetchNextPage`, and the
+  // end-reach gate stops re-firing while this line stands (see
+  // `shouldLoadMoreSessions`).
+  let listFooter: ReactNode = null;
+  if (isFetchNextPageError) {
+    listFooter = (
+      <View className="items-center gap-3 px-6 py-4">
+        <Text variant="muted" className="text-center text-xs">
+          {t('common.couldnTLoadMore')}
+        </Text>
+        <Button
+          variant="outline"
+          size="sm"
+          className={STATE_ACTION_CLASS}
+          onPress={onRetryNextPage}
+          loading={isFetchingNextPage}
+          accessibilityLabel={t('common.retry')}
+        >
+          <Text>{t('common.retry')}</Text>
+        </Button>
+      </View>
+    );
+  } else if (isFetchingNextPage) {
+    listFooter = (
+      <View className="py-4">
+        <ActivityIndicator color={colors.mutedForeground} />
+      </View>
+    );
+  }
+
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {
       if (item.kind === 'skeleton') {
@@ -307,6 +367,7 @@ export function AgentSessionListContent({
         <StoredSessionRow
           session={item.session}
           sortBy={SESSION_LIST_SORT}
+          sectionTitle={item.sectionTitle}
           live={activeSessionIds.has(item.session.session_id)}
           metaWhileLive
           onPress={() => {
@@ -317,11 +378,8 @@ export function AgentSessionListContent({
             );
           }}
           onDelete={() => {
-            // The hook's success toast announces the deletion; onDeleted only
-            // restores focus, and moveA11yFocus no-ops once the header is
-            // unmounted (last session deleted).
             deleteSession(item.session.session_id, () => {
-              moveA11yFocus(searchInputRef);
+              requestA11yFocus(searchInputRef);
             });
           }}
           onRename={newTitle => {
@@ -351,16 +409,16 @@ export function AgentSessionListContent({
         <QueryError
           message={t('common.couldNotLoadSessions')}
           onRetry={onRetry}
+          isRetrying={isRetrying || errorPullBusy}
           refreshControl={refreshControl}
         />
       </Animated.View>
     );
   }
 
-  // No stored rows and no active query: render the history-empty body ("No
-  // past sessions" with no create CTA) full-screen, skipping the list.
-  // Gated on !isLoading (via surface) so a cold open with an empty cache does
-  // not flash this while queries run.
+  // No stored rows and no active query: render the history-empty body with its
+  // new-session action full-screen. The surface selector gates this on !isLoading
+  // so a cold open with an empty cache does not flash before queries settle.
   if (surface.kind === 'history-empty') {
     return (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
@@ -369,6 +427,7 @@ export function AgentSessionListContent({
           kind="no-past-sessions"
           isSearching={isSearching}
           clearQueryAction={clearQueryAction}
+          createSessionAction={createSessionAction}
           onRetry={onRetry}
           refreshControl={refreshControl}
         />
@@ -391,6 +450,7 @@ export function AgentSessionListContent({
             bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
           }
           clearQueryAction={clearQueryAction}
+          isRetrying={isRetrying}
           onRetry={onRetry}
           refreshControl={refreshControl}
         />
@@ -403,25 +463,18 @@ export function AgentSessionListContent({
   // 200ms fade reads as a blank list area on a fast cold open (the skeleton
   // phase would live entirely inside the fade). The skeleton → rows swap is
   // a same-pitch data update inside the mounted list.
-  //
-  // `gap-2` is the clearance between the status band and the rows — the same
-  // gap the live surface leaves below its band (`mx-4 gap-2` in
-  // `AgentSessionsSection`). Without it the list's top edge sits flush on the
-  // band, and a row resting across that edge is cut mid-text directly under
-  // "Couldn't refresh", so the two read as colliding (device defect p5). The
-  // gap lives on the container rather than as the band's padding on purpose:
-  // the clearance must not depend on whether the status line renders, or the
-  // failure line would push the rows down by the gap as it appears.
   return (
-    <Animated.View className="flex-1 gap-2">
-      {/* The band's height is allocated whenever the rows show, so the
-          in-flight spinner and the failure line replace empty space instead of
-          pushing the rows down (device defect uxs1). */}
-      <View className="mx-[22px] min-h-5">
+    <View className="flex-1">
+      {/* The band floats over the list's top padding, so the in-flight
+          spinner and the failure line never push the rows down (device defect
+          uxs1) and scrolled rows run up to the header instead of stopping
+          under an empty strip. */}
+      <View className="absolute left-[22px] right-[22px] top-0 z-10" pointerEvents="box-none">
         <SessionListRefreshStatus
           busy={pullBusy}
           failed={pull.failed || bodyModel.showInlineError}
           onRetry={handlePullRetry}
+          className="bg-background"
         />
       </View>
       <View className="flex-1" style={landscapeSideInsetStyle}>
@@ -432,14 +485,8 @@ export function AgentSessionListContent({
           keyExtractor={keyExtractor}
           getItemType={getItemType}
           extraData={attentionFocusRevision}
-          ListFooterComponent={
-            isFetchingNextPage ? (
-              <View className="py-4">
-                <ActivityIndicator color={colors.mutedForeground} />
-              </View>
-            ) : null
-          }
-          contentContainerStyle={tabBarOnlyClearanceStyle}
+          ListFooterComponent={listFooter}
+          contentContainerStyle={contentInsetStyle}
           keyboardDismissMode="on-drag"
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
@@ -449,6 +496,6 @@ export function AgentSessionListContent({
           maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
         />
       </View>
-    </Animated.View>
+    </View>
   );
 }

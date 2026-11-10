@@ -100,6 +100,7 @@ function setBridge(overrides: Partial<BranchPickerBridge> = {}) {
     branches: ['main', 'release/2.0'],
     defaultBranch: 'main',
     selectedBranch: 'main',
+    truncated: false,
     onSelect: vi.fn(() => undefined),
     ...overrides,
   };
@@ -172,6 +173,20 @@ describe('BranchPickerScreen', () => {
     const name = row.findAll(node => String(node.type) === 'Text')[0];
     expect(name?.props.children).toBe(branch);
     expect(name?.props.numberOfLines).toBeUndefined();
+  });
+
+  it('says the list is incomplete when the provider holds more branches', () => {
+    setBridge({ truncated: true });
+    const renderer = mount();
+
+    expect(texts(renderer)).toContain(i18n.t('agentChat.newSession.branchListIncomplete'));
+  });
+
+  it('says nothing about truncation when the list is the whole repository', () => {
+    setBridge();
+    const renderer = mount();
+
+    expect(texts(renderer)).not.toContain(i18n.t('agentChat.newSession.branchListIncomplete'));
   });
 
   it('dismisses from the header Cancel without reporting a pick', () => {

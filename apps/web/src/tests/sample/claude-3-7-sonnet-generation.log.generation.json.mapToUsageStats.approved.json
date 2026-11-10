@@ -13,9 +13,9 @@
   "inference_provider": "Amazon Bedrock",
   "upstream_id": null,
   "finish_reason": "stop",
-  "latency": 7913,
+  "latency": null,
   "moderation_latency": null,
-  "generation_time": 7793,
+  "generation_time": null,
   "streamed": true,
   "cancelled": false,
   "status_code": 200

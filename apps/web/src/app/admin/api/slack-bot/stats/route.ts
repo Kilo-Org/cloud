@@ -95,7 +95,6 @@ export async function GET(
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
-  // Helper function to safely convert BigInt to number
   const bigIntToNumber = (value: unknown): number => {
     if (value === null || value === undefined) return 0;
     if (typeof value === 'bigint') return Number(value);
@@ -103,7 +102,6 @@ export async function GET(
     return Number(value) || 0;
   };
 
-  // Overview stats
   const overviewResult = await db
     .select({
       total_requests: sql<number>`COUNT(*)`,
@@ -118,7 +116,6 @@ export async function GET(
 
   const overviewStats = overviewResult[0];
 
-  // Requests in last 24h
   const last24hResult = await db
     .select({
       count: sql<number>`COUNT(*)`,
@@ -126,7 +123,6 @@ export async function GET(
     .from(slack_bot_requests)
     .where(sql`${slack_bot_requests.created_at} >= NOW() - INTERVAL '24 hours'`);
 
-  // Requests in last 7 days
   const last7dResult = await db
     .select({
       count: sql<number>`COUNT(*)`,
@@ -134,7 +130,6 @@ export async function GET(
     .from(slack_bot_requests)
     .where(sql`${slack_bot_requests.created_at} >= NOW() - INTERVAL '7 days'`);
 
-  // Weekly Active Users (WAU) - rolling 7-day window
   const wauResult = await db
     .select({
       count: sql<number>`COUNT(DISTINCT ${slack_bot_requests.slack_user_id})`,
@@ -160,7 +155,6 @@ export async function GET(
     weeklyActiveUsers: bigIntToNumber(wauResult[0]?.count),
   };
 
-  // Daily stats for the chart
   const dailyStatsResult = await db
     .select({
       date: sql<string>`DATE(${slack_bot_requests.created_at})`,
@@ -182,7 +176,6 @@ export async function GET(
     avgResponseTimeMs: Math.round(bigIntToNumber(row.avg_response_time_ms)),
   }));
 
-  // Usage by organization
   const usageByOrgResult = await db
     .select({
       organization_id: slack_bot_requests.owned_by_organization_id,
@@ -210,7 +203,6 @@ export async function GET(
     lastRequestAt: row.last_request_at || '',
   }));
 
-  // Usage by Slack user
   const usageByUserResult = await db
     .select({
       slack_user_id: slack_bot_requests.slack_user_id,
@@ -240,7 +232,6 @@ export async function GET(
     lastRequestAt: row.last_request_at || '',
   }));
 
-  // Recent requests (logs)
   const recentRequestsResult = await db
     .select({
       id: slack_bot_requests.id,
@@ -282,7 +273,6 @@ export async function GET(
     organizationName: row.organization_name,
   }));
 
-  // Error summary
   const errorSummaryResult = await db
     .select({
       error_message: slack_bot_requests.error_message,

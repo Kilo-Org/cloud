@@ -8,7 +8,6 @@ import type { TRPCContext } from '../../types.js';
 
 const { queryAccess } = vi.hoisted(() => ({ queryAccess: vi.fn() }));
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn(() => ({})) }));
 vi.mock('@kilocode/worker-utils/cloud-agent-session-access', () => ({
   queryAccessibleCloudAgentSession: queryAccess,
@@ -155,6 +154,16 @@ describe('Worker worktree changes procedures', () => {
     expect(harness.stub.refreshWorktreeChanges).not.toHaveBeenCalled();
     expect(harness.control.getByName).not.toHaveBeenCalled();
   });
+
+  it.each(['uncommitted', 'against-base-branch'] as const)(
+    'forwards the selected %s scope without changing the file identity',
+    async scope => {
+      const harness = setup();
+      const query = { ...fileQuery, scope };
+      await harness.caller.getWorktreeFile({ cloudAgentSessionId: sessionId, ...query });
+      expect(harness.stub.getWorktreeFile).toHaveBeenCalledWith(query);
+    }
+  );
 
   it('normalizes a valid v1 session result at the API boundary', async () => {
     const harness = setup();

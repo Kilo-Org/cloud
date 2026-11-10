@@ -16,6 +16,10 @@ import {
 } from 'lucide-react';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { formatMicrodollars } from '@/lib/admin-utils';
+import { buildDeductionGroups } from '@/lib/credits/deductionGroups';
+import { purchasedCreditTermsText } from '@/lib/credits/purchasedCreditTerms';
+import { CreditsDeductionRows } from '@/components/credits/CreditsDeductionRows';
+import { TableCell, TableHeaderCell } from '@/components/credits/table-cells';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -51,51 +55,10 @@ const HEADER_ACTIONS = (
   </Link>
 );
 
-function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
-  return (
-    <th
-      className={`type-eyebrow text-muted-foreground px-4 py-3 sm:px-6 ${align === 'right' ? 'text-right' : 'text-left'}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  align = 'left',
-  numeric = false,
-  className = '',
-}: {
-  children: React.ReactNode;
-  align?: 'left' | 'right';
-  numeric?: boolean;
-  className?: string;
-}) {
-  return (
-    <td
-      className={`type-body px-4 py-3 whitespace-nowrap sm:px-6 ${align === 'right' ? 'text-right' : ''} ${numeric ? 'tabular-nums' : ''} ${className}`}
-    >
-      {children}
-    </td>
-  );
-}
-
 function formatExpiryTimestamp(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Unknown';
   return EXPIRY_TIMESTAMP_FORMATTER.format(date);
-}
-
-function deductionKindLabel(kind: 'deduction' | 'adjustment' | 'balance_neutral'): string {
-  switch (kind) {
-    case 'balance_neutral':
-      return 'Balance neutral';
-    case 'adjustment':
-      return 'Adjustment';
-    case 'deduction':
-      return 'Deduction';
-  }
 }
 
 function CreditsPageContent() {
@@ -144,6 +107,9 @@ function CreditsPageContent() {
       { transactionId: transactionIdParam ?? '' },
       { enabled: transactionIdIsValid, retry: false }
     )
+  );
+  const { data: paidCreditPolicy, isError: isPaidCreditPolicyError } = useQuery(
+    trpc.user.getPaidCreditPolicy.queryOptions()
   );
   const receiptMutation = useMutation(trpc.user.getCreditPurchaseReceipt.mutationOptions());
 
@@ -225,27 +191,27 @@ function CreditsPageContent() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-muted border-b">
-                      <Th>Purchase Date</Th>
-                      <Th>Type</Th>
-                      <Th>Credits Added</Th>
-                      <Th>Invoice</Th>
+                      <TableHeaderCell>Purchase Date</TableHeaderCell>
+                      <TableHeaderCell>Type</TableHeaderCell>
+                      <TableHeaderCell>Credits Added</TableHeaderCell>
+                      <TableHeaderCell>Invoice</TableHeaderCell>
                     </tr>
                   </thead>
                   <tbody className="divide-border divide-y">
                     {['first', 'second', 'third'].map(row => (
                       <tr key={row} className="even:bg-muted group">
-                        <Td>
+                        <TableCell>
                           <Skeleton className="group-even:bg-background h-4 w-20" />
-                        </Td>
-                        <Td>
+                        </TableCell>
+                        <TableCell>
                           <Skeleton className="group-even:bg-background h-4 w-24" />
-                        </Td>
-                        <Td>
+                        </TableCell>
+                        <TableCell>
                           <Skeleton className="group-even:bg-background h-4 w-16" />
-                        </Td>
-                        <Td>
+                        </TableCell>
+                        <TableCell>
                           <Skeleton className="group-even:bg-background h-4 w-16" />
-                        </Td>
+                        </TableCell>
                       </tr>
                     ))}
                   </tbody>
@@ -296,9 +262,9 @@ function CreditsPageContent() {
   }
 
   const currentBalance = creditData.totalBalance_mUsd;
-  const nextPromotionalExpiry = creditData.creditBlocks.reduce<string | null>(
+  const nextCreditExpiry = creditData.creditBlocks.reduce<string | null>(
     (earliestExpiry, block) => {
-      if (!block.is_free || !block.expiry_date) return earliestExpiry;
+      if (block.balance_mUsd <= 0 || !block.expiry_date) return earliestExpiry;
       if (!earliestExpiry) return block.expiry_date;
       return new Date(block.expiry_date) < new Date(earliestExpiry)
         ? block.expiry_date
@@ -308,6 +274,10 @@ function CreditsPageContent() {
   );
   const showUnverifiedConfirmation =
     transactionIdIsValid && isPurchaseConfirmationError && !confirmation;
+  // New paid credits follow the live policy; a claim shown before the policy
+  // loads, or after it fails, would repeat the old non-expiration promise.
+  const purchasedCreditTerms = purchasedCreditTermsText(paidCreditPolicy, isPaidCreditPolicyError);
+  const deductionGroups = buildDeductionGroups(creditData.deductions);
 
   return (
     <PageLayout
@@ -333,6 +303,11 @@ function CreditsPageContent() {
                     </p>
                     <p className="type-body text-muted-foreground mt-0.5 tabular-nums">
                       Current balance: {formatMicrodollars(currentBalance)}
+                    </p>
+                    <p className="type-body text-muted-foreground mt-0.5">
+                      {confirmation.expiryDate
+                        ? `Purchased credits expire ${formatExpiryTimestamp(confirmation.expiryDate)}.`
+                        : 'These purchased credits do not expire.'}
                     </p>
                   </div>
                 </div>
@@ -420,7 +395,7 @@ function CreditsPageContent() {
             <CardTitle>Your credit balance</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1px_1fr]">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1px_1fr_1px_1fr]">
               <div>
                 <div className="type-title text-foreground tabular-nums">
                   {formatMicrodollars(currentBalance)}
@@ -430,13 +405,20 @@ function CreditsPageContent() {
 
               <div className="bg-border hidden w-px self-stretch lg:block" />
 
+              <div>
+                <p className="type-body text-muted-foreground">Purchased credits</p>
+                <p className="type-body font-medium">{purchasedCreditTerms}</p>
+              </div>
+
+              <div className="bg-border hidden w-px self-stretch lg:block" />
+
               <div className="flex items-start gap-2">
                 <CalendarDays className="text-status-info-icon mt-0.5 size-4 shrink-0" />
                 <div>
-                  <p className="type-body text-muted-foreground">Next promotional expiry</p>
-                  {nextPromotionalExpiry ? (
+                  <p className="type-body text-muted-foreground">Next credit expiry</p>
+                  {nextCreditExpiry ? (
                     <p className="type-body font-medium">
-                      {formatExpiryTimestamp(nextPromotionalExpiry)}
+                      {formatExpiryTimestamp(nextCreditExpiry)}
                     </p>
                   ) : (
                     <p className="type-body font-medium">None scheduled</p>
@@ -446,7 +428,8 @@ function CreditsPageContent() {
             </div>
 
             <div className="type-label text-muted-foreground border-border border-t pt-4">
-              Promotional credits may have their own expiration timestamp.
+              Credits with the earliest expiration are used first. Non-expiring credits are used
+              last. Existing credits keep their current terms.
             </div>
           </CardContent>
         </Card>
@@ -472,27 +455,31 @@ function CreditsPageContent() {
               <table className="w-full min-w-[36rem]">
                 <thead>
                   <tr className="bg-muted border-b">
-                    <Th>Purchase Date</Th>
-                    <Th>Type</Th>
-                    <Th>Credits Added</Th>
-                    <Th>Invoice</Th>
+                    <TableHeaderCell>Purchase Date</TableHeaderCell>
+                    <TableHeaderCell>Type</TableHeaderCell>
+                    <TableHeaderCell>Credits Added</TableHeaderCell>
+                    <TableHeaderCell>Expires</TableHeaderCell>
+                    <TableHeaderCell>Invoice</TableHeaderCell>
                   </tr>
                 </thead>
                 <tbody className="divide-border divide-y">
                   {isPurchaseHistoryLoading && (
                     <tr>
-                      <Td>
+                      <TableCell>
                         <Skeleton className="h-4 w-20" />
-                      </Td>
-                      <Td>
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-4 w-24" />
-                      </Td>
-                      <Td>
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-4 w-16" />
-                      </Td>
-                      <Td>
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-4 w-20" />
-                      </Td>
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
                     </tr>
                   )}
                   {purchaseHistoryData?.entries.map(entry => {
@@ -501,10 +488,15 @@ function CreditsPageContent() {
                       receiptMutation.variables?.transactionId === entry.id;
                     return (
                       <tr key={entry.id} className="even:bg-muted">
-                        <Td>{formatIsoDateString_UsaDateOnlyFormat(entry.date)}</Td>
-                        <Td>{entry.description}</Td>
-                        <Td numeric>{formatMicrodollars(entry.amount_mUsd)}</Td>
-                        <Td>
+                        <TableCell>{formatIsoDateString_UsaDateOnlyFormat(entry.date)}</TableCell>
+                        <TableCell>{entry.description}</TableCell>
+                        <TableCell numeric>{formatMicrodollars(entry.amount_mUsd)}</TableCell>
+                        <TableCell>
+                          {entry.expiryDate
+                            ? formatExpiryTimestamp(entry.expiryDate)
+                            : 'Does not expire'}
+                        </TableCell>
+                        <TableCell>
                           <Button
                             variant="link"
                             className="h-auto p-0"
@@ -522,7 +514,7 @@ function CreditsPageContent() {
                               </>
                             )}
                           </Button>
-                        </Td>
+                        </TableCell>
                       </tr>
                     );
                   })}
@@ -583,24 +575,13 @@ function CreditsPageContent() {
               <table className="w-full min-w-[36rem]">
                 <thead>
                   <tr className="bg-muted border-b">
-                    <Th>Date</Th>
-                    <Th>Description</Th>
-                    <Th>Type</Th>
-                    <Th align="right">Amount</Th>
+                    <TableHeaderCell>Date</TableHeaderCell>
+                    <TableHeaderCell>Description</TableHeaderCell>
+                    <TableHeaderCell>Type</TableHeaderCell>
+                    <TableHeaderCell align="right">Amount</TableHeaderCell>
                   </tr>
                 </thead>
-                <tbody className="divide-border divide-y">
-                  {creditData.deductions.map(deduction => (
-                    <tr key={deduction.id} className="even:bg-muted">
-                      <Td>{formatIsoDateString_UsaDateOnlyFormat(deduction.date)}</Td>
-                      <Td className="whitespace-normal">{deduction.description}</Td>
-                      <Td>{deductionKindLabel(deduction.kind)}</Td>
-                      <Td numeric align="right">
-                        -{formatMicrodollars(Math.abs(deduction.amount_mUsd))}
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
+                <CreditsDeductionRows groups={deductionGroups} />
               </table>
             </div>
             {creditData.deductions.length === 0 && (

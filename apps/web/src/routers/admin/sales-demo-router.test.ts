@@ -426,6 +426,12 @@ describe('sales demo router', () => {
         )
       );
 
+    const membershipsBefore = await db
+      .select()
+      .from(organization_memberships)
+      .where(eq(organization_memberships.organization_id, firstOrgId))
+      .orderBy(organization_memberships.id);
+
     const result = await caller.admin.salesDemo.reset({ organizationId: firstOrgId });
     expect(result.organizationId).toBe(firstOrgId);
 
@@ -447,40 +453,12 @@ describe('sales demo router', () => {
     expect(after.settings.recommendations_digest_enabled).toBe(true);
     expect(typeof after.settings.sales_demo_last_reset_at).toBe('string');
 
-    const strayMemberships = await db
+    const membershipsAfter = await db
       .select()
       .from(organization_memberships)
-      .where(
-        and(
-          eq(organization_memberships.organization_id, firstOrgId),
-          eq(organization_memberships.kilo_user_id, nonAdmin.id)
-        )
-      );
-    expect(strayMemberships).toHaveLength(0);
-
-    const [demoMember01] = await db
-      .select({ role: organization_memberships.role })
-      .from(organization_memberships)
-      .where(
-        and(
-          eq(organization_memberships.organization_id, firstOrgId),
-          eq(organization_memberships.kilo_user_id, salesDemoMemberId(1))
-        )
-      )
-      .limit(1);
-    expect(demoMember01?.role).toBe('member');
-
-    const [ownerMembership] = await db
-      .select({ role: organization_memberships.role })
-      .from(organization_memberships)
-      .where(
-        and(
-          eq(organization_memberships.organization_id, firstOrgId),
-          eq(organization_memberships.kilo_user_id, target.id)
-        )
-      )
-      .limit(1);
-    expect(ownerMembership?.role).toBe('owner');
+      .where(eq(organization_memberships.organization_id, firstOrgId))
+      .orderBy(organization_memberships.id);
+    expect(membershipsAfter).toEqual(membershipsBefore);
 
     const dailyProjections = await db
       .select({ id: microdollar_usage_daily.id })

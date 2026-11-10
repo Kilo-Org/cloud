@@ -45,8 +45,19 @@ Capability lookups derive candidate IDs from the selected router's table; the ca
 cache remains a shared model-ID union because modalities and context limits belong to models.
 
 Both routers are custom-router bases (ADR 0005): owner profile admission, the owner queue,
-owner-pool tables, custom router tables, and client evals accept `efficient` and `frontier`.
+custom router tables, and client evals accept `efficient` and `frontier`.
 Owner work for a base uses that base's configuration, dataset, engine identity, and quota.
+
+Client and direct-BYOK custom-router entries can explicitly link `measuredAs` to a globally
+measured platform model. Same-name variants reuse the base router's live platform measurement;
+other variants remain client-measured. Linked variants neither enter client eval plans nor accept
+client uploads, and status reads do not admit additional platform work for them. Custom tables
+preserve the entry's candidate identity and reprice the linked measurement at its owner's prices:
+token means give exact costs, while older summaries use the blended input/output price ratio.
+Missing client pricing means zero cost; an unpriceable linked summary is excluded from ranking.
+Ready history remains available as stale when its identity changes or its model leaves the catalog.
+`GET /admin/platform-measurements?router=efficient|frontier` lists models and variants with ready
+global history for link selection, including owner-requested platform-key measurements.
 
 ## System-optimal policy settings
 
@@ -137,7 +148,12 @@ reuses recoverable output, and never begins a ledgered paid case again. A queued
 limit, and a resume keeps the running lease. The one-minute tick recovers abandoned claims;
 completion refills slots immediately without waiting for a tick. Recovery and
 infrastructure/grader waits are bounded to six claims, with 15–300 second backoff. Capacity
-and unbilled provider-throttle waits do not create model-failure rows.
+and unbilled provider-throttle waits do not create model-failure rows. A provider throttle
+refunds its claim and counts against a separate budget of 16 throttle deferrals (about an
+hour of backoff), so a briefly rate-limited model is paced instead of losing its lanes; after
+that budget, the chunk falls back to the six-claim limit, so a persistent throttle still fails
+its lane. The gateway exempts only the default benchmark user (`bot-internal-benchmark`)
+from its free-model account limit; a `benchmarkUserId` override is limited like other accounts.
 
 A dispatch pass reads current occupancy and the next pending chunk of every lane — one
 `(run, model, variant, repetition)` chunk chain — and claims as many of those lanes as fit.
@@ -190,7 +206,11 @@ newer empty-output retry.
 Output that arrives after its lane failed or its run became terminal is graded later by a
 single-case recovery message. Recovery never starts inference. A per-case grading lease
 prevents the live and recovery paths from grading the same output twice.
-Unbilled throttle and catalog-load failures are cleared and deferred instead of measured.
+Unbilled throttle, provider-outage (5xx or "temporarily unavailable") and catalog-load
+failures are cleared and deferred instead of measured, including one that ends a multi-step
+run after partial text but before any billed answer. A CLI process killed by a signal before
+its first event gets the same single retry as an empty completion; a timeout, a kill after
+events, or an invalid-request rejection stays a measured failure.
 
 A chunk that finds a ledgered case without output waits for it instead of failing its lane.
 It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
@@ -247,6 +267,7 @@ measurements are included in routing-table version hashes.
 - Admission uses the authenticated catalog for the benchmark identity, including its organization context.
 - Resumed runs preserve their saved user and organization scope. Configuration defaults do not replace a saved personal execution scope.
 - The worker applies the CLI's tool-support rule and validates exact reasoning variants before scheduling.
+- The drain also requires at least 20,000 input tokens after the completion budget the CLI reserves: catalog `context_length` minus `min(top_provider.max_completion_tokens || max_completion_tokens || 20% of the window, 32,000)`. The CLI harness prompt alone is about 16.6k tokens. A smaller pair is registered, then its profile fails with a context-window reason before any paid call. An absent context length is admitted.
 - Platform and owner pools share measurements for identical concrete model, variant, engine, and repetition settings.
 - Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.
 - A model without reasoning controls creates one `(model, null)` entry.
@@ -267,28 +288,24 @@ measurements are included in routing-table version hashes.
 - Daily target changes do not consume the owner's request quota.
 - An unchanged concrete ID has no automatic measurement expiry. Use targeted refresh after a confirmed provider change.
 
-Saved owner pools enter the subscription index when settings are read, saved, or used to assemble a custom table.
-Untouched historical Durable Objects are not centrally enumerable. Backfill known owners before relying on daily coverage for those pools.
+Existing benchmark subscriptions retain their persisted alias targets. Backfill known owners
+with the full model list before relying on daily coverage for historical pools.
 Send the existing full pool to `POST /admin/profiles/subscriptions`:
 
 ```json
 {
   "ownerType": "user",
-  "ownerId": "owner-from-settings",
+  "ownerId": "owner-id",
   "entries": [{ "model": "~vendor/latest" }]
 }
 ```
 
-This authenticated endpoint replaces the owner's tracked pool without editing its saved routing settings.
-Send `entries: null` to remove its subscriptions.
-Use `restorePrevious: true` only to compensate a failed settings save.
+This authenticated endpoint replaces the owner's tracked benchmark models without editing
+its custom router. Send `entries: null` to remove its subscriptions.
+Use `restorePrevious: true` only to compensate a failed router save.
 Ordinary removal and re-addition resolve a new subscription instead of restoring its previous target.
-Apply the additive D1 migration and deploy both routing workers before resuming paused benchmark queues.
+Apply the additive D1 migration and deploy the benchmark worker before resuming paused benchmark queues.
 
-The serving worker bounds its owner-table cache and retains its existing expiry and single-flight loading.
-A mode-only save returns current pool statuses without changing the alias subscription.
-If that status lookup fails, the save leaves the previous mode unchanged.
-A save without an owner pool does not require the benchmark service.
 
 
 ### Unavailable models and targeted refresh
@@ -335,13 +352,23 @@ Expand a route to inspect every ranked model/effort pair.
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
 - A candidate competes within the router's `accuracyNoiseBand` of its effective `minAccuracy` (default noise band 0.05).
 - Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`. The delta is fixed at 0, so the frontier router uses its own system-computed `minAccuracy`.
-- Both routers use the same best-value formula, selecting models and efforts from their own measured pools.
-- Daily re-evaluation: `minAccuracy`/`accuracyNoiseBand` come from a held-out grid over the
-  registry's measurements, `productionTokenProfile`/`switchHorizonTurns` from production auto
-  usage (mean uncached/cached input tokens per request, median requests per session), and the
-  rest are fixed constants. Admin overrides win over the computed values.
+- Both routers share candidate ranking, with separate validation objectives over their own measured pools.
+- Efficient minimizes estimated request cost without reducing the current policy's validation accuracy.
+- Frontier maximizes validation accuracy without increasing the current policy's estimated request cost.
+- Daily re-evaluation includes the current effective thresholds in its validation grid.
+  Incomplete, unmatched, or duplicate case coverage leaves the current settings unchanged.
+  Equivalent outcomes keep the current thresholds.
+- These request-level validation objectives are proxies, not verified full-task success or total task cost.
+  The grid selects settings; it does not provide independent evidence of improvement.
+  Freeze the policy before evaluating untouched full tasks and their complete costs.
+- `productionTokenProfile` and `switchHorizonTurns` still use production usage estimates.
+  Admin overrides retain precedence over computed settings.
 - Competing candidates are ordered by `estimatedRequestCostUsd × effectiveLatency^1.5 / wilson^15`, lowest first. With known TTFT, `effectiveLatency = p50TtftMs + LATENCY_TOTAL_WEIGHT × p50LatencyMs`, where the exported `LATENCY_TOTAL_WEIGHT` is 0.15 (tuned on a fully streamed offline sweep); without TTFT, total `p50LatencyMs` alone preserves legacy ordering.
-- `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
+- Published `estimatedRequestCostUsd` adds the configured input profile to the observed per-pair benchmark cost.
+  Fresh selection uses known request tokens at the prompt price, without assuming cache hits.
+  Unpriced candidates retain their published estimates.
+  The observed benchmark cost remains a limited base estimate, not a prediction of full-task output or remaining turns.
+  Tables without stored noise-band metadata retain their published ordering until republished.
 - `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
 - A candidate whose `estimatedRequestCostUsd` is exactly 0 outranks every paid candidate inside the accuracy band and takes no cost term (ADR 0005): $0 candidates are ordered by `effectiveLatency^1.5 / wilson^15` alone, so a free-but-slow or thinly measured one still loses to a free candidate with latency and coverage. Paid ordering is unchanged. Client models in a custom router are the usual source of $0.
 - The other candidates follow by accuracy, then cost.
@@ -349,17 +376,16 @@ Expand a route to inspect every ranked model/effort pair.
 - `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
 - The ranking policy version is part of every registry table version, so a policy change republishes.
 
-Production CLI benchmarks currently record total latency only, so published D1
-tables use the total-latency fallback. Offline sweep and candidate-screen
-summaries carry measured TTFT and use the TTFT-aware formula; missing TTFT is
-never fabricated.
+Published tables retain measured total latency, time to first token, and the policy noise band through D1 storage.
+If every final candidate lacks total latency, request-time repricing compares cost and Wilson-adjusted accuracy without a latency factor.
+Unknown measurements remain unknown; a candidate missing latency remains conservative when another candidate has measured latency.
 
-The optional `effortByComplexity` table mapping selects a variant after the model
-has been picked, using the production classifier's `low`, `medium`, or `high`
-reasoning-complexity bucket. It never changes models or restores a candidate
-excluded by the decision filters. Same-model effort changes retain the prompt
-cache and do not trigger cost-switch logic; sticky-immediate turns retain the
-incumbent variant until a classification is available.
+The optional `effortByComplexity` mapping filters each model to its measured variant before fresh model selection.
+The filter preserves published relative ordering and cannot restore an ineligible pair.
+Known request pricing then re-ranks those final pairs within the stored quality band.
+Cheapest mode skips the complexity mapping.
+Sticky decisions keep their existing exact-pair identity and cache-switch economics.
+Sticky-immediate turns retain the incumbent variant until classification is available.
 
 Platform and custom-table builds read `case_results` for each ready pair's exact
 provenance run and join the committed `src/datasets/case-complexity.json` labels.
@@ -367,6 +393,11 @@ Missing labels are ignored. Each route/model/bucket ranks its measured variants
 with the same value policy, falling back to the route-level variant when fewer
 than six distinct graded cases are available. Mappings are persisted with the
 table and included in its version identity.
+
+Apply the additive routing-evidence migration before deploying readers that select its columns.
+Deploy the benchmark writer and republish from ready measurements to populate the new evidence.
+Do not backfill old policy bands or latency from current configuration or unrelated profiles.
+
 
 Regenerate the labels with the production classifier and gateway normalization:
 
@@ -455,18 +486,35 @@ cases only. Held-out accuracy, cost, latency, and TTFT then aggregate the raw
 per-case results of the mapped variant for each bucket, not the route-level
 variant's overall summary. Without labels, the existing route-level evaluation
 is unchanged.
-Direct TTFT is time to the first nonempty content or reasoning delta; final streaming
-usage supplies cost. Container TTFT uses the first text event timestamp (or text
+Direct TTFT is time to the first nonempty content or reasoning delta. Streaming
+usage frames are cumulative receipts: a later billing frame supersedes an earlier
+one and is never added to it. Without BYOK, `usage.cost` is the total charge.
+With BYOK, `usage.cost` is only the router fee, so the row cost is that fee plus
+`cost_details.upstream_inference_cost`; either value alone leaves the total
+unknown (`costUsd: null`). Container TTFT uses the first text event timestamp (or text
 `time.start`) relative to request start, and is null when timestamps are unavailable.
 Legacy sweeps without TTFT remain readable and do not substitute total latency.
 Missing picks are excluded; `quality.heldOut.routes` reports coverage.
-`--max-usd` includes model and grader spend (in-flight requests can overshoot).
+`--max-usd` compares known model and grader spend only. In-flight requests can
+overshoot it; this stop is not a financed bound on total charges.
+An unknown model cost stops new model and paid-judge requests across workers.
+Mechanical checks continue. Already dispatched work finishes and retains its receipts.
+Resume preserves this stop when any stored row has unknown cost. A request blocked
+before dispatch creates no result row and remains unattempted for a later resume.
+Direct and container requests send one attempt. HTTP and transport failures do not
+trigger automatic redispatch because the earlier attempt can have an unknown charge.
+The row retains an unknown cost; this does not create a funded reservation.
+An HTTP status alone does not supply a complete billing receipt, including BYOK
+provider charges and auxiliary service fees. Do not infer a zero total charge.
+Legacy null-cost rows remain blocked without independent billing evidence;
+an old error string is not proof that no earlier request reached a provider.
 Atomic checkpoints every 200 cases retain each pair's raw `results`;
 `--resume sweep.json` requires the same suite and pairs, skips completed
 pair/case/repetitions, and retains accumulated spend.
 Infrastructure/grader failures are excluded from graded `cases` and counted in summary
-`errors`; empty answers score zero. Missing usage still permits grading but makes
-`costUsd` null and excludes that row only from the cost mean. Graded training candidates
+`errors`; empty answers score zero. Missing usage still permits mechanical grading.
+New paid judging stays blocked; judged rows without a grade record `grader_failed`.
+An unknown `costUsd` excludes that row from the cost mean. Graded training candidates
 with unknown cost still compete at the route's maximum known request-cost estimate
 (or benchmark cost zero if the entire route lacks costs), without imputing held-out cost.
 Recompute old summaries without
@@ -526,6 +574,257 @@ route mix, table, and pricing snapshot for base and head; use saved table and pr
 files if the live inputs may change between builds. `benchmarkPerTaskUsdWeighted`
 remains the benchmark-only cost and can move differently from this production-input
 estimate.
+
+### Prospective full-task experiment protocol (not admitted)
+
+This section states requirements for a future full-task experiment. It does not
+describe an admitted runner, a passed gate, or a measured result. No quality or
+cost gain is claimed under this protocol.
+
+The scoreboard, sweep, and policy grid above optimize and check single requests.
+That request-validation proxy can select a candidate policy. It cannot prove
+full-task success, full-task cost, or a routing improvement. Only frozen,
+untouched full tasks with complete charges can supply that evidence.
+
+The production worker and sweep keep their own paid-execution ledger. The
+bundled `repo-study` driver and `router-*` scripts implement the separate
+full-task research protocol below. Historical scripts and evidence remain
+audit-only; they cannot authorize new dispatch. Use the bundled runner rather
+than introducing another execution framework.
+
+**Frozen design.** Freeze the spec before any paid request, and bind it by hash.
+
+- Tasks: the frozen 18 tuning tasks and 32 final tasks, disjoint and unchanged.
+- Every final arm runs every final task with exactly 2 repetitions. A repetition
+  is a repeat measurement, not a new independent task. Include any paid tuning
+  in the frozen plan and allowance; this protocol does not add a tuning campaign.
+- Per-run limits: 60 steps, 1800 s wall time, 180 s per action, 16384 requested
+  output tokens, and the approved $60 per-run ceiling. The other pinned
+  resource limits stay unchanged. Prove a finite hidden-output ceiling.
+- Tune only on tuning tasks. Keep final tasks untouched until final selection.
+- Do not add tuning tasks, repetitions, arms, or limits silently. Any change is
+  a prospective amendment with a new freeze, quote, and admission decision.
+
+**Objectives.** Judge Efficient and Frontier separately, with the floor, bound,
+and interval rule frozen before outcomes exist.
+
+- Efficient: minimize total full-task cost subject to meeting the frozen
+  full-task success floor.
+- Frontier: maximize verified full-task success subject to the frozen
+  total-cost bound.
+- A rule that requires both strictly higher success and strictly lower cost for
+  both routers is a strict diagnostic only. It replaces neither objective.
+
+**Mandatory comparisons.** The denominator is every arm × task × repetition.
+
+- Arms: one live router arm per mode (`kilo-auto/efficient` or
+  `kilo-auto/frontier`), a cost-matched content-blind control, and every
+  fixed pool model. Give each fixed model its frozen variant policy.
+- The content-blind control selects without task content and matches the
+  router cost budget. It separates routing signal from spend alone.
+- Share one physical observation between arms only under an immutable,
+  hash-bound identical-intervention mapping. The mapping must prove the same
+  executable, task revision, model, variant, payload, limits, and grader.
+  Any other observation is a separate run.
+- Do not shrink the denominator after dispatch. Missing, failed, and invalid
+  rows stay visible with their reason and charges.
+
+**Financial admission gates.** Version 6 is capped exploration. It has no
+full-plan funding guarantee. A budget stop leaves the plan inconclusive.
+Version 6 dispatches every solver request through the Kilo AI gateway.
+Old version 5 manifests are audit-only.
+
+1. **Continuity.** Retain all historical settled charges and unknown holds at
+   their full bound. Do not reset the ledger, attempt history, or candidate
+   history. Cumulative new allowance across all amendments stays at or below
+   the authorized $100. An amendment never rebases the allowance, and a
+   tranche inside it is not new allowance. A larger legacy ledger cap is not
+   spending permission.
+2. **Whole-plan cost forecast.** Register one hash-bound forecast for the whole
+   plan: every arm, task, and repetition. Price every `(model, variant)` pair
+   reachable from the baseline and candidate tables, not only first picks. A
+   missing or unpriced mandatory pair blocks registration. The forecast total
+   can exceed $100. The forecast is evidence, not funding.
+3. **Nested caps at dispatch.** Reserve each request in full before dispatch.
+   Settled plus held plus the next bound must fit three nested caps: the $100
+   cumulative new allowance, the $60 pilot ceiling for pilot work, and the $60
+   per-run ceiling. The frozen per-run resource limit can bind first. Count
+   incurred commitments only. Do not count unattempted rows. Do not count the
+   unused part of an active run cap. A claim records its per-run cap. The claim
+   reserves no money. Known settlement replaces a hold with the actual charge.
+   The unused part then stops counting. An unknown or breached charge stays at
+   its full bound and stops dispatch.
+4. **Pilot ceiling.** A router-arm protocol pilot has an independent $60
+   ceiling inside the same cumulative allowance. A frozen pilot cap can be
+   lower. The pilot checks execution, grading, and receipts only. It cannot
+   certify either objective. No final request may run before exact successful
+   pilot evidence exists. The live worker picks its classifier from live
+   config. The code does not check the billed classifier. Before approving
+   final dispatch, the operator must confirm the billed classifier model and
+   cost from the organization's recorded usage on the read replica.
+5. **Component tariffs.** Reserve at the dearest public provider price.
+   Take per-component maxima over the Kilo catalog pricing and every public
+   OpenRouter endpoint price for the model, including every override tier,
+   with positive discounts undone. Keep the raw catalog entry and the frozen
+   endpoint snapshots with their hashes as evidence. Sum the component
+   maxima for input, cached read, cache write, output, and hidden reasoning.
+   Add the per-request fee. Never assume a component is free. Missing or
+   unparseable endpoint evidence fails the quote. Hidden reasoning is
+   assumed bounded by `max_tokens`; this is unproven, and a charge above
+   the reservation stops dispatch.
+6. **Gateway worst case.** The gateway selects the provider. The request
+   carries no provider controls. Price a router arm from the maximum over
+   every pool model of its mode. Add the frozen classifier allowance to each
+   router-arm reservation and settlement: the gateway bills the classifier
+   as a separate organization usage row outside `usage.cost`. The Kilo
+   catalog does not list the classifier model, so its price comes from its
+   public endpoints only. The bound is the dearest public input rate times
+   32,768 input tokens, times six questions, times two attempts, plus the
+   request fee per attempt-question: one billed classification runs per
+   gateway request, billing may be per question, and each classification
+   gets at most two HTTP attempts. The classifier request sends no
+   `max_tokens`, so every endpoint output price must be exactly zero or the
+   quote fails. The allowance must be positive and at least this bound; a
+   lower allowance is rejected at quote time. Settlement records the full
+   allowance, so a router arm's settled cost is an upper bound. A router
+   cost claim needs the organization's recorded classifier charges for the
+   run from the read replica.
+7. **Payload guard.** After all variant mutation, validate the final serialized
+   payload. Admit string text only. Reject media, files, native tools, search
+   plugins, cache controls, automatic continuation, budget escalation, and any
+   passthrough field that can add billable work. Reject; do not silently strip.
+   The payload has no `usage`, `provider`, `plugins`, or `tools` field.
+   Bind the guard, its hash, and negative proofs to the executable identity.
+8. **Identity.** Bind the complete executable and input identity before
+   dispatch: source and bundle hashes, parser and grader revisions, task
+   split, pool snapshots, variant catalog, run order seed, resource limits,
+   the frozen Kilo organization ID, the gateway model per mode, the recorded
+   gateway routing table version, and quote evidence. Dispatch only inside
+   the quote validity window; an expired quote needs a fresh quote.
+   Any identity mismatch blocks dispatch.
+
+**Tariff incompatibility is a no-go, not an outage.** If a tariff cannot be
+bounded under this contract, record an accounting failure. Do not mark the
+model unavailable, invent an outage, strip tariff fields, drop a pair, or
+reduce the denominator to escape it.
+
+**Outcome interpretation.** Never retry an attempt that may have been paid.
+
+- Happy path: the run completes, the deterministic grade is valid, and every
+  charge settles. Record resolved or not, with settled total cost.
+- Empty: a dispatched attempt returns no answer or no submission, with settled
+  charges. Score it as a failure, retain its charges, and do not retry it.
+- Retryable: only an attempt proven not dispatched, with no paid call started.
+  It stays undispatched and missing, never a failure, and may run later under
+  the same frozen identity.
+- Nonretryable: any attempt that may have reached a provider. Never dispatch it
+  again. Hold an unknown charge at its full bound, stop further dispatch until
+  the stop is cleared under the frozen policy, and give ambiguous quality the
+  full interval instead of an invented score.
+- A provider outage with a valid outage record is an arm failure.
+  Infrastructure and grader failures block completeness instead. They are not
+  model-quality failures.
+- Budget stop: a cap stops a later request. The plan is partial and
+  inconclusive. A favorable prefix cannot establish a pass, superiority over a
+  fixed model, or control cost matching.
+
+**No-go states.** Paid dispatch stays blocked while an applicable gate fails:
+unaccounted unknown charges; unresolved historical candidate uncertainty;
+incomplete or expired tariff coverage; an unbounded tariff component; a
+missing or malformed gateway token or organization ID; a missing payload
+guard; an executable identity mismatch; or a changed denominator. A forecast
+above the caps is not a no-go. The next unaffordable request is the stop.
+Final dispatch also requires exact successful pilot evidence. The pilot cannot
+prove its own admission retroactively. Report blocked while any applicable gate fails.
+
+The version 6 prospective protocol is implemented by the bundled `repo-study`
+driver and the `router-*` coordinator scripts. Old manifests and old financing
+manifests are audit-only. Paid execution requires, in order:
+
+1. A capped-exploration authorization whose cumulative new allowance is within
+   the $100 programme ceiling and whose origin snapshot is immutable.
+2. A frozen version 6 spec with the complete router, content-blind control and
+   fixed-model arms for each mode, the unchanged task split and resources, the
+   frozen `kilo_organization_id`, the frozen `classifier_allowance_usd`, and
+   `gateway_routing_table_version` (null when no version is published).
+3. A fresh complete tariff quote for every mandatory pair. An unsupported tariff
+   is an accounting failure, not a model outage.
+4. A registered whole-plan cost forecast covering every mandatory row.
+   The `finance` command registers that forecast. It does not fund the plan.
+   Audit executability requires current authorization and frozen plan
+   validation. Each forecast keeps its own total.
+
+The coordinator validates the final text-only payload after variant resolution,
+posts exactly the approved bytes, and consumes each reservation once. It reports
+no pass or savings claim unless every arm has settled charges, determinate grades
+and the frozen coverage. An incomplete analysis is `inconclusive`.
+
+Variant validation accepts the shared gateway catalog's complete verbosity
+vocabulary, including `xhigh`, without dropping its frozen reasoning controls.
+
+These are pre-dispatch reservation checks, not a guaranteed ceiling on final
+provider charges. An over-bound charge is detected after billing and stops
+further dispatch. A provider dashboard budget is not a hard cap either:
+already-dispatched requests can finish after that budget is reached. Real
+dispatch requires independent evidence that all billed exposure stays inside
+the authorization; a quote or dashboard limit alone does not prove that.
+
+Recovery releases a coordinator reservation at zero cost only when neither its
+dispatch admission nor its receipt indicates dispatch. Historical and admitted
+requests retain their full holds. Receipt or observer failures cannot overwrite
+a settled charge. Admission denials finalize their receipt and budget-limit
+evidence even when admission already settled the unused reservation.
+
+Gateway settlement uses one rule for every arm. A charge settles only when
+`usage.cost` is a finite nonnegative number and `usage.is_byok` is exactly
+false. Router-arm settlement records `usage.cost` plus the frozen classifier
+allowance, because the classifier is billed separately. BYOK, a missing
+flag, or a missing cost is an unknown charge: the full hold stays and all
+further dispatch stops.
+
+**Gateway transport.** Every solver request goes to
+`POST https://ai-gateway.kilo.ai/api/v1/chat/completions`. The host-only
+`KILO_API_TOKEN` environment variable authenticates the request as the Kilo
+account. The frozen `kilo_organization_id` is sent as
+`X-KiloCode-OrganizationId`, so the Kilo organization is billed. The
+organization ID is stored in the spec and receipts; it is not secret. The
+token is never stored. The router arm requests `kilo-auto/efficient` or
+`kilo-auto/frontier`; the receipt records the concrete routed model from
+the response `model`. A routed model outside the frozen pool keeps the full
+hold and stops dispatch. Fixed and control arms request their frozen
+concrete model through the same transport. A router arm needs a valid quote
+for every pool pair of its mode, or it blocks admission. The gateway's
+optional `x-kilo-max-cost-microdollars` bound accepts only system and user
+messages, so multi-turn agent requests do not send it. The local serialized
+ledger is the spending control: it reserves each request's quoted worst case
+before dispatch and enforces the cumulative $100 allowance and the $60 pilot
+and $60 per-run ceilings. A charge above its reservation stops all further
+dispatch. A rejected response after dispatch keeps its full hold. This is not
+a provider-invoice hard cap: the gateway balance is a snapshot and in-flight
+requests can finish after a cap is reached. A daily member limit on the
+organization account is a recommended backstop, not a ceiling. Live routing tables
+can change during a run. The spec records the published table version in
+`gateway_routing_table_version`, or null when none is published; a null
+value is a stated limitation, not a frozen table. There is one live router
+arm per mode; objectives compare it against every fixed pool model and the
+content-blind control.
+
+Run the offline checks with:
+
+```sh
+python3 -m pip install -r repo-study/requirements.txt
+(cd repo-study && python3 -m unittest test_text_tariffs)
+(cd scripts && python3 -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants)
+```
+
+Do not authorize paid work without a host-only gateway token, a verified
+organization ID, a finite quote for every mandatory pair, and independent
+evidence of total billed exposure.
+A forecast above the remaining authorization can register for offline checks.
+The code checks quoted reservations; it does not certify a provider-invoice
+ceiling. Local admission stops before an unaffordable reservation. This protocol
+does not authorize a live run by itself. Do not shrink the plan or raise a cap
+implicitly.
 
 ### Shadow routing policy
 
@@ -595,8 +894,9 @@ explicitly listed in `excludedRoutes`, never simulated by direct completions.
 A shared worker pool pulls requests in round-robin order, alternating each model's
 variants within its case sequence. `--concurrency <n>` defaults to 24. Dispatch
 order spreads partial-run coverage across models; completions may arrive out of order.
-Direct requests, streaming TTFT, retries, long-context materialization, and grading
-reuse the offline sweep path. Set `OPENROUTER_API_KEY`; no container is required.
+Direct requests, streaming TTFT, long-context materialization, and grading reuse
+the offline sweep path. Direct model requests are not automatically retried.
+Set `OPENROUTER_API_KEY`; no container is required.
 
 The report contains model-wide and per-variant accuracy, Wilson lower bounds,
 benchmark and estimated production request cost, p50 TTFT and total latency, raw
@@ -650,8 +950,8 @@ All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 (the gateway's admin panel proxies these with the internal secret):
 
 GET endpoints accept `?router=efficient|frontier`; mutations accept `router` in their body
-or query. Omission selects efficient. Owner profile, owner-pool table, and custom router
-endpoints accept both routers. The classifier-winner endpoint returns the shared winner.
+or query. Omission selects efficient. Owner profile and custom router endpoints accept both
+routers. The classifier-winner endpoint returns the shared winner.
 The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 
 
@@ -667,32 +967,31 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
-| `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of the pool models (quota 20 models per base router per 24h) |
-| `POST /admin/profiles/status` | Read current per-effort coverage; free re-admission for engine-stale pairs |
-| `POST /admin/custom-routing-table` | Rank ready/current exact pairs for the selected models (`table: null` → balanced fallback) |
+| `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of a custom router's gateway models (quota 20 models per base router per 24h) |
 | `POST /admin/custom-router-table` | Custom router table from platform and owner client measurements (`CustomRouterBenchmarkContextSchema`) |
 | `POST /admin/custom-router-status` | Per-variant status of every custom router entry (`CustomRouterStatusResponseSchema`) |
 
-## Owner pools and Benchmark profiles
+## Owner Benchmark profiles
 
-Owners (personal users or organizations) can constrain `kilo-auto/efficient` to
-1–10 **pool models**, and custom routers name gateway models of either base router
-(ADR 0005). The pool lives in the auto-routing Durable Object, whose
-read path collapses and deduplicates legacy exact-pair pools. Each selected model
+Custom routers (ADR 0005) name gateway models of either base router. When an owner saves a
+router whose entries or base router changed, the web app registers the gateway entries the
+platform key can serve with `POST /admin/profiles/register`. Each selected model
 expands through the live catalog into every supported reasoning effort, or one
 default pair when there are no reasoning controls. This worker measures exact
 model-effort pairs globally under the current engine identity and repetitions.
-Custom tables rank every measured pair; the router, not the owner, chooses effort.
+Custom router tables rank every measured pair; the router, not the owner, chooses effort.
+ADR 0003 owner pools, which constrained efficient itself, were converted to custom routers
+with slug `efficient` at the ADR 0005 cutover.
 
 ### The two registry queues
 
 A registry row records who wants the measurement: `platform_requested` (the
-saved decider list) and `user_requested` (owner pools). Both can be set — the
+saved decider list) and `user_requested` (custom router gateway entries). Both can be set — the
 row is global, so the pair is benchmarked once and serves both.
 
 | | Platform queue | User queue |
 |---|---|---|
-| Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from owner pools (quota-charged) |
+| Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from the web custom routers API (quota-charged) |
 | Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, one-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
 | Execution share | Efficient and frontier each have default weight 2 | Efficient and frontier each have default weight 1 |
@@ -708,8 +1007,8 @@ If a desired pair remains pending or running, the previous table stays live.
 Failed pairs do not contribute scores.
 If any taxonomy route has no measured candidate, the worker skips publication and keeps the previous table.
 
-Rollback: turning off owner pools (or clearing a pool) leaves the platform table
-untouched — it only ever draws on rows the platform list asks for.
+Rollback: removing a model from a custom router (or deleting the router) leaves the platform
+table untouched — it only ever draws on rows the platform list asks for.
 
 ### Request ledger and admission
 
@@ -724,9 +1023,9 @@ remeasurement is quota-free.
 Concurrent requests share one global pair; the first admission wins and the
 others report its status.
 
-Admission returns before the caller's Durable Object settings write. If that
-write fails, the previous pool remains, but admitted measurements still run.
-Retrying reuses the same global profiles without charging quota twice.
+Admission returns before the web app's router write. If that write fails, the previous
+router remains, but admitted measurements still run. Retrying reuses the same global
+profiles without charging quota twice.
 
 ### Status transitions and drain
 
@@ -744,9 +1043,9 @@ pending → running → ready
   transition — a newer pending/ready row is never clobbered.
 
 Currency: a profile is current only when `engine_identity`, `repetitions`, and
-exact variant match the live decider engine. The platform table and owner-pool tables
-never use a stale row. Custom router tables serve a stale row, flagged `stale`, until the
-current one is ready (see below).
+exact variant match the live decider engine. The platform table never uses a stale row.
+Custom router tables serve a stale row, flagged `stale`, until the current one is ready (see
+below).
 
 **Per-queue drain** (after any decider terminal state, on the admin's manual
 trigger, and on the one-minute cron):
@@ -806,21 +1105,6 @@ Runbook, after the whole stack is merged and deployed (the migration applies on 
    `GET /admin/routing-table` shows a new version.
 4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
    its run.
-
-### Sparse custom routing tables
-
-`POST /admin/custom-routing-table` with 1–10 entries returns
-`CustomRoutingTableResponse`:
-
-- Candidates come only from **ready + current** profiles' provenance
-  `model_summaries` for that entry's exact pair **and** measuring `run_id`
-  (no cross-run leakage), ranked with the saved policy knobs via
-  `rankCandidates`.
-- Candidates carry exact `variant` (never `reasoningEffort`).
-- Route keys with no graded candidates are **omitted** (not empty arrays).
-- If no requested entry is ready/current → `{ table: null }` so the gateway
-  falls back to balanced. Never fabricate candidates.
-
 ## Custom routers and client measurements
 
 ADR 0005 custom routers rank a pool of gateway and client entries against one base
@@ -850,7 +1134,7 @@ entry keys the owner's CLI measures); this worker has no PostgreSQL access.
   count.
 - **Status** (`POST /admin/custom-router-status`): `ready`, `stale`, `pending`, `running`,
   `failed`, or `missing` per variant. A platform pair with only older-engine rows is
-  re-admitted for free, as owner-pool status lookups do.
+  re-admitted for free.
 
 ### Client eval API
 
@@ -860,7 +1144,7 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
 
 | Route | Request | Behavior |
 |---|---|---|
-| `POST /v1/eval/plan` | `InternalClientEvalPlanRequestSchema` | Every (entry, variant, case, repetition) without a current-engine upload, plus `staleEntries` that still serve an older-engine measurement |
+| `POST /v1/eval/plan` | `InternalClientEvalPlanRequestSchema` | Every (entry, variant, case, repetition) without a successful current-engine upload, plus `staleEntries` that still serve an older-engine measurement |
 | `POST /v1/eval/case` | `InternalClientEvalCaseRequestSchema` | `prompt`: the exact `kilo run` prompt the platform container sends (`deciderCliPrompt`, so client and platform rows share byte-identical prompts), and the 180-second timeout; checks and golden answers stay here |
 | `POST /v1/eval/result` | `InternalClientEvalResultRequestSchema` | Grade with the platform graders, store, roll up the profile, return the score |
 
@@ -874,7 +1158,14 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
   stored. The usage id derives from the graded case, so a retried upload records it once.
   If usage cannot be recorded the upload fails with `internal_error` and nothing is stored.
   The serving worker checks the paying owner's balance before forwarding.
-- A case repetition that is already stored returns its stored score without grading again.
+- A case repetition reuses its stored score only after exit code 0, no timeout, and nonempty
+  output. Nonzero exits, timeouts, and empty output remain in the plan; a new upload replaces
+  the failed attempt.
+- A judged upload grades under a per-case claim (`client_case_grading_claims`, one row per
+  profile, case and repetition). The claim holder runs the judge; a parallel upload of the
+  same case returns the stored score once the holder finishes, and otherwise fails with
+  `internal_error` instead of starting a second grading. The claim is released when its
+  grading ends, and a lease lets the next upload take over one left by a vanished request.
 
 Rollout: apply the additive D1 migration (new tables and the `profile_request_events.router`
 column, defaulting existing rows to `efficient`) with the deploy; no queue pause is needed.
@@ -912,7 +1203,7 @@ curl -s http://localhost:8814/admin/config -H "Authorization: Bearer $SECRET"
 ```
 
 A fresh local database has no benchmark configuration, and none is fabricated
-(ADR 0002): profile admission, owner-pool tables, custom routers, and client evals
+(ADR 0002): profile admission, custom routers, and client evals
 answer 400 `benchmark config not set` until one is saved. Save one per base router
 you use, with models from your local catalog, through the admin panel's Benchmarks
 tab or this call (repeat with `?router=frontier` for frontier):

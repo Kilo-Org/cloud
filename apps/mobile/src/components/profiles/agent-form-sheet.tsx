@@ -1,11 +1,14 @@
-import { useRef, useState } from 'react';
+/* eslint-disable max-lines -- the agent form keeps its validation, dirty check, and every field group in one sheet, so Save and the fields it saves stay together */
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { agentErrorText, slugFieldError } from '@/components/profiles/agent-form-errors';
 import { AgentVariantPicker } from '@/components/profiles/agent-variant-picker';
 import {
+  AGENT_VISIBILITY_OPTIONS,
   type AgentFormError,
   type AgentFormState,
   type AgentSource,
@@ -17,26 +20,32 @@ import {
 } from '@/components/profiles/profile-agents-model';
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 
-/** Catalog key for each refused field, so the message lands under the input at fault. */
-const ERROR_KEYS = {
-  'slug-required': 'profiles.agents.slugRequired',
-  'slug-invalid': 'profiles.agents.slugInvalid',
-  'slug-conflict': 'profiles.agents.slugConflict',
-  'name-required': 'profiles.agents.nameRequired',
-} satisfies Record<AgentFormError, string>;
-
-const VISIBILITY_OPTIONS: readonly { value: AgentVisibility; labelKey: string }[] = [
-  { value: 'primary', labelKey: 'profiles.agents.visibilityPrimary' },
-  { value: 'subagent', labelKey: 'profiles.agents.visibilitySubagent' },
-  { value: 'all', labelKey: 'profiles.agents.visibilityAll' },
-];
+const ERROR_FIELDS = {
+  'slug-required': 'slug',
+  'slug-invalid': 'slug',
+  'slug-conflict': 'slug',
+  'name-required': 'name',
+  'name-too-long': 'name',
+  'description-too-long': 'description',
+} as const satisfies Record<AgentFormError, string>;
 
 type AgentFormSheetProps = Readonly<{
+  /**
+   * The form draft the fields belong to (see `lib/form-draft`). The screen
+   * passes a scope scoped to its profile, so a remount reopens the sheet on
+   * what was typed; a caller without one gets fresh fields every mount.
+   */
+  draftScope?: string;
   agent: AgentSource | null;
   /** Slugs of the profile's other agents, so a duplicate fails validation inline. */
   existingSlugs: readonly string[];
@@ -54,7 +63,9 @@ type AgentFormSheetProps = Readonly<{
  * app's iOS text-input rule; visibility and the tool toggles are state.
  *
  * Save validates through `validateAgentForm`; a refused input shows the
- * matching `profiles.agents.*` message under the field at fault. Every tool is
+ * matching `profiles.agents.*` message — or, for an over-long name or
+ * description, the `profiles.tooLong` bound — under the field at fault, and the
+ * typed values stay in the sheet. Every tool is
  * allowed unless its switch is off, which writes `deny` for that tool only.
  *
  * Sampling (max steps, temperature, top_p) mirrors the web editor. The effort
@@ -63,6 +74,7 @@ type AgentFormSheetProps = Readonly<{
  * save: an unavailable model list only hides the control.
  */
 export function AgentFormSheet({
+  draftScope,
   agent,
   existingSlugs,
   organizationId,
@@ -74,22 +86,34 @@ export function AgentFormSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const initial = initialAgentFormState(agent ?? undefined);
-  const slugRef = useRef(initial.slug);
-  const nameRef = useRef(initial.name);
-  const descriptionRef = useRef(initial.description);
-  const promptRef = useRef(initial.prompt);
-  const modelRef = useRef(initial.model);
-  const stepsRef = useRef(initial.steps);
-  const temperatureRef = useRef(initial.temperature);
-  const topPRef = useRef(initial.topP);
+  const scope = draftScope;
+  const slugRef = useFormDraftRef(scope, 'slug', initial.slug);
+  const nameRef = useFormDraftRef(scope, 'name', initial.name);
+  const descriptionRef = useFormDraftRef(scope, 'description', initial.description);
+  const promptRef = useFormDraftRef(scope, 'prompt', initial.prompt);
+  const modelRef = useFormDraftRef(scope, 'model', initial.model);
+  const stepsRef = useFormDraftRef(scope, 'steps', initial.steps);
+  const temperatureRef = useFormDraftRef(scope, 'temperature', initial.temperature);
+  const topPRef = useFormDraftRef(scope, 'topP', initial.topP);
   // The typed model is text in `modelRef`; this state exists only to derive the
   // variant options the catalogue publishes for it.
-  const [modelValue, setModelValue] = useState(initial.model);
-  const [visibility, setVisibility] = useState<AgentVisibility>(initial.visibility);
-  const [variant, setVariant] = useState(initial.variant);
-  const [disabledTools, setDisabledTools] = useState<readonly string[]>(initial.disabledTools);
+  const [modelValue, setModelValue] = useFormDraftState(scope, 'modelValue', initial.model);
+  const [visibility, setVisibility] = useFormDraftState<AgentVisibility>(
+    scope,
+    'visibility',
+    initial.visibility
+  );
+  const [variant, setVariant] = useFormDraftState(scope, 'variant', initial.variant);
+  const [disabledTools, setDisabledTools] = useFormDraftState<readonly string[]>(
+    scope,
+    'disabledTools',
+    initial.disabledTools
+  );
   const [error, setError] = useState<AgentFormError | null>(null);
   const { models } = useAvailableModels(organizationId);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
+    'slug' | 'name' | 'description'
+  >();
 
   const variantsFor = (model: string): readonly string[] =>
     models.find(option => option.id === model.trim())?.variants ?? [];
@@ -130,6 +154,7 @@ export function AgentFormSheet({
     const problem = validateAgentForm(state, existingSlugs);
     if (problem !== null) {
       setError(problem);
+      scrollToField(ERROR_FIELDS[problem]);
       return;
     }
     setError(null);
@@ -147,6 +172,7 @@ export function AgentFormSheet({
         topInset="ios-page-sheet"
       />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -155,32 +181,33 @@ export function AgentFormSheet({
       >
         <FormField
           label={t('profiles.agents.slug')}
-          defaultValue={initial.slug}
-          error={
-            error === 'slug-required' ||
-            error === 'slug-invalid' ||
-            error === 'slug-conflict' ||
-            (slugConflictFromServer && error === null)
-              ? t(ERROR_KEYS[error ?? 'slug-conflict'])
-              : undefined
-          }
+          defaultValue={slugRef.current}
+          error={slugFieldError(t, error, slugConflictFromServer)}
           disabled={isSaving}
           required
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.agents.slugPlaceholder')}
+          containerOnLayout={fieldLayout('slug')}
           onChangeText={value => {
-            slugRef.current = value.toLowerCase().replaceAll(/[^a-z0-9-]/g, '');
+            // Kept exactly as typed: a silent rewrite would save a slug the
+            // reader never entered, and an invalid one is refused with the rule.
+            slugRef.current = value;
             setError(null);
           }}
         />
         <FormField
           label={t('profiles.agents.name')}
-          defaultValue={initial.name}
-          error={error === 'name-required' ? t(ERROR_KEYS[error]) : undefined}
+          defaultValue={nameRef.current}
+          error={
+            error === 'name-required' || error === 'name-too-long'
+              ? agentErrorText(t, error)
+              : undefined
+          }
           disabled={isSaving}
           required
           placeholder={t('profiles.agents.namePlaceholder')}
+          containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameRef.current = value;
             setError(null);
@@ -188,20 +215,23 @@ export function AgentFormSheet({
         />
         <FormField
           label={t('profiles.agents.description')}
-          defaultValue={initial.description}
+          defaultValue={descriptionRef.current}
+          error={error === 'description-too-long' ? agentErrorText(t, error) : undefined}
           disabled={isSaving}
           placeholder={t('profiles.descriptionPlaceholder')}
+          containerOnLayout={fieldLayout('description')}
           onChangeText={value => {
             descriptionRef.current = value;
+            setError(null);
           }}
         />
         <FormField
           label={t('profiles.agents.prompt')}
-          defaultValue={initial.prompt}
+          defaultValue={promptRef.current}
           disabled={isSaving}
           multiline
           textAlignVertical="top"
-          className="min-h-28 leading-5"
+          className="min-h-28 max-h-52 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.agents.promptPlaceholder')}
@@ -211,7 +241,7 @@ export function AgentFormSheet({
         />
         <FormField
           label={t('profiles.agents.model')}
-          defaultValue={initial.model}
+          defaultValue={modelRef.current}
           disabled={isSaving}
           autoCapitalize="none"
           autoCorrect={false}
@@ -236,7 +266,7 @@ export function AgentFormSheet({
 
         <FormField
           label={t('profiles.agents.steps')}
-          defaultValue={initial.steps}
+          defaultValue={stepsRef.current}
           disabled={isSaving}
           keyboardType="number-pad"
           placeholder={t('profiles.agents.stepsPlaceholder')}
@@ -246,7 +276,7 @@ export function AgentFormSheet({
         />
         <FormField
           label={t('profiles.agents.temperature')}
-          defaultValue={initial.temperature}
+          defaultValue={temperatureRef.current}
           disabled={isSaving}
           keyboardType="decimal-pad"
           placeholder={t('profiles.agents.temperaturePlaceholder')}
@@ -256,7 +286,7 @@ export function AgentFormSheet({
         />
         <FormField
           label={t('profiles.agents.topP')}
-          defaultValue={initial.topP}
+          defaultValue={topPRef.current}
           disabled={isSaving}
           keyboardType="decimal-pad"
           placeholder={t('profiles.agents.topPPlaceholder')}
@@ -270,7 +300,7 @@ export function AgentFormSheet({
             {t('profiles.agents.visibility')}
           </Text>
           <View className="gap-1">
-            {VISIBILITY_OPTIONS.map(option => {
+            {AGENT_VISIBILITY_OPTIONS.map(option => {
               const selected = visibility === option.value;
               return (
                 <Pressable
@@ -279,8 +309,7 @@ export function AgentFormSheet({
                     'min-h-11 flex-row items-center rounded-md px-3 active:opacity-70',
                     selected && 'bg-secondary'
                   )}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
+                  {...selectableRowA11y({ multi: false, selected })}
                   accessibilityLabel={t(option.labelKey)}
                   onPress={() => {
                     setVisibility(option.value);
@@ -307,7 +336,11 @@ export function AgentFormSheet({
               const enabled = !disabledTools.includes(tool);
               return (
                 <View key={tool} className="min-h-11 flex-row items-center gap-3 px-1">
-                  <Text variant="mono" className="flex-1 text-sm text-foreground">
+                  <Text
+                    variant="mono"
+                    {...HIDDEN_LABEL_PROPS}
+                    className="flex-1 text-sm text-foreground"
+                  >
                     {tool}
                   </Text>
                   <Switch

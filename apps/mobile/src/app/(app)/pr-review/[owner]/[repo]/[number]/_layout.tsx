@@ -1,5 +1,5 @@
 import { type Href, Stack, useLocalSearchParams } from 'expo-router';
-import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { appScreenLayout } from '@/components/app-screen-layout';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
@@ -10,6 +10,7 @@ import {
   pendingReviewDraftKey,
   PendingReviewProvider,
 } from '@/lib/pr-review/pending-review-provider';
+import { githubPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
@@ -59,13 +60,13 @@ export default function PrReviewNumberLayout() {
   // stay mounted across that sheet's dismissal (see `FeedbackPromptProvider`).
   return (
     <FeedbackPromptProvider>
-      <PrReviewConnectGate>
+      <PrReviewConnectGate prRef={githubPrRef(owner, repo, number)}>
         <PendingReviewProvider
           key={`${draftEntityKey}:${userId ?? ''}`}
           userId={userId}
           draftEntityKey={draftEntityKey}
         >
-          <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+          <Stack screenLayout={appScreenLayout} screenOptions={{ headerShown: false }}>
             {/* Register the overview first: unregistered routes sort after
                 registered siblings, so without this the initial screen is the
                 comment-composer formSheet instead of the PR overview. */}

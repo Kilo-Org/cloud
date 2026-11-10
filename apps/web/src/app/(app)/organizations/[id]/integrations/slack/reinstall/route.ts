@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 
@@ -11,7 +12,7 @@ type RouteContext = {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+  const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse || !user) {
     const signInUrl = new URL('/users/sign_in', request.url);
     signInUrl.searchParams.set('callbackPath', request.nextUrl.pathname);
@@ -19,9 +20,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    await ensureOrganizationAccess({ user }, id);
+    await ensureOrganizationAccess({ user, tokenSource }, id, ORGANIZATION_MANAGE_ROLES);
   } catch {
-    return NextResponse.redirect(new URL('/integrations?error=unauthorized', request.url));
+    return NextResponse.redirect(
+      new URL(`/organizations/${id}/integrations/slack?error=permission_required`, request.url)
+    );
   }
 
   return NextResponse.redirect(

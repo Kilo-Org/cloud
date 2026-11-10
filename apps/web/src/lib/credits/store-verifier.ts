@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import type { PaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 import { APPLE_STORE_BUNDLE_ID } from '@/lib/kilo-pass/apple-store-sdk';
 import {
   decodeAppleStoreTransactionJws,
@@ -43,6 +45,7 @@ export type ValidatedStoreCreditPurchase = {
   amountUsd: number;
   amountMicrodollars: number;
   purchasedAtIso: string;
+  paidCreditTerms?: PaidCreditTerms;
   environment: AppleStoreEnvironment;
   rawPayload: unknown;
 };
@@ -148,6 +151,7 @@ export function mapAppleCreditTransaction(
     amountUsd: product.amountUsd,
     amountMicrodollars: product.amountMicrodollars * quantity,
     purchasedAtIso: new Date(decoded.purchaseDate).toISOString(),
+    paidCreditTerms: 'apple_exempt',
     environment: normalizeEnvironment(decoded.environment),
     rawPayload: decoded.rawPayload,
   };
@@ -161,8 +165,10 @@ export async function verifyAppleCreditPurchase(
 
 function googlePlayPurchaseTimeIso(apiData: androidpublisher_v3.Schema$ProductPurchase): string {
   const purchaseTimeMs = Number(apiData.purchaseTimeMillis);
-  if (Number.isFinite(purchaseTimeMs)) return new Date(purchaseTimeMs).toISOString();
-  return new Date().toISOString();
+  if (!Number.isFinite(purchaseTimeMs) || purchaseTimeMs <= 0) {
+    throw new StoreVerificationError('Google Play purchase is missing a valid purchase time');
+  }
+  return new Date(purchaseTimeMs).toISOString();
 }
 
 export async function verifyGooglePlayCreditPurchase(params: {
@@ -215,6 +221,7 @@ export async function verifyGooglePlayCreditPurchase(params: {
     purchaseToken: params.purchaseToken,
   });
 
+  const purchasedAtIso = googlePlayPurchaseTimeIso(apiData);
   return {
     paymentProvider: KiloPassPaymentProvider.GooglePlay,
     productId: responseProductId,
@@ -224,7 +231,11 @@ export async function verifyGooglePlayCreditPurchase(params: {
     quantity,
     amountUsd: product.amountUsd,
     amountMicrodollars: product.amountMicrodollars * quantity,
-    purchasedAtIso: googlePlayPurchaseTimeIso(apiData),
+    purchasedAtIso,
+    paidCreditTerms:
+      product.creditExpiryPolicy === 'one_year'
+        ? getPaidCreditTerms('google_play', purchasedAtIso)
+        : 'legacy',
     // ProductPurchase.purchaseType: 0 test, 1 promo, 2 rewarded.
     //
     // A test (license-tester) purchase is credited like a paid one on purpose,

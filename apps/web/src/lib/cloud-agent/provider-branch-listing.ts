@@ -23,18 +23,23 @@ import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants'
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
+  getGitHubIntegrationById,
   getIntegrationForOwner,
   getIntegrationsByOrganization,
 } from '@/lib/integrations/db/platform-integrations';
 import * as githubAppsService from '@/lib/integrations/github-apps-service';
+import { fetchGitHubBranchHead } from '@/lib/cloud-agent/github-branch-ops';
 import { isGitHubRateLimitError } from '@/lib/integrations/platforms/github/adapter';
 import {
+  fetchGitLabBranchHead,
   fetchGitLabBranches,
   GitLabBranchesFetchError,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   authorizeProject,
   GitLabReviewError,
+  gitlabReviewErrorToTrpcError,
+  gitlabReviewOwnerFor,
   type GitLabReviewOwner,
 } from '@/lib/provider-review/gitlab-authorization';
 import {
@@ -43,6 +48,8 @@ import {
   BitbucketReviewError,
   type BitbucketRepositoryAccess,
 } from '@/lib/provider-review/bitbucket-authorization';
+import { providerReviewErrorToTrpcError } from '@/lib/provider-review/error-mapping';
+import { normalizeGitUrl } from '@kilocode/worker-utils/normalize-git-url';
 import {
   fetchPage,
   repositoryPathGuard,
@@ -51,17 +58,53 @@ import {
 
 export type ProviderBranchPlatform = 'github' | 'gitlab' | 'bitbucket';
 
+/** The exact remote head of one branch, or the explicit missing state. */
+export type ProviderBranchHead = { sha: string } | { missing: true };
+
+/** The provider a clone URL belongs to; `git` is any host Kilo does not model. */
+export function providerBranchPlatformForGitUrl(gitUrl: string): ProviderBranchPlatform | 'git' {
+  let hostname: string;
+  try {
+    hostname = new URL(normalizeGitUrl(gitUrl)).hostname.toLowerCase();
+  } catch {
+    return 'git';
+  }
+  if (hostname === 'github.com') return 'github';
+  if (hostname === 'bitbucket.org') return 'bitbucket';
+  if (hostname === 'gitlab.com' || hostname.includes('gitlab')) return 'gitlab';
+  return 'git';
+}
+
+/** `owner/repo`, `group/project`, or `workspace/slug`, without a trailing `.git`. */
+export function repositoryFullNameFromGitUrl(gitUrl: string): string | null {
+  try {
+    const path = new URL(normalizeGitUrl(gitUrl)).pathname
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '')
+      .replace(/\.git$/, '');
+    return path.includes('/') ? path : null;
+  } catch {
+    return null;
+  }
+}
+
 export type ProviderBranchListing = {
   /** The provider's default branch, or null when the provider reports none. */
   defaultBranch: string | null;
   branches: string[];
+  /**
+   * True when the provider holds more branches than `branches` includes, so a
+   * client presents the list as partial instead of as the whole repository.
+   */
+  truncated: boolean;
 };
 
-/** The router output contract: `{ defaultBranch, branches }`, nothing else. */
+/** The router output contract: `{ defaultBranch, branches, truncated }`, nothing else. */
 export const ProviderBranchListingSchema = z
   .object({
     defaultBranch: z.string().nullable(),
     branches: z.array(z.string()),
+    truncated: z.boolean(),
   })
   .strict();
 
@@ -102,34 +145,15 @@ async function requireActiveIntegration(owner: Owner, platform: string, label: s
   return integration;
 }
 
-/**
- * Map a classified Bitbucket refusal onto the router error states. The
- * message is the authorization layer's fixed copy — it never embeds a token
- * or a workspace identity.
- */
-function bitbucketErrorToTrpcError(error: BitbucketReviewError): TRPCError {
-  switch (error.kind) {
-    case 'not_found':
-      return new TRPCError({ code: 'NOT_FOUND', message: error.message });
-    case 'forbidden':
-      return new TRPCError({ code: 'FORBIDDEN', message: error.message });
-    case 'reconnect':
-      return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
-    case 'bad_request':
-      return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-    default:
-      // stale_head cannot come from a read; retryable surfaces as a
-      // retryable gateway failure, never as an empty branch list.
-      return new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
-  }
-}
-
 type GitHubBranchRef = { name: string; isDefault: boolean };
 
 function toListing(branches: GitHubBranchRef[]): ProviderBranchListing {
   return {
     defaultBranch: branches.find(branch => branch.isDefault)?.name ?? null,
     branches: branches.map(branch => branch.name),
+    // Both provider walks page until the provider runs out, so nothing here is
+    // held back from the caller.
+    truncated: false,
   };
 }
 
@@ -146,6 +170,19 @@ function cachesRepository(integration: GitHubIntegrationRow, repositoryFullName:
 /** The HTTP status of a provider refusal, when the thrown error carries one. */
 function refusalStatus(error: unknown): unknown {
   return (error as { status?: unknown } | null)?.status;
+}
+
+/**
+ * A GitHub rate limit, primary or secondary, is transient: it is never a
+ * statement about an installation's access, so it may not be read as a
+ * permanent refusal.
+ */
+function githubRateLimitTrpcError(error: unknown): TRPCError {
+  return new TRPCError({
+    code: 'BAD_GATEWAY',
+    message: 'GitHub is limiting requests. Try again in a moment.',
+    cause: error,
+  });
 }
 
 /** A refusal meaning "this installation cannot see that repository" — try the next one. */
@@ -189,6 +226,7 @@ async function listOrganizationGitHubBranches(
     ...healthy.filter(integration => !cachesRepository(integration, repositoryFullName)),
   ];
   let lastError: unknown;
+  let rateLimitError: unknown;
   for (const integration of candidates) {
     try {
       const { branches } = await githubAppsService.listBranches(
@@ -199,10 +237,23 @@ async function listOrganizationGitHubBranches(
       );
       return toListing(branches);
     } catch (error) {
+      // Overloaded 403/429 answers arrive here too. Each installation has its
+      // own quota, so a rate limit says nothing about the remaining candidates
+      // and never ends the walk; it is remembered for the final refusal, which
+      // then stays retryable instead of claiming no installation can see the
+      // repository.
+      if (isGitHubRateLimitError(error)) {
+        rateLimitError ??= error;
+        continue;
+      }
       if (!isRepositoryUnreachable(error)) throw error;
       lastError = error;
     }
   }
+  // A transient refusal outranks a permission one: the caller must retry
+  // rather than show the install message for a repository a limited
+  // installation may well list once the limit clears.
+  if (rateLimitError) throw githubRateLimitTrpcError(rateLimitError);
   throw new TRPCError({
     code: 'NOT_FOUND',
     message:
@@ -229,16 +280,11 @@ async function listGitHubBranches(
   } catch (error) {
     // A blocked or missing repository is GitHub's own refusal, not a server
     // fault: surface it as 403/404 so the caller stops retrying a 500. 403 is
-    // overloaded — a rate-limited request is transient and stays retryable.
+    // overloaded — a rate-limited request is transient and stays retryable,
+    // whether GitHub answers 403 or 429.
+    if (isGitHubRateLimitError(error)) throw githubRateLimitTrpcError(error);
     const status = refusalStatus(error);
     if (status === 403) {
-      if (isGitHubRateLimitError(error)) {
-        throw new TRPCError({
-          code: 'BAD_GATEWAY',
-          message: 'GitHub is limiting requests. Try again in a moment.',
-          cause: error,
-        });
-      }
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: githubRepositoryForbiddenMessage,
@@ -253,24 +299,6 @@ async function listGitHubBranches(
       });
     }
     throw error;
-  }
-}
-
-/** A refusal meaning "this GitLab review call cannot proceed" — router worded. */
-function gitlabErrorToTrpcError(error: GitLabReviewError): TRPCError {
-  switch (error.kind) {
-    case 'not_found':
-      return new TRPCError({ code: 'NOT_FOUND', message: error.message });
-    case 'forbidden':
-      return new TRPCError({ code: 'FORBIDDEN', message: error.message });
-    case 'reconnect':
-      return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
-    case 'bad_request':
-      return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-    default:
-      // stale_head cannot come from a read; retryable surfaces as a
-      // retryable gateway failure, never as an empty branch list.
-      return new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
   }
 }
 
@@ -335,10 +363,7 @@ async function listGitLabBranches(
   // authorization boundary the Bitbucket path enforces through
   // authorizeRepository. Without it, any project path the connected token
   // can reach would be listable.
-  const reviewOwner: GitLabReviewOwner =
-    owner.type === 'org'
-      ? { type: 'organization', organizationId: owner.id, userId: actor.userId }
-      : { type: 'user', userId: actor.userId };
+  const reviewOwner = gitlabReviewOwnerFor(owner, actor.userId);
   try {
     const access = await authorizeProject(reviewOwner, repositoryFullName);
     const branches = await fetchGitLabBranches(
@@ -348,7 +373,7 @@ async function listGitLabBranches(
     );
     return toListing(branches.map(branch => ({ name: branch.name, isDefault: branch.default })));
   } catch (error) {
-    if (error instanceof GitLabReviewError) throw gitlabErrorToTrpcError(error);
+    if (error instanceof GitLabReviewError) throw gitlabReviewErrorToTrpcError(error, reviewOwner);
     if (error instanceof GitLabBranchesFetchError)
       throw gitlabBranchesErrorToTrpcError(error, reviewOwner);
     throw error;
@@ -416,14 +441,14 @@ async function listBitbucketBranches(
       repoSlug
     );
   } catch (error) {
-    if (error instanceof BitbucketReviewError) throw bitbucketErrorToTrpcError(error);
+    if (error instanceof BitbucketReviewError) throw providerReviewErrorToTrpcError(error);
     throw error;
   }
 
   let defaultBranch: string | null = null;
   try {
     const metadata = BitbucketRepositoryMetadataSchema.safeParse(
-      await requestBitbucketJson<unknown>(access, repositoryApiPath(access))
+      await requestBitbucketJson(access, repositoryApiPath(access))
     );
     defaultBranch = metadata.success ? (metadata.data.mainbranch?.name ?? null) : null;
   } catch {
@@ -434,6 +459,9 @@ async function listBitbucketBranches(
   const names: string[] = [];
   const seen = new Set<string>();
   let cursor: string | undefined;
+  // Set only when the page budget ends the walk with a cursor still pointing
+  // at a next page: the provider holds branches this listing does not include.
+  let truncated = false;
   try {
     for (let page = 0; page < MAX_BRANCH_PAGES; page += 1) {
       const result = await fetchPage(
@@ -453,13 +481,208 @@ async function listBitbucketBranches(
       }
       if (!result.nextCursor || result.nextCursor === cursor) break;
       cursor = result.nextCursor;
+      if (page === MAX_BRANCH_PAGES - 1) truncated = true;
     }
   } catch (error) {
-    if (error instanceof BitbucketReviewError) throw bitbucketErrorToTrpcError(error);
+    if (error instanceof BitbucketReviewError) throw providerReviewErrorToTrpcError(error);
     throw error;
   }
 
-  return { defaultBranch, branches: names };
+  // The default branch is what the session checks out, and it is selected
+  // before the list is browsed, so a partial walk must still offer it: a
+  // default that sorts past the page budget would otherwise be unselectable.
+  const branches =
+    defaultBranch !== null && !seen.has(defaultBranch) ? [defaultBranch, ...names] : names;
+
+  return { defaultBranch, branches, truncated };
+}
+
+/**
+ * The exact remote head of one branch. This is the single preflight point for
+ * a base branch: it answers both "is it pushed?" and "which commit is it?",
+ * against the same integration `prepareSession` will use.
+ */
+export async function getProviderBranchHead(input: {
+  platform: ProviderBranchPlatform;
+  userId: string;
+  organizationId?: string;
+  repositoryFullName: string;
+  branch: string;
+  githubIntegrationId?: string;
+}): Promise<ProviderBranchHead> {
+  const owner: Owner = input.organizationId
+    ? { type: 'org', id: input.organizationId }
+    : { type: 'user', id: input.userId };
+  switch (input.platform) {
+    case 'github':
+      return getGitHubBranchHead(owner, input);
+    case 'gitlab':
+      return getGitLabBranchHead(
+        owner,
+        {
+          userId: input.userId,
+          ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+        },
+        input.repositoryFullName,
+        input.branch
+      );
+    case 'bitbucket':
+      return getBitbucketBranchHead(input, input.repositoryFullName, input.branch);
+  }
+}
+
+async function getGitHubBranchHead(
+  owner: Owner,
+  input: {
+    repositoryFullName: string;
+    branch: string;
+    userId: string;
+    githubIntegrationId?: string;
+    organizationId?: string;
+  }
+): Promise<ProviderBranchHead> {
+  const call = async (integration: GitHubIntegrationRow): Promise<ProviderBranchHead> => {
+    if (!integration.platform_installation_id) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'The GitHub installation for this repository is incomplete. Reconnect GitHub.',
+      });
+    }
+    const head = await fetchGitHubBranchHead({
+      installationId: integration.platform_installation_id,
+      appType: integration.github_app_type ?? 'standard',
+      expectedIntegrationId: integration.id,
+      repositoryFullName: input.repositoryFullName,
+      branch: input.branch,
+      purpose: 'agent',
+    });
+    return head === null ? { missing: true } : head;
+  };
+
+  if (input.githubIntegrationId) {
+    const integration = await getGitHubIntegrationById(owner, input.githubIntegrationId);
+    if (!integration || !isPlatformIntegrationHealthy(integration)) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: inactiveConnectionMessage('GitHub'),
+      });
+    }
+    return call(integration);
+  }
+
+  if (owner.type === 'org') {
+    const integrations = (
+      await getIntegrationsByOrganization(owner.id, PLATFORM.GITHUB, 'agent')
+    ).filter(isPlatformIntegrationHealthy);
+    if (integrations.length === 0) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: missingConnectionMessage('GitHub') });
+    }
+    const wanted = input.repositoryFullName.toLowerCase();
+    const candidates = [
+      ...integrations.filter(row =>
+        (row.repositories ?? []).some(repository => repository.full_name?.toLowerCase() === wanted)
+      ),
+      ...integrations.filter(
+        row =>
+          !(row.repositories ?? []).some(
+            repository => repository.full_name?.toLowerCase() === wanted
+          )
+      ),
+    ];
+    let lastError: unknown;
+    let rateLimitError: unknown;
+    for (const integration of candidates) {
+      try {
+        return await call(integration);
+      } catch (error) {
+        if (isGitHubRateLimitError(error)) {
+          rateLimitError ??= error;
+          continue;
+        }
+        if (!isRepositoryUnreachable(error)) throw error;
+        lastError = error;
+      }
+    }
+    if (rateLimitError) throw githubRateLimitTrpcError(rateLimitError);
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: githubRepositoryNotFoundMessage,
+      cause: lastError,
+    });
+  }
+
+  const integration = await requireActiveIntegration(owner, PLATFORM.GITHUB, 'GitHub');
+  return call(integration);
+}
+
+async function getGitLabBranchHead(
+  owner: Owner,
+  actor: { userId: string; organizationId?: string },
+  repositoryFullName: string,
+  branch: string
+): Promise<ProviderBranchHead> {
+  const reviewOwner = gitlabReviewOwnerFor(owner, actor.userId);
+  try {
+    const access = await authorizeProject(reviewOwner, repositoryFullName);
+    const head = await fetchGitLabBranchHead(
+      access.accessToken,
+      access.projectPath,
+      branch,
+      access.instanceUrl
+    );
+    return head === null ? { missing: true } : head;
+  } catch (error) {
+    if (error instanceof GitLabReviewError) throw gitlabReviewErrorToTrpcError(error, reviewOwner);
+    if (error instanceof GitLabBranchesFetchError) {
+      throw gitlabBranchesErrorToTrpcError(error, reviewOwner);
+    }
+    throw error;
+  }
+}
+
+async function getBitbucketBranchHead(
+  input: { userId: string; organizationId?: string },
+  repositoryFullName: string,
+  branch: string
+): Promise<ProviderBranchHead> {
+  if (!input.organizationId) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: BITBUCKET_ORGANIZATION_ONLY_MESSAGE });
+  }
+  const separator = repositoryFullName.indexOf('/');
+  const workspace = repositoryFullName.slice(0, separator);
+  const repoSlug = repositoryFullName.slice(separator + 1);
+  if (separator < 1 || repoSlug.length === 0) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'The Bitbucket repository must be named "workspace/repository".',
+    });
+  }
+
+  let access: BitbucketRepositoryAccess;
+  try {
+    access = await authorizeRepository(
+      { type: 'organization', organizationId: input.organizationId, userId: input.userId },
+      workspace,
+      repoSlug
+    );
+  } catch (error) {
+    if (error instanceof BitbucketReviewError) throw providerReviewErrorToTrpcError(error);
+    throw error;
+  }
+
+  try {
+    const data = await requestBitbucketJson<{ target?: { hash?: string } }>(
+      access,
+      `${repositoryApiPath(access)}/refs/branches/${encodeURIComponent(branch)}`
+    );
+    return typeof data?.target?.hash === 'string' ? { sha: data.target.hash } : { missing: true };
+  } catch (error) {
+    if (error instanceof BitbucketReviewError) {
+      if (error.kind === 'not_found') return { missing: true };
+      throw providerReviewErrorToTrpcError(error);
+    }
+    throw error;
+  }
 }
 
 /**

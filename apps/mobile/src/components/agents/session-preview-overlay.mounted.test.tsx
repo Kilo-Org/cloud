@@ -255,7 +255,7 @@ describe('SessionPreviewOverlay', () => {
     const renderer = mountOverlay();
     openPreview(targetWith({}));
 
-    expect(previewState.moveA11yFocus).toHaveBeenCalledTimes(1);
+    expect(previewState.requestA11yFocus).toHaveBeenCalledTimes(1);
     // The portal mounts the panel a commit after the overlay, so the move has
     // to come from the row's ref callback. If it came from the open effect the
     // recorded node would be absent and VoiceOver would stay on the dimmed
@@ -265,6 +265,6 @@ describe('SessionPreviewOverlay', () => {
     // Closing re-runs the effect for `visible: false` and must not steal
     // focus again.
     pressByLabel(renderer, i18n.t('common.cancel'));
-    expect(previewState.moveA11yFocus).toHaveBeenCalledTimes(1);
+    expect(previewState.requestA11yFocus).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,11 +1,10 @@
 // Route-scoped registry that replaces the process-global navigation bridges.
 //
 // Each bridge value is stored under a `routeKey` — a stable id for the flow
-// that produced it: a session id for the agent-chat pickers, the PR
-// owner/repo/number for the review bridges, or a branded scope for the
-// security filter. A route reads its slot with `useRouteRegistry(routeKey)`
-// which clears every slot under that key when the route unmounts, so a stale
-// bridge never leaks into the next visit.
+// that produced it: a session id for the agent-chat pickers or the PR
+// owner/repo/number for the review bridges. A route reads its slot with
+// `useRouteRegistry(routeKey)` which clears every slot under that key when the
+// route unmounts, so a stale bridge never leaks into the next visit.
 
 import { useEffect } from 'react';
 
@@ -19,7 +18,6 @@ import {
   type ProfilePickerBridge,
   type RepoPickerBridge,
 } from './picker-bridge';
-import { type SecurityFindingFilterBridge } from './security-finding-filter-bridge';
 
 export type RouteKey = string;
 
@@ -29,13 +27,6 @@ export type RouteKey = string;
  * `sessionId: 'unscoped'` default in the model-picker selection scope.
  */
 export const UNFENCED_ROUTE_KEY = 'unscoped';
-
-/**
- * The security filter sheet is pushed from a screen that owns the scope but
- * does not pass it through the bridge, so the slot uses one fixed key. The
- * route clears it on unmount the same way as every other slot.
- */
-export const SECURITY_FILTER_ROUTE_KEY = 'security-filter';
 
 /** A file-navigator "scroll to file" listener. */
 type FileNavigatorListener = (request: {
@@ -55,7 +46,6 @@ type SlotValue = {
   profilePicker: ProfilePickerBridge;
   prFileNav: Set<FileNavigatorListener>;
   prDiffSelection: DiffSelection;
-  securityFilter: SecurityFindingFilterBridge;
 };
 
 type SlotKind = keyof SlotValue;
@@ -72,21 +62,7 @@ const slots: RegistrySlots = {
   profilePicker: new Map<RouteKey, ProfilePickerBridge>(),
   prFileNav: new Map<RouteKey, Set<FileNavigatorListener>>(),
   prDiffSelection: new Map<RouteKey, DiffSelection>(),
-  securityFilter: new Map<RouteKey, SecurityFindingFilterBridge>(),
 };
-
-const ALL_SLOT_KINDS: readonly SlotKind[] = [
-  'modelPicker',
-  'modePicker',
-  'repoPicker',
-  'branchPicker',
-  'instancePicker',
-  'folderPicker',
-  'profilePicker',
-  'prFileNav',
-  'prDiffSelection',
-  'securityFilter',
-];
 
 export type RouteSlot<K extends SlotKind> = {
   get: (routeKey: RouteKey) => SlotValue[K] | undefined;
@@ -120,7 +96,6 @@ export const folderPickerSlot = createSlot('folderPicker');
 export const profilePickerSlot = createSlot('profilePicker');
 export const prFileNavSlot = createSlot('prFileNav');
 export const prDiffSelectionSlot = createSlot('prDiffSelection');
-export const securityFilterSlot = createSlot('securityFilter');
 
 /**
  * Canonical route key for a PR review flow. Owner and repo are lowercased so
@@ -137,8 +112,8 @@ export function prRouteKey(pr: { owner: string; repo: string; number: number }):
 export function useRouteRegistry(routeKey: RouteKey): void {
   useEffect(
     () => () => {
-      for (const kind of ALL_SLOT_KINDS) {
-        slots[kind].delete(routeKey);
+      for (const slotMap of Object.values(slots)) {
+        slotMap.delete(routeKey);
       }
     },
     [routeKey]

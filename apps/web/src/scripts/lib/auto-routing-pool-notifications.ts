@@ -448,7 +448,7 @@ export async function runPoolNotifications(
       }
       if (entry.status === 'attempted') continue;
       if (!options.send) continue;
-      validateCutoverAt(cutoverAt);
+      if (Date.parse(cutoverAt) <= Date.now()) break;
       entry.routersHash = hash(state.hashKey, JSON.stringify(target.routers));
       entry.status = 'attempted';
       await persistState(options.stateDir, state);

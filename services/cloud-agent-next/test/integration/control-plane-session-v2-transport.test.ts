@@ -52,13 +52,13 @@ async function setup() {
       repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
       callback: { target: { url: 'https://callback.test/hook' } },
       workspace: {
-        sandboxId: await generateSandboxId('*', undefined, 'user_transport', sessionId),
-        sandboxProvider: 'cloudflare',
+        sandboxId: await generateSandboxId(sessionId),
+        sandboxProvider: 'cloudflare-containers',
         branchName: 'kilo/test',
       },
       lifecycle: { version: 1, timestamp: 1 },
     }),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   expect(registered).toEqual({ success: true });
   await installPeer(stub, peer);
@@ -125,7 +125,7 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' });
     expect(scaled.session.sandboxRpcDeadlineMs).toBe(2_000);
     expect(scaled.session.transportRecoveryMs).toBe(1_500);
-    expect(scaled.sandbox.routePreparationMs).toBe(12 * 60_000);
+    expect(scaled.sandbox.routePreparationMs).toBe(CONTROL_PLANE_TIMERS.sandbox.routePreparationMs);
     expect(resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: 'invalid' })).toBe(
       CONTROL_PLANE_TIMERS
     );

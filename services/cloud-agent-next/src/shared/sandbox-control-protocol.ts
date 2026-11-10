@@ -1,3 +1,4 @@
+import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
 import { z } from 'zod';
 
 export {
@@ -173,6 +174,13 @@ export const sessionAttachPayloadSchema = z
     directory: z.string().min(1).max(1024).optional(),
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
+    /** Stacked workspace base: the branch the working branch starts from. */
+    baseBranch: z.string().min(1).max(256).optional(),
+    /** The resolved commit the working branch starts from. */
+    baseSha: z
+      .string()
+      .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+      .optional(),
     kilo: z
       .object({
         scopeId: z.string().min(1).max(256),
@@ -203,7 +211,9 @@ export const sessionAttachPayloadSchema = z
       .optional(),
     env: z.record(z.string().max(256), z.string().max(8192)).optional(),
     mcp: sessionAttachMcpServersSchema.optional(),
-    setupCommands: z.array(z.string().max(500)).max(20).optional(),
+    setupCommands: setupCommandsSchema.optional(),
+    startCommands: setupCommandsSchema.optional(),
+    environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),
     preparation: z
       .object({

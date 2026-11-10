@@ -1,4 +1,3 @@
-import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import {
   BYTEPLUS_CODING_MODEL_IDS,
   BYTEPLUS_CODING_PROVIDER_ID,
@@ -27,6 +26,8 @@ export type CodingPlanCatalogEntry = {
   features: readonly string[];
 };
 
+const MINIMAX_M3_MODEL_ID = 'minimax/minimax-m3';
+
 const MINIMAX_COMMON_FEATURES = [
   'Kilo automatically configures MiniMax in your BYOK settings.',
   'Full access to the MiniMax model family (M3, M2.7, image, speech, music).',
@@ -47,7 +48,7 @@ export const CODING_PLAN_CATALOG = {
     providerName: 'MiniMax',
     name: 'Token Plan Plus',
     providerId: 'minimax',
-    coveredModelIds: [MINIMAX_CURRENT_MODEL_ID],
+    coveredModelIds: [MINIMAX_M3_MODEL_ID],
     costMicrodollars: 20_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~1.7B tokens per month of M3 usage.', 'Run 3-4 concurrent agents.'),
@@ -57,7 +58,7 @@ export const CODING_PLAN_CATALOG = {
     providerName: 'MiniMax',
     name: 'Token Plan Max',
     providerId: 'minimax',
-    coveredModelIds: [MINIMAX_CURRENT_MODEL_ID],
+    coveredModelIds: [MINIMAX_M3_MODEL_ID],
     costMicrodollars: 50_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~5.1B tokens per month of M3 usage.', 'Run 4-5 concurrent agents.'),
@@ -67,7 +68,7 @@ export const CODING_PLAN_CATALOG = {
     providerName: 'MiniMax',
     name: 'Token Plan Ultra',
     providerId: 'minimax',
-    coveredModelIds: [MINIMAX_CURRENT_MODEL_ID],
+    coveredModelIds: [MINIMAX_M3_MODEL_ID],
     costMicrodollars: 120_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~12.5B tokens per month of M3 usage.', 'Run 6-7 concurrent agents.'),

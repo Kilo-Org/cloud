@@ -264,6 +264,8 @@ describe('classifyCloudAgentFailure', () => {
     ['git_pack_corrupt', 'platform', 'source_control_repository_corrupt'],
     ['setup_command_timeout', 'user', 'setup_command_timeout'],
     ['setup_command_failed', 'user', 'setup_command'],
+    ['environment_snapshot_required', 'user', 'setup_command'],
+    ['workspace_snapshot_start_failed', 'user', 'workspace_unknown'],
     ['kilo_import_timeout', 'platform', 'session_import_timeout'],
     ['kilo_import_failed', 'platform', 'session_import_failed'],
   ] as const)(
@@ -378,6 +380,7 @@ const ASSISTANT_FAILURE_CODES = ['assistant_error', 'payment_required', 'model_m
  */
 const NON_ASSISTANT_FAILURE_CLASSIFICATIONS = {
   container_limit_reached: { responsibility: 'user', reason: 'container_limit_reached' },
+  account_blocked: { responsibility: 'user', reason: 'account_blocked' },
   sandbox_connect_failed: { responsibility: 'platform', reason: 'sandbox_connectivity' },
   workspace_setup_failed: { responsibility: 'unknown', reason: 'workspace_unknown' },
   kilo_server_failed: { responsibility: 'platform', reason: 'runtime_startup' },
@@ -416,11 +419,16 @@ const WORKSPACE_FAILURE_CLASSIFICATIONS = {
   git_pack_corrupt: { responsibility: 'platform', reason: 'source_control_repository_corrupt' },
   git_checkout_conflict: { responsibility: 'user', reason: 'source_control_configuration' },
   git_branch_missing: { responsibility: 'user', reason: 'source_control_configuration' },
+  base_branch_changed: { responsibility: 'user', reason: 'source_control_configuration' },
+  base_branch_missing: { responsibility: 'user', reason: 'source_control_configuration' },
+  base_branch_stale: { responsibility: 'user', reason: 'source_control_configuration' },
   sandbox_storage_full: { responsibility: 'platform', reason: 'sandbox_capacity' },
   kilo_import_timeout: { responsibility: 'platform', reason: 'session_import_timeout' },
   kilo_import_failed: { responsibility: 'platform', reason: 'session_import_failed' },
   setup_command_timeout: { responsibility: 'user', reason: 'setup_command_timeout' },
   setup_command_failed: { responsibility: 'user', reason: 'setup_command' },
+  environment_snapshot_required: { responsibility: 'user', reason: 'setup_command' },
+  workspace_snapshot_start_failed: { responsibility: 'user', reason: 'workspace_unknown' },
   workspace_setup_unknown: { responsibility: 'unknown', reason: 'workspace_unknown' },
 } as const satisfies Record<WorkspaceFailureSubtype, CloudAgentFailureClassification>;
 

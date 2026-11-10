@@ -28,9 +28,17 @@ import {
   setupNotificationBackgroundHandler,
 } from './notifications';
 
-import type * as Notifications from '@kilocode/notifications';
+import type * as Notifications from '@kilocode/notifications/schemas';
 
-type Response = { notification: { request: { content: { data: unknown } } } };
+type Response = {
+  actionIdentifier?: string;
+  notification: {
+    request: {
+      identifier?: string;
+      content: { title?: string | null; categoryIdentifier?: string; data: unknown };
+    };
+  };
+};
 type ResponseListener = (response: Response) => void;
 
 const mocks = vi.hoisted(() => ({
@@ -204,11 +212,12 @@ vi.mock('@/lib/active-sessions-live-sync', () => ({
 }));
 vi.mock('@/lib/persist/read-cache', () => ({ readCachedUserId: () => null }));
 
-vi.mock('@kilocode/notifications', async importOriginal => ({
+vi.mock('@kilocode/notifications/schemas', async importOriginal => ({
   ...(await importOriginal<typeof Notifications>()),
   ANDROID_NOTIFICATION_CHANNELS: [
     { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
     { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
+    { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
     { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
     { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
     { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
@@ -340,6 +349,7 @@ describe('ensureAndroidNotificationChannels', () => {
           enableVibrate: false,
         },
       ],
+      ['agent-briefing', { name: 'Agent brief', importance: 3, bypassDnd: false }],
       ['kiloclaw', { name: 'KiloClaw activity', importance: 3, bypassDnd: false }],
       ['balance', { name: 'Balance alerts', importance: 3, bypassDnd: false }],
       ['security', { name: 'Security findings', importance: 4, bypassDnd: false }],
@@ -408,6 +418,7 @@ describe('ensureAndroidNotificationChannels', () => {
           enableVibrate: false,
         },
       ],
+      ['agent-briefing', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['kiloclaw', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['balance', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['security', { name: expect.any(String), importance: 4, bypassDnd: false }],
@@ -434,7 +445,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(first).toBe(second);
     await Promise.all([first, second]);
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
     expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(4);
   });
 
@@ -444,7 +455,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
     expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(4);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
@@ -486,6 +497,7 @@ describe('ensureAndroidNotificationChannels', () => {
     expect(mocks.setNotificationChannelAsync.mock.calls.map(call => call[0])).toEqual([
       'needs-input',
       'agent-progress',
+      'agent-briefing',
       'kiloclaw',
       'balance',
       'security',
@@ -502,7 +514,7 @@ describe('ensureAndroidNotificationChannels', () => {
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
     await ensureAndroidNotificationChannels();
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
     mocks.setNotificationChannelAsync.mockClear();
 
     await ensureAndroidNotificationChannels();
@@ -708,7 +720,7 @@ const securityResponses = ['personal', 'org-example'].flatMap(scope =>
     ] as const
   ).map(payload => ({
     data: { ...payload, scope, findingId: 'finding-123' } satisfies Notifications.PushData,
-    path: `/(app)/(tabs)/(3_profile)/security-agent/${scope}/findings/finding-123?via=push`,
+    path: `/(app)/security-agent/${scope}/findings/finding-123?via=push`,
   }))
 );
 const responseCases = [
@@ -1821,6 +1833,10 @@ describe('setupNotificationBackgroundHandler', () => {
     _resetGlanceablePersistForTests();
     _setSecureStoreForTests(secureStoreMock);
     secureStore.clear();
+    // The restore reads the identity beside the record it adopts, as the one
+    // keychain does on the device.
+    secureStore.set(ACTIVE_USER_ID_KEY, 'u1');
+    secureStore.set(ORGANIZATION_STORAGE_KEY, 'org-9');
     mockSecureStoreKeys();
     mocks.defineTask.mockReset();
     mocks.registerTaskAsync.mockResolvedValue(null);
@@ -2394,6 +2410,7 @@ describe('foreground attention-push suppression', () => {
     kind: 'permission',
     prUrl: null,
     organizationId: null,
+    previews: 'generic',
   } as const;
 
   it('suppresses the server attention push while the app notification for that session is posted', async () => {
@@ -2494,6 +2511,49 @@ describe('foreground attention-push suppression', () => {
       },
     });
     expect(progress.shouldShowBanner).toBe(true);
+  });
+});
+
+describe('warm needs-input answer', () => {
+  it('posts the answer result with the preview choice the listener was given', async () => {
+    // The warm listener resolves the user's message-preview choice from the
+    // preferences query and hands it to the answer; the notification it posts
+    // in place of the acted-on one follows that choice.
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    const { setupNotificationResponseHandler } = await loadNotifications();
+    const subscription = setupNotificationResponseHandler({
+      readPreviews: () => 'generic',
+      refreshGlanceableSurfaces: () => Promise.resolve(),
+    });
+
+    deliverWarmResponse({
+      actionIdentifier: 'kilo:approve',
+      notification: {
+        request: {
+          identifier: 'needs-input:ses_1',
+          content: {
+            title: 'Fix the bug',
+            data: {
+              type: 'cloud_agent_session',
+              cliSessionId: 'ses_1',
+              category: 'attention',
+              attentionKind: 'permission',
+            },
+          },
+        },
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(mocks.scheduleNotificationAsync).toHaveBeenCalled();
+    });
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: 'needs-input:ses_1',
+        content: expect.objectContaining({ title: 'Kilo', body: 'Request approved' }),
+      })
+    );
+    subscription.remove();
   });
 });
 
@@ -2858,7 +2918,7 @@ describe('cold iOS background delivery', () => {
     expect(rows).toEqual(
       new Map([['scope-token', { kind: 'ios_push_to_start', organizationId: 'org-9' }]])
     );
-    expect(await background.cleanup.readLogoutCleanupTombstone()).toBeNull();
+    expect(await background.cleanup.readLogoutCleanupRecords()).toEqual([]);
   });
 
   it('waits for the real adapter to submit the native deadline before background completion', async () => {
@@ -2918,6 +2978,8 @@ describe('cold iOS background delivery', () => {
         organizationId: 'org-9',
         userId: 'u1',
         recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+        statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+        boundPermissionId: 'perm_1',
       })
     );
     const background = await loadColdBackground();
@@ -2932,6 +2994,36 @@ describe('cold iOS background delivery', () => {
     ).toBe(0);
 
     expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: true });
+  });
+
+  it('parses a mirrored ask that names no request and keeps Approve off the card', async () => {
+    // A record written before asks carried their request parses and still names
+    // the session, but no request is named, so the push must not offer Approve
+    // until a live select binds one.
+    secureStore.set(
+      'glanceable-waiting-ask',
+      JSON.stringify({
+        kiloSessionId: 'session-1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: SCOPE_KEY,
+        organizationId: 'org-9',
+        userId: 'u1',
+        recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+      })
+    );
+    const background = await loadColdBackground();
+    expect(
+      await background.deliver({
+        status: 'happy',
+        running: 0,
+        needsInput: 1,
+        idle: 0,
+        needsInputSince: '2026-01-01T00:00:00.000Z',
+      })
+    ).toBe(0);
+
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: false });
   });
 
   it('does not revive a mirrored ask recorded for another scope', async () => {
@@ -3033,18 +3125,21 @@ describe('cold iOS background delivery', () => {
     expect(native.exists).toBe(false);
     expect(rows.has('scope-token')).toBe(true);
     expect(rows.has('failed-activity-token')).toBe(true);
-    expect(await background.cleanup.readLogoutCleanupTombstone()).toMatchObject({
-      userId: null,
-      needsPushUnregister: false,
-      needsActivityUnregister: true,
-      activityTokens: ['failed-activity-token'],
-    });
+    expect(await background.cleanup.readLogoutCleanupRecords()).toMatchObject([
+      {
+        userId: null,
+        pushTokens: [],
+        pushLookupPending: false,
+        needsActivityUnregister: true,
+        activityTokens: ['failed-activity-token'],
+      },
+    ]);
     const { attemptLogoutReconciliation } = await import('@/lib/auth/logout-reconciliation');
     await attemptLogoutReconciliation('u1');
     expect(rows).toEqual(
       new Map([['scope-token', { kind: 'ios_push_to_start', organizationId: 'org-9' }]])
     );
-    expect(await background.cleanup.readLogoutCleanupTombstone()).toBeNull();
+    expect(await background.cleanup.readLogoutCleanupRecords()).toEqual([]);
   });
 });
 

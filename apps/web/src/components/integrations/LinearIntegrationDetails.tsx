@@ -15,6 +15,7 @@ import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 import { useConfirm } from '@/components/ui/confirm';
+import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
 
 type LinearIntegrationDetailsProps = {
   organizationId?: string;
@@ -25,10 +26,18 @@ type LinearIntegrationDetailsProps = {
 const linearConnectionErrorMessages: Record<string, string> = {
   workspace_already_connected:
     'This Linear workspace is already connected to another Kilo account or organization. Disconnect it there before connecting it here.',
+  permission_required:
+    'Only organization owners, admins, and billing managers can connect or change the organization Linear integration.',
+  organization_access_required:
+    'You no longer have access to this organization. Ask an organization owner or admin for access.',
 };
 
 function getLinearConnectionErrorMessage(error: string): string {
-  return linearConnectionErrorMessages[error] ?? `Connection failed: ${error}`;
+  return resolveConnectionErrorMessage(
+    linearConnectionErrorMessages,
+    error,
+    `Connection failed: ${error}`
+  );
 }
 
 export function LinearIntegrationDetails({

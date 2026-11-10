@@ -1,77 +1,91 @@
 'use client';
 
-import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 import AdminPage from '@/app/admin/components/AdminPage';
+import { LogExportForm } from '@/app/admin/components/LogExportForm';
 import { BreadcrumbItem } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useStepUpActive } from '@/components/admin/step-up/StepUpProvider';
 
 const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 
 export default function ApiRequestLogPage() {
-  const [id, setId] = useState('');
-  const [userId, setUserId] = useState('');
-  const [organizationId, setOrganizationId] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [model, setModel] = useState('');
-  const [sessionId, setSessionId] = useState('');
-  const [errorsOnly, setErrorsOnly] = useState(false);
-
   const trpc = useTRPC();
-  const summaryQuery = useQuery(trpc.admin.apiRequestLog.getSummary.queryOptions());
+  const queryClient = useQueryClient();
+  const stepUpActive = useStepUpActive();
+  const { canExportApiRequestLogs, isPermissionResolved, isError, refetch } = useAdminPermissions();
+  const summaryQuery = useQuery(
+    trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, {
+      enabled: canExportApiRequestLogs,
+    })
+  );
 
-  function handleDownload() {
-    const params = new URLSearchParams();
-    if (id.trim()) {
-      params.set('id', id.trim());
-    }
-    if (userId.trim()) {
-      params.set('userId', userId.trim());
-    }
-    if (organizationId.trim()) {
-      params.set('organizationId', organizationId.trim());
-    }
-    if (startDate) {
-      params.set('startDate', startDate);
-      if (startTime) {
-        params.set('startTime', startTime);
-      }
-    }
-    if (endDate) {
-      params.set('endDate', endDate);
-      if (endTime) {
-        params.set('endTime', endTime);
-      }
-    }
-    if (model.trim()) {
-      params.set('model', model.trim());
-    }
-    if (sessionId.trim()) {
-      params.set('sessionId', sessionId.trim());
-    }
-    if (errorsOnly) {
-      params.set('errorsOnly', 'true');
-    }
+  async function preflight() {
+    if (!stepUpActive) return;
+    await queryClient.fetchQuery(
+      trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, { staleTime: 0 })
+    );
+  }
 
-    // Navigate directly to preserve server-side streaming
-    window.location.href = `/admin/api/api-request-log/download?${params}`;
+  const breadcrumbs = <BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>;
+
+  if (isError) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>Could not check API request log export access</CardTitle>
+            <CardDescription>The permission check request failed.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => {
+                void refetch();
+              }}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </AdminPage>
+    );
+  }
+
+  if (!isPermissionResolved) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card className="max-w-xl">
+          <CardContent className="text-muted-foreground py-8 text-center text-sm">
+            Checking API request log export access...
+          </CardContent>
+        </Card>
+      </AdminPage>
+    );
+  }
+
+  if (!canExportApiRequestLogs) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>API request log export access required</CardTitle>
+            <CardDescription>
+              Ask a superadmin to grant API request log exporter permission on the Admins page.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </AdminPage>
+    );
   }
 
   return (
-    <AdminPage
-      breadcrumbs={<BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>}
-    >
-      <div className="w-full max-w-xl space-y-4">
+    <AdminPage breadcrumbs={breadcrumbs}>
+      <div className="w-full max-w-3xl space-y-4">
         {summaryQuery.data && (
           <p className="text-muted-foreground text-sm tabular-nums">
             {summaryQuery.data.recordCount.toLocaleString()}{' '}
@@ -90,126 +104,16 @@ export default function ApiRequestLogPage() {
             )}
           </p>
         )}
-        <Card>
-          <CardHeader>
-            <CardTitle>Download API Request Log</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="id">Log ID (optional)</Label>
-              <Input
-                id="id"
-                inputMode="numeric"
-                placeholder="Enter numeric log ID"
-                value={id}
-                onChange={e => setId(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="userId">User ID or email (optional)</Label>
-              <Input
-                id="userId"
-                placeholder="Enter user ID or email"
-                value={userId}
-                onChange={e => setUserId(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="organizationId">Organization ID (optional)</Label>
-              <Input
-                id="organizationId"
-                placeholder="Enter organization ID"
-                value={organizationId}
-                onChange={e => setOrganizationId(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="model">Model prefix (optional)</Label>
-              <Input
-                id="model"
-                placeholder="e.g. anthropic/"
-                value={model}
-                onChange={e => setModel(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sessionId">Session ID (optional)</Label>
-              <Input
-                id="sessionId"
-                placeholder="Enter session ID"
-                value={sessionId}
-                onChange={e => setSessionId(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date (optional)</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={e => setStartDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="startTime">Start Time (optional)</Label>
-                  <Input
-                    id="startTime"
-                    type="time"
-                    value={startTime}
-                    disabled={!startDate}
-                    onChange={e => setStartTime(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endDate">End Date (optional)</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    onChange={e => setEndDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endTime">End Time (optional)</Label>
-                  <Input
-                    id="endTime"
-                    type="time"
-                    value={endTime}
-                    disabled={!endDate}
-                    onChange={e => setEndTime(e.target.value)}
-                  />
-                </div>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                Dates and times are UTC. Without a time, the range covers the whole day. The end
-                time includes the full minute.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="errorsOnly"
-                checked={errorsOnly}
-                onCheckedChange={checked => setErrorsOnly(checked === true)}
-              />
-              <Label htmlFor="errorsOnly" className="cursor-pointer">
-                Errors only (status &ge; 400 or error present)
-              </Label>
-            </div>
-
-            <Button onClick={handleDownload} className="w-full">
-              <Download className="mr-2 h-4 w-4" />
-              Download ZIP
-            </Button>
-          </CardContent>
-        </Card>
+        <LogExportForm
+          title="Download API Request Log"
+          description="Requests and responses logged for the opt-ins below, kept for 30 days."
+          downloadPath="/admin/api/api-request-log/download"
+          idLabel="Log ID"
+          idPlaceholder="Enter numeric log ID"
+          idInputMode="numeric"
+          showErrorsOnly
+          preflight={preflight}
+        />
       </div>
     </AdminPage>
   );

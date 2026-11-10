@@ -29,6 +29,8 @@ const AUTH_ERROR_KEYS = {
   INVALID_CODE: 'authErrors.invalidCode',
   CODE_IN_PROGRESS: 'authErrors.codeInProgress',
   TOO_MANY_ATTEMPTS: 'authErrors.tooManyAttempts',
+  // The native token route's firewall rate limit, on the address or the account.
+  RATE_LIMITED: 'authErrors.tooManySignInAttempts',
   INVALID_TOKEN: 'authErrors.invalidToken',
   INVALID_EMAIL: 'authErrors.invalidEmail',
   INVALID_REQUEST: 'authErrors.invalidRequest',

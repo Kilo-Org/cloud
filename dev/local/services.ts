@@ -44,7 +44,6 @@ const groups: ServiceGroup[] = [
     groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
     id: 'security-agent',
     label: 'Security Agent',
@@ -83,7 +82,6 @@ type ServiceMeta = {
 };
 
 const serviceMeta: Record<string, ServiceMeta> = {
-  // core
   // The web app mints web tickets from Session Ingest
   // (`activeSessions.createWebTicket` / `getToken` in
   // apps/web/src/routers/active-sessions-router.ts), so starting the web app
@@ -92,6 +90,12 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // gets a 412 PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
   // The web app rewrites its AI gateway routes to the ai-gateway app (see
   // apps/web/ai-gateway-rewrites.mjs), so it pulls that app in too.
+  // Every code-review read and write reaches git-token-service for the caller's
+  // provider credential (apps/web/src/lib/integrations/platforms/{github,gitlab,
+  // bitbucket}/ plus lib/provider-review/), so the web stack must pull the
+  // worker in transitively — otherwise those fetches hit a dead
+  // `GIT_TOKEN_SERVICE_API_URL` and a connected GitHub account renders as a
+  // service outage with no pull requests.
   nextjs: {
     group: 'core',
     dependsOn: [
@@ -101,23 +105,37 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'stripe',
       'cloudflare-session-ingest',
       'ai-gateway',
+      'cloudflare-git-token-service',
+      'byok-kms',
     ],
   },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
+  'local-kms': { group: 'core', dependsOn: [] },
+  'byok-kms': { group: 'core', dependsOn: ['local-kms'] },
   stripe: { group: 'core', dependsOn: [] },
   'ai-gateway': {
     group: 'core',
     dependsOn: ['postgres', 'redis', 'redis-http'],
     dir: 'apps/ai-gateway',
   },
+  // Applies WorkOS directory events by calling the app's internal SCIM
+  // endpoints, so it needs Next.js up and Postgres behind it — the same
+  // dependencies `user-data-export` declares for the same reason. Without a
+  // `WORKOS_API_KEY` in `services/scim-sync/.dev.vars` the poll fails and
+  // reports the failure, which is harmless: the alarm retries and nothing is
+  // applied.
+  'cloudflare-scim-sync': {
+    group: 'core',
+    dependsOn: ['postgres', 'nextjs'],
+    dir: 'services/scim-sync',
+  },
   'user-data-export': {
     group: 'data-export',
     dependsOn: ['postgres', 'nextjs'],
     dir: 'services/user-data-export',
   },
-  // auto-routing (kilo-auto/efficient decision engine + benchmark runner)
   'auto-routing': {
     group: 'auto-routing',
     dependsOn: [],
@@ -128,7 +146,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/auto-routing-benchmark',
   },
-  // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
     dependsOn: [
@@ -185,13 +202,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/cloud-agent-next',
   },
   'cloud-agent-public-tunnels': { group: 'cloud-agent-public-tunnels', dependsOn: [] },
-  // git-token-service (shared by cloud-agent, gastown)
   'cloudflare-git-token-service': {
     group: 'git-token-service',
     dependsOn: ['postgres'],
     dir: 'services/git-token-service',
   },
-  // code-review
   'bitbucket-webhook-tunnel': {
     group: 'code-review',
     dependsOn: ['nextjs'],
@@ -201,7 +216,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/code-review-infra',
   },
-  // security-agent
   'cloudflare-security-sync': {
     group: 'security-agent',
     dependsOn: ['postgres', 'cloudflare-git-token-service'],
@@ -218,7 +232,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     ],
     dir: 'services/security-auto-analysis',
   },
-  // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
   notifications: {
@@ -256,7 +269,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['kiloclaw', 'event-service'],
     dir: 'services/kilo-chat',
   },
-  // observability
   'cloudflare-o11y': {
     group: 'observability',
     dependsOn: ['nextjs'],
@@ -278,31 +290,17 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/ai-attribution',
   },
   grafana: { group: 'observability', dependsOn: [] },
-  // mobile
   // The app POSTs its client-observed latency batches to the latency-ingest
   // worker in every dev session (`LATENCY_INGEST_URL` in the mobile env points
   // at its wrangler port), so a stack started for mobile work runs it;
   // otherwise the app POSTs to a dead listener and the ingest path cannot be
   // observed locally.
   mobile: { group: 'mobile', dependsOn: ['latency-ingest'], dir: 'apps/mobile' },
-  // storybook
   storybook: { group: 'storybook', dependsOn: [] },
-  // deletion-mock
   'deletion-mock': {
     group: 'deletion-mock',
     dependsOn: [],
     dir: 'dev/local/scripts',
-  },
-  // gastown
-  'cloudflare-gastown': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'cloudflare-git-token-service', 'container-usage-meter', 'nextjs'],
-    dir: 'services/gastown',
-  },
-  'cloudflare-wasteland': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'nextjs'],
-    dir: 'services/wasteland',
   },
 };
 
@@ -509,10 +507,6 @@ export function resolveE2eInternalSecretSessionEnv(args: {
   return { E2E_INTERNAL_API_SECRET: resolveE2eInternalSecret(env) };
 }
 
-// ---------------------------------------------------------------------------
-// Wrangler config discovery
-// ---------------------------------------------------------------------------
-
 function stripJsonComments(text: string): string {
   let result = '';
   let i = 0;
@@ -572,10 +566,6 @@ export function resolveFakeLlmWorkerPort(): number {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Build service definitions from serviceMeta + wrangler.jsonc
-// ---------------------------------------------------------------------------
-
 // Base host ports for the Compose stack. A worktree with a port offset runs its
 // own Compose project on offset host ports, so its database, its data, and its
 // container lifecycle are its own — a sibling worktree's `docker compose down`
@@ -585,8 +575,15 @@ const INFRA_PORTS: Record<string, number> = {
   postgres: 5432,
   redis: 6379,
   'redis-http': 8079,
+  'local-kms': 8900,
   grafana: 4000,
 };
+
+const BYOK_KMS_SERVICE_BASE_PORT = 8901;
+
+export function byokKmsServicePort(offset: number = portOffset): number {
+  return BYOK_KMS_SERVICE_BASE_PORT + offset;
+}
 
 export function getInfraBasePort(serviceName: string): number | undefined {
   return INFRA_PORTS[serviceName];
@@ -617,15 +614,8 @@ export function getAllInfraProfiles(): string[] {
   return [...new Set(Object.values(INFRA_PROFILES))];
 }
 
-// Wrangler always pulls its container egress-interceptor sidecar
-// (cloudflare/proxy-everything) with --platform linux/amd64. On Apple Silicon
-// the emulated amd64 proxy crashes at startup ("setsockopt: protocol not
-// available" — its transparent-proxy socket options don't survive Rosetta),
-// which surfaces as "Failed to start container" for every local container.
-// Point wrangler at the same proxy version's linux/arm64 manifest instead:
-// pulling a single-platform manifest digest with --platform amd64 only warns.
-// Keep the digest in sync with DEFAULT_CONTAINER_EGRESS_INTERCEPTOR_IMAGE in
-// the pinned wrangler/miniflare version (tag 3cb1195).
+// Wrangler's amd64 egress proxy crashes under Apple Silicon emulation. Pin its
+// arm64 manifest; keep aligned with the pinned Wrangler/Miniflare proxy version.
 const CONTAINER_EGRESS_IMAGE_ARM64 =
   'cloudflare/proxy-everything:3cb1195@sha256:78c7910f4575a511d928d7824b1cbcaec6b7c4bf4dbb3fafaeeae3104030e73c';
 
@@ -845,6 +835,28 @@ function buildServiceDefs(): ServiceDef[] {
         port: INFRA_PORTS[name] + portOffset,
         dependsOn: meta.dependsOn,
         command: dockerComposeUp(name),
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'byok-kms') {
+      const byokKmsPort = byokKmsServicePort();
+      defs.push({
+        name,
+        type: 'process',
+        dir: '.',
+        port: byokKmsPort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'env',
+          `BYOK_KMS_SERVICE_PORT=${byokKmsPort}`,
+          `BYOK_KMS_ENDPOINT=http://127.0.0.1:${INFRA_PORTS['local-kms'] + portOffset}`,
+          'pnpm',
+          'exec',
+          'tsx',
+          'dev/byok-kms/server.ts',
+        ],
         group: meta.group,
       });
       continue;

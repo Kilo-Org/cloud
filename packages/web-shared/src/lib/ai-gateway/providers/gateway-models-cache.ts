@@ -1,42 +1,67 @@
-import { modelsByProvider, StoredModelSchema, type StoredModel } from '@kilocode/db';
-import { desc } from 'drizzle-orm';
-import * as z from 'zod';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-
-export type StoredModelMap = Record<string, StoredModel>;
-
-const StoredModelMapSchema = z.record(z.string(), StoredModelSchema);
+import type { MetadataSource } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import {
+  formatModelIds,
+  joinGatewayModelEndpoints,
+  openRouterGatewayModelsSource,
+  readStoredGatewayModels,
+  retainPreviousEntries,
+  vercelGatewayModelsSource,
+  type GatewayModelList,
+  type GatewayModelMap,
+  type GatewayModelWithEndpoints,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { legacyOpenRouterAliases } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-openrouter-model-ids';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 const TTL_MS = 300_000;
 
-function createStoredModelsFromDatabaseFetcher(provider: 'openrouter' | 'vercel', name: string) {
-  return createCachedFetch<StoredModelMap>(
+/**
+ * Unlike sync-providers, the request path never fetches upstream: a listed model whose endpoints
+ * are not stored yet keeps its previous entry, or is left out until the refresh job stores them. A
+ * list or joined catalog that looks truncated throws, so callers keep the last good map.
+ */
+function createGatewayModelsFetcher(
+  gateway: Provider,
+  source: MetadataSource<GatewayModelList>,
+  name: string
+) {
+  let previous: GatewayModelMap = {};
+  return createCachedFetch<GatewayModelMap>(
     async () => {
-      const [row] = await readDb
-        .select({ models: modelsByProvider[provider] })
-        .from(modelsByProvider)
-        .orderBy(desc(modelsByProvider.id))
-        .limit(1);
-      if (!row?.models || Object.keys(row.models).length === 0) {
+      const stored = await readStoredGatewayModels(gateway, source, readDb);
+      if (!stored) {
         console.debug(`[getGatewayModels] no ${name} models found in the database`);
         return {};
       }
-      return StoredModelMapSchema.parse(row.models);
+      const joined = joinGatewayModelEndpoints(gateway, stored);
+      if (joined.withoutStoredEndpoints.length > 0) {
+        warnExceptInTest(
+          `[getGatewayModels] ${joined.withoutStoredEndpoints.length} ${name} models have no usable stored endpoints: ${formatModelIds(joined.withoutStoredEndpoints)}`
+        );
+      }
+      previous = retainPreviousEntries(joined, previous);
+      return previous;
     },
     TTL_MS,
-    {}
+    {},
+    { name: `gatewayModels[${gateway.type}]` }
   );
 }
 
-export const getVercelModelsMetadataFromDatabase = createStoredModelsFromDatabaseFetcher(
-  'vercel',
+export const getVercelModelsMetadataFromDatabase = createGatewayModelsFetcher(
+  VERCEL_AI_GATEWAY,
+  vercelGatewayModelsSource,
   'Vercel'
 );
 
-export const getOpenRouterModelsMetadataFromDatabase = createStoredModelsFromDatabaseFetcher(
-  'openrouter',
+export const getOpenRouterModelsMetadataFromDatabase = createGatewayModelsFetcher(
+  OPENROUTER,
+  openRouterGatewayModelsSource,
   'OpenRouter'
 );
 
@@ -53,7 +78,7 @@ export async function resolveOpenRouterModelAlias(modelId: string): Promise<stri
  * The ids of language models, including those with no endpoints. Vercel models
  * carry a `type`; OpenRouter models are language models when they output text.
  */
-export function getLanguageModelIds(models: StoredModelMap): string[] {
+export function getLanguageModelIds(models: GatewayModelMap): string[] {
   return Object.values(models)
     .filter(
       model => model.type === 'language' || model.architecture?.output_modalities.includes('text')
@@ -65,7 +90,7 @@ export function getLanguageModelIds(models: StoredModelMap): string[] {
  * The ids of System One models, including `:free` variants and `~` aliases.
  * Vercel types them as `evaluation`; OpenRouter models output `decisions`.
  */
-export function getSystemOneModelIds(models: StoredModelMap): string[] {
+export function getSystemOneModelIds(models: GatewayModelMap): string[] {
   return Object.values(models)
     .filter(
       model =>
@@ -74,7 +99,9 @@ export function getSystemOneModelIds(models: StoredModelMap): string[] {
     .map(model => model.id);
 }
 
-export function extractVercelInferenceProviderIdsFromModel(model: StoredModel): string[] {
+export function extractVercelInferenceProviderIdsFromModel(
+  model: GatewayModelWithEndpoints
+): string[] {
   return [
     ...new Set(
       model.endpoints.map(endpoint => endpoint.provider_name).filter(p => p !== undefined)
@@ -97,7 +124,8 @@ const getVercelInferenceProviderIdsByModel = createCachedFetch<ReadonlyMap<strin
     );
   },
   TTL_MS,
-  new Map()
+  new Map(),
+  { name: 'vercelInferenceProviderIdsByModel' }
 );
 
 export async function getCachedVercelInferenceProviderIdsForModel(
@@ -106,51 +134,31 @@ export async function getCachedVercelInferenceProviderIdsForModel(
   return (await getVercelInferenceProviderIdsByModel()).get(modelId) ?? null;
 }
 
-function createLanguageModelIdsFetcher(fetchModels: () => Promise<StoredModelMap>) {
+function createLanguageModelIdsFetcher(name: string, fetchModels: () => Promise<GatewayModelMap>) {
   return createCachedFetch<ReadonlySet<string>>(
     async () => new Set(getLanguageModelIds(await fetchModels())),
     TTL_MS,
-    new Set<string>()
+    new Set<string>(),
+    { name }
   );
 }
 
 export const getVercelModelsFromDatabase = createLanguageModelIdsFetcher(
+  'vercelLanguageModelIds',
   getVercelModelsMetadataFromDatabase
 );
 
 export const getOpenRouterModelsFromDatabase = createLanguageModelIdsFetcher(
+  'openRouterLanguageModelIds',
   getOpenRouterModelsMetadataFromDatabase
 );
 
 export const getOpenRouterSystemOneModelsFromDatabase = createCachedFetch<ReadonlySet<string>>(
   async () => new Set(getSystemOneModelIds(await getOpenRouterModelsMetadataFromDatabase())),
   TTL_MS,
-  new Set<string>()
+  new Set<string>(),
+  { name: 'openRouterSystemOneModelIds' }
 );
-
-// Undocumented aliases that remain in active use but are absent from OpenRouter's model catalog.
-const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
-  'anthropic/claude-haiku-4-5',
-  'anthropic/claude-sonnet-4-5',
-  'anthropic/claude-sonnet-4-6',
-  'anthropic/claude-sonnet-5-20260630',
-  'claude-sonnet-4.5',
-  'claude-sonnet-5',
-  'deepseek-v4-flash',
-  'deepseek-v4-flash-0731',
-  'deepseek-v4-pro',
-  'gemini-2.5-flash-lite',
-  'gpt-4o',
-  'gpt-4o-mini',
-  'gpt-5.4',
-  'gpt-5.4-mini',
-  'gpt-5.5',
-  'gpt-5.6-luna',
-  'gpt-5.6-sol',
-  'gpt-5.6-terra',
-  'minimax-m3',
-  'minimax/minimax-m2.5-20260211',
-]);
 
 // The cached empty id set is the same instance for a whole TTL window, so warning once per distinct
 // empty snapshot reports an outage once per window instead of once per validated model id.

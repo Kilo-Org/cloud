@@ -12,9 +12,6 @@ import { ModelCatalogDetailScreen } from './model-catalog-detail-screen';
 const detail = vi.hoisted(() => ({ current: undefined as HfModelDetail | undefined }));
 
 vi.mock('@/lib/chat/use-hf-catalog', () => ({
-  HfRequestError: class HfRequestError extends Error {
-    readonly status = 0;
-  },
   useDeviceBudget: () => ({ memoryBytes: 8_000_000_000, freeBytes: 4_000_000_000 }),
   useHfModelDetail: () => ({ data: detail.current, isError: false, isPending: false }),
 }));
@@ -23,6 +20,13 @@ vi.mock('@/lib/chat/gguf-models', () => ({
   useGgufModels: () => ({}),
 }));
 vi.mock('./gguf-model-section', () => ({ GgufDownloadControls: 'GgufDownloadControls' }));
+// The screen binds both Back exits to the catalog rule, which reads
+// `expo-router`; that pipeline is not what this suite covers, so the rule is
+// stubbed here and exercised by `lib/chat/model-catalog-back.mounted.test.tsx`.
+vi.mock('@/lib/chat/model-catalog-back', () => ({
+  useModelCatalogBack: () => () => undefined,
+  useModelCatalogHardwareBack: () => undefined,
+}));
 // The real component renders the header and the summary through FlashList's
 // header slot, so a host-string stub would drop the only content under test.
 vi.mock('@shopify/flash-list', async () => {

@@ -1,6 +1,7 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import {
   getWorktreeChangesOutputSchema,
+  worktreeFileIdentity,
   type GetWorktreeChangesOutput,
   type RefreshWorktreeChangesOutput,
   type WorktreeChangesSnapshot,
@@ -11,18 +12,22 @@ export type WorktreeChangesViewMode = 'flat' | 'tree';
 export type WorktreeChangesFile = WorktreeChangesSnapshot['files'][number];
 
 type WorktreeChangesScope = {
+  /** The signed-in user: another account's snapshot is never served from here. */
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
 };
 
 export function getWorktreeChangesQueryKey({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
 }: WorktreeChangesScope) {
   return [
     'worktree-changes',
+    userId,
     organizationId ?? null,
     worktreeId === undefined ? ['session', cloudAgentSessionId] : ['worktree', worktreeId],
   ] as const;
@@ -30,10 +35,21 @@ export function getWorktreeChangesQueryKey({
 
 export function getWorktreeFileQueryKey({
   path,
+  scope: fileScope,
   expectedRevision,
   ...scope
-}: WorktreeChangesScope & { path: string; expectedRevision: number }) {
-  return [...getWorktreeChangesQueryKey(scope), 'file', path, expectedRevision] as const;
+}: WorktreeChangesScope & {
+  path: string;
+  scope?: WorktreeChangesFile['scope'];
+  expectedRevision: number;
+}) {
+  return [
+    ...getWorktreeChangesQueryKey(scope),
+    'file',
+    fileScope ?? null,
+    path,
+    expectedRevision,
+  ] as const;
 }
 
 export type WorktreeChangesTreeNode =
@@ -66,7 +82,76 @@ export function getWorktreeChangesTotals(
     countsComplete = countsComplete && file.countsComplete;
   }
 
-  return { fileCount: snapshot.files.length, additions, deletions, countsComplete };
+  return {
+    fileCount: new Set(snapshot.files.map(file => file.path)).size,
+    additions,
+    deletions,
+    countsComplete,
+  };
+}
+
+export const getWorktreeChangesFileKey = worktreeFileIdentity;
+
+export function groupWorktreeChangesByScope(files: readonly WorktreeChangesFile[]) {
+  const sections = [
+    {
+      label: 'Uncommitted',
+      scope: 'uncommitted' as const,
+      files: files.filter(file => file.scope === 'uncommitted'),
+    },
+    {
+      label: 'Against base branch',
+      scope: 'against-base-branch' as const,
+      files: files.filter(file => file.scope === 'against-base-branch'),
+    },
+  ];
+  const legacy = files.filter(file => file.scope === undefined);
+  return legacy.length > 0
+    ? [...sections, { label: 'Saved changes', scope: undefined, files: legacy }]
+    : sections;
+}
+
+export type WorktreeChangesRepositoryGroup = {
+  repoFullName: string;
+  baseRef: string;
+  truncated: boolean;
+  files: WorktreeChangesFile[];
+};
+
+/**
+ * `files` of a multi-repository snapshot, grouped by repository. A file
+ * belongs to the repository with the longest `path` that prefixes it, and a
+ * repository without files is left out. Returns null when the snapshot has
+ * fewer than two repositories (V1 or a single V2 repository) or a file belongs
+ * to none, so the caller shows the plain list.
+ */
+export function groupWorktreeChangesByRepository(
+  snapshot: WorktreeChangesSnapshot | null | undefined,
+  files: readonly WorktreeChangesFile[]
+): WorktreeChangesRepositoryGroup[] | null {
+  const repositories = snapshot?.repositories;
+  if (!snapshot || !repositories || repositories.length < 2) return null;
+
+  const byLongestPath = [...repositories].sort((a, b) => b.path.length - a.path.length);
+  const groups = new Map<string, WorktreeChangesRepositoryGroup>(
+    repositories.map(repository => [
+      repository.path,
+      {
+        repoFullName: repository.repoFullName,
+        baseRef: repository.comparison.baseRef,
+        truncated: repository.truncated,
+        files: [],
+      },
+    ])
+  );
+  for (const file of files) {
+    const owner = byLongestPath.find(
+      repository => repository.path === '' || file.path.startsWith(`${repository.path}/`)
+    );
+    if (!owner) return null;
+    groups.get(owner.path)?.files.push(file);
+  }
+  return [...groups.values()].filter(group => group.files.length > 0);
 }
 
 export function deserializeWorktreeChangesViewMode(value: string): WorktreeChangesViewMode {
@@ -101,8 +186,13 @@ export function resolveWorktreeChangesSelection(
   selectedPath: string | null,
   files: readonly WorktreeChangesFile[]
 ): string | null {
-  if (selectedPath && files.some(file => file.path === selectedPath)) return selectedPath;
-  return groupWorktreeChangesByDirectory(files)[0]?.files[0]?.path ?? null;
+  if (selectedPath && files.some(file => getWorktreeChangesFileKey(file) === selectedPath))
+    return selectedPath;
+  for (const section of groupWorktreeChangesByScope(files)) {
+    const first = groupWorktreeChangesByDirectory(section.files)[0]?.files[0];
+    if (first) return getWorktreeChangesFileKey(first);
+  }
+  return null;
 }
 
 export function formatWorktreeChangesBaseBranch(baseRef: string): string {

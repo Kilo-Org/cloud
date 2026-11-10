@@ -4,8 +4,10 @@
 // NO destructive CTA (the user already merged; re-running the merge
 // would 422 and there is no rollback from the client side).
 //
-// Styling mirrors `AutoMergeEnabledBanner` so the two read as
-// siblings; tone is "soft" / accent, not destructive.
+// Styling keeps the full accent surface: this banner lands after the merge, so
+// no primary action shares the screen and it is the one element that reports
+// the outcome. `AutoMergeEnabledBanner` sits directly above the merge button,
+// so it paints the low-emphasis accent tint instead.
 
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';

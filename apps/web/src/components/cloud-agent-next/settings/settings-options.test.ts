@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   getSandboxAllocationRequest,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -18,16 +18,14 @@ function capabilities(): SandboxSelectionCapabilities {
   return {
     enabled: true,
     options: [
-      { allocation: getSandboxAllocationRequest('cloudflare-single') },
       {
         allocation: getSandboxAllocationRequest('vercel-small'),
         repositoryUnavailableReason: 'Vercel sandboxes support GitHub repositories only',
       },
       {
-        allocation: getSandboxAllocationRequest('cloudflare-shared'),
+        allocation: getSandboxAllocationRequest('cloudflare-containers-standard-4'),
         unavailableReason: 'Cloudflare is down',
       },
-      { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-4') },
       { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') },
     ],
   };
@@ -35,16 +33,18 @@ function capabilities(): SandboxSelectionCapabilities {
 
 describe('settings-options', () => {
   test('names the default sandbox with its provider and capacity', () => {
-    expect(describeDefaultSandbox(getSandboxAllocationRequest('cloudflare-single'))).toEqual({
-      summary: 'Cloudflare · 2 vCPU / 6 GiB',
-      full: 'Cloudflare · 2 vCPU / 6 GiB · Small',
+    expect(
+      describeDefaultSandbox(getSandboxAllocationRequest('cloudflare-containers-standard-3'))
+    ).toEqual({
+      summary: 'Cloudflare Containers · 2 vCPU / 8 GiB',
+      full: 'Cloudflare Containers · 2 vCPU / 8 GiB · Medium',
     });
   });
 
   test('names a provider-chosen default without a capacity', () => {
     expect(
       describeDefaultSandbox({
-        provider: { id: 'vercel', account: 'kilo' },
+        provider: { id: 'vercel', account: 'byoc' },
         instanceType: 'default',
       })
     ).toEqual({ summary: 'Vercel · Provider default', full: 'Vercel · Provider default' });
@@ -56,8 +56,6 @@ describe('settings-options', () => {
 
   test('offers only options without an unavailability reason', () => {
     expect(getEligibleAllocationChoices(capabilities()).map(c => c.allocation)).toEqual([
-      'cloudflare-single',
-      'cloudflare-containers-standard-4',
       'cloudflare-containers-standard-3',
     ]);
   });
@@ -68,50 +66,56 @@ describe('settings-options', () => {
   });
 
   test('names the provider without the account and keeps the tier out of the summary', () => {
-    const shared = getEligibleAllocationChoices({
+    const medium = getEligibleAllocationChoices({
       enabled: true,
-      options: [{ allocation: getSandboxAllocationRequest('cloudflare-shared') }],
+      options: [{ allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') }],
     })[0];
-    expect(shared.provider).toBe('Cloudflare');
-    expect(shared.instance).toContain('Large · Shared');
-    expect(shared.summary.startsWith('Cloudflare · ')).toBe(true);
-    expect(shared.summary).not.toContain('Shared');
+    expect(medium.provider).toBe('Cloudflare Containers');
+    expect(medium.instance).toContain('Medium');
+    expect(medium.summary.startsWith('Cloudflare Containers · ')).toBe(true);
+    expect(medium.summary).not.toContain('Medium');
   });
 
   test('groups choices by provider in the order they are offered', () => {
-    const groups = groupChoicesByProvider(getEligibleAllocationChoices(capabilities()));
+    const groups = groupChoicesByProvider(
+      getEligibleAllocationChoices({
+        enabled: true,
+        options: [
+          { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') },
+          { allocation: getSandboxAllocationRequest('vercel-large') },
+        ],
+      })
+    );
     expect(
       groups.map(group => [group.provider, group.choices.map(choice => choice.allocation)])
     ).toEqual([
-      ['Cloudflare', ['cloudflare-single']],
-      [
-        'Cloudflare Containers',
-        ['cloudflare-containers-standard-4', 'cloudflare-containers-standard-3'],
-      ],
+      ['Vercel', ['vercel-large']],
+      ['Cloudflare Containers', ['cloudflare-containers-standard-3']],
     ]);
   });
 
   test('keeps the offered list when the saved allocation is already offered or empty', () => {
     const choices = getEligibleAllocationChoices(capabilities());
-    expect(withSavedChoice(choices, 'cloudflare-single', 'ignored')).toBe(choices);
+    expect(withSavedChoice(choices, 'cloudflare-containers-standard-3', 'ignored')).toBe(choices);
     expect(withSavedChoice(choices, null, undefined)).toBe(choices);
     expect(withSavedChoice(choices, 'not-an-allocation', undefined)).toBe(choices);
+    expect(withSavedChoice(choices, 'cloudflare-shared', 'retired')).toBe(choices);
   });
 
   test('adds a saved allocation that is no longer offered as an unavailable choice', () => {
     const choices = getEligibleAllocationChoices(capabilities());
     const withSaved = withSavedChoice(
       choices,
-      'vercel-small',
+      'vercel-large',
       'Vercel sandboxes support GitHub repositories only'
     );
     expect(withSaved).toHaveLength(choices.length + 1);
     expect(withSaved.at(-1)).toMatchObject({
-      allocation: 'vercel-small',
+      allocation: 'vercel-large',
       provider: 'Vercel',
       unavailableReason: 'Vercel sandboxes support GitHub repositories only',
     });
-    expect(withSavedChoice(choices, 'vercel-small', undefined).at(-1)?.unavailableReason).toBe(
+    expect(withSavedChoice(choices, 'vercel-large', undefined).at(-1)?.unavailableReason).toBe(
       'This sandbox is unavailable'
     );
   });
@@ -119,12 +123,12 @@ describe('settings-options', () => {
   test('groups an unavailable saved allocation with its provider', () => {
     const choices = getEligibleAllocationChoices(capabilities());
     const groups = groupChoicesByProvider(
-      withSavedChoice(choices, 'cloudflare-shared', 'Cloudflare is down')
+      withSavedChoice(choices, 'cloudflare-containers-standard-4', 'Cloudflare is down')
     );
-    expect(groups[0].provider).toBe('Cloudflare');
+    expect(groups[0].provider).toBe('Cloudflare Containers');
     expect(groups[0].choices.map(choice => choice.allocation)).toEqual([
-      'cloudflare-single',
-      'cloudflare-shared',
+      'cloudflare-containers-standard-3',
+      'cloudflare-containers-standard-4',
     ]);
   });
 
@@ -167,7 +171,7 @@ describe('settings-options', () => {
   });
 
   test('the chosen key round-trips through the capability option', () => {
-    const option = capabilities().options[0];
-    expect(getKiloSandboxAllocation(option.allocation)).toBe('cloudflare-single');
+    const option = capabilities().options.at(-1)!;
+    expect(getSandboxAllocation(option.allocation)).toBe('cloudflare-containers-standard-3');
   });
 });

@@ -14,6 +14,7 @@ import {
   fetchSessionMessagesPage,
   deleteSession,
   shareSession,
+  SessionShareTooLargeError,
   unshareSession,
   fetchSharedSessionMetadata,
   fetchSharedSessionSnapshot,
@@ -300,6 +301,40 @@ describe('deleteSession', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'workspace_requires_root_session',
+    'workspace_deleting',
+    'workspace_identity_conflict',
+    'worktree_deleting',
+  ])('maps an ingest 409 %s response to TRPC CONFLICT', async reason => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: false, error: reason }), {
+        status: 409,
+        statusText: 'Conflict',
+      })
+    );
+
+    await expect(deleteSession('ses_abc123', 'user_123')).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: reason,
+    });
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('does not map an unknown ingest 409 reason to TRPC CONFLICT', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: false, error: 'session_deleted' }), {
+        status: 409,
+        statusText: 'Conflict',
+      })
+    );
+
+    await expect(deleteSession('ses_abc123', 'user_123')).rejects.toThrow(
+      'Session ingest delete failed: 409 Conflict - {"success":false,"error":"session_deleted"}'
+    );
+    expect(mockCaptureException).toHaveBeenCalled();
+  });
+
   it('encodes session ID in URL', async () => {
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
@@ -321,6 +356,29 @@ describe('shareSession', () => {
     mockFetch.mockReset();
     mockCaptureException.mockReset();
     mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+  });
+
+  it.each([
+    [{}, { duration: '7d', include_new_messages: false }],
+    [
+      { duration: 'forever', include_new_messages: true },
+      { duration: 'forever', include_new_messages: true },
+    ],
+  ] as const)('sends validated share options %s', async (options, expected) => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, share_token: 'test-link' }))
+    );
+    await shareSession('ses_abc123', 'user_123', options);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify(expected),
+        headers: {
+          Authorization: 'Bearer mock-jwt-token',
+          'Content-Type': 'application/json',
+        },
+      })
+    );
   });
 
   it('returns share_token on success', async () => {
@@ -361,7 +419,9 @@ describe('shareSession', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ headers: { Authorization: 'Bearer mock-jwt-token' } })
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer mock-jwt-token', 'Content-Type': 'application/json' },
+      })
     );
   });
 
@@ -378,6 +438,14 @@ describe('shareSession', () => {
       audience: 'session-ingest',
       expiresIn: 60 * 60,
     });
+  });
+
+  it('preserves a specific oversized-share error from the worker', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 413 }));
+    await expect(shareSession('ses_abc123', 'user_123')).rejects.toBeInstanceOf(
+      SessionShareTooLargeError
+    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it('throws on 404', async () => {

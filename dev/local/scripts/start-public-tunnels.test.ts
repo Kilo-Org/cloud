@@ -66,10 +66,6 @@ test('can pin KILO_OPENROUTER_BASE to the backend tunnel /api', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// Fake LLM tunnel guard
-// ---------------------------------------------------------------------------
-
 function guardInput(overrides: {
   fakeLlmPort?: string;
   adminToken?: string;

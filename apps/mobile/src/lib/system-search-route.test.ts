@@ -29,8 +29,19 @@ const mocks = vi.hoisted(() => {
     addListener: vi.fn<(listener: () => void) => { remove: () => void } | null>(() => ({
       remove: vi.fn<() => void>(),
     })),
+    toastError: vi.fn<(title: string, options?: unknown) => string | number>(() => 'toast-id'),
   };
 });
+
+// The toast adapter renders `sonner-native` (and reanimated with it); the suite
+// asserts the call the routing makes, and a device proof covers the rendering.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: {
+    error: mocks.toastError,
+    success: vi.fn<(title: string) => string | number>(() => 'toast-id'),
+    warning: vi.fn<(title: string) => string | number>(() => 'toast-id'),
+  },
+}));
 
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
@@ -68,7 +79,7 @@ import {
 
 const SESSION_ID = '/(app)/agent-chat/session-1';
 const PR_ID = '/(app)/pr-review/owner/repo/42';
-const FINDING_ID = '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1';
+const FINDING_ID = '/(app)/security-agent/personal/findings/finding-1';
 
 /** The source of the durable record, the only place the source is observable. */
 function persistedSource(): string | null {
@@ -245,6 +256,7 @@ describe('system-search-route', () => {
         'error.operation': 'consume-route',
       });
       expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(mocks.toastError).not.toHaveBeenCalled();
     });
   });
 
@@ -304,6 +316,12 @@ describe('system-search-route', () => {
       for (const id of ids) {
         expect(systemSearchHrefFromRoute(id)).toBe(id);
       }
+    });
+
+    it('resolves an id indexed before the finding route moved', () => {
+      expect(
+        systemSearchHrefFromRoute('/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/f-1')
+      ).toBe('/(app)/security-agent/org-1/findings/f-1');
     });
 
     it('resolves the link Android stores to the exact screen', () => {

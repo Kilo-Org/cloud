@@ -203,10 +203,18 @@ export async function prepareAgentSession(
         })
       : await trpcClient.cloudAgentNext.prepareSession.mutate(body);
 
-    // Rotate before the post-success work so a UI failure cannot keep the
-    // successful key for a retry.
-    deps.rotateKey();
-    await deps.removeOutboxRow(fingerprint);
+    // The session exists from here on, so no post-success work may report the
+    // create as failed. Rotate before the cleanup so a cleanup failure cannot
+    // keep the successful key for a retry; the local outbox delete is
+    // best-effort like the invalidation below. A row left behind is harmless:
+    // a relaunch reuses its stored operation key, and the server dedupes that
+    // key to this same session.
+    try {
+      deps.rotateKey();
+      await deps.removeOutboxRow(fingerprint);
+    } catch {
+      // Cosmetic; the caller still signals success.
+    }
 
     // The cloud session already exists, so a post-success invalidation failure
     // is cosmetic and must not report the create as failed or invite a
@@ -222,8 +230,14 @@ export async function prepareAgentSession(
     const message = cloudPrepareFailureMessage(error);
     // A typed terminal rejection ends the intent; a retryable one keeps the key.
     if (!retryable) {
-      deps.rotateKey();
-      await deps.removeOutboxRow(fingerprint);
+      // The handler must never reject: a cleanup failure here cannot change
+      // the classified create failure it is reporting.
+      try {
+        deps.rotateKey();
+        await deps.removeOutboxRow(fingerprint);
+      } catch {
+        // The intent is already over; the rejection changes nothing it reports.
+      }
     }
     return {
       ok: false,

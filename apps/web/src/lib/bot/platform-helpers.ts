@@ -6,10 +6,11 @@ import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 
 function isAvailableForBot(integration: PlatformIntegration): boolean {
-  return (
-    integration.platform !== 'github' ||
-    (integration.github_connection_role === 'workflow' && isPlatformIntegrationHealthy(integration))
-  );
+  if (!isPlatformIntegrationHealthy(integration)) {
+    return false;
+  }
+
+  return integration.platform !== 'github' || integration.github_connection_role === 'workflow';
 }
 
 export class PlatformIntegrationUnavailableError extends Error {

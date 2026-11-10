@@ -1,4 +1,5 @@
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import type { ContentBlock } from '@modelcontextprotocol/sdk/types.js';
 import type { jsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/types.js';
 import type { RemoteMcpAbort, RemoteMcpRequest } from './http.js';
 import type { RemoteMcpToken } from './credential.js';
@@ -48,6 +49,27 @@ interface RemoteMcpClientDeps {
       credential, or gone. A `protocol` failure is the server answering wrongly,
       so it is not one; a person's screen never sees the model's tool result. */
   onCallFailure?: (error: RemoteMcpError) => void;
+  /**
+   * Told what a call answered, whole, after the model has been handed its text.
+   * A host that draws the call's MCP Apps view renders the server's own content
+   * and structured result, and neither survives the text the model reads, so
+   * the surface that draws the view is handed them here instead. Nothing in the
+   * harness keeps them.
+   */
+  onCallResult?: (answered: RemoteMcpCallAnswered) => void;
 }
 
-export type { RemoteMcpClientDeps };
+/**
+ * The answer a call received, as a surface that draws the call needs it: which
+ * tool and call it belongs to, and the server's own content.
+ */
+interface RemoteMcpCallAnswered {
+  /** The tool as the server names it, without the server prefix the model sees. */
+  readonly tool: string;
+  /** The identifier of the model's call, which is what a transcript holds. */
+  readonly callId: string;
+  readonly content: readonly ContentBlock[];
+  readonly structuredContent: Readonly<Record<string, unknown>> | undefined;
+}
+
+export type { RemoteMcpCallAnswered, RemoteMcpClientDeps };

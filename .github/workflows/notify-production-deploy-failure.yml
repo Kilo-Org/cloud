@@ -1,4 +1,4 @@
-name: Notify Scheduled Production Deployment Failure
+name: Notify Production Deployment Failure
 
 on:
   workflow_run:
@@ -10,9 +10,12 @@ permissions: {}
 
 jobs:
   notify:
+    # Both automatic entry points alert: the CI-completion trigger and the
+    # catch-up poll. A manual dispatch is run by a person who is already watching.
     if: >-
       github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.event == 'schedule' &&
+      (github.event.workflow_run.event == 'workflow_run' ||
+      github.event.workflow_run.event == 'schedule') &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
@@ -25,11 +28,11 @@ jobs:
           script: |
             const run = context.payload.workflow_run;
             const payload = {
-              text: `Scheduled production deployment failed on main: ${run.html_url}`,
+              text: `Production deployment failed on main: ${run.html_url}`,
               blocks: [
                 {
                   type: 'header',
-                  text: { type: 'plain_text', text: 'Scheduled production deployment failed' },
+                  text: { type: 'plain_text', text: 'Production deployment failed' },
                 },
                 {
                   type: 'section',

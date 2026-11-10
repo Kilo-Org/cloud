@@ -48,7 +48,7 @@ describe('native upload episode projection', () => {
         uploadUrl: UPLOAD_URL,
         uploadGrant: UPLOAD_GRANT,
         wrapperLogPath,
-        homeRoot: dir,
+        homeRoots: [dir],
         fetch: () =>
           Promise.resolve(new Response(null, { status: archiveStatuses.shift() ?? 204 })),
         onDiagnostic: diagnostics.onDiagnostic,

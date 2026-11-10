@@ -14,8 +14,8 @@ const BINARY_DATA_REPLACEMENT =
   'skip it, or use a tool appropriate for its format (for example, image or ' +
   'PDF tools) instead.';
 
-function normalizeToolCallId(toolCallId: string, maxIdLength: number | undefined) {
-  return crypto.hash('sha256', toolCallId).slice(0, maxIdLength);
+function normalizeToolCallId(toolCallId: string) {
+  return crypto.hash('sha256', toolCallId);
 }
 
 export function dropToolStrictProperties(requestToMutate: OpenRouterChatCompletionRequest) {
@@ -28,11 +28,14 @@ export function dropToolStrictProperties(requestToMutate: OpenRouterChatCompleti
 
 export function normalizeToolCallIds(
   requestToMutate: GatewayRequest,
-  filter: (toolCallId: string) => boolean,
-  maxIdLength: number | undefined
+  filter: (toolCallId: string) => boolean
 ) {
-  const normalize = (toolCallId: string) =>
-    filter(toolCallId) ? normalizeToolCallId(toolCallId, maxIdLength) : toolCallId;
+  const normalizedIds = new Set<string>();
+  const normalize = (toolCallId: string) => {
+    if (!filter(toolCallId)) return toolCallId;
+    normalizedIds.add(toolCallId);
+    return normalizeToolCallId(toolCallId);
+  };
 
   if (requestToMutate.kind === 'chat_completions') {
     normalizeChatCompletionsToolCallIds(requestToMutate.body, normalize);
@@ -40,6 +43,17 @@ export function normalizeToolCallIds(
     normalizeResponsesToolCallIds(requestToMutate.body, normalize);
   } else {
     normalizeMessagesToolCallIds(requestToMutate.body, normalize);
+  }
+
+  // One line per request, not per id: histories are resent every turn.
+  const [exampleId] = normalizedIds;
+  if (exampleId !== undefined) {
+    console.warn('[normalizeToolCallIds] normalized tool call ids', {
+      kind: requestToMutate.kind,
+      model: requestToMutate.body.model,
+      normalizedIdCount: normalizedIds.size,
+      exampleId: exampleId.slice(0, 64),
+    });
   }
 }
 
@@ -133,6 +147,36 @@ function deduplicateToolUses(assistantMessage: OpenAI.ChatCompletionAssistantMes
 }
 
 export function repairChatCompletionsTools(requestToMutate: OpenRouterChatCompletionRequest) {
+  let legacyFunctionCallMessageCount = 0;
+  let legacyFunctionResultMessageCount = 0;
+  for (const message of requestToMutate.messages) {
+    if (message?.role === 'assistant' && message.function_call != null) {
+      legacyFunctionCallMessageCount++;
+    }
+    if (message?.role === 'function') {
+      legacyFunctionResultMessageCount++;
+    }
+  }
+  const legacyFunctionDefinitionCount = Array.isArray(requestToMutate.functions)
+    ? requestToMutate.functions.length
+    : 0;
+  const hasLegacyFunctionChoice = requestToMutate.function_call != null;
+  if (
+    legacyFunctionCallMessageCount > 0 ||
+    legacyFunctionResultMessageCount > 0 ||
+    legacyFunctionDefinitionCount > 0 ||
+    hasLegacyFunctionChoice
+  ) {
+    console.debug('[repairChatCompletionsTools] legacy function calling detected', {
+      model: requestToMutate.model,
+      messageCount: requestToMutate.messages.length,
+      legacyFunctionCallMessageCount,
+      legacyFunctionResultMessageCount,
+      legacyFunctionDefinitionCount,
+      hasLegacyFunctionChoice,
+    });
+  }
+
   const groups = groupByAssistantMessage(requestToMutate.messages);
 
   for (const group of groups) {

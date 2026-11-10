@@ -14,12 +14,33 @@ import { vi } from 'vitest';
 import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
 
 const alertMock = vi.hoisted(() => vi.fn());
+const backMock = vi.hoisted(() => vi.fn());
+// The route on top of the composer's stack. A picker route makes the guard
+// treat a Back as the picker's, exactly as the app's live stack does while a
+// sheet presents.
+const navigationState = vi.hoisted(() => ({ topRoute: 'agent-chat/new' }));
+const stateListeners = vi.hoisted(() => new Set<() => void>());
 const dispatchMock = vi.hoisted(() => vi.fn());
 const toastErrorMock = vi.hoisted(() => vi.fn());
 // Mutable so a single file proves the confirm is one cross-platform
 // implementation: the same in-app dialog opens for both platform values, and
 // the native alert is never reached on either.
 const platform = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
+// The provider's keyboard state and the focused prompt, so a suite can hold the
+// keyboard open across a leave and report its close the way the provider does.
+const keyboardState = vi.hoisted(() => ({ visible: false, listeners: new Set<() => void>() }));
+const focusedInput = vi.hoisted(() => ({ current: null as object | null }));
+const keyboardDismissMock = vi.hoisted(() => vi.fn());
+const focusTextInputMock = vi.hoisted(() => vi.fn());
+// Android's window focus events, which move to the sheet's dialog window while
+// the confirm is presented and back to the app window after it closes.
+const windowFocusListeners = vi.hoisted(
+  () =>
+    new Map<'blur' | 'focus', Set<() => void>>([
+      ['blur', new Set()],
+      ['focus', new Set()],
+    ])
+);
 
 /** Both platform values, so every behaviour below is proven for iOS and Android. */
 const PLATFORMS = ['ios', 'android'] as const;
@@ -51,6 +72,16 @@ const usePreventRemoveMock = vi.hoisted(() =>
 // the native confirm again fails here.
 vi.mock('react-native', () => ({
   Alert: { alert: alertMock },
+  AppState: {
+    addEventListener: (event: 'blur' | 'focus', listener: () => void) => {
+      windowFocusListeners.get(event)?.add(listener);
+      return {
+        remove: () => {
+          windowFocusListeners.get(event)?.delete(listener);
+        },
+      };
+    },
+  },
   I18nManager: { isRTL: false },
   Modal: 'Modal',
   Platform: {
@@ -61,7 +92,32 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
+  Keyboard: { dismiss: keyboardDismissMock },
+  TextInput: {
+    State: {
+      currentlyFocusedInput: () => focusedInput.current,
+      focusTextInput: focusTextInputMock,
+    },
+  },
 }));
+
+vi.mock('react-native-keyboard-controller', async () => {
+  const { useSyncExternalStore } = await import('react');
+  const subscribe = (listener: () => void) => {
+    keyboardState.listeners.add(listener);
+    return () => {
+      keyboardState.listeners.delete(listener);
+    };
+  };
+  return {
+    useKeyboardState: <T,>(selector: (state: { isVisible: boolean }) => T) =>
+      selector({
+        isVisible: useSyncExternalStore(subscribe, () => keyboardState.visible),
+      }),
+  };
+});
 
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
@@ -82,9 +138,25 @@ vi.mock('sonner-native', () => ({
   toast: { error: toastErrorMock },
 }));
 
-vi.mock('expo-router', () => ({
-  usePreventRemove: usePreventRemoveMock,
-}));
+vi.mock('expo-router', () => {
+  const navigation = {
+    getState: () => ({
+      index: 1,
+      routes: [{ name: 'agent-chat/new' }, { name: navigationState.topRoute }],
+    }),
+    addListener: (_event: string, listener: () => void) => {
+      stateListeners.add(listener);
+      return () => {
+        stateListeners.delete(listener);
+      };
+    },
+  };
+  return {
+    useNavigation: () => navigation,
+    usePreventRemove: usePreventRemoveMock,
+    useRouter: () => ({ back: backMock }),
+  };
+});
 
 function GuardHarness({
   dirty,
@@ -123,6 +195,25 @@ export function mountGuard(dirty: boolean, onDiscard: () => Promise<void>) {
     throw new Error('guard did not render');
   }
   return { renderer: ref.current, skipRef };
+}
+
+/**
+ * Mounts the guard while one of the screen's picker sheets is the top route.
+ * Clean prompt: the picker rule is the only reason a Back is held back.
+ */
+export function mountGuardWithPicker(dirty = false) {
+  navigationState.topRoute = 'agent-chat/repo-picker';
+  const skipRef: RefObject<boolean> = { current: false };
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(
+      createElement(GuardHarness, { dirty, onDiscard: noOpDiscard, skipRef })
+    );
+  });
+  if (!ref.current) {
+    throw new Error('guard did not render');
+  }
+  return { renderer: ref.current };
 }
 
 /** Mounts the guard for an empty prompt that still holds admitted uploads. */
@@ -166,6 +257,34 @@ export function triggerPreventRemoveInAct(): Action {
   return holder.action;
 }
 
+/** Reports the keyboard as shown or hidden, as the provider's events do. */
+export function setKeyboardVisible(visible: boolean): void {
+  act(() => {
+    keyboardState.visible = visible;
+    for (const listener of keyboardState.listeners) {
+      listener();
+    }
+  });
+}
+
+/** Reports the app window losing or regaining focus, as Android does around a sheet. */
+export function setWindowFocused(focused: boolean): void {
+  act(() => {
+    for (const listener of windowFocusListeners.get(focused ? 'focus' : 'blur') ?? []) {
+      listener();
+    }
+  });
+}
+
+export function setPickerTopRoute(topRoute: string): void {
+  act(() => {
+    navigationState.topRoute = topRoute;
+    for (const listener of stateListeners) {
+      listener();
+    }
+  });
+}
+
 /** Returns every hoisted mock and the captured removal to its pre-test state. */
 export function resetGuardHarness(): void {
   platform.os = 'ios';
@@ -175,6 +294,16 @@ export function resetGuardHarness(): void {
   usePreventRemoveMock.mockReset();
   usePreventRemoveHolder.preventRemove = undefined;
   usePreventRemoveHolder.callback = undefined;
+  navigationState.topRoute = 'agent-chat/new';
+  stateListeners.clear();
+  keyboardState.visible = false;
+  keyboardState.listeners.clear();
+  focusedInput.current = null;
+  keyboardDismissMock.mockReset();
+  focusTextInputMock.mockReset();
+  for (const listeners of windowFocusListeners.values()) {
+    listeners.clear();
+  }
 }
 
 export function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
@@ -242,7 +371,11 @@ export async function flushMicrotasks() {
 
 export {
   alertMock,
+  backMock,
   dispatchMock,
+  focusedInput,
+  focusTextInputMock,
+  keyboardDismissMock,
   platform,
   PLATFORMS,
   toastErrorMock,

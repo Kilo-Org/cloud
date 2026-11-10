@@ -1,7 +1,9 @@
 import { eq, desc, and, isNull, gt, notExists, or, notLike } from 'drizzle-orm';
+import { z } from 'zod';
 import { db, readDb, sql } from './drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import { credit_transactions, kilo_pass_issuance_items, kilocode_users } from '@kilocode/db/schema';
+import { isPaidCreditReportingSql, paidCreditPrincipalSql } from './paidCreditReporting';
 
 export type CreditSummary = {
   total_promotional_musd: number;
@@ -15,11 +17,12 @@ export async function getCreditTransactionsSummaryByUserId(
   const { rows } = await db.execute(
     sql`
     select
-      coalesce(sum(amount_microdollars) filter (where is_free),0) :: bigint  total_promotional_musd,
-      coalesce(sum(amount_microdollars) filter (where not is_free),0) :: bigint  total_purchased_musd,
+      coalesce(sum(amount_microdollars) filter (where is_free and paid_credit_policy is null),0) :: bigint total_promotional_musd,
+      coalesce(sum(${paidCreditPrincipalSql}) filter (where ${isPaidCreditReportingSql}),0) :: bigint total_purchased_musd,
       count(*) as credit_transaction_count
     from public.credit_transactions
     where kilo_user_id = ${kiloUserId}
+      and organization_id is null
   `
   );
   const result = rows[0] as {
@@ -38,11 +41,15 @@ export async function getCreditTransactionsSummaryByUserId(
 export async function getCreditTransactionsSummaryForOrganization(
   organizationId: Organization['id']
 ): Promise<CreditSummary> {
+  // Same visibility rule as the paged list below: the per-request accounting
+  // entries (`kpo:consumption:*`) are internal bookkeeping, so the count and
+  // the balances report only grants, purchases, transfers and adjustments.
+  // Excluding them here is intended, not an oversight; keep both filters in step.
   const { rows } = await db.execute(
     sql`
     select
-      coalesce(sum(amount_microdollars) filter (where is_free),0) :: bigint  total_promotional_musd,
-      coalesce(sum(amount_microdollars) filter (where not is_free),0) :: bigint  total_purchased_musd,
+      coalesce(sum(amount_microdollars) filter (where is_free and paid_credit_policy is null),0) :: bigint total_promotional_musd,
+      coalesce(sum(${paidCreditPrincipalSql}) filter (where ${isPaidCreditReportingSql}),0) :: bigint total_purchased_musd,
       count(*) as credit_transaction_count
     from public.credit_transactions
     where organization_id = ${organizationId}
@@ -81,6 +88,7 @@ export async function summarizeUserPayments(kiloUserId: string, fromDb: typeof d
         and(
           eq(credit_transactions.kilo_user_id, kiloUserId),
           eq(credit_transactions.is_free, false),
+          isNull(credit_transactions.organization_id),
           gt(credit_transactions.amount_microdollars, 0),
           notExists(
             fromDb
@@ -103,6 +111,11 @@ export async function getCreditTransactionsForOrganization(organizationId: Organ
       expiration_baseline_microdollars_used:
         credit_transactions.expiration_baseline_microdollars_used,
       original_baseline_microdollars_used: credit_transactions.original_baseline_microdollars_used,
+      consumed_microdollars: credit_transactions.consumed_microdollars,
+      retired_microdollars: credit_transactions.retired_microdollars,
+      paid_credit_policy: credit_transactions.paid_credit_policy,
+      credit_source: credit_transactions.credit_source,
+      source_transaction_id: credit_transactions.source_transaction_id,
       is_free: credit_transactions.is_free,
       description: credit_transactions.description,
       original_transaction_id: credit_transactions.original_transaction_id,
@@ -154,12 +167,58 @@ function encodeLedgerCursor(row: { created_at: string; id: string }): string {
   return `${row.created_at}|${row.id}`;
 }
 
+// `created_at` is selected in `mode: 'string'`, so a cursor carries it exactly as
+// Postgres renders a `timestamptz`: `2026-10-22 10:49:31.051648+00`, or `+05:30`
+// for a half-hour offset.
+const LEDGER_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?[+-](\d{2})(?::?(\d{2}))?$/;
+const LEDGER_CURSOR_ID = z.uuid();
+
+function isLedgerTimestamp(value: string): boolean {
+  const match = LEDGER_TIMESTAMP_PATTERN.exec(value);
+  if (!match) {
+    return false;
+  }
+  const [, year, month, day, hour, minute, second, fraction = '', offsetHour, offsetMinute = '00'] =
+    match;
+  if (Number(offsetHour) > 15 || Number(offsetMinute) > 59) {
+    return false;
+  }
+  // `Date.UTC` normalizes out-of-range fields where the database cast rejects them
+  // (`2026-02-30` becomes March 2, `24:00` the next day), so the wall clock has to
+  // survive a round trip before the value can be handed to the query.
+  const wallClock = new Date(
+    Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second),
+      Number(fraction.padEnd(3, '0').slice(0, 3))
+    )
+  );
+  return (
+    wallClock.getUTCFullYear() === Number(year) &&
+    wallClock.getUTCMonth() === Number(month) - 1 &&
+    wallClock.getUTCDate() === Number(day) &&
+    wallClock.getUTCHours() === Number(hour) &&
+    wallClock.getUTCMinutes() === Number(minute) &&
+    wallClock.getUTCSeconds() === Number(second)
+  );
+}
+
 function decodeLedgerCursor(cursor: string): { createdAt: string; id: string } | null {
   const separator = cursor.indexOf('|');
   if (separator <= 0 || separator === cursor.length - 1) {
     return null;
   }
-  return { createdAt: cursor.slice(0, separator), id: cursor.slice(separator + 1) };
+  const createdAt = cursor.slice(0, separator);
+  const id = cursor.slice(separator + 1);
+  if (!isLedgerTimestamp(createdAt) || !LEDGER_CURSOR_ID.safeParse(id).success) {
+    return null;
+  }
+  return { createdAt, id };
 }
 
 export async function getCreditTransactionsForOrganizationPage(
@@ -179,6 +238,11 @@ export async function getCreditTransactionsForOrganizationPage(
           credit_transactions.expiration_baseline_microdollars_used,
         original_baseline_microdollars_used:
           credit_transactions.original_baseline_microdollars_used,
+        consumed_microdollars: credit_transactions.consumed_microdollars,
+        retired_microdollars: credit_transactions.retired_microdollars,
+        paid_credit_policy: credit_transactions.paid_credit_policy,
+        credit_source: credit_transactions.credit_source,
+        source_transaction_id: credit_transactions.source_transaction_id,
         is_free: credit_transactions.is_free,
         description: credit_transactions.description,
         original_transaction_id: credit_transactions.original_transaction_id,
@@ -194,6 +258,14 @@ export async function getCreditTransactionsForOrganizationPage(
       .where(
         and(
           eq(credit_transactions.organization_id, organizationId),
+          // Visibility rule for the organization readers that list transactions
+          // in this module: the per-request accounting entries
+          // (`kpo:consumption:*`) are internal bookkeeping, so the paged list,
+          // its summary and the admin list show only grants, purchases,
+          // transfers and adjustments. A page therefore ends when the visible
+          // rows run out, which can be before the organization's total row
+          // count. That is intended, not a lost page. The paid-history checks
+          // below are outside this rule and read the table unfiltered.
           or(
             isNull(credit_transactions.credit_category),
             notLike(credit_transactions.credit_category, 'kpo:consumption:%')
@@ -232,6 +304,8 @@ export async function getAdminCreditTransactionsForOrganization(
       expiration_baseline_microdollars_used:
         credit_transactions.expiration_baseline_microdollars_used,
       is_free: credit_transactions.is_free,
+      paid_credit_policy: credit_transactions.paid_credit_policy,
+      credit_source: credit_transactions.credit_source,
       description: credit_transactions.description,
       stripe_payment_id: credit_transactions.stripe_payment_id,
       credit_category: credit_transactions.credit_category,

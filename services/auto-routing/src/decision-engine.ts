@@ -1,4 +1,5 @@
 import {
+  rankCandidates,
   taxonomyRouteKey,
   DEFAULT_AUTO_ROUTING_MODE,
   isVirtualAutoModelId,
@@ -66,6 +67,31 @@ function candidateVariant(candidate: RankedCandidate): string | null {
   return null;
 }
 
+function pairOf(candidate: RankedCandidate): BenchmarkPair {
+  return { model: candidate.model, variant: candidateVariant(candidate) };
+}
+
+// Keep only each mapped model's final variant. Unmapped models keep every
+// variant; a mapping whose pair is absent from the eligible set keeps the
+// model's candidates instead of dropping or resurrecting a filtered pair.
+function selectFinalCandidates(
+  candidates: ReadonlyArray<RankedCandidate>,
+  table: RoutingTable,
+  routeKey: string,
+  complexity: ClassifierOutput['reasoningComplexity'],
+  applyMapping: boolean
+): ReadonlyArray<RankedCandidate> {
+  if (!applyMapping) return candidates;
+  return candidates.filter(candidate => {
+    const variant = table.effortByComplexity?.[routeKey]?.[candidate.model]?.[complexity];
+    if (variant === undefined) return true;
+    const mappedPresent = candidates.some(
+      c => c.model === candidate.model && candidateVariant(c) === variant
+    );
+    return !mappedPresent || candidateVariant(candidate) === variant;
+  });
+}
+
 function findIncumbentCandidate(
   candidates: ReadonlyArray<RankedCandidate>,
   incumbent: DecisionIncumbent | null
@@ -113,6 +139,23 @@ function pickFreshCandidate(
   candidates: ReadonlyArray<RankedCandidate>,
   mode: AutoRoutingMode
 ): RankedCandidate {
+  if (mode === 'cheapest') {
+    let cheapest: RankedCandidate | undefined;
+    for (const candidate of candidates) {
+      if (!candidate.meetsThreshold) continue;
+      const cost = candidate.estimatedRequestCostUsd ?? candidate.avgCostUsd;
+      const cheapestCost = cheapest?.estimatedRequestCostUsd ?? cheapest?.avgCostUsd;
+      if (
+        cheapest === undefined ||
+        cheapestCost === undefined ||
+        cost < cheapestCost ||
+        (cost === cheapestCost && candidate.accuracy > cheapest.accuracy)
+      ) {
+        cheapest = candidate;
+      }
+    }
+    return cheapest ?? pickFreshCandidate(candidates, 'best_accuracy');
+  }
   if (mode === 'best_accuracy') {
     const [candidate] = candidates.toSorted(
       (a, b) => b.accuracy - a.accuracy || a.avgCostUsd - b.avgCostUsd
@@ -278,12 +321,60 @@ export function computeDecision(
     return null;
   }
 
-  const freshPick = pickFreshCandidate(
+  const effectiveMode = isLowConfidence(table, options.confidence) ? 'best_accuracy' : mode;
+  const requestTokens = options.constraints?.promptTokensEstimate ?? options.contextTokens;
+  const applyMapping =
+    effectiveMode !== 'cheapest' &&
+    !options.preserveIncumbentVariant &&
+    !!classification.reasoningComplexity;
+  const finalCandidates = selectFinalCandidates(
     candidates,
-    isLowConfidence(table, options.confidence) ? 'best_accuracy' : mode
+    table,
+    routeKey,
+    classification.reasoningComplexity,
+    applyMapping
   );
+  const canReprice =
+    requestTokens != null &&
+    table.accuracyNoiseBand != null &&
+    finalCandidates.some(candidate => candidate.pricing != null);
+  const selectionCandidates = canReprice
+    ? rankCandidates(
+        finalCandidates.map(candidate => ({
+          ...candidate,
+          p50LatencyMs: candidate.p50LatencyMs ?? null,
+        })),
+        table.minAccuracy,
+        {
+          requestTokens,
+          accuracyNoiseBand: table.accuracyNoiseBand,
+          ignoreLatency: finalCandidates.every(candidate => candidate.p50LatencyMs == null),
+        }
+      )
+    : finalCandidates;
+  const pickedSelection = pickFreshCandidate(selectionCandidates, effectiveMode);
+  // Selection copies may carry cold request estimates. Sticky economics and
+  // the decision keep the published candidate, so the horizon cache-loss
+  // term below is counted once, against published estimates.
+  const picked =
+    selectionCandidates === finalCandidates
+      ? pickedSelection
+      : (finalCandidates.find(
+          c =>
+            c.model === pickedSelection.model &&
+            candidateVariant(c) === candidateVariant(pickedSelection) &&
+            c.avgCostUsd === pickedSelection.avgCostUsd &&
+            c.accuracy === pickedSelection.accuracy
+        ) ??
+        finalCandidates.find(
+          c =>
+            c.model === pickedSelection.model &&
+            candidateVariant(c) === candidateVariant(pickedSelection)
+        ) ??
+        pickedSelection);
+  const freshPair = pairOf(picked);
   const applyComplexityEffort = (candidate: RankedCandidate): RankedCandidate => {
-    if (options.preserveIncumbentVariant || !classification.reasoningComplexity) return candidate;
+    if (!applyMapping) return candidate;
     const variant =
       table.effortByComplexity?.[routeKey]?.[candidate.model]?.[classification.reasoningComplexity];
     if (variant === undefined) return candidate;
@@ -292,23 +383,18 @@ export function computeDecision(
       candidate
     );
   };
-  const picked = applyComplexityEffort(freshPick);
-  const freshPair = { model: picked.model, variant: candidateVariant(picked) };
 
   const incumbentCandidate = findIncumbentCandidate(candidates, incumbent);
   const incumbentPick = incumbentCandidate ? applyComplexityEffort(incumbentCandidate) : undefined;
-  // Sticky eligibility, shared by the keep decision and the switchReason
-  // telemetry below so the two can never disagree. best_accuracy keeps the
-  // strict bar (that mode exists to buy accuracy); cost_per_accuracy keeps
-  // any incumbent inside the benchmark noise band.
+  // Only cost_per_accuracy tolerates a below-threshold incumbent within benchmark noise.
   const incumbentStickyEligible = (candidate: RankedCandidate): boolean =>
-    mode === 'best_accuracy'
-      ? candidate.meetsThreshold
-      : candidate.accuracy >= table.minAccuracy - STICKY_ACCURACY_TOLERANCE;
+    mode === 'cost_per_accuracy'
+      ? candidate.accuracy >= table.minAccuracy - STICKY_ACCURACY_TOLERANCE
+      : candidate.meetsThreshold;
   const costSwitchWorthwhile = (candidate: RankedCandidate): boolean => {
     if (
       table.switchHorizonTurns != null &&
-      options.contextTokens != null &&
+      requestTokens != null &&
       candidate.estimatedRequestCostUsd != null &&
       picked.estimatedRequestCostUsd != null &&
       candidate.pricing != null &&
@@ -318,32 +404,27 @@ export function computeDecision(
         (candidate.estimatedRequestCostUsd - picked.estimatedRequestCostUsd) *
         table.switchHorizonTurns;
       const cacheLossCost =
-        options.contextTokens *
+        requestTokens *
         (picked.pricing.promptUsdPerToken -
           (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken));
       return expectedSavings > cacheLossCost;
     }
     return picked.avgCostUsd * table.switchCostFactor < candidate.avgCostUsd;
   };
+  const incumbentPair = incumbentCandidate ? pairOf(incumbentCandidate) : null;
+  const incumbentServedPair = incumbentPick ? pairOf(incumbentPick) : null;
   const stickyIncumbent =
     incumbentCandidate &&
     incumbentPick &&
+    incumbentPair &&
+    incumbentServedPair &&
     incumbentStickyEligible(incumbentCandidate) &&
-    ((incumbentCandidate.model === freshPick.model &&
-      ((options.preserveIncumbentVariant &&
-        !sameExactPair(
-          { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
-          freshPair
-        )) ||
-        incumbentPick !== incumbentCandidate ||
-        picked !== freshPick)) ||
-      (!sameExactPair(
-        { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
-        freshPair
-      ) &&
-        ((mode === 'cost_per_accuracy' && !costSwitchWorthwhile(incumbentPick)) ||
-          (mode === 'best_accuracy' &&
-            !(picked.accuracy - incumbentPick.accuracy > table.bestAccuracySwitchThreshold)))));
+    !sameExactPair(incumbentPair, freshPair) &&
+    (sameExactPair(incumbentServedPair, freshPair) ||
+      (options.preserveIncumbentVariant && incumbentCandidate.model === picked.model) ||
+      (mode !== 'best_accuracy' && !costSwitchWorthwhile(incumbentPick)) ||
+      (mode === 'best_accuracy' &&
+        !(picked.accuracy - incumbentPick.accuracy > table.bestAccuracySwitchThreshold)));
 
   if (stickyIncumbent && incumbentCandidate && incumbentPick) {
     return {
@@ -360,7 +441,7 @@ export function computeDecision(
 
   const switched =
     incumbent !== null &&
-    (picked !== freshPick || incumbent.variant === null
+    (incumbent.variant === null
       ? incumbent.model !== picked.model
       : !sameExactPair(incumbent, freshPair));
 

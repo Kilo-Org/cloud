@@ -9,11 +9,6 @@ export function BriefingPeriodLabel({ report }: { readonly report: BriefingRepor
   const { t, i18n } = useTranslation();
   return (
     <View className="gap-1">
-      {report.kind === 'one_off' ? (
-        <Text className="text-sm text-muted-foreground">{t('agentBriefing.oneOff')}</Text>
-      ) : (
-        <Text className="text-sm text-muted-foreground">{report.localDate}</Text>
-      )}
       <Text className="text-xs text-muted-foreground">
         {t('agentBriefing.window', {
           start: formatBriefingTimestamp(report.nightStartAt, i18n.language, report.timezone),
@@ -21,13 +16,11 @@ export function BriefingPeriodLabel({ report }: { readonly report: BriefingRepor
         })}
       </Text>
       <Text className="text-xs text-muted-foreground">{report.timezone}</Text>
-      {report.kind === 'one_off' ? (
-        <Text className="text-xs text-muted-foreground">
-          {t('agentBriefing.createdAt', {
-            time: formatBriefingTimestamp(report.createdAt, i18n.language, report.timezone),
-          })}
-        </Text>
-      ) : null}
+      <Text className="text-xs text-muted-foreground">
+        {t('agentBriefing.capturedAt', {
+          time: formatBriefingTimestamp(report.capturedAt, i18n.language, report.timezone),
+        })}
+      </Text>
     </View>
   );
 }

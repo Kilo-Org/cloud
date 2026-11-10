@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth, isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { emailDomainSuffixes, findBlacklistedDomains } from '@kilocode/worker-utils/account-access';
 import type { UsersApiResponse, SortableField, UserTableProps } from '@/types/admin';
 import { sortableFields } from '@/types/admin';
 import {
@@ -36,7 +37,6 @@ import { captureException } from '@sentry/nextjs';
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<{ error: string } | UsersApiResponse>> {
-  // Parse query parameters outside try block for error reporting
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '25')));
@@ -50,7 +50,6 @@ export async function GET(
   const autoTopUp = searchParams.get('autoTopUp');
 
   try {
-    // Check authentication and admin status
     const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
     if (authFailedResponse) {
       return authFailedResponse;
@@ -59,13 +58,10 @@ export async function GET(
     const hasValidationStytch = searchParams.get('hasValidationStytch');
     const hasValidationNovelCard = searchParams.get('hasValidationNovelCard');
 
-    // Validate sortBy field
     const sortField = sortableFields.includes(sortBy) ? sortBy : 'created_at';
 
-    // Build where conditions
     const conditions = [];
 
-    // User-specific search condition
     if (searchTerm) {
       const referralCodeOwnerId = (
         await db
@@ -89,9 +85,7 @@ export async function GET(
       );
     }
 
-    // Notes and blocked reason search condition
     if (notesSearchTerm) {
-      // Get user IDs that have matching admin notes
       const usersWithMatchingNotes = await db
         .selectDistinct({ kilo_user_id: user_admin_notes.kilo_user_id })
         .from(user_admin_notes)
@@ -109,7 +103,6 @@ export async function GET(
       );
     }
 
-    // Filter conditions
     if (hasValidationStytch === 'true') {
       conditions.push(eq(kilocode_users.has_validation_stytch, true));
     } else if (hasValidationStytch === 'false') {
@@ -127,14 +120,12 @@ export async function GET(
       conditions.push(eq(kilocode_users.has_validation_novel_card_with_hold, false));
     }
 
-    // Blocked status filter
     if (blockedStatus === 'blocked') {
       conditions.push(isNotNull(kilocode_users.blocked_reason));
     } else if (blockedStatus === 'not_blocked') {
       conditions.push(isNull(kilocode_users.blocked_reason));
     }
 
-    // Organization membership filter - use EXISTS subquery for performance
     if (orgMembership === 'in_org') {
       conditions.push(
         exists(
@@ -155,7 +146,6 @@ export async function GET(
       );
     }
 
-    // Payment status filter
     if (paymentStatus === 'paid') {
       conditions.push(gt(kilocode_users.total_microdollars_acquired, 0));
     } else if (paymentStatus === 'never_paid') {
@@ -167,7 +157,6 @@ export async function GET(
       );
     }
 
-    // Auto top-up filter
     if (autoTopUp === 'enabled') {
       conditions.push(eq(kilocode_users.auto_top_up_enabled, true));
     } else if (autoTopUp === 'disabled') {
@@ -176,7 +165,6 @@ export async function GET(
 
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // Build order condition
     const orderFunction = sortOrder === 'asc' ? asc : desc;
     const orderCondition = orderFunction(kilocode_users[sortField]);
 
@@ -208,23 +196,27 @@ export async function GET(
 
     const notesByUserId = Map.groupBy(notes, note => note.kilo_user_id);
 
-    // Calculate pagination metadata
     const totalPages = Math.ceil(totalUserCount / limit);
 
-    const usersWithPaymentStatus: UserTableProps[] = await Promise.all(
-      users.map(async user => ({
-        ...user,
-        paymentMethodStatus: describePaymentMethods(
-          paymentMethodsByUserId[user.id] || [],
-          user,
-          usersWithValidationCredits.has(user.id)
-        ),
-        admin_notes: notesByUserId.get(user.id)?.map(o => ({ ...o, admin_kilo_user: null })) || [],
-        is_blacklisted_by_domain: await isUserBlacklistedByDomain({
-          google_user_email: user.google_user_email,
-        }),
-      }))
+    const domainSuffixesByUserId = new Map(
+      users.map(user => [user.id, emailDomainSuffixes(user.google_user_email)])
     );
+    const blacklistedDomains = await findBlacklistedDomains(db, [
+      ...new Set([...domainSuffixesByUserId.values()].flat()),
+    ]);
+
+    const usersWithPaymentStatus: UserTableProps[] = users.map(user => ({
+      ...user,
+      paymentMethodStatus: describePaymentMethods(
+        paymentMethodsByUserId[user.id] || [],
+        user,
+        usersWithValidationCredits.has(user.id)
+      ),
+      admin_notes: notesByUserId.get(user.id)?.map(o => ({ ...o, admin_kilo_user: null })) || [],
+      is_blacklisted_by_domain: (domainSuffixesByUserId.get(user.id) ?? []).some(domain =>
+        blacklistedDomains.has(domain)
+      ),
+    }));
 
     const response: UsersApiResponse = {
       users: usersWithPaymentStatus,

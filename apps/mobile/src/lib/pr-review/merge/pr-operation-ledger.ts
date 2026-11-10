@@ -2,10 +2,11 @@
 // admits a `pr`-domain ledger row for each mutation carrying an `operationKey`.
 // This module owns the mapping from the server's stable ledger markers onto
 // per-surface PR copy. The per-intent key and the raw markers live in
-// `@/lib/operation-key`, which every ledgered surface shares.
+// `@/lib/operation-key` and `@/lib/operation-markers`, which every ledgered
+// surface shares.
 
 import { i18n } from '@/i18n';
-import { isOperationInProgress } from '@/lib/operation-key';
+import { isOperationInProgress } from '@/lib/operation-markers';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 
 export const PR_OPERATION_AMBIGUOUS_MESSAGE = "Couldn't confirm — check the PR before retrying.";

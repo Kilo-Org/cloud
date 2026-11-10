@@ -1,10 +1,17 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-member-access @typescript-eslint/no-unsafe-argument -- footer prop inspection walks raw React element tree */
 /* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
+import * as WebBrowser from 'expo-web-browser';
 import { TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
+import {
+  INLINE_LINK_BOX_CLASS,
+  MIN_TAP_TARGET_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { ConsentDetails, VoiceTranscriptionControl } from './consent-details';
 
 // ---- mocks ----
@@ -23,6 +30,8 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
+  Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
   View: 'View',
@@ -229,7 +238,7 @@ describe('ConsentDetails copy', () => {
   it('review heading does not claim optional telemetry is on', () => {
     const renderer = mount('review');
     const texts = findTextStrings(renderer.root);
-    expect(texts).toContain('Optional — you can change this any time in Settings');
+    expect(texts).toContain('Optional');
     expect(texts).not.toContain('Optional — on unless you turn it off');
   });
 
@@ -314,6 +323,39 @@ describe('ConsentDetails copy', () => {
     );
     expect(gateway?.what).toBe(
       'Account ID, request metadata, token usage, and the prompts and voice recordings the app sends through it.'
+    );
+  });
+
+  it('gives the retention sentence privacy link a full target and opens the policy', async () => {
+    const renderer = mount();
+    const links = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        (n.props as { accessibilityRole?: string }).accessibilityRole === 'link'
+    );
+    expect(links).toHaveLength(1);
+    const link = links[0];
+    if (!link) {
+      throw new Error('privacy link not found');
+    }
+    // A real 28dp box plus the vertical slop: the control-size audit reads the
+    // node's own rect, and the 14dp text line alone was reported as too small
+    // to tap; the slop carries the 44pt region.
+    // Test renderer props are untyped (`any` from the JSON tree); name them once.
+    const props = link.props as { className?: string; hitSlop?: { top?: number; bottom?: number } };
+    expect(String(props.className)).toContain(INLINE_LINK_BOX_CLASS);
+    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, props.hitSlop?.top ?? 0)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    expect(props.hitSlop?.bottom).toBe(props.hitSlop?.top);
+
+    await TestRenderer.act(async () => {
+      await Promise.resolve();
+      (link.props as { onPress: () => void }).onPress();
+    });
+    expect(vi.mocked(WebBrowser.openBrowserAsync)).toHaveBeenCalledWith(
+      'https://kilo.ai/privacy-app'
     );
   });
 });

@@ -1,3 +1,4 @@
+import { environmentReferenceSchema } from '../environment-build/reference.js';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
@@ -23,9 +24,13 @@ import {
   type SandboxKind,
 } from '../sandbox-placement.js';
 import { isControlSession } from '../session-identity.js';
-import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { agentSandboxProviderSchema, type AgentSandboxProvider } from '../types.js';
+import {
+  bindingFromLegacyProvider,
+  SandboxProviderBindingSchema,
+  type SandboxProviderBinding,
+} from '../sandbox-provider-binding.js';
 import {
   AttachmentsSchema,
   branchNameSchema,
@@ -39,10 +44,14 @@ const SandboxIdSchema = z
   .refine(isValidSandboxId, 'Invalid sandboxId format')
   .transform(s => s);
 
+/** Legacy decode only: the key of a retired owner-scoped shared sandbox. */
 const SharedSandboxIdSchema = z
   .string()
   .refine(isGeneratedSharedSandboxId, 'Invalid shared sandbox ID format')
   .transform(s => s);
+
+/** Legacy decode only: the failover slot a retired shared sandbox route could record. */
+const LEGACY_SHARED_SANDBOX_FAILOVER_SUFFIX = 'shared-slot-v1';
 
 const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
 const SandboxProviderSchema = agentSandboxProviderSchema;
@@ -91,6 +100,13 @@ const MetadataAuthSchema = z
 const RepositoryCommonSchema = {
   token: z.string().optional(),
   upstreamBranch: branchNameSchema.optional(),
+  /** Branch a stacked workspace was created from; null/absent means the default branch. */
+  baseBranch: branchNameSchema.optional(),
+  /** Parent tip the working branch was last created or restacked onto. */
+  baseSha: z
+    .string()
+    .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+    .optional(),
 };
 
 const repositoryTypes = new Set(['github', 'gitlab', 'bitbucket', 'git']);
@@ -142,6 +158,7 @@ const MetadataRepositorySchema = z.preprocess(
           platform: z.literal('github').optional(),
           githubIntegrationId: z.string().uuid().optional(),
           githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
+          allowUserAuthorization: z.boolean().optional(),
           githubInstallationId: z.string().optional(),
           githubAppType: z.enum(['standard', 'lite']).optional(),
           pullRequestNumber: z.number().int().positive().optional(),
@@ -167,6 +184,11 @@ const MetadataRepositorySchema = z.preprocess(
           bitbucketIntegrationId: z.string().uuid().optional(),
           bitbucketTokenManaged: z.boolean().optional(),
           upstreamBranch: branchNameSchema.optional(),
+          baseBranch: branchNameSchema.optional(),
+          baseSha: z
+            .string()
+            .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+            .optional(),
         })
         .strip(),
       z
@@ -211,11 +233,10 @@ const MetadataAgentSchema = z
   .object({
     mode: z.string().optional(),
     model: z.string().optional(),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    // Variant values are provider-specific (for example `budget-32768`), and a
+    // continued session may forward an empty string. Keep `""` distinct from an
+    // absent variant; do not widen any other public input.
+    variant: z.string().max(50).optional(),
     appendSystemPrompt: z.string().max(10000).optional(),
   })
   .strip();
@@ -234,11 +255,16 @@ const MetadataCallbackSchema = z
   })
   .strip();
 
+/**
+ * Legacy decode only. Every sandbox serves one workspace; this route belongs to
+ * a retired owner-scoped shared sandbox. Stored metadata can still carry it, so
+ * it must keep parsing, but no new session writes it.
+ */
 const MetadataSharedSandboxRouteSchema = z
   .object({
     kind: z.literal('shared'),
     routeKey: SharedSandboxIdSchema,
-    suffix: z.literal(SHARED_SANDBOX_FAILOVER_SUFFIX).optional(),
+    suffix: z.literal(LEGACY_SHARED_SANDBOX_FAILOVER_SUFFIX).optional(),
   })
   .strip();
 
@@ -251,7 +277,10 @@ const CredentialContainmentSchema = z
   })
   .strip();
 
-/** Sandbox-ID class each isolated allocation must have in persisted metadata. */
+/**
+ * Sandbox-ID class each isolated allocation must have in persisted metadata.
+ * `cloudflare-shared` is legacy decode only and is matched separately.
+ */
 const SANDBOX_ALLOCATION_ID_CLASS: Record<
   Exclude<SandboxAllocation, 'cloudflare-shared'>,
   SandboxIdClass
@@ -298,11 +327,21 @@ const MetadataWorkspaceSchema = egressPolicySchema
     sandboxKind: sandboxKindSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
+    sandboxProviderBinding: SandboxProviderBindingSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
     worktreeId: cloudAgentWorktreeIdSchema.optional(),
+    /** Parent worktree for a stacked workspace. */
+    parentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
     workspacePath: z.string().optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
+    /**
+     * The generated `kilo/<slug>` branch of a session on a V2 environment. The
+     * launch repository can run on `repository.branch` instead, so `branchName`
+     * is not always this value. A repository of the environment without a
+     * requested branch uses it.
+     */
+    generatedBranchName: branchNameSchema.optional(),
     shallow: z.boolean().optional(),
     credentialContainment: CredentialContainmentSchema.optional(),
     managedScmContainment: z.boolean().optional(),
@@ -368,11 +407,11 @@ const MetadataWorkspaceSchema = egressPolicySchema
   })
   .refine(
     workspace =>
-      workspace.egressMode !== 'allowlist' ||
+      (workspace.egressMode !== 'allowlist' && workspace.egressAudit !== true) ||
       (workspace.sandboxProvider === 'cloudflare-containers' &&
         isIsolatedProviderWorkspace(workspace) &&
         workspace.sandboxRoute === undefined),
-    'allowlist egress requires an isolated Cloudflare containers sandbox'
+    'Egress policy requires an isolated Cloudflare containers sandbox'
   )
   .refine(
     workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),
@@ -396,6 +435,13 @@ const MetadataWorkspaceSchema = egressPolicySchema
       workspace.providerRuntime === undefined ||
       workspace.providerRuntime.provider === workspace.sandboxProvider,
     'Provider runtime must match the workspace sandbox provider'
+  )
+  .refine(
+    workspace =>
+      workspace.sandboxProviderBinding === undefined ||
+      workspace.sandboxProvider === undefined ||
+      workspace.sandboxProviderBinding.kind === workspace.sandboxProvider,
+    'Provider binding must match the workspace sandbox provider'
   );
 
 const MetadataDevContainerSchema = z
@@ -435,10 +481,19 @@ export const CurrentSessionMetadataSchema = z
     auth: MetadataAuthSchema,
     repository: MetadataRepositorySchema.optional(),
     clone: MetadataCloneSchema.optional(),
+    /**
+     * Server-only marker set by the `continueHostedWorkspace` handler. It makes
+     * the wrapper skip transcript file restoration: the pushed branch is the
+     * source of truth. Never set from client input; a metadata clone is not this
+     * signal.
+     */
+    continuation: z.literal(true).optional(),
     initialMessage: CurrentMetadataInitialMessageSchema.optional(),
     agent: MetadataAgentSchema.optional(),
     finalization: MetadataFinalizationSchema.optional(),
     profile: SessionProfileBundleSchema.optional(),
+    /** The repository environment this session admitted, for snapshot selection. */
+    environment: environmentReferenceSchema.optional(),
     callback: MetadataCallbackSchema.optional(),
     workspace: MetadataWorkspaceSchema.optional(),
     devcontainer: MetadataDevContainerSchema.optional(),
@@ -476,6 +531,7 @@ export const CurrentSessionMetadataSchema = z
 
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
 export type CredentialContainment = z.infer<typeof CredentialContainmentSchema>;
+export type { SandboxProviderBinding };
 
 export function getControlPlaneCredentialContainment(
   sessionId: string,
@@ -526,12 +582,57 @@ export function hasRetiredDevcontainerRuntime(metadata: SessionMetadata): boolea
   );
 }
 
+export const CLOUDFLARE_RUNTIME_RETIRED_MESSAGE =
+  'The Cloudflare Sandbox runtime has been retired. This session cannot be started or resumed. Create a new session using the default sandbox.';
+
+/**
+ * The reason a stored session can no longer start compute, or null when its
+ * runtime is still active. A missing workspace is not evidence of a retired
+ * runtime; a workspace without an explicit provider keeps the historical
+ * Cloudflare default.
+ */
+export function retiredRuntimeMessage(metadata: SessionMetadata): string | null {
+  if (hasRetiredDevcontainerRuntime(metadata)) return DEVCONTAINER_RETIRED_MESSAGE;
+  if (metadata.workspace === undefined) return null;
+  return getSandboxProvider(metadata) === 'cloudflare' ? CLOUDFLARE_RUNTIME_RETIRED_MESSAGE : null;
+}
+
+/**
+ * Legacy decode only: whether a stored workspace names a retired owner-scoped
+ * shared sandbox. Every sandbox now serves one workspace. Such a workspace ran
+ * on the retired Cloudflare Sandbox runtime, so {@link retiredRuntimeMessage}
+ * already stops its compute; this check keeps it from gaining new authority or
+ * from being registered again.
+ */
+export function isLegacySharedSandboxWorkspace(
+  workspace:
+    | {
+        sandboxAllocation?: SandboxAllocation;
+        sandboxKind?: SandboxKind;
+        sandboxRoute?: unknown;
+      }
+    | undefined
+): boolean {
+  return (
+    workspace?.sandboxAllocation === 'cloudflare-shared' ||
+    workspace?.sandboxKind === 'shared' ||
+    workspace?.sandboxRoute !== undefined
+  );
+}
+
 export function requiresContainmentSandbox(metadata: SessionMetadata): boolean {
   return hasCredentialContainment(getEffectiveCredentialContainment(metadata));
 }
 
 export function getSandboxProvider(metadata: SessionMetadata): AgentSandboxProvider {
-  return metadata.workspace?.sandboxProvider ?? 'cloudflare';
+  return getSandboxProviderBinding(metadata).kind;
+}
+
+export function getSandboxProviderBinding(metadata: SessionMetadata): SandboxProviderBinding {
+  return (
+    metadata.workspace?.sandboxProviderBinding ??
+    bindingFromLegacyProvider(metadata.workspace?.sandboxProvider ?? 'cloudflare')
+  );
 }
 
 type LegacySessionMetadata = z.output<typeof LegacySessionMetadataSchema>;

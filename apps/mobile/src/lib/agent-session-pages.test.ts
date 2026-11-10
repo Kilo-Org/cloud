@@ -50,6 +50,14 @@ describe('collectUnfilteredPages', () => {
     const pages = [{ cliSessions: [s('a'), s('b')] }, { cliSessions: [s('c'), s('a'), s('d')] }];
     expect(collectUnfilteredPages(pages)).toEqual([s('a'), s('b'), s('c'), s('d')]);
   });
+  it('skips restored pages whose session collection is missing', () => {
+    const pages = [
+      { cliSessions: [s('a')] },
+      { cliSessions: undefined },
+      { cliSessions: [s('b')] },
+    ] as never;
+    expect(collectUnfilteredPages(pages)).toEqual([s('a'), s('b')]);
+  });
 });
 
 describe('collectSearchPages', () => {
@@ -70,6 +78,10 @@ describe('collectSearchPages', () => {
     const pages = [{ results: [s('x'), s('y')] }, { results: [s('z'), s('x')] }];
     expect(collectSearchPages(pages)).toEqual([s('x'), s('y'), s('z')]);
   });
+  it('skips restored search pages whose results collection is missing', () => {
+    const pages = [{ results: [s('x')] }, { results: undefined }] as never;
+    expect(collectSearchPages(pages)).toEqual([s('x')]);
+  });
 });
 
 describe('shouldLoadMoreSessions', () => {
@@ -78,6 +90,7 @@ describe('shouldLoadMoreSessions', () => {
       shouldLoadMoreSessions({
         hasNextPage: true,
         isFetchingNextPage: false,
+        isFetchNextPageError: false,
         isPlaceholderData: false,
       })
     ).toBe(true);
@@ -88,6 +101,7 @@ describe('shouldLoadMoreSessions', () => {
       shouldLoadMoreSessions({
         hasNextPage: false,
         isFetchingNextPage: false,
+        isFetchNextPageError: false,
         isPlaceholderData: false,
       })
     ).toBe(false);
@@ -98,6 +112,7 @@ describe('shouldLoadMoreSessions', () => {
       shouldLoadMoreSessions({
         hasNextPage: true,
         isFetchingNextPage: true,
+        isFetchNextPageError: false,
         isPlaceholderData: false,
       })
     ).toBe(false);
@@ -108,7 +123,19 @@ describe('shouldLoadMoreSessions', () => {
       shouldLoadMoreSessions({
         hasNextPage: true,
         isFetchingNextPage: false,
+        isFetchNextPageError: false,
         isPlaceholderData: true,
+      })
+    ).toBe(false);
+  });
+
+  it('returns false when the last next page failed (footer retry owns recovery)', () => {
+    expect(
+      shouldLoadMoreSessions({
+        hasNextPage: true,
+        isFetchingNextPage: false,
+        isFetchNextPageError: true,
+        isPlaceholderData: false,
       })
     ).toBe(false);
   });
@@ -118,6 +145,7 @@ describe('shouldLoadMoreSessions', () => {
       shouldLoadMoreSessions({
         hasNextPage: undefined,
         isFetchingNextPage: false,
+        isFetchNextPageError: false,
         isPlaceholderData: false,
       })
     ).toBe(false);

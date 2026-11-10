@@ -2,18 +2,21 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { LinearClient } from '@linear/sdk';
+import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
 import {
   exchangeLinearOAuthCode,
   fetchLinearOAuthIdentity,
-  LINEAR_REDIRECT_URI,
+  getConflictingLinearInstallation,
   LinearWorkspaceAlreadyConnectedError,
   type LinearOAuthIdentity,
+  type PreviousLinearWorkspace,
+  retirePreviousLinearWorkspace,
   revokeLinearToken,
   upsertLinearInstallation,
 } from '@/lib/integrations/linear-service';
-import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
 import { linkKiloUser, unlinkTeamKiloUsers } from '@/lib/bot-identity';
@@ -33,8 +36,13 @@ import {
   buildIntegrationOAuthRedirectPathFromOwner,
   parseOAuthStateOwner,
   cancelMissingCodeProviderOAuthAttempt,
+  organizationAccessDenialErrorCode,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
+import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
+import { restoreProviderInstallation } from '@/lib/integrations/oauth/provider-installation-restore';
+import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 
 async function getChatSdkLinearAccessToken(organizationId: string): Promise<string | null> {
   const installation = await bot.getAdapter('linear').getInstallation(organizationId);
@@ -47,34 +55,6 @@ async function deleteChatSdkLinearInstallation(organizationId: string): Promise<
 
 async function deleteChatSdkLinearIdentityCache(organizationId: string): Promise<void> {
   await unlinkTeamKiloUsers(bot.getState(), PLATFORM.LINEAR, organizationId);
-}
-
-/**
- * Fetch the workspace name for a freshly installed Linear installation by
- * querying Linear's `organization` GraphQL field with the freshly-issued
- * access token. We cannot use `linearAdapter.getUser('me')` for this: with
- * `actor=app` installs (which is what `getLinearOAuthUrl` uses), the
- * authenticated viewer is the app actor — the configured `userName`
- * (`'kilo'` / `'kilo-dev'`) — not the human installer or the workspace.
- *
- * Falls back to the organizationId on failure so the install still succeeds
- * with a human-readable label.
- */
-async function fetchLinearWorkspaceName(
-  accessToken: string,
-  organizationId: string
-): Promise<string> {
-  try {
-    const organization = await new LinearClient({ accessToken }).organization;
-    return organization.name || organization.urlKey || organizationId;
-  } catch (error) {
-    captureMessage('Failed to fetch Linear workspace name', {
-      level: 'warning',
-      tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
-      extra: { organizationId, error: error instanceof Error ? error.message : String(error) },
-    });
-    return organizationId;
-  }
 }
 
 function htmlPage(title: string, message: string, status = 200): Response {
@@ -247,7 +227,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       captureMessage('Linear OAuth error', {
         level: 'warning',
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
-        extra: { error, state },
+        extra: { error, ...safeCallbackContext(searchParams) },
       });
       return NextResponse.redirect(
         new URL(
@@ -267,7 +247,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       captureMessage('Linear callback missing code', {
         level: 'warning',
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
-        extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: safeCallbackContext(searchParams),
       });
       return NextResponse.redirect(
         new URL(
@@ -286,7 +266,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       captureMessage('Linear callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
-        extra: { code: '***', state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: safeCallbackContext(searchParams),
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
@@ -311,13 +291,16 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
+    // An organization connection carries a shared bot token and model policy, and
+    // completing an install can move the connection to another workspace, so this
+    // completion requires the organization role that governs the integration.
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
+      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }
 
-    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+    if (verified.provider !== PLATFORM.LINEAR || verified.purpose !== 'provider_install') {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
@@ -334,74 +317,132 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       throw new Error('Linear OAuth attempt is invalid, expired, or already used');
     }
 
-    // Chat SDK exchanges the code, persists the per-workspace installation in
-    // its state adapter, and returns the Linear organizationId + installation.
     await bot.initialize();
     const linearAdapter = bot.getAdapter('linear');
-    const { organizationId, installation } = await linearAdapter.handleOAuthCallback(request, {
-      redirectUri: LINEAR_REDIRECT_URI,
-    });
 
-    const workspaceName = await fetchLinearWorkspaceName(installation.accessToken, organizationId);
+    const { accessToken, refreshToken, expiresIn } = await exchangeLinearOAuthCode(code);
+    const identity = await fetchLinearOAuthIdentity(accessToken);
+    const organizationId = identity.organizationId;
+    // Resolve the owner's model policy before taking the workspace locks, so the
+    // transaction only performs the ownership check and the integration write.
+    const defaultModel =
+      owner.type === 'org'
+        ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+        : DEFAULT_BOT_MODEL;
 
-    try {
-      await upsertLinearInstallation(
-        {
-          owner,
-          organizationId,
-          organizationName: workspaceName,
-          botUserId: installation.botUserId,
-        },
-        {
-          getChatSdkAccessToken: getChatSdkLinearAccessToken,
-          deleteChatSdkInstallation: deleteChatSdkLinearInstallation,
-          deleteChatSdkIdentityCache: deleteChatSdkLinearIdentityCache,
+    const conflictRedirect = NextResponse.redirect(
+      new URL(
+        buildIntegrationOAuthRedirectPathFromOwner(
+          PLATFORM.LINEAR,
+          verifiedOwner,
+          'error=workspace_already_connected',
+          verified?.returnTo
+        ),
+        APP_URL
+      )
+    );
+
+    const install = await withWorkspaceInstallationLock(
+      PLATFORM.LINEAR,
+      owner,
+      organizationId,
+      async tx => {
+        const conflicting = await getConflictingLinearInstallation(owner, organizationId, tx);
+        if (conflicting) {
+          return { response: conflictRedirect, previousWorkspace: null };
         }
-      );
-    } catch (error) {
-      if (error instanceof LinearWorkspaceAlreadyConnectedError) {
-        // The Chat SDK adapter already persisted the freshly-issued OAuth
-        // token under linear:installation:${organizationId} during
-        // handleOAuthCallback. Since the uniqueness check rejected this
-        // install, we must roll that state back — otherwise we overwrite the
-        // original installer's token and any future bot/webhook traffic for
-        // that workspace runs with mismatched credentials.
-        await linearAdapter.deleteInstallation(organizationId);
-        await unlinkTeamKiloUsers(bot.getState(), PLATFORM.LINEAR, organizationId);
-        return NextResponse.redirect(
-          new URL(
-            buildIntegrationOAuthRedirectPathFromOwner(
-              PLATFORM.LINEAR,
-              verifiedOwner,
-              'error=workspace_already_connected',
-              verified?.returnTo
-            ),
-            APP_URL
-          )
-        );
+
+        const previousInstallation = await linearAdapter.getInstallation(organizationId);
+
+        await linearAdapter.setInstallation(organizationId, {
+          accessToken,
+          botUserId: identity.viewerId,
+          expiresAt: expiresIn === null ? null : Date.now() + expiresIn * 1000,
+          organizationId,
+          ...(refreshToken ? { refreshToken } : {}),
+        });
+
+        const workspaceName = identity.organizationName ?? organizationId;
+
+        let previousWorkspace: PreviousLinearWorkspace | null = null;
+        try {
+          const result = await upsertLinearInstallation(
+            {
+              owner,
+              organizationId,
+              organizationName: workspaceName,
+              botUserId: identity.viewerId,
+            },
+            {
+              getChatSdkAccessToken: getChatSdkLinearAccessToken,
+              defaultModel,
+            },
+            tx
+          );
+          previousWorkspace = result.previousWorkspace;
+        } catch (error) {
+          // The installation store is not part of the database transaction, so a
+          // rolled-back write must put back what this install replaced.
+          await restoreProviderInstallation({
+            provider: 'linear',
+            previousInstallation,
+            setInstallation: restored => linearAdapter.setInstallation(organizationId, restored),
+            deleteInstallation: () => linearAdapter.deleteInstallation(organizationId),
+          });
+
+          if (error instanceof LinearWorkspaceAlreadyConnectedError) {
+            return { response: conflictRedirect, previousWorkspace: null };
+          }
+          throw error;
+        }
+
+        const successPath = verified.returnTo
+          ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=linear_installed')
+          : buildIntegrationOAuthRedirectPath(PLATFORM.LINEAR, owner, 'success=installed');
+
+        return {
+          response: NextResponse.redirect(new URL(successPath, APP_URL)),
+          previousWorkspace,
+        };
       }
-      throw error;
+    );
+
+    // The workspace this install replaces is retired only after the connection
+    // write has committed, giving the two writes one outcome.
+    if (install.previousWorkspace) {
+      await retirePreviousLinearWorkspace(install.previousWorkspace, {
+        deleteChatSdkInstallation: deleteChatSdkLinearInstallation,
+        deleteChatSdkIdentityCache: deleteChatSdkLinearIdentityCache,
+      });
     }
 
-    const successPath = verified.returnTo
-      ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=linear_installed')
-      : buildIntegrationOAuthRedirectPath(PLATFORM.LINEAR, owner, 'success=installed');
-
-    return NextResponse.redirect(new URL(successPath, APP_URL));
+    return install.response;
   } catch (error) {
     const searchParams = request.nextUrl.searchParams;
     const state = searchParams.get('state');
     const verified = state ? verifyOAuthState(state) : null;
+
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (denialCode) {
+      return NextResponse.redirect(
+        new URL(
+          buildIntegrationOAuthRedirectPathFromOwner(
+            PLATFORM.LINEAR,
+            verified?.owner,
+            `error=${denialCode}`,
+            verified?.returnTo
+          ),
+          APP_URL
+        )
+      );
+    }
 
     captureException(error, {
       tags: {
         endpoint: 'linear/callback',
         source: 'linear_oauth',
       },
-      extra: {
-        state,
-        hasCode: !!searchParams.get('code'),
-      },
+      extra: safeCallbackContext(searchParams),
     });
 
     return NextResponse.redirect(

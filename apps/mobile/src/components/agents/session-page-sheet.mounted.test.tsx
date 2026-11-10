@@ -17,6 +17,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
 }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   View: 'View',
   Platform: reactNativeMock.Platform,
 }));
@@ -33,6 +35,7 @@ function sheetElement(
     onClose?: () => void;
     onDismiss?: () => void;
     onRequestDismiss?: () => boolean;
+    dismissible?: boolean;
     children?: ReactElement | null;
   } = {}
 ): ReactElement {
@@ -41,6 +44,7 @@ function sheetElement(
     onClose: props.onClose ?? vi.fn<() => void>(),
     onDismiss: props.onDismiss,
     onRequestDismiss: props.onRequestDismiss,
+    dismissible: props.dismissible,
     // eslint-disable-next-line react/no-children-prop -- tsgo requires `children` in the props object, not the third argument.
     children: props.children ?? null,
   });
@@ -51,6 +55,7 @@ async function mountSheet(
     onClose?: () => void;
     onDismiss?: () => void;
     onRequestDismiss?: () => boolean;
+    dismissible?: boolean;
     children?: ReactElement | null;
   } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
@@ -186,6 +191,11 @@ describe('SessionPageSheet mounted', () => {
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface')[0];
     // The padding keeps the content below the system status bar.
     expect(surface?.props.style).toEqual({ paddingTop: 24 });
+    // The surface clears the status bar, so the sheet must not reserve that inset
+    // too: Android reads a dialog window's insets only after the sheet measured
+    // itself, and the sheet then shrank by the status bar and moved its whole
+    // content — header included — after it had already appeared.
+    expect(sheet(renderer.root).props.contentOwnsTopInset).toBe(true);
 
     renderer.unmount();
   });
@@ -203,6 +213,33 @@ describe('SessionPageSheet mounted', () => {
     // The form decides whether that requested dismissal really closes it.
     const requestDismiss = booleanHandler(sheetNode.props.onRequestDismiss);
     expect(requestDismiss()).toBe(false);
+    expect(onRequestDismiss).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('lets a read-only surface dismiss on a drag', async () => {
+    const renderer = await mountSheet({ dismissible: true });
+
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.dismissGestures).toBe(true);
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('keeps the drag off a sheet that asks before closing', async () => {
+    // A drag has already taken the native sheet down when the question is asked,
+    // so a refused request could only answer Keep editing into an empty window.
+    const onRequestDismiss = vi.fn(() => false);
+    const renderer = await mountSheet({ dismissible: true, onRequestDismiss });
+
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.dismissGestures).toBe(false);
+    // The dismissal paths that ask first stay reachable, and the caller still
+    // decides the answer.
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
+    expect(booleanHandler(sheetNode.props.onRequestDismiss)()).toBe(false);
     expect(onRequestDismiss).toHaveBeenCalledTimes(1);
 
     renderer.unmount();

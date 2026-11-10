@@ -1,4 +1,5 @@
 import 'server-only';
+import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
@@ -8,7 +9,15 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
+import {
+  GITLAB_PROJECT_NOT_IN_CACHE_MESSAGE,
+  matchCachedGitLabProject,
+} from '@/lib/integrations/platforms/gitlab/project-scope';
+import {
+  requireNumericPlatformRepositories,
+  shouldSyncProviderRepositories,
+  type Owner,
+} from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { updateRepositoriesForIntegration } from '@/lib/integrations/db/platform-integrations';
 import { ownerCondition } from '@/lib/integrations/db/predicates';
@@ -25,7 +34,9 @@ import {
   validateProjectAccessToken,
   validatePersonalAccessToken,
   type GitLabProjectAccessToken,
+  type GitLabProjectAccessTokenValidation,
   type GitLabPATValidationResult,
+  GitLabAuthenticationError,
   GitLabProjectAccessTokenPermissionError,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { randomBytes, randomUUID } from 'crypto';
@@ -35,7 +46,9 @@ import {
   GitLabInstanceUrlError,
   normalizeGitLabInstanceUrl,
 } from '@/lib/integrations/platforms/gitlab/instance-url';
+import { GITLAB_RECONNECT_REQUIRED_MESSAGE } from '@/lib/integrations/platforms/gitlab/credential-errors';
 import {
+  mutateGitLabMetadata,
   mutateGitLabMetadataInTransaction,
   readGitLabMetadataInTransaction,
 } from '@/lib/integrations/platforms/gitlab/metadata-mutation';
@@ -43,6 +56,15 @@ import {
   encryptGitLabPersonalAccessToken,
   encryptGitLabProjectAccessToken,
 } from '@/lib/integrations/platforms/gitlab/credential-encryption';
+import {
+  deleteStoredProjectCredential,
+  deleteStoredProjectTokenMetadataEntry,
+  readGitLabAccountId,
+  readProjectRevocationStatus,
+  retireProjectCredentialsForReplacedAccount,
+  retireStoredProjectCredential,
+  type StoredProjectCredential,
+} from '@/lib/integrations/platforms/gitlab/project-credential-lifecycle';
 import {
   GitLabPersonalAccessTokenMetadataSchema,
   GitLabProjectAccessTokenCredentialRowSchema,
@@ -98,18 +120,6 @@ function requireMetadataRecord(metadata: unknown): Readonly<Record<string, unkno
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid GitLab integration metadata' });
   }
   return { ...metadata };
-}
-
-function copyMetadataObject(
-  metadata: Readonly<Record<string, unknown>>,
-  key: string
-): Record<string, unknown> {
-  const value = metadata[key];
-  if (value === undefined) return {};
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error(`GitLab metadata ${key} must be an object`);
-  }
-  return { ...value };
 }
 
 function countMetadataObjectEntries(value: unknown): number {
@@ -228,7 +238,7 @@ function requireAvailableGitLabCredential(
     case 'reconnect_required':
       throw new TRPCError({
         code: 'UNAUTHORIZED',
-        message: 'GitLab integration must be reconnected',
+        message: GITLAB_RECONNECT_REQUIRED_MESSAGE,
       });
     case 'temporarily_unavailable':
       throw new TRPCError({
@@ -239,7 +249,7 @@ function requireAvailableGitLabCredential(
 }
 
 export async function getValidGitLabToken(
-  integration: PlatformIntegration,
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
   actor: GitLabCredentialActor
 ): Promise<string> {
   const metadata = requireMetadataRecord(integration.metadata);
@@ -276,7 +286,9 @@ export async function getValidGitLabProjectAccessToken(
 
 /**
  * List repositories accessible by a GitLab integration
- * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true
+ * Returns the cached snapshot by default, including an empty one that has
+ * already synced; reads the provider when the row has no snapshot yet or when
+ * forceRefresh is true
  */
 export async function listGitLabRepositories(
   owner: Owner,
@@ -306,7 +318,16 @@ export async function listGitLabRepositories(
   }
 
   const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-  if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
+  // Answer from the cached snapshot unless the caller forces a sync or the
+  // integration has never synced: a synced empty snapshot is the
+  // connected-empty state, not a reason to re-query GitLab on every read.
+  if (
+    shouldSyncProviderRepositories({
+      forceRefresh,
+      cachedRepositories,
+      repositoriesSyncedAt: integration.repositories_synced_at,
+    })
+  ) {
     const accessToken = await getValidGitLabToken(integration, actor);
     const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
     const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
@@ -321,7 +342,7 @@ export async function listGitLabRepositories(
   }
 
   return {
-    repositories: cachedRepositories,
+    repositories: cachedRepositories ?? [],
     syncedAt: integration.repositories_synced_at,
   };
 }
@@ -334,7 +355,7 @@ export async function listGitLabBranches(
   owner: Owner,
   integrationId: string,
   actor: GitLabCredentialActor,
-  projectPath: string // e.g., "group/project" or project ID
+  projectPath: string // must be a cached full path, e.g. "group/project"
 ) {
   const ownershipCondition = ownerCondition(owner);
 
@@ -357,11 +378,24 @@ export async function listGitLabBranches(
     });
   }
 
+  // The connection's cached repository set is the project authorization
+  // scope: a caller-supplied path must be one of its full paths, compared
+  // case-insensitively end-to-end (the same rule authorizeProject enforces
+  // for the review layer). The refusal comes before any token is minted, and
+  // the fetch uses the cache's canonical full path in stored casing.
+  const match = matchCachedGitLabProject(integration, projectPath);
+  if (!match) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: GITLAB_PROJECT_NOT_IN_CACHE_MESSAGE,
+    });
+  }
+
   const accessToken = await getValidGitLabToken(integration, actor);
   const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
-  const branches = await fetchGitLabBranches(accessToken, projectPath, instanceUrl);
+  const branches = await fetchGitLabBranches(accessToken, match.full_name, instanceUrl);
 
   return {
     branches: branches.map(b => ({
@@ -372,14 +406,231 @@ export async function listGitLabBranches(
 }
 
 /**
+ * The actor a credential lookup uses for an owner's integration. An
+ * organization integration resolves only for a member of that organization,
+ * so the acting user must travel with the owner.
+ */
+export function gitLabCredentialActor(owner: Owner, actingUserId: string): GitLabCredentialActor {
+  return {
+    userId: actingUserId,
+    ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
+  };
+}
+
+/**
+ * Project ids whose access token belongs to the integration: the encrypted
+ * rows it holds and any legacy metadata entry it still carries. Malformed
+ * metadata keys are not GitLab project ids and cannot be revoked.
+ */
+async function listIntegrationProjectIds(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>
+): Promise<string[]> {
+  const projectIds = new Set<string>();
+  const metadata = requireMetadataRecord(integration.metadata);
+  const storedTokens = metadata.project_tokens;
+  if (typeof storedTokens === 'object' && storedTokens !== null && !Array.isArray(storedTokens)) {
+    for (const projectId of Object.keys(storedTokens)) {
+      if (/^[1-9][0-9]*$/.test(projectId)) projectIds.add(projectId);
+    }
+  }
+
+  const rows = await db
+    .select({ projectId: platform_access_token_credentials.provider_resource_id })
+    .from(platform_access_token_credentials)
+    .where(
+      and(
+        eq(platform_access_token_credentials.platform_integration_id, integration.id),
+        eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
+      )
+    );
+  for (const row of rows) {
+    if (row.projectId !== null) projectIds.add(row.projectId);
+  }
+
+  return [...projectIds];
+}
+
+/**
+ * Attempts the settlement makes to revoke a project token the provider did not
+ * settle. Every attempt needs the credential the caller holds, which the
+ * suspension drops, so the attempts share one request.
+ */
+const PROJECT_TOKEN_SETTLEMENT_ATTEMPTS = 2;
+
+/** Pause between settlement attempts, so a transient provider error can clear. */
+const PROJECT_TOKEN_SETTLEMENT_RETRY_DELAY_MS = 250;
+
+/**
+ * Wall-clock budget for settling one integration's project tokens inside one
+ * request. A settlement that reaches it stops attempting further projects and
+ * skips its second attempt: the handles it did not reach stay stored, and a
+ * reconnect of the same account settles them.
+ */
+const PROJECT_TOKEN_SETTLEMENT_BUDGET_MS = 20_000;
+
+function waitForSettlementRetry(): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, PROJECT_TOKEN_SETTLEMENT_RETRY_DELAY_MS);
+  return promise;
+}
+
+type ProjectTokenSettlement = {
+  /** Tokens the provider confirmed revoked, whose stored handles are gone. */
+  revoked: number;
+  /** Entries dropped because they named no revocable token id. */
+  scrubbed: number;
+  /** Stored handles that remain, including the ones not attempted. */
+  retained: number;
+  /** Handles that were listed but never attempted, for lack of credential or budget. */
+  unattempted: number;
+};
+
+/**
+ * Settles every project access token the integration stores, with a credential
+ * the caller already holds.
+ *
+ * Every stored id of a project is revoked before either handle for that project
+ * is dropped, so a project is retained whole or settled whole. A metadata entry
+ * that names no revocable token id is dropped instead, because it is the last
+ * stored copy of a secret that no revocation handle can reach. Only an answer a
+ * repeat can change is attempted again: no answer, a rate limit, or a server
+ * error. A permission or authentication refusal keeps its handle and is not
+ * repeated.
+ *
+ * The work is bounded twice: by the attempt count, and by `options.signal`,
+ * which defaults to a wall-clock budget. When the signal aborts, the remaining
+ * projects are left as they are, so the request answers instead of being cut
+ * off with live handles unattempted.
+ *
+ * Returns null when the stored project list cannot be read, which a caller
+ * reports separately from a token the provider refused.
+ */
+export async function settleStoredProjectTokens(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  actor: GitLabCredentialActor,
+  userToken: string | undefined,
+  options: { signal?: AbortSignal } = {}
+): Promise<ProjectTokenSettlement | null> {
+  let projectIds: string[];
+  try {
+    projectIds = await listIntegrationProjectIds(integration);
+  } catch (error) {
+    logExceptInTest('[settleStoredProjectTokens] Project token list unavailable', {
+      integrationId: integration.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+
+  if (userToken === undefined) {
+    // The cleanup that needs no provider call runs before the credential check,
+    // so one request settles those entries too.
+    const noCredentialOutstanding = new Set(projectIds);
+    let noCredentialScrubbed = 0;
+    for (const projectId of projectIds) {
+      const dropped = await getStoredProjectCredential(integration.id, projectId)
+        .then(storedCredential =>
+          dropUnrevokableProjectTokenEntry(integration, projectId, storedCredential)
+        )
+        .catch(() => false);
+      if (dropped) {
+        noCredentialOutstanding.delete(projectId);
+        noCredentialScrubbed += 1;
+      }
+    }
+    return {
+      revoked: 0,
+      scrubbed: noCredentialScrubbed,
+      retained: noCredentialOutstanding.size,
+      unattempted: noCredentialOutstanding.size,
+    };
+  }
+
+  const signal = options.signal ?? AbortSignal.timeout(PROJECT_TOKEN_SETTLEMENT_BUDGET_MS);
+  const outstandingProjectIds = new Set(projectIds);
+  const attemptedProjectIds = new Set<string>();
+  const retryProjectIds = new Set<string>();
+  let revoked = 0;
+  let scrubbed = 0;
+  for (let attempt = 0; attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
+    if (attempt > 0 && retryProjectIds.size === 0) break;
+    if (attempt > 0) {
+      if (signal.aborted) break;
+      await waitForSettlementRetry();
+    }
+    const attemptProjectIds = attempt === 0 ? [...outstandingProjectIds] : [...retryProjectIds];
+    retryProjectIds.clear();
+    for (const projectId of attemptProjectIds) {
+      if (signal.aborted) break;
+      attemptedProjectIds.add(projectId);
+      const outcome = await removeStoredProjectAccessToken(integration, projectId, actor, {
+        userToken,
+        signal,
+      }).catch(error => {
+        logExceptInTest('[settleStoredProjectTokens] Project token settlement failed', {
+          integrationId: integration.id,
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return { outcome: 'retained' as const, retryable: false };
+      });
+      if (outcome.outcome === 'removed') {
+        outstandingProjectIds.delete(projectId);
+        revoked += 1;
+      } else if (outcome.outcome === 'scrubbed') {
+        outstandingProjectIds.delete(projectId);
+        scrubbed += 1;
+      } else if (outcome.outcome === 'retained' && outcome.retryable) {
+        retryProjectIds.add(projectId);
+      }
+    }
+  }
+
+  const unattempted = [...outstandingProjectIds].filter(
+    projectId => !attemptedProjectIds.has(projectId)
+  ).length;
+  return { revoked, scrubbed, retained: outstandingProjectIds.size, unattempted };
+}
+
+/**
  * Disconnect GitLab integration for an owner
  *
- * Instead of deleting the integration record, we mark it as disconnected.
- * This preserves the webhook_secret, configured_webhooks, and project_tokens
- * so that when the user reconnects (via OAuth or PAT), existing webhook
- * configurations continue to work.
+ * Instead of deleting the integration record, we mark it as disconnected and
+ * settle the provider-side credentials it delegated:
+ *
+ * 1. resolve the connected credential once, while the integration still counts
+ *    as connected — the token service refuses a suspended integration, so this
+ *    is the last moment the credential that can revoke project tokens is
+ *    reachable;
+ * 2. mark the integration suspended and drop the connection's own encrypted
+ *    credentials, which stops every caller and the token service from resolving
+ *    anything against this integration;
+ * 3. revoke each per-project access token at GitLab through the same removal
+ *    contract the review lifecycle uses: a metadata entry and an encrypted row
+ *    are deleted only after GitLab settles the revocation, and any other
+ *    outcome keeps both.
+ *
+ * The settlement runs inside this request, over a bounded number of attempts
+ * and a wall-clock budget, because step 2 drops the credential that can revoke
+ * a token: a suspended integration resolves nothing, so a repeated disconnect
+ * answers as not found. Reaching the budget stops the settlement and keeps the
+ * handles it did not reach; each such handle keeps neither reading nor revoking
+ * anything through this integration. Both stay revocable: a reconnect of the
+ * same account, through a personal access token or OAuth, settles them with the
+ * credential it presents, so a disconnect that could not finish converges
+ * without a new bot token being minted on top of it.
+ *
+ * A metadata entry that names no revocable token id is dropped, because it is
+ * the last stored copy of a secret that no revocation handle can reach.
+ *
+ * The webhook_secret and configured_webhooks stay, so a reconnect keeps the
+ * existing webhook configuration.
+ *
+ * `actingUserId` is the user who requested the disconnect. It names the actor
+ * for the credential lookup, which for an organization integration must be a
+ * member of that organization.
  */
-export async function disconnectGitLabIntegration(owner: Owner) {
+export async function disconnectGitLabIntegration(owner: Owner, actingUserId: string) {
   const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
@@ -398,6 +649,21 @@ export async function disconnectGitLabIntegration(owner: Owner) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'GitLab integration not found',
+    });
+  }
+
+  const actor = gitLabCredentialActor(owner, actingUserId);
+  // The token service refuses a suspended integration, so the credential that
+  // can revoke project tokens must be resolved before the suspension. It is
+  // resolved even when no project token is visible yet: a review that is
+  // already running can store one before the suspension commits.
+  let userToken: string | undefined;
+  try {
+    userToken = await getValidGitLabToken(integration, actor);
+  } catch (error) {
+    logExceptInTest('[disconnectGitLabIntegration] Connected credential unavailable', {
+      integrationId: integration.id,
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 
@@ -433,13 +699,24 @@ export async function disconnectGitLabIntegration(owner: Owner) {
     return nextMetadata;
   });
 
+  // Settle after the suspension: nothing can mint a project token while the
+  // integration is suspended, so the list read here also covers a token stored
+  // between the first credential lookup and the suspension. The integration is
+  // suspended already, so an unreadable project list cannot fail the disconnect;
+  // the kept handles stay unusable through it.
+  const settlement = await settleStoredProjectTokens(integration, actor, userToken);
+
   logExceptInTest(
     '[disconnectGitLabIntegration] Integration suspended (preserved webhook config)',
     {
       integrationId: integration.id,
       preservedWebhookSecret: !!updatedMetadata.webhook_secret,
       preservedWebhooks: countMetadataObjectEntries(updatedMetadata.configured_webhooks),
-      preservedProjectTokens: countMetadataObjectEntries(updatedMetadata.project_tokens),
+      revokedProjectTokens: settlement?.revoked ?? 0,
+      scrubbedProjectTokens: settlement?.scrubbed ?? 0,
+      retainedProjectTokens: settlement?.retained ?? 0,
+      unsettledProjectTokens: settlement?.unattempted ?? 0,
+      projectTokenListUnavailable: settlement === null,
     }
   );
 
@@ -449,7 +726,10 @@ export async function disconnectGitLabIntegration(owner: Owner) {
 /**
  * Regenerate webhook secret for a GitLab integration
  * This is useful when the user has lost the webhook secret and needs to reconfigure
- * their GitLab webhook settings
+ * their GitLab webhook settings.
+ *
+ * The new secret is merged into the stored metadata under the integration
+ * lifecycle lock, so a concurrent connect or disconnect keeps its own fields.
  */
 export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSecret: string }> {
   const ownershipCondition = ownerCondition(owner);
@@ -475,19 +755,7 @@ export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSe
 
   const newWebhookSecret = randomBytes(32).toString('hex');
 
-  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
-  const updatedMetadata = {
-    ...existingMetadata,
-    webhook_secret: newWebhookSecret,
-  };
-
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata: updatedMetadata,
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integration.id));
+  await mutateGitLabMetadata(integration.id, { set: { webhook_secret: newWebhookSecret } });
 
   return { webhookSecret: newWebhookSecret };
 }
@@ -539,6 +807,53 @@ export type GitLabIntegrationMetadata = {
  */
 const KILO_BOT_TOKEN_NAME = 'Kilo Code Review Bot';
 
+/** The only field of a legacy metadata entry that can still revoke its token. */
+const LegacyStoredProjectAccessTokenSchema = z
+  .object({ token_id: z.number().int().positive() })
+  .passthrough();
+
+const GitLabProjectTokenMetadataSchema = z
+  .object({ project_tokens: z.record(z.string(), z.unknown()).optional() })
+  .passthrough();
+
+/**
+ * Token id named by a legacy plaintext metadata entry, or null when the entry
+ * is absent or does not carry a usable id.
+ */
+function readLegacyProjectTokenId(metadata: unknown, projectId: string): number | null {
+  const parsedMetadata = GitLabProjectTokenMetadataSchema.safeParse(metadata);
+  if (!parsedMetadata.success) return null;
+  const entry = parsedMetadata.data.project_tokens?.[projectId];
+  const parsedEntry = LegacyStoredProjectAccessTokenSchema.safeParse(entry);
+  return parsedEntry.success ? parsedEntry.data.token_id : null;
+}
+
+/** True when the integration still carries any metadata entry for the project. */
+function hasLegacyProjectTokenEntry(metadata: unknown, projectId: string): boolean {
+  const parsedMetadata = GitLabProjectTokenMetadataSchema.safeParse(metadata);
+  if (!parsedMetadata.success) return false;
+  return parsedMetadata.data.project_tokens?.[projectId] !== undefined;
+}
+
+/**
+ * Drops one stored project token entry that a provider call cannot settle.
+ * Returns true when it dropped one. Needs no provider credential.
+ */
+async function dropUnrevokableProjectTokenEntry(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  projectId: string,
+  storedCredential: StoredProjectCredential | null
+): Promise<boolean> {
+  if (storedCredential !== null) return false;
+  if (readLegacyProjectTokenId(integration.metadata, projectId) !== null) return false;
+  if (!hasLegacyProjectTokenEntry(integration.metadata, projectId)) return false;
+  await deleteStoredProjectTokenMetadataEntry({ integrationId: integration.id, projectId });
+  logExceptInTest('[removeStoredProjectAccessToken] Dropped entry with no revocable token id', {
+    projectId,
+  });
+  return true;
+}
+
 async function getStoredProjectCredential(integrationId: string, projectId: string) {
   const [row] = await db
     .select()
@@ -569,7 +884,31 @@ async function getStoredProjectCredential(integrationId: string, projectId: stri
     credentialVersion: parsed.data.credential_version,
     tokenId,
     expiresAt: parsed.data.provider_metadata.expiresOn,
-  };
+    authorizedAccountId: parsed.data.provider_metadata.authorizedAccountId ?? null,
+    unusable: parsed.data.provider_metadata.unusableReason !== undefined,
+  } satisfies StoredProjectCredential;
+}
+
+async function validateStoredProjectAccessToken(
+  token: string,
+  instanceUrl: string
+): Promise<GitLabProjectAccessTokenValidation> {
+  const first = await validateProjectAccessToken(token, instanceUrl);
+  if (first.status !== 'unverified') {
+    return first;
+  }
+
+  // A rejected instance URL is a stored configuration problem: repeating the
+  // probe cannot change the answer.
+  if (first.reason === 'instance-url') {
+    return first;
+  }
+
+  logExceptInTest('[validateStoredProjectAccessToken] Retrying unconfirmed token probe', {
+    reason: first.reason,
+    status: first.httpStatus,
+  });
+  return validateProjectAccessToken(token, instanceUrl);
 }
 
 /**
@@ -580,6 +919,9 @@ async function getStoredProjectCredential(integrationId: string, projectId: stri
  * 2. If exists and not expiring soon, returns it
  * 3. If exists but expiring soon, rotates it
  * 4. If doesn't exist, creates a new one
+ *
+ * Validation is best effort for transient provider failures; explicit denials
+ * require replacement. Invalid instance configuration is reported to the caller.
  *
  * @param integration - The GitLab integration record
  * @param projectId - GitLab project ID
@@ -595,7 +937,33 @@ export async function getOrCreateProjectAccessToken(
   const projectIdStr = requireGitLabProjectId(projectId);
 
   // Credential metadata is authoritative; the plaintext project map is migration-only.
-  const storedCredential = await getStoredProjectCredential(integration.id, projectIdStr);
+  let storedCredential = await getStoredProjectCredential(integration.id, projectIdStr);
+  const integratingAccountId = readGitLabAccountId(integration);
+
+  if (integratingAccountId === null) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: GITLAB_RECONNECT_REQUIRED_MESSAGE,
+    });
+  }
+
+  if (storedCredential?.unusable) {
+    logExceptInTest('[getOrCreateProjectAccessToken] Stored token is not usable', {
+      projectId,
+      tokenId: storedCredential.tokenId,
+    });
+    storedCredential = null;
+  } else if (storedCredential && storedCredential.authorizedAccountId !== integratingAccountId) {
+    const userToken = await getValidGitLabToken(integration, actor);
+    await retireStoredProjectCredential({
+      integrationId: integration.id,
+      projectId: projectIdStr,
+      credential: storedCredential,
+      userToken,
+      instanceUrl,
+    });
+    storedCredential = null;
+  }
 
   if (storedCredential) {
     // Check if token is expiring soon (within 7 days)
@@ -604,9 +972,24 @@ export async function getOrCreateProjectAccessToken(
     if (!isExpiringSoon) {
       // Validate the token is still valid on GitLab (might have been manually revoked)
       const projectToken = await getValidGitLabProjectAccessToken(integration, projectIdStr, actor);
-      const isValid = await validateProjectAccessToken(projectToken, instanceUrl);
+      const validation = await validateStoredProjectAccessToken(projectToken, instanceUrl);
 
-      if (isValid) {
+      if (validation.status === 'unverified') {
+        logExceptInTest('[getOrCreateProjectAccessToken] Token health is unconfirmed', {
+          projectId,
+          tokenId: storedCredential.tokenId,
+          reason: validation.reason,
+          status: validation.httpStatus,
+        });
+        if (validation.reason === 'instance-url') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'GitLab instance URL is invalid.',
+          });
+        }
+      }
+
+      if (validation.status !== 'invalid') {
         logExceptInTest('[getOrCreateProjectAccessToken] Using existing token', {
           projectId,
           tokenId: storedCredential.tokenId,
@@ -615,14 +998,23 @@ export async function getOrCreateProjectAccessToken(
         return projectToken;
       }
 
-      // Token is invalid (revoked), remove from storage and create a new one
-      logExceptInTest('[getOrCreateProjectAccessToken] Stored token is invalid, creating new one', {
-        projectId,
-        tokenId: storedCredential.tokenId,
-      });
+      // Token is denied or revoked, remove from storage and create a new one
+      logExceptInTest(
+        '[getOrCreateProjectAccessToken] Stored token is unusable, creating new one',
+        {
+          projectId,
+          tokenId: storedCredential.tokenId,
+          reason: validation.reason,
+          status: validation.httpStatus,
+        }
+      );
 
       // Remove the invalid token from storage and skip to creating a new one
-      await removeInvalidStoredToken(integration.id, projectIdStr, storedCredential);
+      await deleteStoredProjectCredential({
+        integrationId: integration.id,
+        projectId: projectIdStr,
+        credential: storedCredential,
+      });
       // Don't try to rotate - fall through to create new token below
     } else {
       // Token is expiring soon, try to rotate it
@@ -713,6 +1105,14 @@ export async function getOrCreateProjectAccessToken(
 
     return newToken.token;
   } catch (error) {
+    if (error instanceof GitLabAuthenticationError) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message:
+          'GitLab rejected the connected credential. Reconnect the GitLab integration and try again.',
+        cause: error,
+      });
+    }
     if (error instanceof GitLabProjectAccessTokenPermissionError) {
       throw new TRPCError({
         code: 'FORBIDDEN',
@@ -722,41 +1122,6 @@ export async function getOrCreateProjectAccessToken(
     }
     throw error;
   }
-}
-
-/**
- * Removes an invalid stored token from the integration metadata
- * Called when a stored token is found to be invalid (e.g., manually revoked on GitLab)
- */
-async function removeInvalidStoredToken(
-  integrationId: string,
-  projectId: string,
-  credential: { credentialId: string; credentialVersion: number }
-): Promise<void> {
-  await db.transaction(async tx => {
-    await mutateGitLabMetadataInTransaction(tx, integrationId, currentMetadata => {
-      const projectTokens = copyMetadataObject(currentMetadata, 'project_tokens');
-      delete projectTokens[projectId];
-      return { set: { project_tokens: projectTokens } };
-    });
-    const deleted = await tx
-      .delete(platform_access_token_credentials)
-      .where(
-        and(
-          eq(platform_access_token_credentials.id, credential.credentialId),
-          eq(platform_access_token_credentials.credential_version, credential.credentialVersion)
-        )
-      )
-      .returning({ id: platform_access_token_credentials.id });
-    if (deleted.length !== 1) {
-      throw new Error('GitLab project access token was replaced concurrently');
-    }
-  });
-
-  logExceptInTest('[removeInvalidStoredToken] Removed invalid token from storage', {
-    integrationId,
-    projectId,
-  });
 }
 
 /**
@@ -779,9 +1144,14 @@ async function updateStoredProjectAccessToken(
   const owner = getGitLabIntegrationOwner(integration);
   const metadata = integration.metadata as GitLabIntegrationMetadata | null;
   const providerBaseUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
+  const authorizedAccountId = readGitLabAccountId(integration);
+  if (authorizedAccountId === null) {
+    throw new Error('GitLab integration has no connected account');
+  }
   const providerMetadata = GitLabProjectAccessTokenMetadataSchema.parse({
     providerCredentialId: String(providerToken.id),
     expiresOn: providerToken.expires_at,
+    authorizedAccountId,
   });
   const validatedAt = new Date().toISOString();
 
@@ -792,6 +1162,22 @@ async function updateStoredProjectAccessToken(
     );
     const currentIntegrationType = readOptionalMetadataString(currentMetadata, 'auth_type');
     if (currentProviderBaseUrl !== providerBaseUrl || currentIntegrationType !== integrationType) {
+      throw new Error('GitLab integration changed while storing project credential');
+    }
+    const [currentIntegration] = await tx
+      .select({
+        platform_account_id: platform_integrations.platform_account_id,
+        platform_installation_id: platform_integrations.platform_installation_id,
+      })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.id, integration.id),
+          eq(platform_integrations.platform, PLATFORM.GITLAB)
+        )
+      )
+      .limit(1);
+    if (!currentIntegration || readGitLabAccountId(currentIntegration) !== authorizedAccountId) {
       throw new Error('GitLab integration changed while storing project credential');
     }
     const [existingCredential] = await tx
@@ -868,63 +1254,110 @@ async function updateStoredProjectAccessToken(
 }
 
 /**
+ * Outcome of removing one stored project token. A retained outcome says whether
+ * a repeated attempt can settle it, so a caller that can try again does not
+ * repeat a refusal the provider will keep answering. Only a missing answer, a
+ * rate limit, or a server error can change on a repeat; a permission or
+ * authentication refusal cannot. A scrubbed outcome drops an entry that named
+ * no revocable token id, so nothing is left at the provider that this path
+ * could reach.
+ */
+export type StoredProjectTokenRemoval =
+  | { outcome: 'removed' }
+  | { outcome: 'absent' }
+  | { outcome: 'scrubbed' }
+  | { outcome: 'retained'; retryable: boolean };
+
+/**
  * Removes the stored Project Access Token for a project
- * Called when a project is removed from code reviews
+ * Called when a project is removed from code reviews, and by every project on
+ * disconnect
+ *
+ * The metadata entry and the encrypted credential row are deleted only after
+ * GitLab settles the revocation, either by confirming it or by reporting the
+ * token as already gone (404). Any other outcome keeps both handles so a later
+ * removal can try again. A legacy metadata entry names a token id too, and it
+ * keeps the same contract: every stored id for the project is revoked before
+ * either handle is dropped. An entry that names no revocable id is dropped
+ * instead of kept, because no stored reader uses its plaintext token.
+ *
+ * `userToken` lets a caller that already resolved the connected credential — a
+ * disconnect resolves it before the integration stops counting as connected —
+ * reuse it instead of asking the token service per project. `signal` carries
+ * that caller's deadline into the provider request.
  */
 export async function removeStoredProjectAccessToken(
-  integration: PlatformIntegration,
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
   projectId: string | number,
-  actor: GitLabCredentialActor
-): Promise<void> {
+  actor: GitLabCredentialActor,
+  options: { userToken?: string; signal?: AbortSignal } = {}
+): Promise<StoredProjectTokenRemoval> {
   const metadata = integration.metadata as GitLabIntegrationMetadata | null;
   const projectIdStr = requireGitLabProjectId(projectId);
   const storedCredential = await getStoredProjectCredential(integration.id, projectIdStr);
-  if (!storedCredential) return;
+  const tokenIds = [
+    ...new Set(
+      [
+        storedCredential?.tokenId,
+        readLegacyProjectTokenId(integration.metadata, projectIdStr),
+      ].filter((tokenId): tokenId is number => tokenId !== null && tokenId !== undefined)
+    ),
+  ];
+  if (tokenIds.length === 0) {
+    const dropped = await dropUnrevokableProjectTokenEntry(
+      integration,
+      projectIdStr,
+      storedCredential
+    );
+    return { outcome: dropped ? 'scrubbed' : 'absent' };
+  }
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
-  // Try to revoke the token in GitLab
   try {
-    const userToken = await getValidGitLabToken(integration, actor);
-    await revokeProjectAccessToken(userToken, projectId, storedCredential.tokenId, instanceUrl);
-    logExceptInTest('[removeStoredProjectAccessToken] Token revoked in GitLab', {
-      projectId,
-      tokenId: storedCredential.tokenId,
-    });
+    const userToken = options.userToken ?? (await getValidGitLabToken(integration, actor));
+    for (const tokenId of tokenIds) {
+      await revokeProjectAccessToken(userToken, projectId, tokenId, instanceUrl, options.signal);
+    }
   } catch (error) {
-    // Log but don't fail - the token might already be revoked
-    logExceptInTest('[removeStoredProjectAccessToken] Failed to revoke token in GitLab', {
-      projectId,
-      tokenId: storedCredential.tokenId,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    const status = readProjectRevocationStatus(error);
+    logExceptInTest(
+      '[removeStoredProjectAccessToken] Revocation unsettled; keeping stored project credential',
+      {
+        projectId,
+        tokenIds,
+        status,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    );
+    return {
+      outcome: 'retained',
+      retryable: status === undefined || status === 429 || status >= 500,
+    };
   }
 
-  await db.transaction(async tx => {
-    await mutateGitLabMetadataInTransaction(tx, integration.id, currentMetadata => {
-      const projectTokens = copyMetadataObject(currentMetadata, 'project_tokens');
-      delete projectTokens[projectIdStr];
-      return { set: { project_tokens: projectTokens } };
-    });
-    const deleted = await tx
-      .delete(platform_access_token_credentials)
-      .where(
-        and(
-          eq(platform_access_token_credentials.id, storedCredential.credentialId),
-          eq(
-            platform_access_token_credentials.credential_version,
-            storedCredential.credentialVersion
-          )
-        )
-      )
-      .returning({ id: platform_access_token_credentials.id });
-    if (deleted.length !== 1) {
-      throw new Error('GitLab project access token was replaced concurrently');
-    }
+  logExceptInTest('[removeStoredProjectAccessToken] Token revoked in GitLab', {
+    projectId,
+    tokenIds,
   });
+
+  if (storedCredential) {
+    await deleteStoredProjectCredential({
+      integrationId: integration.id,
+      projectId: projectIdStr,
+      credential: storedCredential,
+    });
+  } else {
+    await deleteStoredProjectTokenMetadataEntry({
+      integrationId: integration.id,
+      projectId: projectIdStr,
+    });
+  }
 
   logExceptInTest('[removeStoredProjectAccessToken] Token removed from metadata', {
     projectId,
   });
+
+  return { outcome: 'removed' };
 }
 
 /**
@@ -971,6 +1404,61 @@ export async function importExistingProjectAccessToken(
  */
 export { validatePersonalAccessToken, type GitLabPATValidationResult };
 
+const GITLAB_REPOSITORY_SYNC_WARNING =
+  'Connected, but the repository list could not be loaded. Refresh the project list from the GitLab integration page.';
+
+/**
+ * Caches the connected account's repositories after the integration row and
+ * credential are committed.
+ *
+ * A provider refusal here says nothing about the connection itself, so it is
+ * reported as a warning on the successful result instead of failing the
+ * connect. A new connection, or one whose previous list was dropped, then has
+ * no cached list, so the next repository-list read refetches it (see
+ * `listGitLabRepositories`); a same-instance reconnect keeps its last
+ * successful list until the user refreshes it.
+ *
+ * `discardOnFailure` is for an instance change: the cached rows belong to the
+ * previous GitLab instance, so they are dropped rather than shown against a
+ * credential that cannot reach them.
+ */
+async function cacheConnectedGitLabRepositories(
+  integrationId: string,
+  token: string,
+  instanceUrl: string,
+  discardOnFailure: boolean
+): Promise<string | undefined> {
+  try {
+    const repos = await fetchGitLabProjects(token, instanceUrl);
+    await updateRepositoriesForIntegration(integrationId, repos);
+    logExceptInTest('[connectWithPAT] Repositories cached', {
+      integrationId,
+      repoCount: repos.length,
+    });
+    return undefined;
+  } catch (error) {
+    logExceptInTest('[connectWithPAT] Repository sync failed after commit', {
+      integrationId,
+      error: error instanceof Error ? error.message : String(error),
+      discardOnFailure,
+    });
+    if (discardOnFailure) {
+      try {
+        await db
+          .update(platform_integrations)
+          .set({ repositories: null, repositories_synced_at: null })
+          .where(eq(platform_integrations.id, integrationId));
+      } catch (clearError) {
+        logExceptInTest('[connectWithPAT] Failed to discard stale repositories', {
+          integrationId,
+          error: clearError instanceof Error ? clearError.message : String(clearError),
+        });
+      }
+    }
+    return GITLAB_REPOSITORY_SYNC_WARNING;
+  }
+}
+
 /**
  * Connects GitLab using a Personal Access Token
  *
@@ -986,6 +1474,13 @@ export { validatePersonalAccessToken, type GitLabPATValidationResult };
  * If an existing integration exists, this function will update it instead of
  * creating a new one. This preserves webhook secrets and configured webhooks
  * so existing webhook configurations continue to work.
+ * Replacing a credential clears its authentication invalidation in the same
+ * transaction; connection health does not depend on the repository-cache sync.
+ *
+ * Reconnecting a suspended integration of the same account on the same instance
+ * settles the project access tokens a disconnect could not revoke. The
+ * presented credential is the only one that can revoke them, so this is the
+ * point where a partially completed disconnect converges.
  *
  * @param owner - User or organization owner
  * @param token - Personal Access Token
@@ -1041,6 +1536,30 @@ export async function connectWithPAT(
   if (existingIntegration) {
     let existingMetadata: Record<string, unknown> = {};
     let isInstanceChange = false;
+    let isAccountChange = false;
+    const existingAccountId = readGitLabAccountId(existingIntegration);
+    const connectedAccountId = String(validatedUser.id);
+    if (
+      existingIntegration.integration_status === INTEGRATION_STATUS.SUSPENDED &&
+      !instanceUrlChanged(
+        readOptionalMetadataString(
+          requireMetadataRecord(existingIntegration.metadata),
+          'gitlab_instance_url'
+        ),
+        normalizedInstanceUrl
+      ) &&
+      (existingAccountId === null || existingAccountId === connectedAccountId)
+    ) {
+      const settlement = await settleStoredProjectTokens(
+        existingIntegration,
+        gitLabCredentialActor(owner, authorizedByUserId),
+        token
+      );
+      logExceptInTest('[connectWithPAT] Reconnect settled retained project tokens', {
+        integrationId: existingIntegration.id,
+        settledProjectTokens: settlement === null ? null : settlement,
+      });
+    }
 
     await db.transaction(async tx => {
       existingMetadata = await readGitLabMetadataInTransaction(tx, existingIntegration.id);
@@ -1048,6 +1567,8 @@ export async function connectWithPAT(
         readOptionalMetadataString(existingMetadata, 'gitlab_instance_url'),
         normalizedInstanceUrl
       );
+      isAccountChange =
+        !isInstanceChange && existingAccountId !== null && existingAccountId !== connectedAccountId;
       const [existingPrimaryCredential] = await tx
         .select()
         .from(platform_access_token_credentials)
@@ -1086,6 +1607,7 @@ export async function connectWithPAT(
           'client_id',
           'client_secret',
           ...(isInstanceChange ? ['configured_webhooks', 'project_tokens'] : []),
+          ...(isAccountChange ? ['project_tokens'] : []),
         ],
       });
 
@@ -1098,6 +1620,8 @@ export async function connectWithPAT(
           platform_account_login: validatedUser.username,
           scopes: validation.tokenInfo?.scopes ?? ['api'],
           integration_status: INTEGRATION_STATUS.ACTIVE,
+          auth_invalid_at: null,
+          auth_invalid_reason: null,
           updated_at: new Date().toISOString(),
         })
         .where(eq(platform_integrations.id, existingIntegration.id));
@@ -1170,9 +1694,21 @@ export async function connectWithPAT(
       });
     }
 
-    // If instance changed, reset the code review agent config
-    // (selected repos and manually added repos belong to the old instance)
-    if (isInstanceChange) {
+    if (isAccountChange) {
+      const retirement = await retireProjectCredentialsForReplacedAccount({
+        integrationId: existingIntegration.id,
+        userToken: token,
+        instanceUrl: normalizedInstanceUrl,
+        currentAccountId: connectedAccountId,
+      });
+      logExceptInTest('[connectWithPAT] Connected account changed — retired project credentials', {
+        integrationId: existingIntegration.id,
+        retired: retirement.retired,
+        retained: retirement.retained,
+      });
+    }
+
+    if (isInstanceChange || isAccountChange) {
       await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
     }
 
@@ -1190,9 +1726,14 @@ export async function connectWithPAT(
         : countMetadataObjectEntries(existingMetadata.configured_webhooks),
     });
 
-    // Fetch and cache repositories
-    const repos = await fetchGitLabProjects(token, normalizedInstanceUrl);
-    await updateRepositoriesForIntegration(existingIntegration.id, repos);
+    // Fetch and cache repositories. The connection is already committed, so a
+    // repository-list failure is a warning from here on, never a failed connect.
+    const syncWarning = await cacheConnectedGitLabRepositories(
+      existingIntegration.id,
+      token,
+      normalizedInstanceUrl,
+      isInstanceChange
+    );
 
     return {
       success: true,
@@ -1202,7 +1743,7 @@ export async function connectWithPAT(
         accountId: String(validatedUser.id),
         instanceUrl: normalizedInstanceUrl,
       },
-      warnings: validation.warnings,
+      warnings: [...(validation.warnings ?? []), ...(syncWarning ? [syncWarning] : [])],
     };
   }
 
@@ -1282,14 +1823,14 @@ export async function connectWithPAT(
     authType: 'pat',
   });
 
-  // 6. Fetch and cache repositories
-  const repos = await fetchGitLabProjects(token, normalizedInstanceUrl);
-  await updateRepositoriesForIntegration(integration.id, repos);
-
-  logExceptInTest('[connectWithPAT] Repositories cached', {
-    integrationId: integration.id,
-    repoCount: repos.length,
-  });
+  // 6. Fetch and cache repositories. The integration is committed above, so a
+  // repository-list failure is a warning from here on, never a failed connect.
+  const syncWarning = await cacheConnectedGitLabRepositories(
+    integration.id,
+    token,
+    normalizedInstanceUrl,
+    false
+  );
 
   return {
     success: true,
@@ -1299,6 +1840,6 @@ export async function connectWithPAT(
       accountId: String(validatedUser.id),
       instanceUrl: normalizedInstanceUrl,
     },
-    warnings: validation.warnings,
+    warnings: [...(validation.warnings ?? []), ...(syncWarning ? [syncWarning] : [])],
   };
 }

@@ -24,6 +24,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const windowDimensionsState = vi.hoisted(() => ({ fontScale: 1 }));
 
+// The hook reads the live system font scale; this suite calls it directly, so
+// the provider's React context cannot answer a hook and the dimensions mock
+// stands in for the value.
+vi.mock('@/lib/font-scale/system-font-scale-context', () => ({
+  useSystemFontScale: () => null,
+  useLiveFontScale: () => windowDimensionsState.fontScale,
+}));
+
 vi.mock('react-native', () => ({
   useWindowDimensions: () => ({
     fontScale: windowDimensionsState.fontScale,

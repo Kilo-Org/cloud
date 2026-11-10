@@ -23,8 +23,7 @@ describe('removeRecursiveJsonSchemaRefs', () => {
       },
     };
 
-    removeRecursiveJsonSchemaRefs(schema);
-
+    expect(removeRecursiveJsonSchemaRefs(schema)).toBe(1);
     expect(schema).toEqual({
       type: 'object',
       properties: { filters: { $ref: '#/$defs/filters' } },
@@ -48,7 +47,7 @@ describe('removeRecursiveJsonSchemaRefs', () => {
     };
     const expected = structuredClone(schema);
 
-    removeRecursiveJsonSchemaRefs(schema);
+    expect(removeRecursiveJsonSchemaRefs(schema)).toBe(0);
 
     expect(schema).toEqual(expected);
   });
@@ -73,7 +72,7 @@ describe('removeRecursiveJsonSchemaRefs', () => {
       },
     };
 
-    removeRecursiveJsonSchemaRefs(schema);
+    expect(removeRecursiveJsonSchemaRefs(schema)).toBe(1);
 
     expect(schema.definitions).toEqual({
       a: { type: 'object', properties: { b: { $ref: '#/definitions/b' } } },

@@ -34,7 +34,9 @@ export async function redirectToSessionScope({
   const href = session ? sessionScopeHref(session, organizationId, anchorMessageId) : null;
   if (!href) return;
   if (session?.organization_id) {
-    const target = await getAuthorizedOrgContext(session.organization_id);
+    const target = await getAuthorizedOrgContext(session.organization_id, undefined, {
+      surface: 'server-component',
+    });
     if (!target.success) return;
   }
   redirect(href);

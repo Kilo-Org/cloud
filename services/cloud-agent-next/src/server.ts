@@ -1,3 +1,4 @@
+import { byocVercelOwnerSchema } from './byoc/vercel-owner.js';
 import { Hono } from 'hono';
 import type { Context, Next } from 'hono';
 import { trpcServer } from '@hono/trpc-server';
@@ -47,20 +48,26 @@ import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
 import { registerStartupFailureRoute } from './sandbox-control/startup-failure.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
+import { registerEnvironmentBuildRoutes } from './environment-build/routes.js';
 import {
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeCredentialProxyUpstream,
   type RuntimeProxyHandleClaims,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
-import { logRuntimeProxyRequestFailed } from './runtime-credential-proxy-diagnostics.js';
+import {
+  logRuntimeProxyRequestFailed,
+  readUpstreamFailureEvidence,
+} from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopeIngestRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
+  runtimeProxyAttestationAudience,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
+import { readBoundedBody } from './utils/read-bounded-body.js';
 import {
   encodeCloudAgentSessionScopeV2ViewHeaders,
   forwardCloudAgentSessionScopeRequest,
@@ -70,7 +77,6 @@ import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
-  type RuntimeProxyAttestationAudience,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { TRPCError } from '@trpc/server';
 import {
@@ -78,8 +84,36 @@ import {
   widgetApprovalKeyRequestSchema,
   type WidgetApproval,
 } from './widget-approval-key.js';
+import { getVercelSnapshotBuildStub } from './byoc/vercel-snapshot-build-stub.js';
+import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
+import { z } from 'zod';
+import { isOrgInList } from './sandbox-id.js';
+import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
 
 const app = new Hono<HonoContext>();
+
+const SnapshotBuildOwnerSchema = byocVercelOwnerSchema;
+const SnapshotBuildStartInputSchema = z
+  .object({
+    credentialId: z.uuid(),
+    buildGeneration: z.uuid(),
+  })
+  .and(SnapshotBuildOwnerSchema);
+const SnapshotBuildCleanupInputSchema = z
+  .object({
+    credentialId: z.uuid(),
+    buildGeneration: z.uuid(),
+    snapshotId: z.string().min(1).max(256).optional(),
+  })
+  .and(SnapshotBuildOwnerSchema);
+
+function snapshotBuildOwnerKey(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
+  return input.organizationId !== undefined ? input.organizationId : `user:${input.userId}`;
+}
+
+function snapshotBuildOwnerId(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
+  return input.organizationId !== undefined ? input.organizationId : input.userId;
+}
 
 function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean {
   const allowedOrigins = (env.WS_ALLOWED_ORIGINS || '')
@@ -257,6 +291,8 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
 });
 
+registerVercelScmBrokerRoute(app);
+
 app.get('/health', (c: Context<HonoContext>) => {
   return c.json({
     status: 'ok',
@@ -282,6 +318,84 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 registerControlLogRoutes(app);
 registerRuntimeArtifactRoutes(app);
 registerStartupFailureRoute(app);
+registerEnvironmentBuildRoutes(app);
+
+app.get('/internal/byoc/vercel-enrollment/:organizationId', (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const organizationId = z.uuid().safeParse(c.req.param('organizationId'));
+  if (!organizationId.success) return c.text('Invalid organization ID', 400);
+
+  return c.json({ enrolled: isOrgInList(c.env.BYOC_VERCEL_IDS, organizationId.data) }, 200, {
+    'Cache-Control': 'no-store',
+  });
+});
+
+app.get('/internal/byoc/vercel-enrollment/user/:userId', (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const userId = z.string().min(1).safeParse(c.req.param('userId'));
+  if (!userId.success) return c.text('Invalid user ID', 400);
+
+  return c.json({ enrolled: isOrgInList(c.env.BYOC_VERCEL_IDS, userId.data) }, 200, {
+    'Cache-Control': 'no-store',
+  });
+});
+
+app.get('/internal/byoc/vercel-runtime-identity', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  try {
+    return c.json(await getVercelRuntimeIdentity(c.env), 200, { 'Cache-Control': 'no-store' });
+  } catch {
+    return c.text('Vercel runtime identity could not be resolved', 502);
+  }
+});
+
+app.post('/internal/byoc/vercel-snapshot-build/start', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const input = SnapshotBuildStartInputSchema.safeParse(await c.req.json().catch(() => null));
+  if (!input.success) return c.text('Invalid request', 400);
+  if (!isOrgInList(c.env.BYOC_VERCEL_IDS, snapshotBuildOwnerId(input.data))) {
+    return c.text('Owner is not enrolled in Vercel compute', 403);
+  }
+
+  try {
+    await withDORetry(
+      () => getVercelSnapshotBuildStub(c.env, snapshotBuildOwnerKey(input.data)),
+      stub => stub.start(input.data),
+      'startVercelSnapshotBuild'
+    );
+  } catch {
+    return c.text('Snapshot build could not be started', 502);
+  }
+  return c.json({ accepted: true }, 202);
+});
+
+app.post('/internal/byoc/vercel-snapshot-build/cleanup', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const input = SnapshotBuildCleanupInputSchema.safeParse(await c.req.json().catch(() => null));
+  if (!input.success) return c.text('Invalid request', 400);
+
+  try {
+    await withDORetry(
+      () => getVercelSnapshotBuildStub(c.env, snapshotBuildOwnerKey(input.data)),
+      stub => stub.cleanup(input.data),
+      'cleanupVercelSnapshotBuild'
+    );
+  } catch {
+    return c.text('Snapshot build resources could not be cleaned up', 502);
+  }
+
+  return c.body(null, 204);
+});
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
   return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
@@ -415,29 +529,6 @@ function sanitizeRuntimeProxyResponse(response: Response): Response {
   });
 }
 
-async function readBoundedBody(request: Request, maximumBytes: number): Promise<string | null> {
-  if (!request.body) return null;
-  const reader = request.body.getReader();
-  const decoder = new TextDecoder();
-  let size = 0;
-  let value = '';
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) return value + decoder.decode();
-      const bytes = new Uint8Array(chunk.value);
-      size += bytes.byteLength;
-      if (size > maximumBytes) {
-        await reader.cancel();
-        return null;
-      }
-      value += decoder.decode(bytes, { stream: true });
-    }
-  } catch {
-    return null;
-  }
-}
-
 async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Response> {
   const handle = runtimeProxyAuthorization(c.req.raw);
   if (!handle) return c.text('Unauthorized', 401);
@@ -542,8 +633,7 @@ async function forwardRuntimeCredentialProxy(
   if (!upstream) return c.text('Not found', 404);
   try {
     // The route allowlist is resolved above before a proof is issued.
-    const audience: RuntimeProxyAttestationAudience =
-      route === 'backend' ? 'kilo-api' : route === 'ingest' ? 'session-ingest' : 'kilo-gateway';
+    const audience = runtimeProxyAttestationAudience(route, path);
     const proof = await issueRuntimeProxyAttestation({
       secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
         if (!value) throw new Error('Authentication unavailable');
@@ -577,6 +667,7 @@ async function forwardRuntimeCredentialProxy(
       logRuntimeProxyRequestFailed({
         upstreamAttempted: true,
         upstreamStatus: response.status,
+        evidence: await readUpstreamFailureEvidence(response),
         sessionId: claims.sessionId,
         kiloSessionId: claims.kiloSessionId,
       });
@@ -873,5 +964,4 @@ export default {
   },
 };
 
-export { Sandbox } from '@cloudflare/sandbox';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

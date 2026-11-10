@@ -1,5 +1,4 @@
 import type { WorkerDb } from '@kilocode/db';
-import { TRPCError } from '@trpc/server';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
@@ -9,6 +8,7 @@ import {
   agent_environment_profile_agents,
   agent_environment_profile_kilo_commands,
   agent_environment_profile_instructions,
+  cli_sessions_v2,
   type AgentEnvironmentProfile,
 } from '@kilocode/db/schema';
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
@@ -19,7 +19,6 @@ import {
   verifyProfileOwnership,
 } from './profile-utils';
 import { withProfileTransaction } from './database';
-import { countBindingsForProfile } from './repo-binding-db';
 import { listMcpServersForProfile } from './profile-mcp-service';
 import { listSkillsForProfile } from './profile-skills-service';
 import { listAgentsForProfile } from './profile-agents-service';
@@ -84,55 +83,55 @@ export async function updateProfile(
 }
 
 /**
- * Delete a profile and cascade to vars and commands. For an organization-owned
- * profile that is bound to a repository, only an organization manager may
- * delete it: the repo-binding FK cascade would otherwise let a member strip
- * protected bindings.
+ * Delete a profile and cascade to vars and commands. Callers authorize
+ * organization-owned profile deletion themselves (organization managers only,
+ * enforced in the agent-profiles router).
  */
 export async function deleteProfile(
   db: ProfileDatabase,
   profileId: string,
-  owner: ProfileOwner,
-  canManageOrganizationProfiles: boolean
+  owner: ProfileOwner
 ): Promise<void> {
   await withProfileTransaction(db, async tx => {
     await lockProfileOwnership(tx, profileId, owner);
-    if (owner.type === 'organization' && !canManageOrganizationProfiles) {
-      const boundCount = await countBindingsForProfile(tx, profileId);
-      if (boundCount > 0) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Only organization owners and admins can delete a profile bound to a repository',
-        });
-      }
-    }
     await tx.delete(agent_environment_profiles).where(eq(agent_environment_profiles.id, profileId));
   });
 }
 
+/** The metadata and collection counts a list row and the Overview screen render. */
+type ProfileSummaryRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ProfileCounts = Omit<
+  ProfileSummary,
+  'id' | 'name' | 'description' | 'isDefault' | 'createdAt' | 'updatedAt'
+>;
+
+const NO_COLLECTIONS: ProfileCounts = {
+  varCount: 0,
+  commandCount: 0,
+  mcpServerCount: 0,
+  skillCount: 0,
+  agentCount: 0,
+  kiloCommandCount: 0,
+  instructionCount: 0,
+};
+
 /**
- * List all profiles for an owner with summary info.
+ * Collection counts per profile, in one grouped query per collection. Counting
+ * rows never transfers their contents, so this stays bounded however large a
+ * profile's skills or instructions are.
  */
-export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<ProfileSummary[]> {
-  const profiles = await db
-    .select({
-      id: agent_environment_profiles.id,
-      name: agent_environment_profiles.name,
-      description: agent_environment_profiles.description,
-      isDefault: agent_environment_profiles.is_default,
-      createdAt: agent_environment_profiles.created_at,
-      updatedAt: agent_environment_profiles.updated_at,
-    })
-    .from(agent_environment_profiles)
-    .where(buildOwnershipCondition(owner))
-    .orderBy(agent_environment_profiles.name);
-
-  const profileIds = profiles.map(p => p.id);
-
-  if (profileIds.length === 0) {
-    return [];
-  }
-
+async function countsByProfileId(
+  db: WorkerDb,
+  profileIds: string[]
+): Promise<Map<string, ProfileCounts>> {
   const [
     varCounts,
     commandCounts,
@@ -208,21 +207,84 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
   const kiloCommandCountMap = new Map(kiloCommandCounts.map(k => [k.profileId, Number(k.count)]));
   const instructionCountMap = new Map(instructionCounts.map(i => [i.profileId, Number(i.count)]));
 
-  return profiles.map(p => ({
-    id: p.id,
-    name: p.name,
-    description: p.description,
-    isDefault: p.isDefault,
-    createdAt: p.createdAt,
-    updatedAt: p.updatedAt,
-    varCount: varCountMap.get(p.id) ?? 0,
-    commandCount: commandCountMap.get(p.id) ?? 0,
-    mcpServerCount: mcpServerCountMap.get(p.id) ?? 0,
-    skillCount: skillCountMap.get(p.id) ?? 0,
-    agentCount: agentCountMap.get(p.id) ?? 0,
-    kiloCommandCount: kiloCommandCountMap.get(p.id) ?? 0,
-    instructionCount: instructionCountMap.get(p.id) ?? 0,
-  }));
+  const counts = new Map<string, ProfileCounts>();
+  for (const profileId of profileIds) {
+    counts.set(profileId, {
+      varCount: varCountMap.get(profileId) ?? 0,
+      commandCount: commandCountMap.get(profileId) ?? 0,
+      mcpServerCount: mcpServerCountMap.get(profileId) ?? 0,
+      skillCount: skillCountMap.get(profileId) ?? 0,
+      agentCount: agentCountMap.get(profileId) ?? 0,
+      kiloCommandCount: kiloCommandCountMap.get(profileId) ?? 0,
+      instructionCount: instructionCountMap.get(profileId) ?? 0,
+    });
+  }
+  return counts;
+}
+
+/** One summary row: the profile's metadata plus its collection counts. */
+function toProfileSummary(
+  profile: ProfileSummaryRow,
+  counts: ProfileCounts | undefined
+): ProfileSummary {
+  return { ...profile, ...(counts ?? NO_COLLECTIONS) };
+}
+
+/**
+ * List all profiles for an owner with summary info.
+ */
+export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<ProfileSummary[]> {
+  const profiles = await db
+    .select({
+      id: agent_environment_profiles.id,
+      name: agent_environment_profiles.name,
+      description: agent_environment_profiles.description,
+      isDefault: agent_environment_profiles.is_default,
+      createdAt: agent_environment_profiles.created_at,
+      updatedAt: agent_environment_profiles.updated_at,
+    })
+    .from(agent_environment_profiles)
+    .where(buildOwnershipCondition(owner))
+    .orderBy(agent_environment_profiles.name);
+
+  if (profiles.length === 0) {
+    return [];
+  }
+
+  const counts = await countsByProfileId(
+    db,
+    profiles.map(profile => profile.id)
+  );
+  return profiles.map(profile => toProfileSummary(profile, counts.get(profile.id)));
+}
+
+/**
+ * One profile's metadata and collection counts.
+ *
+ * The profile editor's Overview renders metadata and six counts and nothing
+ * else, so it reads this instead of {@link getProfile}: a profile may carry
+ * every skill's markdown and companion files (bounded per profile by the skill
+ * caps), and transferring all of it to render counts alone spends the client's
+ * request budget on bytes the screen never uses.
+ */
+export async function getProfileOverview(
+  db: WorkerDb,
+  profileId: string,
+  owner: ProfileOwner
+): Promise<ProfileSummary> {
+  const profile = await verifyProfileOwnership(db, profileId, owner);
+  const counts = await countsByProfileId(db, [profile.id]);
+  return toProfileSummary(
+    {
+      id: profile.id,
+      name: profile.name,
+      description: profile.description,
+      isDefault: profile.is_default,
+      createdAt: profile.created_at,
+      updatedAt: profile.updated_at,
+    },
+    counts.get(profile.id)
+  );
 }
 
 /**
@@ -236,7 +298,7 @@ export async function getProfile(
 ): Promise<ProfileResponse> {
   const profile = await verifyProfileOwnership(db, profileId, owner);
 
-  const [vars, commands, mcpServers, skills, agents, kiloCommands, instructions] =
+  const [vars, commands, mcpServers, skills, agents, kiloCommands, instructions, [usage]] =
     await Promise.all([
       db
         .select({
@@ -268,6 +330,14 @@ export async function getProfile(
       listAgentsForProfile(db, profileId),
       listKiloCommandsForProfile(db, profileId),
       listInstructionsForProfile(db, profileId),
+      db
+        .select({
+          lastUsedAt: sql<
+            string | null
+          >`max(coalesce(${cli_sessions_v2.last_activity_at}, ${cli_sessions_v2.created_at}))`,
+        })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.profile_id, profileId)),
     ]);
 
   return {
@@ -277,6 +347,7 @@ export async function getProfile(
     isDefault: profile.is_default,
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
+    lastUsedAt: usage?.lastUsedAt ? new Date(usage.lastUsedAt).toISOString() : null,
     vars,
     commands,
     mcpServers,
@@ -325,6 +396,26 @@ export async function clearDefaultProfile(
     .update(agent_environment_profiles)
     .set({ is_default: false })
     .where(eq(agent_environment_profiles.id, profileId));
+}
+
+/**
+ * Resolve the owner's default profile by identifier only.
+ *
+ * Session preparation orders the profile layers from this id and reads the
+ * applied profile's collections inside its own layer transaction. The id is
+ * the only value it needs here.
+ */
+export async function getDefaultProfileId(
+  db: WorkerDb,
+  owner: ProfileOwner
+): Promise<string | null> {
+  const [profile] = await db
+    .select({ id: agent_environment_profiles.id })
+    .from(agent_environment_profiles)
+    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.is_default, true)))
+    .limit(1);
+
+  return profile?.id ?? null;
 }
 
 /**

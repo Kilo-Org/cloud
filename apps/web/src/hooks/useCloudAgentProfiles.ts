@@ -4,6 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import { useTRPC } from '@/lib/trpc/utils';
+import { CLOUD_AGENT_METADATA_STALE_TIME } from '@/lib/cloud-agent/constants';
 import { useInvalidateCloudAgentSettings } from './useCloudAgentSettings';
 
 // Owner type for profiles
@@ -62,7 +63,7 @@ export type ProfileSkill = {
   id: string;
   name: string;
   description: string | null;
-  sourceType: 'marketplace' | 'custom';
+  sourceType: 'marketplace' | 'custom' | 'skills-sh';
   sourceUrl: string | null;
   rawMarkdown: string;
   /** Companion files (excluding SKILL.md). Relative path → content. */
@@ -111,6 +112,7 @@ export type ProfileDetails = {
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
+  lastUsedAt: string | null;
   vars: ProfileVar[];
   commands: ProfileCommand[];
   mcpServers: ProfileMcpServer[];
@@ -146,7 +148,8 @@ export function useProfiles(options: UseProfilesOptions = {}) {
       { organizationId },
       {
         enabled,
-        staleTime: 30_000,
+        staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+        gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
       }
     )
   );
@@ -169,7 +172,8 @@ export function useProfile(profileId: string, options: UseProfileOptions = {}) {
       { profileId, organizationId },
       {
         enabled: enabled && !!profileId,
-        staleTime: 30_000,
+        staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+        gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
       }
     )
   );
@@ -191,6 +195,9 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
   const invalidateProfiles = async () => {
     await queryClient.invalidateQueries({
       queryKey: trpc.agentProfiles.list.queryKey({ organizationId }),
+    });
+    await queryClient.invalidateQueries({
+      queryKey: trpc.agentProfiles.listCombined.queryKey(),
     });
   };
 
@@ -311,6 +318,13 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
       },
     })
   );
+  const createSkillsShSkill = useMutation(
+    trpc.agentProfiles.createSkillsShSkill.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
   const updateSkill = useMutation(
     trpc.agentProfiles.updateSkill.mutationOptions({
       onSuccess: async (_data, variables) => {
@@ -417,6 +431,7 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     deleteMcp,
     setMcpEnabled,
     createCustomSkill,
+    createSkillsShSkill,
     updateSkill,
     deleteSkill,
     setSkillEnabled,
@@ -470,7 +485,8 @@ export function useCombinedProfiles(options: UseCombinedProfilesOptions) {
       { organizationId },
       {
         enabled,
-        staleTime: 30_000,
+        staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+        gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
         select: data => ({
           ...data,
           allProfiles: [...data.orgProfiles, ...data.personalProfiles],
@@ -497,7 +513,7 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
 
   const invalidateCombinedProfiles = async () => {
     await queryClient.invalidateQueries({
-      queryKey: trpc.agentProfiles.listCombined.queryKey({ organizationId }),
+      queryKey: trpc.agentProfiles.listCombined.queryKey(),
     });
     // Also invalidate individual list queries
     await queryClient.invalidateQueries({
@@ -625,6 +641,13 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
       },
     })
   );
+  const createSkillsShSkill = useMutation(
+    trpc.agentProfiles.createSkillsShSkill.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
   const updateSkill = useMutation(
     trpc.agentProfiles.updateSkill.mutationOptions({
       onSuccess: async (_data, variables) => {
@@ -731,6 +754,7 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     deleteMcp,
     setMcpEnabled,
     createCustomSkill,
+    createSkillsShSkill,
     updateSkill,
     deleteSkill,
     setSkillEnabled,
@@ -781,7 +805,11 @@ export function useRepoBindings(options: UseRepoBindingsOptions = {}) {
   return useQuery(
     trpc.agentProfiles.listRepoBindings.queryOptions(
       { organizationId },
-      { enabled, staleTime: 30_000 }
+      {
+        enabled,
+        staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+        gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+      }
     )
   );
 }

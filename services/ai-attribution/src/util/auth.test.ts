@@ -3,7 +3,18 @@ import { Hono } from 'hono';
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { AI_ATTRIBUTION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { HonoContext } from '../ai-attribution.worker';
-import { authMiddleware, validateKiloToken } from './auth';
+import {
+  authMiddleware,
+  createIdentityMiddleware,
+  identityMiddleware,
+  validateKiloToken,
+  type AttributionIdentityCheck,
+} from './auth';
+
+const mockGetWorkerDb = jest.fn();
+jest.mock('@kilocode/db/client', () => ({
+  getWorkerDb: (...args: unknown[]) => mockGetWorkerDb(...args),
+}));
 
 const TEST_SECRET = 'ai-attribution-test-secret';
 const USER_ID = 'user-123';
@@ -55,10 +66,11 @@ async function organizationToken(
   return token;
 }
 
-function buildApp() {
+function buildApp(checkIdentity?: AttributionIdentityCheck) {
   let downstreamCalls = 0;
   const app = new Hono<HonoContext>();
   app.use('*', authMiddleware);
+  app.use('*', checkIdentity ? createIdentityMiddleware(checkIdentity) : identityMiddleware);
   app.get('*', c => {
     downstreamCalls += 1;
     return c.json({
@@ -197,7 +209,7 @@ describe('authMiddleware', () => {
   });
 
   it('sets the existing user and organization contexts for a valid token', async () => {
-    const { app, downstreamCalls } = buildApp();
+    const { app, downstreamCalls } = buildApp(async () => null);
     const token = await organizationToken({
       audience: AI_ATTRIBUTION_AUDIENCE,
       organizationRole: 'owner',
@@ -221,5 +233,88 @@ describe('authMiddleware', () => {
       organizationRole: 'owner',
       token,
     });
+  });
+
+  it.each([
+    ['a blocked identity', 'identity_blocked'],
+    ['an identity with no account', 'identity_missing'],
+    ['an identity that is no longer a member', 'membership_missing'],
+  ] as const)('refuses %s with 403 and never reaches the handler', async (_label, refusal) => {
+    const checkIdentity = jest.fn(async () => refusal);
+    const { app, downstreamCalls } = buildApp(checkIdentity);
+    const token = await organizationToken({ audience: AI_ATTRIBUTION_AUDIENCE });
+    const env = { NEXTAUTH_SECRET: { get: async () => TEST_SECRET } } as Env;
+
+    const response = await app.request(
+      '/attributions/whoami',
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      env
+    );
+
+    expect(checkIdentity).toHaveBeenCalledWith(env, {
+      kiloUserId: USER_ID,
+      organizationId: ORGANIZATION_ID,
+    });
+    expect(response.status).toBe(403);
+    expect(downstreamCalls()).toBe(0);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Access denied',
+    });
+  });
+
+  it('answers a retryable 503 when the account check cannot run', async () => {
+    const checkIdentity = jest.fn(async () => {
+      throw new Error('database unavailable');
+    });
+    const { app, downstreamCalls } = buildApp(checkIdentity);
+    const token = await organizationToken({ audience: AI_ATTRIBUTION_AUDIENCE });
+    const env = { NEXTAUTH_SECRET: { get: async () => TEST_SECRET } } as Env;
+
+    const response = await app.request(
+      '/attributions/whoami',
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      env
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('5');
+    expect(downstreamCalls()).toBe(0);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Account checks are temporarily unavailable',
+    });
+  });
+
+  it('checks the identity against the database bound to the worker', async () => {
+    mockGetWorkerDb.mockImplementation(() => {
+      throw new Error('database unavailable');
+    });
+    const { app, downstreamCalls } = buildApp();
+    const token = await organizationToken({ audience: AI_ATTRIBUTION_AUDIENCE });
+    const env = {
+      NEXTAUTH_SECRET: { get: async () => TEST_SECRET },
+      HYPERDRIVE: { connectionString: 'postgres://hyperdrive-connection' },
+    } as unknown as Env;
+
+    const response = await app.request(
+      '/attributions/whoami',
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      env
+    );
+
+    expect(mockGetWorkerDb).toHaveBeenCalledWith(
+      'postgres://hyperdrive-connection',
+      expect.objectContaining({ statement_timeout: 2_000 })
+    );
+    expect(response.status).toBe(503);
+    expect(downstreamCalls()).toBe(0);
+    mockGetWorkerDb.mockReset();
   });
 });

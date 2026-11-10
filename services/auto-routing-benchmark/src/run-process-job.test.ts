@@ -25,6 +25,7 @@ vi.mock('./scheduler', async importOriginal => {
     clearUnbilledCase: vi.fn(),
     cooldownProviders: vi.fn(),
     deferChunk: vi.fn(),
+    deferThrottledChunk: vi.fn(),
     failChunk: vi.fn(),
     failScheduledEntry: vi.fn(),
     finishChunk: vi.fn(),
@@ -155,6 +156,7 @@ import {
   clearUnbilledCase,
   cooldownProviders,
   deferChunk,
+  deferThrottledChunk,
   failChunk,
   finishChunk,
   failScheduledEntry,
@@ -165,6 +167,8 @@ import {
   restartPaidCase,
   scheduleRunChunks,
   startChunk,
+  SCHEDULER_MAX_ATTEMPTS,
+  SCHEDULER_MAX_THROTTLE_DEFERRALS,
   type SchedulerClaim,
 } from './scheduler';
 
@@ -190,6 +194,10 @@ const [benchCase] = DECIDER_CASES;
 const successfulCliResult = {
   text: 'not the expected answer',
   costUsd: null,
+  inputTokens: null,
+  cachedInputTokens: null,
+  outputTokens: null,
+  reasoningTokens: null,
   latencyMs: 25,
   exitCode: 0,
   stderrTail: '',
@@ -223,6 +231,7 @@ function mockClaim(overrides: Partial<SchedulerClaim> = {}): SchedulerClaim {
     case_ids: JSON.stringify([benchCase.id]),
     slot: 7,
     attempts: 1,
+    throttle_deferrals: 0,
     ...overrides,
   };
   vi.mocked(getChunk).mockResolvedValue(claim);
@@ -503,6 +512,34 @@ describe('processJob — scheduler-owned execution', () => {
     expect(claimScheduledChunks).toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
     expect(destroyDeciderCliContainer).not.toHaveBeenCalled();
+  });
+
+  it('carries token usage through pending output and the recorded case result', async () => {
+    const result = {
+      ...successfulCliResult,
+      inputTokens: 12,
+      cachedInputTokens: 24,
+      outputTokens: 36,
+      reasoningTokens: 48,
+    };
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce(result);
+
+    await processJob(env, deciderMessage());
+
+    expect(savePendingDeciderOutput).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.any(Object),
+      expect.objectContaining({ result })
+    );
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        input_tokens: 12,
+        cached_input_tokens: 24,
+        output_tokens: 36,
+        reasoning_tokens: 48,
+      })
+    );
   });
 
   it('defers a claim whose exact pair is missing rather than executing another variant', async () => {
@@ -1011,16 +1048,50 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(deferChunk).toHaveBeenCalled();
   });
 
-  it.each([false, true])(
-    'cools down provider 429s and clears transient pending output (persisted: %s)',
-    async persisted => {
+  it.each([
+    { persisted: false, text: '', lastEventTypes: ['error'], stderrTail: 'HTTP 429 rate limited' },
+    { persisted: true, text: '', lastEventTypes: ['error'], stderrTail: 'HTTP 429 rate limited' },
+    {
+      persisted: false,
+      text: 'Partial step before the limit',
+      lastEventTypes: ['tool_use', 'error'],
+      stderrTail: 'Error: rate\u001b[0m limit reached',
+    },
+    {
+      persisted: false,
+      text: 'Partial step before the limit',
+      lastEventTypes: ['tool_use', 'error'],
+      stderrTail: 'HTTP 429 rate limited',
+    },
+    {
+      persisted: true,
+      text: 'Partial step before the limit',
+      lastEventTypes: ['tool_use', 'error'],
+      stderrTail: 'HTTP 429 rate limited',
+    },
+    {
+      persisted: false,
+      text: '',
+      lastEventTypes: ['error'],
+      stderrTail: '\u001b[91m\u001b[1mError: \u001b[0mInternal Server Error\n',
+    },
+    {
+      persisted: false,
+      text: '',
+      lastEventTypes: ['step_start', 'error'],
+      stderrTail: 'Authorization temporarily unavailable',
+    },
+  ])(
+    'cools down unbilled provider failures and clears transient pending output (%j)',
+    async ({ persisted, text, lastEventTypes, stderrTail }) => {
       const claim = mockClaim();
       const result = {
         ...successfulCliResult,
-        text: '',
+        text,
+        lastEventTypes,
         exitCode: 1,
         costUsd: 0,
-        stderrTail: 'HTTP 429 rate limited',
+        stderrTail,
       };
       const persistedStartedAt = 1_729_411_200_000;
       if (persisted) {
@@ -1052,12 +1123,83 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       expect(deletePendingDeciderOutput).toHaveBeenCalledTimes(persisted ? 1 : 0);
       expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(persisted ? 0 : 1);
       expect(cooldownProviders).toHaveBeenCalledWith(env.BENCH_DB, claim, expect.any(Number));
-      expect(deferChunk).toHaveBeenCalled();
+      expect(deferThrottledChunk).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        'chunk-1',
+        'token-1',
+        expect.any(Number)
+      );
+      expect(deferChunk).not.toHaveBeenCalled();
+      expect(failChunk).not.toHaveBeenCalled();
       expect(savePendingDeciderOutput).not.toHaveBeenCalled();
       expect(upsertCaseResult).not.toHaveBeenCalled();
       expect(recordLaneFailure).not.toHaveBeenCalled();
     }
   );
+
+  it('keeps a throttled chunk with spent attempts alive until its throttle budget runs out', async () => {
+    const throttled = {
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      costUsd: 0,
+      stderrTail: 'HTTP 429 rate limited',
+    };
+    vi.mocked(runDeciderCaseViaCli)
+      .mockResolvedValueOnce(throttled)
+      .mockResolvedValueOnce(throttled);
+    mockClaim({ attempts: SCHEDULER_MAX_ATTEMPTS });
+    await processJob(env, deciderMessage());
+    expect(deferThrottledChunk).toHaveBeenCalled();
+    expect(failChunk).not.toHaveBeenCalled();
+
+    vi.mocked(deferThrottledChunk).mockClear();
+    mockClaim({
+      attempts: SCHEDULER_MAX_ATTEMPTS,
+      throttle_deferrals: SCHEDULER_MAX_THROTTLE_DEFERRALS,
+    });
+    await processJob(env, deciderMessage());
+    expect(deferThrottledChunk).not.toHaveBeenCalled();
+    expect(failChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
+    expect(recordLaneFailure).toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'a 429 after a billed step',
+      costUsd: 0.02,
+      timedOut: false,
+      stderrTail: 'HTTP 429 rate limited',
+    },
+    {
+      name: 'an unbilled invalid-request rejection',
+      costUsd: 0,
+      timedOut: false,
+      stderrTail: '[Phala] The request was rejected as invalid',
+    },
+    {
+      name: 'a timeout after an unbilled 429 error event',
+      costUsd: 0,
+      timedOut: true,
+      stderrTail: 'HTTP 429 rate limited',
+    },
+  ])('keeps a graded failure for $name', async ({ costUsd, timedOut, stderrTail }) => {
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: 'Partial step before the error',
+      lastEventTypes: ['tool_use', 'error'],
+      exitCode: timedOut ? -1 : 1,
+      timedOut,
+      costUsd,
+      stderrTail,
+    });
+    await processJob(env, deciderMessage());
+    expect(deferThrottledChunk).not.toHaveBeenCalled();
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ cost_usd: costUsd })
+    );
+  });
 
   it('fails the lane without paying again once a prior paid execution can no longer deliver', async () => {
     vi.mocked(getPaidCaseStartedAt).mockResolvedValue(Date.now() - PAID_OUTPUT_WAIT_MS);
@@ -1162,6 +1304,33 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
   });
 
+  it.each([
+    { name: 'a signal kill before any event', timedOut: false, eventCount: 0, calls: 2 },
+    { name: 'a timeout', timedOut: true, eventCount: 0, calls: 1 },
+    { name: 'a kill after events', timedOut: false, eventCount: 3, calls: 1 },
+  ])(
+    'retries $name only when the run said nothing about the model',
+    async ({ timedOut, eventCount, calls }) => {
+      const killed = {
+        ...successfulCliResult,
+        text: '',
+        exitCode: -1,
+        timedOut,
+        eventCount,
+        lastEventTypes: [],
+      };
+      for (const result of [killed, successfulCliResult].slice(0, calls)) {
+        vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce(result);
+      }
+      await processJob(env, deciderMessage());
+      expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(calls);
+      expect(upsertCaseResult).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({ retried: calls === 2 })
+      );
+    }
+  );
+
   it('keeps the original measured failure without another call when the ledger refuses a retry', async () => {
     vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
       ...successfulCliResult,
@@ -1232,7 +1401,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(clearUnbilledCase).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves retry cost and generation from a container callback through grading', async () => {
+  it('preserves retry cost, tokens, and generation from a container callback through grading', async () => {
     const execution = {
       runId,
       model,
@@ -1243,13 +1412,19 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       attemptStartedAt: 1_729_411_200_001,
       retried: true,
       priorCostUsd: 0.01,
+      priorUsage: {
+        inputTokens: 100,
+        cachedInputTokens: null,
+        outputTokens: 20,
+        reasoningTokens: 5,
+      },
     };
     const response = {
       exitCode: 0,
       durationMs: 12,
       stdoutLines: [
         '{"type":"text","part":{"text":"42","time":{"end":1}}}',
-        '{"type":"step_finish","part":{"cost":0.02}}',
+        '{"type":"step_finish","part":{"cost":0.02,"tokens":{"input":300,"output":40,"reasoning":0,"cache":{"read":50}}}}',
       ],
       stderrTail: '',
     };
@@ -1283,6 +1458,10 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       env.BENCH_DB,
       expect.objectContaining({
         cost_usd: 0.03,
+        input_tokens: 400,
+        cached_input_tokens: 50,
+        output_tokens: 60,
+        reasoning_tokens: 5,
         retried: true,
         prompt_revision: 2,
       })
@@ -1412,6 +1591,10 @@ describe('processJob — canonical registry publication', () => {
         score: 1,
         latency_ms: 10,
         cost_usd: 0.001,
+        input_tokens: null,
+        cached_input_tokens: null,
+        output_tokens: null,
+        reasoning_tokens: null,
         error: null,
         fallback_reason: null,
         route_hit: null,

@@ -1,8 +1,14 @@
 import {
+  KILO_CLI_VERSION_HEADER,
+  WRAPPER_VERSION_HEADER,
+  RUNTIME_HARNESS_HEADER,
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
+  WORKSPACE_CONFIGURATION_HEADER,
+  WORKSPACE_CONFIGURATION_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import { describe, expect, it } from 'bun:test';
+import { z } from 'zod';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneHelloFrame,
@@ -21,6 +27,34 @@ import {
 } from './connection.js';
 
 type WrapperTimerOverrides = Partial<ControlPlaneTimers['wrapper']>;
+
+// The hello accepted by the Worker before workspaceSnapshots was added. Its schema is strict,
+// so the extra field is rejected and the wrapper must retry without it.
+const previousWorkerHelloSchema = z
+  .object({
+    type: z.literal('hello'),
+    wrapperId: z.string(),
+    allocationId: z.string(),
+    protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
+    heartbeatAck: z.literal(true).optional(),
+    redactsNamedSecrets: z.literal(true).optional(),
+    installsSkillsSh: z.literal(true).optional(),
+  })
+  .strict();
+
+/** A Worker that predates the startCommands capability. */
+const startCommandsPredatingWorkerHelloSchema = previousWorkerHelloSchema
+  .extend({ workspaceSnapshots: z.literal(true).optional() })
+  .strict();
+
+const legacyWorkerHelloSchema = z
+  .object({
+    type: z.literal('hello'),
+    wrapperId: z.string(),
+    allocationId: z.string(),
+    protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
+  })
+  .strict();
 
 class TestSocket {
   static OPEN = 1;
@@ -134,6 +168,7 @@ async function withTestSocket(
     }),
     random: () => 0,
     onDisconnected: reason => disconnected.push(reason),
+    getHeartbeat: () => ({ active: false, degraded: false, workspaceBusy: true }),
   });
   try {
     connection.start();
@@ -151,6 +186,9 @@ it('advertises worktree support without changing the strict legacy hello', () =>
     connection.start();
     const socket = TestSocket.instances[0];
     expect(socket.options?.headers?.[WORKTREE_RUNTIME_HEADER]).toBe(WORKTREE_RUNTIME_VERSION);
+    expect(socket.options?.headers?.[WORKSPACE_CONFIGURATION_HEADER]).toBe(
+      WORKSPACE_CONFIGURATION_VERSION
+    );
     socket.onopen?.();
     expect(socket.frames[0]).toEqual({
       type: 'hello',
@@ -158,9 +196,66 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       allocationId: 'alloc-1',
       protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       heartbeatAck: true,
+      workspaceSnapshots: true,
       redactsNamedSecrets: true,
+      installsSkillsSh: true,
+      startCommands: true,
+      worktreeGit: true,
     });
   });
+});
+
+it.each(['kilo', 'kilo2'] as const)(
+  'reports the %s runtime harness as an upgrade header, not a hello field',
+  runtimeHarness => {
+    withControlledConnection(
+      ({ connection }) => {
+        connection.start();
+        const socket = TestSocket.instances[0];
+        expect(socket.options?.headers?.[RUNTIME_HARNESS_HEADER]).toBe(runtimeHarness);
+        socket.onopen?.();
+        expect(socket.frames[0]).not.toHaveProperty('runtimeHarness');
+      },
+      { runtimeHarness }
+    );
+  }
+);
+
+it('omits the runtime harness header when no harness is configured', () => {
+  withControlledConnection(({ connection }) => {
+    connection.start();
+    expect(TestSocket.instances[0].options?.headers).not.toHaveProperty(RUNTIME_HARNESS_HEADER);
+  });
+});
+
+it('reports observed runtime versions on every upgrade without changing hello', () => {
+  withControlledConnection(
+    ({ connection }) => {
+      const socket = TestSocket.instances[0];
+      expect(socket.options?.headers?.[KILO_CLI_VERSION_HEADER]).toBe('7.9.0-canary.123');
+      expect(socket.options?.headers?.[WRAPPER_VERSION_HEADER]).toBe('2.4.0');
+      socket.onopen?.();
+      expect(socket.frames[0]).not.toHaveProperty('runtimeVersions');
+      expect(socket.frames[0]).not.toHaveProperty('kiloCliVersion');
+      expect(socket.frames[0]).not.toHaveProperty('wrapperVersion');
+      connection.recycle();
+      expect(TestSocket.instances[1].options?.headers?.[KILO_CLI_VERSION_HEADER]).toBe(
+        '7.9.0-canary.123'
+      );
+      expect(TestSocket.instances[1].options?.headers?.[WRAPPER_VERSION_HEADER]).toBe('2.4.0');
+    },
+    { runtimeVersions: { kiloCliVersion: '7.9.0-canary.123', wrapperVersion: '2.4.0' } }
+  );
+});
+
+it('still reports the wrapper version when the CLI version probe fails', () => {
+  withControlledConnection(
+    () => {
+      expect(TestSocket.instances[0].options?.headers).not.toHaveProperty(KILO_CLI_VERSION_HEADER);
+      expect(TestSocket.instances[0].options?.headers?.[WRAPPER_VERSION_HEADER]).toBe('2.4.0');
+    },
+    { runtimeVersions: { kiloCliVersion: null, wrapperVersion: '2.4.0' } }
+  );
 });
 
 describe('acknowledged heartbeat', () => {
@@ -214,18 +309,66 @@ describe('acknowledged heartbeat', () => {
     expect(scaled.sandbox.heartbeatMs).toBe(450);
     expect(scaled.sandbox.reconnectMs).toBe(900);
   });
-  it('uses a legacy hello fallback and never times out an unnegotiated peer', async () => {
-    await withTestSocket(async (_connection, socket, disconnected) => {
-      expect(socket.frames[0]).toMatchObject({ type: 'hello', heartbeatAck: true });
+  it('falls back through the capability hello before the bare legacy hello', async () => {
+    await withTestSocket(async (connection, socket, disconnected) => {
+      expect(startCommandsPredatingWorkerHelloSchema.safeParse(socket.frames[0]).success).toBe(
+        false
+      );
       await waitFor(() => socket.frames.length === 2);
-      expect(socket.frames[1]).toEqual({
+      expect(startCommandsPredatingWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(
+        true
+      );
+      expect(socket.frames[1]).toMatchObject({ workspaceSnapshots: true });
+      await waitFor(() => socket.frames.length === 3);
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      await waitFor(() => socket.frames.length === 4);
+      expect(socket.frames[3]).toEqual({
         type: 'hello',
         wrapperId: socket.frames[0].type === 'hello' ? socket.frames[0].wrapperId : '',
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       });
+      expect(legacyWorkerHelloSchema.safeParse(socket.frames[3]).success).toBe(true);
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
+      expect(connection.snapshot().phase).toBe('connected');
+      expect(disconnected).toEqual([]);
+      expect(TestSocket.instances).toHaveLength(1);
+    });
+  });
+
+  it.each([false, true])(
+    'sends snapshot-only busy state only after capability confirmation: %s',
+    async supported => {
+      await withTestSocket(async (_connection, socket) => {
+        socket.receive({
+          type: 'welcome',
+          protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+          ...(supported ? { workspaceSnapshots: true } : {}),
+        });
+        await waitFor(() => socket.frames.some(frame => frame.type === 'heartbeat'));
+        const heartbeat = socket.frames.find(frame => frame.type === 'heartbeat');
+        expect(heartbeat?.active).toBe(false);
+        if (supported) expect(heartbeat?.workspaceBusy).toBe(true);
+        else expect(heartbeat).not.toHaveProperty('workspaceBusy');
+      });
+    }
+  );
+
+  it('keeps prior capabilities when the peer only predates workspaceSnapshots', async () => {
+    await withTestSocket(async (connection, socket, disconnected) => {
+      await waitFor(() => socket.frames.length === 3);
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      expect(socket.frames[2]).toMatchObject({
+        heartbeatAck: true,
+        redactsNamedSecrets: true,
+        installsSkillsSh: true,
+      });
+      expect(socket.frames[2]).not.toHaveProperty('workspaceSnapshots');
+      socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      await Bun.sleep(120);
+      expect(connection.snapshot().phase).toBe('connected');
+      expect(socket.frames.filter(frame => frame.type === 'hello')).toHaveLength(3);
       expect(disconnected).toEqual([]);
       expect(TestSocket.instances).toHaveLength(1);
     });
@@ -783,9 +926,9 @@ async function connect(
 }
 
 describe('control-plane turn cap and accepted backstop', () => {
-  it('derives the 125-minute accepted backstop from the 120-minute cap', () => {
-    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(7_200_000);
-    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(7_500_000);
+  it('derives the 12-hour 5-minute accepted backstop from the 12-hour cap', () => {
+    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(43_200_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(43_500_000);
 
     const margin =
       CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs;
@@ -795,9 +938,9 @@ describe('control-plane turn cap and accepted backstop', () => {
     );
 
     const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
-    expect(scaled.wrapper.turnHardCapMs).toBe(72_000);
+    expect(scaled.wrapper.turnHardCapMs).toBe(432_000);
     // The accepted-backstop margin is not scaled, so it does not shrink with the cap.
-    expect(scaled.session.acceptedBackstopMs).toBe(372_000);
+    expect(scaled.session.acceptedBackstopMs).toBe(732_000);
     expect(scaled.session.acceptedBackstopMs).toBe(scaled.wrapper.turnHardCapMs + margin);
     expect(scaled.session.acceptedBackstopMs).toBeGreaterThan(scaled.wrapper.turnHardCapMs);
   });
@@ -880,7 +1023,11 @@ describe('createControlPlaneConnection', () => {
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         heartbeatAck: true,
+        workspaceSnapshots: true,
         redactsNamedSecrets: true,
+        installsSkillsSh: true,
+        startCommands: true,
+        worktreeGit: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

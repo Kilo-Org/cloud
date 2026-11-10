@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { describe, it, expect } from 'vitest';
-import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
+import { rankCandidates, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { RankedCandidate, RoutingTable } from '@kilocode/auto-routing-contracts';
 import {
   exactPairKey,
@@ -117,6 +117,10 @@ describe('mapSummaryRow', () => {
       route_key: 'implementation/code_generation',
       accuracy: 0.92,
       avg_cost_usd: 0.0015,
+      avg_input_tokens: 100.5,
+      avg_cached_input_tokens: 40.25,
+      avg_output_tokens: 20.5,
+      avg_reasoning_tokens: 10.75,
       avg_latency_ms: 320.5,
       p50_latency_ms: 300.0,
       p95_latency_ms: 300.0,
@@ -133,6 +137,10 @@ describe('mapSummaryRow', () => {
       routeKey: 'implementation/code_generation',
       accuracy: 0.92,
       avgCostUsd: 0.0015,
+      avgInputTokens: 100.5,
+      avgCachedInputTokens: 40.25,
+      avgOutputTokens: 20.5,
+      avgReasoningTokens: 10.75,
       avgLatencyMs: 320.5,
       p50LatencyMs: 300.0,
       p95LatencyMs: 300.0,
@@ -151,6 +159,10 @@ describe('mapSummaryRow', () => {
       route_key: '*',
       accuracy: 0.85,
       avg_cost_usd: null,
+      avg_input_tokens: null,
+      avg_cached_input_tokens: null,
+      avg_output_tokens: null,
+      avg_reasoning_tokens: null,
       avg_latency_ms: 150.0,
       p50_latency_ms: null,
       p95_latency_ms: null,
@@ -163,6 +175,10 @@ describe('mapSummaryRow', () => {
     const result = mapSummaryRow(row);
     expect(result.variant).toBeNull();
     expect(result.avgCostUsd).toBeNull();
+    expect(result.avgInputTokens).toBeNull();
+    expect(result.avgCachedInputTokens).toBeNull();
+    expect(result.avgOutputTokens).toBeNull();
+    expect(result.avgReasoningTokens).toBeNull();
     expect(result.p50LatencyMs).toBeNull();
     expect(result.p95LatencyMs).toBeNull();
     expect(result.routeKey).toBe('*');
@@ -303,6 +319,58 @@ describe('routingTableToRows', () => {
 });
 
 describe('rowsToRoutingTable', () => {
+  it.each([
+    { name: 'the strict quality band', noiseBand: 0, expected: 'measured' },
+    { name: 'the latency evidence', noiseBand: 0.05, expected: 'measured' },
+  ])('preserves $name when serving a published table', ({ noiseBand, expected }) => {
+    const published: RoutingTable = {
+      ...sampleTable,
+      minAccuracy: 0.95,
+      accuracyNoiseBand: noiseBand,
+      routes: {
+        'implementation/code_generation': [
+          {
+            ...candidate('measured'),
+            accuracy: 1,
+            cases: 30,
+            p50LatencyMs: noiseBand === 0 ? 1000 : 10_000,
+            p50TtftMs: noiseBand === 0 ? 100 : 1,
+            avgCostUsd: 0.002,
+            pricing: {
+              promptUsdPerToken: 0.000001,
+              completionUsdPerToken: 0.000001,
+              cacheReadUsdPerToken: null,
+            },
+          },
+          {
+            ...candidate('economical'),
+            accuracy: noiseBand === 0 ? 0.93 : 1,
+            cases: 30,
+            p50LatencyMs: noiseBand === 0 ? 10_000 : 5000,
+            p50TtftMs: noiseBand === 0 ? 1000 : 4500,
+            avgCostUsd: noiseBand === 0 ? 0 : 0.001,
+            pricing: {
+              promptUsdPerToken: noiseBand === 0 ? 0 : 0.0000001,
+              completionUsdPerToken: noiseBand === 0 ? 0 : 0.0000001,
+              cacheReadUsdPerToken: null,
+            },
+          },
+        ],
+      },
+    };
+    const rows = routingTableToRows(published, '2026-11-06T00:00:00.000Z');
+    const restored = rowsToRoutingTable(rows.tableRow, rows.candidateRows);
+    const ranked = rankCandidates(
+      (restored.routes['implementation/code_generation'] ?? []).map(candidate => ({
+        ...candidate,
+        p50LatencyMs: candidate.p50LatencyMs ?? null,
+      })),
+      restored.minAccuracy,
+      { requestTokens: 100, accuracyNoiseBand: restored.accuracyNoiseBand }
+    );
+    expect(ranked[0]?.model).toBe(expected);
+  });
+
   it('preserves production-cost metadata through publication storage', () => {
     const table: RoutingTable = {
       ...sampleTable,
@@ -379,6 +447,7 @@ describe('rowsToRoutingTable', () => {
       published_at: '2026-06-01T11:00:00.000Z',
       generated_at: '2026-06-01T10:00:00.000Z',
       min_accuracy: 0.7,
+      accuracy_noise_band: null,
       switch_cost_factor: 3,
       best_accuracy_switch_threshold: 0.05,
       production_token_profile: null,
@@ -401,6 +470,8 @@ describe('rowsToRoutingTable', () => {
         variant: 'high',
         pricing: null,
         estimated_request_cost_usd: null,
+        p50_latency_ms: null,
+        p50_ttft_ms: null,
       },
     ];
     const table = rowsToRoutingTable(tableRow, candidateRows);
@@ -416,6 +487,7 @@ describe('rowsToRoutingTable', () => {
       published_at: '2026-06-01T11:00:00.000Z',
       generated_at: '2026-06-01T10:00:00.000Z',
       min_accuracy: 0.7,
+      accuracy_noise_band: null,
       switch_cost_factor: 3,
       best_accuracy_switch_threshold: 0.05,
       production_token_profile: null,
@@ -438,6 +510,8 @@ describe('rowsToRoutingTable', () => {
         variant: 'max',
         pricing: null,
         estimated_request_cost_usd: null,
+        p50_latency_ms: null,
+        p50_ttft_ms: null,
       },
     ];
     const table = rowsToRoutingTable(tableRow, candidateRows);

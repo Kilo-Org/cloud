@@ -2,9 +2,9 @@
 import * as Clipboard from 'expo-clipboard';
 import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { I18nManager, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
@@ -22,10 +22,17 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
+import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
+import { announcePendingLinkOutcome, pendingLinkOutcome } from '@/lib/auth/pending-link';
+import {
+  readPendingLinkOffer,
+  recordPendingLinkOutcome,
+  setPendingLinkOffer,
+  takePendingLinkOutcome,
+} from '@/lib/auth/pending-link-state';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  clearLoginDrafts,
   clearPersistedLoginDrafts,
   persistLoginDrafts,
   restoreLoginDrafts,
@@ -35,7 +42,7 @@ import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 import { useScreenInsets } from '@/lib/screen-insets';
 
 export function LoginScreen() {
-  const { sessionEnded, signIn } = useAuth();
+  const { sessionEnded, signIn, token: publishedToken } = useAuth();
   const router = useRouter();
   const {
     status,
@@ -46,6 +53,8 @@ export function LoginScreen() {
     error,
     verificationUrl,
     resumed,
+    pendingLink: pendingLinkResult,
+    expiredPendingLinkToken,
     start,
     cancel,
     openBrowser,
@@ -60,21 +69,60 @@ export function LoginScreen() {
     email: string;
     ssoRecovery: SsoRecoveryDraft | null;
   } | null>(null);
+  // Held in the module rather than in this screen: the screen unmounts while a
+  // browser sign-in is pending and right after the device approved one, and a
+  // remount must return to the same link instead of the plain landing.
+  const [pendingLink, setPendingLink] = useState<PendingLinkOffer | null>(readPendingLinkOffer);
+  const updatePendingLink = useCallback((offer: PendingLinkOffer | null) => {
+    setPendingLinkOffer(offer);
+    setPendingLink(offer);
+  }, []);
+
+  // Set once this mount completes a sign-in: the unmount persistence then
+  // stays off, because the signed-in session owns the screen and a typed
+  // email from the abandoned attempt must not survive into the next login.
+  const signedInRef = useRef(false);
+
+  // The outcome of the last link-resolution survives a remount the same way the
+  // offer does, so a mount that follows an activity restart still tells the
+  // person what happened — once, then the record is gone. Past the link's own
+  // deadline the notice would describe a link nobody can still resolve.
+  useEffect(() => {
+    const offer = readPendingLinkOffer();
+    const outcome = takePendingLinkOutcome();
+    if (!offer || Date.now() < offer.expiresAt) {
+      announcePendingLinkOutcome(outcome, offer);
+    }
+  }, []);
 
   const persistToken = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
       setPersistFailed(false);
       try {
         await signIn(tokenValue, refreshTokenValue, expiresInValue);
-        clearLoginDrafts();
       } catch {
         // The message renders from the catalog at draw time, so a language
         // switch re-renders it in the new language.
         setPersistFailed(true);
+        return;
       }
+      announcePendingLinkOutcome(takePendingLinkOutcome(), pendingLink);
+      // The link is resolved: a later login must not restore it.
+      updatePendingLink(null);
     },
-    [signIn]
+    [pendingLink, signIn, updatePendingLink]
   );
+
+  // Every provider's completed sign-in — device code, email code, Apple,
+  // Google, passkey — publishes its token through the auth context, so this
+  // one watch covers them all: `signIn` drops the module drafts, and this
+  // flag keeps the unmount persistence off, or the next login mount would
+  // pre-fill the previous account's address.
+  useEffect(() => {
+    if (publishedToken !== undefined) {
+      signedInRef.current = true;
+    }
+  }, [publishedToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +142,22 @@ export function LoginScreen() {
     void restoreDrafts();
     return () => {
       cancelled = true;
+      // Write the module-level drafts back before this mount's state dies, so
+      // the next mount restores what the user had typed — a device rotation
+      // that recreates the activity must not blank the email field. A failed
+      // write leaves the field empty on the next mount; the restore path
+      // already tolerates missing drafts. After a completed sign-in the
+      // drafts were cleared on purpose, so persistence stays off.
+      if (signedInRef.current) {
+        return;
+      }
+      void (async () => {
+        try {
+          await persistLoginDrafts();
+        } catch {
+          // Swallow: nothing to show on an unmounting screen.
+        }
+      })();
     };
   }, []);
 
@@ -103,6 +167,15 @@ export function LoginScreen() {
       announcingToast.warning(t('login.sessionEnded'), { id: 'session-ended' });
     }
   }, [sessionEnded, t]);
+
+  // The approved code carries the outcome of the link it resolved. Record it here, before the
+  // effect below persists the token and announces it, so a mount that follows an activity
+  // restart can still reach it.
+  useEffect(() => {
+    if (status === 'approved' && pendingLink) {
+      recordPendingLinkOutcome(pendingLinkOutcome(pendingLinkResult));
+    }
+  }, [pendingLink, pendingLinkResult, status]);
 
   useEffect(() => {
     if (status === 'approved' && token) {
@@ -159,9 +232,13 @@ export function LoginScreen() {
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
   const globeDisabled = status === 'pending' || authFormBusy;
-  const globeTrailing = I18nManager.isRTL
-    ? { left: insets.left + 16 }
-    : { right: insets.right + 16 };
+  // The globe owns the screen's first row, and the scroll content starts below
+  // it: the logo used to share the control's band on a compact screen because
+  // the scroller began at the window top while the globe was an absolute overlay.
+  // The root's side paddings already carry `insets.left`/`insets.right`, so
+  // `paddingEnd` keeps the same RTL-aware clearance from the cutout that the old
+  // absolute `end` offset measured.
+  const headerRowStyle = { paddingTop: insets.top + 8, paddingEnd: 16 } as const;
   // A terminal device-auth error — an expired code, denied access, or the poll
   // timing out — renders its message above the idle form. Idle, every terminal
   // error, and a start that has not answered yet share the same single IdleAuth
@@ -189,6 +266,24 @@ export function LoginScreen() {
         paddingRight: insets.right,
       }}
     >
+      <View className="flex-row justify-end" style={headerRowStyle}>
+        <Pressable
+          onPress={() => {
+            setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
+            router.push('/(auth)/language-picker' as Href);
+          }}
+          disabled={globeDisabled}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.language')}
+          accessibilityState={{ disabled: globeDisabled }}
+          className={cn(
+            ICON_TARGET_BOX_CLASS,
+            'rounded-full active:opacity-70 disabled:opacity-50'
+          )}
+        >
+          <Globe size={22} color={colors.foreground} />
+        </Pressable>
+      </View>
       <ScrollView
         className="flex-1 bg-background"
         contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
@@ -196,7 +291,12 @@ export function LoginScreen() {
       >
         <View className="w-full max-w-sm items-center gap-2">
           <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />
-          <Text className="text-center text-lg">{t('login.welcome')}</Text>
+          {/* DESIGN.md's title step (1.5rem / 600), not body size: `text-lg`
+              alone renders 15.75pt medium, which reads weaker than the 17pt
+              button labels under it and leaves the screen without a heading. */}
+          <Text variant="h3" className="text-center">
+            {t('login.welcome')}
+          </Text>
         </View>
 
         {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2
@@ -229,6 +329,14 @@ export function LoginScreen() {
               initialSsoRecovery={draft?.ssoRecovery ?? null}
               onBusyChange={setAuthFormBusy}
               onSignInStart={clearError}
+              pendingLink={pendingLink}
+              pendingLinkRefused={
+                pendingLink !== null && pendingLink.token === expiredPendingLinkToken
+              }
+              onPendingLink={updatePendingLink}
+              onClearPendingLink={() => {
+                updatePendingLink(null);
+              }}
             />
           )}
 
@@ -300,24 +408,6 @@ export function LoginScreen() {
           )}
         </View>
       </ScrollView>
-      <Pressable
-        onPress={() => {
-          setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
-          router.push('/(auth)/language-picker' as Href);
-        }}
-        disabled={globeDisabled}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.language')}
-        accessibilityState={{ disabled: globeDisabled }}
-        className={cn(
-          ICON_TARGET_BOX_CLASS,
-          'absolute rounded-full active:opacity-70 disabled:opacity-50'
-        )}
-        // eslint-disable-next-line react-native/no-inline-styles -- safe-area + RTL-aware trailing edge
-        style={{ top: insets.top + 8, ...globeTrailing }}
-      >
-        <Globe size={22} color={colors.foreground} />
-      </Pressable>
     </View>
   );
 }

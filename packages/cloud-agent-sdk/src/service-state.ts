@@ -4,16 +4,31 @@
  *
  * Processes ServiceEvents from the normalizer and provides a reactive snapshot
  * of the current service state via subscribe().
+ *
+ * Preparation diagnostics use the PREPARATION_MAX_* history budgets in schemas.ts:
+ * setup messages follow arrival order, attempts follow startedAt, and steps follow
+ * causal start order. Each list retains its newest entries. Output tails use the
+ * UTF-8 byte budget in limits.ts.
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
-import { knownSessionStatus, sessionCommitDataSchema } from './schemas';
+import { upsertByRequestId } from './pending-requests';
+import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
+import {
+  PREPARATION_MAX_ATTEMPTS,
+  PREPARATION_MAX_SETUP_LOG_ENTRIES,
+  PREPARATION_MAX_STEPS,
+  knownSessionStatus,
+  sessionCommitDataSchema,
+  type KnownSessionStatus,
+} from './schemas';
 import type {
   SessionInfo,
   SessionActivity,
   AgentStatus,
   QuestionState,
   PermissionState,
+  UnreadablePermissionState,
   ServiceStateSnapshot,
   SuggestionAction,
   SuggestionState,
@@ -23,6 +38,18 @@ import type {
   SessionCommit,
   PreparationStepSnapshot,
 } from './types';
+
+/**
+ * Keep the most recent `maxBytes` UTF-8 bytes of `text`, advancing past any
+ * continuation byte so the decoded result never starts mid-code-point.
+ */
+function utf8Tail(text: string, maxBytes: number): { text: string; truncated: boolean } {
+  const bytes = new TextEncoder().encode(text);
+  if (bytes.length <= maxBytes) return { text, truncated: false };
+  let start = bytes.length - maxBytes;
+  while (start < bytes.length && ((bytes[start] ?? 0) & 0b1100_0000) === 0b1000_0000) start++;
+  return { text: new TextDecoder().decode(bytes.subarray(start)), truncated: true };
+}
 
 /**
  * Keep a known goal reason when a later update for the same session carries the
@@ -106,8 +133,12 @@ type ServiceState = {
   getPreparationAttempts(): readonly PreparationAttempt[];
   getCommits(): readonly SessionCommit[];
   clearCommits(): void;
+  /** Drop the preparation rows held by the live state. */
+  clearPreparationAttempts(): void;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
+  /** Pending permission requests this app could not read, oldest first. */
+  getUnreadablePermissions(): readonly UnreadablePermissionState[];
   getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
   getPendingMessages(): ReadonlyMap<string, MessageDeliveryState>;
@@ -142,23 +173,6 @@ type ServiceReplayBatch = {
   hadSessionInfo: boolean;
 };
 
-/**
- * FIFO upsert. A repeat of the same requestId replaces the entry in place —
- * the wrapper replays pending requests after a snapshot, and a replay must
- * not enqueue a duplicate card. A new requestId goes to the back, so the
- * oldest pending request is always the head.
- */
-function upsertByRequestId<T extends { requestId: string }>(
-  list: readonly T[],
-  next: T
-): readonly T[] {
-  const index = list.findIndex(entry => entry.requestId === next.requestId);
-  if (index === -1) return [...list, next];
-  const copy = [...list];
-  copy[index] = next;
-  return copy;
-}
-
 function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   let config = initialConfig;
   let rootSessionId = config.rootSessionId;
@@ -167,11 +181,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   let cloudStatus: CloudStatus | null = null;
   let setupLog: string[] = [];
   let preparationAttempts: PreparationAttempt[] = [];
+  let pendingPreparationSteps: Extract<ServiceEvent, { type: 'preparing' }>[] = [];
   let commits: readonly SessionCommit[] = [];
   const seenCommits = new Set<string>();
   let sessionInfo: SessionInfo | null = null;
   let questions: readonly QuestionState[] = [];
   let permissions: readonly PermissionState[] = [];
+  let unreadablePermissions: readonly UnreadablePermissionState[] = [];
   let suggestion: SuggestionState | null = null;
   const pendingMessages = new Map<string, MessageDeliveryState>();
   let activeMessageId: string | null = null;
@@ -214,6 +230,62 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     return sessionId === rootSessionId;
   }
 
+  /**
+   * The one mapping from a session status to this state's activity and
+   * lifecycle status. A `session.status` event and the status carried by a
+   * `connected` snapshot both go through it, so the same reported status lands
+   * in the same place whether it arrives live or on connect.
+   *
+   * `null` is a status this SDK does not know yet: the event is kept but it has
+   * no meaning here, so the previous activity and status stand, never idle.
+   * Only the root session repaints activity and status; a child's `busy` still
+   * clears the replay error recorded for it.
+   */
+  function applySessionStatus(sessionId: string, known: KnownSessionStatus | null): void {
+    if (known === null) return;
+    if (known.type === 'busy') {
+      replay?.childErrors.delete(sessionId);
+    }
+    if (!isRootSession(sessionId)) return;
+
+    switch (known.type) {
+      case 'busy':
+        activity = { type: 'busy' };
+        status = IDLE_STATUS;
+        disconnectedSource = null;
+        completed = false;
+        terminated = false;
+        break;
+      case 'retry':
+        // A retry is the same turn making progress again, so it only reports
+        // the attempt; the lifecycle status the turn already carries stays.
+        // The turn is in flight, so a later wrapper disconnect is a real loss
+        // and must install the lost-connection status.
+        completed = false;
+        activity = {
+          type: 'retrying',
+          attempt: known.attempt,
+          message: known.message,
+        };
+        break;
+      case 'idle':
+        if (activity.type !== 'idle') activity = { type: 'idle' };
+        break;
+      case 'scheduled':
+        // A scheduled session does nothing now, so the activity reads idle
+        // while the lifecycle status carries the wake time.
+        if (activity.type !== 'idle') activity = { type: 'idle' };
+        status = {
+          type: 'scheduled',
+          ...(known.scheduledAt ? { scheduledAt: known.scheduledAt } : {}),
+        };
+        break;
+      // `question` and `permission` name a pending interaction that the
+      // question.asked / permission.asked events already carry, so the status
+      // alone changes nothing here.
+    }
+  }
+
   function processSessionStatus(event: Extract<ServiceEvent, { type: 'session.status' }>): void {
     const { sessionId, status: sessionStatus } = event;
 
@@ -223,48 +295,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       terminated = false;
     }
 
-    const known = knownSessionStatus(sessionStatus);
-    if (known === null) {
-      // A status this SDK does not know yet keeps its event, but it has no
-      // meaning here; the previous activity and status stand, never idle.
-      notify();
-      return;
-    }
-
-    if (known.type === 'busy') {
-      replay?.childErrors.delete(sessionId);
-      if (isRootSession(sessionId)) {
-        activity = { type: 'busy' };
-        status = IDLE_STATUS;
-        disconnectedSource = null;
-        completed = false;
-        terminated = false;
-      }
-    } else if (known.type === 'retry' && isRootSession(sessionId)) {
-      activity = {
-        type: 'retrying',
-        attempt: known.attempt,
-        message: known.message,
-      };
-    } else if (known.type === 'idle') {
-      if (isRootSession(sessionId) && activity.type !== 'idle') {
-        activity = { type: 'idle' };
-      }
-    } else if (known.type === 'scheduled') {
-      // A scheduled session does nothing now, so the activity reads idle while
-      // the lifecycle status carries the wake time. Like `busy`, a child
-      // session's status must not repaint the root's status.
-      if (isRootSession(sessionId)) {
-        if (activity.type !== 'idle') activity = { type: 'idle' };
-        status = {
-          type: 'scheduled',
-          ...(known.scheduledAt ? { scheduledAt: known.scheduledAt } : {}),
-        };
-      }
-    }
-    // `question` and `permission` name a pending interaction that the
-    // question.asked / permission.asked events already carry, so the status
-    // alone changes nothing here.
+    applySessionStatus(sessionId, knownSessionStatus(sessionStatus));
     notify();
   }
 
@@ -394,12 +425,26 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       metadata,
       always,
     });
+    // A readable request supersedes an unreadable notice for the same id.
+    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
     config.onPermissionAsked?.(requestId, permissionType, patterns, metadata, always);
+    notify();
+  }
+
+  function processPermissionUnreadable(requestId: string): void {
+    // The scope could not be read, so no consent card may stand for this id: a
+    // card already shown for it would describe a scope the app no longer holds.
+    if (permissions.some(entry => entry.requestId === requestId)) {
+      permissions = permissions.filter(entry => entry.requestId !== requestId);
+      config.onPermissionResolved?.(requestId);
+    }
+    unreadablePermissions = upsertByRequestId(unreadablePermissions, { requestId });
     notify();
   }
 
   function processPermissionResolved(requestId: string): void {
     permissions = permissions.filter(entry => entry.requestId !== requestId);
+    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
     config.onPermissionResolved?.(requestId);
     notify();
   }
@@ -430,7 +475,17 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
 
   function processPreparing(event: Extract<ServiceEvent, { type: 'preparing' }>): void {
     if (event.version === 2 && event.attemptId && event.triggerMessageId && event.action) {
-      const attempt = processPreparationEvent(event);
+      let attempt = processPreparationEvent(event);
+      if (attempt) {
+        const attemptId = attempt.id;
+        const pending = pendingPreparationSteps.filter(step => step.attemptId === attemptId);
+        pendingPreparationSteps = pendingPreparationSteps.filter(
+          step => step.attemptId !== attemptId
+        );
+        for (const step of pending) {
+          attempt = processPreparationEvent(step) ?? attempt;
+        }
+      }
       // Only an event that actually advanced the attempt may move cloudStatus.
       // Stale duplicates and replayed snapshots of a finished attempt would
       // otherwise flip a ready session back to 'preparing' and permanently
@@ -458,8 +513,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       config.onPreparationFailed?.(event.message);
     } else {
       cloudStatus = { type: 'preparing', step: event.step, message: event.message };
-      if (event.step === 'setup_commands' && event.message) {
-        setupLog = [...setupLog, event.message];
+      if (
+        (event.step === 'setup_commands' ||
+          event.step === 'session_setup_commands' ||
+          event.step === 'start_commands') &&
+        event.message
+      ) {
+        setupLog = [...setupLog.slice(-(PREPARATION_MAX_SETUP_LOG_ENTRIES - 1)), event.message];
       }
     }
     notify();
@@ -529,11 +589,10 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
           ? settleRunningSteps(handedOff.steps, 'completed')
           : (existing?.steps ?? []),
       };
-      preparationAttempts = [
-        ...preparationAttempts.filter(item => item.id !== attempt.id),
-        attempt,
-      ].sort((a, b) => a.startedAt - b.startedAt);
-      return attempt;
+      preparationAttempts = [...preparationAttempts.filter(item => item.id !== attempt.id), attempt]
+        .sort((a, b) => a.startedAt - b.startedAt)
+        .slice(-PREPARATION_MAX_ATTEMPTS);
+      return preparationAttempts.includes(attempt) ? attempt : null;
     }
     if (event.action === 'attempt_snapshot' && event.attempt) {
       if (existing && existing.revision > event.attempt.revision) return null;
@@ -548,13 +607,29 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         revision: snapshot.revision,
         steps: existing?.steps ?? [],
       };
-      preparationAttempts = [
-        ...preparationAttempts.filter(item => item.id !== attempt.id),
-        attempt,
-      ].sort((a, b) => a.startedAt - b.startedAt);
-      return attempt;
+      preparationAttempts = [...preparationAttempts.filter(item => item.id !== attempt.id), attempt]
+        .sort((a, b) => a.startedAt - b.startedAt)
+        .slice(-PREPARATION_MAX_ATTEMPTS);
+      return preparationAttempts.includes(attempt) ? attempt : null;
     }
-    if (!existing) return null;
+    if (!existing) {
+      // Materialized step rows can precede their parent attempt in cursor replay.
+      if (event.action === 'step_snapshot' && event.stepId && event.stepSnapshot) {
+        const pending = pendingPreparationSteps.find(
+          step => step.attemptId === event.attemptId && step.stepId === event.stepId
+        );
+        if (pending?.stepSnapshot && pending.stepSnapshot.revision > event.stepSnapshot.revision) {
+          return null;
+        }
+        pendingPreparationSteps = [
+          ...pendingPreparationSteps.filter(
+            step => step.attemptId !== event.attemptId || step.stepId !== event.stepId
+          ),
+          event,
+        ].slice(-(PREPARATION_MAX_ATTEMPTS * PREPARATION_MAX_STEPS));
+      }
+      return null;
+    }
     if (event.action === 'attempt_completed' || event.action === 'attempt_failed') {
       if (existing.revision >= event.revision || existing.status !== 'running') return null;
       const status = event.action === 'attempt_completed' ? 'completed' : 'failed';
@@ -599,11 +674,23 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       existingStep.status === 'running'
     ) {
       if (event.action === 'step_progress' && event.detail !== undefined) {
-        nextStep = { ...existingStep, latestDetail: event.detail, revision: event.revision };
-      } else if (event.action === 'step_output' && event.output !== undefined) {
         nextStep = {
           ...existingStep,
-          outputTail: `${existingStep.outputTail ?? ''}${event.output}`,
+          latestDetail: event.detail,
+          ...(event.snapshotCapturedAt === undefined
+            ? {}
+            : { snapshotCapturedAt: event.snapshotCapturedAt }),
+          revision: event.revision,
+        };
+      } else if (event.action === 'step_output' && event.output !== undefined) {
+        const tail = utf8Tail(
+          `${existingStep.outputTail ?? ''}${event.output}`,
+          PREPARATION_OUTPUT_TAIL_MAX_BYTES
+        );
+        nextStep = {
+          ...existingStep,
+          outputTail: tail.text,
+          outputTruncated: existingStep.outputTruncated === true || tail.truncated,
           revision: event.revision,
         };
       } else if (event.action === 'step_completed') {
@@ -630,15 +717,17 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     const attempt: PreparationAttempt = {
       ...existing,
       revision: Math.max(existing.revision, step.revision),
-      steps: [...existing.steps.filter(item => item.id !== step.id), step].sort(
-        (a, b) =>
-          Number(a.startedRevision !== undefined) - Number(b.startedRevision !== undefined) ||
-          (a.startedRevision !== undefined && b.startedRevision !== undefined
-            ? a.startedRevision - b.startedRevision
-            : 0) ||
-          a.startedAt - b.startedAt ||
-          a.id.localeCompare(b.id)
-      ),
+      steps: [...existing.steps.filter(item => item.id !== step.id), step]
+        .sort(
+          (a, b) =>
+            Number(a.startedRevision !== undefined) - Number(b.startedRevision !== undefined) ||
+            (a.startedRevision !== undefined && b.startedRevision !== undefined
+              ? a.startedRevision - b.startedRevision
+              : 0) ||
+            a.startedAt - b.startedAt ||
+            a.id.localeCompare(b.id)
+        )
+        .slice(-PREPARATION_MAX_STEPS),
     };
     preparationAttempts = preparationAttempts.map(item =>
       item.id === existing.id ? attempt : item
@@ -672,8 +761,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     const parsedCommit = sessionCommitDataSchema.safeParse(event);
     const commitHash = parsedCommit.success ? parsedCommit.data.commitHash : undefined;
     if (parsedCommit.success) {
-      if (seenCommits.has(parsedCommit.data.commitHash)) return;
-      seenCommits.add(parsedCommit.data.commitHash);
+      const identity = JSON.stringify([parsedCommit.data.repository, parsedCommit.data.commitHash]);
+      if (seenCommits.has(identity)) return;
+      seenCommits.add(identity);
       commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }];
     }
     if (event.success || commitHash) {
@@ -814,6 +904,25 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   }
 
   /**
+   * Drops every pending delivery entry that is not a failure, keeping failed
+   * ones so their recovery affordance survives a reconciliation. `excludeIds`
+   * names the ids the caller is about to write from an authoritative source
+   * (the queue snapshot); a failed entry for one of those is stale and goes.
+   *
+   * The Map identity is preserved: subscribers hold onto the previous
+   * reference.
+   */
+  function retainFailedMessages(excludeIds?: ReadonlySet<string>): void {
+    const failed = [...pendingMessages.entries()].filter(
+      ([messageId, state]) => state.status === 'failed' && !excludeIds?.has(messageId)
+    );
+    pendingMessages.clear();
+    for (const [messageId, state] of failed) {
+      pendingMessages.set(messageId, state);
+    }
+  }
+
+  /**
    * CLI-only: `queue.changed` carries the authoritative FIFO snapshot of
    * queued user-message IDs. Each emission is a full reconciliation, not a
    * delta — entries absent from the new snapshot are dropped.
@@ -827,38 +936,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
    */
   function processQueueChanged(event: Extract<ServiceEvent, { type: 'queue.changed' }>): void {
     if (!isRootSession(event.sessionId)) return;
-    if (event.queued.length === 0) {
-      if (pendingMessages.size === 0) return;
-      // Preserve failed entries — a failed delivery row must survive a
-      // reconciliation so its recovery affordance stays visible.
-      const failed = [...pendingMessages.entries()].filter(
-        ([messageId, state]) => state.status === 'failed' && !event.queued.includes(messageId)
-      );
-      pendingMessages.clear();
-      for (const [messageId, state] of failed) {
-        pendingMessages.set(messageId, state);
-      }
-      notify();
-      return;
-    }
-    const next = new Map<string, MessageDeliveryState>();
-    for (const messageId of event.queued) {
-      next.set(messageId, { status: 'queued' });
-    }
-    // Preserve failed entries before the wholesale replace, then re-insert
-    // them after the queued entries are written. Skip any failed id that is
-    // also in this snapshot: the queue is authoritative for those ids.
-    const failed = [...pendingMessages.entries()].filter(
-      ([messageId, state]) => state.status === 'failed' && !event.queued.includes(messageId)
-    );
-    // Reuse the same Map identity where possible to avoid invalidating
-    // existing subscribers that hold onto the previous reference.
-    pendingMessages.clear();
-    for (const [messageId, state] of next) {
-      pendingMessages.set(messageId, state);
-    }
-    for (const [messageId, state] of failed) {
-      pendingMessages.set(messageId, state);
+    if (event.queued.length === 0 && pendingMessages.size === 0) return;
+    const queued = new Set(event.queued);
+    // The snapshot is authoritative for the ids it names, so a failed entry for
+    // one of them gives way to the queued state; every other failed entry stays.
+    retainFailedMessages(queued);
+    for (const messageId of queued) {
+      pendingMessages.set(messageId, { status: 'queued' });
     }
     notify();
   }
@@ -866,50 +950,41 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   function clearPendingInteractions(): void {
     const clearedQuestions = questions;
     const clearedPermissions = permissions;
+    const clearedUnreadablePermissions = unreadablePermissions;
     const clearedSuggestion = suggestion;
     questions = [];
     permissions = [];
+    unreadablePermissions = [];
     suggestion = null;
     for (const entry of clearedQuestions) config.onQuestionResolved?.(entry.requestId);
     for (const entry of clearedPermissions) config.onPermissionResolved?.(entry.requestId);
+    for (const entry of clearedUnreadablePermissions)
+      config.onPermissionResolved?.(entry.requestId);
     if (clearedSuggestion) config.onSuggestionResolved?.(clearedSuggestion.requestId);
   }
 
   function processConnected(event: Extract<ServiceEvent, { type: 'connected' }>): void {
-    // Set activity from sessionStatus. When sessionStatus is absent (server
-    // has no execution-derived state yet), default to idle — we know the
-    // transport connected, so we're at least no longer in the 'connecting' phase.
+    // The status mapping is the same one `session.status` uses; only the
+    // bootstrap below is connect-specific. A connected payload describes the
+    // root session.
     const sessionStatus = event.sessionStatus;
     if (event.activeMessageId !== undefined) {
       activeMessageId = event.activeMessageId;
     } else if (sessionStatus?.type === 'idle') {
       activeMessageId = null;
     }
-    if (sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry') {
-      status = IDLE_STATUS;
-      disconnectedSource = null;
-      completed = false;
-    }
     if (sessionStatus === undefined) {
-      // Only default to idle on initial connect (activity === 'connecting').
-      // On reconnect, preserve existing activity — the server will send a
-      // separate session.status event with the authoritative state.
+      // When sessionStatus is absent (server has no execution-derived state
+      // yet), default to idle — we know the transport connected, so we're at
+      // least no longer in the 'connecting' phase. Only on initial connect
+      // (activity === 'connecting'); on reconnect, preserve existing activity —
+      // the server will send a separate session.status event with the
+      // authoritative state.
       if (activity.type === 'connecting') {
         activity = { type: 'idle' };
       }
     } else {
-      const known = knownSessionStatus(sessionStatus);
-      if (known?.type === 'busy') {
-        activity = { type: 'busy' };
-      } else if (known?.type === 'idle') {
-        activity = { type: 'idle' };
-      } else if (known?.type === 'retry') {
-        activity = {
-          type: 'retrying',
-          attempt: known.attempt,
-          message: known.message,
-        };
-      }
+      applySessionStatus(rootSessionId, knownSessionStatus(sessionStatus));
     }
 
     // Set cloudStatus (undefined means not provided — leave as null)
@@ -932,14 +1007,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
 
     // Clear pending-message delivery state — replayed cloud.message.queued
     // events following the snapshot will repopulate it with the current truth.
-    // Failed entries survive the reconnect: replayed cloud.message.queued events
-    // repopulate the queued half, and the failed half must survive a reconnect
-    // so the row keeps its recovery affordance.
-    const failed = [...pendingMessages.entries()].filter(([, state]) => state.status === 'failed');
-    pendingMessages.clear();
-    for (const [messageId, state] of failed) {
-      pendingMessages.set(messageId, state);
-    }
+    // Failed entries survive the reconnect so the row keeps its recovery
+    // affordance.
+    retainFailedMessages();
 
     notify();
   }
@@ -981,6 +1051,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         break;
       case 'permission.replied':
         processPermissionResolved(event.requestId);
+        break;
+      case 'permission.unreadable':
+        processPermissionUnreadable(event.requestId);
         break;
       case 'suggestion.shown':
         processSuggestionShown(event);
@@ -1123,8 +1196,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       commits = [];
       notify();
     },
+    clearPreparationAttempts(): void {
+      preparationAttempts = [];
+      pendingPreparationSteps = [];
+      notify();
+    },
     getQuestion: () => questions[0] ?? null,
     getPermission: () => permissions[0] ?? null,
+    getUnreadablePermissions: () => unreadablePermissions,
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
     getPendingMessages: () => pendingMessages,
@@ -1158,6 +1237,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       sessionInfo,
       question: questions[0] ?? null,
       permission: permissions[0] ?? null,
+      unreadablePermissions,
       suggestion,
       pendingMessages,
     }),
@@ -1192,11 +1272,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       cloudStatus = null;
       setupLog = [];
       preparationAttempts = [];
+      pendingPreparationSteps = [];
       commits = [];
       seenCommits.clear();
       sessionInfo = null;
       questions = [];
       permissions = [];
+      unreadablePermissions = [];
       suggestion = null;
       pendingMessages.clear();
       activeMessageId = null;

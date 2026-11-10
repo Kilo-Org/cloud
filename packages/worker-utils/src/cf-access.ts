@@ -3,12 +3,14 @@ import { z } from 'zod';
 /**
  * Validate a raw Request against Cloudflare Access.
  * Throws if the JWT is missing, malformed, or invalid.
+ * Returns the verified payload so callers can authorize and audit the
+ * authenticated identity (user email or service-token common name).
  * Usable outside Hono middleware (e.g. WebSocket upgrade handler).
  */
 export async function validateCfAccessRequest(
   request: Request,
   { team, audience }: { team: AccessTeam; audience: AccessAudience }
-): Promise<void> {
+): Promise<AccessPayload> {
   const accessTeamDomain = AccessTeamDomain.parse(
     `https://${AccessTeam.parse(team)}.cloudflareaccess.com`
   );
@@ -17,7 +19,8 @@ export async function validateCfAccessRequest(
   if (!hasValidJWT(request)) {
     throw new Error('Missing CF Access JWT');
   }
-  await validateAccessJWT({ request, accessTeamDomain, accessAud });
+  const { payload } = await validateAccessJWT({ request, accessTeamDomain, accessAud });
+  return AccessPayload.parse(payload);
 }
 
 // Access validation code adapted from:

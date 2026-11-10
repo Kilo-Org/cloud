@@ -7,7 +7,11 @@ import { z } from 'zod';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
-import { getLocalScopeKey } from './persist';
+import {
+  adoptGlanceableScopeKey,
+  getAuthenticatedGlanceableScopeKey,
+  getLocalScopeKey,
+} from './persist';
 
 /**
  * One durable record of the oldest waiting ask: the session the activity's
@@ -37,6 +41,20 @@ export type WaitingAsk = {
   organizationId: string | null;
   userId: string;
   recordedAt: number;
+  /**
+   * The selected row's status time, the ask's identity beside the session and
+   * status: a changed wait carries a new time, so a binding is never carried
+   * onto a different request. Absent on rows that never carried one, and on a
+   * record mirrored by a build that did not store it.
+   */
+  statusUpdatedAt?: string | null;
+  /**
+   * The pending permission id this ask's surface names, or null while the ask
+   * has no binding (a record made before the control-plane read lands, a read
+   * that failed, or a mirror written by a release without bindings). Approve is
+   * offered only with one, and an answer is sent only for it.
+   */
+  boundPermissionId: string | null;
 };
 
 /**
@@ -68,6 +86,11 @@ const waitingAskSchema = z.object({
   organizationId: z.string().nullable(),
   userId: z.string(),
   recordedAt: z.number(),
+  // A mirror a release without bindings wrote carries neither key: it parses,
+  // and it reads as an ask with no identity time and no binding, so Approve
+  // stays hidden until a live select binds it.
+  statusUpdatedAt: z.string().nullable().optional(),
+  boundPermissionId: z.string().nullable().default(null),
 });
 
 /**
@@ -137,6 +160,10 @@ export function selectWaitingAsk(
     organizationId: ctx.organizationId,
     userId: ctx.userId,
     recordedAt: now,
+    statusUpdatedAt: chosen.statusUpdatedAt,
+    // Selection is pure: the answer path's binding comes from the control-plane
+    // read the recording step runs, never from the trace.
+    boundPermissionId: null,
   };
 }
 
@@ -214,26 +241,6 @@ function parseStoredAsk(raw: string): WaitingAsk | null {
 }
 
 /**
- * True when a mirrored ask belongs to the scope this process currently
- * publishes. The mirror outlives a sign-out or an org switch, and the ask names
- * both the session and the organization an action would answer, so an ask
- * recorded for another scope must never reach a surface or an approval.
- *
- * Fails closed: a null local scope means no snapshot scope was restored (an
- * absent mirror, a failed read, or a process that has not published yet), so
- * this process cannot prove the ask belongs to the account it would answer for.
- * Accepting it there let a stale session/org record reach Open and Approve on
- * the strength of nothing. The live path is unaffected: `recordWaitingAsk`
- * stores the ask with the publisher's own context, and hydration — the one
- * boundary where the mirror enters the process — only fills a cold process that
- * has recorded nothing.
- */
-function isAskInCurrentScope(ask: WaitingAsk): boolean {
-  const localScopeKey = getLocalScopeKey();
-  return localScopeKey !== null && ask.scopeKey === localScopeKey;
-}
-
-/**
  * Replace the one ask and mirror it to SecureStore. `null` clears both. The
  * mirror is fire-and-forget: the in-memory value is authoritative for the sinks
  * of this run, and a failed mirror is treated as absent after a restart. The
@@ -244,12 +251,34 @@ export function recordWaitingAsk(ask: WaitingAsk | null): void {
   waitingAskEpoch += 1;
   currentAsk = ask;
   recordedInProcess = true;
+  if (ask !== null) {
+    // A live record carries the context the publisher draws for, and the
+    // platform sinks draw before the persist sink writes the frame: adopt it
+    // here so the draw-time fence judges this ask by the scope it was recorded
+    // for, not by the one still in memory.
+    adoptGlanceableScopeKey(ask.scopeKey);
+  }
   mirrorAsk(ask);
 }
 
-/** The hydrated in-memory ask; the sinks read this synchronously. */
+/**
+ * The hydrated in-memory ask; the sinks read this synchronously.
+ *
+ * Fenced against the scope this process can act for. An ask recorded before the
+ * process learned a different scope is never drawn: every surface reads the ask
+ * at draw time to decide whether Open and Approve are offered, so a switch must
+ * not keep the previous scope's actions up until the next select replaces the
+ * record. A process with no confirmed scope yet still draws the ask it recorded
+ * itself — that record carries the publisher's own context, and the mirror, the
+ * only other source, is not hydrated without a scope to authorize it against.
+ */
 export function getWaitingAsk(): WaitingAsk | null {
-  return currentAsk;
+  const ask = currentAsk;
+  if (ask === null) {
+    return null;
+  }
+  const localScopeKey = getLocalScopeKey();
+  return localScopeKey === null || ask.scopeKey === localScopeKey ? ask : null;
 }
 
 let hydrationPromise: Promise<void> | null = null;
@@ -261,8 +290,16 @@ let hydrationPromise: Promise<void> | null = null;
  * has recorded anything itself is not hydrated either, because the mirror it
  * would read can still hold the value that record replaced — a cleared ask
  * whose delete is queued behind the write chain. Best effort — a failed or
- * malformed read leaves the in-memory state alone. A record from another scope
- * is dropped here, at the one boundary where the mirror enters the process.
+ * malformed read leaves the in-memory state alone.
+ *
+ * A record is accepted only for the scope this process can act for: the one a
+ * publish or a matching restore confirmed, or — when neither has resolved one —
+ * the scope the signed-in account derives. The mirror outlives a sign-out or an
+ * org switch, so this is the one boundary where another scope's record could
+ * enter the process. A record this process can place outside its scope is
+ * deleted here rather than left for whichever account reads the device next; an
+ * unconfirmed scope keeps it, because absence of proof is not proof it is
+ * foreign.
  */
 async function hydrateStoredAsk(): Promise<void> {
   const startEpoch = waitingAskEpoch;
@@ -271,11 +308,24 @@ async function hydrateStoredAsk(): Promise<void> {
     if (waitingAskEpoch !== startEpoch) {
       return;
     }
-    if (raw !== null && currentAsk === null && !recordedInProcess) {
-      const parsed = parseStoredAsk(raw);
-      if (parsed !== null && isAskInCurrentScope(parsed)) {
-        currentAsk = parsed;
-      }
+    if (raw === null || currentAsk !== null || recordedInProcess) {
+      return;
+    }
+    const parsed = parseStoredAsk(raw);
+    if (parsed === null) {
+      return;
+    }
+    const scopeKey = getLocalScopeKey() ?? (await getAuthenticatedGlanceableScopeKey());
+    if (waitingAskEpoch !== startEpoch) {
+      return;
+    }
+    if (scopeKey === null) {
+      return;
+    }
+    if (parsed.scopeKey === scopeKey) {
+      currentAsk = parsed;
+    } else {
+      mirrorAsk(null);
     }
   } catch (error) {
     // A malformed mirror is treated as absent; the next record repopulates it.
@@ -286,12 +336,13 @@ async function hydrateStoredAsk(): Promise<void> {
 /**
  * Hydrate from SecureStore once and return the current ask. The headless
  * background paths (a push wake with no React context) call this; the sinks use
- * the synchronous `getWaitingAsk`.
+ * the synchronous `getWaitingAsk`. The answer is the same fenced read, so an ask
+ * this process can place in another scope is never returned to an approval.
  */
 export async function readWaitingAsk(): Promise<WaitingAsk | null> {
   hydrationPromise ??= hydrateStoredAsk();
   await hydrationPromise;
-  return currentAsk;
+  return getWaitingAsk();
 }
 
 // ── Test-only helpers ──────────────────────────────────────────────────────

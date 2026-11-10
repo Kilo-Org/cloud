@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
+import { currentRouteHref } from '@/lib/current-route-href';
 import { LAST_ROUTE_KEY } from '@/lib/storage-keys';
-import { isConcreteLastRouteHref } from '@/lib/last-route-recordable';
+import { isConcreteLastRouteHref, isUnrestorableLastRouteHref } from '@/lib/last-route-recordable';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
@@ -84,7 +85,18 @@ function parseStoredRecord(raw: string): LastRouteRecord | null {
     // A record written before hrefs were concrete names a route pattern
     // (`profiles/[profileId]/variables`); restoring it opens a screen whose
     // data reads cannot resolve, so it is dropped instead of replayed once.
-    return isConcreteLastRouteHref(result.data.href) ? result.data : null;
+    const href = currentRouteHref(result.data.href);
+    if (!isConcreteLastRouteHref(href)) {
+      return null;
+    }
+    // An older build could record a route this rule no longer accepts (a picker
+    // sheet, or another transient sheet). Replaying one would reopen it alone
+    // over the start route, so it reads as absent like any other unusable
+    // record and the repair leaves the start route alone.
+    if (isUnrestorableLastRouteHref(href)) {
+      return null;
+    }
+    return { ...result.data, href };
   } catch {
     return null;
   }
@@ -269,6 +281,11 @@ export function clearLastRoute(): void {
 // when a write is legitimate (the account navigated after repair, or the
 // record was absent and nothing could be repaired).
 let repairEvaluated = false;
+
+/** Hold the focused route until the root layout remounts and restores it on Retry. */
+export function prepareLastRouteRepair(): void {
+  repairEvaluated = false;
+}
 
 /**
  * Read-and-latch for the relaunch repair: opens recording from then on (see

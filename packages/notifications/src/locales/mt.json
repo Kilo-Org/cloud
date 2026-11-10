@@ -9,6 +9,7 @@
       "lowBalance": "Il-bilanċ tiegħek għandu bżonn attenzjoni",
       "spendAlert": "L-infiq tiegħek għandu bżonn attenzjoni",
       "securityFinding": "Seba ta' sigurtà għandu bżonn attenzjoni",
+      "securityUpdate": "Verifika tas-sigurtà għandha aġġornament",
       "activeAgentsGlanceable": "L-aġenti attivi għandhom aġġornament"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Seba ta' sigurtà għandu bżonn attenzjoni"
+      "body": "Verifika tas-sigurtà għandha aġġornament"
     }
   },
   "instanceLifecycle": {

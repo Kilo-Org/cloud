@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTO_ROUTING_DENIED_MODELS_PATH,
   CUSTOM_ROUTER_DECIDE_PATH,
+  CUSTOM_ROUTER_EVAL_CASE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
@@ -14,6 +15,7 @@ import {
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import type * as DbModule from '@kilocode/db';
+import type { SQL } from 'drizzle-orm';
 import { signKiloToken, clearSecretCacheForTest } from '@kilocode/worker-utils';
 import type * as AccountAccessModule from '@kilocode/worker-utils/account-access';
 import type { OrganizationMemberBalanceRow } from '@kilocode/worker-utils/account-access';
@@ -22,6 +24,7 @@ import type * as ClassifierConfigModule from './classifier-config';
 import type * as CustomRouterStoreModule from './custom-router-store';
 import type * as ModelCapabilitiesModule from './model-capabilities';
 import type * as ModelClassifierModule from './model-classifier';
+import { clearEmailDomainBlacklistCache } from './caller-auth';
 import { clearCustomRouterTableCache } from './custom-router-decision';
 import { clearClassificationHotCache } from './decision-cache';
 import { clearOrganizationPolicyCache } from './organization-policy';
@@ -29,20 +32,22 @@ import { app } from './index';
 
 const findCustomRouter = vi.hoisted(() => vi.fn());
 const findCustomRouterById = vi.hoisted(() => vi.fn());
-const findLegacyPoolRouter = vi.hoisted(() => vi.fn());
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const findOrganizationMemberRole = vi.hoisted(() => vi.fn());
 const findOrganizationMemberBalanceRow = vi.hoisted(() => vi.fn());
 const dbRows = vi.hoisted(() => ({
   user: [] as unknown[],
   organization: [] as unknown[],
+  blacklistedDomains: [] as string[],
+  blacklistLookupError: null as Error | null,
+  // The domains each blacklisted_domains lookup asked about.
+  blacklistLookups: [] as string[][],
 }));
 
 vi.mock('./custom-router-store', async importOriginal => ({
   ...(await importOriginal<typeof CustomRouterStoreModule>()),
   findCustomRouter,
   findCustomRouterById,
-  findLegacyPoolRouter,
 }));
 
 vi.mock('./model-classifier', async importOriginal => ({
@@ -76,15 +81,29 @@ vi.mock('@kilocode/worker-utils/account-access', async importOriginal => ({
 
 vi.mock('@kilocode/db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
+  const { PgDialect } = await import('drizzle-orm/pg-core');
+  const dialect = new PgDialect();
+  // Answers `domain in (...)` against the configured blocked domains.
+  const blacklistLookup = async (condition: SQL) => {
+    const domains = dialect.sqlToQuery(condition).params.map(String);
+    dbRows.blacklistLookups.push(domains);
+    if (dbRows.blacklistLookupError) throw dbRows.blacklistLookupError;
+    return domains
+      .filter(domain => dbRows.blacklistedDomains.includes(domain))
+      .map(domain => ({ domain }));
+  };
   return {
     ...actual,
     getWorkerDb: () => ({
       select: () => ({
         from: (table: unknown) => ({
-          where: () => ({
-            limit: async () =>
-              table === actual.kilocode_users ? dbRows.user : dbRows.organization,
-          }),
+          where: (condition: SQL) => {
+            if (table === actual.blacklisted_domains) return blacklistLookup(condition);
+            return {
+              limit: async () =>
+                table === actual.kilocode_users ? dbRows.user : dbRows.organization,
+            };
+          },
         }),
       }),
     }),
@@ -190,8 +209,6 @@ const env = {
   AUTO_ROUTING_DECISION_SECRET: { get: async () => DECISION_SECRET },
   KILO_WEB_API_BASE_URL: 'https://web.example.test',
   KILO_AI_GATEWAY_BASE_URL: 'https://gateway.example.test',
-  UPSTASH_REDIS_REST_URL: { get: async () => 'https://redis.example.test' },
-  UPSTASH_REDIS_REST_TOKEN: { get: async () => 'redis-read-token' },
   HYPERDRIVE: { connectionString: 'postgres://worker' },
   AUTO_ROUTING_CONFIG: { get: async () => null, put: async () => {}, delete: async () => {} },
   BENCHMARK_SERVICE: { fetch: benchmarkFetch },
@@ -213,7 +230,6 @@ const env = {
         if (mode === null) platformModes.delete(key);
         else platformModes.set(key, mode);
       },
-      getSettings: async () => ({ mode: platformModes.get(key) ?? null, pool: null }),
     }),
   },
 };
@@ -258,6 +274,38 @@ async function post(path: string, body: unknown, headers: Record<string, string>
   );
 }
 
+// A request body that reports whether the handler consumed it. A ReadableStream fills its
+// queue on construction, so a pull counter cannot distinguish consumption; `bodyUsed` can.
+function streamingBody() {
+  const text = JSON.stringify({ routerId: '11111111-1111-4111-8111-111111111111' });
+  return new Response(text).body as ReadableStream<Uint8Array>;
+}
+
+async function postStream(
+  path: string,
+  body: ReadableStream<Uint8Array>,
+  headers: Record<string, string> = {}
+) {
+  const request = new Request(`https://auto-routing.example.com${path}`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${await userToken()}`,
+      'content-type': 'application/json',
+      ...headers,
+    },
+    body,
+    duplex: 'half',
+  } as RequestInit);
+  const res = await app.request(request, undefined, env, executionCtx);
+  return { res, bodyUsed: request.bodyUsed };
+}
+
+// Pads a request object with an unknown field, which the contracts strip, to an exact body size.
+function paddedBody(value: Record<string, unknown>, bytes: number) {
+  const base = JSON.stringify({ ...value, padding: '' }).length;
+  return { ...value, padding: 'x'.repeat(bytes - base) };
+}
+
 function decideBody(overrides: Record<string, unknown> = {}) {
   return {
     model: 'kilo-auto/custom/mine',
@@ -289,6 +337,17 @@ async function decisionOf(res: Response) {
   return CustomRouterDecideResponseSchema.parse(await res.json());
 }
 
+// A user whose credited balance is fully spent.
+function spentBalanceUser() {
+  return {
+    api_token_pepper: 'pepper-1',
+    blocked_reason: null,
+    google_user_email: 'dev@example.com',
+    total_microdollars_acquired: 1_000_000,
+    microdollars_used: 1_000_000,
+  };
+}
+
 async function errorCode(res: Response) {
   const body = (await res.json()) as { error: { code: string } };
   return body.error.code;
@@ -298,12 +357,6 @@ const fetchMock = vi.fn<typeof fetch>();
 let gatewayDeniedModelIds: string[] = [];
 let gatewayFailuresLeft = 0;
 let gatewayFailureStatus = 503;
-let blacklistedDomainsConfig: string | null = null;
-let redisAvailable = true;
-
-function blacklistConfig(domains: string[]) {
-  return JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null });
-}
 
 function gatewayCalls() {
   return fetchMock.mock.calls.filter(([input]) =>
@@ -320,6 +373,7 @@ beforeEach(() => {
   clearCustomRouterTableCache();
   clearClassificationHotCache();
   clearOrganizationPolicyCache();
+  clearEmailDomainBlacklistCache();
   backgroundTasks.length = 0;
   platformModes.clear();
   getPlatformMode.mockClear();
@@ -327,9 +381,7 @@ beforeEach(() => {
   gatewayDeniedModelIds = [];
   gatewayFailuresLeft = 0;
   gatewayFailureStatus = 503;
-  blacklistedDomainsConfig = null;
-  redisAvailable = true;
-  fetchMock.mockReset().mockImplementation(async (input, init) => {
+  fetchMock.mockReset().mockImplementation(async input => {
     const url = requestUrl(input);
     if (url.startsWith('https://gateway.example.test')) {
       if (gatewayFailuresLeft > 0) {
@@ -337,14 +389,6 @@ beforeEach(() => {
         return new Response('down', { status: gatewayFailureStatus });
       }
       return Response.json({ deniedModelIds: gatewayDeniedModelIds });
-    }
-    // Like serverless-redis-http: only the command form is served.
-    if (url === 'https://redis.example.test' && init?.method === 'POST') {
-      if (!redisAvailable) return new Response('unavailable', { status: 503 });
-      const [command, key] = JSON.parse(init.body as string) as string[];
-      return command === 'GET' && key === 'admin:blacklisted-domains'
-        ? Response.json({ result: blacklistedDomainsConfig })
-        : Response.json({ error: 'unexpected command' }, { status: 400 });
     }
     return new Response('not found', { status: 404 });
   });
@@ -359,9 +403,11 @@ beforeEach(() => {
     },
   ];
   dbRows.organization = [{ total_microdollars_acquired: 3_000_000, microdollars_used: 0 }];
+  dbRows.blacklistedDomains = [];
+  dbRows.blacklistLookupError = null;
+  dbRows.blacklistLookups = [];
   findCustomRouter.mockReset().mockResolvedValue(customRouter());
   findCustomRouterById.mockReset().mockResolvedValue(customRouter());
-  findLegacyPoolRouter.mockReset().mockResolvedValue(null);
   findOrganizationMemberRole.mockReset().mockResolvedValue('member');
   findOrganizationMemberBalanceRow.mockReset().mockResolvedValue(memberBalanceRow());
   classifyNormalizedInput.mockReset().mockResolvedValue({
@@ -383,20 +429,16 @@ beforeEach(() => {
 
 afterEach(async () => {
   await drainBackgroundTasks();
+  clearEmailDomainBlacklistCache();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe('public custom router decide', () => {
   it.each(['efficient', 'frontier'] as const)(
-    'uses the saved %s custom mode independently of platform modes and inheritance markers',
+    'keeps %s custom mode independent of personal and organization platform modes',
     async baseRouter => {
-      let router = customRouter({
-        baseRouter,
-        mode: 'best_accuracy',
-        legacyPool: true,
-        legacyModeInherited: true,
-      });
+      let router = customRouter({ baseRouter, mode: 'best_accuracy' });
       findCustomRouter.mockImplementation(async () => router);
       platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
       platformModes.set(`org:${ORG_ID}`, 'cost_per_accuracy');
@@ -412,6 +454,7 @@ describe('public custom router decide', () => {
           { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
         ],
       });
+
       const headers = { 'X-KiloCode-OrganizationId': ORG_ID };
       const first = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), headers));
       expect(first.decision).toMatchObject({ model: SONNET, fallback: false });
@@ -421,6 +464,7 @@ describe('public custom router decide', () => {
       expect(edited.decision).toMatchObject({ model: 'client:ollama/qwen3:32b', fallback: false });
       expect(platformModes.get(`user:${USER_ID}`)).toBe('cost_per_accuracy');
       expect(platformModes.get(`org:${ORG_ID}`)).toBe('cost_per_accuracy');
+
       for (const [ownerType, ownerId] of [
         ['user', USER_ID],
         ['org', ORG_ID],
@@ -440,6 +484,7 @@ describe('public custom router decide', () => {
         );
         expect(updated.status).toBe(200);
       }
+
       const afterPlatformEdit = await decisionOf(
         await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), headers)
       );
@@ -449,7 +494,6 @@ describe('public custom router decide', () => {
       });
       expect(router.mode).toBe('cost_per_accuracy');
       expect(getPlatformMode).not.toHaveBeenCalled();
-      expect(findLegacyPoolRouter).not.toHaveBeenCalled();
       expect(platformModes.get(`user:${USER_ID}`)).toBe('best_accuracy');
       expect(platformModes.get(`org:${ORG_ID}`)).toBe('best_accuracy');
     }
@@ -663,35 +707,64 @@ describe('public custom router decide', () => {
   });
 
   it('refuses a user in a blocked email domain', async () => {
-    blacklistedDomainsConfig = blacklistConfig(['example.com']);
+    dbRows.blacklistedDomains = ['example.com'];
     const decide = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
     expect(decide.status).toBe(403);
     expect(await errorCode(decide)).toBe('forbidden');
     const plan = await post(CUSTOM_ROUTER_EVAL_PLAN_PATH, { routerId: ROUTER_ID });
     expect(plan.status).toBe(403);
+    expect(dbRows.blacklistLookups[0]).toEqual(['example.com', 'com']);
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
     expect(benchmarkFetch).not.toHaveBeenCalled();
   });
 
-  it('fails closed with a retryable error before the blocked-domain list has ever loaded', async () => {
-    redisAvailable = false;
-    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
-    expect(res.status).toBe(500);
-    expect(res.headers.get('retry-after')).toBe('5');
-    expect(await errorCode(res)).toBe('internal_error');
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
-  });
-
-  it('keeps enforcing the last loaded blocked-domain list when Redis later fails', async () => {
-    blacklistedDomainsConfig = blacklistConfig(['example.com']);
-    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(403);
-    redisAvailable = false;
-    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000);
+  it('refuses a user in a subdomain of a blocked email domain', async () => {
+    dbRows.blacklistedDomains = ['example.com'];
+    dbRows.user = [
+      {
+        api_token_pepper: 'pepper-1',
+        blocked_reason: null,
+        google_user_email: 'dev@Mail.Example.com',
+        total_microdollars_acquired: 5_000_000,
+        microdollars_used: 1_000_000,
+      },
+    ];
     const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
     expect(res.status).toBe(403);
-    expect(
-      fetchMock.mock.calls.filter(([input]) => requestUrl(input).includes('redis'))
-    ).toHaveLength(2);
+    expect(await errorCode(res)).toBe('forbidden');
+  });
+
+  it('admits a user whose email domain is not blocked', async () => {
+    dbRows.blacklistedDomains = ['notexample.com', 'mail.example.com'];
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(dbRows.blacklistLookups).toEqual([['example.com', 'com']]);
+  });
+
+  it('maps a failed blocked-domain lookup to a retryable internal error and retries it on the next request', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    dbRows.blacklistLookupError = new Error('connection terminated');
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      error: { code: 'internal_error', message: 'Account checks are temporarily unavailable' },
+    });
+    expect(res.headers.get('retry-after')).toBe('5');
+    expect(JSON.parse(String(consoleWarn.mock.calls[0]?.[0]))).toMatchObject({
+      event: 'auto_routing_blacklisted_domains_read_failed',
+      error: 'connection terminated',
+    });
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+
+    dbRows.blacklistLookupError = null;
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(dbRows.blacklistLookups).toHaveLength(2);
+  });
+
+  it('looks up the blocked-domain status of a user once per minute', async () => {
+    for (let i = 0; i < 3; i++) {
+      await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    }
+    expect(dbRows.blacklistLookups).toHaveLength(1);
   });
 
   it('fails with custom_router_unavailable when no entry is servable', async () => {
@@ -776,6 +849,24 @@ describe('public custom router decide', () => {
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
+  it('requires a paid-usage balance from a personal caller', async () => {
+    dbRows.user = [
+      {
+        api_token_pepper: 'pepper-1',
+        blocked_reason: null,
+        google_user_email: 'dev@example.com',
+        total_microdollars_acquired: 1_000_000,
+        microdollars_used: 1_000_000,
+      },
+    ];
+    const { res, bodyUsed } = await postStream(CUSTOM_ROUTER_DECIDE_PATH, streamingBody());
+    expect(res.status).toBe(402);
+    expect(await errorCode(res)).toBe('insufficient_balance');
+    expect(bodyUsed).toBe(false);
+    expect(findCustomRouter).not.toHaveBeenCalled();
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
   it('charges an organization context to the member allowance', async () => {
     findOrganizationMemberBalanceRow.mockResolvedValue(
       memberBalanceRow({ microdollar_limit: 1_000_000, microdollar_usage: 1_000_000 })
@@ -848,138 +939,25 @@ describe('internal custom router decide', () => {
     });
   });
 
-  it('routes old and new Efficient IDs through the same canonical table and cache scope', async () => {
-    const canonical = customRouter({
-      slug: 'efficient',
-      legacyPool: true,
-      entries: [sonnet],
-    });
-    findLegacyPoolRouter.mockResolvedValue(canonical);
-    findCustomRouter.mockResolvedValue(canonical);
-    const oldResponse = await internalDecide({ router: 'efficient' }, 'kilo-auto/efficient');
-    const newResponse = await internalDecide(
+  it('keeps the saved Efficient custom ID on its canonical table and cache scope', async () => {
+    findCustomRouter.mockResolvedValue(customRouter({ slug: 'efficient', entries: [sonnet] }));
+    const response = await internalDecide(
       { customRouter: { scope: 'user', slug: 'efficient' } },
       'kilo-auto/custom/efficient'
     );
-    expect(oldResponse.status).toBe(200);
-    expect(newResponse.status).toBe(200);
-    const oldBody = await oldResponse.json();
-    const newBody = await newResponse.json();
-    expect(oldBody).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
-    expect(newBody).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toHaveProperty(
+      'decision',
+      expect.objectContaining({ model: SONNET })
+    );
     expect(benchmarkFetch).toHaveBeenCalledTimes(1);
     expect(
       cacheIdFromName.mock.calls.every(([key]) => key.startsWith(`custom:${ROUTER_ID}:`))
     ).toBe(true);
     await drainBackgroundTasks();
     expect(recordUsage.mock.calls.map(([usage]) => usage.core.requested_model)).toContain(
-      'kilo-auto/efficient'
-    );
-  });
-
-  it('shares the canonical pool but not mode between a platform alias and explicit custom ID', async () => {
-    const canonical = customRouter({
-      slug: 'efficient',
-      legacyPool: true,
-      legacyModeInherited: true,
-      mode: 'best_accuracy',
-    });
-    findLegacyPoolRouter.mockResolvedValue(canonical);
-    findCustomRouter.mockResolvedValue(canonical);
-    platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
-    customTable = table({
-      [ROUTE]: [
-        {
-          model: 'client:ollama/qwen3:32b',
-          accuracy: 0.8,
-          avgCostUsd: 0,
-          meetsThreshold: true,
-          variant: null,
-        },
-        { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
-      ],
-    });
-    const clientEntries = [{ provider: 'ollama', model: 'qwen3:32b' }];
-    const alias = await internalDecide(
-      { router: 'efficient', clientEntries },
-      'kilo-auto/efficient'
-    );
-    const explicit = await internalDecide({
-      customRouter: { scope: 'user', slug: 'efficient' },
-      clientEntries,
-    });
-    expect(alias.status).toBe(200);
-    expect(explicit.status).toBe(200);
-    await expect(alias.json()).resolves.toMatchObject({
-      decision: { model: 'client:ollama/qwen3:32b', fallback: false },
-    });
-    await expect(explicit.json()).resolves.toMatchObject({
-      decision: { model: SONNET, fallback: false },
-    });
-    expect(canonical.mode).toBe('best_accuracy');
-    expect(platformModes.get(`user:${USER_ID}`)).toBe('cost_per_accuracy');
-  });
-
-  it('uses platform mode for a gateway-resolved platform alias and the row mode for the explicit custom ID', async () => {
-    const canonical = customRouter({
-      slug: 'efficient',
-      legacyPool: true,
-      legacyModeInherited: true,
-      mode: 'best_accuracy',
-    });
-    findLegacyPoolRouter.mockResolvedValue(canonical);
-    findCustomRouter.mockResolvedValue(canonical);
-    platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
-    customTable = table({
-      [ROUTE]: [
-        {
-          model: 'client:ollama/qwen3:32b',
-          accuracy: 0.8,
-          avgCostUsd: 0,
-          meetsThreshold: true,
-          variant: null,
-        },
-        { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
-      ],
-    });
-    const clientEntries = [{ provider: 'ollama', model: 'qwen3:32b' }];
-    const reference = { scope: 'user', slug: 'efficient' } as const;
-    const gatewayAlias = await internalDecide(
-      { customRouter: reference, clientEntries },
-      'kilo-auto/efficient'
-    );
-    const explicit = await internalDecide(
-      { customRouter: reference, clientEntries },
       'kilo-auto/custom/efficient'
     );
-    expect(gatewayAlias.status).toBe(200);
-    expect(explicit.status).toBe(200);
-    await expect(gatewayAlias.json()).resolves.toMatchObject({
-      decision: { model: 'client:ollama/qwen3:32b', fallback: false },
-    });
-    await expect(explicit.json()).resolves.toMatchObject({
-      decision: { model: SONNET, fallback: false },
-    });
-  });
-
-  it('never falls back outside a migrated legacy pool when policy denies its only gateway entry', async () => {
-    findLegacyPoolRouter.mockResolvedValue(
-      customRouter({ slug: 'efficient', legacyPool: true, entries: [sonnet] })
-    );
-    const response = await internalDecide(
-      { router: 'efficient', routingPolicy: { deniedModelIds: [SONNET] } },
-      'kilo-auto/efficient'
-    );
-    expect(response.status).toBe(422);
-    expect(await errorCode(response)).toBe('custom_router_unavailable');
-  });
-
-  it('does not consult a platform table after a canonical lookup fails', async () => {
-    findLegacyPoolRouter.mockRejectedValue(new Error('canonical storage unavailable'));
-    const response = await internalDecide({ router: 'efficient' }, 'kilo-auto/efficient');
-    expect(response.status).toBe(500);
-    expect(benchmarkFetch).not.toHaveBeenCalled();
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   it('returns router_not_found for an organization router without an organization', async () => {
@@ -1003,6 +981,23 @@ describe('client eval proxy', () => {
   function forwarded(path: string) {
     const call = benchmarkFetch.mock.calls.find(([url]) => new URL(url).pathname === path);
     return call ? (JSON.parse(call[1]?.body as string) as Record<string, unknown>) : null;
+  }
+
+  function resultUpload(overrides: Record<string, unknown> = {}) {
+    return {
+      routerId: ROUTER_ID,
+      engineIdentity: 'router:v3:abc',
+      entry: { kind: 'client', provider: 'ollama', model: 'qwen3:32b' },
+      variant: null,
+      caseId: 'case-1',
+      rep: 0,
+      output: 'done',
+      costUsd: 0,
+      durationMs: 1200,
+      exitCode: 0,
+      timedOut: false,
+      ...overrides,
+    };
   }
 
   it('forwards a plan with the router context and passes the benchmark answer through', async () => {
@@ -1030,6 +1025,7 @@ describe('client eval proxy', () => {
       customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
     );
     findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findOrganizationMemberBalanceRow.mockResolvedValue(null);
     benchmarkFetch.mockResolvedValueOnce(Response.json({ score: 1 }));
     const upload = {
       routerId: ROUTER_ID,
@@ -1086,5 +1082,96 @@ describe('client eval proxy', () => {
     );
     expect(res.status).toBe(402);
     expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it('requires a funded payer for an eval plan', async () => {
+    dbRows.user = [spentBalanceUser()];
+    dbRows.organization = [{ total_microdollars_acquired: 1_000, microdollars_used: 1_000 }];
+    const { res, bodyUsed } = await postStream(CUSTOM_ROUTER_EVAL_PLAN_PATH, streamingBody(), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    expect(res.status).toBe(402);
+    expect(await errorCode(res)).toBe('insufficient_balance');
+    expect(bodyUsed).toBe(false);
+    expect(findCustomRouterById).not.toHaveBeenCalled();
+    expect(benchmarkFetch).not.toHaveBeenCalled();
+  });
+
+  it('runs an eval plan for an organization billing manager funded by the organization', async () => {
+    findCustomRouterById.mockResolvedValue(
+      customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
+    );
+    findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findOrganizationMemberBalanceRow.mockResolvedValue(null);
+    dbRows.user = [spentBalanceUser()];
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const res = await post(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      { routerId: ROUTER_ID },
+      { 'X-KiloCode-OrganizationId': ORG_ID }
+    );
+    expect(res.status).toBe(200);
+    expect(forwarded(CUSTOM_ROUTER_EVAL_PLAN_PATH)).toMatchObject({
+      routerId: ROUTER_ID,
+      ownerType: 'org',
+      ownerId: ORG_ID,
+    });
+  });
+
+  it('accepts an eval plan at the body cap and refuses a larger one', async () => {
+    const limit = 16_000;
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const atLimit = await postStream(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      new Response(JSON.stringify(paddedBody({ routerId: ROUTER_ID }, limit)))
+        .body as ReadableStream<Uint8Array>
+    );
+    expect(atLimit.res.status).toBe(200);
+    expect(atLimit.bodyUsed).toBe(true);
+    const tooLarge = await post(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      paddedBody({ routerId: ROUTER_ID }, limit + 1)
+    );
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts an eval case at the body cap and refuses a larger one', async () => {
+    const limit = 16_000;
+    const body = { routerId: ROUTER_ID, caseId: 'case-1' };
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const atLimit = await post(CUSTOM_ROUTER_EVAL_CASE_PATH, paddedBody(body, limit));
+    expect(atLimit.status).toBe(200);
+    expect(forwarded(CUSTOM_ROUTER_EVAL_CASE_PATH)).toMatchObject({
+      routerId: ROUTER_ID,
+      caseId: 'case-1',
+    });
+    const tooLarge = await post(CUSTOM_ROUTER_EVAL_CASE_PATH, paddedBody(body, limit + 1));
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a maximal client output and refuses a body above the result cap', async () => {
+    benchmarkFetch.mockResolvedValueOnce(Response.json({ score: 1 }));
+    const res = await post(
+      CUSTOM_ROUTER_EVAL_RESULT_PATH,
+      resultUpload({ output: 'x'.repeat(1_000_000) })
+    );
+    expect(res.status).toBe(200);
+    const tooLarge = await post(
+      CUSTOM_ROUTER_EVAL_RESULT_PATH,
+      paddedBody(resultUpload(), 8_000_000 + 1)
+    );
+    expect(tooLarge.status).toBe(400);
+    expect(await tooLarge.json()).toEqual({
+      error: { code: 'invalid_request', message: 'Request body is too large' },
+    });
+    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
   });
 });

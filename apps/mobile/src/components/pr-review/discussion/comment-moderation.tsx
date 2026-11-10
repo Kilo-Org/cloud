@@ -60,10 +60,16 @@ function showModerationFailure(action: ModerationAction, error: unknown, retry: 
     announcingToast.error(failure.message);
     return;
   }
-  Alert.alert(i18n.t('common.somethingWentWrong'), failure.message, [
-    { text: i18n.t('common.cancel'), style: 'cancel' },
-    { text: i18n.t('common.retry'), onPress: retry },
-  ]);
+  Alert.alert(
+    i18n.t('common.somethingWentWrong'),
+    failure.message,
+    [
+      { text: i18n.t('common.cancel'), style: 'cancel' },
+      { text: i18n.t('common.retry'), onPress: retry },
+    ],
+    // Android back dismisses, which equals Cancel: nothing is retried.
+    { cancelable: true }
+  );
 }
 
 /**

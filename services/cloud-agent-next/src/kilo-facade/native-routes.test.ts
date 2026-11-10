@@ -86,6 +86,17 @@ describe('native body parsing', () => {
     });
   });
 
+  it('accepts a question rejection without a body, as the native SDK sends it', async () => {
+    const route = classifyCollectionPath('POST', '/question/que_1/reject');
+    if (route?.kind !== 'answering') throw new Error('expected answering route');
+    await expect(
+      parseNativeAnswerBody(
+        new Request('http://worker.test/kilo/question/que_1/reject', { method: 'POST' }),
+        route
+      )
+    ).resolves.toEqual({ ok: true, reply: { action: 'question.reject', questionId: 'que_1' } });
+  });
+
   it('rejects an unsupported reply body', async () => {
     const route = classifyCollectionPath('POST', '/permission/per_1/reply');
     if (route?.kind !== 'answering') throw new Error('expected answering route');

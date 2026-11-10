@@ -12,23 +12,24 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { SearchX } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { deviceFit, fitsDevice } from '@/lib/chat/device-fit';
 import { GGUF_CATALOG } from '@/lib/chat/gguf-catalog';
 import { type HfListedModel } from '@/lib/chat/hf-catalog';
+import { isHfGone, isHfRestricted } from '@/lib/chat/hf-request';
 import { useDeviceBudget, useHfModelSearch } from '@/lib/chat/use-hf-catalog';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { catalogEmptyCopy, type CatalogTab } from './model-catalog-empty';
 import { downloadBytes, LoadingRows, ModelRow, RecommendedRow } from './model-catalog-rows';
 import { ModelSearchField, useModelSearch } from './model-catalog-search';
-
-type Tab = 'fits' | 'all';
 
 /** Hugging Face GGUF models: the pinned ones first, then search and pages. */
 export function ModelCatalogScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const budget = useDeviceBudget();
-  const [tab, setTab] = useState<Tab>('fits');
+  const [tab, setTab] = useState<CatalogTab>('fits');
   const search = useModelSearch();
   const listRef = useRef<FlashListRef<HfListedModel>>(null);
   // Changing the filter or the paused search text swaps the search query's
@@ -38,8 +39,9 @@ export function ModelCatalogScreen() {
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [tab, search.query]);
+  const query = search.query;
   const models = useHfModelSearch({
-    search: search.query,
+    search: query,
     fitsOnly: tab === 'fits',
     memoryBytes: budget.memoryBytes,
   });
@@ -48,31 +50,52 @@ export function ModelCatalogScreen() {
     [models.data?.pages]
   );
   const recommended =
-    search.query === ''
+    query === ''
       ? GGUF_CATALOG.filter(model => {
           const fit = deviceFit(downloadBytes(model), budget);
           return tab === 'all' || fitsDevice(fit);
         })
       : [];
   const hasPages = (models.data?.pages.length ?? 0) > 0;
+  // The device cap is a server-side filter, so an empty Fits answer alone
+  // cannot say whether the search matched anything. The same search without
+  // the cap answers it, and its cache also serves the All tab.
+  const capMayHideMatches = tab === 'fits' && query !== '' && hasPages && rows.length === 0;
+  const wider = useHfModelSearch({
+    search: query,
+    fitsOnly: false,
+    memoryBytes: budget.memoryBytes,
+    enabled: capMayHideMatches,
+  });
+  const emptyCopy = catalogEmptyCopy({
+    tab,
+    query,
+    widerMatch: (wider.data?.pages.flatMap(page => page.models).length ?? 0) > 0,
+  });
 
   let empty = <LoadingRows />;
   if (models.isError && !hasPages) {
-    empty = (
-      <QueryError
-        variant="server"
-        title={t('agentChat.newSession.couldNotLoadModels')}
-        placement="top"
-        onRetry={() => void models.refetch()}
-        isRetrying={models.isFetching}
-      />
-    );
+    if (isHfGone(models.error)) {
+      empty = <QueryError variant="not-found" placement="top" />;
+    } else if (isHfRestricted(models.error)) {
+      empty = <QueryError variant="permission" placement="top" />;
+    } else {
+      empty = (
+        <QueryError
+          variant="server"
+          title={t('agentChat.newSession.couldNotLoadModels')}
+          placement="top"
+          onRetry={() => void models.refetch()}
+          isRetrying={models.isFetching}
+        />
+      );
+    }
   } else if (hasPages) {
     empty = (
       <EmptyState
         icon={SearchX}
-        title={t(tab === 'fits' ? 'modelChat.catalog.noFits' : 'modelChat.catalog.noResults')}
-        {...(tab === 'fits' ? { description: t('modelChat.catalog.noFitsDescription') } : {})}
+        title={t(emptyCopy.titleKey, { query })}
+        {...(emptyCopy.descriptionKey ? { description: t(emptyCopy.descriptionKey) } : {})}
         placement="top"
       />
     );
@@ -88,6 +111,7 @@ export function ModelCatalogScreen() {
         <Button
           size="sm"
           variant="outline"
+          className={STATE_ACTION_CLASS}
           onPress={() => void models.fetchNextPage()}
           accessibilityLabel={t('common.retryLoadingMore')}
         >

@@ -12,7 +12,7 @@ import {
 import type { EncryptedData } from '@kilocode/db/schema-types';
 import { inArray, like } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
 import type { SeedResult } from '../index';
@@ -684,6 +684,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const scenario = requireScenario(rawScenario);
   const key = requireEncryptionKey();
+  assertLocalSeedDatabase('coding-plans:demo-data');
   const oldStripeCustomerIds = await cleanupScenario(scenario);
   await Promise.all(oldStripeCustomerIds.map(customerId => deleteSeedStripeCustomer(customerId)));
   const stripeCustomerIds = await createStripeCustomers(scenario);

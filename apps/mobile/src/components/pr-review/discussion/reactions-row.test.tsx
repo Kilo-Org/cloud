@@ -30,7 +30,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 vi.mock('@/lib/a11y/announce', () => ({
-  moveA11yFocus: moveFocus,
+  requestA11yFocus: moveFocus,
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -168,14 +168,17 @@ describe('ReactionsRow picker dismissal focus', () => {
     renderer.unmount();
   });
 
-  it('retries the picker title focus when a layout lands before the title handle exists', async () => {
-    // Android delivers the first layout before the ref is attached, and
-    // `findNodeHandle` on an empty ref resolves nothing, so the helper reports
-    // false. That must not burn the once-per-presentation guard.
+  it('retries the picker title request until one is dispatched, then holds the latch', async () => {
+    // A missing host must not latch the once-per-presentation guard.
     moveFocus.mockReturnValueOnce(false).mockReturnValue(true);
     const renderer = await openPicker();
     expect(moveFocus).not.toHaveBeenCalled();
 
+    layoutPickerTitle(renderer);
+    expect(moveFocus).toHaveBeenCalledTimes(1);
+
+    // The dispatched request seals the presentation: further layout signals
+    // must not ask the platform again.
     layoutPickerTitle(renderer);
     expect(moveFocus).toHaveBeenCalledTimes(1);
 

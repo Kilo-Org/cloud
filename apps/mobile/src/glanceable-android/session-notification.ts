@@ -12,9 +12,18 @@ import { z } from 'zod';
  * channel, the actions, and the Live Update promotion.
  */
 
+/** The account and organization a card was followed under. */
+export type SessionCardScope = { userId: string; organizationId: string | null };
+
 /** One followed session's notification, as the native module draws it. */
 export type SessionNotificationCard = {
   sessionId: string;
+  /**
+   * The account the card was followed under. Native storage keeps it with the
+   * card so a restore can tell two accounts in one organization apart; it is
+   * never drawn.
+   */
+  userId: string | null;
   /** The scope the card was followed in; null for Personal. */
   organizationId: string | null;
   title: string;
@@ -61,9 +70,9 @@ export type SessionNotificationCard = {
 
 /**
  * One stored session card as native storage keeps it. Only the facts the follow
- * lifecycle needs are read back: the session, its scope, and the approval key
- * the card shows. A card that no longer parses is dropped, which costs one
- * notification.
+ * lifecycle needs are read back: the session, the account and scope it was
+ * followed under, and the approval key the card shows. A card that no longer
+ * parses is dropped, which costs one notification.
  */
 /**
  * The native store writes an absent optional field as the empty string (Kotlin
@@ -77,6 +86,12 @@ const storedOptionalStringSchema = z
 
 const storedSessionCardSchema = z.object({
   sessionId: z.string().min(1),
+  /**
+   * The account the card was followed under. A record written before the card
+   * kept it has no `userId`, and reads as absent: such a card cannot be placed
+   * in a scope, so the restore cancels it.
+   */
+  userId: storedOptionalStringSchema.optional(),
   organizationId: storedOptionalStringSchema,
   approvalKey: storedOptionalStringSchema,
   /**

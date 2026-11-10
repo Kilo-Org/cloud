@@ -11,6 +11,7 @@ jest.mock('@/lib/web-config.server', () => ({
 }));
 
 const originalFetch = global.fetch;
+const originalEnv = process.env;
 
 function createRequest(body?: string, forwardedFor: string | null = '1.2.3.4') {
   return new NextRequest('http://localhost:3000/api/auth/verify-turnstile', {
@@ -30,12 +31,14 @@ function verifySiteverifyCalls() {
 
 beforeEach(() => {
   global.fetch = jest.fn().mockResolvedValue(Response.json({ success: true }));
+  process.env = { ...originalEnv };
   delete process.env.VERCEL;
   delete process.env.VERCEL_ENV;
 });
 
 afterEach(() => {
   global.fetch = originalFetch;
+  process.env = originalEnv;
 });
 
 describe('POST /api/auth/verify-turnstile request body', () => {

@@ -35,7 +35,7 @@ export function AddCreditsButton({ onPress, className }: AddCreditsButtonProps) 
     <Button
       size="sm"
       variant="outline"
-      className={cn('dark:bg-secondary-fill', STATE_ACTION_CLASS, className)}
+      className={cn('dark:bg-secondary-fill', className, STATE_ACTION_CLASS)}
       onPress={onPress}
     >
       <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>

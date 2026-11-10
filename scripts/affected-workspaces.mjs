@@ -32,10 +32,12 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { posix } from 'node:path';
 
-// Root paths that change how every workspace is checked.
+// Root paths that change how every workspace is checked. A dependency patch is
+// not one of them: its content enters the resolved closure of the workspaces
+// that carry the patched selector, so it is a dependency input
+// (DEPENDENCY_INPUTS below).
 const GLOBAL = [
   /^(package\.json|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|tsconfig[^/]*\.json)$/,
-  /^patches\//,
   /^\.github\/workflows\/(ci|kilo-app-ci)\.yml$/,
   /^\.github\/actions\//,
   /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs|build-key-inputs\.mjs|trpc-declaration-key\.mjs|harness-sdk-build-key\.mjs|ttsc-plugin-key\.mjs)$/,
@@ -84,12 +86,28 @@ export function isNeutral(file) {
   return NEUTRAL.some(pattern => pattern.test(file));
 }
 
-// Manifests whose effect reaches one workspace at a time through its resolved
-// dependency graph (scripts/changed-dependencies.mjs). They select the
-// workspaces whose graph moved, and everything only when the graph cannot
-// attribute the change: a root or unscoped dependency, a workspace glob or an
-// installation-policy key, or an unreadable manifest.
+// Dependency inputs whose effect reaches one workspace at a time through its
+// resolved dependency graph (scripts/changed-dependencies.mjs): the manifests,
+// and the patch content those closures carry. They select the workspaces whose
+// graph moved, and everything only when the graph cannot attribute the change:
+// a root or unscoped dependency, a workspace glob, an installation-policy key
+// that can change the installed tree, a patch that the root importer or no
+// importer resolves, or an unreadable manifest. A workspace test that reads one
+// of these files as data runs that workspace's tests alone (`test_only_*`).
 export const DEPENDENCY_MANIFESTS = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml']);
+
+// The patch content those closures carry. A patch reaches a workspace only when
+// that workspace resolves the patched selector, so it is not a global input.
+export const PATCH_DIR = 'patches/';
+
+// Every path whose diff makes the detector parse a dependency with
+// scripts/changed-dependencies.mjs, in the paths-filter glob syntax the ci.yml
+// install gate lists.
+export const DEPENDENCY_INPUTS = [...DEPENDENCY_MANIFESTS, `${PATCH_DIR}**`];
+
+const isPatchFile = file => file.startsWith(PATCH_DIR);
+
+export const isDependencyInput = file => DEPENDENCY_MANIFESTS.has(file) || isPatchFile(file);
 
 const SOURCE_GLOBS = ['ts', 'tsx', 'mts', 'cts', 'js', 'mjs', 'cjs', 'json', 'jsonc'];
 
@@ -258,6 +276,19 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
   // [reader, test file]: the test file reads changed data.
   const tested = [];
 
+  // The workspaces that read a root path: a test that reads it as data runs the
+  // reader's tests alone, and any other reader is a normal reader.
+  const readRootPath = file => {
+    const reading = rootReads.filter(
+      ([target]) => file === target || file.startsWith(`${target}/`)
+    );
+    for (const [, reader, testFile] of reading) {
+      if (testFile) tested.push([reader, testFile]);
+      else changed.add(reader);
+    }
+    return reading.length > 0;
+  };
+
   const reasons = [];
   const fullChecks = new Set();
   const changed = new Set();
@@ -282,25 +313,28 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
       fullChecks.add(input[1]);
       continue;
     }
-    if (DEPENDENCY_MANIFESTS.has(file)) {
+    if (isDependencyInput(file)) {
+      // The closure names workspaces alone, so a test that reads the file as
+      // data still needs its own workspace's tests.
+      readRootPath(file);
       if (dependencyDirs.includes('*') || dependencyDirs.includes('.')) {
         reasons.push(`${file} changes root or unscoped dependencies`);
+        continue;
       }
-      for (const dependencyDir of dependencyDirs) {
-        if (readers.has(dependencyDir)) changed.add(dependencyDir);
+      const consumers = dependencyDirs.filter(dependencyDir => readers.has(dependencyDir));
+      // A patch that no workspace resolves cannot be attributed: widen rather
+      // than check no workspace at all.
+      if (consumers.length === 0 && isPatchFile(file)) {
+        reasons.push(`${file} changes a dependency patch that no workspace resolves`);
+        continue;
       }
+      for (const consumer of consumers) changed.add(consumer);
       continue;
     }
-    const rootReaders = rootReads.filter(
-      ([target]) => file === target || file.startsWith(`${target}/`)
-    );
-    for (const [, reader, testFile] of rootReaders) {
-      if (testFile) tested.push([reader, testFile]);
-      else changed.add(reader);
-    }
+    const rootRead = readRootPath(file);
     const owned = OWNED.find(([pattern]) => pattern.test(file));
     if (owned) changed.add(owned[1]);
-    if (owned || rootReaders.length || isNeutral(file)) continue;
+    if (owned || rootRead || isNeutral(file)) continue;
     reasons.push(`${file} is outside every workspace`);
   }
 
@@ -396,7 +430,7 @@ function detect(base, worktree) {
         .split('\n')
         .filter(Boolean)
     : ['<no base revision>'];
-  const dependencyDirs = changedFiles.some(file => DEPENDENCY_MANIFESTS.has(file))
+  const dependencyDirs = changedFiles.some(isDependencyInput)
     ? execFileSync('node', ['scripts/changed-dependencies.mjs', base], { encoding: 'utf8' })
         .split('\n')
         .filter(Boolean)

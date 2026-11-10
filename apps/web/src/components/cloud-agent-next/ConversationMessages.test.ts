@@ -1667,6 +1667,15 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).toContain('Thought');
     expect(container.textContent).toContain('pnpm test -- bash-1');
     expect(container.textContent).not.toContain('Output for');
+    const groupContentId = group?.getAttribute('aria-controls');
+    const groupContent = groupContentId ? document.getElementById(groupContentId) : null;
+    expect(groupContent).not.toBeNull();
+    expect(groupContent?.getAttribute('role')).toBe('region');
+    expect(groupContent?.getAttribute('aria-label')).toContain('1 tool call');
+    expect(groupContent?.getAttribute('tabindex')).toBe('0');
+    expect(groupContent?.classList.contains('max-h-[min(24rem,50vh)]')).toBe(true);
+    expect(groupContent?.classList.contains('overflow-y-auto')).toBe(true);
+    expect(groupContent?.classList.contains('overscroll-y-contain')).toBe(true);
 
     renderConversationMessages({
       ...props,
@@ -1689,6 +1698,8 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).toContain('pnpm test -- bash-2');
     expect(group?.textContent).toContain('bash: pnpm test -- bash-2');
     expect(group?.getAttribute('aria-expanded')).toBe('true');
+    expect(groupContent?.getAttribute('aria-label')).toContain('2 tool calls');
+    expect(groupContent?.querySelectorAll('[data-tool-card]')).toHaveLength(3);
 
     renderConversationMessages({ ...props, isStreaming: false });
     expect(group?.textContent).not.toContain('bash:');

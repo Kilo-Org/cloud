@@ -37,7 +37,12 @@ export function AgentWorkGroup({
           aria-hidden
         />
       </CollapsibleTrigger>
-      <CollapsibleContent className="border-muted space-y-2 border-t px-3 py-2">
+      <CollapsibleContent
+        role="region"
+        aria-label={summary}
+        tabIndex={0}
+        className="border-muted focus-visible:ring-ring max-h-[min(24rem,50vh)] space-y-2 overflow-y-auto overscroll-y-contain border-t px-3 py-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
+      >
         {children}
       </CollapsibleContent>
     </Collapsible>

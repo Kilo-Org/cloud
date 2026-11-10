@@ -70,7 +70,7 @@ const pendingFilePart: ToolPart = {
   state: { status: 'running', input: { path: '/tmp/random.txt' }, time: { start: 0 } },
 };
 
-function buildMessages(part: ToolPart): StoredMessage[] {
+function buildMessages(part: ToolPart, reply: string): StoredMessage[] {
   return [
     ...Array.from({ length: 6 }, (_, index) =>
       userMessage(`history-${index}`, 'Earlier message in the conversation.')
@@ -98,14 +98,16 @@ function buildMessages(part: ToolPart): StoredMessage[] {
           sessionID: SESSION,
           messageID: 'file-answer',
           type: 'text',
-          text: 'Sent random.txt to your app.',
+          text: reply,
         },
       ],
     },
   ];
 }
-const messages = buildMessages(filePart);
-const runningMessages = buildMessages(pendingFilePart);
+const messages = buildMessages(filePart, 'Sent random.txt to your app.');
+// The unfinished variant carries no delivery claim, so the transcript agrees
+// with its running tool row.
+const runningMessages = buildMessages(pendingFilePart, 'Writing the file to send you.');
 const unavailableCommand = () => Promise.resolve(false);
 const ignoreAction = () => undefined;
 const ignoreExit = () => Promise.resolve();

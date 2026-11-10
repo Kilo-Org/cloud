@@ -18,6 +18,7 @@ import { apiKindLabel } from '@/lib/api-kind-labels';
 import { DetailGrid, DetailSection, yesNo, type DetailItem } from './detail-primitives';
 import { EnkryptOutputReportSection, EnkryptReportSection } from './EnkryptReportSection';
 import {
+  ABSENT,
   formatCount,
   formatDurationMs,
   formatMicrodollarsAsUsd,
@@ -56,10 +57,10 @@ export function RequestSummary({
           copyableItem('Requested model', requestedModel),
           copyableItem('Auto model', request?.auto_model),
           copyableItem('Served model', request?.model),
-          { label: 'Provider', value: row.provider ?? '—' },
+          { label: 'Provider', value: row.provider ?? ABSENT },
           {
             label: 'Gateway',
-            value: (request?.provider ? gatewayName(request.provider) : null) ?? '—',
+            value: (request?.provider ? gatewayName(request.provider) : null) ?? ABSENT,
           },
           { label: 'Cost', value: formatMicrodollarsAsUsd(row.cost_microdollars) },
           { label: 'BYOK', value: yesNo(row.is_user_byok) },
@@ -68,20 +69,20 @@ export function RequestSummary({
           { label: 'Cache read tokens', value: formatCount(row.cache_hit_tokens) },
           {
             label: 'Cache write tokens',
-            value: request ? formatCount(request.cache_write_tokens) : '—',
+            value: request ? formatCount(request.cache_write_tokens) : ABSENT,
           },
           { label: 'Latency', value: formatDurationMs(row.latency_ms) },
           { label: 'Generation time', value: formatDurationMs(row.generation_time_ms) },
-          { label: 'Status code', value: request?.status_code ?? '—' },
-          { label: 'Finish reason', value: request?.finish_reason ?? '—' },
+          { label: 'Status code', value: request?.status_code ?? ABSENT },
+          { label: 'Finish reason', value: request?.finish_reason ?? ABSENT },
           { label: 'Error', value: row.has_error ? 'Yes' : 'No' },
-          { label: 'API', value: request?.api_kind ? apiKindLabel(request.api_kind) : '—' },
+          { label: 'API', value: request?.api_kind ? apiKindLabel(request.api_kind) : ABSENT },
           { label: 'Streamed', value: yesNo(request?.streamed ?? null) },
           { label: 'Requested region', value: request?.inference_region ?? 'Global' },
-          { label: 'Feature', value: row.feature ?? '—' },
-          { label: 'Project', value: row.project_id ?? '—' },
-          { label: 'Editor', value: request?.editor_name ?? '—' },
-          { label: 'Mode', value: request?.mode ?? '—' },
+          { label: 'Feature', value: row.feature ?? ABSENT },
+          { label: 'Project', value: row.project_id ?? ABSENT },
+          { label: 'Editor', value: request?.editor_name ?? ABSENT },
+          { label: 'Mode', value: request?.mode ?? ABSENT },
           copyableItem('Session', request?.session_id),
           copyableItem('Request ID', row.id),
         ]}
@@ -91,7 +92,7 @@ export function RequestSummary({
 }
 
 function copyableItem(label: string, value: string | null | undefined): DetailItem {
-  return value ? { label, value, mono: true, copyValue: value } : { label, value: '—', mono: true };
+  return value ? { label, value, mono: true, copyValue: value } : { label, value: ABSENT };
 }
 
 export function RoutingSections({ metadata }: { metadata: RequestLogDetails['metadata'] }) {

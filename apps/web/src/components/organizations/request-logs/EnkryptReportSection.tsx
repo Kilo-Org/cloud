@@ -10,7 +10,7 @@ import {
   PII_ENTITY_DETAILS,
 } from '@/components/organizations/guardrails/EnkryptDetectorList';
 import { DetailGrid, DetailSection, ToneBadge, yesNo, type DetailItem } from './detail-primitives';
-import { formatCount, formatDurationMs } from './format';
+import { ABSENT, formatCount, formatDurationMs } from './format';
 import type { StepTone } from './routing-labels';
 
 type Verdict = EnkryptGuardrailReport['verdict'];
@@ -165,7 +165,7 @@ function GuardrailReportBody({
           { label: 'Added latency', value: formatDurationMs(addedLatencyMs) },
           {
             label: 'Scans tool results',
-            value: settings ? yesNo(settings.scan_tool_results) : '—',
+            value: settings ? yesNo(settings.scan_tool_results) : ABSENT,
           },
           ...(unavailableReason
             ? [
@@ -246,7 +246,7 @@ export function EnkryptOutputReportSection({ report }: { report: EnkryptOutputGu
         { label: 'Held for', value: formatDurationMs(report.held_ms) },
         {
           label: 'Characters scanned',
-          value: report.output_characters === null ? '—' : formatCount(report.output_characters),
+          value: report.output_characters === null ? ABSENT : formatCount(report.output_characters),
         },
         ...(report.not_scanned_reason
           ? [

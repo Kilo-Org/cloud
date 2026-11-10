@@ -37,6 +37,7 @@ import {
 } from '@/lib/request-logs/filters';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
+import { ABSENT_CELL } from './detail-primitives';
 import { formatCount, formatMicrodollarsAsUsd, formatRequestTime } from './format';
 import { EnkryptUsageTab } from './EnkryptUsageTab';
 import { RequestLogDetailsSheet, userLabel, type RequestLogRow } from './RequestLogDetailsSheet';
@@ -54,8 +55,6 @@ const COLUMNS = [
 
 const ALL_USERS = '__all__';
 const MODEL_PREFIX_DEBOUNCE_MS = 300;
-
-const EMPTY = <span className="text-muted-foreground">—</span>;
 
 function RequestLogTableRow({
   row,
@@ -92,16 +91,18 @@ function RequestLogTableRow({
       </TableCell>
       <TableCell className="max-w-64">
         <div className="truncate font-mono text-xs" title={row.model ?? undefined}>
-          {row.model ?? EMPTY}
+          {row.model ?? ABSENT_CELL}
         </div>
       </TableCell>
-      <TableCell className="whitespace-nowrap">{row.provider ?? ''}</TableCell>
+      <TableCell className="whitespace-nowrap">{row.provider ?? ABSENT_CELL}</TableCell>
       <TableCell className="text-right whitespace-nowrap tabular-nums">
         {formatMicrodollarsAsUsd(row.cost_microdollars)}
       </TableCell>
       <TableCell className="text-right tabular-nums">{formatCount(row.input_tokens)}</TableCell>
       <TableCell className="text-right tabular-nums">{formatCount(row.output_tokens)}</TableCell>
-      <TableCell>{row.is_user_byok ? <Badge variant="secondary">BYOK</Badge> : EMPTY}</TableCell>
+      <TableCell>
+        {row.is_user_byok ? <Badge variant="secondary">BYOK</Badge> : ABSENT_CELL}
+      </TableCell>
     </TableRow>
   );
 }

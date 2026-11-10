@@ -93,6 +93,10 @@ function contractIssueCode(category: ImportCategory, field: string | null): Impo
  * session contract, reporting the first failure per field. The item is only
  * accepted when both contracts accept it; the storage schema's parsed output is
  * returned so the stored shape matches the storage contract exactly.
+ *
+ * The message is the field's own rejection text. Which contract rejected it is
+ * machine information: it stays in `code` and `category`, not in the copy the
+ * user reads.
  */
 function validateItem<T>(
   state: ParseState,
@@ -106,28 +110,34 @@ function validateItem<T>(
   const runtimeResult = runtimeSchema.safeParse(value);
   if (profileResult.success && runtimeResult.success) return profileResult.data;
 
+  // A field both contracts reject keeps the storage contract's message, because
+  // that is the shape the profile stores.
+  const failures = [
+    ...(profileResult.success ? [] : profileResult.error.issues),
+    ...(runtimeResult.success ? [] : runtimeResult.error.issues),
+  ];
   const failedFields = new Set<string>();
-  for (const [label, error] of [
-    ['profile', profileResult.success ? null : profileResult.error],
-    ['runtime', runtimeResult.success ? null : runtimeResult.error],
-  ] as const) {
-    if (!error) continue;
-    for (const zodIssue of error.issues) {
-      const field = zodIssue.path.length > 0 ? zodIssue.path.map(String).join('.') : null;
-      const key = field ?? '<root>';
-      if (failedFields.has(key)) continue;
-      failedFields.add(key);
-      state.issues.push(
-        makeIssue(
-          'error',
-          contractIssueCode(category, field),
-          category,
-          source,
-          field,
-          `${label} contract: ${zodIssue.message}`
-        )
-      );
+  for (const zodIssue of failures) {
+    const field = zodIssue.path.length > 0 ? zodIssue.path.map(String).join('.') : null;
+    const key = field ?? '<root>';
+    if (failedFields.has(key)) continue;
+    // A repeated field is already reported. So is a value inside a field that
+    // failed as a whole, such as one companion file under a rejected `files`
+    // map: the user sees one problem per field, not one per nested key.
+    if (field !== null && [...failedFields].some(parent => field.startsWith(`${parent}.`))) {
+      continue;
     }
+    failedFields.add(key);
+    state.issues.push(
+      makeIssue(
+        'error',
+        contractIssueCode(category, field),
+        category,
+        source,
+        field,
+        zodIssue.message
+      )
+    );
   }
   return null;
 }

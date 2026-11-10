@@ -2,6 +2,7 @@ import {
   createScanner,
   parse as parseJsonc,
   parseTree,
+  printParseErrorCode,
   type Node,
   type ParseError,
   type SyntaxKind,
@@ -46,6 +47,23 @@ const TOKEN_CLOSE_BRACE = scanTokenKind('}');
 const TOKEN_OPEN_BRACKET = scanTokenKind('[');
 const TOKEN_CLOSE_BRACKET = scanTokenKind(']');
 const TOKEN_EOF = scanTokenKind('');
+
+/**
+ * A 1-based `line 3, column 16` position for a character offset, so an issue
+ * points at a place the user can open instead of a raw index into the file.
+ */
+function describePosition(text: string, offset: number): string {
+  const end = Math.min(offset, text.length);
+  let line = 1;
+  let lineStart = 0;
+  for (let index = 0; index < end; index += 1) {
+    if (text[index] === '\n') {
+      line += 1;
+      lineStart = index + 1;
+    }
+  }
+  return `line ${line}, column ${end - lineStart + 1}`;
+}
 
 /**
  * Whether the document nests objects or arrays deeper than `maxDepth`. The
@@ -213,6 +231,7 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
   const errors: ParseError[] = [];
   const parsed: unknown = parseJsonc(configEntry.content, errors, { allowTrailingComma: true });
   if (errors.length > 0) {
+    const [firstError] = errors;
     state.issues.push(
       makeIssue(
         'error',
@@ -220,7 +239,7 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
         'config',
         configEntry.path,
         null,
-        `Could not parse ${configEntry.path}: ${errors[0].error} at offset ${errors[0].offset}`
+        `Could not parse ${configEntry.path}: ${printParseErrorCode(firstError.error)} at ${describePosition(configEntry.content, firstError.offset)}`
       )
     );
     return sections;
@@ -251,7 +270,7 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
           'config',
           `${configEntry.path}#${duplicate.path}`,
           null,
-          `Duplicate property "${duplicate.path}" at offsets ${duplicate.firstOffset} and ${duplicate.secondOffset} in ${configEntry.path}; import is ambiguous`
+          `Duplicate property "${duplicate.path}" at ${describePosition(configEntry.content, duplicate.firstOffset)} and ${describePosition(configEntry.content, duplicate.secondOffset)} in ${configEntry.path}; import is ambiguous`
         )
       );
     }

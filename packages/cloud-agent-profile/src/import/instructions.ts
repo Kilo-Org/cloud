@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { overLimitMessage } from '../contracts/limit-copy';
 
 /**
  * Imported instruction files are materialized as `.kilocode/rules/<name>.md`
@@ -28,7 +29,7 @@ export const instructionImportSchema = z.object({
     .min(1)
     .max(
       MAX_IMPORT_INSTRUCTION_LENGTH,
-      `Instruction content exceeds ${MAX_IMPORT_INSTRUCTION_LENGTH} bytes`
+      overLimitMessage('Instruction content', MAX_IMPORT_INSTRUCTION_LENGTH)
     ),
 });
 

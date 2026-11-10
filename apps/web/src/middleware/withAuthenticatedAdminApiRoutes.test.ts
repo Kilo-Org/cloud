@@ -138,23 +138,34 @@ const HANDLER_DECLARATION =
 type Handler = { method: string; body: string };
 
 /**
- * Splits a route file into its exported HTTP handlers. A handler body ends at
- * the next top-level `export`, so one guarded handler cannot stand in for an
- * unguarded sibling in the same file.
+ * Splits a route file into top-level blocks. A block starts at a top-level
+ * statement keyword in column 0, so a continuation line of a multi-line
+ * signature stays inside its block. Only a block that declares an HTTP method is
+ * a handler, so a top-level helper or constant is never credited to the handler
+ * above it.
  */
+const TOP_LEVEL_STATEMENT =
+  /^(?:export|import|const|let|var|function|async|class|type|interface|declare|enum|namespace)\b/;
+
+function topLevelBlocks(source: string): string[][] {
+  const blocks: string[][] = [];
+  let block: string[] = [];
+  for (const line of source.split('\n')) {
+    if (TOP_LEVEL_STATEMENT.test(line) && block.length > 0) {
+      blocks.push(block);
+      block = [];
+    }
+    block.push(line);
+  }
+  if (block.length > 0) blocks.push(block);
+  return blocks;
+}
+
 function exportedHandlers(source: string): Handler[] {
-  const lines = source.split('\n');
-  const declarations: { line: number; method: string }[] = [];
-  lines.forEach((line, index) => {
-    const declaration = HANDLER_DECLARATION.exec(line);
-    if (declaration) declarations.push({ line: index, method: declaration[1] });
+  return topLevelBlocks(source).flatMap(lines => {
+    const declaration = HANDLER_DECLARATION.exec(lines[0]);
+    return declaration ? [{ method: declaration[1], body: lines.join('\n') }] : [];
   });
-  return declarations.map((declaration, position) => ({
-    method: declaration.method,
-    body: lines
-      .slice(declaration.line, declarations[position + 1]?.line ?? lines.length)
-      .join('\n'),
-  }));
 }
 
 type MountedProcedure = { _def?: { middlewares?: readonly unknown[] } };
@@ -177,7 +188,9 @@ function hasAdminCheck(handler: Handler): boolean {
 
 function unguardedHandlerNames(routeFile: string): string[] {
   const route = routePathOf(routeFile);
-  return exportedHandlers(fs.readFileSync(routeFile, 'utf8'))
+  const handlers = exportedHandlers(fs.readFileSync(routeFile, 'utf8'));
+  if (handlers.length === 0) return [`${route} exports no HTTP handler`];
+  return handlers
     .filter(handler => !hasAdminCheck(handler))
     .map(handler => `${handler.method} ${route}`);
 }

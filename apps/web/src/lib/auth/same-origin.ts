@@ -59,12 +59,17 @@ export function isSameOriginSubmission(request: Request): boolean {
  * `Sec-Fetch-Site` is the signal a browser sends on a navigation, because a
  * top-level GET usually carries no `Origin`. Only `same-origin` and `none` pass:
  * every other value names a page outside this origin, and such a navigation
- * carries the session cookie. A request with neither signal is refused.
+ * carries the session cookie. When the request carries both signals they must
+ * agree, so an `Origin` that names this host does not admit a navigation that
+ * Fetch Metadata reports from elsewhere. A request with neither signal is
+ * refused.
  */
 export function isSameOriginNavigation(request: Request): boolean {
-  const originMatches = originMatchesAddressedHost(request);
-  if (originMatches !== undefined) return originMatches;
-
   const fetchSite = request.headers.get('sec-fetch-site');
-  return fetchSite === 'same-origin' || fetchSite === 'none';
+  const fetchMetadataAdmits = fetchSite === 'same-origin' || fetchSite === 'none';
+
+  const originMatches = originMatchesAddressedHost(request);
+  if (originMatches === undefined) return fetchMetadataAdmits;
+
+  return originMatches && (fetchSite === null || fetchMetadataAdmits);
 }

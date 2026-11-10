@@ -284,6 +284,24 @@ describe('GET /cloud-agent-fork/review-md', () => {
     expect(response.status).toBe(303);
   });
 
+  it.each(['same-site', 'cross-site'] as const)(
+    'refuses a host-matching Origin beside a %s Fetch Metadata report',
+    async secFetchSite => {
+      const response = await getRoute(
+        makeRequest({
+          platform: 'github',
+          repo: 'owner/repo',
+          secFetchSite,
+          origin: 'https://kilo.test',
+          host: 'kilo.test',
+        })
+      );
+
+      expectErrorRedirect(response, 'invalid_conversion_request');
+      expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
+    }
+  );
+
   it('refuses an Origin that names another host', async () => {
     const response = await getRoute(
       makeRequest({

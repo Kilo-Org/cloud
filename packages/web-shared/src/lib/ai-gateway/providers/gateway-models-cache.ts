@@ -9,6 +9,7 @@ import {
   joinGatewayModelEndpoints,
   openRouterGatewayModelsSource,
   readStoredGatewayModels,
+  retainPreviousEntries,
   vercelGatewayModelsSource,
   type GatewayModelList,
   type GatewayModelMap,
@@ -21,14 +22,15 @@ const TTL_MS = 300_000;
 
 /**
  * Unlike sync-providers, the request path never fetches upstream: a listed model whose endpoints
- * are not stored yet is left out until the refresh job stores them. A list or joined catalog that
- * looks truncated throws, so callers keep the last good map.
+ * are not stored yet keeps its previous entry, or is left out until the refresh job stores them. A
+ * list or joined catalog that looks truncated throws, so callers keep the last good map.
  */
 function createGatewayModelsFetcher(
   gateway: Provider,
   source: MetadataSource<GatewayModelList>,
   name: string
 ) {
+  let previous: GatewayModelMap = {};
   return createCachedFetch<GatewayModelMap>(
     async () => {
       const stored = await readStoredGatewayModels(gateway, source, readDb);
@@ -36,13 +38,14 @@ function createGatewayModelsFetcher(
         console.debug(`[getGatewayModels] no ${name} models found in the database`);
         return {};
       }
-      const { models, withoutStoredEndpoints } = joinGatewayModelEndpoints(gateway, stored);
-      if (withoutStoredEndpoints.length > 0) {
+      const joined = joinGatewayModelEndpoints(gateway, stored);
+      if (joined.withoutStoredEndpoints.length > 0) {
         warnExceptInTest(
-          `[getGatewayModels] left out ${withoutStoredEndpoints.length} ${name} models without usable stored endpoints: ${formatModelIds(withoutStoredEndpoints)}`
+          `[getGatewayModels] ${joined.withoutStoredEndpoints.length} ${name} models have no usable stored endpoints: ${formatModelIds(joined.withoutStoredEndpoints)}`
         );
       }
-      return models;
+      previous = retainPreviousEntries(joined, previous);
+      return previous;
     },
     TTL_MS,
     {},

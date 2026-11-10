@@ -246,3 +246,30 @@ export function joinGatewayModelEndpoints(
     withoutStoredEndpoints: withoutStoredEndpoints.sort(),
   };
 }
+
+/**
+ * The refresh job stores a model list before the endpoints of newly listed models, so a catalog can
+ * briefly list models it cannot serve yet. A listed model without usable stored endpoints keeps its
+ * previous entry, and an alias retargeted to a model that is not usable yet keeps its previous
+ * entry or is left out, so an alias never points at a model the catalog leaves out.
+ */
+export function retainPreviousEntries(
+  joined: JoinedGatewayModels,
+  previous: GatewayModelMap
+): GatewayModelMap {
+  const models: GatewayModelMap = { ...joined.models };
+  for (const modelId of joined.withoutStoredEndpoints) {
+    if (Object.hasOwn(previous, modelId)) models[modelId] = previous[modelId];
+  }
+  const unusable = new Set(joined.withoutStoredEndpoints.filter(id => !Object.hasOwn(models, id)));
+  for (const [modelId, model] of Object.entries(models)) {
+    const target = model.alias_target?.slug;
+    if (target === undefined || !unusable.has(target)) continue;
+    if (Object.hasOwn(previous, modelId)) {
+      models[modelId] = previous[modelId];
+    } else {
+      delete models[modelId];
+    }
+  }
+  return models;
+}

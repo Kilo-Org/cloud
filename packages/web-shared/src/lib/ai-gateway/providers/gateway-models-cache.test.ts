@@ -302,8 +302,76 @@ describe('gateway model metadata readers', () => {
       })
     );
     expect(mockWarnExceptInTest).toHaveBeenCalledWith(
-      '[getGatewayModels] left out 2 Vercel models without usable stored endpoints: vendor/not-stored, vendor/unparseable'
+      '[getGatewayModels] 2 Vercel models have no usable stored endpoints: vendor/not-stored, vendor/unparseable'
     );
+  });
+
+  it('keeps an alias on its previous target until the new target has stored endpoints', async () => {
+    const alias = '~vendor/model-latest';
+    const previousTarget = textModel('vendor/model-a');
+    const newTarget = textModel('vendor/model-b');
+    await storeOpenRouterModels([
+      { ...textModel(alias), alias_target: { slug: previousTarget.id } },
+      previousTarget,
+    ]);
+    await expect(resolveOpenRouterModelAlias(alias)).resolves.toBe(previousTarget.id);
+
+    await storeRows([
+      listRow(openRouterGatewayModelsSource.url, [
+        { ...textModel(alias), alias_target: { slug: newTarget.id } },
+        previousTarget,
+        newTarget,
+        ...fillerModels,
+      ]),
+    ]);
+    startNextCacheWindow();
+
+    await expect(resolveOpenRouterModelAlias(alias)).resolves.toBe(previousTarget.id);
+    await expect(isValidOpenRouterModelId(previousTarget.id)).resolves.toBe(true);
+    await expect(isValidOpenRouterModelId(newTarget.id)).resolves.toBe(false);
+
+    await storeRows(endpointsRows(OPENROUTER, [newTarget]));
+    startNextCacheWindow();
+
+    await expect(resolveOpenRouterModelAlias(alias)).resolves.toBe(newTarget.id);
+    await expect(isValidOpenRouterModelId(newTarget.id)).resolves.toBe(true);
+  });
+
+  it('keeps the previous entry of a listed model whose endpoints row becomes unusable', async () => {
+    const model = gatewayModel({ id: 'vendor/flaky', endpoints: [{ provider_name: 'before' }] });
+    await storeVercelModels([model]);
+    await expect(getVercelModelsMetadataFromDatabase()).resolves.toHaveProperty(
+      'vendor/flaky',
+      model
+    );
+
+    await storeRows([
+      [gatewayModelEndpointsUrl(VERCEL_AI_GATEWAY, model.id), { data: { endpoints: 'nope' } }],
+    ]);
+    startNextCacheWindow();
+
+    await expect(getVercelModelsMetadataFromDatabase()).resolves.toHaveProperty(
+      'vendor/flaky',
+      model
+    );
+  });
+
+  it('leaves out an alias whose target has no stored endpoints on a cold start', async () => {
+    const coldCache = await loadColdGatewayModelsCache();
+    await storeRows([
+      listRow(openRouterGatewayModelsSource.url, [
+        { ...textModel('~vendor/cold-latest'), alias_target: { slug: 'vendor/cold-new' } },
+        textModel('vendor/cold-new'),
+        ...fillerModels,
+      ]),
+      ...endpointsRows(OPENROUTER, [textModel('~vendor/cold-latest'), ...fillerModels]),
+    ]);
+
+    const models = await coldCache.getOpenRouterModelsMetadataFromDatabase();
+
+    expect(models).not.toHaveProperty('~vendor/cold-latest');
+    expect(models).not.toHaveProperty('vendor/cold-new');
+    expect(Object.keys(models)).toHaveLength(fillerModels.length);
   });
 
   it('returns an empty map when the list is not stored', async () => {

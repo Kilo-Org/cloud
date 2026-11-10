@@ -10,6 +10,7 @@ import {
   gatewayModelsSource,
   joinGatewayModelEndpoints,
   readStoredGatewayModels,
+  retainPreviousEntries,
   type ListedGatewayModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
@@ -389,6 +390,40 @@ describe('joinGatewayModelEndpoints', () => {
         ...listedFillers.slice(1),
       ])
     ).toThrow('Suspicious: total number of vercel models is 99 < 100');
+  });
+});
+
+describe('retainPreviousEntries', () => {
+  const model = (id: string, provider: string, aliasTarget?: string) => ({
+    id,
+    name: id,
+    ...(aliasTarget && { alias_target: { slug: aliasTarget } }),
+    endpoints: [{ provider_name: provider }],
+  });
+
+  it('keeps previous entries for models without stored endpoints and aliases to them', () => {
+    const previous = {
+      '~vendor/a-latest': model('~vendor/a-latest', 'before', 'vendor/a'),
+      'vendor/a': model('vendor/a', 'before'),
+      'vendor/kept': model('vendor/kept', 'before'),
+    };
+    const joined = {
+      models: {
+        '~vendor/a-latest': model('~vendor/a-latest', 'now', 'vendor/new'),
+        '~vendor/kept-latest': model('~vendor/kept-latest', 'now', 'vendor/kept'),
+        '~vendor/fresh-latest': model('~vendor/fresh-latest', 'now', 'vendor/new'),
+        'vendor/a': model('vendor/a', 'now'),
+      },
+      withoutEndpointsResource: [],
+      withoutStoredEndpoints: ['vendor/kept', 'vendor/new'],
+    };
+
+    expect(retainPreviousEntries(joined, previous)).toEqual({
+      '~vendor/a-latest': previous['~vendor/a-latest'],
+      '~vendor/kept-latest': joined.models['~vendor/kept-latest'],
+      'vendor/a': joined.models['vendor/a'],
+      'vendor/kept': previous['vendor/kept'],
+    });
   });
 });
 

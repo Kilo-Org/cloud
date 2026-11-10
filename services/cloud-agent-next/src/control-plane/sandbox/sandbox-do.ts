@@ -1199,10 +1199,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           workspaceId: route.credentialSource?.workspaceId,
           sessionId: route.sessionId,
           reason,
-          configured: Boolean(
-            this.env.WORKSPACE_SNAPSHOT_USER_IDS?.trim() ||
-            this.env.WORKSPACE_SNAPSHOT_ORG_IDS?.trim()
-          ),
+          configured: Boolean(this.env.WORKSPACE_SNAPSHOT_IDS?.trim()),
         },
         'info',
         { coalesceIdentity: `workspace_snapshot_eligibility:${this.sandboxId}:${route.sessionId}` }

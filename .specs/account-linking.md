@@ -135,6 +135,12 @@ way, including Apple from connected accounts.
 7. The link MUST be evaluated against the approving user only after the
    device credentials are issued.
 
+### Accounts from providers without an email
+
+1. A provider sign-in that shares no email address MUST be refused with a
+   specific reason that names the missing address, not a generic failure.
+2. The refusal MUST NOT create an account or a pending link.
+
 ### Sign-in gates
 
 1. Pending-link flows MUST keep every existing sign-in gate: blocked

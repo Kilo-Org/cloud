@@ -324,6 +324,7 @@ describe('sign-in touch targets', () => {
       'EMAIL-INVALID-FORMAT',
       'EMAIL-MUST-BE-LOWERCASE',
       'EMAIL-CANNOT-CONTAIN-PLUS',
+      'EMAIL-REQUIRED',
       'untrusted-query-error',
     ];
 

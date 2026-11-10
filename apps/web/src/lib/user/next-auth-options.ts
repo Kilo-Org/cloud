@@ -1161,6 +1161,13 @@ export const authOptions: NextAuthOptions = {
         // early return for email auth (magic link)
         const isEmailAuth = account.provider === 'email';
 
+        // A provider that shares no address cannot name an account: the
+        // address is the account key, so refuse with a specific reason instead
+        // of an internal error.
+        if (!user.email) {
+          return redirectUrlForCode('EMAIL-REQUIRED');
+        }
+
         // normalize the account, user, and profile objects into a single object
         // why does next-auth have 3 separate objects for this? who knows.
         accountInfo = createAccountInfo(account, user, profile);

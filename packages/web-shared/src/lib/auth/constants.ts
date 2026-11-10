@@ -34,7 +34,8 @@ export type AuthErrorType =
   | 'EMAIL-ALREADY-USED'
   | 'EMAIL-SIGNUP-DISABLED'
   | 'ADMISSION_REQUIRED'
-  | 'SSO_ERROR';
+  | 'SSO_ERROR'
+  | 'EMAIL-REQUIRED';
 
 /**
  * The sign-in methods a signup step-up can ask for, in display order. Bouncer may list other

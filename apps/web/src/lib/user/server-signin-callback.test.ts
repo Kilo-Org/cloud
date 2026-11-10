@@ -135,6 +135,19 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(false);
   });
 
+  it('refuses a provider profile that shares no email address', async () => {
+    setValidTurnstileCookie();
+
+    const result = await signIn({
+      user: { id: 'x', email: null, name: 'CB Discord', image: '' },
+      account: { provider: 'discord', providerAccountId: 'cb-discord-no-email', type: 'oauth' },
+      profile: { verified: true },
+    } as never);
+
+    expect(result).toBe('/users/sign_in?error=EMAIL-REQUIRED');
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
   it('passes autoLink=true for a Discord profile with verified true', async () => {
     setValidTurnstileCookie();
 

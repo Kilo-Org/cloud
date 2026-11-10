@@ -31,6 +31,21 @@ auth returns 401. Invalid JSON/schema returns 400, requests or serialized events
 over 120,000 bytes return 413, and enqueue failure returns a generic 503.
 Unrelated paths return 404; other methods on `/usage` return 405.
 
+Authenticated `POST /enkrypt-usage` accepts one bare Enkrypt usage record that
+parses under `EnkryptUsageWriteSchema` and sends exactly one
+`{kind: 'enkrypt_usage', v: 1, record}` message to the same `USAGE_INGEST_QUEUE`.
+The path names the kind, so this ingress is the only place that builds the
+envelope; an envelope-shaped body, an LLM usage body, or any other unknown key
+returns 400, and an Enkrypt record on `/usage` returns 400. It uses the same
+`USAGE_INGEST_PUBLISH_SECRET`, checked before the body is read, because the
+gateway is the only Enkrypt producer and already holds it. Bodies over 8,192
+bytes return 413; other statuses and the `usage_ingest_rejected`,
+`usage_ingest_enqueue_start` and `usage_ingest_enqueue` events match `/usage`,
+with an added `usage_kind: "enkrypt_usage"`. Body read and send failures also
+log `error_name`, never the error message. Enkrypt schema rejections log only
+issue codes and top-level schema field names. Deploy the consumer that routes tagged Enkrypt
+messages before this ingress, and this ingress before any gateway publishes to it.
+
 | Environment | Worker | Producer and consumer queue | DLQ (no consumer) |
 |---|---|---|---|
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
@@ -156,8 +171,9 @@ The same queue can also carry Enkrypt guardrail usage. Such a message is a tagge
 envelope, `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
 (`EnkryptUsageQueueMessageSchema` in `@kilocode/usage-contracts`). LLM usage stays
 untagged and unchanged; its ingress schema strips unknown keys, so a body with its
-own `kind` key is always a tagged message. Nothing produces Enkrypt messages yet:
-the ingress and the gateway producer, behind a default-off flag, follow separately.
+own `kind` key is always a tagged message. The gateway produces Enkrypt messages
+only through `/enkrypt-usage`, behind a default-off flag; see
+[Enkrypt usage rollout](#enkrypt-usage-rollout).
 
 The consumer reads the tag before anything else:
 
@@ -579,6 +595,35 @@ about live selection; source defaults alone do not establish deployed state. No 
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.
 The Worker has no direct database connection; the authenticated writer owns persistence. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
+
+## Enkrypt usage rollout
+
+The gateway sends Enkrypt guardrail usage through this queue only when the
+`kilocode-ai-gateway` variable `ENKRYPT_USAGE_QUEUE_ENABLED` is exactly `true`; see
+`ENVIRONMENT.md`. It posts the bare Enkrypt usage record to `/enkrypt-usage` on the
+same Worker as `/usage`, and the ingress wraps it in the tagged queue envelope.
+
+Deploy in this order. Each step must be deployed and verified before the next:
+
+1. The gateway accepts an optional `usageId` in Enkrypt handoff replies.
+2. The web app's Enkrypt usage route echoes `usageId` and takes queue writer admission.
+3. The writer's small non-LLM admission class, the consumer that routes tagged Enkrypt
+   messages, and the `/enkrypt-usage` ingress. Nothing posts to the ingress before step 4.
+4. The gateway producer, with the flag off.
+5. The flag on. Frankfurt and SFO pick it up with the same gateway deployment; that is not
+   an atomic cutover, because a rolling deployment can briefly overlap old and new settings.
+
+Rollback: set the flag to anything other than `true` and redeploy the gateway. New Enkrypt
+usage then takes the direct path again, and the consumer drains what the queue already
+accepted. Never roll the consumer back to an LLM-only version while tagged Enkrypt messages
+may still be in the source queue or in flight: they would fail every retry and reach the DLQ.
+
+Human-only steps, before the flag is turned on:
+
+- name a replay owner for the now-mixed DLQ, with a replay that handles both LLM and Enkrypt
+  messages;
+- confirm the existing DLQ alerting covers it;
+- set the flag on `kilocode-ai-gateway` and redeploy.
 
 ## Retention
 

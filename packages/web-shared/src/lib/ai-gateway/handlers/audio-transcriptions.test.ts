@@ -360,30 +360,33 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     }
   );
 
-  it('rejects malformed request provider privacy on JSON requests', async () => {
-    setUserAuth();
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: {
-        provider_allow_list: ['openai'],
-        model_deny_list: [],
-        data_collection: 'allow',
-      } satisfies OrganizationSettings,
-      plan: 'enterprise',
-    });
+  it.each([{ data_collection: 'invalid' }, { only: [['openai']] }, { ignore: 'azure' }])(
+    'rejects malformed request provider preferences on JSON requests: %j',
+    async provider => {
+      setUserAuth();
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: {
+          provider_allow_list: ['openai'],
+          model_deny_list: [],
+          data_collection: 'allow',
+        } satisfies OrganizationSettings,
+        plan: 'enterprise',
+      });
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
-      makeRequest({
-        model: 'openai/gpt-4o-mini-transcribe',
-        input_audio: { data: 'UklGRiQA', format: 'wav' },
-        provider: { data_collection: 'invalid' },
-      }) as never
-    );
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(
+        makeRequest({
+          model: 'openai/gpt-4o-mini-transcribe',
+          input_audio: { data: 'UklGRiQA', format: 'wav' },
+          provider,
+        }) as never
+      );
 
-    expect(response.status).toBe(400);
-    expect(mockedFetch).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(400);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects malformed transcription bodies before proxying without reporting to Sentry', async () => {
     setUserAuth();

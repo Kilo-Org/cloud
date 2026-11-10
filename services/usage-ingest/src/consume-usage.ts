@@ -1,9 +1,9 @@
 import { ENKRYPT_USAGE_WRITE_PATH, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import {
-  recordUsage,
+  recordLlmUsage,
   recordEnkryptUsage,
   type EnkryptUsageWriteOutcome,
-  type UsageWriteOutcome,
+  type LlmUsageWriteOutcome,
 } from '@kilocode/worker-utils/usage-writer-client';
 import type { Env } from './publish-usage';
 import { logSafely, queueMetrics } from './diagnostics';
@@ -106,14 +106,14 @@ function writerUrlFor(path: string, llmWriterUrl: string | undefined): string | 
 function recordQueuedUsage(
   usage: Exclude<QueuedUsage, { kind: 'invalid' }>,
   env: Env
-): Promise<UsageWriteOutcome | EnkryptUsageWriteOutcome> {
+): Promise<LlmUsageWriteOutcome | EnkryptUsageWriteOutcome> {
   const config = {
     secret: env.USAGE_WRITER_SECRET,
     protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
     source: 'queue',
   } as const;
   if (usage.kind === 'llm') {
-    return recordUsage(usage.usage, { url: env.USAGE_WRITER_URL, ...config });
+    return recordLlmUsage(usage.usage, { url: env.USAGE_WRITER_URL, ...config });
   }
   return recordEnkryptUsage(usage.record, {
     url: writerUrlFor(ENKRYPT_USAGE_WRITE_PATH, env.USAGE_WRITER_URL),
@@ -161,7 +161,7 @@ async function processMessage(
     ...queueMetrics(batch),
   }));
   let outcome:
-    | UsageWriteOutcome
+    | LlmUsageWriteOutcome
     | EnkryptUsageWriteOutcome
     | { kind: 'unavailable'; reason: 'invalid_event' | 'unsupported_kind' | 'invocation_budget' };
   let writerDurationMs: number | undefined;

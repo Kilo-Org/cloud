@@ -2603,6 +2603,46 @@ describe.each([
     }
   );
 
+  it('forwards valid provider preferences and other provider options unchanged', async () => {
+    const requestProvider = {
+      only: ['openai'],
+      ignore: ['azure'],
+      order: ['openai'],
+      sort: 'throughput',
+      require_parameters: true,
+      allow_fallbacks: false,
+      max_price: { prompt: 1, completion: 2 },
+    };
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest({ model: 'openai/gpt-4o', ...input, provider: requestProvider }, undefined, path)
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual(requestProvider);
+  });
+
+  it.each([
+    { only: [['openai']] },
+    { only: 'openai' },
+    { only: [1] },
+    { ignore: [['azure']] },
+    { ignore: { azure: true } },
+    { order: [null] },
+    null,
+    ['openai'],
+  ])('rejects malformed provider preferences %j before routing', async provider => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest({ model: 'openai/gpt-4o', ...input, provider }, undefined, path)
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'invalid_request' });
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it.each<{
     organizationData: 'allow' | 'deny';
     requestPrivacy: OpenRouterProviderConfig;

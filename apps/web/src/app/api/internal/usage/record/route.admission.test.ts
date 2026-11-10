@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
-import { recordUsage } from '@kilocode/worker-utils/usage-writer-client';
+import { recordLlmUsage } from '@kilocode/worker-utils/usage-writer-client';
 import { saveUsageRelatedDataLocally } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { queueWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
 import { POST } from './route';
@@ -277,7 +277,7 @@ it('composes actual route429 with the queue writer client without acknowledgemen
   writerPool.waitingCount = 1;
   const fetchWriter: typeof fetch = async (url, init) =>
     POST(new NextRequest(new Request(url, init)));
-  const outcome = await recordUsage(
+  const outcome = await recordLlmUsage(
     payload,
     {
       url: 'http://localhost/api/internal/usage/record',

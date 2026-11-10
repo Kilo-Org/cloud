@@ -37,7 +37,7 @@ type UnavailableWrite = {
 
 type AcknowledgedWrite<Result> = { kind: 'recorded' | 'duplicate'; result: Result };
 
-export type UsageWriteOutcome =
+export type LlmUsageWriteOutcome =
   | AcknowledgedWrite<NonNullable<UsageRecordResponse['result']>>
   | UnavailableWrite;
 
@@ -174,11 +174,11 @@ async function sendUsageWrite<Result>(
   }
 }
 
-export function recordUsage(
+export function recordLlmUsage(
   payload: UsageRecordRequest,
   config: UsageWriterConfig,
   fetchWriter: typeof fetch = fetch
-): Promise<UsageWriteOutcome> {
+): Promise<LlmUsageWriteOutcome> {
   return sendUsageWrite(
     {
       usageId: payload.core.id,

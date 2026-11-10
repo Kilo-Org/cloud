@@ -127,7 +127,7 @@ describe('recoverMissedReviews restart against the database', () => {
             id: 501,
             name: 'widgets',
             full_name: REPO,
-            clone_url: `https://github.com/${REPO}.git`,
+            private: false,
           },
         ],
       })

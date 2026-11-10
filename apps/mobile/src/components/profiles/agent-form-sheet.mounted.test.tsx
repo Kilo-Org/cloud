@@ -80,6 +80,13 @@ function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
 }
 
+/** The per-tool switches, one per entry in the tool list. */
+function toolSwitches(root: ReactTestInstance): ReactTestInstance[] {
+  return findAll(root, 'Switch').filter(node =>
+    PERMISSION_TOOLS.includes(node.props.accessibilityLabel as string)
+  );
+}
+
 function findField(root: ReactTestInstance, label: string): ReactTestInstance {
   const field = findAll(root, 'FormField').find(node => node.props.label === label);
   if (!field) {
@@ -245,17 +252,15 @@ describe('AgentFormSheet parity fields', () => {
       config: { ...wholeRule.config, permission: 'ask' },
     });
 
-    const switches = findAll(renderer.root, 'Switch').filter(node =>
-      PERMISSION_TOOLS.includes(node.props.accessibilityLabel as string)
-    );
+    const switches = toolSwitches(renderer.root);
     expect(switches).toHaveLength(PERMISSION_TOOLS.length);
     for (const node of switches) {
       expect(node.props.disabled).toBe(true);
       expect(node.props.value).toBe(true);
     }
-    expect(
-      findAll(renderer.root, 'Text').some(node => String(node.props.children).includes('ask'))
-    ).toBe(true);
+    // The note renders the catalog sentence with the stored action filled in.
+    const note = i18n.t('profiles.agents.wholeToolRule', { rule: 'ask' });
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === note)).toBe(true);
 
     unmount();
   });
@@ -267,10 +272,7 @@ describe('AgentFormSheet parity fields', () => {
       config: { ...base.config, permission: 'deny' },
     });
 
-    const switches = findAll(renderer.root, 'Switch').filter(node =>
-      PERMISSION_TOOLS.includes(node.props.accessibilityLabel as string)
-    );
-    for (const node of switches) {
+    for (const node of toolSwitches(renderer.root)) {
       expect(node.props.disabled).toBe(true);
       expect(node.props.value).toBe(false);
     }
@@ -279,11 +281,14 @@ describe('AgentFormSheet parity fields', () => {
   });
 
   it('leaves a per-tool map editable', async () => {
-    const { renderer, unmount } = await mountSheet(agentSource());
+    const base = agentSource();
+    const { renderer, unmount } = await mountSheet({
+      ...base,
+      config: { ...base.config, permission: { bash: 'deny', read: 'ask' } },
+    });
 
-    const switches = findAll(renderer.root, 'Switch').filter(node =>
-      PERMISSION_TOOLS.includes(node.props.accessibilityLabel as string)
-    );
+    const switches = toolSwitches(renderer.root);
+    expect(switches).toHaveLength(PERMISSION_TOOLS.length);
     for (const node of switches) {
       expect(node.props.disabled).toBe(false);
     }

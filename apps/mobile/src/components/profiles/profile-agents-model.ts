@@ -115,31 +115,33 @@ export function agentRows(agents: readonly AgentSource[]): AgentRow[] {
 }
 
 /**
+ * The whole-agent action a stored permission applies to every tool at once, or
+ * `undefined` when the permission is a per-tool map (or absent). The switches
+ * cannot express such a rule: it governs tools this editor does not list.
+ */
+function wholeActionOf(permission: AgentPermissionMap): 'allow' | 'ask' | 'deny' | undefined {
+  if (permission === 'allow' || permission === 'ask' || permission === 'deny') {
+    return permission;
+  }
+  return undefined;
+}
+
+/**
  * The per-tool map when the value is one, or an empty map when the permission
- * is the CLI's bare-action shorthand (`allow`/`ask`/`deny`) or absent. Mirrors
- * the web editor's `typeof permission !== 'object'` guard: a bare action means
- * "every tool at this level" and carries no per-tool rules.
+ * is the CLI's whole-agent action (`allow`/`ask`/`deny`) or absent. Mirrors the
+ * web editor's check: a whole-agent action means "every tool at this level" and
+ * carries no per-tool rules.
  */
 function permissionMapOf(permission: AgentPermissionMap): Readonly<Record<string, unknown>> {
-  if (
-    permission == null ||
-    permission === 'allow' ||
-    permission === 'ask' ||
-    permission === 'deny'
-  ) {
+  if (wholeActionOf(permission) !== undefined || permission == null) {
     return {};
   }
   return permission;
 }
 
-/**
- * The whole-agent action a stored permission applies to every tool at once, or
- * `undefined` when the permission is a per-tool map (or absent). The switches
- * cannot express such a rule: it governs tools this editor does not list.
- */
+/** The whole-agent action of a stored permission, for the read-only note. */
 export function readWholeToolAction(permission: AgentPermissionMap): string | undefined {
-  if (permission == null || typeof permission === 'object') return undefined;
-  return permission;
+  return wholeActionOf(permission);
 }
 
 /**
@@ -148,8 +150,8 @@ export function readWholeToolAction(permission: AgentPermissionMap): string | un
  * denies every tool.
  */
 export function readDisabledTools(permission: AgentPermissionMap): string[] {
-  if (typeof permission === 'string') {
-    return permission === 'deny' ? [...PERMISSION_TOOLS] : [];
+  if (wholeActionOf(permission) === 'deny') {
+    return [...PERMISSION_TOOLS];
   }
   const map = permissionMapOf(permission);
   return PERMISSION_TOOLS.filter(tool => map[tool] === 'deny');
@@ -171,16 +173,19 @@ export function mergePermissions(
   existing: AgentPermissionMap,
   disabledTools: readonly string[]
 ): Record<string, unknown> | string | undefined {
-  if (typeof existing === 'string') return existing;
-  const base: Record<string, unknown> = { ...permissionMapOf(existing) };
+  const wholeAction = wholeActionOf(existing);
+  if (wholeAction !== undefined) {
+    return wholeAction;
+  }
+  const base = new Map(Object.entries(permissionMapOf(existing)));
   for (const tool of PERMISSION_TOOLS) {
     if (disabledTools.includes(tool)) {
-      base[tool] = 'deny';
-    } else if (base[tool] === 'deny') {
-      delete base[tool];
+      base.set(tool, 'deny');
+    } else if (base.get(tool) === 'deny') {
+      base.delete(tool);
     }
   }
-  return Object.keys(base).length > 0 ? base : undefined;
+  return base.size > 0 ? Object.fromEntries(base) : undefined;
 }
 
 /** The add/edit form fields. Every numeric field is text; blank means "inherit". */

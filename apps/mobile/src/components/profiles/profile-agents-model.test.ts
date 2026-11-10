@@ -32,21 +32,11 @@ function agentSource(overrides: Partial<AgentSource> = {}): AgentSource {
 
 describe('agentRows', () => {
   it('projects the row fields with primary as the default visibility', () => {
+    const row = { id: 'agent-1', name: 'Reviewer', visibility: 'primary' };
+
     expect(agentRows([agentSource(), agentSource({ config: {} })])).toEqual([
-      {
-        id: 'agent-1',
-        name: 'Reviewer',
-        visibility: 'primary',
-        description: 'Reviews code',
-        model: 'anthropic/claude',
-      },
-      {
-        id: 'agent-1',
-        name: 'Reviewer',
-        visibility: 'primary',
-        description: '',
-        model: '',
-      },
+      { ...row, description: 'Reviews code', model: 'anthropic/claude' },
+      { ...row, description: '', model: '' },
     ]);
   });
 });
@@ -75,32 +65,24 @@ describe('mergePermissions', () => {
   it('writes deny for a disabled tool and clears a stored denial that is now on', () => {
     expect(mergePermissions({ bash: 'deny', read: 'ask' }, ['read'])).toEqual({ read: 'deny' });
     expect(mergePermissions({ bash: 'deny', read: 'deny' }, [])).toBeUndefined();
-    expect(mergePermissions(undefined, [])).toBeUndefined();
   });
 
-  it('keeps a stored per-tool action the edit does not change', () => {
-    const loaded: AgentPermissionMap = { read: 'ask', bash: 'deny' };
+  it('keeps every stored rule the edit does not change', () => {
+    const loaded: AgentPermissionMap = {
+      read: 'ask',
+      bash: { 'git *': 'allow' },
+      external_directory: null,
+    };
+    const off = [...readDisabledTools(loaded), 'bash'];
 
     expect(mergePermissions(loaded, readDisabledTools(loaded))).toEqual(loaded);
-    expect(mergePermissions({ read: 'ask' }, [])).toEqual({ read: 'ask' });
-  });
-
-  it('keeps a per-pattern rule after switching the tool off and back on', () => {
-    const perPattern: AgentPermissionMap = { glob: { '**/*.ts': 'deny' } };
-    const off = [...readDisabledTools(perPattern), 'glob'];
-
     expect(
       mergePermissions(
-        perPattern,
-        off.filter(tool => tool !== 'glob')
+        loaded,
+        off.filter(tool => tool !== 'bash')
       )
-    ).toEqual(perPattern);
-  });
-
-  it('keeps unrelated tool keys and the null sentinel', () => {
-    const loaded: AgentPermissionMap = { external_directory: null, webfetch: 'allow' };
-
-    expect(mergePermissions(loaded, [])).toEqual(loaded);
+    ).toEqual(loaded);
+    expect(mergePermissions(undefined, [])).toBeUndefined();
   });
 
   it('returns a whole-agent action unchanged instead of rewriting it per tool', () => {
@@ -140,9 +122,6 @@ describe('initialAgentFormState', () => {
       variant: '',
       disabledTools: ['bash'],
     });
-  });
-
-  it('seeds the sampling fields and variant from the agent config', () => {
     expect(
       initialAgentFormState(
         agentSource({
@@ -219,17 +198,10 @@ describe('validateAgentForm', () => {
     expect(validateAgentForm(formState({ description: `  ${'d'.repeat(2000)}\n` }))).toBeNull();
   });
 
-  it('refuses a slug reserved by a built-in agent', () => {
+  it('refuses a reserved or already-taken slug and allows a free one', () => {
     expect(validateAgentForm(formState({ slug: 'code' }))).toBe('slug-conflict');
-  });
-
-  it('refuses a slug another agent in the profile already uses', () => {
     expect(validateAgentForm(formState({ slug: 'reviewer' }), ['reviewer'])).toBe('slug-conflict');
-  });
-
-  it('allows a slug no other agent uses', () => {
     expect(validateAgentForm(formState({ slug: 'reviewer' }), ['plan'])).toBeNull();
-    expect(validateAgentForm(formState({ slug: 'reviewer' }), [])).toBeNull();
   });
 
   it('requires a display name', () => {

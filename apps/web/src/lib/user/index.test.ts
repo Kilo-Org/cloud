@@ -2013,6 +2013,46 @@ describe('User', () => {
       expect(linked.user.id).toBe(existing.id);
     });
 
+    it('does not ask for an email proof when the account already has that provider type', async () => {
+      const existing = await insertTestUserAndGoogleAuth({
+        google_user_email: 'lazy-proof-same-provider@example.com',
+        google_user_name: 'Same Provider',
+        hosted_domain: 'example.com',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'github',
+        provider_account_id: 'github-same-provider-existing',
+        email: 'lazy-proof-same-provider@example.com',
+        avatar_url: '',
+        hosted_domain: null,
+      });
+      const resolveEmailProof = jest.fn(async () => true);
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'lazy-proof-same-provider@example.com',
+          google_user_name: 'octo',
+          google_user_image_url: '',
+          hosted_domain: hosted_domain_specials.github,
+          provider: 'github',
+          provider_account_id: 'github-same-provider-other',
+          display_name: 'octo',
+        },
+        undefined,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        undefined,
+        { resolveEmailProof }
+      );
+
+      expect(result).toMatchObject({ success: false, error: 'DIFFERENT-OAUTH' });
+      expect(resolveEmailProof).not.toHaveBeenCalled();
+    });
+
     it('does not ask for an email proof when no account holds the address', async () => {
       const resolveEmailProof = jest.fn(async () => false);
 

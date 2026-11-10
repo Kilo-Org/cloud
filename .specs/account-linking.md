@@ -82,8 +82,8 @@ way, including Apple from connected accounts.
 3. For Discord, proof MUST come from the profile verified flag.
 4. This rule MUST NOT make an existing GitHub or Discord row count as a
    verified account address.
-5. GitLab keeps the generic rule until a live provider response proves a
-   verified field for the address the sign-in uses.
+5. GitLab uses the generic rule: its OIDC provider emits the standard
+   `email_verified` claim for the address the application may see.
 
 ### Apple explicit linking
 
@@ -163,10 +163,7 @@ way, including Apple from connected accounts.
 
 ## Not Yet Implemented
 
-1. The system SHOULD treat a GitLab verified flag as incoming proof.
-   (Currently no live provider response in this codebase proves the
-   field for the address a sign-in uses, so GitLab keeps the generic
-   rule.)
+None.
 
 ## Changelog
 

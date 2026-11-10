@@ -656,12 +656,14 @@ export async function createOrUpdateUser(
     const accountHasVerifiedPrimaryAddress =
       existingProviders.length === 0 ||
       hasVerifiedPrimaryAddress(userByEmail.google_user_email, existingProviders);
-    // A lazy proof is resolved only here, where an email collision makes it
-    // decisive, so a provider that must ask its API pays that cost only when
-    // the answer can change the outcome.
+    // A lazy proof is resolved only when it can change the outcome: a different
+    // provider type on an account that verified its address. Otherwise the
+    // sign-in is refused or resolved for reasons the proof cannot affect, and
+    // asking a provider for it would only cost a request.
+    const proofDecides = !hasThisProvider && accountHasVerifiedPrimaryAddress && !onlyHasFakeLogin;
     const provesEmailOwnership =
       autoLinkToExistingUser ||
-      (options.resolveEmailProof ? await options.resolveEmailProof() : false);
+      (proofDecides && options.resolveEmailProof ? await options.resolveEmailProof() : false);
     const workosSettles = args.provider === 'workos' && provesEmailOwnership;
     const shouldLink =
       workosSettles ||

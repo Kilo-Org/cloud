@@ -619,9 +619,9 @@ export async function fetchGitHubEmailVerified(
  * rule is the provider-asserted `email_verified` claim (Apple delivers the
  * string "true"). Discord carries the same fact in its typed `verified`
  * field. GitHub has no such claim in its profile; its proof comes from
- * `/user/emails` via `fetchGitHubEmailVerified`. GitLab stays unchanged:
- * no live `/api/v4/user` response in this codebase proves a field for the
- * address the sign-in uses, so only a real `email_verified` claim counts.
+ * `/user/emails` via `fetchGitHubEmailVerified`. GitLab emits the standard
+ * `email_verified` claim from its OIDC provider, so the generic rule already
+ * covers it.
  */
 export function profileProvesEmailOwnership(profile: unknown, provider?: string): boolean {
   if (provider === 'discord') {

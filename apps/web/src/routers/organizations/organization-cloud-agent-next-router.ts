@@ -90,6 +90,7 @@ import {
   baseCloseTerminalNextOutputSchema,
   baseCreatePreviewNextSchema,
   baseCreatePreviewNextOutputSchema,
+  previewTargetFromInput,
   baseListPreviewServicesNextSchema,
   baseListPreviewServicesNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
@@ -118,6 +119,7 @@ async function createCloudAgentControlToken(
 }
 import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { buildPreviewOpenUrl } from '@/lib/cloud-agent/preview-open-url';
+import { verifyOrgOwnsPreviewWorktree } from '@/lib/cloud-agent-next/preview-worktree-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
@@ -273,13 +275,15 @@ const CreateTerminalInput = baseCreateTerminalNextSchema.extend({
   organizationId: z.uuid(),
 });
 
-const CreatePreviewInput = baseCreatePreviewNextSchema.extend({
-  organizationId: z.uuid(),
-});
+const CreatePreviewInput = z.intersection(
+  baseCreatePreviewNextSchema,
+  z.object({ organizationId: z.uuid() })
+);
 
-const ListPreviewServicesInput = baseListPreviewServicesNextSchema.extend({
-  organizationId: z.uuid(),
-});
+const ListPreviewServicesInput = z.intersection(
+  baseListPreviewServicesNextSchema,
+  z.object({ organizationId: z.uuid() })
+);
 
 const RefreshTerminalTicketInput = baseRefreshTerminalTicketNextSchema.extend({
   organizationId: z.uuid(),
@@ -943,17 +947,37 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(CreatePreviewInput)
     .output(baseCreatePreviewNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertOrganizationOwnsSession({
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
-      });
+      const target = previewTargetFromInput(input);
+      if (target === null) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'A preview target is required' });
+      }
+
+      if (target.worktreeId !== undefined) {
+        const ownsWorktree = await verifyOrgOwnsPreviewWorktree(
+          db,
+          input.organizationId,
+          ctx.user.id,
+          target.worktreeId
+        );
+        if (!ownsWorktree) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Worktree not found or access denied',
+          });
+        }
+      } else if (target.cloudAgentSessionId !== undefined) {
+        await assertOrganizationOwnsSession({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          cloudAgentSessionId: target.cloudAgentSessionId,
+        });
+      }
 
       const { ticket, expiresAt } = signPreviewTicket({
         userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
         port: input.port,
         organizationId: input.organizationId,
+        ...target,
       });
       return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
     }),
@@ -962,19 +986,39 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(ListPreviewServicesInput)
     .output(baseListPreviewServicesNextOutputSchema)
     .query(async ({ ctx, input }) => {
-      await assertOrganizationOwnsSession({
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
-      });
+      const target = previewTargetFromInput(input);
+      if (target === null)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing preview target' });
+      if (target.worktreeId !== undefined) {
+        const ownsWorktree = await verifyOrgOwnsPreviewWorktree(
+          db,
+          input.organizationId,
+          ctx.user.id,
+          target.worktreeId
+        );
+        if (!ownsWorktree) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Worktree not found or access denied',
+          });
+        }
+      } else if (target.cloudAgentSessionId !== undefined) {
+        await assertOrganizationOwnsSession({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          cloudAgentSessionId: target.cloudAgentSessionId,
+        });
+      }
       const authToken = await createCloudAgentControlToken(
         ctx.user,
         ctx.headersList,
         input.organizationId
       );
-      return await createCloudAgentNextClient(authToken).listPreviewServices({
-        cloudAgentSessionId: input.cloudAgentSessionId,
-      });
+      return await createCloudAgentNextClient(authToken).listPreviewServices(
+        target.worktreeId !== undefined
+          ? { ...target, organizationId: input.organizationId }
+          : target
+      );
     }),
 
   refreshTerminalTicket: organizationMemberMutationProcedure

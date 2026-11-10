@@ -196,7 +196,11 @@ import {
 } from '../worktree-changes-ready.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
-import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
+import type {
+  PreviewSandboxScope,
+  PreviewTargetResult,
+  ResolvedPreviewTarget,
+} from '../sandbox/preview-target.js';
 import { isTerminalSessionEligible } from '../../terminal/access.js';
 import type { ListPreviewServicesOutput } from '../../shared/preview-services.js';
 import { readWorktreeChildSessions } from './worktree-child-sessions.js';
@@ -545,9 +549,9 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   /** B10: forwards one allowlisted native read to the live wrapper. */
   kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult>;
   /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
-  previewTarget(sessionId: string): Promise<PreviewTargetResult>;
+  previewTarget(scope: PreviewSandboxScope): Promise<PreviewTargetResult>;
   /** Lists live listening services through the bound wrapper (never wakes an allocation). */
-  previewServices(sessionId: string): Promise<ListPreviewServicesOutput>;
+  previewServices(scope: PreviewSandboxScope): Promise<ListPreviewServicesOutput>;
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
@@ -827,7 +831,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
     this.preview = createControlPlanePreview({
       getMetadata: () => this.metadata,
-      resolveTarget: sandboxId => this.previewTargetFor(sandboxId),
+      resolveTarget: (sandboxId, scope) => this.previewTargetFor(sandboxId, scope),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
@@ -846,14 +850,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return peer.terminal(input);
   }
 
-  private async previewTargetFor(sandboxId: string): Promise<PreviewTargetResult> {
+  private async previewTargetFor(
+    sandboxId: string,
+    scope: PreviewSandboxScope
+  ): Promise<PreviewTargetResult> {
     const peer = this.sandboxPeerFor(sandboxId);
     if (peer === null) {
       return { status: 'not_running' };
     }
     return withDORetry(
       () => this.sandboxPeerFor(sandboxId) ?? peer,
-      stub => stub.previewTarget(this.sessionId),
+      stub => stub.previewTarget(scope),
       'previewTarget'
     );
   }
@@ -3175,11 +3182,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (sandboxId === undefined || sandboxId.length === 0) {
       return { services: [], status: 'not_ready' };
     }
+    const scope: PreviewSandboxScope = {
+      ownerId: metadata.identity.userId,
+      organizationId: metadata.identity.orgId ?? null,
+      scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    };
     const peer = this.sandboxPeerFor(sandboxId);
     if (peer === null) return { services: [], status: 'not_running' };
     return withDORetry(
       () => this.sandboxPeerFor(sandboxId) ?? peer,
-      stub => stub.previewServices(this.sessionId),
+      stub => stub.previewServices(scope),
       'previewServices'
     );
   }

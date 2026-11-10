@@ -284,15 +284,21 @@ export function directoryEvent(
 }
 
 /**
- * An activation the SDK deserializes with `domains` absent, which is what the
- * Events API sends for a directory with none: the SDK copies the field through
- * without defaulting it, so the dispatcher's `data.domains.map(...)` throws a
- * `TypeError` rather than failing a schema check.
+ * An activation for a directory that has no domains.
  */
 export function activationWithoutDomains(id: string): unknown {
   const event = directoryEvent(id) as { data: Record<string, unknown> };
   const { domains: _dropped, ...data } = event.data;
   return { ...event, data };
+}
+
+/**
+ * An activation for tests that need a payload the dispatcher cannot build a
+ * request from.
+ */
+export function activationWithNonListDomains(id: string): unknown {
+  const event = directoryEvent(id) as { data: Record<string, unknown> };
+  return { ...event, data: { ...event.data, domains: { domain: 'acme.test' } } };
 }
 
 export function groupEvent(id: string, event = 'dsync.group.created'): unknown {

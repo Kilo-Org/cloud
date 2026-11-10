@@ -35,11 +35,7 @@ import {
   type SidebarWorktreeDetails,
 } from './hooks/useSidebarSessions';
 import { useActiveSessions } from './hooks/useActiveSessions';
-import {
-  apiSessionToDbSession,
-  dbSessionsAtom,
-  deleteSessionFromStoreAtom,
-} from './store/db-session-atoms';
+import { apiSessionToDbSession, dbSessionsAtom } from './store/db-session-atoms';
 import {
   getDeletionErrorMessage,
   getWorktreeDeletionRedirect,
@@ -603,7 +599,6 @@ function CloudSidebarLayoutContent({
   }, [recentReposData?.repositories]);
   const queryClient = useQueryClient();
   const setDbSessions = useSetAtom(dbSessionsAtom);
-  const deleteSessionFromStore = useSetAtom(deleteSessionFromStoreAtom);
 
   const { mutateAsync: renameCliSessionV2 } = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions()
@@ -999,7 +994,6 @@ function CloudSidebarLayoutContent({
           queryClient,
           trpc,
           setDbSessions,
-          deleteSessionFromStore,
         });
         navigateAfterWorkspaceDeletion(worktreeId, deletedSessionIds);
         await invalidateSessionQueries({ queryClient, trpc });
@@ -1022,7 +1016,6 @@ function CloudSidebarLayoutContent({
       }
     })();
   }, [
-    deleteSessionFromStore,
     deleteWorktree,
     deletingSessionWorktreeIds,
     deletingWorktreeIds,

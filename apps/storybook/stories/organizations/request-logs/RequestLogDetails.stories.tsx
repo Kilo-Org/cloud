@@ -89,7 +89,6 @@ const directByokDetails: RequestLogDetails = {
       enkrypt: {
         settings: {
           status: 'ready',
-          scan_tool_results: true,
           detectors: [
             { detector: 'injection_attack', action: 'log' },
             { detector: 'policy_violation', action: 'log', policy_format: 'text' },

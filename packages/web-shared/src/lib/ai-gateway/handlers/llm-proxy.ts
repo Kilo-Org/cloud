@@ -242,9 +242,7 @@ export async function handleLlmProxyRequest(
           microdollarUsageId: usageId,
           apiKind: requestBodyParsed.kind,
           clientRequestId: headers.clientRequestId,
-          segments: extractRequestSegments(requestBodyParsed, {
-            includeToolResults: inputGuardrail.config.scanToolResults,
-          }),
+          segments: extractRequestSegments(requestBodyParsed),
         }
     ),
     request.signal

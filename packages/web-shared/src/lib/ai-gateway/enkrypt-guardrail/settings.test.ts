@@ -51,7 +51,6 @@ describe('resolveEnkryptInputGuardrail', () => {
 
   it('applies Kilo Default, logging prompt injection, and scans tool results when no detectors were saved', () => {
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true } } })).toEqual({
-      scanToolResults: true,
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
@@ -73,10 +72,9 @@ describe('resolveEnkryptInputGuardrail', () => {
 
     expect(
       resolve({
-        enkrypt: { input_guardrail: { enabled: true, scan_tool_results: false, detectors } },
+        enkrypt: { input_guardrail: { enabled: true, ...{ scan_tool_results: false }, detectors } },
       })
     ).toEqual({
-      scanToolResults: true,
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
@@ -148,7 +146,6 @@ describe('resolveEnkryptInputGuardrail', () => {
     detectors.toxicity.enabled = true;
 
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toEqual({
-      scanToolResults: true,
       status: 'ready',
       detectors: { injection_attack: { enabled: true, need_explanation: false } },
       blockingDetectors: ['injection_attack'],
@@ -169,14 +166,13 @@ describe('resolveEnkryptInputGuardrail', () => {
       resolve({
         enkrypt: { input_guardrail: { enabled: true, detectors: { injection_attack: true } } },
       })
-    ).toEqual({ scanToolResults: true, status: 'invalid' });
+    ).toEqual({ status: 'invalid' });
   });
 
   it('logs prompt injection without blocking when Kilo Default was saved', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
 
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toEqual({
-      scanToolResults: true,
       status: 'ready',
       detectors: { injection_attack: { enabled: true, need_explanation: false } },
       blockingDetectors: [],
@@ -261,20 +257,17 @@ describe('splitEnkryptInputGuardrail', () => {
   it('scans blocking and log-only detectors separately', () => {
     expect(
       splitEnkryptInputGuardrail({
-        scanToolResults: false,
         status: 'ready',
         detectors,
         blockingDetectors: ['injection_attack'],
       })
     ).toEqual({
       blocking: {
-        scanToolResults: false,
         status: 'ready',
         detectors: { injection_attack: detectors.injection_attack },
         blockingDetectors: ['injection_attack'],
       },
       logOnly: {
-        scanToolResults: false,
         status: 'ready',
         detectors: { pii: detectors.pii, bias: detectors.bias },
         blockingDetectors: [],
@@ -284,7 +277,6 @@ describe('splitEnkryptInputGuardrail', () => {
 
   it('makes only a blocking scan when every detector blocks', () => {
     const config: EnkryptInputGuardrailConfig = {
-      scanToolResults: true,
       status: 'ready',
       detectors,
       blockingDetectors: ['injection_attack', 'pii', 'bias'],
@@ -295,7 +287,6 @@ describe('splitEnkryptInputGuardrail', () => {
 
   it('makes only a log-only scan when every detector only logs', () => {
     const config: EnkryptInputGuardrailConfig = {
-      scanToolResults: true,
       status: 'ready',
       detectors: { pii: detectors.pii, bias: detectors.bias },
       blockingDetectors: [],
@@ -305,7 +296,7 @@ describe('splitEnkryptInputGuardrail', () => {
   });
 
   it('keeps an invalid configuration blocking so it fails closed', () => {
-    const config: EnkryptInputGuardrailConfig = { scanToolResults: true, status: 'invalid' };
+    const config: EnkryptInputGuardrailConfig = { status: 'invalid' };
 
     expect(splitEnkryptInputGuardrail(config)).toEqual({ blocking: config, logOnly: null });
   });
@@ -371,7 +362,7 @@ describe('resolveEnkryptOutputGuardrail', () => {
   it('reports invalid saved detectors instead of disabling the guardrail', () => {
     expect(
       resolveOutput({ enkrypt: { output_guardrail: { enabled: true, detectors: { pii: 'bad' } } } })
-    ).toEqual({ scanToolResults: false, status: 'invalid' });
+    ).toEqual({ status: 'invalid' });
   });
 
   it('maps the saved detectors to the Enkrypt request and blocks only on block actions', () => {
@@ -380,7 +371,6 @@ describe('resolveEnkryptOutputGuardrail', () => {
         enkrypt: { output_guardrail: { enabled: true, detectors: savedOutputDetectors() } },
       })
     ).toEqual({
-      scanToolResults: false,
       status: 'ready',
       detectors: {
         pii: { enabled: true, entities: ['secrets'] },
@@ -411,7 +401,6 @@ describe('resolveEnkryptOutputGuardrail', () => {
     detectors.nsfw = { enabled: true, action };
 
     expect(resolveOutput({ enkrypt: { output_guardrail: { enabled: true, detectors } } })).toEqual({
-      scanToolResults: false,
       status: 'ready',
       detectors: { nsfw: { enabled: true } },
       blockingDetectors: action === 'block' ? ['nsfw'] : [],

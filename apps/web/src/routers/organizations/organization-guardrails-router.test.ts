@@ -172,7 +172,6 @@ describe('organization guardrails router', () => {
           input_guardrail: {
             ...inputGuardrail,
             detectors: storableEnkryptInputDetectors(inputGuardrail.detectors),
-            scan_tool_results: true,
           },
           output_guardrail: output,
         },
@@ -381,7 +380,6 @@ describe('organization guardrails router', () => {
       input_guardrail: {
         ...inputOnly,
         detectors: storableEnkryptInputDetectors(inputOnly.detectors),
-        scan_tool_results: true,
       },
     });
   });
@@ -433,7 +431,7 @@ describe('organization guardrails router', () => {
     expect(auditLog.message).not.toContain('customer records');
   });
 
-  it('always saves tool result scanning on, even when an older page sends it off', async () => {
+  it('strips the retired tool result setting when an older page sends it off', async () => {
     const caller = await createCallerForUser(owner.id);
 
     const saved = await caller.organizations.guardrails.update({
@@ -444,7 +442,7 @@ describe('organization guardrails router', () => {
 
     expect(saved).not.toHaveProperty('scan_tool_results');
     const updated = await getOrganizationById(organization.id);
-    expect(updated?.settings.enkrypt?.input_guardrail?.scan_tool_results).toBe(true);
+    expect(updated?.settings.enkrypt?.input_guardrail).not.toHaveProperty('scan_tool_results');
   });
 
   it('rejects enabling guardrails with no configurable detector', async () => {

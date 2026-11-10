@@ -36,7 +36,7 @@ export const ENKRYPT_SCAN_OVERLAP_CHARACTERS = 2_000;
  * Bounds the lookup. Cached prefixes are earlier requests of the same conversation, which end near
  * the end of the current one.
  */
-export const MAX_PROBED_PREFIXES = 128;
+export const MAX_PROBED_PREFIXES = 1_024;
 
 const cachedBlockVerdictSchema = z
   .object({
@@ -77,7 +77,8 @@ function configHash(config: ReadyConfig): Buffer {
       JSON.stringify({
         detectors: config.detectors,
         blockingDetectors: [...config.blockingDetectors].sort(),
-        scanToolResults: config.scanToolResults,
+        // Preserve existing tool-inclusive keys without allowing a tool-result opt-out.
+        scanToolResults: true,
       })
     )
     .digest();
@@ -236,7 +237,6 @@ export async function scanRequestWithVerdictCache(
       session_id: request.sessionId,
       client_request_id: request.clientRequestId,
       api_kind: request.apiKind,
-      scan_tool_results: config.scanToolResults,
       ...report,
     });
     return {

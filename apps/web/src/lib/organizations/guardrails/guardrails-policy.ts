@@ -68,7 +68,7 @@ export function resolveGuardrailsSettings(organization: GuardrailSettingsOrganiz
   return {
     inputScan: {
       enabled: inputGuardrail !== null,
-      scanToolResults: inputGuardrail?.scanToolResults ?? false,
+      scanToolResults: inputGuardrail !== null,
     },
     outputScan: {
       enabled: outputGuardrail !== null,

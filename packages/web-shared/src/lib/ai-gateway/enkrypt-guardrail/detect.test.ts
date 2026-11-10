@@ -20,7 +20,6 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 const config = {
-  scanToolResults: true,
   status: 'ready',
   detectors: {
     injection_attack: { enabled: true, need_explanation: false },
@@ -351,10 +350,7 @@ describe('scanRequest', () => {
   it('rejects every request without calling Enkrypt when the saved detectors are unreadable', async () => {
     const dependencies = deps(async () => detectResponse({ summary: {} }));
 
-    const result = await scanRequest(
-      makeScan({ config: { scanToolResults: true, status: 'invalid' } }),
-      dependencies
-    );
+    const result = await scanRequest(makeScan({ config: { status: 'invalid' } }), dependencies);
 
     expect(result).toEqual({
       report: expect.any(Object),
@@ -987,7 +983,6 @@ describe('scanRequest', () => {
   });
   describe('a log-only scan', () => {
     const logOnlyConfig = {
-      scanToolResults: true,
       status: 'ready',
       detectors: { pii: { enabled: true, entities: ['secrets'] } },
       blockingDetectors: [],

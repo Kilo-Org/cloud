@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   CodeReviewCouncilConfigSchema,
+  EnkryptInputGuardrailSettingsSchema,
   ModelsSchema,
   OpenRouterPricing,
   OpenRouterProvider,
@@ -54,6 +55,21 @@ describe('OpenRouterProvider', () => {
     );
     expect(parsed.dataPolicy.privacyPolicyURL).toBe('https://www.anthropic.com/legal/privacy');
     expect(parsed.headquarters).toBe('US');
+  });
+});
+
+describe('EnkryptInputGuardrailSettingsSchema', () => {
+  it.each([false, true])('strips legacy scan_tool_results: %s', scan_tool_results => {
+    const settings = {
+      enabled: true,
+      detectors: { injection_attack: { enabled: true, action: 'block' } },
+      group_id: '00000000-0000-4000-8000-000000000003',
+    };
+
+    const parsed = EnkryptInputGuardrailSettingsSchema.parse({ ...settings, scan_tool_results });
+
+    expect(parsed).toEqual(settings);
+    expect(parsed).not.toHaveProperty('scan_tool_results');
   });
 });
 

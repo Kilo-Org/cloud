@@ -1468,7 +1468,7 @@ export const EnkryptOutputDetectorsUpdateSchema =
  * Enkrypt AI input scan of each gateway chat request. Requests flagged by a blocking detector are
  * blocked. Blocking scans fail closed while Enkrypt is unavailable; log-only scans do not gate
  * requests. Without `detectors` the gateway applies Kilo Default. The gateway checks every input,
- * including tool results; `scan_tool_results` is no longer read and is always written as true.
+ * including tool results.
  * With `group_id`, only members of that organization group are scanned; without it, every member.
  *
  * `detectors` is validated with `EnkryptInputDetectorsSchema` where it is written and read, not
@@ -1477,7 +1477,6 @@ export const EnkryptOutputDetectorsUpdateSchema =
  */
 export const EnkryptInputGuardrailSettingsSchema = z.object({
   enabled: z.boolean(),
-  scan_tool_results: z.boolean().optional(),
   detectors: z.unknown().optional(),
   group_id: z.string().nullable().optional(),
 });

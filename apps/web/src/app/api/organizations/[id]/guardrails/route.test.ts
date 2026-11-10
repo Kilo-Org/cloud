@@ -100,7 +100,7 @@ describe('GET /api/organizations/[id]/guardrails', () => {
         skill: { enabled: true, scan_before_use: false },
       },
       enkrypt: {
-        input_guardrail: { enabled: true, scan_tool_results: false },
+        input_guardrail: { enabled: true, ...{ scan_tool_results: false } },
       },
     });
     await addMcp(organization.id, 'Zeta', '@acme/zeta');

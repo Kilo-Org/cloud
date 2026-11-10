@@ -72,6 +72,7 @@ const FAILURE_TEXT: Record<string, string> = {
   input_unavailable: 'The builder could not read its inputs.',
   repository_unauthorized: 'Repository access is no longer authorized.',
   actor_unauthorized: 'The person who started the build no longer has access.',
+  account_blocked: 'This account is blocked.',
   billing_blocked: 'Builds need available credits.',
   billing_unavailable: 'Billing could not admit the build. Try again.',
   container_limit_reached: 'The concurrent container limit is reached.',

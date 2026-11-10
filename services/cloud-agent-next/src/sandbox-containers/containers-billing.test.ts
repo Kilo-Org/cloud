@@ -23,6 +23,7 @@ import type {
   RecordStartResult,
 } from '@kilocode/container-usage';
 import type { Env } from '../types.js';
+import { containerLimitError } from '../container-limit-test-helpers.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import { SandboxContainers, type ContainerInstanceSize } from './SandboxContainers.js';
@@ -349,6 +350,20 @@ afterEach(() => {
 });
 
 describe('ContainersBilling identity and admission', () => {
+  it('bounds a stalled native admission RPC and permits later admission', async () => {
+    const { instance, meter, container } = setup();
+    const original = meter.recordStart.bind(meter);
+    const recordStart = vi
+      .spyOn(meter, 'recordStart')
+      .mockImplementation(() => new Promise(() => {}));
+    const admission = admit(instance, 'standard-4');
+    await vi.advanceTimersByTimeAsync(31_000);
+    expect(await admission).toMatchObject({ success: false, code: 'meter_unavailable' });
+    expect(container.running).toBe(false);
+    recordStart.mockImplementation(original);
+    await expect(admit(instance, 'standard-4')).resolves.toEqual({ success: true });
+  });
+
   it('admits on a real continue meter and rejects on a real insufficient_credits admission', async () => {
     const admitted = setup();
 
@@ -407,6 +422,27 @@ describe('ContainersBilling identity and admission', () => {
     expect(context).toBeDefined();
     expect(context?.measurementStarted).toBe(false);
     expect(storage.map.get(START_ACK_KEY)).toBeUndefined();
+  });
+
+  it('sends the capacity marker and drops the generation at the container limit', async () => {
+    const admitted = setup();
+    await expect(admit(admitted.instance, 'standard-4')).resolves.toEqual({ success: true });
+    expect(admitted.meter.recordStartInputs).toEqual([
+      expect.objectContaining({ enforceCapacity: true }),
+    ]);
+
+    const limited = setup();
+    const limit = containerLimitError('organization', 50);
+    limited.meter.startResult = {
+      success: false,
+      error: { code: 'container_limit_reached', message: limit.message },
+    };
+
+    await expect(admit(limited.instance, 'standard-4')).rejects.toMatchObject({
+      code: 'container_limit_reached',
+      message: limit.message,
+    });
+    expect(limited.storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
   });
 
   it('does not skip an unmeasured context that carries a pending stop', async () => {

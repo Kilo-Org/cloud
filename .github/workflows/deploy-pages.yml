@@ -119,8 +119,9 @@ jobs:
           path: ${{ runner.temp }}/pages-package
 
       # The package was built by the other repository's scripts. Before Wrangler
-      # reads it: no field that runs a command, and no Worker, account, route,
-      # database or bucket other than the profile's.
+      # reads it: no file beside the ones the packaging script writes, no field
+      # that runs a command, no migration that removes stored data, and no
+      # Worker, account, route, database or bucket other than the profile's.
       - name: Check the package against the profile
         env:
           PROFILE: ${{ inputs.profile }}

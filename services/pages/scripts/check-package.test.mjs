@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
-import { packageProblems } from './check-package.mjs';
+import { packageFileProblems, packageProblems } from './check-package.mjs';
 
 const profile = JSON.parse(readFileSync(new URL('../profiles/dev.json', import.meta.url), 'utf8'));
 
@@ -75,6 +77,10 @@ const refused = {
     (config.durable_objects.bindings[0].script_name = 'another-worker'),
   'a transferred Durable Object class': config =>
     config.migrations.push({ tag: 'v2', transferred_classes: [] }),
+  'a deleted Durable Object class': config =>
+    config.migrations.push({ tag: 'v2', deleted_classes: ['Page'] }),
+  'a renamed Durable Object class': config =>
+    config.migrations.push({ tag: 'v2', renamed_classes: [{ from: 'Page', to: 'Other' }] }),
   'a trigger that is not a cron': config => (config.triggers.events = []),
 };
 
@@ -92,3 +98,56 @@ test('refuses a profile without an account', () => {
   delete config.account_id;
   assert.notDeepEqual(packageProblems(config, withoutAccount), []);
 });
+
+/** A directory with the entries the packaging script writes. */
+function packageDirectory(t) {
+  const directory = mkdtempSync(path.join(tmpdir(), 'pages-package-test-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  mkdirSync(path.join(directory, 'worker'));
+  mkdirSync(path.join(directory, 'public', 'chunks'), { recursive: true });
+  for (const file of [
+    'wrangler.json',
+    'build-receipt.json',
+    'worker/index.js',
+    'worker/automerge.wasm',
+    'public/index.html',
+    'public/chunks/editor.js',
+  ])
+    writeFileSync(path.join(directory, file), '');
+  return directory;
+}
+
+test('the entries the packaging script writes pass', t => {
+  assert.deepEqual(packageFileProblems(packageDirectory(t)), []);
+});
+
+const refusedFiles = {
+  'a .env beside the configuration': directory =>
+    writeFileSync(path.join(directory, '.env'), 'CLOUDFLARE_API_BASE_URL=https://example.com'),
+  'a package.json beside the configuration': directory =>
+    writeFileSync(path.join(directory, 'package.json'), '{}'),
+  'a missing entry module': directory => rmSync(path.join(directory, 'worker/index.js')),
+  'a missing public directory': directory =>
+    rmSync(path.join(directory, 'public'), { recursive: true }),
+  'a directory of modules': directory => mkdirSync(path.join(directory, 'worker/more')),
+  'a symlinked module': directory =>
+    symlinkSync('/etc/hosts', path.join(directory, 'worker/hosts.js')),
+  'a symlinked asset': directory =>
+    symlinkSync('/etc/hosts', path.join(directory, 'public/chunks/hosts.js')),
+  'a symlinked configuration': directory => {
+    rmSync(path.join(directory, 'wrangler.json'));
+    symlinkSync('/etc/hosts', path.join(directory, 'wrangler.json'));
+  },
+  'a symlinked public directory': directory => {
+    rmSync(path.join(directory, 'public'), { recursive: true });
+    symlinkSync(tmpdir(), path.join(directory, 'public'));
+  },
+};
+
+for (const [name, change] of Object.entries(refusedFiles)) {
+  test(`refuses ${name}`, t => {
+    const directory = packageDirectory(t);
+    change(directory);
+    assert.notDeepEqual(packageFileProblems(directory), []);
+  });
+}

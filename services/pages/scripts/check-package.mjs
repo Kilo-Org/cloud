@@ -8,10 +8,13 @@
 // configuration may hold only the fields listed here, and every field that
 // names a Cloudflare resource must say what the profile says.
 //
-// What the Pages source decides stays open: its Durable Object classes and
-// migrations, cron triggers, asset handling and extra variables. A field Pages
-// adds later fails this check until it is listed here.
-import { existsSync, readFileSync } from 'node:fs';
+// What the Pages source decides stays open: its Durable Object classes, the
+// migrations that add them, cron triggers, asset handling and extra variables.
+// A field Pages adds later fails this check until it is listed here.
+//
+// Wrangler also reads files beside its configuration, so the package may hold
+// only the entries the packaging script writes, as regular files.
+import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
@@ -35,8 +38,12 @@ const CONFIG_FIELDS = [
   'observability',
 ];
 const ASSET_FIELDS = ['directory', 'binding', 'not_found_handling', 'run_worker_first'];
-// `transferred_classes` is left out: it moves storage in from another Worker.
-const MIGRATION_FIELDS = ['tag', 'new_sqlite_classes', 'deleted_classes', 'renamed_classes'];
+// A migration may only add classes. `deleted_classes` destroys stored
+// documents, `renamed_classes` moves them, and `transferred_classes` takes
+// storage from another Worker. A release that needs one of them changes this
+// list in the same pull request that moves the pin.
+const MIGRATION_FIELDS = ['tag', 'new_sqlite_classes'];
+const PACKAGE_ENTRIES = ['build-receipt.json', 'public', 'worker', 'wrangler.json'];
 
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const unknownFields = (value, known) => Object.keys(value).filter(key => !known.includes(key));
@@ -121,7 +128,7 @@ export function packageProblems(config, profile) {
       config.migrations.every(
         migration => isObject(migration) && unknownFields(migration, MIGRATION_FIELDS).length === 0
       ),
-    'migrations must use known fields'
+    'migrations may only add classes'
   );
   expect(
     isObject(config.triggers) &&
@@ -142,6 +149,47 @@ export function packageProblems(config, profile) {
   return problems;
 }
 
+/** Every entry in the package directory that the packaging script does not
+ * write. A symlink could attach a file from the deploying machine as a Worker
+ * module or an asset, and a stray file such as `.env` could steer Wrangler. */
+export function packageFileProblems(directory) {
+  const problems = [];
+  const kind = file => {
+    const stat = lstatSync(file);
+    return stat.isDirectory() ? 'directory' : stat.isFile() ? 'file' : 'other';
+  };
+  const walk = relative => {
+    for (const name of readdirSync(path.join(directory, relative)).sort()) {
+      const entry = path.join(relative, name);
+      const found = kind(path.join(directory, entry));
+      if (found === 'other') problems.push(`${entry} must be a regular file or a directory`);
+      else if (found === 'directory' && relative === 'worker')
+        problems.push(`${entry} must be a file: worker holds only modules`);
+      else if (found === 'directory') walk(entry);
+    }
+  };
+
+  const present = readdirSync(directory).sort();
+  for (const name of present)
+    if (!PACKAGE_ENTRIES.includes(name)) problems.push(`${name} is not part of a Pages package`);
+  for (const name of PACKAGE_ENTRIES)
+    if (!present.includes(name)) problems.push(`The package has no ${name}`);
+  if (problems.length) return problems;
+
+  for (const name of PACKAGE_ENTRIES) {
+    const expected = name.endsWith('.json') ? 'file' : 'directory';
+    if (kind(path.join(directory, name)) !== expected)
+      problems.push(`${name} must be a ${expected}`);
+  }
+  if (problems.length) return problems;
+
+  walk('worker');
+  walk('public');
+  if (!readdirSync(path.join(directory, 'worker')).includes('index.js'))
+    problems.push('The package has no worker/index.js');
+  return problems;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const [profileName, directory, ...extra] = process.argv.slice(2);
   if (extra.length || !profileName || !directory) {
@@ -156,10 +204,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   const profile = JSON.parse(
     readFileSync(path.join(service, 'profiles', `${profileName}.json`), 'utf8')
   );
-  const config = JSON.parse(readFileSync(path.join(directory, 'wrangler.json'), 'utf8'));
-  const problems = packageProblems(config, profile);
-  for (const file of ['worker/index.js', 'public'])
-    if (!existsSync(path.join(directory, file))) problems.push(`The package has no ${file}`);
+  const problems = packageFileProblems(directory);
+  // The configuration is read only once it is known to be a regular file.
+  const config = problems.length
+    ? undefined
+    : JSON.parse(readFileSync(path.join(directory, 'wrangler.json'), 'utf8'));
+  if (config) problems.push(...packageProblems(config, profile));
   if (problems.length) {
     for (const problem of problems) console.error(problem);
     process.exit(1);

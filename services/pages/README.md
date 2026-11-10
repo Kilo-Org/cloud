@@ -39,7 +39,9 @@ scripts never run in a job that holds the Cloudflare token:
 2. `deploy` installs Wrangler from this repository's lockfile. It runs
    `scripts/check-package.mjs` first: the package's `wrangler.json` may hold
    no field that runs a command, and no Worker, account, route, database or
-   bucket other than the profile's. Then it runs
+   bucket other than the profile's. Its migrations may only add Durable
+   Object classes, and the package may hold only the files the packaging
+   script writes, with no symlink. Then it runs
    `wrangler deploy --config PACKAGE/wrangler.json` with
    `CLOUDFLARE_API_TOKEN`, the repository secret the other Workers deploy
    with.
@@ -98,7 +100,9 @@ A rollback changes code only:
   release that changes stored data cannot be undone this way. The dev
   deployment's data is disposable: empty it and deploy again.
 - Cloudflare refuses a rollback to a version from before a Durable Object
-  migration.
+  migration. `scripts/check-package.mjs` lets a migration add classes only: a
+  release that deletes or renames one changes that script in the pull request
+  that moves the pin.
 - A version runs with the secret values it was deployed with. Before a
   rollback across a secret rotation, read "Session key rotation" in nteract's
   `apps/pages/DEPLOYMENT.md`.

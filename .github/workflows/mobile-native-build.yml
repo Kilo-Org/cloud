@@ -149,6 +149,10 @@ jobs:
   # The filtered install matches those two producers: the action builds
   # `@kilocode/trpc` alone, but its declaration program also reads web-shared
   # and apps/web sources through their path aliases.
+  #
+  # The job runs only when a platform job will: the gate clears a platform whose
+  # artifact another run already published, so a run with both cleared pays no
+  # install and no build for nobody.
   prepare-trpc:
     needs: gate
     if: needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'

@@ -226,14 +226,18 @@ describe('hosted facade command balance gate', { timeout: 30_000 }, () => {
       const prompt = await postFacadeMutation('/prompt_async', {
         parts: [{ type: 'text', text: 'hello' }],
       });
+      const afterPrompt = await backend.requests();
+      expect(afterPrompt.filter(path => path.endsWith('/balance'))).toHaveLength(1);
+
       const command = await postFacadeMutation('/command', { command: 'compact' });
-      // Both mutations run the balance check before they answer. The fixture has no
-      // live runtime, so each answers from the same model preflight.
+      const afterCommand = await backend.requests();
+      // Each mutation reads the balance exactly once, and the fixture has no
+      // live runtime, so both answer from the same model preflight.
+      expect(afterCommand.filter(path => path.endsWith('/balance'))).toHaveLength(2);
       expect(prompt.status).toBe(command.status);
       await expect(command.json()).resolves.not.toMatchObject({
         error: 'KILO_BALANCE_VALIDATION_FAILED',
       });
-      expect(await backend.requests()).toContainEqual(expect.stringContaining('/balance'));
     } finally {
       await backend.release();
     }

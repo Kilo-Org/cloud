@@ -1274,29 +1274,35 @@ test('the changes job installs the root project only for a dependency input', ()
 // The extension changes job is the serialized prelude of every extension CI
 // run: `verify`, `build-firefox` and `e2e-chrome` all need it, so an install it
 // does not need costs every run. It reads the repository for the same reason as
-// the ci.yml job above, over the same detector set, so it carries the same gate
-// and the two expressions must stay one gate rather than diverge.
-test('the extension changes job installs the root project only for a resource manifest', () => {
+// the ci.yml job above, over the same detector set, so it carries one gate:
+// these assertions compare the two step definitions, and a new detector input
+// added to one gate without the other fails here.
+test('the extension changes job carries the shared dependency-input install gate', () => {
   const steps = workflows['extension-ci.yml'].jobs.changes.steps;
-  const filter = steps.find(step => step.id === 'filter_resources');
-  const retry = steps.find(step => step.id === 'filter_resources_retry');
-  assert.ok(filter, 'extension-ci changes: the resource-manifest filter is missing');
-  assert.ok(retry, 'extension-ci changes: the resource-manifest filter retry is missing');
-  for (const step of [filter, retry]) {
-    assert.deepEqual(
-      load(step.with.filters).resources,
-      [...DEPENDENCY_MANIFESTS],
-      'the filter matches the detector set exactly'
-    );
-  }
+  const shared = ciJobs.changes.steps;
+  const sharedStep = id => shared.find(step => step.id === id);
+  const step = id => steps.find(candidate => candidate.id === id);
+
+  const filter = step('filter_resources');
+  const retry = step('filter_resources_retry');
+  const base = step('resources_base');
+  assert.ok(filter, 'extension-ci changes: the dependency-input filter is missing');
+  assert.ok(retry, 'extension-ci changes: the dependency-input filter retry is missing');
+  assert.ok(base, 'extension-ci changes: the detector-base dependency-input check is missing');
+
+  assert.equal(
+    filter.with.filters,
+    sharedStep('filter_resources').with.filters,
+    'both changes jobs filter the same dependency inputs'
+  );
   assert.equal(
     filter['continue-on-error'],
-    true,
+    sharedStep('filter_resources')['continue-on-error'],
     'the first attempt tolerates a transient failure'
   );
   assert.equal(
     retry.if,
-    "steps.filter_resources.outcome == 'failure'",
+    sharedStep('filter_resources_retry').if,
     'the retry runs only after a failed first attempt'
   );
   assert.equal(
@@ -1306,39 +1312,30 @@ test('the extension changes job installs the root project only for a resource ma
   );
   assert.equal(
     retry['continue-on-error'],
-    undefined,
+    sharedStep('filter_resources_retry')['continue-on-error'],
     'a persistent filter failure fails the job instead of installing nothing'
   );
-
-  const base = steps.find(step => step.id === 'resources_base');
-  assert.ok(base, 'extension-ci changes: the detector-base manifest check is missing');
-  const ciBase = ciJobs.changes.steps.find(step => step.id === 'resources_base');
   assert.equal(
     base.env.BASE_SHA,
-    ciBase.env.BASE_SHA,
+    sharedStep('resources_base').env.BASE_SHA,
     'both changes jobs diff the base their detector diffs'
   );
-  assert.match(base.run, /DEPENDENCY_MANIFESTS/);
-  assert.doesNotMatch(
+  assert.equal(
     base.run,
-    /pnpm-(lock|workspace)\.yaml/,
-    'the manifest set stays in scripts/affected-workspaces.mjs'
-  );
-  assert.match(
-    base.run,
-    /if \[ -z "\$manifests" \]; then[\s\S]*echo "manifests=true"/,
-    'an unreadable detector list keeps the install instead of risking a detector without js-yaml'
+    sharedStep('resources_base').run,
+    'one detector-base check serves both jobs, so the input set stays in one place'
   );
 
-  const install = steps.find(step => step.name === 'Install root dependencies');
+  const install = steps.find(candidate => candidate.name === 'Install root dependencies');
+  const sharedInstall = shared.find(candidate => candidate.name === 'Install root dependencies');
   assert.equal(
     install.run,
-    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts',
+    sharedInstall.run,
     'the gate removes the install from the run, never changes what it installs'
   );
   assert.equal(
     install.if,
-    ciJobs.changes.steps.find(step => step.name === 'Install root dependencies').if,
+    sharedInstall.if,
     'the extension and the shared changes job gate the install on the same answers'
   );
   assert.ok(
@@ -1346,7 +1343,7 @@ test('the extension changes job installs the root project only for a resource ma
     'the install reads answers both detections already wrote'
   );
   assert.ok(
-    steps.indexOf(install) < steps.indexOf(steps.find(step => step.id === 'workspaces')),
+    steps.indexOf(install) < steps.indexOf(step('workspaces')),
     'the detector that may need js-yaml runs after the install it can ask for'
   );
   assert.equal(

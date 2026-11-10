@@ -272,16 +272,10 @@ function routedStepsOfPreview(steps: ByokRoutePreviewStep[]): RoutedSteps {
     ];
   });
 
-  const chatGptIndex = steps.findIndex(step => step.route === 'chatgpt');
-  const catalogKeyServesAboveChatGpt = steps
-    .slice(0, Math.max(chatGptIndex, 0))
-    .some(step => step.route === 'direct-byok' && step.reason === 'serves');
-  const routed: ProviderRoutingDecision['steps'] = catalogKeyServesAboveChatGpt
-    ? [{ step: 'chatgpt', outcome: 'deferred', reason: 'catalog-key-serves' }]
-    : steps
-        .slice(0, usedIndex)
-        .filter(step => step.route === 'chatgpt')
-        .map(() => ({ step: 'chatgpt', outcome: 'skipped', reason: 'unavailable' }));
+  const routed: ProviderRoutingDecision['steps'] = steps
+    .slice(0, usedIndex)
+    .filter(step => step.route === 'chatgpt')
+    .map(() => ({ step: 'chatgpt', outcome: 'skipped', reason: 'unavailable' }));
   const noKeyServed = {
     step: 'byok-key',
     outcome: 'skipped',
@@ -532,7 +526,7 @@ describe('previewByokRouting', () => {
     }
   );
 
-  test('marks the ChatGPT connection as not tried below a serving key', async () => {
+  test('places the conditional ChatGPT connection ahead of a serving catalog key', async () => {
     const user = await insertTestUser();
     await db.insert(byok_api_keys).values({
       kilo_user_id: user.id,
@@ -553,8 +547,8 @@ describe('previewByokRouting', () => {
 
     if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
     expect(preview.steps.map(({ route, outcome }) => ({ route, outcome }))).toEqual([
+      { route: 'chatgpt', outcome: 'conditional' },
       { route: 'direct-byok', outcome: 'used' },
-      { route: 'chatgpt', outcome: 'unreached' },
       { route: 'kilo', outcome: 'unreached' },
     ]);
   });

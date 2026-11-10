@@ -552,7 +552,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       serve_catalog_models
         ? {
             title: `Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}?`,
-            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For the catalog models it serves, this key is used, and pays, ahead of a ChatGPT connection and other BYOK keys.${organizationId ? ' Organization model and provider restrictions apply to every request through this key.' : ''}`,
+            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For eligible OpenAI requests, linked ChatGPT billing takes precedence; BYOK fallback follows the ordinary key priority order.${organizationId ? ' Organization model and provider restrictions apply to every request through this key.' : ''}`,
             confirmLabel: 'Use catalog model IDs',
           }
         : {
@@ -685,9 +685,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           {canReorder ? (
             <p className="text-muted-foreground mb-4 text-sm">
               Priority 1 is tried first. Each request uses the highest key in this list that can
-              serve its model, skipping disabled keys and keys whose provider does not offer it. A
-              connected ChatGPT subscription serves eligible OpenAI requests first, unless a key
-              using Kilo catalog model IDs is ranked above the key that would otherwise serve.
+              serve its model, skipping disabled keys and keys whose provider does not offer it.
+              Eligible OpenAI requests use linked ChatGPT billing first. BYOK fallback follows the
+              key priority order shown here.
               {organizationId ? ' This key order applies to all organization members.' : ''}
             </p>
           ) : null}

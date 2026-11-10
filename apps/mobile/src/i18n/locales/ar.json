@@ -1971,7 +1971,7 @@
       "discardWithUploadsMessage": "ستُحذف تعليماتك وأي ملفات مرفوعة لم تُرفق برسائل مرسلة.",
       "discardFailed": "تعذّر حذف المسودة. حاول مرة أخرى.",
       "remoteHint": "لتشغيل الجلسة على حاسوبك، شغّل Kilo هناك واتركه يعمل.",
-      "continueFrom": "تجري متابعة {{title}}.",
+      "continueFrom": "تجري متابعة «{{title}}».",
       "importingSession": "جارٍ استيراد الجلسة",
       "cliCannotContinue": "إصدار CLI هذا لا يدعم متابعة الجلسات. اختر Cloud Agent أو CLI آخر.",
       "importFailed": "تعذر استيراد هذه الجلسة.",

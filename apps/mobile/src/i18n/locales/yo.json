@@ -2425,7 +2425,7 @@
       "discardWithUploadsMessage": "A ó pa ọ̀rọ̀ ìtọ́ni rẹ àti àwọn fáìlì tí o ti gbé sókè tí kò tíì ní ìfiránṣẹ́ tí a so wọ́n mọ́ rẹ́.",
       "discardFailed": "A kò lè pa àkọ́kọ́ ìkọ̀wé náà rẹ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "remoteHint": "Láti lè ṣiṣẹ́ lórí kọ̀ǹpútà rẹ, bẹ̀rẹ̀ Kilo níbẹ̀ kí o sì fi sílẹ̀ kí ó máa ṣiṣẹ́.",
-      "continueFrom": "A ń tẹ̀síwájú pẹ̀lú {{title}}.",
+      "continueFrom": "A ń tẹ̀síwájú pẹ̀lú “{{title}}”.",
       "importingSession": "Ń gbé ìgbà iṣẹ́ wọlé",
       "cliCannotContinue": "CLI yìí kò lè tẹ̀síwájú pẹ̀lú ìgbà iṣẹ́ kan. Yan Cloud Agent tàbí CLI mìíràn.",
       "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",

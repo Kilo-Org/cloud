@@ -1203,7 +1203,7 @@ describe('applyPreferredProvider', () => {
     model => {
       const request = makeRequest(model);
 
-      applyPreferredProvider(config, model, request.body, false);
+      applyPreferredProvider(config, model, request.body, true);
 
       expect(request.body.provider).toEqual({ order: ['openai'] });
     }
@@ -1222,9 +1222,18 @@ describe('applyPreferredProvider', () => {
     const model = 'openai/gpt-5.5';
     const request = makeRequest(model);
 
-    applyPreferredProvider(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG, model, request.body, false);
+    applyPreferredProvider(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG, model, request.body, true);
 
     expect(request.body.provider).toBeUndefined();
+  });
+
+  it('still ignores Amazon Bedrock for OpenAI models without a stored config', () => {
+    const model = 'openai/gpt-5.5';
+    const request = makeRequest(model);
+
+    applyPreferredProvider(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG, model, request.body, false);
+
+    expect(request.body.provider).toEqual({ ignore: ['amazon-bedrock'] });
   });
 
   it('still ignores Anthropic for Claude without a stored config', () => {
@@ -1267,12 +1276,28 @@ describe('applyPreferredProvider', () => {
     });
   });
 
-  it('does not ignore Anthropic for non-Claude models', () => {
+  it('ignores Amazon Bedrock instead of Anthropic for OpenAI models', () => {
     const request = makeRequest('openai/gpt-5.5');
 
     applyPreferredProvider(config, 'openai/gpt-5.5', request.body, false);
 
+    expect(request.body.provider).toEqual({ order: ['openai'], ignore: ['amazon-bedrock'] });
+  });
+
+  it('does not ignore Amazon Bedrock for OpenAI models when the organization is a non-trial enterprise', () => {
+    const request = makeRequest('openai/gpt-5.5');
+
+    applyPreferredProvider(config, 'openai/gpt-5.5', request.body, true);
+
     expect(request.body.provider).toEqual({ order: ['openai'] });
+  });
+
+  it('does not ignore Amazon Bedrock for gpt-oss', () => {
+    const request = makeRequest('openai/gpt-oss-120b');
+
+    applyPreferredProvider(config, 'openai/gpt-oss-120b', request.body, false);
+
+    expect(request.body.provider).toBeUndefined();
   });
 
   it('preserves valid provider options when adding order', () => {
@@ -1389,8 +1414,14 @@ describe('getIgnoredProviders', () => {
   it.each([
     ['anthropic/claude-opus-5', false, ['anthropic']],
     ['anthropic/claude-opus-5', true, []],
-    ['openai/gpt-5.5', false, []],
-  ] as const)('for %s with Anthropic allowed=%s returns %j', (model, allowed, expected) => {
-    expect(getIgnoredProviders(model, allowed)).toEqual(expected);
-  });
+    ['openai/gpt-5.5', false, ['amazon-bedrock']],
+    ['openai/gpt-5.5', true, []],
+    ['openai/gpt-oss-120b', false, []],
+    ['moonshotai/kimi-k3', false, []],
+  ] as const)(
+    'for %s with non-trial enterprise=%s returns %j',
+    (model, isNonTrialEnterprise, expected) => {
+      expect(getIgnoredProviders(model, isNonTrialEnterprise)).toEqual(expected);
+    }
+  );
 });

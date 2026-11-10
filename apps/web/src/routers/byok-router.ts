@@ -16,8 +16,6 @@ import {
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
 import { and, eq, ne, sql } from 'drizzle-orm';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
   CreateBYOKKeyInputSchema,
@@ -417,8 +415,6 @@ export const byokRouter = createTRPCRouter({
       await rejectUnavailableExperimentalProvider(provider_id, organizationId);
       validateUserByokCredential(provider_id, api_key);
 
-      // Encrypt the API key
-      const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
       const keyId = crypto.randomUUID();
       const envelope = await encryptByokForStorage({
         apiKey: api_key,
@@ -439,7 +435,6 @@ export const byokRouter = createTRPCRouter({
           organization_id: organizationId ?? null,
           kilo_user_id: organizationId ? null : ctx.user.id,
           provider_id,
-          encrypted_api_key: encrypted,
           encrypted_api_key_envelope: envelope,
           created_by: ctx.user.id,
         })
@@ -514,7 +509,6 @@ export const byokRouter = createTRPCRouter({
       );
       validateUserByokCredential(existingKey.provider_id, api_key);
 
-      const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
       const envelope = await encryptByokForStorage({
         apiKey: api_key,
         context: getByokKmsContext(existingKey),
@@ -522,7 +516,7 @@ export const byokRouter = createTRPCRouter({
       });
       const [updatedKey] = await db
         .update(byok_api_keys)
-        .set({ encrypted_api_key: encrypted, encrypted_api_key_envelope: envelope })
+        .set({ encrypted_api_key_envelope: envelope })
         .where(eq(byok_api_keys.id, id))
         .returning(BYOK_KEY_COLUMNS);
 
@@ -686,7 +680,6 @@ export const byokRouter = createTRPCRouter({
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
-          encrypted_api_key: byok_api_keys.encrypted_api_key,
           encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
           management_source: byok_api_keys.management_source,
         })

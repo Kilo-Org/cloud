@@ -3,7 +3,7 @@ import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
 import { and, eq, like, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { encryptCredential, requireEncryptionKey } from '../lib/byok';
+import { createByokEnvelope } from '../lib/byok';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { isValidEmail, resolveSeedUserId } from '../lib/users';
 import type { SeedResult } from '../index';
@@ -82,6 +82,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // insertion, marker cleanup, metadata validation, and metadata writes commit together,
   // so a validation or write failure rolls back and never leaves the user without the
   // previous key or half-cleaned metadata.
+  const fixtureKeyId = crypto.randomUUID();
+  const envelope = await createByokEnvelope(
+    { key_id: fixtureKeyId, owner_type: 'user', owner_id: userId, provider_id: provider },
+    `${KEY_PREFIX}:${provider}`
+  );
   const byokKeyId = await db.transaction(async tx => {
     // Reset only this topic's key data: the dedicated test account's personal key for
     // this provider. Re-running with the same user+provider is idempotent.
@@ -92,10 +97,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     const [insertedKey] = await tx
       .insert(byok_api_keys)
       .values({
+        id: fixtureKeyId,
         organization_id: null,
         kilo_user_id: userId,
         provider_id: provider,
-        encrypted_api_key: encryptCredential(`${KEY_PREFIX}:${provider}`, requireEncryptionKey()),
+        encrypted_api_key_envelope: envelope,
         management_source: 'user',
         created_by: userId,
         is_enabled: true,

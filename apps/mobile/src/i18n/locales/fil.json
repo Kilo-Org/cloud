@@ -2431,7 +2431,7 @@
       "discardWithUploadsMessage": "Buburahin ang iyong prompt at mga na-upload na file na hindi pa nagagamit.",
       "discardFailed": "Hindi mabura ang burador. Subukang muli.",
       "remoteHint": "Para patakbuhin sa iyong computer, simulan ang Kilo doon at iwanan itong tumatakbo.",
-      "continueFrom": "Ipinagpapatuloy ang {{title}}.",
+      "continueFrom": "Ipinagpapatuloy ang “{{title}}”.",
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",
       "importFailed": "Hindi ma-import ang sesyong ito.",

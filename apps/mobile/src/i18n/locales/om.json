@@ -2425,7 +2425,7 @@
       "discardWithUploadsMessage": "Gaaffiin kee fi faayiloonni ol fe'aman kan ergaa ergametti hin qabachiifamne ni haqamu.",
       "discardFailed": "Wixinee haquu hin danda'amne. Deebi'ii yaali.",
       "remoteHint": "Kompiitara kee irratti hojjechuuf, Kilo baniitii akka itti fufu hafi.",
-      "continueFrom": "{{title}} itti fufaa jira.",
+      "continueFrom": "“{{title}}” itti fufaa jira.",
       "importingSession": "Turtii galchaa jira",
       "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",
       "importFailed": "Turtii kana galchuu hin danda'amne.",

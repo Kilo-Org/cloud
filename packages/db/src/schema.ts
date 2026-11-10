@@ -7510,7 +7510,7 @@ export const byok_api_keys = pgTable(
       onDelete: 'cascade',
     }),
     provider_id: text().notNull(),
-    encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
+    encrypted_api_key: jsonb().$type<EncryptedData>(),
     encrypted_api_key_envelope: jsonb().$type<BYOKApiKeyEnvelope>(),
     management_source: text().$type<BYOKManagementSource>().notNull().default('user'),
     is_enabled: boolean().default(true).notNull(),
@@ -11495,6 +11495,10 @@ export const operation_ledgers = pgTable(
       table.operation_key
     ),
     index('IDX_operation_ledgers_status_expires_at').on(table.status, table.expires_at),
+    index('IDX_operation_ledgers_admin_renewal_batch')
+      .on(table.intent, table.resource_key, table.status)
+      .concurrently()
+      .where(sql`${table.domain} = 'admin_kiloclaw_stripe_renewals'`),
     // Partial: provider_ref is NULL for every non-security domain, so the
     // index only carries the rows the provider-ref join actually reads.
     index('IDX_operation_ledgers_provider_ref')

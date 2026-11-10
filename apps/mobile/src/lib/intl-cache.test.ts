@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   dateTimeFormat,
+  deviceTimeZone,
   durationFormat,
   listFormat,
   numberFormat,
@@ -36,6 +37,10 @@ describe('intl-cache', () => {
     expect(relativeTimeFormat('pl', { numeric: 'auto' })).toBe(
       relativeTimeFormat('pl', { numeric: 'auto' })
     );
+  });
+
+  it('reports the device zone through the same probe that drops the cache', () => {
+    expect(deviceTimeZone()).toBe(new Intl.DateTimeFormat().resolvedOptions().timeZone);
   });
 
   it('formats in the locale it was asked for', () => {

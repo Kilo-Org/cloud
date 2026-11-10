@@ -2451,6 +2451,20 @@
       "when": 1794319425521,
       "tag": "0349_pending_auth_links",
       "breakpoints": true
+    },
+    {
+      "idx": 350,
+      "version": "7",
+      "when": 1794328810920,
+      "tag": "0350_kiloclaw_stripe_renewal_batch_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 351,
+      "version": "7",
+      "when": 1794335141995,
+      "tag": "0351_byok_legacy_key_nullable",
+      "breakpoints": true
     }
   ]
 }

@@ -122,6 +122,11 @@ const nextConfig = {
         permanent: false,
       },
       {
+        source: '/learn',
+        destination: '/',
+        permanent: true,
+      },
+      {
         source: '/users/sign_up',
         destination: '/get-started',
         permanent: true,

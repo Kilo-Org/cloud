@@ -1887,7 +1887,7 @@
       "discardWithUploadsMessage": "你輸入的提示詞與尚未附加至已傳送訊息的上傳檔案都會刪除。",
       "discardFailed": "無法捨棄草稿。請再試一次。",
       "remoteHint": "若要在你的電腦上執行，請在該電腦上啟動 Kilo 並讓它保持執行。",
-      "continueFrom": "正在接續 {{title}}。",
+      "continueFrom": "正在接續「{{title}}」。",
       "importingSession": "匯入工作階段中",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
       "importFailed": "無法匯入此工作階段。",

@@ -43,6 +43,10 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys, claude_billing_connections, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
+import {
+  testByokEnvelope,
+  useFakeByokKms,
+} from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
@@ -142,7 +146,7 @@ async function insertKeys(user: User, keys: KeyFixture[], organizationId?: strin
     keys.map(({ providerId, catalogMode = false, priority, isEnabled = true }) => ({
       ...(organizationId ? { organization_id: organizationId } : { kilo_user_id: user.id }),
       provider_id: providerId,
-      encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+      encrypted_api_key_envelope: testByokEnvelope(`${providerId}-secret`),
       created_by: user.id,
       is_enabled: isEnabled,
       settings: { serve_catalog_models: catalogMode, priority },
@@ -202,6 +206,8 @@ const NO_DIRECT_BYOK_MODEL = {
   reason: 'no-match',
 } as const;
 const CHATGPT_UNAVAILABLE = { step: 'chatgpt', outcome: 'skipped', reason: 'unavailable' } as const;
+
+useFakeByokKms();
 
 beforeEach(() => {
   jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);

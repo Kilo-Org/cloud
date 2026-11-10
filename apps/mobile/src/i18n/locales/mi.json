@@ -2425,7 +2425,7 @@
       "discardWithUploadsMessage": "Ka mukua ō tohutohu me ngā kōnae kua tukuna ake kāore anō kia hono ki tētahi karere.",
       "discardFailed": "Kāore i taea te muku i te hukihuki. Whakamātau anō.",
       "remoteHint": "Mō te haere i tō rorohiko, whakatīmata a Kilo ki reira, ka waiho kia haere tonu.",
-      "continueFrom": "Kei te haere tonu te wātū {{title}}.",
+      "continueFrom": "Kei te haere tonu te wātū “{{title}}”.",
       "importingSession": "Kei te kawemai i te wātū",
       "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria a Cloud Agent, tētahi atu CLI rānei.",
       "importFailed": "Kāore i taea te kawemai i tēnei wātū.",

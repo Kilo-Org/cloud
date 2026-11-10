@@ -1007,8 +1007,9 @@ describe('POST /api/v1/chat/completions request handling', () => {
       R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
       R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
     });
+    const model = 'x-ai/grok-4';
     const decision: ProviderRoutingDecision = {
-      requested_model: 'openai/gpt-4o',
+      requested_model: model,
       api_kind: 'chat_completions',
       owner_type: 'user',
       steps: [
@@ -1054,7 +1055,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
     let response: Response;
     try {
-      response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+      response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
       expect(fakeR2.objects.size).toBe(0);
       await Promise.all(
         jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
@@ -1560,7 +1561,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     );
   });
 
-  describe('Anthropic provider for Claude', () => {
+  describe('Kilo provider exclusions outside non-trial enterprise', () => {
     function setOrganizationAuth(plan: 'teams' | 'enterprise') {
       mockedGetUserFromAuth.mockResolvedValue({
         user: {
@@ -1579,7 +1580,10 @@ describe('POST /api/v1/chat/completions request handling', () => {
       mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     }
 
-    async function sendClaudeRequest() {
+    const CLAUDE_MODEL = 'anthropic/claude-sonnet-4.5';
+    const OPENAI_MODEL = 'openai/gpt-4o';
+
+    async function sendRequest(model: string) {
       let routingProvider: OpenRouterProviderConfig | undefined;
       let kiloIgnoredProviders: string[] | undefined;
       mockedGetProvider.mockImplementationOnce(async input => {
@@ -1594,9 +1598,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
         };
       });
       const { handleLlmProxyRequest } = await import('./llm-proxy');
-      const response = await handleLlmProxyRequest(
-        makeRequest(makeBody('anthropic/claude-sonnet-4.5')) as never
-      );
+      const response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
       expect(response.status).toBe(200);
       return {
         routingProvider,
@@ -1606,7 +1608,8 @@ describe('POST /api/v1/chat/completions request handling', () => {
     }
 
     it('ignores Anthropic for personal accounts without an organization lookup', async () => {
-      const { routingProvider, kiloIgnoredProviders, upstreamProvider } = await sendClaudeRequest();
+      const { routingProvider, kiloIgnoredProviders, upstreamProvider } =
+        await sendRequest(CLAUDE_MODEL);
 
       expect(routingProvider).toBeUndefined();
       expect(kiloIgnoredProviders).toEqual(['anthropic']);
@@ -1620,7 +1623,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     it('ignores Anthropic for teams organizations without an organization lookup', async () => {
       setOrganizationAuth('teams');
 
-      const { upstreamProvider } = await sendClaudeRequest();
+      const { upstreamProvider } = await sendRequest(CLAUDE_MODEL);
 
       expect(upstreamProvider?.ignore).toEqual(['anthropic']);
       expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
@@ -1630,7 +1633,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
       setOrganizationAuth('enterprise');
       mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(false);
 
-      const { kiloIgnoredProviders, upstreamProvider } = await sendClaudeRequest();
+      const { kiloIgnoredProviders, upstreamProvider } = await sendRequest(CLAUDE_MODEL);
 
       expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[0]).toBe('org-1');
       expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[1]).toBe(readDb);
@@ -1642,23 +1645,38 @@ describe('POST /api/v1/chat/completions request handling', () => {
       setOrganizationAuth('enterprise');
       mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(true);
 
-      const { kiloIgnoredProviders, upstreamProvider } = await sendClaudeRequest();
+      const { kiloIgnoredProviders, upstreamProvider } = await sendRequest(CLAUDE_MODEL);
 
       expect(kiloIgnoredProviders).toEqual([]);
       expect(upstreamProvider).toEqual({ order: ['google-vertex', 'amazon-bedrock'] });
     });
 
-    it('does not ignore Anthropic for non-Claude models of trial enterprise organizations', async () => {
+    it('ignores Amazon Bedrock instead of Anthropic for OpenAI models of trial enterprise organizations', async () => {
       setOrganizationAuth('enterprise');
       mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(false);
-      const { handleLlmProxyRequest } = await import('./llm-proxy');
 
-      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+      const { kiloIgnoredProviders, upstreamProvider } = await sendRequest(OPENAI_MODEL);
 
-      expect(response.status).toBe(200);
-      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
-        order: ['openai'],
-      });
+      expect(kiloIgnoredProviders).toEqual(['amazon-bedrock']);
+      expect(upstreamProvider).toEqual({ order: ['openai'], ignore: ['amazon-bedrock'] });
+    });
+
+    it('ignores Amazon Bedrock for OpenAI models of personal accounts', async () => {
+      const { kiloIgnoredProviders, upstreamProvider } = await sendRequest(OPENAI_MODEL);
+
+      expect(kiloIgnoredProviders).toEqual(['amazon-bedrock']);
+      expect(upstreamProvider?.ignore).toEqual(['amazon-bedrock']);
+      expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
+    });
+
+    it('allows Amazon Bedrock for OpenAI models of non-trial enterprise organizations', async () => {
+      setOrganizationAuth('enterprise');
+      mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(true);
+
+      const { kiloIgnoredProviders, upstreamProvider } = await sendRequest(OPENAI_MODEL);
+
+      expect(kiloIgnoredProviders).toEqual([]);
+      expect(upstreamProvider).toEqual({ order: ['openai'] });
     });
   });
 
@@ -2567,7 +2585,10 @@ describe.each([
 
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest.mock.calls[0]?.[0]).toMatchObject({ chatApi: kind });
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual(requestProvider);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+      ...requestProvider,
+      ignore: ['amazon-bedrock'],
+    });
   });
 
   it('does not introduce a provider object when privacy is absent', async () => {
@@ -2587,7 +2608,10 @@ describe.each([
     );
 
     expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({ order: ['openai'] });
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+      order: ['openai'],
+      ignore: ['amazon-bedrock'],
+    });
   });
 
   it.each([{ data_collection: 'invalid' }, { zdr: 'true' }])(
@@ -2619,7 +2643,10 @@ describe.each([
     );
 
     expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual(requestProvider);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+      ...requestProvider,
+      ignore: ['azure', 'amazon-bedrock'],
+    });
   });
 
   it.each([
@@ -2692,7 +2719,11 @@ describe.each([
       );
 
       expect(response.status).toBe(200);
-      const expectedProvider = { ...expectedPrivacy, order: ['openai'] };
+      const expectedProvider = {
+        ...expectedPrivacy,
+        order: ['openai'],
+        ignore: ['amazon-bedrock'],
+      };
       expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual(expectedProvider);
     }
   );
@@ -2733,7 +2764,12 @@ describe.each([
     );
 
     expect(response.status).toBe(200);
-    const expectedProvider = { only: ['openai'], order: ['openai'], ...privacy };
+    const expectedProvider = {
+      only: ['openai'],
+      order: ['openai'],
+      ignore: ['amazon-bedrock'],
+      ...privacy,
+    };
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual(expectedProvider);
   });
 });
@@ -2981,6 +3017,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
       ...expectedPrivacy,
       order: ['openai'],
+      ignore: ['amazon-bedrock'],
     });
   });
 

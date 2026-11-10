@@ -2425,7 +2425,7 @@
       "discardWithUploadsMessage": "Kehotteesi ja palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
       "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
       "remoteHint": "Käynnistä Kilo tietokoneellasi ja jätä se käyntiin.",
-      "continueFrom": "Jatketaan istuntoa: {{title}}.",
+      "continueFrom": "Jatketaan istuntoa: ”{{title}}”.",
       "importingSession": "Tuodaan istuntoa",
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
       "importFailed": "Tätä istuntoa ei voitu tuoda.",

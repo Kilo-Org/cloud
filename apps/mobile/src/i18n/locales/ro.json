@@ -2467,7 +2467,7 @@
       "discardWithUploadsMessage": "Instrucțiunile tale și fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
       "discardFailed": "Nu s-a putut șterge ciorna. Încearcă din nou.",
       "remoteHint": "Pentru a rula pe computerul tău, pornește Kilo acolo și lasă-l pornit.",
-      "continueFrom": "Se continuă sesiunea {{title}}.",
+      "continueFrom": "Se continuă sesiunea „{{title}}”.",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
       "importFailed": "Nu s-a putut importa această sesiune.",

@@ -2425,7 +2425,7 @@
       "discardWithUploadsMessage": "Za a share umarnin aikinka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
       "discardFailed": "An kasa watsar da daftarin. Sake gwadawa.",
       "remoteHint": "Don gudanar da aiki a kwamfutarka, fara Kilo a can ka bar shi yana aiki.",
-      "continueFrom": "Ana ci gaba da {{title}}.",
+      "continueFrom": "Ana ci gaba da “{{title}}”.",
       "importingSession": "Ana shigo da zaman",
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
       "importFailed": "An kasa shigo da wannan zaman.",

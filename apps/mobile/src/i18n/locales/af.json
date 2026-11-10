@@ -2425,7 +2425,7 @@
       "discardWithUploadsMessage": "Jou opdrag en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
       "discardFailed": "Die konsep kon nie weggegooi word nie. Probeer asseblief weer.",
       "remoteHint": "Om op jou rekenaar uit te voer, moet jy Kilo daar begin en laat loop.",
-      "continueFrom": "Die sessie {{title}} word voortgesit.",
+      "continueFrom": "Die sessie “{{title}}” word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
       "importFailed": "Hierdie sessie kon nie ingevoer word nie.",

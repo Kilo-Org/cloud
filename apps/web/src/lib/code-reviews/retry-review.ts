@@ -13,7 +13,10 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
+import {
+  getCodeReviewActionRequiredCopy,
+  getCodeReviewActionRequiredState,
+} from '@/lib/code-reviews/action-required';
 import { isCodeReviewActionRequiredReason } from '@/lib/code-reviews/action-required-shared';
 import type { Owner } from '@/lib/code-reviews/core';
 import { CodeReviewPlatformSchema } from '@/lib/code-reviews/core/schemas';
@@ -223,31 +226,52 @@ function actorFromOwner(owner: Owner): GitLabCredentialActor {
  *
  * Without this the pull request keeps a queued check that no worker will ever
  * finish, so the merge gate stays blocked on a review that already stopped. A
- * billing refusal and an action-required cause close the gate with their own
- * conclusion on their own path, and this leaves those two alone.
+ * billing refusal closes the gate on its own path for either platform, and an
+ * action-required cause closes it there for a provider review on GitHub, so
+ * those cases are already settled; every other case is closed here with the
+ * conclusion the status callback gives the same review state.
  */
 async function finalizeRetryGateCheck(
   review: CloudAgentCodeReview,
   actor: GitLabCredentialActor
 ): Promise<void> {
   if (review.terminal_reason === 'billing') return;
-  if (isCodeReviewActionRequiredReason(review.terminal_reason)) return;
   if (!shouldPublishCodeReviewToProvider(review)) return;
   if (!review.platform_integration_id) return;
 
   const platform = CodeReviewPlatformSchema.parse(review.platform);
   if (platform === PLATFORM.BITBUCKET) return;
 
+  const actionRequiredReason = isCodeReviewActionRequiredReason(review.terminal_reason)
+    ? review.terminal_reason
+    : null;
+  if (
+    actionRequiredReason &&
+    platform === PLATFORM.GITHUB &&
+    getManualCodeReviewConfig(review) === null
+  ) {
+    return;
+  }
+
   const integration = await getIntegrationById(review.platform_integration_id);
   if (!integration) return;
 
   const detailsUrl = `${APP_URL}/code-reviews/${review.id}`;
   const cancelled = review.status === 'cancelled';
-  const copy = getCodeReviewTerminalReasonCopy(review.terminal_reason);
-  const title = cancelled
-    ? 'Kilo Code Review cancelled'
-    : (copy?.checkTitle ?? 'Kilo Code Review failed');
-  const summary = cancelled ? 'Review was cancelled.' : (copy?.checkSummary ?? 'Review failed.');
+  const terminalCopy = getCodeReviewTerminalReasonCopy(review.terminal_reason);
+  const actionCopy = actionRequiredReason
+    ? getCodeReviewActionRequiredCopy(actionRequiredReason)
+    : null;
+  const title = actionCopy
+    ? actionCopy.checkTitle
+    : cancelled
+      ? 'Kilo Code Review cancelled'
+      : (terminalCopy?.checkTitle ?? 'Kilo Code Review failed');
+  const summary = actionCopy
+    ? actionCopy.checkSummary
+    : cancelled
+      ? 'Review was cancelled.'
+      : (terminalCopy?.checkSummary ?? 'Review failed.');
 
   if (platform === PLATFORM.GITHUB && integration.platform_installation_id) {
     const appType = integration.github_app_type ?? 'standard';
@@ -262,7 +286,7 @@ async function finalizeRetryGateCheck(
       review.check_run_id,
       {
         status: 'completed',
-        conclusion: cancelled ? 'cancelled' : 'failure',
+        conclusion: actionCopy ? 'action_required' : cancelled ? 'cancelled' : 'failure',
         detailsUrl,
         output: { title, summary },
       },

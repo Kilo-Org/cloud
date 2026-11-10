@@ -27,6 +27,15 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   updateCheckRun: jest.fn(),
 }));
 
+jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  setCommitStatus: jest.fn(),
+}));
+
+jest.mock('@/lib/integrations/gitlab-service', () => ({
+  getValidGitLabProjectAccessToken: jest.fn(),
+  getValidGitLabToken: jest.fn(),
+}));
+
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import type { Owner } from '@/lib/code-reviews/core';
@@ -39,7 +48,12 @@ import {
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import {
+  getValidGitLabProjectAccessToken,
+  getValidGitLabToken,
+} from '@/lib/integrations/gitlab-service';
 import { createCheckRun, updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
+import { setCommitStatus } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   AUTOMATIC_RETRY_ATTEMPT_LIMIT,
   isAutomaticallyRetryableFailure,
@@ -58,6 +72,9 @@ const mockedDispatch = jest.mocked(tryDispatchPendingReviews);
 const mockedGetIntegration = jest.mocked(getIntegrationById);
 const mockedCreateCheckRun = jest.mocked(createCheckRun);
 const mockedUpdateCheckRun = jest.mocked(updateCheckRun);
+const mockedSetCommitStatus = jest.mocked(setCommitStatus);
+const mockedGitLabProjectToken = jest.mocked(getValidGitLabProjectAccessToken);
+const mockedGitLabToken = jest.mocked(getValidGitLabToken);
 
 const OWNER: Owner = { type: 'user', id: 'user-1', userId: 'user-1' };
 
@@ -93,6 +110,9 @@ beforeEach(() => {
     metadata: null,
   } as never);
   mockedCreateCheckRun.mockResolvedValue(990);
+  mockedSetCommitStatus.mockResolvedValue(undefined);
+  mockedGitLabProjectToken.mockResolvedValue('project-token');
+  mockedGitLabToken.mockResolvedValue('group-token');
   mockedGetAgentConfig.mockResolvedValue({
     id: 'config-1',
     config: {},
@@ -233,6 +253,78 @@ describe('retryFailedCodeReview', () => {
       990,
       expect.objectContaining({ status: 'completed', conclusion: 'failure' }),
       'standard'
+    );
+  });
+
+  it('closes the check run as action_required for a manual review that needs configuration', async () => {
+    mockedGetReview.mockResolvedValue(
+      makeReview({
+        status: 'failed',
+        terminal_reason: 'byok_invalid_key',
+        check_run_id: 990,
+        manual_config: {
+          agentConfig: { review_style: 'balanced', focus_areas: [], model_slug: 'kilo/test' },
+          instructions: null,
+          outputMode: 'provider',
+        },
+      })
+    );
+
+    const result = await retryFailedCodeReview({
+      review: makeReview(),
+      owner: OWNER,
+      retryReason: 'manual_retrigger',
+    });
+
+    expect(result).toEqual({ outcome: 'still_failed', errorMessage: undefined });
+    expect(mockedUpdateCheckRun).toHaveBeenCalledWith(
+      '123456',
+      'acme',
+      'widgets',
+      990,
+      expect.objectContaining({ status: 'completed', conclusion: 'action_required' }),
+      'standard'
+    );
+  });
+
+  it('leaves an action-required check run on GitHub to the dispatch path', async () => {
+    mockedGetReview.mockResolvedValue(
+      makeReview({
+        status: 'failed',
+        terminal_reason: 'byok_invalid_key',
+        check_run_id: 990,
+      })
+    );
+
+    const result = await retryFailedCodeReview({
+      review: makeReview(),
+      owner: OWNER,
+      retryReason: 'automatic_recovery',
+    });
+
+    expect(result).toEqual({ outcome: 'still_failed', errorMessage: undefined });
+    expect(mockedUpdateCheckRun).not.toHaveBeenCalled();
+  });
+
+  it('closes the commit status of a GitLab review that did not start', async () => {
+    mockedGetReview.mockResolvedValue(
+      makeReview({ status: 'failed', platform: 'gitlab', platform_project_id: 42 })
+    );
+
+    const result = await retryFailedCodeReview({
+      review: makeReview({ platform: 'gitlab', platform_project_id: 42 }),
+      owner: OWNER,
+      retryReason: 'automatic_recovery',
+    });
+
+    expect(result).toEqual({ outcome: 'still_failed', errorMessage: undefined });
+    expect(mockedSetCommitStatus).toHaveBeenLastCalledWith(
+      'project-token',
+      42,
+      'abc123',
+      'failed',
+      expect.objectContaining({ description: expect.any(String) }),
+      'https://gitlab.com'
     );
   });
 

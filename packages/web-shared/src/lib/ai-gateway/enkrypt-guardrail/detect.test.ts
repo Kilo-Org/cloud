@@ -20,7 +20,6 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 const config = {
-  scanToolResults: true,
   status: 'ready',
   detectors: {
     injection_attack: { enabled: true, need_explanation: false },
@@ -351,10 +350,7 @@ describe('scanRequest', () => {
   it('rejects every request without calling Enkrypt when the saved detectors are unreadable', async () => {
     const dependencies = deps(async () => detectResponse({ summary: {} }));
 
-    const result = await scanRequest(
-      makeScan({ config: { scanToolResults: true, status: 'invalid' } }),
-      dependencies
-    );
+    const result = await scanRequest(makeScan({ config: { status: 'invalid' } }), dependencies);
 
     expect(result).toEqual({
       report: expect.any(Object),
@@ -487,6 +483,18 @@ describe('scanRequest', () => {
     );
   });
 
+  it('sends a request at the 250,000-character scan limit without truncating', async () => {
+    const text = 'a'.repeat(250_000);
+    const dependencies = deps(async () => detectResponse({ summary: {} }));
+
+    const result = await scanRequest(makeScan({ text }), dependencies);
+
+    expect(result.verdict).toEqual({ action: 'allow' });
+    expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+    const [[, init]] = fetchCalls(dependencies);
+    expect(JSON.parse(String(init.body)).text).toBe(text);
+  });
+
   describe('a request above the scan limit', () => {
     const text = 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1);
 
@@ -499,7 +507,7 @@ describe('scanRequest', () => {
         report: expect.any(Object),
         verdict: {
           action: 'block',
-          message: expect.stringContaining('cannot scan more than 3,000,000 characters'),
+          message: expect.stringContaining('cannot scan more than 250,000 characters'),
         },
         usageRecords: [],
       });
@@ -531,7 +539,7 @@ describe('scanRequest', () => {
     ]);
   });
 
-  it('shares a single 30-second deadline across retry attempts', async () => {
+  it('shares a single 5-second deadline across retry attempts', async () => {
     const timeout = jest.spyOn(AbortSignal, 'timeout');
     const responses = [
       detectResponse({ summary: {} }, { status: 502 }),
@@ -545,7 +553,7 @@ describe('scanRequest', () => {
       await scanRequest(makeScan(), dependencies);
 
       expect(timeout).toHaveBeenCalledTimes(1);
-      expect(timeout).toHaveBeenCalledWith(30_000);
+      expect(timeout).toHaveBeenCalledWith(5_000);
       const calls = fetchCalls(dependencies);
       expect(calls).toHaveLength(2);
       expect(calls[0][1].signal).toBe(calls[1][1].signal);
@@ -975,7 +983,6 @@ describe('scanRequest', () => {
   });
   describe('a log-only scan', () => {
     const logOnlyConfig = {
-      scanToolResults: true,
       status: 'ready',
       detectors: { pii: { enabled: true, entities: ['secrets'] } },
       blockingDetectors: [],

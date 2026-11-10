@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { PINNED_CLIS } from '../../scripts/runtime-cli-artifact.js';
 import { loadDevVars, loadExistingUserByEmail, loadRepoEnvFiles, mintApiToken } from './auth.js';
 import {
   DEFAULT_CONFIG,
@@ -58,7 +59,9 @@ const config: DriverConfig = {
   expectControlPlane: true,
   workerUrl: `http://localhost:${port('cloud-agent-next')}`,
   fakeLlmUrl: `http://localhost:${port('fake-llm')}`,
-  githubRepo: 'na2-org/hi-how-are-you',
+  ...(process.env.E2E_GITHUB_REPO
+    ? { githubRepo: process.env.E2E_GITHUB_REPO }
+    : { gitUrl: process.env.E2E_GIT_URL ?? DEFAULT_CONFIG.gitUrl }),
   skipBalanceCheck: false,
 };
 const tag = `kilo2-${randomUUID().slice(0, 8)}`;
@@ -150,6 +153,7 @@ try {
     'kilo2'
   );
   const version = await docker('exec', native.container.id, 'kilo2', '--version');
+  assert.equal(version, PINNED_CLIS.kilo2.reportedVersion, 'Running Kilo v2 differs from the pin');
   const hash = (
     await docker(
       'exec',

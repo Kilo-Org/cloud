@@ -229,6 +229,21 @@
     "signInCodeField": "ລະຫັດເຂົ້າສູ່ລະບົບ",
     "or": "ຫຼື"
   },
+  "pendingLink": {
+    "description": "ມີບັນຊີທີ່ໃຊ້ {{email}} ຢູ່ແລ້ວ. ເຂົ້າສູ່ລະບົບດ້ວຍວິທີໃດໜຶ່ງຂອງບັນຊີນັ້ນເພື່ອເພີ່ມ {{provider}}.",
+    "emailCode": "ສົ່ງລະຫັດເຂົ້າສູ່ລະບົບໃຫ້ຂ້ອຍທາງອີເມວ",
+    "continueInBrowser": "ສືບຕໍ່ໃນບຣາວເຊີ",
+    "startAgain": "ເລີ່ມໃໝ່",
+    "expired": "ຄຳຂໍເພີ່ມ {{provider}} ນີ້ໝົດອາຍຸແລ້ວ.",
+    "noMethods": "ບັນຊີນີ້ບໍ່ມີວິທີເຂົ້າສູ່ລະບົບອື່ນ, ສະນັ້ນຈຶ່ງບໍ່ສາມາດເພີ່ມ {{provider}} ໄດ້.",
+    "linked": "ເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານແລ້ວ.",
+    "failedExpired": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະຄຳຂໍໝົດອາຍຸແລ້ວ.",
+    "failedWrongAccount": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະທ່ານເຂົ້າສູ່ລະບົບບັນຊີອື່ນ.",
+    "failedAccountAlreadyLinked": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະມັນເຊື່ອມຕໍ່ກັບບັນຊີອື່ນຢູ່ແລ້ວ.",
+    "failedProviderAlreadyLinked": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະບັນຊີຂອງທ່ານມີການເຂົ້າສູ່ລະບົບ {{provider}} ອື່ນຢູ່ແລ້ວ.",
+    "failedLinking": "ບໍ່ສາມາດເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານໄດ້.",
+    "notAdded": "ທ່ານເຂົ້າສູ່ລະບົບແລ້ວ. ບໍ່ໄດ້ເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານ."
+  },
   "profile": {
     "codeReviewerSubtitle": "ການກວດສອບ PR ອັດຕະໂນມັດ",
     "securityAgentSubtitle": "ຊອກຫາ ແລະ ແກ້ໄຂຈຸດອ່ອນດ້ານຄວາມປອດໄພ",
@@ -267,6 +282,8 @@
     "providerTestAccount": "ບັນຊີທົດສອບ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ສຳລັບອົງກອນ",
     "passkeysTitle": "ກະແຈເຂົ້າ",
     "passkeysSubtitle": "ເຂົ້າສູ່ລະບົບໂດຍບໍ່ມີລະຫັດຜ່ານ",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "ຂໍ້ຄວາມທີ່ເຈົ້າຮ່າງໄວ້ ແລະໄຟລ໌ທີ່ອັບໂຫຼດໄວ້ແຕ່ຍັງບໍ່ໄດ້ໃຊ້ຈະຖືກລຶບ.",
       "discardFailed": "ບໍ່ສາມາດລຶບຂໍ້ຄວາມຮ່າງໄດ້. ກະລຸນາລອງໃໝ່.",
       "remoteHint": "ເພື່ອຈະເຮັດວຽກເທິງຄອມພິວເຕີຂອງເຈົ້າ, ໃຫ້ເປີດ Kilo ຢູ່ບ່ອນນັ້ນ ແລະເປີດຄ້າງໄວ້ຕໍ່ໄປ.",
-      "continueFrom": "ກຳລັງເຮັດວຽກຕໍ່ຈາກ {{title}}.",
+      "continueFrom": "ກຳລັງເຮັດວຽກຕໍ່ຈາກ “{{title}}”.",
       "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
       "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດເຮັດວຽກຕໍ່ຈາກເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
       "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້.",
@@ -2560,7 +2577,21 @@
       "thought": "ຄວາມຄິດ",
       "showDetails": "ສະແດງລາຍລະອຽດ",
       "pending": "ລໍຖ້າ…",
-      "running": "ກຳລັງເຮັດວຽກ…"
+      "running": "ກຳລັງເຮັດວຽກ…",
+      "field": {
+        "filePath": "ເສັ້ນທາງໄຟລ໌",
+        "path": "ເສັ້ນທາງ",
+        "offset": "ຕຳແໜ່ງ",
+        "limit": "ຂີດຈຳກັດ",
+        "pattern": "ຮູບແບບ",
+        "include": "ລວມ",
+        "patchText": "ຂໍ້ຄວາມແພັດ",
+        "query": "ຄຳຄົ້ນຫາ",
+        "prompt": "ຂໍ້ຄວາມສັ່ງ",
+        "header": "ຫົວຂໍ້",
+        "question": "ຄຳຖາມ",
+        "options": "ຕົວເລືອກ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ບໍ່ສາມາດສະແດງເນື້ອໃນໄດ້."

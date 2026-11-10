@@ -10,6 +10,7 @@ import {
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, gt, isNull } from 'drizzle-orm';
+import { removeClaudeBillingGrant } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
@@ -56,6 +57,8 @@ export async function removeUserFromOrganization(
             eq(cli_sessions_v2.organization_id, organizationId)
           )
         );
+
+      await removeClaudeBillingGrant({ kind: 'member', kiloUserId: userId, organizationId }, tx);
 
       await tx
         .insert(organization_membership_removals)

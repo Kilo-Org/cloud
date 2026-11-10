@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Voer je e-mailadres in.",
     "or": "of"
   },
+  "pendingLink": {
+    "description": "Er is al een account dat {{email}} gebruikt. Meld je aan met een van de methoden van dat account om {{provider}} toe te voegen.",
+    "emailCode": "Aanmeldcode naar mijn e-mail sturen",
+    "continueInBrowser": "Doorgaan in de browser",
+    "startAgain": "Opnieuw beginnen",
+    "expired": "Dit verzoek om {{provider}} toe te voegen is verlopen.",
+    "noMethods": "Dit account heeft geen andere aanmeldmethode, dus {{provider}} kan niet worden toegevoegd.",
+    "linked": "{{provider}} is toegevoegd aan je account.",
+    "failedExpired": "{{provider}} is niet toegevoegd omdat het verzoek is verlopen.",
+    "failedWrongAccount": "{{provider}} is niet toegevoegd omdat je bij een ander account bent aangemeld.",
+    "failedAccountAlreadyLinked": "{{provider}} is niet toegevoegd omdat het al aan een ander account is gekoppeld.",
+    "failedProviderAlreadyLinked": "{{provider}} is niet toegevoegd omdat je account al een andere {{provider}}-aanmelding heeft.",
+    "failedLinking": "{{provider}} kon niet aan je account worden toegevoegd.",
+    "notAdded": "Je bent aangemeld. {{provider}} is niet aan je account toegevoegd."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatische PR-beoordelingen",
     "securityAgentSubtitle": "Kwetsbaarheden vinden en verhelpen",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testaccount",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO voor bedrijven",
     "passkeysTitle": "Passkeys",
     "passkeysSubtitle": "Aanmelden zonder wachtwoord",
@@ -1870,7 +1887,7 @@
       "discardWithUploadsMessage": "Je prompt en alle uploads die nog niet zijn gebruikt, worden verwijderd.",
       "discardFailed": "Het concept kon niet worden verwijderd. Probeer het opnieuw.",
       "remoteHint": "Om op je computer uit te voeren, start je Kilo daar en laat je het draaien.",
-      "continueFrom": "Je gaat verder met {{title}}.",
+      "continueFrom": "Je gaat verder met ‘{{title}}’.",
       "importingSession": "Sessie importeren…",
       "cliCannotContinue": "Deze CLI kan geen sessie voortzetten. Kies Cloud Agent of een andere CLI.",
       "importFailed": "Deze sessie kon niet worden geïmporteerd.",
@@ -2022,7 +2039,21 @@
       "thought": "Gedachtegang",
       "showDetails": "Details tonen",
       "pending": "In afwachting…",
-      "running": "Bezig…"
+      "running": "Bezig…",
+      "field": {
+        "filePath": "Bestandspad",
+        "path": "Pad",
+        "offset": "Startregel",
+        "limit": "Limiet",
+        "pattern": "Patroon",
+        "include": "Bestandsfilter",
+        "patchText": "Wijzigingstekst",
+        "query": "Zoekopdracht",
+        "prompt": "Instructie",
+        "header": "Kop",
+        "question": "Vraag",
+        "options": "Opties"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "De inhoud kon niet worden weergegeven."

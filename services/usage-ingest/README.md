@@ -31,6 +31,21 @@ auth returns 401. Invalid JSON/schema returns 400, requests or serialized events
 over 120,000 bytes return 413, and enqueue failure returns a generic 503.
 Unrelated paths return 404; other methods on `/usage` return 405.
 
+Authenticated `POST /enkrypt-usage` accepts one bare Enkrypt usage record that
+parses under `EnkryptUsageWriteSchema` and sends exactly one
+`{kind: 'enkrypt_usage', v: 1, record}` message to the same `USAGE_INGEST_QUEUE`.
+The path names the kind, so this ingress is the only place that builds the
+envelope; an envelope-shaped body, an LLM usage body, or any other unknown key
+returns 400, and an Enkrypt record on `/usage` returns 400. It uses the same
+`USAGE_INGEST_PUBLISH_SECRET`, checked before the body is read, because the
+gateway is the only Enkrypt producer and already holds it. Bodies over 8,192
+bytes return 413; other statuses and the `usage_ingest_rejected`,
+`usage_ingest_enqueue_start` and `usage_ingest_enqueue` events match `/usage`,
+with an added `usage_kind: "enkrypt_usage"`. Body read and send failures also
+log `error_name`, never the error message. Enkrypt schema rejections log only
+issue codes and top-level schema field names. Deploy the consumer that routes tagged Enkrypt
+messages before this ingress, and this ingress before any gateway publishes to it.
+
 | Environment | Worker | Producer and consumer queue | DLQ (no consumer) |
 |---|---|---|---|
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
@@ -143,7 +158,58 @@ successful processing; missing configuration retries instead of discarding usage
 The shared helper makes one attempt with a 160-second timeout. HTTP 200
 `not_recorded`, malformed or mismatched acknowledgements, redirects, and transport
 failures are unavailable outcomes. Responses are limited to 4 KiB; helper logs
-contain only the usage ID and categorical outcome or HTTP status.
+contain only the usage ID, the usage kind for tagged writes, categorical outcome or
+HTTP status, and for a caught transport, parse or stream failure its error name
+(never its message). An unread error body is released; if that release fails, the
+helper logs `usage writer response release failed` with the usage ID, usage kind
+and error name only, and the write outcome is unchanged. A body that was already
+read is not released again.
+
+### Tagged Enkrypt usage
+
+The same queue can also carry Enkrypt guardrail usage. Such a message is a tagged
+envelope, `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
+(`EnkryptUsageQueueMessageSchema` in `@kilocode/usage-contracts`). LLM usage stays
+untagged and unchanged; its ingress schema strips unknown keys, so a body with its
+own `kind` key is always a tagged message. The gateway produces Enkrypt messages
+only through `/enkrypt-usage`, behind a default-off flag; see
+[Enkrypt usage rollout](#enkrypt-usage-rollout).
+
+The consumer reads the tag before anything else:
+
+| Body | Writer call | ACK on | Retry on |
+|---|---|---|---|
+| Untagged | Existing LLM writer at `USAGE_WRITER_URL` | Unchanged | Unchanged |
+| `enkrypt_usage`, `v: 1`, valid record | `/api/internal/enkrypt-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
+| `enkrypt_usage`, `v: 1`, invalid record or extra key | None | Never | Conservative retry (`invalid_event`) |
+| Any other `kind`, or another `v` | None | Never | Conservative retry (`unsupported_kind`) |
+
+A message that never ACKs exhausts the shared 20-retry budget and goes to the DLQ,
+so the DLQ can hold both kinds. A recognized admission 429 takes the admission
+retry schedule, and HTTP 429/503 rejects the invocation, exactly as for LLM usage.
+The invocation launch budget is shared. Consumer settings are unchanged. On the
+writer, these queue writes take the `non_llm` admission class described under
+[writer admission protection](#writer-admission-protection); its ceiling rejection
+is a recognized `queue_limit` 429.
+
+The Enkrypt writer URL is `USAGE_WRITER_URL` with its documented
+`/api/internal/usage/record` suffix replaced by the Enkrypt path, so no new
+variable is needed. If `USAGE_WRITER_URL` is missing or does not end with that
+suffix, Enkrypt messages retry as `missing_config` without network I/O. The writer
+credential, bypass and 160-second timeout are shared.
+
+Tagged messages add `usage_kind` to `usage_ingest_handler_entry`,
+`usage_ingest_processing` and the writer helper logs (`usageKind` there):
+`enkrypt_usage`, or `unknown` for an unrecognized tag (the raw tag is not logged).
+Untagged LLM logs keep exactly their existing fields, so filter LLM-only counts
+with a missing `usage_kind`. Enkrypt logs carry only the usage id and kind: no
+payer, user, session, cost or `occurredAt`-derived age.
+
+Deploy order: this consumer first, then the ingress, then the producer with its
+flag off. Never roll the consumer back to an LLM-only version while tagged
+messages may be in flight or retrying: an LLM-only consumer fails them as invalid
+events and they reach the DLQ after 20 retries. To stop tagged traffic, turn the
+producer flag off and let the consumer drain.
 
 ## Observability
 
@@ -402,9 +468,22 @@ batch size at 6 in production and 2 in staging; retry settings also stay unchang
 There is no new environment knob; merging this change activates queue rejection
 when the normal automatic deployment reaches the writer.
 
+Queue writes to the Enkrypt writer (`/api/internal/enkrypt-usage/record`) use the
+same guard and the same shared limit, as writer class `non_llm`. That class has
+its own ceiling inside the shared limit: `max(1, min(2, limit - 1))`, currently
+**2 of 8**. A `non_llm` call over the ceiling gets the same HTTP 429 body with
+reason `queue_limit` and is not written. Its active plus queued calls never exceed
+the ceiling, so it cannot fill the FIFO either. LLM queue writes can still use all
+8 slots; the ceiling only stops non-LLM writes from taking more than 2. When the
+shared limit is 1 (pool maximum 3 or less), the ceiling is 1 and a non-LLM call
+can take the only slot. The total limit is unchanged. Like the shared limit, this
+is a per-runtime counter, not a connection reservation, and it makes no
+fleet-wide fairness claim.
+
 `usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
 all rejected decisions. Fields contain only the bounded caller/outcome/reason,
-active count/limit, pool gauges/max, and sample rate; diagnostic failures cannot
+`writer_class` (`queue` or `non_llm`), active count/limit, `active_non_llm` and
+`non_llm_limit`, pool gauges/max, and sample rate; diagnostic failures cannot
 change admission or persistence results.
 
 The source policy remains finite: initial delivery plus up to **20 retries**
@@ -463,9 +542,11 @@ route, retry delay/budget and per-message dispositions.
 
 ## Deploy
 
-The existing `.github/workflows/deploy-workers.yml` discovers this service for
-production and staging deployments. Production's scheduled workflow can deploy
-merged changes automatically; deployment authorization and all
+The `detect-changes` job of `.github/workflows/deploy-workers.yml` discovers
+this service for production and staging deployments. Each deploy workflow calls
+that workflow once for detection, as soon as it holds the baseline, and a second
+time to deploy the matrix the detection call returns. Production's scheduled
+workflow can deploy merged changes automatically; deployment authorization and all
 [production prerequisites](eu-queues.md#production-merge-gate)
 must be satisfied before merge. There is no guaranteed manual deployment window.
 To deploy it individually when separately authorized, dispatch that
@@ -514,6 +595,35 @@ about live selection; source defaults alone do not establish deployed state. No 
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.
 The Worker has no direct database connection; the authenticated writer owns persistence. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
+
+## Enkrypt usage rollout
+
+The gateway sends Enkrypt guardrail usage through this queue only when the
+`kilocode-ai-gateway` variable `ENKRYPT_USAGE_QUEUE_ENABLED` is exactly `true`; see
+`ENVIRONMENT.md`. It posts the bare Enkrypt usage record to `/enkrypt-usage` on the
+same Worker as `/usage`, and the ingress wraps it in the tagged queue envelope.
+
+Deploy in this order. Each step must be deployed and verified before the next:
+
+1. The gateway accepts an optional `usageId` in Enkrypt handoff replies.
+2. The web app's Enkrypt usage route echoes `usageId` and takes queue writer admission.
+3. The writer's small non-LLM admission class, the consumer that routes tagged Enkrypt
+   messages, and the `/enkrypt-usage` ingress. Nothing posts to the ingress before step 4.
+4. The gateway producer, with the flag off.
+5. The flag on. Frankfurt and SFO pick it up with the same gateway deployment; that is not
+   an atomic cutover, because a rolling deployment can briefly overlap old and new settings.
+
+Rollback: set the flag to anything other than `true` and redeploy the gateway. New Enkrypt
+usage then takes the direct path again, and the consumer drains what the queue already
+accepted. Never roll the consumer back to an LLM-only version while tagged Enkrypt messages
+may still be in the source queue or in flight: they would fail every retry and reach the DLQ.
+
+Human-only steps, before the flag is turned on:
+
+- name a replay owner for the now-mixed DLQ, with a replay that handles both LLM and Enkrypt
+  messages;
+- confirm the existing DLQ alerting covers it;
+- set the flag on `kilocode-ai-gateway` and redeploy.
 
 ## Retention
 

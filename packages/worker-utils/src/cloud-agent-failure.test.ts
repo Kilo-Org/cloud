@@ -111,6 +111,8 @@ describe('classifyCloudAgentFailure', () => {
     ['gateway_unavailable', 'managed', 'provider', 'gateway_unavailable'],
     ['gateway_unavailable', 'byok', 'provider', 'gateway_unavailable'],
     ['gateway_unavailable', 'unknown', 'provider', 'gateway_unavailable'],
+    ['model_catalog_unavailable', 'managed', 'platform', 'model_catalog_unavailable'],
+    ['model_catalog_unavailable', 'unknown', 'platform', 'model_catalog_unavailable'],
   ] as const)(
     'classifies %s with %s ownership without losing the known cause',
     (assistantReason, providerOwnership, responsibility, reason) => {
@@ -419,6 +421,9 @@ const WORKSPACE_FAILURE_CLASSIFICATIONS = {
   git_pack_corrupt: { responsibility: 'platform', reason: 'source_control_repository_corrupt' },
   git_checkout_conflict: { responsibility: 'user', reason: 'source_control_configuration' },
   git_branch_missing: { responsibility: 'user', reason: 'source_control_configuration' },
+  base_branch_changed: { responsibility: 'user', reason: 'source_control_configuration' },
+  base_branch_missing: { responsibility: 'user', reason: 'source_control_configuration' },
+  base_branch_stale: { responsibility: 'user', reason: 'source_control_configuration' },
   sandbox_storage_full: { responsibility: 'platform', reason: 'sandbox_capacity' },
   kilo_import_timeout: { responsibility: 'platform', reason: 'session_import_timeout' },
   kilo_import_failed: { responsibility: 'platform', reason: 'session_import_failed' },
@@ -686,6 +691,14 @@ const ASSISTANT_FAILURE_CLASSIFICATIONS: ReadonlyArray<{
   {
     match: { code: ['assistant_error'], assistantReason: ['structured_output'] },
     expected: { responsibility: 'platform', reason: 'assistant_structured_output' },
+  },
+  // A Kilo-side catalog path failure is the platform's, whatever the code or ownership.
+  {
+    match: {
+      code: ['assistant_error', 'model_missing'],
+      assistantReason: ['model_catalog_unavailable'],
+    },
+    expected: { responsibility: 'platform', reason: 'model_catalog_unavailable' },
   },
   // `model_missing` resolves to the unavailable-model branch for every reason except the overrides above.
   {

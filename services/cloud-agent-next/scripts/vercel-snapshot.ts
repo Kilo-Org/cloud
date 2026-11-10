@@ -10,6 +10,7 @@ import { shellQuote } from '../src/kilo/utils.js';
 import { RUNTIME_DISTRIBUTION } from '../src/shared/runtime-distribution.js';
 import {
   CONTROL_PLANE_SUPERVISOR,
+  GH_STACK_INSTALL_PATH,
   GIT_CREDENTIAL_HELPER,
   WRAPPER_BUNDLES,
 } from '../src/shared/runtime-distribution.js';
@@ -875,6 +876,17 @@ export function builderInstallSteps(): Array<{ label: string; script: string }> 
       script: installPinnedArchiveScript('gh'),
     },
     {
+      label: `install gh-stack ${versions.ghStack}`,
+      script: [
+        `GH_STACK_VERSION=${shellQuote(versions.ghStack)}`,
+        `GH_STACK_SHA256=${shellQuote(versions.ghStackSha256)}`,
+        'curl -fsSL "https://github.com/github/gh-stack/releases/download/v${GH_STACK_VERSION}/linux-amd64" -o /tmp/gh-stack',
+        'echo "${GH_STACK_SHA256}  /tmp/gh-stack" | sha256sum -c -',
+        `sudo install -D -m 0755 /tmp/gh-stack ${shellQuote(GH_STACK_INSTALL_PATH)}`,
+        'rm -f /tmp/gh-stack',
+      ].join('\n'),
+    },
+    {
       label: `install pnpm ${versions.pnpm}`,
       script: installPinnedNpmPackageScript('pnpm'),
     },
@@ -891,6 +903,7 @@ export function builderInstallSteps(): Array<{ label: string; script: string }> 
         `case "$(node --version)" in v${versions.nodeMajor}.*) ;; *) echo "unexpected node $(node --version)" >&2; exit 1 ;; esac`,
         'curl --version >/dev/null',
         'git --version >/dev/null',
+        `test "$(sha256sum ${shellQuote(GH_STACK_INSTALL_PATH)} | cut -d' ' -f1)" = ${shellQuote(versions.ghStackSha256)}`,
         'git-lfs version >/dev/null',
       ].join('\n'),
     },

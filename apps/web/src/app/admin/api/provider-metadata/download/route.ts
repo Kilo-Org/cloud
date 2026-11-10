@@ -8,6 +8,7 @@ import {
   readAiProviderMetadata,
 } from '@kilocode/web-shared/lib/r2/ai-provider-metadata-bucket';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { canCurrentUserExportApiRequestLogs } from '@/lib/admin/admin-permissions';
 import { adminActionContextFromHeaders, recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
   formatTimestamp,
@@ -86,6 +87,9 @@ export async function GET(request: NextRequest) {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) {
     return authFailedResponse;
+  }
+  if (!user || !(await canCurrentUserExportApiRequestLogs(user.id))) {
+    return jsonError('API request log export access required', 403);
   }
 
   const searchParams = request.nextUrl.searchParams;

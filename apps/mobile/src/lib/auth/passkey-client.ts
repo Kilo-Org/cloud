@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { buildAuthHeaders } from '@/lib/auth/auth-header';
 import { postAuth } from '@/lib/auth/auth-fetch';
-import { parseTokenPair } from '@/lib/auth/native-auth-contract';
+import { parseTokenPair, type PendingLinkResult } from '@/lib/auth/native-auth-contract';
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 
@@ -164,6 +164,7 @@ export type PasskeySignInResult =
       refreshToken?: string;
       expiresIn?: number;
       created?: boolean;
+      pendingLink?: PendingLinkResult;
     }
   | {
       status: 'error';
@@ -181,10 +182,11 @@ export type PasskeySignInResult =
  * platform credential API produce the assertion, hand the assertion back for
  * server-side verification, then redeem the one-time ticket through the same
  * native token route the other providers use. The screen signs the returned
- * token pair in.
+ * token pair in. `pendingLinkToken` ties the sign-in to the pending link it resolves.
  */
 export async function signInWithPasskey(
-  api: PasskeysApi | null = loadPasskeys()
+  api: PasskeysApi | null = loadPasskeys(),
+  pendingLinkToken?: string
 ): Promise<PasskeySignInResult> {
   if (!usable(api)) {
     return { status: 'error', failure: 'unsupported' };
@@ -256,6 +258,7 @@ export async function signInWithPasskey(
     ticket: ticket.data.ticket,
     supportsRefresh: true,
     ...admissionBody,
+    ...(pendingLinkToken ? { pendingLinkToken } : {}),
   });
   if (!tokenResult.ok) {
     if (!tokenResult.errorCode) {
@@ -279,6 +282,7 @@ export async function signInWithPasskey(
     refreshToken: 'refreshToken' in parsed ? parsed.refreshToken : undefined,
     expiresIn: 'expiresIn' in parsed ? parsed.expiresIn : undefined,
     created: parsed.created,
+    ...(parsed.pendingLink ? { pendingLink: parsed.pendingLink } : {}),
   };
 }
 

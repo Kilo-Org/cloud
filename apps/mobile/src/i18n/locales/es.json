@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Introduce tu correo electrónico.",
     "or": "o"
   },
+  "pendingLink": {
+    "description": "Ya hay una cuenta que usa {{email}}. Inicia sesión con uno de sus métodos para añadir {{provider}}.",
+    "emailCode": "Enviarme un código de inicio de sesión por correo",
+    "continueInBrowser": "Continuar en el navegador",
+    "startAgain": "Empezar de nuevo",
+    "expired": "Esta solicitud para añadir {{provider}} ha caducado.",
+    "noMethods": "Esta cuenta no tiene otro método de inicio de sesión, así que no se puede añadir {{provider}}.",
+    "linked": "{{provider}} se añadió a tu cuenta.",
+    "failedExpired": "No se añadió {{provider}} porque la solicitud caducó.",
+    "failedWrongAccount": "No se añadió {{provider}} porque iniciaste sesión en otra cuenta.",
+    "failedAccountAlreadyLinked": "No se añadió {{provider}} porque ya está vinculado a otra cuenta.",
+    "failedProviderAlreadyLinked": "No se añadió {{provider}} porque tu cuenta ya tiene otro inicio de sesión de {{provider}}.",
+    "failedLinking": "No se pudo añadir {{provider}} a tu cuenta.",
+    "notAdded": "Has iniciado sesión. No se añadió {{provider}} a tu cuenta."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisiones automáticas de PR",
     "securityAgentSubtitle": "Encontrar y corregir vulnerabilidades",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Cuenta de prueba",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO empresarial",
     "passkeysTitle": "Claves de acceso",
     "passkeysSubtitle": "Inicia sesión sin contraseña",
@@ -1891,7 +1908,7 @@
       "discardWithUploadsMessage": "Se eliminarán tus instrucciones y los archivos subidos que no estén adjuntos a mensajes enviados.",
       "discardFailed": "No se pudo descartar el borrador. Inténtalo de nuevo.",
       "remoteHint": "Para ejecutarlo en tu ordenador, inicia Kilo allí y déjalo en marcha.",
-      "continueFrom": "Se está continuando la sesión {{title}}.",
+      "continueFrom": "Se está continuando la sesión «{{title}}».",
       "importingSession": "Importando sesión",
       "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",
       "importFailed": "No se pudo importar esta sesión.",
@@ -2047,7 +2064,21 @@
       "thought": "Razonamiento",
       "showDetails": "Mostrar detalles",
       "pending": "Pendiente…",
-      "running": "En ejecución…"
+      "running": "En ejecución…",
+      "field": {
+        "filePath": "Ruta de archivo",
+        "path": "Ruta",
+        "offset": "Desplazamiento",
+        "limit": "Límite",
+        "pattern": "Patrón",
+        "include": "Incluir",
+        "patchText": "Texto del parche",
+        "query": "Consulta",
+        "prompt": "Indicación",
+        "header": "Encabezado",
+        "question": "Pregunta",
+        "options": "Opciones"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "No se pudo mostrar el contenido."

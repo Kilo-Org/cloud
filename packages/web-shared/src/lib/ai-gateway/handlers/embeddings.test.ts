@@ -293,16 +293,19 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it.each([{ data_collection: 'invalid' }, { zdr: 'true' }])(
-    'rejects malformed provider privacy before proxying: %j',
-    async provider => {
-      const { handleEmbeddingsRequest } = await import('./embeddings');
-      const response = await handleEmbeddingsRequest(makeRequest({ provider }));
+  it.each([
+    { data_collection: 'invalid' },
+    { zdr: 'true' },
+    { only: [['openai']] },
+    { ignore: 'azure' },
+    { order: [1] },
+  ])('rejects malformed provider preferences before proxying: %j', async provider => {
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest({ provider }));
 
-      expect(response.status).toBe(400);
-      expect(mockedFetch).not.toHaveBeenCalled();
-    }
-  );
+    expect(response.status).toBe(400);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
 
   it.each([
     { privacy: undefined, settings: undefined, translated: {} },

@@ -1,3 +1,4 @@
+import { billingFailureFromAdmission } from '../billing-failure.js';
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import {
@@ -80,7 +81,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
     ref,
     billing
   ) => {
-    if (!billing) return;
+    if (!billing) throw new ProviderCreationError('invalid_configuration');
     const parsed = decodeOwnedProviderRef(ref);
     if (!parsed) throw new ProviderCreationError('invalid_configuration');
     let input: ReturnType<typeof parseSandboxBillingInput>;
@@ -89,33 +90,28 @@ export function createCloudflareContainersProviderAdapter(deps: {
     } catch {
       throw new ProviderCreationError('invalid_configuration');
     }
-    const container = deps.getContainer(deps.logicalSandboxId);
-    let blocked = false;
+    let admission: SandboxBillingAdmissionResult;
     try {
-      blocked = await container.isBillingBlocked();
-    } catch {
-      blocked = input.enforcementRequested === true;
-    }
-    if (input.enforcementRequested || blocked) {
-      let admission: SandboxBillingAdmissionResult;
-      try {
-        admission = await container.ensureBillingAdmission(input, instance);
-      } catch (error) {
-        if (getContainerCapacityFailureReason(error)) throw error;
-        admission = {
-          success: false,
-          code: 'meter_unavailable',
-          message: 'Container billing admission is unavailable',
-        };
-      }
-      if (!admission.success) {
-        throw new ProviderCreationError(admission.code);
-      }
-    } else {
-      await withDORetry(
+      admission = await withDORetry(
         () => deps.getContainer(deps.logicalSandboxId),
-        container => container.configureBilling(input, instance),
-        'configureSandboxContainersBilling'
+        async (stub): Promise<SandboxBillingAdmissionResult> =>
+          stub.ensureBillingAdmission(input, instance),
+        'ensureSandboxContainersBillingAdmission'
+      );
+    } catch (error) {
+      if (getContainerCapacityFailureReason(error)) throw error;
+      admission = {
+        success: false,
+        code: 'meter_unavailable',
+        message: 'Container billing admission is unavailable',
+      };
+    }
+    if (!admission.success) {
+      throw new ProviderCreationError(
+        admission.code,
+        admission.code === 'invalid_configuration'
+          ? undefined
+          : billingFailureFromAdmission(input.subject, { ...admission, code: admission.code })
       );
     }
   };

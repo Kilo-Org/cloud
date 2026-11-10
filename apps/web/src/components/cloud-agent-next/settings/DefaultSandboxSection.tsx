@@ -50,6 +50,7 @@ export function DefaultSandboxSection({ organizationId, settings }: DefaultSandb
         unavailableReason={settings.contextUnavailableReason}
         noneLabel="Platform default"
         noneDescription={describeDefaultSandbox(settings.capabilities.defaultDestination)}
+        noneDestination={settings.capabilities.defaultDestination}
         labelledBy={headingId}
         disabled={!settings.canManage || setContextAllocation.isPending}
         onChange={allocation =>

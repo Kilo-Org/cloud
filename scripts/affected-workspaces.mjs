@@ -35,12 +35,15 @@ import { posix } from 'node:path';
 // Root paths that change how every workspace is checked. A dependency patch is
 // not one of them: its content enters the resolved closure of the workspaces
 // that carry the patched selector, so it is a dependency input
-// (DEPENDENCY_INPUTS below).
+// (DEPENDENCY_INPUTS below). An action is global by default: it changes the job
+// that runs it rather than one workspace's sources, and a new action must not
+// skip every check until a table attributes it. The single-package actions and
+// their key scripts are attributed in OWNED, which is consulted first.
 const GLOBAL = [
   /^(package\.json|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|tsconfig[^/]*\.json)$/,
   /^\.github\/workflows\/(ci|kilo-app-ci)\.yml$/,
   /^\.github\/actions\//,
-  /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs|build-key-inputs\.mjs|trpc-declaration-key\.mjs|harness-sdk-build-key\.mjs|ttsc-plugin-key\.mjs)$/,
+  /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs|build-key-inputs\.mjs|ttsc-plugin-key\.mjs)$/,
 ];
 
 // Root paths that change one check for every workspace, and nothing else: the
@@ -56,10 +59,20 @@ const CHECK_INPUTS = [
   [/^tools\/oxlint\//, 'lint'],
 ];
 
-// Root paths whose effect belongs to one workspace.
+// Root paths whose effect belongs to one workspace. Every entry here is
+// consulted before GLOBAL, so it attributes a path even when a broad GLOBAL
+// pattern also covers it.
 const OWNED = [
   [/^scripts\/web-env\//, 'apps/web'],
   [/^tools\/(i18n|nativewind)\//, 'apps/mobile'],
+  // A build action for one package, and the script that decides its cache key,
+  // change that package's dist and nothing else. Either one is an input of the
+  // dist key, so a change to it forces a rebuild; the package's readers follow
+  // through the reader closure.
+  [/^\.github\/actions\/harness-sdk-build\//, 'packages/harness-sdk'],
+  [/^scripts\/harness-sdk-build-key\.mjs$/, 'packages/harness-sdk'],
+  [/^\.github\/actions\/trpc-declarations\//, 'packages/trpc'],
+  [/^scripts\/trpc-declaration-key\.mjs$/, 'packages/trpc'],
 ];
 
 // [pattern, workspace]: files whose change also affects a workspace, beyond
@@ -304,7 +317,10 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
       }
       continue;
     }
-    if (GLOBAL.some(pattern => pattern.test(file))) {
+    // A table entry wins over a broad rule: it attributes a root path to one
+    // workspace even when a GLOBAL pattern also covers it.
+    const owned = OWNED.find(([pattern]) => pattern.test(file));
+    if (!owned && GLOBAL.some(pattern => pattern.test(file))) {
       reasons.push(`${file} changes how every workspace is checked`);
       continue;
     }
@@ -332,7 +348,6 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
       continue;
     }
     const rootRead = readRootPath(file);
-    const owned = OWNED.find(([pattern]) => pattern.test(file));
     if (owned) changed.add(owned[1]);
     if (owned || rootRead || isNeutral(file)) continue;
     reasons.push(`${file} is outside every workspace`);

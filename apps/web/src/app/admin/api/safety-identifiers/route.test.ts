@@ -1,65 +1,87 @@
+import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { kilocode_users } from '@kilocode/db';
-import { eq } from 'drizzle-orm';
-import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { GET, POST } from './route';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  getSafetyIdentifierStatus,
+  regenerateSafetyIdentifiers,
+  SAFETY_IDENTIFIER_BACKFILL_ERROR,
+} from '@/lib/safety-identifiers';
+import { GET, POST, maxDuration } from './route';
 
-jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@/lib/safety-identifiers', () => ({
+  getSafetyIdentifierStatus: jest.fn(),
+  regenerateSafetyIdentifiers: jest.fn(),
+  SAFETY_IDENTIFIER_BACKFILL_ERROR: 'Safety identifier regeneration failed. Retry to resume.',
+  SAFETY_IDENTIFIER_WORK_BUDGET_MS: 240_000,
+}));
 
-const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const originalOpenRouterOrgId = process.env.OPENROUTER_ORG_ID;
-
-beforeEach(async () => {
-  await cleanupDbForTest();
-  process.env.OPENROUTER_ORG_ID = 'test-openrouter-org';
-  mockedGetUserFromAuth.mockResolvedValue({
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.mocked(getUserFromAuth).mockResolvedValue({
     user: defineTestUser({ is_admin: true }),
     authFailedResponse: null,
   });
 });
 
-afterEach(() => {
-  if (originalOpenRouterOrgId === undefined) {
-    delete process.env.OPENROUTER_ORG_ID;
-  } else {
-    process.env.OPENROUTER_ORG_ID = originalOpenRouterOrgId;
+test.each([GET, POST])(
+  'requires existing admin authorization before accessing progress or mutating users',
+  async handler => {
+    const denied = NextResponse.json(
+      { success: false as const, error: 'Unauthorized' },
+      { status: 403 }
+    );
+    jest.mocked(getUserFromAuth).mockResolvedValue({ user: null, authFailedResponse: denied });
+    expect(await handler()).toBe(denied);
+    expect(getUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
+    expect(getSafetyIdentifierStatus).not.toHaveBeenCalled();
+    expect(regenerateSafetyIdentifiers).not.toHaveBeenCalled();
   }
+);
+
+test('returns resumable progress without mutating', async () => {
+  const status = {
+    running: false,
+    batchSize: 5000,
+    backfill: {
+      status: 'pending' as const,
+      processed: 0,
+      total: null,
+      cursor: null,
+      startedAt: null,
+      updatedAt: null,
+      completedAt: null,
+      lastBatchProcessed: 0,
+      lastError: null,
+    },
+  };
+  jest.mocked(getSafetyIdentifierStatus).mockResolvedValue(status);
+  await expect((await GET()).json()).resolves.toEqual(status);
+  expect(regenerateSafetyIdentifiers).not.toHaveBeenCalled();
 });
 
-describe('safety identifier backfill', () => {
-  it('fills the OpenRouter downstream identifier without replacing existing identifiers', async () => {
-    const user = await insertTestUser({
-      openrouter_upstream_safety_identifier: 'existing-openrouter-upstream',
-      vercel_downstream_safety_identifier: 'existing-vercel-downstream',
-    });
+test('runs the same bounded regeneration pass and retains the POST response shape', async () => {
+  const before = Date.now();
+  jest
+    .mocked(regenerateSafetyIdentifiers)
+    .mockResolvedValue({ processed: 5, remaining: true, skipped: false });
+  await expect((await POST()).json()).resolves.toEqual({ processed: 5, remaining: true });
+  const { deadlineAt } = jest.mocked(regenerateSafetyIdentifiers).mock.calls[0][0];
+  expect(deadlineAt).toBeGreaterThanOrEqual(before + 240_000);
+  expect(deadlineAt - before).toBeLessThan(maxDuration * 1000);
+});
 
-    const countResponse = await GET();
-    expect(await countResponse.json()).toEqual({ missing: 1 });
+test('returns 409 when cron or another admin owns the mutex', async () => {
+  jest
+    .mocked(regenerateSafetyIdentifiers)
+    .mockResolvedValue({ processed: 0, remaining: true, skipped: true });
+  expect((await POST()).status).toBe(409);
+});
 
-    const backfillResponse = await POST();
-    expect(await backfillResponse.json()).toEqual({ processed: 1, remaining: false });
-
-    const [updatedUser] = await db
-      .select({
-        openrouter_upstream_safety_identifier: kilocode_users.openrouter_upstream_safety_identifier,
-        openrouter_downstream_safety_identifier:
-          kilocode_users.openrouter_downstream_safety_identifier,
-        vercel_downstream_safety_identifier: kilocode_users.vercel_downstream_safety_identifier,
-      })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, user.id));
-
-    expect(updatedUser).toEqual({
-      openrouter_upstream_safety_identifier: 'existing-openrouter-upstream',
-      openrouter_downstream_safety_identifier: generateOpenRouterDownstreamSafetyIdentifier(
-        user.id
-      ),
-      vercel_downstream_safety_identifier: 'existing-vercel-downstream',
-    });
-
-    const completeCountResponse = await GET();
-    expect(await completeCountResponse.json()).toEqual({ missing: 0 });
-  });
+test.each([GET, POST])('returns only a generic error on backend failures', async handler => {
+  jest.mocked(getSafetyIdentifierStatus).mockRejectedValue(new Error('synthetic private input'));
+  jest.mocked(regenerateSafetyIdentifiers).mockRejectedValue(new Error('synthetic private input'));
+  const response = await handler();
+  expect(response.status).toBe(500);
+  await expect(response.json()).resolves.toEqual({ error: SAFETY_IDENTIFIER_BACKFILL_ERROR });
 });

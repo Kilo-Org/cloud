@@ -229,6 +229,21 @@
     "signInCodeField": "Code sa pag-sign in",
     "or": "o"
   },
+  "pendingLink": {
+    "description": "May account na gumagamit ng {{email}}. Mag-sign in gamit ang isa sa mga paraan nito para maidagdag ang {{provider}}.",
+    "emailCode": "I-email sa akin ang code sa pag-sign in",
+    "continueInBrowser": "Magpatuloy sa browser",
+    "startAgain": "Magsimulang muli",
+    "expired": "Nag-expire na ang kahilingang ito na idagdag ang {{provider}}.",
+    "noMethods": "Walang ibang paraan ng pag-sign in ang account na ito, kaya hindi maidaragdag ang {{provider}}.",
+    "linked": "Naidagdag ang {{provider}} sa iyong account.",
+    "failedExpired": "Hindi naidagdag ang {{provider}} dahil nag-expire ang kahilingan.",
+    "failedWrongAccount": "Hindi naidagdag ang {{provider}} dahil nag-sign in ka sa ibang account.",
+    "failedAccountAlreadyLinked": "Hindi naidagdag ang {{provider}} dahil naka-link na ito sa ibang account.",
+    "failedProviderAlreadyLinked": "Hindi naidagdag ang {{provider}} dahil may ibang {{provider}} sign-in na ang iyong account.",
+    "failedLinking": "Hindi maidagdag ang {{provider}} sa iyong account.",
+    "notAdded": "Naka-sign in ka na. Hindi naidagdag ang {{provider}} sa iyong account."
+  },
   "profile": {
     "codeReviewerSubtitle": "Awtomatikong pagsusuri ng PR",
     "securityAgentSubtitle": "Hanapin at ayusin ang mga kahinaan sa seguridad",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Akawnt sa pagsubok",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO para sa negosyo",
     "passkeysTitle": "Mga passkey",
     "passkeysSubtitle": "Mag-sign in nang walang password",
@@ -2414,7 +2431,7 @@
       "discardWithUploadsMessage": "Buburahin ang iyong prompt at mga na-upload na file na hindi pa nagagamit.",
       "discardFailed": "Hindi mabura ang burador. Subukang muli.",
       "remoteHint": "Para patakbuhin sa iyong computer, simulan ang Kilo doon at iwanan itong tumatakbo.",
-      "continueFrom": "Ipinagpapatuloy ang {{title}}.",
+      "continueFrom": "Ipinagpapatuloy ang “{{title}}”.",
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",
       "importFailed": "Hindi ma-import ang sesyong ito.",
@@ -2566,7 +2583,21 @@
       "thought": "Naisip",
       "showDetails": "Ipakita ang mga detalye",
       "pending": "Nakabinbin…",
-      "running": "Tumatakbo…"
+      "running": "Tumatakbo…",
+      "field": {
+        "filePath": "Landas ng file",
+        "path": "Landas",
+        "offset": "Offset",
+        "limit": "Hangganan",
+        "pattern": "Padron",
+        "include": "Kasama",
+        "patchText": "Tekstong patch",
+        "query": "Paghahanap",
+        "prompt": "Panuto",
+        "header": "Pamagat",
+        "question": "Tanong",
+        "options": "Pagpipilian"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Hindi maipakita ang nilalaman."

@@ -229,6 +229,21 @@
     "signInCodeField": "Kodi i hyrjes",
     "or": "ose"
   },
+  "pendingLink": {
+    "description": "Një llogari e përdor tashmë {{email}}. Hyr me një nga metodat e saj për të shtuar {{provider}}.",
+    "emailCode": "Më dërgo me email një kod hyrjeje",
+    "continueInBrowser": "Vazhdo në shfletues",
+    "startAgain": "Fillo nga e para",
+    "expired": "Kjo kërkesë për të shtuar {{provider}} ka skaduar.",
+    "noMethods": "Kjo llogari nuk ka metodë tjetër hyrjeje, prandaj {{provider}} nuk mund të shtohet.",
+    "linked": "{{provider}} u shtua në llogarinë tënde.",
+    "failedExpired": "{{provider}} nuk u shtua sepse kërkesa skadoi.",
+    "failedWrongAccount": "{{provider}} nuk u shtua sepse hyre në një llogari tjetër.",
+    "failedAccountAlreadyLinked": "{{provider}} nuk u shtua sepse është lidhur tashmë me një llogari tjetër.",
+    "failedProviderAlreadyLinked": "{{provider}} nuk u shtua sepse llogaria jote ka tashmë një hyrje tjetër me {{provider}}.",
+    "failedLinking": "{{provider}} nuk mund të shtohej në llogarinë tënde.",
+    "notAdded": "Ke hyrë. {{provider}} nuk u shtua në llogarinë tënde."
+  },
   "profile": {
     "codeReviewerSubtitle": "Rishikime automatike të PR",
     "securityAgentSubtitle": "Gjej dhe korrigjo cenueshmëritë",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Llogari testimi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO për ndërmarrje",
     "passkeysTitle": "Çelësat e hyrjes",
     "passkeysSubtitle": "Hyr pa fjalëkalim",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Kërkesa jote dhe skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
       "discardFailed": "Nuk u fshi drafti. Provo përsëri.",
       "remoteHint": "Për ta ekzekutuar në kompjuterin tënd, nis Kilo aty dhe lëre të funksionojë.",
-      "continueFrom": "Po vazhdon seanca {{title}}.",
+      "continueFrom": "Po vazhdon seanca «{{title}}».",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
       "importFailed": "Nuk u arrit të importohej kjo seancë.",
@@ -2560,7 +2577,21 @@
       "thought": "Mendimi",
       "showDetails": "Shfaq detajet",
       "pending": "Në pritje…",
-      "running": "Duke u ekzekutuar…"
+      "running": "Duke u ekzekutuar…",
+      "field": {
+        "filePath": "Shtegu i skedarit",
+        "path": "Shtegu",
+        "offset": "Zhvendosja",
+        "limit": "Kufiri",
+        "pattern": "Modeli",
+        "include": "Përfshirja",
+        "patchText": "Teksti i arnës",
+        "query": "Kërkimi",
+        "prompt": "Udhëzimi",
+        "header": "Titulli",
+        "question": "Pyetja",
+        "options": "Opsionet"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nuk u shfaq përmbajtja."

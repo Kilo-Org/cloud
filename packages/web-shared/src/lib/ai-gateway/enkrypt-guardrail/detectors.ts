@@ -43,12 +43,12 @@ export const ENKRYPT_SUMMARY_DETECTORS: Record<string, EnkryptDetectorId> = {
 };
 
 /**
- * Kilo Default: prompt injection blocks. Detectors without input controls stay off; see
- * `enforcedEnkryptInputDetectors`.
+ * Kilo Default: prompt injection is logged, not blocked. Detectors without input controls stay off;
+ * see `enforcedEnkryptInputDetectors`.
  */
 export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors {
   return {
-    injection_attack: { enabled: true, action: 'block' },
+    injection_attack: { enabled: true, action: 'log' },
     pii: { enabled: false, action: 'log', entities: ['secrets'] },
     keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
     topic_detector: { enabled: false, topic: [] },

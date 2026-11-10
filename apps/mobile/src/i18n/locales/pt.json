@@ -229,6 +229,21 @@
     "signInCodeField": "Código de início de sessão",
     "or": "ou"
   },
+  "pendingLink": {
+    "description": "Já existe uma conta que utiliza {{email}}. Inicia sessão com um dos métodos dessa conta para adicionar {{provider}}.",
+    "emailCode": "Enviar-me um código de início de sessão por e-mail",
+    "continueInBrowser": "Continuar no navegador",
+    "startAgain": "Recomeçar",
+    "expired": "Este pedido para adicionar {{provider}} expirou.",
+    "noMethods": "Esta conta não tem outro método de início de sessão, por isso não é possível adicionar {{provider}}.",
+    "linked": "{{provider}} foi adicionado à tua conta.",
+    "failedExpired": "{{provider}} não foi adicionado porque o pedido expirou.",
+    "failedWrongAccount": "{{provider}} não foi adicionado porque iniciaste sessão numa conta diferente.",
+    "failedAccountAlreadyLinked": "{{provider}} não foi adicionado porque já está associado a outra conta.",
+    "failedProviderAlreadyLinked": "{{provider}} não foi adicionado porque a tua conta já tem um início de sessão {{provider}} diferente.",
+    "failedLinking": "Não foi possível adicionar {{provider}} à tua conta.",
+    "notAdded": "Tens sessão iniciada. {{provider}} não foi adicionado à tua conta."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisões automáticas de PR",
     "securityAgentSubtitle": "Detetar e corrigir vulnerabilidades",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Conta de teste",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO empresarial",
     "passkeysTitle": "Chaves de acesso",
     "passkeysSubtitle": "Inicia sessão sem palavra-passe",
@@ -2456,7 +2473,7 @@
       "discardWithUploadsMessage": "O seu pedido e os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados.",
       "discardFailed": "Não foi possível eliminar o rascunho. Tente novamente.",
       "remoteHint": "Para executar no seu computador, inicie o Kilo aí e deixe-o a correr.",
-      "continueFrom": "A sessão {{title}} está a ser retomada.",
+      "continueFrom": "A sessão “{{title}}” está a ser retomada.",
       "importingSession": "A importar a sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
       "importFailed": "Não foi possível importar esta sessão.",
@@ -2612,7 +2629,21 @@
       "thought": "Raciocínio",
       "showDetails": "Mostrar detalhes",
       "pending": "Pendente…",
-      "running": "Em execução…"
+      "running": "Em execução…",
+      "field": {
+        "filePath": "Caminho do ficheiro",
+        "path": "Caminho",
+        "offset": "Deslocamento",
+        "limit": "Limite",
+        "pattern": "Padrão",
+        "include": "Incluir",
+        "patchText": "Texto da alteração",
+        "query": "Consulta",
+        "prompt": "Instrução",
+        "header": "Título",
+        "question": "Pergunta",
+        "options": "Opções"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Não foi possível apresentar o conteúdo."

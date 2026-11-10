@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { load } from 'js-yaml';
 
+import { wiringCommand } from './ci-wiring-suites.mjs';
+
 const workflow = load(
   readFileSync(new URL('../.github/workflows/meta-janitor-approve.yml', import.meta.url), 'utf8')
 );
@@ -11,24 +13,6 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const execute = new AsyncFunction('github', 'context', 'core', script);
 const sha = 'a'.repeat(40);
 const bot = { login: 'kilo-code-bot[bot]', type: 'Bot' };
-// ci-wiring runs the wiring suites in one `node --test` invocation; pin the
-// exact command so this suite cannot silently leave the job.
-const wiringSuites = [
-  'scripts/stacked-ci.test.mjs',
-  'scripts/changed-dependencies.test.mjs',
-  'scripts/build-key-inputs.test.mjs',
-  'scripts/ttsc-plugin-key.test.mjs',
-  'scripts/affected-workspaces.test.mjs',
-  'scripts/changed-workspaces.test.mjs',
-  'scripts/changes-filter-retry.test.mjs',
-  'scripts/typecheck-ci.test.mjs',
-  'scripts/deployment-workflows.test.mjs',
-  'scripts/main-workflow-failure.test.mjs',
-  'scripts/production-deploy-failure.test.mjs',
-  'scripts/meta-janitor-approve.test.mjs',
-  'scripts/mobile-sbom-workflow.test.mjs',
-];
-const wiringCommand = `node --test ${wiringSuites.join(' ')}`;
 const signalBody = `Meta Janitor: Safety review passed; requesting approval.\n\n<!-- meta-janitor-approve:v1 head=${sha} -->`;
 
 function fixture() {

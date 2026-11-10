@@ -229,6 +229,21 @@
     "signInCodeField": "Нэвтрэх код",
     "or": "эсвэл"
   },
+  "pendingLink": {
+    "description": "{{email}}-г аль хэдийн нэг бүртгэл ашиглаж байна. {{provider}}-г нэмэхийн тулд тухайн бүртгэлийн нэвтрэх аргуудын аль нэгээр нэвтэрнэ үү.",
+    "emailCode": "Нэвтрэх кодыг имэйлээр илгээх",
+    "continueInBrowser": "Хөтөч дээр үргэлжлүүлэх",
+    "startAgain": "Дахин эхлэх",
+    "expired": "{{provider}}-г нэмэх энэ хүсэлтийн хугацаа дууссан.",
+    "noMethods": "Энэ бүртгэлд өөр нэвтрэх арга байхгүй тул {{provider}}-г нэмэх боломжгүй.",
+    "linked": "{{provider}} таны бүртгэлд нэмэгдлээ.",
+    "failedExpired": "Хүсэлтийн хугацаа дууссан тул {{provider}} нэмэгдсэнгүй.",
+    "failedWrongAccount": "Та өөр бүртгэлээр нэвтэрсэн тул {{provider}} нэмэгдсэнгүй.",
+    "failedAccountAlreadyLinked": "{{provider}} өөр бүртгэлтэй аль хэдийн холбогдсон тул нэмэгдсэнгүй.",
+    "failedProviderAlreadyLinked": "Таны бүртгэлд өөр {{provider}} нэвтрэлт аль хэдийн байгаа тул {{provider}} нэмэгдсэнгүй.",
+    "failedLinking": "{{provider}}-г таны бүртгэлд нэмж чадсангүй.",
+    "notAdded": "Та нэвтэрсэн байна. {{provider}} таны бүртгэлд нэмэгдсэнгүй."
+  },
   "profile": {
     "codeReviewerSubtitle": "PR-ийн автомат хяналт",
     "securityAgentSubtitle": "Эмзэг байдлыг олж, арилгах",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Туршилтын бүртгэл",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Байгууллагын SSO",
     "passkeysTitle": "Нэвтрэх түлхүүр",
     "passkeysSubtitle": "Нууц үггүйгээр нэвтрэх",
@@ -2560,7 +2577,21 @@
       "thought": "Бодол",
       "showDetails": "Дэлгэрэнгүйг харуулах",
       "pending": "Хүлээгдэж байна…",
-      "running": "Ажиллаж байна…"
+      "running": "Ажиллаж байна…",
+      "field": {
+        "filePath": "Файлын зам",
+        "path": "Зам",
+        "offset": "Эхлэл",
+        "limit": "Хязгаар",
+        "pattern": "Загвар",
+        "include": "Оруулах",
+        "patchText": "Засварын бичвэр",
+        "query": "Асуулга",
+        "prompt": "Заавар",
+        "header": "Гарчиг",
+        "question": "Асуулт",
+        "options": "Сонголтууд"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Агуулгыг харуулж чадсангүй."

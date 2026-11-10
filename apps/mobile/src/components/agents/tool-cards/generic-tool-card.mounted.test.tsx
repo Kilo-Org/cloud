@@ -81,6 +81,25 @@ function makeMcpErrorPart(): ToolPart {
   };
 }
 
+function makeSendFilePart(): ToolPart {
+  return {
+    id: 'file-1',
+    sessionID: 'session-1',
+    messageID: 'message-1',
+    type: 'tool',
+    callID: 'call-file',
+    tool: 'send_file',
+    state: {
+      status: 'completed',
+      input: { filePath: '/workspace/report.txt' },
+      output: 'File report.txt delivered to the app.',
+      title: 'Sent report.txt',
+      metadata: {},
+      time: { start: 0, end: 1 },
+    },
+  };
+}
+
 function makeEmptyUnknownPart(): ToolPart {
   return {
     id: 'unknown-1',
@@ -172,13 +191,26 @@ describe('GenericToolCardBody mounted', () => {
     const renderer = await renderBody(makeQuestionPart());
 
     const values = textValues(renderer.root);
-    expect(values).toContain('header');
+    expect(values).toContain('Header');
     expect(values).toContain('E2E');
-    expect(values).toContain('question');
+    expect(values).toContain('Question');
     expect(values).toContain('Which fields should the sheet show?');
-    expect(values).toContain('options');
+    expect(values).toContain('Options');
     expect(values).toContain('Continue — Continue the E2E scenario');
     expect(values.some(value => value.includes('"questions"'))).toBe(false);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('labels a known tool argument instead of showing its raw key', async () => {
+    const renderer = await renderBody(makeSendFilePart());
+
+    const values = textValues(renderer.root);
+    expect(values).toContain('File path');
+    expect(values).toContain('/workspace/report.txt');
+    expect(values).not.toContain('filePath');
 
     act(() => {
       renderer.unmount();

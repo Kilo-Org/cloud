@@ -170,11 +170,12 @@ function launchIdentity(provider: FakeProvider): { credential: string; allocatio
 async function connectAndHello(
   provider: FakeProvider,
   sandboxId: string,
-  wrapperId: string
+  wrapperId: string,
+  worktreeGit = false
 ): Promise<FakeWrapper> {
   const { credential, allocationId } = launchIdentity(provider);
   const wrapper = await FakeWrapper.connect({ sandboxId, credential });
-  const reply = await wrapper.hello({ wrapperId, allocationId });
+  const reply = await wrapper.hello({ wrapperId, allocationId, worktreeGit });
   expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return wrapper;
 }
@@ -322,6 +323,42 @@ afterEach(async () => {
 });
 
 describe('control-plane worktree changes (B10)', () => {
+  it.each([false, true])('gates git operations on wrapper support: %s', async supportsGit => {
+    const sandboxId = await generateSandboxId(newSessionId());
+    const provider = createFakeProvider();
+    const stub = await injectProvider(sandboxId, provider);
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_git_support', supportsGit);
+    const operation = stub.worktreeGit({
+      session: {
+        sessionId: newSessionId(),
+        kiloSessionId: kiloSessionId(),
+        directory: '/workspace/x',
+      },
+      payload: { operation: 'sync' },
+    });
+    if (supportsGit) {
+      const frame = await awaitFrame(wrapper, 'worktree.git');
+      const result = {
+        status: 'refused',
+        operation: 'sync',
+        branch: 'feat/test',
+        reason: 'turn_running',
+        message: 'A turn is running.',
+      };
+      wrapper.send({ type: 'worktree.result', requestId: frame.requestId, ok: true, result });
+      await expect(operation).resolves.toEqual({ ok: true, result });
+    } else {
+      await expect(operation).resolves.toMatchObject({
+        ok: false,
+        error: { code: 'wrapper_upgrade_required', retryable: false },
+      });
+      expect(await wrapper.next(25)).toBeNull();
+    }
+    wrapper.close();
+  });
+
   it.each(['changes', 'file', 'recovery', 'refresh'] as const)(
     'deduplicates %s readers and removes their subscription on worktree deletion',
     async operation => {
@@ -1410,16 +1447,23 @@ describe('SandboxSessionV2 preview service discovery', () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
     const sessionStub = await startSessionWithSandbox({
       sessionId,
       sandboxId,
       provider,
-      worktreeId: `worktree_${crypto.randomUUID()}`,
+      worktreeId,
     });
     const wrapper = await connectAndHello(provider, sandboxId, wrapperId);
     await markRouteReady(sessionStub, wrapper, sessionId);
     await settleCaptures(wrapper);
-    return { sessionId, sandboxId, sessionStub, wrapper };
+    return {
+      sessionId,
+      sandboxId,
+      sessionStub,
+      wrapper,
+      scope: { ownerId: USER_ID, organizationId: ORG_ID, scopeId: worktreeId },
+    };
   }
 
   it('relays a bound wrapper scan to the session caller', async () => {
@@ -1442,14 +1486,14 @@ describe('SandboxSessionV2 preview service discovery', () => {
   });
 
   it('surfaces a post-send timeout as an error instead of not_ready', async () => {
-    const { sessionId, sandboxId, wrapper } = await readySession('wr_preview_timeout');
+    const { sandboxId, wrapper, scope } = await readySession('wr_preview_timeout');
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, instance => {
       instance.controlRequestTimeoutMs = 25;
     });
 
     const assertion = expect(
-      runInDurableObject(sandboxStub, instance => instance.previewServices(sessionId))
+      runInDurableObject(sandboxStub, instance => instance.previewServices(scope))
     ).rejects.toThrow('Preview service discovery timed out');
     await awaitFrame(wrapper, 'preview.list');
 
@@ -1458,11 +1502,11 @@ describe('SandboxSessionV2 preview service discovery', () => {
   });
 
   it('surfaces a wrapper scan error', async () => {
-    const { sessionId, sandboxId, wrapper } = await readySession('wr_preview_error');
+    const { sandboxId, wrapper, scope } = await readySession('wr_preview_error');
     const sandboxStub = sandboxes.getByName(sandboxId);
 
     const assertion = expect(
-      runInDurableObject(sandboxStub, instance => instance.previewServices(sessionId))
+      runInDurableObject(sandboxStub, instance => instance.previewServices(scope))
     ).rejects.toThrow('Preview service scan failed (scan_failed)');
     const frame = await awaitFrame(wrapper, 'preview.list');
     wrapper.send({

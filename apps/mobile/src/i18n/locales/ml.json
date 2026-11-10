@@ -229,6 +229,21 @@
     "signInCodeField": "സൈൻ ഇൻ കോഡ്",
     "or": "അല്ലെങ്കിൽ"
   },
+  "pendingLink": {
+    "description": "{{email}} ഇതിനകം ഒരു അക്കൗണ്ട് ഉപയോഗിക്കുന്നുണ്ട്. {{provider}} ചേർക്കാൻ അതിന്റെ ഏതെങ്കിലും ഒരു രീതി ഉപയോഗിച്ച് സൈൻ ഇൻ ചെയ്യുക.",
+    "emailCode": "എനിക്ക് ഒരു സൈൻ ഇൻ കോഡ് ഇമെയിൽ ചെയ്യുക",
+    "continueInBrowser": "ബ്രൗസറിൽ തുടരുക",
+    "startAgain": "വീണ്ടും ആരംഭിക്കുക",
+    "expired": "{{provider}} ചേർക്കാനുള്ള ഈ അഭ്യർത്ഥനയുടെ കാലാവധി കഴിഞ്ഞു.",
+    "noMethods": "ഈ അക്കൗണ്ടിന് മറ്റ് സൈൻ ഇൻ രീതികളൊന്നുമില്ല, അതിനാൽ {{provider}} ചേർക്കാനാകില്ല.",
+    "linked": "{{provider}} നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് ചേർത്തു.",
+    "failedExpired": "അഭ്യർത്ഥനയുടെ കാലാവധി കഴിഞ്ഞതിനാൽ {{provider}} ചേർത്തില്ല.",
+    "failedWrongAccount": "നിങ്ങൾ മറ്റൊരു അക്കൗണ്ടിലേക്ക് സൈൻ ഇൻ ചെയ്തതിനാൽ {{provider}} ചേർത്തില്ല.",
+    "failedAccountAlreadyLinked": "{{provider}} ഇതിനകം മറ്റൊരു അക്കൗണ്ടുമായി ലിങ്ക് ചെയ്തിട്ടുള്ളതിനാൽ ചേർത്തില്ല.",
+    "failedProviderAlreadyLinked": "നിങ്ങളുടെ അക്കൗണ്ടിൽ ഇതിനകം മറ്റൊരു {{provider}} സൈൻ ഇൻ ഉള്ളതിനാൽ {{provider}} ചേർത്തില്ല.",
+    "failedLinking": "{{provider}} നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് ചേർക്കാനായില്ല.",
+    "notAdded": "നിങ്ങൾ സൈൻ ഇൻ ചെയ്തിട്ടുണ്ട്. {{provider}} നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് ചേർത്തില്ല."
+  },
   "profile": {
     "codeReviewerSubtitle": "സ്വയമേവയുള്ള PR അവലോകനങ്ങൾ",
     "securityAgentSubtitle": "സുരക്ഷാ ദൗർബല്യങ്ങൾ കണ്ടെത്തി പരിഹരിക്കുക",
@@ -267,6 +282,8 @@
     "providerTestAccount": "ടെസ്റ്റ് അക്കൗണ്ട്",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "എന്റർപ്രൈസ് SSO",
     "passkeysTitle": "പാസ്കീകൾ",
     "passkeysSubtitle": "പാസ്‌വേഡ് ഇല്ലാതെ സൈൻ ഇൻ ചെയ്യുക",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "നിങ്ങളുടെ പ്രോംപ്റ്റും ഒരു സന്ദേശത്തിലും ചേർത്തിട്ടില്ലാത്ത അപ്‌ലോഡുകളും ഇല്ലാതാക്കും.",
       "discardFailed": "ഡ്രാഫ്റ്റ് ഉപേക്ഷിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "remoteHint": "നിങ്ങളുടെ കമ്പ്യൂട്ടറിൽ പ്രവർത്തിപ്പിക്കുന്നതിന്, അവിടെ Kilo ആരംഭിച്ച് അത് പ്രവർത്തിച്ചുകൊണ്ടിരിക്കാൻ വിടുക.",
-      "continueFrom": "{{title}} തുടരുന്നു.",
+      "continueFrom": "“{{title}}” തുടരുന്നു.",
       "importingSession": "സെഷൻ ഇംപോർട്ട് ചെയ്യുന്നു",
       "cliCannotContinue": "ഈ CLI-യ്ക്ക് ഒരു സെഷൻ തുടരാൻ കഴിയില്ല. Cloud Agent അല്ലെങ്കിൽ മറ്റൊരു CLI തിരഞ്ഞെടുക്കുക.",
       "importFailed": "ഈ സെഷൻ ഇംപോർട്ട് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
@@ -2560,7 +2577,21 @@
       "thought": "ചിന്ത",
       "showDetails": "വിശദാംശങ്ങൾ കാണിക്കുക",
       "pending": "കാത്തിരിക്കുന്നു…",
-      "running": "പ്രവർത്തിക്കുന്നു…"
+      "running": "പ്രവർത്തിക്കുന്നു…",
+      "field": {
+        "filePath": "ഫയൽ പാത",
+        "path": "പാത",
+        "offset": "ഓഫ്സെറ്റ്",
+        "limit": "പരിധി",
+        "pattern": "പാറ്റേൺ",
+        "include": "ഉൾപ്പെടുത്തൽ",
+        "patchText": "പാച്ച് വാചകം",
+        "query": "അന്വേഷണം",
+        "prompt": "പ്രോംപ്റ്റ്",
+        "header": "തലക്കെട്ട്",
+        "question": "ചോദ്യം",
+        "options": "ഓപ്ഷനുകൾ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ഉള്ളടക്കം പ്രദർശിപ്പിക്കാൻ കഴിഞ്ഞില്ല."

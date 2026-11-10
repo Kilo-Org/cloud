@@ -123,6 +123,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/process-kiloclaw-stripe-renewals",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/user-deletion-attention-summary",
       "schedule": "0 12 * * *"
     },
@@ -163,8 +167,8 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/backfill-byok-envelopes",
-      "schedule": "*/5 * * * *"
+      "path": "/api/cron/backfill-safety-identifiers",
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/recover-code-reviews",

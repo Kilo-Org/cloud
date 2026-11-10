@@ -3822,6 +3822,31 @@ describe('SandboxControlV2 environment repository credentials', () => {
     expect(JSON.parse(row?.grant ?? '{}')).toMatchObject({ directory: `/workspace/${SESSION}` });
   });
 
+  it('delivers a stacked base in the prepare frame', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker());
+    const baseSha = 'a'.repeat(40);
+    const { prepareFrame } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, credentialsSource(SESSION), {
+        ...routeSpec(SESSION),
+        branch: 'kilo/stacked',
+        branchMode: 'working',
+        baseBranch: 'feature/parent',
+        baseSha,
+      })
+    );
+
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec).toMatchObject({
+      branch: 'kilo/stacked',
+      branchMode: 'working',
+      baseBranch: 'feature/parent',
+      baseSha,
+    });
+  });
+
   it('redeems the capability of the member that the request URL names', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();

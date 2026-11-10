@@ -156,8 +156,10 @@ export function claimAuthTerminalFailureReport(route: string, status: number): b
 
 /**
  * Report one terminal sign-in failure, at most once per process, with the
- * stable fingerprint above. The expected expiry of the stored credential is a
- * lifecycle event, so it is filed at warning level; every other terminal
+ * stable fingerprint above. Two answers are expected rather than defects, and
+ * they are filed at warning level: the expiry of the stored credential on the
+ * refresh route, and a 401 on an attempt route, which refuses the code,
+ * ticket, ID token or passkey the attempt presented. Every other terminal
  * refusal names a defect and stays at error. Same tags and fingerprint either
  * way, so one route and status keeps one issue and only its severity moves.
  * Never throws; a no-op until a telemetry sink is installed.
@@ -166,12 +168,16 @@ export function reportAuthTerminalFailure(route: AuthTerminalRoute, status: numb
   if (!claimAuthTerminalFailureReport(route, status)) {
     return;
   }
-  // The stored credential's own expiry is the expected end of a session: it
-  // was expired, revoked or already rotated, and the person signs in again.
-  // Every other terminal refusal names a defect, so only that one is a warning.
-  const expired = route === STORED_CREDENTIAL_ROUTE && status === 401;
+  // Both expected cases are a 401, and every route reported here is either the
+  // stored credential route or an attempt route: the stored credential's own
+  // expiry ends a session the person renews by signing in, and an attempt
+  // route's 401 refuses the credential the attempt presented (the server's
+  // INVALID_CODE, INVALID_TOKEN, INVALID_TICKET or a PasskeyVerificationError
+  // code), which a mistyped code, a reused ticket or a cancelled ceremony
+  // produces. Any other terminal status names a defect and stays at error.
+  const expectedRefusal = status === 401;
   captureTelemetry({
-    level: expired ? 'warning' : 'error',
+    level: expectedRefusal ? 'warning' : 'error',
     error: new Error(`Terminal sign-in failure: ${status} on ${route}`),
     tags: {
       'error.subsystem': 'auth',

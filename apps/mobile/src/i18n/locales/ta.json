@@ -229,6 +229,21 @@
     "signInCodeField": "உள்நுழைவுக் குறியீடு",
     "or": "அல்லது"
   },
+  "pendingLink": {
+    "description": "{{email}} ஐ ஏற்கெனவே ஒரு கணக்கு பயன்படுத்துகிறது. {{provider}} ஐச் சேர்க்க, அதன் முறைகளில் ஒன்றின் மூலம் உள்நுழையவும்.",
+    "emailCode": "உள்நுழைவுக் குறியீட்டை எனக்கு மின்னஞ்சல் செய்யவும்",
+    "continueInBrowser": "உலாவியில் தொடரவும்",
+    "startAgain": "மீண்டும் தொடங்கவும்",
+    "expired": "{{provider}} ஐச் சேர்க்கும் இந்தக் கோரிக்கை காலாவதியாகிவிட்டது.",
+    "noMethods": "இந்தக் கணக்கிற்கு வேறு உள்நுழைவு முறை இல்லை, எனவே {{provider}} ஐச் சேர்க்க முடியாது.",
+    "linked": "{{provider}} உங்கள் கணக்கில் சேர்க்கப்பட்டது.",
+    "failedExpired": "கோரிக்கை காலாவதியானதால் {{provider}} சேர்க்கப்படவில்லை.",
+    "failedWrongAccount": "நீங்கள் வேறு கணக்கில் உள்நுழைந்ததால் {{provider}} சேர்க்கப்படவில்லை.",
+    "failedAccountAlreadyLinked": "{{provider}} ஏற்கெனவே வேறொரு கணக்குடன் இணைக்கப்பட்டுள்ளதால் சேர்க்கப்படவில்லை.",
+    "failedProviderAlreadyLinked": "உங்கள் கணக்கில் ஏற்கெனவே வேறொரு {{provider}} உள்நுழைவு இருப்பதால் {{provider}} சேர்க்கப்படவில்லை.",
+    "failedLinking": "{{provider}} ஐ உங்கள் கணக்கில் சேர்க்க முடியவில்லை.",
+    "notAdded": "நீங்கள் உள்நுழைந்துவிட்டீர்கள். {{provider}} உங்கள் கணக்கில் சேர்க்கப்படவில்லை."
+  },
   "profile": {
     "codeReviewerSubtitle": "தானியங்கி PR மதிப்பாய்வுகள்",
     "securityAgentSubtitle": "பாதுகாப்புக் குறைபாடுகளைக் கண்டறிந்து சரிசெய்யவும்",
@@ -267,6 +282,8 @@
     "providerTestAccount": "சோதனைக் கணக்கு",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "நிறுவன SSO",
     "passkeysTitle": "பாஸ்கீகள்",
     "passkeysSubtitle": "கடவுச்சொல் இல்லாமல் உள்நுழையவும்",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "உங்கள் வினவலும் அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்களும் நீக்கப்படும்.",
       "discardFailed": "வரைவை நீக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "remoteHint": "உங்கள் கணினியில் இயக்க, அங்கு Kilo-ஐத் தொடங்கி, அது இயங்கிக்கொண்டே இருக்க விட்டுவிடுங்கள்.",
-      "continueFrom": "{{title}} தொடரப்படுகிறது.",
+      "continueFrom": "“{{title}}” தொடரப்படுகிறது.",
       "importingSession": "அமர்வு இறக்குமதி செய்யப்படுகிறது",
       "cliCannotContinue": "இந்த CLI-இல் அமர்வைத் தொடர முடியாது. Cloud Agent அல்லது வேறொரு CLI-ஐத் தேர்ந்தெடுக்கவும்.",
       "importFailed": "இந்த அமர்வை இறக்குமதி செய்ய முடியவில்லை.",
@@ -2560,7 +2577,21 @@
       "thought": "சிந்தனை",
       "showDetails": "விவரங்களைக் காட்டவும்",
       "pending": "நிலுவையில்…",
-      "running": "இயங்குகிறது…"
+      "running": "இயங்குகிறது…",
+      "field": {
+        "filePath": "கோப்பு பாதை",
+        "path": "பாதை",
+        "offset": "இடப்பெயர்ச்சி",
+        "limit": "வரம்பு",
+        "pattern": "வடிவம்",
+        "include": "சேர்க்கை",
+        "patchText": "திருத்த உரை",
+        "query": "வினவல்",
+        "prompt": "தூண்டுதல்",
+        "header": "தலைப்பு",
+        "question": "கேள்வி",
+        "options": "விருப்பங்கள்"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "உள்ளடக்கத்தைக் காட்ட முடியவில்லை."

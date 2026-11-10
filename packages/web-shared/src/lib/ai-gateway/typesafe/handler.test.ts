@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
-import type { StoredModel } from '@kilocode/db';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { after, NextRequest, NextResponse } from 'next/server';
 import type * as NextServer from 'next/server';
@@ -131,7 +131,7 @@ const METERED_LATENCY_MS = CLOCK_STEP_MS;
 const METERED_COMPLETE_REQUEST_MS = 2 * CLOCK_STEP_MS;
 const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
 const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
-const pricedSystemOneModels: Record<string, StoredModel> = {
+const pricedSystemOneModels: Record<string, GatewayModelWithEndpoints> = {
   [TYPESAFE_MODEL]: {
     id: TYPESAFE_MODEL,
     name: 'TypeSafe: Jev 1.13',

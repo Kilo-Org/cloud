@@ -14,19 +14,25 @@
  * Formatting built by hand instead of through `@/lib/intl-cache` skips the tag
  * normalisation every other surface shares, and pins or ignores the locale.
  *
+ * Every rule reads the syntax tree oxc builds (tools/lib/ast.mjs): a JSX
+ * attribute belongs to its own element, an import specifier is a specifier,
+ * and a formatter is a call. Text that only looks like code — a comment, a
+ * string, a type annotation, a nested template — is a node of its own, so it
+ * can no longer desynchronise a rule or hide the call sites after it.
+ *
  * Usage: node tools/nativewind/check-classes.mjs
  */
-import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { endOfComment, endOfQuoted, endOfQuotedOrComment } from '../lib/js-scan.mjs';
+import { lineIndex, parseProblems, parseSourceFile, walk } from '../lib/ast.mjs';
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
-const ROOT = new URL('../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src'), join(ROOT, 'packages/app-shared/src')];
 
 /** Utilities that take a colour, so `<utility>-black/<alpha>` can appear. */
@@ -124,210 +130,72 @@ function rules() {
  * been 21 / 21, with cards running off the trailing edge. Correct in LTR, so
  * nothing catches it until someone reads the app in Arabic, Farsi or Hebrew.
  */
-const SCROLL_CONTAINERS =
-  '(?:Animated\\.)?(?:ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView)';
-const SCROLL_TAG = new RegExp(`<(${SCROLL_CONTAINERS})\\b`, 'g');
+const SCROLL_CONTAINER =
+  /^(?:Animated\.)?(?:ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView)$/;
 const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
 
-/** Index of the `}` matching the `{` at `start`, skipping quoted text and comments. */
-function endOfBraces(text, start) {
-  let depth = 0;
-  for (let index = start; index < text.length; index++) {
-    const skipped = endOfQuotedOrComment(text, index);
-    if (skipped !== -1) {
-      index = skipped - 1;
-      continue;
-    }
-    const char = text[index];
-    if (char === '{') {
-      depth++;
-    } else if (char === '}' && --depth === 0) {
-      return index;
-    }
-  }
-  return -1;
-}
-
 /**
- * Index of the `>` closing the type argument list that starts at `start`
- * (`<FlashList<Row> ...>`). `=>` inside a function type does not close it,
- * `>>` closes two nested lists, and an object type keeps its braces.
+ * The class strings in one `className` value: every string literal and
+ * template chunk it holds, including the ones a `${…}` or a `cn(…)` argument
+ * contributes, so `cn('flex-1', compact && 'p-2')` contributes `p-2` and
+ * `` `flex-1 ${wide ? 'p-6' : ''}` `` contributes `p-6`.
+ *
+ * Only the value of the element's own `className` is read, so an element
+ * nested in `renderItem` or `ListHeaderComponent` keeps its classes to itself.
  */
-function endOfTypeArguments(text, start) {
-  let depth = 0;
-  for (let index = start; index < text.length; index++) {
-    const skipped = endOfQuotedOrComment(text, index);
-    if (skipped !== -1) {
-      index = skipped - 1;
-      continue;
-    }
-    const char = text[index];
-    if (char === '<') {
-      depth++;
-    } else if (char === '>' && text[index - 1] !== '=') {
-      if (--depth === 0) {
-        return index;
-      }
-    }
+function classStrings(value) {
+  if (value === null || value === undefined) {
+    return [];
   }
-  return -1;
-}
-
-/**
- * Index of the `>` closing the tag whose attributes start at `start`. A nested
- * JSX value or an arrow function keeps its braces open, so `=>` inside an
- * attribute cannot end the tag early, and a comment between attributes is
- * skipped whole.
- */
-function endOfTag(text, start) {
-  let depth = 0;
-  for (let index = start; index < text.length; index++) {
-    const skipped = endOfQuotedOrComment(text, index);
-    if (skipped !== -1) {
-      index = skipped - 1;
-      continue;
-    }
-    const char = text[index];
-    if (char === '{') {
-      depth++;
-    } else if (char === '}') {
-      depth--;
-    } else if (char === '>' && depth === 0) {
-      return index;
-    }
+  if (value.type === 'Literal') {
+    return typeof value.value === 'string' ? [value.value] : [];
   }
-  return -1;
-}
-
-/**
- * The class strings in a `className` expression: every string literal and
- * template-literal chunk, including the ones inside `${...}` and object
- * branches, so `cn('flex-1', compact && 'p-2')` reports `p-2`.
- */
-function classStrings(expression) {
   const strings = [];
-  let index = 0;
-  while (index < expression.length) {
-    const char = expression[index];
-    if (char === '"' || char === "'") {
-      const end = endOfQuoted(expression, index);
-      strings.push(expression.slice(index + 1, end - 1));
-      index = end;
-    } else if (char === '`') {
-      let end = index + 1;
-      let chunk = '';
-      while (end < expression.length && expression[end] !== '`') {
-        if (expression[end] === '\\') {
-          chunk += expression[end + 1] ?? '';
-          end += 2;
-        } else if (expression[end] === '$' && expression[end + 1] === '{') {
-          const interpolation = endOfBraces(expression, end + 1);
-          if (interpolation === -1) {
-            end = expression.length;
-            break;
-          }
-          strings.push(...classStrings(expression.slice(end + 2, interpolation)));
-          chunk += ' ';
-          end = interpolation + 1;
-        } else {
-          chunk += expression[end++];
-        }
-      }
-      strings.push(chunk);
-      index = end + 1;
-    } else if (char === '/') {
-      const end = endOfComment(expression, index);
-      index = end === -1 ? index + 1 : end;
-    } else if (char === '{') {
-      const end = endOfBraces(expression, index);
-      if (end === -1) {
-        break;
-      }
-      strings.push(...classStrings(expression.slice(index + 1, end)));
-      index = end + 1;
-    } else {
-      index++;
+  walk(value, node => {
+    if (node.type === 'Literal' && typeof node.value === 'string') {
+      strings.push(node.value);
+    } else if (node.type === 'TemplateElement') {
+      strings.push(node.value.cooked ?? node.value.raw);
     }
-  }
+  });
   return strings;
 }
 
-/**
- * The class strings on the element's own `className`. Attributes such as
- * `renderItem` and `ListHeaderComponent` hold nested JSX at brace depth > 0,
- * so the container's own classes are the only ones read.
- */
-function ownClassStrings(attributes) {
-  const strings = [];
-  let depth = 0;
-  for (let index = 0; index < attributes.length; index++) {
-    const skipped = endOfQuotedOrComment(attributes, index);
-    if (skipped !== -1) {
-      index = skipped - 1;
-      continue;
-    }
-    const char = attributes[index];
-    if (char === '{') {
-      depth++;
-    } else if (char === '}') {
-      depth--;
-    } else if (depth === 0 && attributes.startsWith('className', index)) {
-      if (index > 0 && /[\w$.-]/.test(attributes[index - 1])) {
-        continue;
-      }
-      let value = index + 'className'.length;
-      while (/\s/.test(attributes[value])) {
-        value++;
-      }
-      if (attributes[value] !== '=') {
-        continue;
-      }
-      value++;
-      while (/\s/.test(attributes[value])) {
-        value++;
-      }
-      const quote = attributes[value];
-      if (quote === '"' || quote === "'") {
-        const end = endOfQuoted(attributes, value);
-        strings.push(attributes.slice(value + 1, end - 1));
-        index = end - 1;
-      } else if (quote === '{') {
-        const end = endOfBraces(attributes, value);
-        if (end === -1) {
-          break;
-        }
-        strings.push(...classStrings(attributes.slice(value + 1, end)));
-        index = end;
-      }
-    }
-  }
-  return strings;
+/** The source of a JSX tag's name, `ScrollView` or `Animated.ScrollView` alike. */
+function tagName(node, text) {
+  return text.slice(node.name.start, node.name.end);
 }
 
-export function checkScrollPadding(relative, text, index = lineIndex(text)) {
+export function checkScrollPadding(relative, program, text, lineOf) {
   const problems = [];
-  for (const match of text.matchAll(SCROLL_TAG)) {
-    let attributesStart = match.index + match[0].length;
-    if (text[attributesStart] === '<') {
-      const typeEnd = endOfTypeArguments(text, attributesStart);
-      if (typeEnd !== -1) {
-        attributesStart = typeEnd + 1;
-      }
+  walk(program, node => {
+    if (node.type !== 'JSXOpeningElement') {
+      return;
     }
-    const tagEnd = endOfTag(text, attributesStart);
-    if (tagEnd === -1) {
-      continue;
+    const name = tagName(node, text);
+    if (!SCROLL_CONTAINER.test(name)) {
+      return;
     }
-    const padding = ownClassStrings(text.slice(attributesStart, tagEnd))
-      .flatMap(classes => classes.split(/\s+/))
-      .filter(classes => HORIZONTAL_PADDING.test(classes));
+    const attribute = node.attributes.find(
+      candidate =>
+        candidate.type === 'JSXAttribute' &&
+        candidate.name.type === 'JSXIdentifier' &&
+        candidate.name.name === 'className'
+    );
+    const padding = [
+      ...new Set(
+        classStrings(attribute?.value)
+          .flatMap(classes => classes.split(/\s+/))
+          .filter(classes => HORIZONTAL_PADDING.test(classes))
+      ),
+    ].sort();
     if (padding.length > 0) {
-      const line = lineOf(index.lineStarts, match.index);
+      const line = lineOf(node.start);
       problems.push(
-        `${relative}:${line}: <${match[1]}> carries "${padding.join(' ')}" on its own className; move it to contentContainerClassName or the RTL layout offsets by it`
+        `${relative}:${line}: <${name}> carries "${padding.join(' ')}" on its own className; move it to contentContainerClassName or the RTL layout offsets by it`
       );
     }
-  }
+  });
   return problems;
 }
 
@@ -339,7 +207,6 @@ export function checkScrollPadding(relative, text, index = lineIndex(text)) {
  * runtime import renders the raw component under whatever name it takes, so an
  * alias is reported like a bare import.
  */
-const RAW_TEXT_IMPORT = /import\s+(type\s*)?\{([^}]*)\}\s*from\s*'react-native'/gs;
 const RAW_TEXT_EXEMPT = new Set([
   // A hidden node measured for height. It must not inherit the shared
   // component's base font classes, or the measurement stops matching the
@@ -363,34 +230,36 @@ const RAW_TEXT_EXEMPT = new Set([
   'apps/mobile/src/components/pr-review/diff/pr-diff-side-by-side-row.tsx',
 ]);
 
-/**
- * Whether one named specifier brings the runtime component in: a bare `Text`
- * and `Text as <name>` do, while `type Text` and `type Text as <name>` are the
- * annotations callers type refs with. The `as` split leaves that leading
- * `type` in the imported name, so the name comparison alone excludes them.
- */
-function importsRuntimeText(specifier) {
-  const [imported] = specifier.split(/\s+as\s+/);
-  return imported.trim() === 'Text';
+/** The name one import specifier brings in, as written. */
+function importedName(node) {
+  return node.type === 'Identifier' ? node.name : node.value;
 }
 
-export function checkRawText(relative, text, index = lineIndex(text)) {
+export function checkRawText(relative, program, lineOf) {
   const problems = [];
   if (RAW_TEXT_EXEMPT.has(relative) || relative.endsWith('components/ui/text.tsx')) {
     return problems;
   }
-  for (const match of text.matchAll(RAW_TEXT_IMPORT)) {
-    // `import type { … }` types the list, so nothing in it is rendered.
-    const typeOnly = match[1] !== undefined;
-    const runtime =
-      !typeOnly && match[2].split(',').some(specifier => importsRuntimeText(specifier));
+  walk(program, node => {
+    if (node.type !== 'ImportDeclaration' || node.importKind === 'type') {
+      return;
+    }
+    if (node.source.value !== 'react-native') {
+      return;
+    }
+    const runtime = node.specifiers.some(
+      specifier =>
+        specifier.type === 'ImportSpecifier' &&
+        specifier.importKind !== 'type' &&
+        importedName(specifier.imported) === 'Text'
+    );
     if (runtime) {
-      const line = lineOf(index.lineStarts, match.index);
+      const line = lineOf(node.start);
       problems.push(
         `${relative}:${line}: imports Text from 'react-native'; use @/components/ui/text so the copy follows the RTL paragraph direction`
       );
     }
-  }
+  });
   return problems;
 }
 
@@ -401,17 +270,24 @@ export function checkRawText(relative, text, index = lineIndex(text)) {
  * Scoped to the app: `packages/app-shared` is web's too, and its hardcoded
  * `en-US` calls are a separate decision.
  *
- * ECMA-402 lets the constructors run without `new`, so the names match both
- * forms. The no-`new` form requires its call parenthesis so a type reference
- * such as `Intl.DateTimeFormatOptions` or an `Intl.NumberFormat` annotation
- * stays out; `new Intl.X` matches on its own, parenthesis or not.
+ * ECMA-402 lets the constructors run without `new`, so both forms are calls
+ * here. A plain call is reported through its parenthesis; a type reference
+ * such as `Intl.DateTimeFormatOptions` or an `Intl.NumberFormat` annotation is
+ * a type node, so there is nothing to report.
  */
-const INTL_CONSTRUCTORS =
-  'Collator|DateTimeFormat|DisplayNames|DurationFormat|ListFormat|Locale|NumberFormat|PluralRules|RelativeTimeFormat|Segmenter';
-const DIRECT_INTL = new RegExp(
-  `new\\s+Intl\\.\\w+|Intl\\.(?:${INTL_CONSTRUCTORS})\\s*\\(|\\.toLocale(?:Date|Time|)String\\s*\\(`,
-  'g'
-);
+const INTL_CONSTRUCTORS = new Set([
+  'Collator',
+  'DateTimeFormat',
+  'DisplayNames',
+  'DurationFormat',
+  'ListFormat',
+  'Locale',
+  'NumberFormat',
+  'PluralRules',
+  'RelativeTimeFormat',
+  'Segmenter',
+]);
+const TO_LOCALE_STRING = /^toLocale(?:Date|Time)?String$/;
 const DIRECT_INTL_DIR = join(ROOT, 'apps/mobile/src');
 // These layouts are stringified and run in the iOS widget extension, which
 // cannot import @/lib/intl-cache; they normalise the locale tag themselves.
@@ -421,90 +297,27 @@ const WIDGET_PROCESS_LAYOUTS = new Set([
   'apps/mobile/src/glanceable-ios/session-live-activity.tsx',
 ]);
 
-/**
- * A line whose first non-space run opens a comment is documentation, not a
- * violation: a ban list and a formatter rule both quote themselves in one.
- */
-const COMMENT_LINE = /^\s*(?:\/\/|\*|\/\*)/;
-
-/**
- * One file's line facts: the offset each line starts at, and the 1-based lines
- * that begin a comment. A whole-text scan needs both to report the line it
- * found, and one file pays for the split once however many rules read it.
- */
-function lineIndex(text) {
-  const lineStarts = [0];
-  const commentLines = new Set();
-  let start = 0;
-  for (let index = 0; index < text.length; index++) {
-    if (text[index] !== '\n') {
-      continue;
-    }
-    if (COMMENT_LINE.test(text.slice(start, index))) {
-      commentLines.add(lineStarts.length);
-    }
-    start = index + 1;
-    lineStarts.push(start);
+/** `object.name` from a member expression read as a plain dotted name. */
+function memberName(callee) {
+  if (callee.type !== 'MemberExpression' || callee.computed) {
+    return null;
   }
-  if (COMMENT_LINE.test(text.slice(start))) {
-    commentLines.add(lineStarts.length);
+  if (callee.property.type !== 'Identifier') {
+    return null;
   }
-  return { lineStarts, commentLines };
+  return {
+    object: callee.object.type === 'Identifier' ? callee.object.name : null,
+    name: callee.property.name,
+    propertyStart: callee.property.start,
+  };
 }
 
-/** The 1-based line holding `index`, from one file's line starts. */
-function lineOf(lineStarts, index) {
-  let low = 0;
-  let high = lineStarts.length - 1;
-  while (low < high) {
-    const mid = Math.ceil((low + high) / 2);
-    if (lineStarts[mid] <= index) {
-      low = mid;
-    } else {
-      high = mid - 1;
-    }
-  }
-  return low + 1;
+/** The `@/lib/intl-cache` advice every hand-built formatter carries. */
+function formatterProblem(relative, line, quote) {
+  return `${relative}:${line}: "${quote}" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once`;
 }
 
-/**
- * Every match of `pattern` that reads as code, in text order: the pattern runs
- * once over the whole file instead of once per line, its match index maps back
- * to the line it reports, and a match on a comment line is dropped.
- *
- * A match across a line break is dropped too, and the scan then resumes one
- * character into it: the per-line scan this replaced could not see `new\nX`,
- * but it did see the `X(…)` starting on the next line, so the rejected match
- * must not consume it. `exec` rather than `matchAll` because the loop rewinds
- * `lastIndex`; the pattern's own index is reset on the way in and out.
- */
-function codeMatches(text, pattern, index) {
-  const matches = [];
-  pattern.lastIndex = 0;
-  for (let match = pattern.exec(text); match !== null; match = pattern.exec(text)) {
-    if (match[0].includes('\n')) {
-      pattern.lastIndex = match.index + 1;
-      continue;
-    }
-    if (match[0].length === 0) {
-      pattern.lastIndex = match.index + 1;
-      continue;
-    }
-    const line = lineOf(index.lineStarts, match.index);
-    if (index.commentLines.has(line)) {
-      continue;
-    }
-    matches.push({ line, match });
-  }
-  pattern.lastIndex = 0;
-  return matches;
-}
-
-/**
- * `index` is the file's line index when the caller already built one, so
- * `checkSourceFile` pays for it once for every whole-text scan.
- */
-export function checkDirectIntl(relative, absolute, text, index = lineIndex(text)) {
+export function checkDirectIntl(relative, absolute, program, lineOf) {
   const problems = [];
   if (
     !absolute.startsWith(DIRECT_INTL_DIR) ||
@@ -513,20 +326,63 @@ export function checkDirectIntl(relative, absolute, text, index = lineIndex(text
   ) {
     return problems;
   }
-  for (const { line, match } of codeMatches(text, DIRECT_INTL, index)) {
-    problems.push(
-      `${relative}:${line}: "${match[0]}" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once`
-    );
-  }
+  walk(program, node => {
+    if (node.type === 'NewExpression') {
+      const member = memberName(node.callee);
+      if (member?.object === 'Intl') {
+        problems.push(
+          formatterProblem(relative, lineOf(node.callee.start), `new Intl.${member.name}`)
+        );
+      }
+      return;
+    }
+    if (node.type !== 'CallExpression') {
+      return;
+    }
+    const member = memberName(node.callee);
+    if (member === null) {
+      return;
+    }
+    if (member.object === 'Intl' && INTL_CONSTRUCTORS.has(member.name)) {
+      problems.push(formatterProblem(relative, lineOf(node.callee.start), `Intl.${member.name}(`));
+    } else if (TO_LOCALE_STRING.test(member.name)) {
+      problems.push(formatterProblem(relative, lineOf(member.propertyStart), `.${member.name}(`));
+    }
+  });
   return problems;
 }
 
-/** The ban list over one file: every match of every rule, in text order. */
-export function checkRules(relative, text, index = lineIndex(text)) {
+/**
+ * The raw source of every string literal and template chunk in one file, with
+ * the offset it starts at. These are the only places a class name can be
+ * written: a comment, a regular expression and an identifier are nodes of
+ * their own, so a ban can no longer fire on text that only reads like a class.
+ *
+ * The raw source is what the rules read, so a match's offset inside it maps
+ * straight back to the file's line, escapes included.
+ */
+function stringSources(program, text) {
+  const sources = [];
+  walk(program, node => {
+    if (node.type === 'Literal' && typeof node.value === 'string') {
+      sources.push({ start: node.start, source: text.slice(node.start, node.end) });
+    } else if (node.type === 'TemplateElement') {
+      // The node spans its delimiters; the chunk itself starts just inside.
+      sources.push({ start: node.start + 1, source: node.value.raw });
+    }
+  });
+  return sources;
+}
+
+/** The ban list over one file: every match of every rule, in source order. */
+export function checkRules(relative, program, text, lineOf) {
   const problems = [];
+  const strings = stringSources(program, text);
   for (const rule of rules()) {
-    for (const { line, match } of codeMatches(text, rule.pattern, index)) {
-      problems.push(`${relative}:${line}: "${match[0]}" ${rule.advice}`);
+    for (const { start, source } of strings) {
+      for (const match of source.matchAll(rule.pattern)) {
+        problems.push(`${relative}:${lineOf(start + match.index)}: "${match[0]}" ${rule.advice}`);
+      }
     }
   }
   return problems;
@@ -600,16 +456,19 @@ export function checkCompilerStillDropsThese() {
  * `relative` is the path from the repository root without a leading separator;
  * a `./` or `/` prefix is stripped here, once, so every exemption lookup,
  * prefix test and diagnostic below reads the same spelling of the path. The
- * file's line index is built here too and shared by every whole-text scan.
+ * file is parsed here too, and a file the parser refuses is a problem of its
+ * own: its tree is empty, so leaving it out would report the file as clean.
  */
 export function checkSourceFile(relative, absolute, text) {
   const path = relative.replace(/^(?:\.?\/)+/, '');
-  const index = lineIndex(text);
+  const lineOf = lineIndex(text);
+  const { program, errors } = parseSourceFile(path, text);
   return [
-    ...checkScrollPadding(path, text, index),
-    ...checkRawText(path, text, index),
-    ...checkDirectIntl(path, absolute, text, index),
-    ...checkRules(path, text, index),
+    ...parseProblems(path, errors, lineOf),
+    ...checkScrollPadding(path, program, text, lineOf),
+    ...checkRawText(path, program, lineOf),
+    ...checkDirectIntl(path, absolute, program, lineOf),
+    ...checkRules(path, program, text, lineOf),
   ];
 }
 

@@ -229,6 +229,21 @@
     "signInCodeField": "Kodiċi tad-dħul",
     "or": "jew"
   },
+  "pendingLink": {
+    "description": "Diġà hemm kont li juża {{email}}. Idħol b'wieħed mill-metodi tiegħu biex iżżid {{provider}}.",
+    "emailCode": "Ibagħtli kodiċi tad-dħul bl-email",
+    "continueInBrowser": "Kompli fil-browser",
+    "startAgain": "Erġa' ibda",
+    "expired": "Din it-talba biex jiżdied {{provider}} skadiet.",
+    "noMethods": "Dan il-kont m'għandux metodu ieħor tad-dħul, għalhekk {{provider}} ma jistax jiżdied.",
+    "linked": "{{provider}} żdied mal-kont tiegħek.",
+    "failedExpired": "{{provider}} ma żdiedx għax it-talba skadiet.",
+    "failedWrongAccount": "{{provider}} ma żdiedx għax dħalt f'kont differenti.",
+    "failedAccountAlreadyLinked": "{{provider}} ma żdiedx għax diġà marbut ma' kont ieħor.",
+    "failedProviderAlreadyLinked": "{{provider}} ma żdiedx għax il-kont tiegħek diġà għandu dħul ieħor b'{{provider}}.",
+    "failedLinking": "{{provider}} ma setax jiżdied mal-kont tiegħek.",
+    "notAdded": "Dħalt. {{provider}} ma żdiedx mal-kont tiegħek."
+  },
   "profile": {
     "codeReviewerSubtitle": "Reviżjonijiet awtomatiċi tal-PR",
     "securityAgentSubtitle": "Sib u rrimedja l-vulnerabbiltajiet",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Kont tat-test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO tal-intrapriża",
     "passkeysTitle": "Ċwievet tal-aċċess",
     "passkeysSubtitle": "Idħol mingħajr password",
@@ -2534,7 +2551,7 @@
       "discardWithUploadsMessage": "L-istruzzjoni tiegħek u kull fajl imtella' li għadu mhux mehmuż ma' messaġġ mibgħut se jitħassru.",
       "discardFailed": "Ma setax jitwarrab l-abbozz. Erġa' pprova.",
       "remoteHint": "Biex taħdem fuq il-kompjuter tiegħek, ibda Kilo hemm u ħallih jaħdem.",
-      "continueFrom": "Qed tkompli s-sessjoni {{title}}.",
+      "continueFrom": "Qed tkompli s-sessjoni “{{title}}”.",
       "importingSession": "Qed tiġi importata s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
       "importFailed": "Ma setgħetx tiġi importata din is-sessjoni.",
@@ -2698,7 +2715,21 @@
       "thought": "Ħsieb",
       "showDetails": "Uri d-dettalji",
       "pending": "Pendenti…",
-      "running": "Qed jaħdem…"
+      "running": "Qed jaħdem…",
+      "field": {
+        "filePath": "Mogħdija tal-fajl",
+        "path": "Mogħdija",
+        "offset": "Bidu",
+        "limit": "Limitu",
+        "pattern": "Mudell",
+        "include": "Inklużjoni",
+        "patchText": "Test tal-patċ",
+        "query": "Tfittxija",
+        "prompt": "Istruzzjoni",
+        "header": "Titolu",
+        "question": "Mistoqsija",
+        "options": "Għażliet"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Ma setax jintwera l-kontenut."

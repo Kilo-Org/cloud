@@ -229,6 +229,21 @@
     "signInCodeField": "รหัสลงชื่อเข้าใช้",
     "or": "หรือ"
   },
+  "pendingLink": {
+    "description": "มีบัญชีที่ใช้ {{email}} อยู่แล้ว ลงชื่อเข้าใช้ด้วยวิธีใดวิธีหนึ่งของบัญชีนั้นเพื่อเพิ่ม {{provider}}",
+    "emailCode": "ส่งรหัสลงชื่อเข้าใช้ให้ฉันทางอีเมล",
+    "continueInBrowser": "ดำเนินการต่อในเบราว์เซอร์",
+    "startAgain": "เริ่มใหม่",
+    "expired": "คำขอเพิ่ม {{provider}} นี้หมดอายุแล้ว",
+    "noMethods": "บัญชีนี้ไม่มีวิธีลงชื่อเข้าใช้อื่น จึงเพิ่ม {{provider}} ไม่ได้",
+    "linked": "เพิ่ม {{provider}} ในบัญชีของคุณแล้ว",
+    "failedExpired": "ไม่ได้เพิ่ม {{provider}} เนื่องจากคำขอหมดอายุ",
+    "failedWrongAccount": "ไม่ได้เพิ่ม {{provider}} เนื่องจากคุณลงชื่อเข้าใช้บัญชีอื่น",
+    "failedAccountAlreadyLinked": "ไม่ได้เพิ่ม {{provider}} เนื่องจากลิงก์กับบัญชีอื่นอยู่แล้ว",
+    "failedProviderAlreadyLinked": "ไม่ได้เพิ่ม {{provider}} เนื่องจากบัญชีของคุณมีการลงชื่อเข้าใช้ {{provider}} อื่นอยู่แล้ว",
+    "failedLinking": "ไม่สามารถเพิ่ม {{provider}} ในบัญชีของคุณได้",
+    "notAdded": "คุณลงชื่อเข้าใช้แล้ว ไม่ได้เพิ่ม {{provider}} ในบัญชีของคุณ"
+  },
   "profile": {
     "codeReviewerSubtitle": "การตรวจสอบ PR อัตโนมัติ",
     "securityAgentSubtitle": "ค้นหาและแก้ไขช่องโหว่",
@@ -267,6 +282,8 @@
     "providerTestAccount": "บัญชีทดสอบ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO สำหรับองค์กร",
     "passkeysTitle": "พาสคีย์",
     "passkeysSubtitle": "ลงชื่อเข้าใช้โดยไม่ใช้รหัสผ่าน",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "พรอมต์และไฟล์ที่อัปโหลดไว้แต่ยังไม่ได้ใช้จะถูกลบ",
       "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง",
       "remoteHint": "หากต้องการรันบนคอมพิวเตอร์ของคุณ ให้เริ่ม Kilo บนเครื่องนั้นและปล่อยให้ทำงานค้างไว้",
-      "continueFrom": "กำลังทำงานต่อจาก {{title}}",
+      "continueFrom": "กำลังทำงานต่อจาก “{{title}}”",
       "importingSession": "กำลังนำเข้าเซสชัน",
       "cliCannotContinue": "CLI นี้ไม่สามารถทำงานต่อจากเซสชันเดิมได้ เลือก Cloud Agent หรือ CLI อื่น",
       "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้",
@@ -2560,7 +2577,21 @@
       "thought": "ความคิด",
       "showDetails": "แสดงรายละเอียด",
       "pending": "รอดำเนินการ…",
-      "running": "กำลังทำงาน…"
+      "running": "กำลังทำงาน…",
+      "field": {
+        "filePath": "เส้นทางไฟล์",
+        "path": "เส้นทาง",
+        "offset": "ตำแหน่งเริ่มต้น",
+        "limit": "จำนวนสูงสุด",
+        "pattern": "รูปแบบ",
+        "include": "ไฟล์ที่รวม",
+        "patchText": "ข้อความแพตช์",
+        "query": "คำค้นหา",
+        "prompt": "พรอมต์",
+        "header": "หัวข้อ",
+        "question": "คำถาม",
+        "options": "ตัวเลือก"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ไม่สามารถแสดงเนื้อหาได้"

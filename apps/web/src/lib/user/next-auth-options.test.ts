@@ -18,7 +18,6 @@ jest.mock('@/lib/user', () => ({
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   ...jest.requireActual<typeof userServerModule>('@kilocode/web-shared/lib/user/server'),
   getUserFromSession: jest.fn(),
-  isEmailBlacklistedByDomainAsync: jest.fn(),
   isBlockedTLD: jest.fn(),
 }));
 jest.mock('@/lib/account-linking-session', () => ({
@@ -39,6 +38,7 @@ import {
   parseAnacondaProfile,
   parseOpenAiProfile,
   profileProvesEmailOwnership,
+  githubEmailsProveOwnership,
   authOptions,
   parseSignInRedirectContext,
   getInvitationTokenFromCallbackPath,
@@ -513,6 +513,66 @@ describe('profileProvesEmailOwnership', () => {
   test('rejects undefined', () => {
     expect(profileProvesEmailOwnership(undefined)).toBe(false);
   });
+
+  test('accepts a Discord profile with verified true', () => {
+    expect(profileProvesEmailOwnership({ verified: true }, 'discord')).toBe(true);
+  });
+
+  test('rejects a Discord profile with verified false', () => {
+    expect(profileProvesEmailOwnership({ verified: false }, 'discord')).toBe(false);
+  });
+
+  test('rejects a Discord profile without the verified flag', () => {
+    expect(profileProvesEmailOwnership({ email_verified: true }, 'discord')).toBe(false);
+  });
+
+  test('rejects a GitHub profile without the email list proof', () => {
+    expect(profileProvesEmailOwnership({ login: 'octocat' }, 'github')).toBe(false);
+  });
+
+  test('keeps the generic claim rule for GitLab', () => {
+    expect(profileProvesEmailOwnership({ confirmed_at: '2024-01-01' }, 'gitlab')).toBe(false);
+    expect(profileProvesEmailOwnership({ email_verified: true }, 'gitlab')).toBe(true);
+  });
+});
+
+describe('githubEmailsProveOwnership', () => {
+  test('accepts the verified flag for the address the sign-in uses', () => {
+    expect(
+      githubEmailsProveOwnership(
+        [
+          { email: 'Other@Example.com', primary: false, verified: false, visibility: 'private' },
+          { email: 'Used@Example.com', primary: true, verified: true, visibility: 'public' },
+        ],
+        'used@example.com'
+      )
+    ).toBe(true);
+  });
+
+  test('rejects an unverified address and a verified different address', () => {
+    expect(
+      githubEmailsProveOwnership(
+        [{ email: 'used@example.com', primary: true, verified: false, visibility: null }],
+        'used@example.com'
+      )
+    ).toBe(false);
+    expect(
+      githubEmailsProveOwnership(
+        [{ email: 'other@example.com', primary: true, verified: true, visibility: null }],
+        'used@example.com'
+      )
+    ).toBe(false);
+  });
+
+  test('rejects a malformed payload', () => {
+    expect(githubEmailsProveOwnership({ email: 'used@example.com' }, 'used@example.com')).toBe(
+      false
+    );
+    expect(githubEmailsProveOwnership(null, 'used@example.com')).toBe(false);
+    expect(githubEmailsProveOwnership([{ email: 'used@example.com' }], 'used@example.com')).toBe(
+      false
+    );
+  });
 });
 
 describe('parseSignInRedirectContext', () => {
@@ -643,7 +703,6 @@ describe('WorkOS sign-in callback', () => {
     jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(watchwood);
     jest.mocked(processSSOUserLogin).mockResolvedValue(true);
     jest.mocked(userLib.findAndSyncExistingUser).mockResolvedValue(null);
-    jest.mocked(userServer.isEmailBlacklistedByDomainAsync).mockResolvedValue(false);
     jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
   });
 

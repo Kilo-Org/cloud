@@ -2,8 +2,11 @@ import * as z from 'zod';
 import { BUILTIN_AGENT_MODES } from './agent-modes.js';
 
 export const RuntimeProfileLimits = {
+  MAX_RUNTIME_INSTRUCTIONS: 50,
+  MAX_RUNTIME_INSTRUCTION_NAME_LENGTH: 100,
+  MAX_RUNTIME_INSTRUCTION_CONTENT: 100_000,
   MAX_RUNTIME_SKILLS: 50,
-  MAX_RUNTIME_SKILL_MARKDOWN: 100_000, // ~100KB
+  MAX_RUNTIME_SKILL_MARKDOWN: 100_000,
   MAX_RUNTIME_SKILL_NAME_LENGTH: 100,
   MAX_RUNTIME_SKILL_COMPANION_FILES: 40,
   MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE: 100_000,
@@ -20,6 +23,29 @@ export const RuntimeProfileLimits = {
   MAX_RUNTIME_KILO_COMMAND_TEMPLATE: 100_000,
   MAX_RUNTIME_KILO_COMMAND_DESCRIPTION: 2000,
 } as const;
+
+/** Profile rules share the legacy rules directory with the reserved built-in file. */
+export const RuntimeInstructionSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(RuntimeProfileLimits.MAX_RUNTIME_INSTRUCTION_NAME_LENGTH)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'Instruction name must be a lowercase slug')
+    .refine(name => name !== 'cloud-agent', {
+      message:
+        'Instruction name conflicts with the Cloud-Agent-owned rules file; choose another name',
+    }),
+  content: z.string().min(1).max(RuntimeProfileLimits.MAX_RUNTIME_INSTRUCTION_CONTENT),
+});
+
+export const RuntimeInstructionsSchema = z
+  .array(RuntimeInstructionSchema)
+  .max(
+    RuntimeProfileLimits.MAX_RUNTIME_INSTRUCTIONS,
+    `Maximum ${RuntimeProfileLimits.MAX_RUNTIME_INSTRUCTIONS} runtime instructions allowed`
+  );
+
+export type RuntimeInstructionInput = z.infer<typeof RuntimeInstructionSchema>;
 
 const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
 
@@ -58,7 +84,7 @@ const RuntimeSkillFilesSchema = z
     if (total > RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL) {
       ctx.addIssue({
         code: 'custom',
-        message: `Skill companion files total ${total} bytes, exceeds ${RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL}`,
+        message: `Skill companion files total ${total} characters, over the limit of ${RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL} characters`,
       });
     }
   });

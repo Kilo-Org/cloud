@@ -22,6 +22,8 @@ export type SessionListRow =
       /** Heading of the date section this row sits under, so the row can tell
        * when its relative label would restate it (see `sectionAwareTimeMeta`). */
       sectionTitle: string;
+      /** The zone that heading was grouped in, so the row names the same day. */
+      timeZone: string;
     };
 
 /** Reserved loading rows shown while the first history page loads. */
@@ -68,6 +70,7 @@ export function flattenSessionSections(
         key: session.session_id,
         session,
         sectionTitle: section.title,
+        timeZone: section.timeZone,
       });
     }
   }

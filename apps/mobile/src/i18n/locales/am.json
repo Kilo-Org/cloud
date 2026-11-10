@@ -229,6 +229,21 @@
     "signInCodeField": "የመግቢያ ኮድ",
     "or": "ወይም"
   },
+  "pendingLink": {
+    "description": "{{email}} ቀድሞውኑ በአንድ መለያ ጥቅም ላይ ውሏል። {{provider}}ን ለማከል ከመለያው የመግቢያ ዘዴዎች በአንዱ ይግቡ።",
+    "emailCode": "የመግቢያ ኮድ በኢሜይል ይላኩልኝ",
+    "continueInBrowser": "በአሳሽ ውስጥ ይቀጥሉ",
+    "startAgain": "እንደገና ይጀምሩ",
+    "expired": "{{provider}}ን የማከል ይህ ጥያቄ ጊዜው አልፎበታል።",
+    "noMethods": "ይህ መለያ ሌላ የመግቢያ ዘዴ ስለሌለው {{provider}}ን ማከል አይቻልም።",
+    "linked": "{{provider}} ወደ መለያዎ ታክሏል።",
+    "failedExpired": "ጥያቄው ጊዜው ስላለፈበት {{provider}} አልታከለም።",
+    "failedWrongAccount": "ወደ ሌላ መለያ ስለገቡ {{provider}} አልታከለም።",
+    "failedAccountAlreadyLinked": "{{provider}} አስቀድሞ ከሌላ መለያ ጋር ስለተገናኘ አልታከለም።",
+    "failedProviderAlreadyLinked": "መለያዎ አስቀድሞ ሌላ የ{{provider}} መግቢያ ስላለው {{provider}} አልታከለም።",
+    "failedLinking": "{{provider}}ን ወደ መለያዎ ማከል አልተቻለም።",
+    "notAdded": "ገብተዋል። {{provider}} ወደ መለያዎ አልታከለም።"
+  },
   "profile": {
     "codeReviewerSubtitle": "በራስ ሰር የሚደረጉ የPR ግምገማዎች",
     "securityAgentSubtitle": "ተጋላጭነቶችን ፈልገው ያስተካክሉ",
@@ -267,6 +282,8 @@
     "providerTestAccount": "የሙከራ መለያ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "የድርጅት SSO",
     "passkeysTitle": "ፓስኪዎች",
     "passkeysSubtitle": "ያለ የይለፍ ቃል ይግቡ",
@@ -2414,7 +2431,7 @@
       "discardWithUploadsMessage": "ጥያቄዎና ከተላኩ መልእክቶች ጋር ያልተያያዙ የተሰቀሉ ፋይሎች ይሰረዛሉ።",
       "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "remoteHint": "በኮምፒውተርዎ ላይ ለማስኬድ በዚያ ላይ Kilo ይጀምሩ እና እየሰራ እንዲቀጥል ይተዉ።",
-      "continueFrom": "{{title}} እየቀጠለ ነው።",
+      "continueFrom": "«{{title}}» እየቀጠለ ነው።",
       "importingSession": "ክፍለ ጊዜውን በማስመጣት ላይ",
       "cliCannotContinue": "ይህ CLI ክፍለ ጊዜን መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
       "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።",
@@ -2566,7 +2583,21 @@
       "thought": "ሐሳብ",
       "showDetails": "ዝርዝሮችን ያሳዩ",
       "pending": "በመጠበቅ ላይ…",
-      "running": "በሥራ ላይ…"
+      "running": "በሥራ ላይ…",
+      "field": {
+        "filePath": "የፋይል መንገድ",
+        "path": "መንገድ",
+        "offset": "መነሻ",
+        "limit": "ገደብ",
+        "pattern": "ንድፍ",
+        "include": "ማካተቻ",
+        "patchText": "የማስተካከያ ጽሑፍ",
+        "query": "የፍለጋ ጥያቄ",
+        "prompt": "መመሪያ",
+        "header": "አርዕስት",
+        "question": "ጥያቄ",
+        "options": "አማራጮች"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ይዘቱን ማሳየት አልተሳካም።"

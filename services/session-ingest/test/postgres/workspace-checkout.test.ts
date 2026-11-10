@@ -68,6 +68,17 @@ describe('recordWorkspaceCheckout', () => {
     );
   });
 
+  it('keeps the workspace branch through a checkout of its base branch', async () => {
+    await client.db
+      .update(cloud_agent_worktrees)
+      .set({ base_branch: 'main' })
+      .where(eq(cloud_agent_worktrees.worktree_id, worktreeId));
+    await recordWorkspaceCheckout(client.db, userId, { worktreeId, gitUrl, gitBranch: 'kilo/one' });
+    await recordWorkspaceCheckout(client.db, userId, { worktreeId, gitUrl, gitBranch: 'main' });
+
+    expect((await readCheckout())?.git_branch).toBe('kilo/one');
+  });
+
   it("does not write another user's or a deleting workspace", async () => {
     await recordWorkspaceCheckout(client.db, 'oauth/someone-else', {
       worktreeId,

@@ -22,6 +22,9 @@ export async function recordWorkspaceCheckout(
           eq(cloud_agent_worktrees.worktree_id, checkout.worktreeId),
           eq(cloud_agent_worktrees.kilo_user_id, kiloUserId),
           isNull(cloud_agent_worktrees.deletion_started_at),
+          // A checkout of the base branch (to pull, or to inspect a stack
+          // parent) is a detour, not the workspace's own work: keep the branch.
+          sql`${cloud_agent_worktrees.base_branch} IS DISTINCT FROM ${checkout.gitBranch}`,
           or(
             sql`${cloud_agent_worktrees.git_url} IS DISTINCT FROM ${checkout.gitUrl}`,
             sql`${cloud_agent_worktrees.git_branch} IS DISTINCT FROM ${checkout.gitBranch}`

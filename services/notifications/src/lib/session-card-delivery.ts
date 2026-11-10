@@ -12,13 +12,15 @@ import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-sna
 import {
   buildSessionLiveActivityContentState,
   type PushData,
-  SESSION_LIVE_COMMAND_LIMIT,
   sessionCardStaleAtSeconds,
   sessionLiveActivityRelevance,
   type SessionLiveActivityContentState,
   type SessionCardStatusKind,
 } from '@kilocode/notifications';
-import { sessionLiveSummarySchema } from '@kilocode/session-ingest-contracts';
+import {
+  SESSION_LIVE_COMMAND_LIMIT,
+  sessionLiveSummarySchema,
+} from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 
 import type { LiveActivityPriority } from './apns-live-activity';
@@ -278,7 +280,6 @@ export function planSessionCardSend(params: {
       // The quiet window for a working card, the aggregate window otherwise.
       staleAtSeconds: sessionCardStaleAtSeconds(
         content,
-        nowSeconds,
         nowSeconds + SESSION_CARD_AGGREGATE_STALE_MS / 1000
       ),
     },

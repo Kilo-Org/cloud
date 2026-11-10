@@ -110,7 +110,13 @@ vi.mock('./bitbucket-workspace-access-token-authorization-service.js', () => ({
   },
 }));
 
-import gitTokenServiceWorker, { GitTokenRPCEntrypoint } from './index.js';
+import gitTokenServiceWorker, {
+  GitTokenRPCEntrypoint,
+  type IssueGitHubSessionCapabilityParams,
+  type IssueGitLabSessionCapabilityParams,
+  type RedeemGitHubSessionCapabilityParams,
+  type RedeemGitLabSessionCapabilityParams,
+} from './index.js';
 import { GitHubTokenGenerationError } from './github-token-service.js';
 
 beforeEach(() => {
@@ -970,14 +976,18 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     ).resolves.toEqual({ success: false, reason: 'invalid_upstream_url' });
   });
 
-  it('rejects a REST API request to an unapproved origin', async () => {
+  it.each([
+    'https://evil.example/2.0/repositories/acme/widgets/pullrequests',
+    'https://api.bitbucket.org:8443/2.0/repositories/acme/widgets/pullrequests',
+    'https://192.0.2.1/2.0/repositories/acme/widgets/pullrequests',
+  ])('rejects a REST API request to an unapproved origin: %s', async requestUrl => {
     const capability = await issueCapability();
     await expect(
       createService().redeemBitbucketSessionCapability({
         capability,
         outboundContainerId: 'outbound-container-1',
         requestMethod: 'GET',
-        requestUrl: 'https://evil.example.com/2.0/repositories/acme/widgets/pullrequests/42',
+        requestUrl,
       })
     ).resolves.toEqual({ success: false, reason: 'upstream_origin_not_allowed' });
   });
@@ -1311,7 +1321,13 @@ describe.each([
   'getCloudAgentAuthForRepo',
   'issueGitHubSessionCapability',
 ] as const)('GitHub credential failures through %s', method => {
-  const params = { githubRepo: 'acme/repo', userId: 'user_1' };
+  // The same container id the other suites issue redemption with, present on
+  // every GitHub credential call so each method reaches its lookup gate.
+  const params = {
+    githubRepo: 'acme/repo',
+    userId: 'user_1',
+    outboundContainerId: 'outbound-container-1',
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1404,7 +1420,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       permissions: { contents: 'write', pull_requests: 'write' },
     });
     serviceMocks.getTokenForRepo.mockResolvedValue('installation-token');
-    serviceMocks.selectUserAuthorization.mockResolvedValue({
+    serviceMocks.selectUserAuthorization.mockReset().mockResolvedValue({
       selected: true,
       token: 'user-token',
       gitAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
@@ -1627,69 +1643,52 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         capability: issued.capability,
         requestMethod: 'GET',
         requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
-      })
+      } as RedeemGitHubSessionCapabilityParams)
     ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
     expect(serviceMocks.findManagedInstallationForRepo).not.toHaveBeenCalled();
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 
-  it('temporarily issues and redeems a legacy unbound GitHub capability for an old caller', async () => {
+  it('rejects issuance without a container binding before any credential lookup', async () => {
+    const service = createService();
+    // A pre-tightening caller sends the wire shape without the container id.
+    const legacyParams = { githubRepo: 'acme/repo', userId: 'user_1' };
+
+    await expect(
+      service.issueGitHubSessionCapability(legacyParams as IssueGitHubSessionCapabilityParams)
+    ).resolves.toEqual({ success: false, reason: 'capability_configuration_error' });
+    expect(serviceMocks.findManagedInstallationForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+
+    await expect(
+      service.issueGitHubSessionCapability({ ...legacyParams, outboundContainerId: '' })
+    ).resolves.toEqual({ success: false, reason: 'capability_configuration_error' });
+    expect(serviceMocks.findManagedInstallationForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('rejects a legacy unbound capability before any credential lookup', async () => {
     const service = createService();
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
-    expect(issued.capability).toMatch(/^kgh1\./);
+    serviceMocks.findManagedInstallationForRepo.mockClear();
     serviceMocks.getTokenForRepo.mockClear();
 
     await expect(
       service.redeemGitHubSessionCapability({
-        capability: issued.capability,
+        capability: `kgh1.${issued.capability.slice('kgh2.'.length)}`,
+        outboundContainerId,
         requestMethod: 'GET',
-        requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
+        requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
       })
-    ).resolves.toEqual({
-      success: true,
-      authorization: `Basic ${Buffer.from('x-access-token:installation-token').toString('base64')}`,
-      installationId: '123',
-      source: 'installation',
-      appType: 'standard',
-    });
-    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+    ).resolves.toEqual({ success: false, reason: 'invalid_capability' });
+    expect(serviceMocks.findManagedInstallationForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
-
-  it.each([
-    ['POST', 'https://api.github.com/graphql', 'repository_mismatch'],
-    [
-      'GET',
-      'https://github.com/acme/other.git/info/refs?service=git-upload-pack',
-      'repository_mismatch',
-    ],
-    ['GET', 'https://npm.pkg.github.com/@acme/design', 'upstream_host_not_allowed'],
-    ['GET', 'https://npm.pkg.github.com/@acme%2fdesign', 'invalid_upstream_url'],
-  ] as const)(
-    'keeps legacy unbound GitHub capabilities repository-confined for %s %s',
-    async (requestMethod, requestUrl, reason) => {
-      const service = createService();
-      const issued = await service.issueGitHubSessionCapability({
-        githubRepo: 'acme/repo',
-        userId: 'user_1',
-      });
-      if (!issued.success) throw new Error('Expected successful issuance');
-      expect(issued.capability).toMatch(/^kgh1\./);
-      serviceMocks.getTokenForRepo.mockClear();
-
-      await expect(
-        service.redeemGitHubSessionCapability({
-          capability: issued.capability,
-          requestMethod,
-          requestUrl,
-        })
-      ).resolves.toEqual({ success: false, reason });
-      expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
-    }
-  );
 
   it('rejects tampered capabilities before resolving any upstream authorization', async () => {
     const service = createService();
@@ -1782,6 +1781,8 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   it.each([
     'https://github.com/acme/repo.git/info/lfs/objects/batch',
     'https://github.com/acme/repo.git/info/lfs/locks/verify',
+    'https://github.com/acme/repo.git/info/lfs/locks',
+    'https://github.com/acme/repo.git/info/lfs/locks/42/unlock',
   ])('redeems an installation-pinned capability for exact LFS control URL %s', async requestUrl => {
     const service = createService();
     const issued = await service.issueGitHubSessionCapability({
@@ -1810,16 +1811,21 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   });
 
   it.each([
-    ['POST', 'https://api.github.com/graphql'],
-    ['GET', 'https://api.github.com/user/repos'],
-    ['DELETE', 'https://api.github.com/repos/acme/other/issues/42/comments/1'],
+    ['GET', 'https://api.github.com/repos/acme/repo/pulls/42'],
+    ['POST', 'https://api.github.com/repos/acme/repo/issues/42/comments'],
+    ['PUT', 'https://api.github.com/repos/acme/repo/pulls/42/merge'],
+    ['DELETE', 'https://api.github.com/repos/acme/repo/issues/42/labels/bug'],
     ['GET', 'https://api.github.com/repos/acme/repo/contents/src%2Findex.ts'],
+    ['GET', 'https://api.github.com/user'],
+    ['POST', 'https://api.github.com/graphql'],
+    ['POST', 'https://uploads.github.com/repos/acme/repo/releases/1/assets?name=asset.zip'],
     ['GET', 'https://npm.pkg.github.com/@acme%2fdesign'],
     ['GET', 'https://npm.pkg.github.com/download/@acme/design/1.0.0/package.tgz'],
-    ['POST', 'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip'],
-    ['POST', 'https://github.com/acme/other.git/info/lfs/objects/batch'],
+    ['GET', 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack'],
+    ['GET', 'https://github.com/acme/repo/info/refs?service=git-upload-pack'],
+    ['POST', 'https://github.com/acme/repo.git/git-receive-pack'],
   ] as const)(
-    'redeems an installation-pinned capability for unrestricted GitHub request %s %s',
+    'redeems an installation-pinned capability for its own repository request %s %s',
     async (requestMethod, requestUrl) => {
       const service = createService();
       const issued = await service.issueGitHubSessionCapability({
@@ -1847,6 +1853,435 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         appType: 'standard',
       });
       expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    }
+  );
+
+  const userAttachmentUrl =
+    'https://uploads.github.com/user-attachments/assets?content_type=image%2Fpng&name=screenshot.png&repository_id=1145038391';
+
+  it('uses stored user OAuth for an installation-pinned attachment and its repository lookup', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ id: 1145038391, full_name: 'Acme/Repo' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: userAttachmentUrl,
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer user-token',
+      installationId: '123',
+      source: 'user',
+      appType: 'standard',
+    });
+    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+    expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledExactlyOnceWith({
+      userId: 'user_1',
+      githubRepo: 'acme/repo',
+      accessPurpose: 'workflow',
+      strictRepositoryLookup: true,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.github.com/repos/acme/repo',
+      expect.objectContaining({
+        method: 'GET',
+        redirect: 'manual',
+        signal: expect.any(AbortSignal),
+        headers: expect.objectContaining({
+          Authorization: 'Bearer user-token',
+          'User-Agent': 'Kilo-Git-Token-Service',
+        }),
+      })
+    );
+  });
+
+  it.each([
+    'no_user_authorization',
+    'revoked',
+    'insufficient_user_access',
+    'refresh_failed',
+    'credential_unreadable',
+    'credential_configuration_error',
+  ])(
+    'never falls back to installation credentials for an attachment when user auth is %s',
+    async reason => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(Response.json({ id: 1145038391, full_name: 'acme/repo' }));
+      vi.stubGlobal('fetch', fetchMock);
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      serviceMocks.selectUserAuthorization.mockResolvedValueOnce({ selected: false, reason });
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'POST',
+          requestUrl: userAttachmentUrl,
+        })
+      ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+      expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([false, true])(
+    'sanitizes attachment user-authorization lookup errors without installation fallback (user pin=%s)',
+    async allowUserAuthorization => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+        allowUserAuthorization,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      serviceMocks.selectUserAuthorization.mockRejectedValueOnce(
+        new Error('private lookup detail')
+      );
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'POST',
+          requestUrl: userAttachmentUrl,
+        })
+      ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('redeems a selected-user user-attachment upload with the identity-checked user token', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ id: 1145038391, full_name: 'acme/repo' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: userAttachmentUrl,
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer user-token',
+      installationId: '123',
+      source: 'user',
+      appType: 'standard',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.github.com/repos/acme/repo',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer user-token',
+          'User-Agent': 'Kilo-Git-Token-Service',
+        }),
+      })
+    );
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ id: 42, full_name: 'acme/repo' }, 'repository_mismatch'],
+    [{ id: 1145038391, full_name: 'acme/other' }, 'repository_mismatch'],
+  ] as const)(
+    'rejects a user-attachment upload whose authoritative repository metadata does not match',
+    async (metadata, reason) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(metadata)));
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'POST',
+          requestUrl: userAttachmentUrl,
+        })
+      ).resolves.toEqual({ success: false, reason });
+    }
+  );
+
+  it.each([302, 403, 404, 429, 503])(
+    'cancels a rejected repository lookup body for status %s and fails closed even if cancellation rejects',
+    async status => {
+      const cancel = vi.fn(() =>
+        status === 503 ? Promise.reject(new Error('cancellation failed')) : Promise.resolve()
+      );
+      const response = new Response(new ReadableStream({ cancel }), { status });
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'POST',
+          requestUrl: userAttachmentUrl,
+        })
+      ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+      expect(cancel).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    ['a network failure', () => Promise.reject(new Error('lookup failed'))],
+    [
+      'a redirect',
+      () =>
+        Promise.resolve(
+          new Response(null, {
+            status: 302,
+            headers: { Location: 'https://api.github.com/repos/acme/repo' },
+          })
+        ),
+    ],
+    [
+      'a non-200 response',
+      () => Promise.resolve(Response.json({ message: 'Not Found' }, { status: 404 })),
+    ],
+    ['malformed JSON', () => Promise.resolve(new Response('not-json', { status: 200 }))],
+    [
+      'an invalid metadata shape',
+      () => Promise.resolve(Response.json({ id: '1145038391', full_name: 'acme/repo' })),
+    ],
+    [
+      'an oversized metadata body',
+      () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 1145038391,
+              full_name: 'acme/repo',
+              padding: 'x'.repeat(64 * 1024),
+            }),
+            { status: 200 }
+          )
+        ),
+    ],
+  ] as const)(
+    'fails closed with source_unavailable when repository lookup returns %s',
+    async (_description, response) => {
+      vi.stubGlobal('fetch', vi.fn().mockImplementation(response));
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'POST',
+          requestUrl: userAttachmentUrl,
+        })
+      ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+    }
+  );
+
+  it.each([
+    [
+      'GET',
+      'https://uploads.github.com/user-attachments/assets?repository_id=1145038391',
+      'invalid_upstream_request',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments/assets?content_type=image%2Fpng&name=screenshot.png',
+      'invalid_upstream_request',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments/assets?repository_id=1145038391&repository_id=1145038391',
+      'invalid_upstream_request',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments/assets?repository_id=1145038391&name=x;repository_id=42',
+      'invalid_upstream_request',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments/assets?repository_id=0',
+      'invalid_upstream_request',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments/assets?repository_id=01',
+      'invalid_upstream_request',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments/assets?repository_id=-1',
+      'invalid_upstream_request',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments/assets?repository_id=1.0',
+      'invalid_upstream_request',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments/assets?repository_id=1e3',
+      'invalid_upstream_request',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments/assets?repository_id=9007199254740992',
+      'invalid_upstream_request',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments/assets/extra?repository_id=1145038391',
+      'repository_mismatch',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/user-attachments?repository_id=1145038391',
+      'repository_mismatch',
+    ],
+    [
+      'POST',
+      'https://api.github.com/user-attachments/assets?repository_id=1145038391',
+      'repository_mismatch',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com.evil.example/user-attachments/assets?repository_id=1145038391',
+      'upstream_host_not_allowed',
+    ],
+  ] as const)(
+    'rejects user-attachment upload shape %s %s without minting a token or looking up metadata',
+    async (requestMethod, requestUrl, reason) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      serviceMocks.getTokenForRepo.mockClear();
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod,
+          requestUrl,
+        })
+      ).resolves.toEqual({ success: false, reason });
+      expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not redeem a user-attachment upload from another outbound container', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId: 'another-outbound-container',
+        requestMethod: 'POST',
+        requestUrl: userAttachmentUrl,
+      })
+    ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['GET', 'https://api.github.com/repos/acme/other/pulls/42', 'repository_mismatch'],
+    ['GET', 'https://api.github.com/user/repos', 'repository_mismatch'],
+    ['GET', 'https://api.github.com/graphql', 'invalid_upstream_request'],
+    ['OPTIONS', 'https://api.github.com/repos/acme/repo/pulls/42', 'invalid_upstream_request'],
+    [
+      'POST',
+      'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip',
+      'repository_mismatch',
+    ],
+    ['GET', 'https://npm.pkg.github.com/@other%2fdesign', 'repository_mismatch'],
+    ['POST', 'https://npm.pkg.github.com/@acme%2fdesign', 'invalid_upstream_request'],
+    ['GET', 'https://github.com/acme/other/issues', 'repository_mismatch'],
+    ['GET', 'https://github.com/acme/other.git/archive/main.tar.gz', 'repository_mismatch'],
+    ['GET', 'https://api.github.com/repos/acme/repo/files/..%2f..%2fother', 'invalid_upstream_url'],
+  ] as const)(
+    'applies the recorded repository scope to installation-pinned request %s %s',
+    async (requestMethod, requestUrl, reason) => {
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      serviceMocks.getTokenForRepo.mockClear();
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod,
+          requestUrl,
+        })
+      ).resolves.toEqual({ success: false, reason });
+      expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
     }
   );
 
@@ -1921,16 +2356,20 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   });
 
   it.each([
-    ['POST', 'https://api.github.com/graphql'],
-    ['GET', 'https://api.github.com/user/repos'],
-    ['DELETE', 'https://api.github.com/repos/acme/other/issues/42/comments/1'],
+    ['GET', 'https://api.github.com/repos/acme/repo/pulls/42'],
+    ['PATCH', 'https://api.github.com/repos/acme/repo/pulls/42'],
+    ['DELETE', 'https://api.github.com/repos/acme/repo/issues/42/labels/bug'],
     ['GET', 'https://api.github.com/repos/acme/repo/contents/src%2Findex.ts'],
+    ['GET', 'https://api.github.com/user'],
+    ['POST', 'https://uploads.github.com/repos/acme/repo/releases/1/assets?name=asset.zip'],
     ['GET', 'https://npm.pkg.github.com/@acme%2fdesign'],
     ['GET', 'https://npm.pkg.github.com/download/@acme/design/1.0.0/package.tgz'],
-    ['POST', 'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip'],
-    ['GET', 'https://github.com/acme/other.git/info/refs?service=git-upload-pack'],
+    ['GET', 'https://github.com/acme/repo/info/refs?service=git-upload-pack'],
+    ['POST', 'https://github.com/acme/repo.git/info/lfs/objects/batch'],
+    ['GET', 'https://github.com/acme/repo.git/info/lfs/locks?path=asset.bin&limit=100'],
+    ['POST', 'https://github.com/acme/repo.git/info/lfs/locks'],
   ] as const)(
-    'redeems a selected-user capability for unrestricted GitHub request %s %s',
+    'redeems a selected-user capability for its own repository request %s %s',
     async (requestMethod, requestUrl) => {
       const service = createService();
       const issued = await service.issueGitHubSessionCapability({
@@ -1963,6 +2402,195 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     }
   );
 
+  it('redeems GraphQL for a selected-user capability with the user token', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    expect(issued.source).toBe('user');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer user-token',
+      installationId: '123',
+      source: 'user',
+      appType: 'standard',
+    });
+    expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('redeems GraphQL for an installation-source capability with the installation token', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    expect(issued.source).toBe('installation');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer installation-token',
+      installationId: '123',
+      source: 'installation',
+      appType: 'standard',
+    });
+    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('refuses GraphQL for a selected-user capability whose pin no longer resolves', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.selectUserAuthorization.mockResolvedValueOnce({
+      selected: false,
+      reason: 'no_user_authorization',
+    });
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+    expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('refuses GraphQL for a selected-user capability when the installation integration no longer matches', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+      success: false,
+      reason: 'integration_mismatch',
+    });
+    serviceMocks.findRefreshCandidates.mockResolvedValueOnce({ success: true, candidates: [] });
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('forwards a Git request for another repository anonymously', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'GET',
+        requestUrl: 'https://github.com/acme/other.git/info/refs?service=git-upload-pack',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: null,
+      installationId: '123',
+      source: 'user',
+      appType: 'standard',
+    });
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['GET', 'https://api.github.com/repos/acme/other/pulls/42', 'repository_mismatch'],
+    ['GET', 'https://api.github.com/user/repos', 'repository_mismatch'],
+    [
+      'DELETE',
+      'https://api.github.com/repos/acme/other/issues/42/comments/1',
+      'repository_mismatch',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip',
+      'repository_mismatch',
+    ],
+    ['GET', 'https://npm.pkg.github.com/@other%2fdesign', 'repository_mismatch'],
+    ['OPTIONS', 'https://api.github.com/repos/acme/repo/pulls/42', 'invalid_upstream_request'],
+    ['GET', 'https://github.com/acme/repo2/archive/main.tar.gz', 'repository_mismatch'],
+    ['GET', 'https://github.com/acme/other/issues', 'repository_mismatch'],
+  ] as const)(
+    'applies the recorded repository scope to selected-user request %s %s',
+    async (requestMethod, requestUrl, reason) => {
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+        allowUserAuthorization: true,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      expect(issued.source).toBe('user');
+      serviceMocks.selectUserAuthorization.mockClear();
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod,
+          requestUrl,
+        })
+      ).resolves.toEqual({ success: false, reason });
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    }
+  );
+
   it.each([
     [
       'GET',
@@ -1985,6 +2613,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       'upstream_host_not_allowed',
     ],
     ['GET', 'https://api.github.com:8443/user/repos', 'upstream_host_not_allowed'],
+    ['GET', 'https://192.0.2.1/acme/repo.git/info/refs', 'upstream_host_not_allowed'],
     ['GET', 'https://api.github.com/user/repos#fragment', 'invalid_upstream_url'],
     ['GET', 'http://npm.pkg.github.com/@acme%2fdesign', 'invalid_upstream_url'],
     ['GET', 'https://attacker@npm.pkg.github.com/@acme%2fdesign', 'invalid_upstream_url'],
@@ -2142,225 +2771,6 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   });
 });
 
-describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
-  const kiloTargets = {
-    backendBaseUrl: 'https://api.kilo.ai',
-    providerBaseUrl: 'https://api.kilo.ai',
-    sessionIngestBaseUrl: 'https://ingest.kilosessions.ai',
-  };
-  const kiloSubject = {
-    userId: 'user_1',
-    cloudAgentSessionId: 'cloud-agent-session-1',
-    kiloSessionId: 'kilo-session-1',
-    outboundContainerId,
-    userToken: 'raw-user-token',
-    targets: kiloTargets,
-  };
-
-  it('issues an opaque Kilo capability that does not leak the enclosed token', async () => {
-    const result = await createService().issueKiloSessionCapability(kiloSubject);
-
-    expect(result).toMatchObject({ success: true });
-    if (!result.success) throw new Error('Expected successful issuance');
-    expect(result.capability).toMatch(/^kka1\./);
-    expect(result.capability).not.toContain(kiloSubject.userToken);
-  });
-
-  it('rejects issuance for malformed targets', async () => {
-    const result = await createService().issueKiloSessionCapability({
-      ...kiloSubject,
-      targets: { ...kiloTargets, backendBaseUrl: 'https://user@api.kilo.ai' },
-    });
-
-    expect(result).toEqual({ success: false, reason: 'invalid_targets' });
-  });
-
-  it('returns a sanitized declared failure when capability key configuration is invalid', async () => {
-    const service = new GitTokenRPCEntrypoint(
-      {} as ExecutionContext,
-      { SCM_SESSION_CAPABILITY_ENCRYPTION_KEY: 'not-a-valid-key' } as unknown as CloudflareEnv
-    );
-
-    await expect(service.issueKiloSessionCapability(kiloSubject)).resolves.toEqual({
-      success: false,
-      reason: 'capability_configuration_error',
-    });
-  });
-
-  it('redeems the user token for provider model routes', async () => {
-    const service = createService();
-    const issued = await service.issueKiloSessionCapability(kiloSubject);
-    if (!issued.success) throw new Error('Expected successful issuance');
-
-    await expect(
-      service.redeemKiloSessionCapability({
-        capability: issued.capability,
-        outboundContainerId,
-        requestMethod: 'POST',
-        requestUrl: 'https://api.kilo.ai/api/openrouter/v1/chat/completions',
-      })
-    ).resolves.toEqual({
-      success: true,
-      authorization: 'Bearer raw-user-token',
-      routeClass: 'provider_model',
-    });
-  });
-
-  it('redeems the user token for backend API routes', async () => {
-    const service = createService();
-    const issued = await service.issueKiloSessionCapability(kiloSubject);
-    if (!issued.success) throw new Error('Expected successful issuance');
-
-    await expect(
-      service.redeemKiloSessionCapability({
-        capability: issued.capability,
-        outboundContainerId,
-        requestMethod: 'GET',
-        requestUrl: 'https://api.kilo.ai/api/users/me',
-      })
-    ).resolves.toEqual({
-      success: true,
-      authorization: 'Bearer raw-user-token',
-      routeClass: 'backend_api',
-    });
-  });
-
-  it('redeems the user token for session export/import routes', async () => {
-    const service = createService();
-    const issued = await service.issueKiloSessionCapability(kiloSubject);
-    if (!issued.success) throw new Error('Expected successful issuance');
-
-    await expect(
-      service.redeemKiloSessionCapability({
-        capability: issued.capability,
-        outboundContainerId,
-        requestMethod: 'GET',
-        requestUrl: 'https://ingest.kilosessions.ai/api/session/kilo-session-1/export',
-      })
-    ).resolves.toEqual({
-      success: true,
-      authorization: 'Bearer raw-user-token',
-      routeClass: 'session_ingest',
-    });
-  });
-
-  it('redeems the user token for a bootstrap bound to the Kilo session', async () => {
-    const service = createService();
-    const issued = await service.issueKiloSessionCapability(kiloSubject);
-    if (!issued.success) throw new Error('Expected successful issuance');
-
-    await expect(
-      service.redeemKiloSessionCapability({
-        capability: issued.capability,
-        outboundContainerId,
-        requestMethod: 'POST',
-        requestUrl: 'https://ingest.kilosessions.ai/api/session',
-        bootstrapKiloSessionId: kiloSubject.kiloSessionId,
-      })
-    ).resolves.toEqual({
-      success: true,
-      authorization: 'Bearer raw-user-token',
-      routeClass: 'session_ingest',
-    });
-  });
-
-  it('returns trusted session scope claims only for a broadened child route', async () => {
-    const rootKiloSessionId = 'ses_12345678901234567890123456';
-    const childKiloSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
-    const service = createService();
-    const issued = await service.issueKiloSessionCapability({
-      ...kiloSubject,
-      kiloSessionId: rootKiloSessionId,
-    });
-    if (!issued.success) throw new Error('Expected successful issuance');
-
-    await expect(
-      service.redeemKiloSessionCapability({
-        capability: issued.capability,
-        outboundContainerId,
-        requestMethod: 'POST',
-        requestUrl: `https://ingest.kilosessions.ai/api/session/${childKiloSessionId}/ingest`,
-        sessionIngestProxyVersion: 1,
-      })
-    ).resolves.toEqual({
-      success: true,
-      authorization: 'Bearer raw-user-token',
-      routeClass: 'session_ingest',
-      sessionIngestScope: {
-        cloudAgentSessionId: kiloSubject.cloudAgentSessionId,
-        rootKiloSessionId,
-      },
-    });
-  });
-
-  it('does not redeem a session ingest route for another Kilo session', async () => {
-    const service = createService();
-    const issued = await service.issueKiloSessionCapability(kiloSubject);
-    if (!issued.success) throw new Error('Expected successful issuance');
-
-    await expect(
-      service.redeemKiloSessionCapability({
-        capability: issued.capability,
-        outboundContainerId,
-        requestMethod: 'GET',
-        requestUrl: 'https://ingest.kilosessions.ai/api/session/another-session/export',
-      })
-    ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });
-  });
-
-  it('does not leak the user token to another session ingest route on a shared origin', async () => {
-    const service = createService();
-    const issued = await service.issueKiloSessionCapability({
-      ...kiloSubject,
-      targets: {
-        backendBaseUrl: 'https://api.kilo.ai',
-        providerBaseUrl: 'https://api.kilo.ai/api/openrouter',
-        sessionIngestBaseUrl: 'https://api.kilo.ai',
-      },
-    });
-    if (!issued.success) throw new Error('Expected successful issuance');
-
-    await expect(
-      service.redeemKiloSessionCapability({
-        capability: issued.capability,
-        outboundContainerId,
-        requestMethod: 'GET',
-        requestUrl: 'https://api.kilo.ai/api/session/another-session/export',
-      })
-    ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });
-  });
-
-  it('does not redeem a capability from another outbound container', async () => {
-    const service = createService();
-    const issued = await service.issueKiloSessionCapability(kiloSubject);
-    if (!issued.success) throw new Error('Expected successful issuance');
-
-    await expect(
-      service.redeemKiloSessionCapability({
-        capability: issued.capability,
-        outboundContainerId: 'another-outbound-container',
-        requestMethod: 'GET',
-        requestUrl: 'https://api.kilo.ai/api/users/me',
-      })
-    ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
-  });
-
-  it('rejects redemption against a disallowed upstream', async () => {
-    const service = createService();
-    const issued = await service.issueKiloSessionCapability(kiloSubject);
-    if (!issued.success) throw new Error('Expected successful issuance');
-
-    await expect(
-      service.redeemKiloSessionCapability({
-        capability: issued.capability,
-        outboundContainerId,
-        requestMethod: 'GET',
-        requestUrl: 'https://evil.example.com/api/users/me',
-      })
-    ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });
-  });
-});
-
 describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -2494,7 +2904,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
         capability: issued.capability,
         requestMethod: 'GET',
         requestUrl: 'https://gitlab.com/api/v4/projects',
-      })
+      } as RedeemGitLabSessionCapabilityParams)
     ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
     expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
     expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
@@ -2565,79 +2975,50 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
   });
 
-  it('temporarily issues and redeems a legacy unbound GitLab capability for an old caller', async () => {
+  it('rejects GitLab issuance without a container binding before any credential lookup', async () => {
+    const service = createService();
+    await expect(
+      service.issueGitLabSessionCapability({
+        gitUrl: 'https://gitlab.com/acme/widgets.git',
+        userId: 'user_1',
+      } as IssueGitLabSessionCapabilityParams)
+    ).resolves.toEqual({ success: false, reason: 'capability_configuration_error' });
+    expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
+    expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
+
+    await expect(
+      service.issueGitLabSessionCapability({
+        gitUrl: 'https://gitlab.com/acme/widgets.git',
+        userId: 'user_1',
+        outboundContainerId: '',
+      })
+    ).resolves.toEqual({ success: false, reason: 'capability_configuration_error' });
+    expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
+    expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects a legacy unbound GitLab capability before any credential lookup', async () => {
     const service = createService();
     const issued = await service.issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',
       userId: 'user_1',
+      outboundContainerId,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
-    expect(issued.capability).toMatch(/^kgl1\./);
     serviceMocks.findGitLabIntegration.mockClear();
-    serviceMocks.getGitLabToken.mockResolvedValueOnce({
-      success: true,
-      token: 'refreshed-gitlab-token',
-      instanceUrl: 'https://gitlab.com',
-    });
+    serviceMocks.getGitLabToken.mockClear();
 
     await expect(
       service.redeemGitLabSessionCapability({
-        capability: issued.capability,
+        capability: `kgl1.${issued.capability.slice('kgl2.'.length)}`,
+        outboundContainerId,
         requestMethod: 'GET',
         requestUrl: 'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests/42/changes',
       })
-    ).resolves.toEqual({
-      success: true,
-      headers: { authorization: 'Bearer refreshed-gitlab-token' },
-    });
-    expect(serviceMocks.findGitLabIntegration).toHaveBeenCalledOnce();
-    expect(serviceMocks.getGitLabToken).toHaveBeenCalledTimes(2);
+    ).resolves.toEqual({ success: false, reason: 'invalid_capability' });
+    expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
+    expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
   });
-
-  it.each([
-    ['POST', 'https://gitlab.com/api/graphql', 'invalid_upstream_request'],
-    ['GET', 'https://gitlab.com/api/v4/projects?membership=true', 'invalid_upstream_request'],
-    ['GET', 'https://gitlab.com/api/v4/projects/acme%2Fother/issues', 'repository_mismatch'],
-    ['CONNECT', 'https://gitlab.com/api/v4/projects', 'invalid_upstream_request'],
-    [
-      'GET',
-      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/variables',
-      'invalid_upstream_request',
-    ],
-    [
-      'PUT',
-      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests/42/merge',
-      'invalid_upstream_request',
-    ],
-    [
-      'GET',
-      'https://gitlab.com/other/project.git/info/refs?service=git-upload-pack',
-      'repository_mismatch',
-    ],
-  ] as const)(
-    'keeps legacy unbound GitLab capabilities project-confined for %s %s',
-    async (requestMethod, requestUrl, reason) => {
-      const service = createService();
-      const issued = await service.issueGitLabSessionCapability({
-        gitUrl: 'https://gitlab.com/acme/widgets.git',
-        userId: 'user_1',
-      });
-      if (!issued.success) throw new Error('Expected successful issuance');
-      expect(issued.capability).toMatch(/^kgl1\./);
-      serviceMocks.findGitLabIntegration.mockClear();
-      serviceMocks.getGitLabToken.mockClear();
-
-      await expect(
-        service.redeemGitLabSessionCapability({
-          capability: issued.capability,
-          requestMethod,
-          requestUrl,
-        })
-      ).resolves.toEqual({ success: false, reason });
-      expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
-      expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
-    }
-  );
 
   it('issues an opaque project-source capability from a GitLab project response without exposing its token', async () => {
     vi.stubGlobal(
@@ -2705,36 +3086,77 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       'GET',
       'https://gitlab.com/api/v4/projects/42/merge_requests/42/changes',
       { 'PRIVATE-TOKEN': 'project-access-token' },
+      null,
     ],
-    ['POST', 'https://gitlab.com/api/graphql', { 'PRIVATE-TOKEN': 'project-access-token' }],
+    [
+      'GET',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/approval_rules',
+      { 'PRIVATE-TOKEN': 'project-access-token' },
+      null,
+    ],
+    [
+      'POST',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests',
+      { 'PRIVATE-TOKEN': 'project-access-token' },
+      null,
+    ],
+    [
+      'POST',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests/7/discussions',
+      { 'PRIVATE-TOKEN': 'project-access-token' },
+      null,
+    ],
     [
       'DELETE',
-      'https://gitlab.com/api/v4/projects/99/merge_requests/7',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/repository/branches/feature',
       { 'PRIVATE-TOKEN': 'project-access-token' },
+      null,
     ],
     [
       'GET',
       'https://gitlab.com/acme/widgets.git/info/refs?service=git-upload-pack',
       { authorization: `Basic ${Buffer.from('oauth2:project-access-token').toString('base64')}` },
+      null,
+    ],
+    ['POST', 'https://gitlab.com/api/graphql', null, 'invalid_upstream_request'],
+    [
+      'DELETE',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets',
+      null,
+      'invalid_upstream_request',
+    ],
+    ['PUT', 'https://gitlab.com/api/v4/projects/42', null, 'invalid_upstream_request'],
+    [
+      'POST',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/access_tokens',
+      null,
+      'invalid_upstream_request',
     ],
     [
       'GET',
-      'https://gitlab.com/other/project.git/info/refs?service=git-upload-pack',
-      { authorization: `Basic ${Buffer.from('oauth2:project-access-token').toString('base64')}` },
-    ],
-    [
-      'GET',
-      'https://gitlab.com/api/project.git/info/refs?service=git-upload-pack',
-      { authorization: `Basic ${Buffer.from('oauth2:project-access-token').toString('base64')}` },
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/variables',
+      null,
+      'invalid_upstream_request',
     ],
     [
       'POST',
-      'https://gitlab.com/api/v4/project.git/info/lfs/locks/123/unlock',
-      { authorization: `Basic ${Buffer.from('oauth2:project-access-token').toString('base64')}` },
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/hooks',
+      null,
+      'invalid_upstream_request',
+    ],
+    ['GET', 'https://gitlab.com/api/v4/user', null, 'invalid_upstream_request'],
+    ['GET', 'https://gitlab.com/api/v4/projects', null, 'invalid_upstream_request'],
+    ['GET', 'https://gitlab.com/api/v4/projects/acme%2Fother/issues', null, 'repository_mismatch'],
+    ['GET', 'https://gitlab.com/api/v4/projects/99/issues', null, 'repository_mismatch'],
+    [
+      'GET',
+      'https://gitlab.com/other/project.git/info/refs?service=git-upload-pack',
+      null,
+      'repository_mismatch',
     ],
   ] as const)(
-    'redeems an unrestricted bound project-source capability server-side for %s %s',
-    async (requestMethod, requestUrl, headers) => {
+    'applies project credential request policy for %s %s',
+    async (requestMethod, requestUrl, headers, reason) => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ id: 42 })));
       const projectIntegration = {
         success: true as const,
@@ -2763,6 +3185,8 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       });
       if (!issued.success) throw new Error('Expected successful issuance');
       serviceMocks.getGitLabToken.mockClear();
+      serviceMocks.findGitLabIntegration.mockClear();
+      serviceMocks.resolveGitLabCredential.mockClear();
 
       await expect(
         service.redeemGitLabSessionCapability({
@@ -2771,7 +3195,11 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
           requestMethod,
           requestUrl,
         })
-      ).resolves.toEqual({ success: true, headers });
+      ).resolves.toEqual(reason ? { success: false, reason } : { success: true, headers });
+      if (reason) {
+        expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
+        expect(serviceMocks.resolveGitLabCredential).not.toHaveBeenCalled();
+      }
       expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
     }
   );
@@ -2885,18 +3313,6 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       'GET',
       'https://gitlab.example.com:8443/gitlab/api/v4/projects/acme%2Fplatform%2Fwidgets/merge_requests/42/changes',
       { authorization: 'Bearer refreshed-self-managed-token' },
-    ],
-    [
-      'POST',
-      'https://gitlab.example.com:8443/gitlab/api/graphql',
-      { authorization: 'Bearer refreshed-self-managed-token' },
-    ],
-    [
-      'GET',
-      'https://gitlab.example.com:8443/gitlab/other/project.git/info/refs?service=git-upload-pack',
-      {
-        authorization: `Basic ${Buffer.from('oauth2:refreshed-self-managed-token').toString('base64')}`,
-      },
     ],
   ] as const)(
     'issues and redeems a nested self-managed GitLab capability for %s %s',
@@ -3077,6 +3493,14 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     ['POST', 'https://gitlab.com/acme/widgets.git/git-receive-pack', 'Basic'],
     ['POST', 'https://gitlab.com/acme/widgets.git/info/lfs/objects/batch', 'Basic'],
     ['POST', 'https://gitlab.com/acme/widgets.git/info/lfs/locks/verify', 'Basic'],
+    ['GET', 'https://gitlab.com/acme/widgets.git/info/lfs/locks', 'Basic'],
+    ['POST', 'https://gitlab.com/acme/widgets.git/info/lfs/locks', 'Basic'],
+    ['POST', 'https://gitlab.com/acme/widgets.git/info/lfs/locks/123/unlock', 'Basic'],
+    [
+      'GET',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/repository/archive.tar.gz',
+      'Bearer',
+    ],
     [
       'GET',
       'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests/42/changes',
@@ -3093,6 +3517,18 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests/42/discussions',
       'Bearer',
     ],
+    ['GET', 'https://gitlab.com/api/v4/projects/acme%2Fwidgets', 'Bearer'],
+    [
+      'GET',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests/42/versions',
+      'Bearer',
+    ],
+    [
+      'GET',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests/42/approval_state',
+      'Bearer',
+    ],
+    ['DELETE', 'https://gitlab.com/api/v4/projects/acme%2Fwidgets/issues/1', 'Bearer'],
   ] as const)('redeems allowed GitLab request %s %s', async (requestMethod, requestUrl, scheme) => {
     const service = createService();
     const issued = await service.issueGitLabSessionCapability({
@@ -3127,12 +3563,21 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
   });
 
   it.each([
-    ['GET', 'https://gitlab.com/api/v4/projects?membership=true'],
-    ['POST', 'https://gitlab.com/api/graphql'],
-    ['DELETE', 'https://gitlab.com/api/v4/projects/acme%2Fother/issues/1'],
+    ['GET', 'https://gitlab.com/api/v4/projects?membership=true', 'invalid_upstream_request'],
+    ['POST', 'https://gitlab.com/api/graphql', 'invalid_upstream_request'],
+    ['GET', 'https://gitlab.com/api/v4/user', 'invalid_upstream_request'],
+    ['GET', 'https://gitlab.com/api/v4/users/42', 'invalid_upstream_request'],
+    ['DELETE', 'https://gitlab.com/api/v4/projects/acme%2Fother/issues/1', 'repository_mismatch'],
+    ['GET', 'https://gitlab.com/api/v4/projects/42/merge_requests/7', 'repository_mismatch'],
+    [
+      'GET',
+      'https://gitlab.com/other/project.git/info/refs?service=git-upload-pack',
+      'repository_mismatch',
+    ],
+    ['GET', 'https://gitlab.com/acme/widgets', 'invalid_upstream_request'],
   ] as const)(
-    'redeems an unrestricted bound GitLab integration capability for API request %s %s',
-    async (requestMethod, requestUrl) => {
+    'applies integration request policy for %s %s',
+    async (requestMethod, requestUrl, reason) => {
       const service = createService();
       const issued = await service.issueGitLabSessionCapability({
         gitUrl: 'https://gitlab.com/acme/widgets.git',
@@ -3141,11 +3586,8 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       });
       if (!issued.success) throw new Error('Expected successful issuance');
       serviceMocks.findGitLabIntegration.mockClear();
-      serviceMocks.getGitLabToken.mockResolvedValueOnce({
-        success: true,
-        token: 'refreshed-gitlab-token',
-        instanceUrl: 'https://gitlab.com',
-      });
+      serviceMocks.resolveGitLabCredential.mockClear();
+      serviceMocks.getGitLabToken.mockClear();
 
       await expect(
         service.redeemGitLabSessionCapability({
@@ -3154,11 +3596,10 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
           requestMethod,
           requestUrl,
         })
-      ).resolves.toEqual({
-        success: true,
-        headers: { authorization: 'Bearer refreshed-gitlab-token' },
-      });
-      expect(serviceMocks.findGitLabIntegration).toHaveBeenCalledOnce();
+      ).resolves.toEqual({ success: false, reason });
+      expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
+      expect(serviceMocks.resolveGitLabCredential).not.toHaveBeenCalled();
+      expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
     }
   );
 

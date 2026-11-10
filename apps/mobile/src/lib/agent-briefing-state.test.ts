@@ -7,6 +7,7 @@ import {
   briefingReportMissing,
   briefingSyncDelayMs,
   canReadBriefingContext,
+  parseBriefingSafeguardInput,
   parseBriefingSafeguards,
   readableBriefingOrganizationIds,
   visibleHomeBriefing,
@@ -15,8 +16,9 @@ import {
 const now = Date.parse('2026-10-15T09:00:00Z');
 const report: BriefingReport = {
   id: 'report-1',
-  kind: 'scheduled',
   createdAt: '2026-10-15T08:00:00Z',
+  capturedAt: '2026-10-15T08:00:00Z',
+  truncated: false,
   timezone: 'UTC',
   context: { id: 'personal', organizationId: null, name: 'Personal' },
   localDate: '2026-10-15',
@@ -26,12 +28,10 @@ const report: BriefingReport = {
   publishedAt: '2026-10-15T08:00:00Z',
   updatedAt: '2026-10-15T08:00:00Z',
   expiresAt: '2026-10-15T12:00:00Z',
-  revision: 1,
-  revised: false,
   readAt: null,
   dismissedAt: null,
-  scorecard: { sessions: 2, pullRequests: 1, blockers: 0, spendMicrodollars: 400_000 },
-  coverage: { activity: 'partial', pullRequests: 'partial', blockers: 'partial', spend: 'partial' },
+  scorecard: { sessions: 2, pullRequests: 1, blockers: 0 },
+  coverage: { activity: 'partial', pullRequests: 'partial', blockers: 'partial' },
   sessions: [],
   sources: [],
   summary: {
@@ -44,7 +44,6 @@ const report: BriefingReport = {
     startedAt: null,
     finishedAt: null,
     error: null,
-    canRetry: false,
   },
 };
 
@@ -54,20 +53,6 @@ describe('visibleHomeBriefing', () => {
     expect(
       visibleHomeBriefing([report], 'organization-1', { dismissedReportIds: [], now })
     ).toBeUndefined();
-  });
-
-  it('keeps manual reports in history without replacing the scheduled Home card', () => {
-    const manual: BriefingReport = {
-      ...report,
-      id: 'manual-1',
-      kind: 'one_off',
-      morningEndAt: '2026-11-14T09:00:00Z',
-      expiresAt: '2026-11-14T09:00:00Z',
-    };
-    expect(visibleHomeBriefing([manual], null, { dismissedReportIds: [], now })).toBeUndefined();
-    expect(visibleHomeBriefing([manual, report], null, { dismissedReportIds: [], now })).toBe(
-      report
-    );
   });
 
   it('honors offline dismissal without requiring a server response', () => {
@@ -148,7 +133,7 @@ describe('briefingEstimateUnavailableKey', () => {
       'agentBriefing.estimateSpendLimitTooLow'
     );
     expect(briefingEstimateUnavailableKey('input_too_large')).toBe(
-      'agentBriefing.estimateInputTooLarge'
+      'agentBriefing.snapshotEstimateInputTooLarge'
     );
     expect(briefingEstimateUnavailableKey('permission_unavailable')).toBe(
       'agentBriefing.estimatePermissionUnavailable'
@@ -201,6 +186,79 @@ describe('parseBriefingSafeguards', () => {
     expect(parseBriefingSafeguards(5, Number.NaN)).toBeNull();
     expect(parseBriefingSafeguards(Number.POSITIVE_INFINITY, 2)).toBeNull();
     expect(parseBriefingSafeguards(5, Number.MAX_SAFE_INTEGER)).toBeNull();
+  });
+});
+
+describe('parseBriefingSafeguardInput', () => {
+  it('reads the decimal separator of the active language', () => {
+    expect(parseBriefingSafeguardInput('2,5', '2,5', 'de')).toEqual({
+      maxDurationSeconds: 150,
+      maxSpendMicrodollars: 2_500_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '2.5', 'en')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 2_500_000,
+    });
+  });
+
+  it('rejects text the fields cannot turn into a server-valid limit', () => {
+    expect(parseBriefingSafeguardInput('', '2,5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('2,5', '', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('zwei', '2,5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('2,5', '-1', 'de')).toBeNull();
+  });
+
+  it('refuses a separator the active language does not read as a decimal point', () => {
+    // Each case pairs the refused text with a valid value in the other field, so
+    // the grammar check is the only reason the result is null: without it the
+    // text would still turn into a server-valid limit.
+    expect(parseBriefingSafeguardInput('5', '2.5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('0.5', '1', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('5', '2,5', 'en')).toBeNull();
+  });
+
+  it('refuses a group separator on the wrong side of the decimal separator', () => {
+    // Pasted from another convention: German grammar reads the comma as the
+    // decimal separator, so the trailing ".50" cannot be a group.
+    expect(parseBriefingSafeguardInput('10', '1,234.50', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('10', '1.234.5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('10', '1,23.50', 'en')).toBeNull();
+  });
+
+  it('accepts the language its own display writes', () => {
+    expect(parseBriefingSafeguardInput('10', '1234,5', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '1.234,5', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '1,234.5', 'en')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+  });
+
+  it('follows the grouping and separator the active language formats', () => {
+    // Pairing groups of two then three is correct in these languages and wrong
+    // in English, where the same text must be refused.
+    expect(parseBriefingSafeguardInput('10', '1,23,456.7', 'hi')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 123_456_700_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '123,456.7', 'hi')).toBeNull();
+    // French formats a narrow no-break space; a typed plain space reads the same.
+    expect(parseBriefingSafeguardInput('10', '1 234,5', 'fr')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+    // A fraction long enough to round the integer up must not invalidate the
+    // grouping the person typed.
+    expect(parseBriefingSafeguardInput('10', '9.999,9999', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 9_999_999_900,
+    });
   });
 });
 

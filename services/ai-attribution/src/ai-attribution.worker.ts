@@ -1,19 +1,22 @@
-/**
- * Cloudflare Worker entry point for AI Attributions Tracking
- */
-
-import { Hono, type MiddlewareHandler } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { useWorkersLogger } from 'workers-tagged-logger';
-import { AttributionTrackerDO, getAttributionTrackerDO } from './dos/AttributionTracker.do';
+import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
+import {
+  AttributionTrackerDO,
+  attributionTrackerKey,
+  getAttributionTrackerDO,
+} from './dos/AttributionTracker.do';
 import { logger } from './util/logger';
 import { resError, resSuccess } from '@kilocode/worker-utils';
-import { authMiddleware } from './util/auth';
+import { authMiddleware, identityMiddleware } from './util/auth';
+import { attributionRateLimitMiddleware } from './util/rate-limit';
 import { adminAuthMiddleware } from './util/admin-auth';
 import {
   AdminAttributionsQueryParams,
   AdminDeleteAttributionParams,
   AttributionsTrackRequestBody,
   AttributionEventResponse,
+  MAX_TRACK_BODY_BYTES,
 } from './schemas';
 
 export { AttributionTrackerDO };
@@ -36,7 +39,6 @@ const app = new Hono<HonoContext>();
 // The runtime middleware is fully compatible; only the .d.ts is stale.
 app.use('*', useWorkersLogger('ai-attribution') as unknown as MiddlewareHandler);
 
-// Health check endpoint (no auth required)
 app.get('/health', c => {
   return c.json({
     status: 'ok',
@@ -44,10 +46,13 @@ app.get('/health', c => {
   });
 });
 
-// Apply auth middleware to all /attributions/* routes
+// Apply auth middleware to all /attributions/* routes. The order matters: verify the
+// bearer, charge the budgets on the claimed identity, then decide whether that identity
+// may act, so a caller's own budget bounds the database work it can cause.
 app.use('/attributions/*', authMiddleware);
+app.use('/attributions/*', attributionRateLimitMiddleware);
+app.use('/attributions/*', identityMiddleware);
 
-// GET /attributions/whoami - Test authentication and return user info
 app.get('/attributions/whoami', c => {
   return c.json(
     resSuccess({
@@ -58,30 +63,62 @@ app.get('/attributions/whoami', c => {
   );
 });
 
-// POST /attributions/track - Track a new attribution
 app.post('/attributions/track', async c => {
-  const env = c.env;
   const user_id = c.get('user_id');
   const organization_id = c.get('organization_id');
 
-  // Parse and validate request body
+  let bodyText: string | undefined;
+  try {
+    const declaredLength = Number(c.req.header('Content-Length') ?? Number.NaN);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_TRACK_BODY_BYTES) {
+      return c.json(resError('Request body too large'), 413);
+    }
+    if (c.req.raw.body !== null) {
+      const bounded = await readBoundedStream(
+        c.req.raw.body as ReadableStream<Uint8Array>,
+        MAX_TRACK_BODY_BYTES
+      );
+      if (!bounded.ok) {
+        return c.json(resError('Request body too large'), 413);
+      }
+      bodyText = new TextDecoder().decode(bounded.bytes);
+    }
+  } catch (error) {
+    // An upload that ends before completion surfaces here as a read error;
+    // return a plain 400 instead of surfacing an internal failure.
+    logger.warn('Attribution tracking request ended before completion', {
+      error: error instanceof Error ? error.message : String(error),
+      organization_id,
+    });
+    return c.json(resError('Invalid request payload'), 400);
+  }
+
   let payload: AttributionsTrackRequestBody;
   try {
-    const body: unknown = await c.req.json();
+    const body: unknown = bodyText === undefined ? {} : JSON.parse(bodyText);
     payload = AttributionsTrackRequestBody.parse(body);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     return c.json(resError('Invalid request payload:\n' + errMsg), 400);
   }
 
-  // Get DurableObject stub
+  return trackAttribution(c, payload, user_id, organization_id);
+});
+
+async function trackAttribution(
+  c: Context<HonoContext>,
+  payload: AttributionsTrackRequestBody,
+  user_id: string,
+  organization_id: string
+) {
+  const env = c.env;
+
   const stub = getAttributionTrackerDO(env, {
     organization_id,
     project_id: payload.project_id,
     file_path: payload.file_path,
   });
 
-  // Track attribution
   try {
     const result = await stub.trackAttribution({
       ...payload,
@@ -101,16 +138,10 @@ app.post('/attributions/track', async c => {
     });
     return c.json(resError('Failed to track attribution'), 500);
   }
-});
+}
 
-// ============================================================================
-// Admin Routes (service-to-service communication)
-// ============================================================================
-
-// Apply admin auth middleware to all /admin/* routes
 app.use('/admin/*', adminAuthMiddleware);
 
-// GET /admin/health - Admin health check (verifies admin auth is working)
 app.get('/admin/health', c => {
   return c.json(
     resSuccess({
@@ -120,12 +151,9 @@ app.get('/admin/health', c => {
   );
 });
 
-// GET /admin/attributions - Get lines added for a given organization/project/file_path
-// Optionally filter by branch. Returns an object where keys are line hashes and values are arrays of line numbers
 app.get('/admin/attributions', async c => {
   const env = c.env;
 
-  // Parse and validate query params
   let params: AdminAttributionsQueryParams;
   try {
     const query = c.req.query();
@@ -140,16 +168,15 @@ app.get('/admin/attributions', async c => {
     return c.json(resError('Invalid query parameters:\n' + errMsg), 400);
   }
 
-  // Get DurableObject stub
-  const stub = getAttributionTrackerDO(env, {
+  const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
     file_path: params.file_path,
-  });
+  };
+  const stub = getAttributionTrackerDO(env, target);
 
-  // Get lines added grouped by hash, optionally filtered by branch
   try {
-    const linesAddedByHash = await stub.getLinesAddedByHash(params.branch);
+    const linesAddedByHash = await stub.getLinesAddedByHash(target, params.branch);
     return c.json(resSuccess({ lines_added: linesAddedByHash }));
   } catch (error) {
     console.error(error);
@@ -161,12 +188,9 @@ app.get('/admin/attributions', async c => {
   }
 });
 
-// GET /admin/attribution-events - Get attribution events with ordered line hashes for flexible retention
-// This endpoint returns data structured for the LCS-based retention calculation
 app.get('/admin/attribution-events', async c => {
   const env = c.env;
 
-  // Parse and validate query params
   let params: AdminAttributionsQueryParams;
   try {
     const query = c.req.query();
@@ -181,17 +205,15 @@ app.get('/admin/attribution-events', async c => {
     return c.json(resError('Invalid query parameters:\n' + errMsg), 400);
   }
 
-  // Get DurableObject stub
-  const stub = getAttributionTrackerDO(env, {
+  const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
     file_path: params.file_path,
-  });
+  };
+  const stub = getAttributionTrackerDO(env, target);
 
-  // Get attribution events with ordered line hashes
   try {
-    const events = await stub.getAttributionEvents(params.branch);
-    // Validate response shape
+    const events = await stub.getAttributionEvents(target, params.branch);
     const validatedEvents = events.map(e => AttributionEventResponse.parse(e));
     return c.json(resSuccess({ events: validatedEvents }));
   } catch (error) {
@@ -204,12 +226,9 @@ app.get('/admin/attribution-events', async c => {
   }
 });
 
-// GET /admin/debug-data - Get all debug data for a Durable Object
-// This endpoint returns the same data as the /debug/do route but as JSON for the admin panel
 app.get('/admin/debug-data', async c => {
   const env = c.env;
 
-  // Parse and validate query params
   let params: AdminAttributionsQueryParams;
   try {
     const query = c.req.query();
@@ -224,17 +243,16 @@ app.get('/admin/debug-data', async c => {
     return c.json(resError('Invalid query parameters:\n' + errMsg), 400);
   }
 
-  // Get DurableObject stub
-  const stub = getAttributionTrackerDO(env, {
+  const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
     file_path: params.file_path,
-  });
+  };
+  const stub = getAttributionTrackerDO(env, target);
 
-  // Get debug data from the DO
   try {
-    const debugData = await stub.getDebugData();
-    const doKey = `${params.organization_id}/${params.project_id}/${params.file_path}`;
+    const debugData = await stub.getDebugData(target);
+    const doKey = attributionTrackerKey(target);
     return c.json(resSuccess({ doKey, ...debugData }));
   } catch (error) {
     console.error(error);
@@ -246,11 +264,9 @@ app.get('/admin/debug-data', async c => {
   }
 });
 
-// DELETE /admin/attribution/:id - Delete a single attribution and its associated lines
 app.delete('/admin/attribution/:id', async c => {
   const env = c.env;
 
-  // Parse and validate params
   let params: AdminDeleteAttributionParams;
   try {
     const query = c.req.query();
@@ -266,16 +282,15 @@ app.delete('/admin/attribution/:id', async c => {
     return c.json(resError('Invalid parameters:\n' + errMsg), 400);
   }
 
-  // Get DurableObject stub
-  const stub = getAttributionTrackerDO(env, {
+  const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
     file_path: params.file_path,
-  });
+  };
+  const stub = getAttributionTrackerDO(env, target);
 
-  // Delete the attribution
   try {
-    const deleted = await stub.deleteAttribution(params.attribution_id);
+    const deleted = await stub.deleteAttribution(target, params.attribution_id);
     if (!deleted) {
       return c.json(resError('Attribution not found'), 404);
     }
@@ -290,12 +305,10 @@ app.delete('/admin/attribution/:id', async c => {
   }
 });
 
-// 404 handler
 app.notFound(c => {
   return c.json({ success: false, error: 'Not found' }, 404);
 });
 
-// Error handler
 app.onError((err, c) => {
   logger.error('Unhandled error', {
     error: err.message,

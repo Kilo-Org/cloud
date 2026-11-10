@@ -5,6 +5,7 @@ import { clearUserSessionTitles } from '@/components/agents/session-detail-renam
 import { clearSessionGoalCollapseState } from '@/components/agents/session-goal-collapse';
 import { clearToolCardImageCache } from '@/components/agents/tool-card-image-cache';
 import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
+import { clearSessionCatalogBestEffort } from '@/lib/app-actions/session-catalog';
 import { clearArtifactMirror } from '@/lib/artifacts/artifact-mirror';
 import { resetArtifactMirrorSyncState } from '@/lib/artifacts/artifact-mirror-sync';
 import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
@@ -12,10 +13,12 @@ import { clearChatBackends } from '@/lib/chat/backend-store';
 import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
+import { clearFormDrafts } from '@/lib/form-draft';
 import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
+import { clearConversationRetention } from '@/lib/pr-review/discussion/conversation-retention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { reportSystemSearchFailure } from '@/lib/system-search-telemetry';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
@@ -54,6 +57,13 @@ function clearSearchIndexBestEffort(): void {
  */
 export function clearSystemSearchIndexOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();
+  // The intent catalog is the same titles in another place, and its clear has
+  // the same one-shot problem: the teardown fired it without awaiting, so a
+  // process killed before it landed would leave the previous account's sessions
+  // named by Siri for the whole signed-out window. The signed-out launch is that
+  // retry, and running it while signed out cannot re-publish anything because
+  // the sync is gated off.
+  clearSessionCatalogBestEffort();
 }
 
 /**
@@ -85,16 +95,17 @@ function clearRecentPrsBestEffort(): void {
 /**
  * Clear the session-scoped local state that must not leak across an account
  * boundary: trusted hosts, trusted image hosts, confirmed markdown images, media
- * caches, per-session auto-approve and goal-disclosure flags, the remote MCP
+ * caches, typed profile form drafts, per-session auto-approve and goal-disclosure
+ * flags, the remote MCP
  * connection and the stored servers behind it, the app-settings-tools group
  * switch, the debounced repository-selection send state, the browsable
- * artifact mirror, app-owned temp copies, the stored PR recents, and the
- * phone's own search index. Every member is best-effort; one
- * member's throw falls through to the members after it, and to the caller's own
- * sign-in/sign-out state reset. The recents delete and OS search clear are
- * fired without awaiting, so the function stays synchronous; a rejection is
- * reported through telemetry, and the signed-out-launch re-clear retries the
- * index clear.
+ * artifact mirror, app-owned temp copies, the stored PR recents, the retained
+ * PR discussion conversation, and the phone's own search index. Every member is
+ * best-effort; one member's throw falls through to the members after it, and to
+ * the caller's own sign-in/sign-out state reset. The recents delete and OS
+ * search clear are fired without awaiting, so the function stays synchronous;
+ * a rejection is reported through telemetry, and the signed-out-launch re-clear
+ * retries the index clear.
  *
  * Both boundaries call this: the sign-out body and the account switch. A clear
  * that only the sign-out path ran would let a direct switch hand the next
@@ -110,6 +121,11 @@ export function clearSessionScopedState(): void {
   runClear(clearToolCardImageCache);
   runClear(clearFilePartCache);
   runClear(clearClipboardImages);
+  // Profile form drafts hold what someone typed, including a secret value, in
+  // this process's memory, so the account boundary drops them with the other
+  // stores: a form left open under the previous account must not reopen under
+  // the next one.
+  runClear(clearFormDrafts);
   runClear(clearSessionAutoApprove);
   runClear(forgetRemoteMcp);
   runClear(clearRemoteMcpServers);
@@ -138,6 +154,11 @@ export function clearSessionScopedState(): void {
   // index itself. Without this, an account switch re-indexes the previous
   // account's pull requests from the recents the new account then inherits.
   runClear(clearRecentPrsBestEffort);
+  // Cross-account separation for the retained PR discussion conversation: the
+  // sign-in account switch and the sign-out clear it with the other
+  // account-scoped members. Within one account, the organization component of
+  // `conversationRetentionKey` separates organizations' reads of the same PR.
+  runClear(clearConversationRetention);
   // The phone's search index is device-wide, not scoped to the signed-in
   // session, so without this the previous account's session, pull-request and
   // security titles stay searchable in Spotlight and Android app search after a
@@ -146,6 +167,12 @@ export function clearSessionScopedState(): void {
   // ledger the indexer diffs against, so the next sync re-indexes whatever the
   // new account can see.
   runClear(clearSearchIndexBestEffort);
+  // The App Intents session catalog is device-wide for the same reason, and it
+  // is the same titles in another place: without this, Shortcuts and Siri would
+  // keep offering the previous account's sessions after a sign-out or an
+  // account switch, and the next sync would republish them from the cache that
+  // has not been cleared yet.
+  runClear(clearSessionCatalogBestEffort);
 }
 
 /** One best-effort clear: a throw never stops the clears that follow it. */

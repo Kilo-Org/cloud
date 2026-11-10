@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { buildProfileSections, isEffectiveDefault } from '@/components/profiles/profile-list-model';
+import { ProfileOwnerHeading } from '@/components/profiles/profile-owner-heading';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
 import { selectProfilesListErrorView } from '@/components/profiles/profiles-list-error-view';
 import { QueryError } from '@/components/query-error';
@@ -106,7 +107,10 @@ export function ProfilesListScreen({
 
   const openProfile = (profile: AgentProfileListItem) => {
     router.push(
-      getProfileOverviewPath(profile.id, profileOrganizationId(organizationId, profile), stack)
+      getProfileOverviewPath(profile.id, {
+        organizationId: profileOrganizationId(organizationId, profile),
+        stack,
+      })
     );
   };
 
@@ -142,6 +146,10 @@ export function ProfilesListScreen({
           <QueryError
             variant={listError.variant}
             placement="top"
+            // The scroll view already supplies the list's gutter and top pad;
+            // the state's own pin air and padding would inset it 24 dp further
+            // than the rows it replaces and leave a band above it.
+            className="px-0 pt-0"
             title={listError.titleKey ? t(listError.titleKey) : undefined}
             onRetry={listError.showRetry ? () => void refetch() : undefined}
             isRetrying={isRefetching}
@@ -165,37 +173,34 @@ export function ProfilesListScreen({
           sections.length > 0 &&
           sections.map(section => (
             <View key={section.key} className="gap-3">
-              {section.titleKey ? (
-                <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                  {t(section.titleKey, {
-                    // Reviewed English heading until the `profiles.list.*`
-                    // copy lands with the translation slice.
-                    defaultValue: t(
-                      section.key === 'organization' ? 'common.organization' : 'common.personal'
-                    ),
-                  })}
-                </Text>
-              ) : null}
+              {section.titleKey ? <ProfileOwnerHeading owner={section.key} /> : null}
               {section.profiles.map((profile, index) => {
                 const subtitle = formatProfileCountItems(t, profileCountItems(profile)).join(' · ');
+                const isDefault = isEffectiveDefault(profile, effectiveDefaultId);
+                // The star is a visual mark inside the pressable row, so the
+                // row's own name has to carry the state it announces. TalkBack
+                // never reads `accessibilityHint` (React Native maps it to the
+                // node's tooltip), so the action belongs in the name as well.
+                const accessibilityLabel = [
+                  profile.name,
+                  subtitle,
+                  isDefault ? t('profiles.defaultSectionTitle') : '',
+                  t('profiles.openHint'),
+                ]
+                  .filter(part => part.length > 0)
+                  .join(', ');
                 return (
                   <ConfigureRow
                     key={profile.id}
                     icon={ownerIcon(profile)}
                     title={profile.name}
                     subtitle={subtitle || undefined}
+                    accessibilityLabel={accessibilityLabel}
                     className="rounded-lg bg-secondary px-3"
                     last={index === section.profiles.length - 1}
                     trailing={
-                      isEffectiveDefault(profile, effectiveDefaultId) ? (
-                        // The row already announces the profile name; the
-                        // star adds only the state it marks.
-                        <Star
-                          size={16}
-                          color={colors.primary}
-                          fill={colors.primary}
-                          accessibilityLabel={t('profiles.defaultSectionTitle')}
-                        />
+                      isDefault ? (
+                        <Star size={16} color={colors.primary} fill={colors.primary} />
                       ) : undefined
                     }
                     onPress={() => {

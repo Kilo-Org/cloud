@@ -4,6 +4,7 @@ import { i18n } from '@/i18n';
 import {
   councilDecisionLabel,
   councilVoteLabel,
+  findingsEmptyCopyKey,
   flattenCouncilFindings,
   gateThresholdLabel,
   reviewCancellationLabel,
@@ -257,5 +258,41 @@ describe('reviewCancellationLabel', () => {
         terminalReason: 'interrupted',
       })
     ).toBe(i18n.t('codeReviewer.reviewDetail.cancelReasonInterrupted'));
+  });
+});
+
+describe('findingsEmptyCopyKey', () => {
+  it.each(['queued', 'pending', 'running'])(
+    'reports an unfinished review as still in progress (%s)',
+    status => {
+      // A review that has not ended has no result to report, so the section may
+      // never read as a clean "no findings" outcome.
+      expect(findingsEmptyCopyKey(status)).toBe('codeReviewer.reviewDetail.findingsInProgress');
+    }
+  );
+
+  it.each(['cancelled', 'interrupted'])('reports an early ending (%s)', status => {
+    expect(findingsEmptyCopyKey(status)).toBe(
+      'codeReviewer.reviewDetail.findingsEndedWithoutResults'
+    );
+  });
+
+  it('keeps the failure copy for a failed review', () => {
+    expect(findingsEmptyCopyKey('failed')).toBe('codeReviewer.reviewDetail.findingsUnavailable');
+  });
+
+  it('reports an ended review with no findings as a result', () => {
+    expect(findingsEmptyCopyKey('completed')).toBe('codeReviewer.reviewDetail.noFindings');
+    // A status the catalog does not know yet still ended, so a clean result is
+    // the only claim left to make.
+    expect(findingsEmptyCopyKey('something-new')).toBe('codeReviewer.reviewDetail.noFindings');
+  });
+
+  it('names a catalog key the active locale actually translates', () => {
+    const key = findingsEmptyCopyKey('running');
+    expect(i18n.t(key)).not.toBe(key);
+    expect(i18n.t('codeReviewer.reviewDetail.findingsEndedWithoutResults')).not.toBe(
+      'codeReviewer.reviewDetail.findingsEndedWithoutResults'
+    );
   });
 });

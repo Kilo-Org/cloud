@@ -3,6 +3,13 @@ import { isRecord, kiloEventSessionId } from '../../../src/shared/kilo-event.js'
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import {
+  activitySessionId,
+  type ActivityPart,
+  type ActivitySnapshotMessage,
+  type HarnessActivityEvent,
+} from './harness-activity.js';
+import { kiloActivity } from './kilo-message-activity.js';
+import {
   beginPause,
   endPause,
   pausedMs,
@@ -26,10 +33,7 @@ export type SessionObservation = {
   status: 'busy' | 'retry' | 'idle';
   /** Present when `status` is `retry`. */
   retry?: ExecutionRetry;
-  messages: Array<{
-    info: { id: string; role: string; time?: { created: number; completed?: number } };
-    parts: unknown[];
-  }>;
+  messages: ActivitySnapshotMessage[];
   interactions: SessionInteraction[];
 };
 export type ExecutionIdentity = {
@@ -54,11 +58,13 @@ export type SessionSupervisorOptions = {
    * Called before native abort events can settle a Cloud message with another reason.
    * `retry` is set when a `no_progress` execution, or a descendant it stops, was stalled
    * in Kilo's model retry loop: the stall belongs to the model path, not the platform.
+   * `stopped` confirms cancellation and native retirement, or resolves false on failure/disposal.
    */
   onDeadline(
     identity: ExecutionIdentity,
     reason: ExecutionFailure,
-    retry: ExecutionRetry | undefined
+    retry: ExecutionRetry | undefined,
+    stopped: Promise<boolean>
   ): void;
   /** The existing runtime owner performs bounded process recovery, including sibling failures. */
   onObservationFailure(reason: 'abort_unconfirmed' | 'activity_capacity'): void;
@@ -72,7 +78,9 @@ type Part = {
   kind: string;
   messageID: string;
   callID?: string;
-  tool?: string;
+  /** The tool waits for the user. */
+  interactive: boolean;
+  /** The session a subagent tool runs in. */
   childID?: string;
   status?: string;
   bytes: number;
@@ -90,6 +98,8 @@ type Execution = ExecutionPauses & {
   activity: SessionActivity;
   parts: Map<string, Part>;
   interactions: Map<string, SessionInteraction>;
+  /** Newest Kilo completion timestamp this execution already credited or retired. */
+  evidenceThrough?: number;
   stop?: AbortController;
 };
 type Session = {
@@ -97,9 +107,8 @@ type Session = {
   directory: string;
   parentID?: string;
   revision: number;
+  /** Live assistant messages only; completed terminal history is retired. */
   roles: Map<string, string>;
-  /** Assistant messages Kilo reported complete; snapshots need not re-read them. */
-  completed: Set<string>;
   execution?: Execution;
 };
 
@@ -135,7 +144,6 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       directory,
       revision: -1,
       roles: new Map(),
-      completed: new Set(),
     };
     sessions.set(id, next);
     return next;
@@ -170,18 +178,39 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
   function finish(record: Session): void {
     record.execution = undefined;
     record.roles.clear();
-    record.completed.clear();
     if (snapshot !== undefined) tombstones.set(record.id, revision);
   }
 
-  function remember(record: Session, id: string, role: string, completed: boolean): boolean {
+  function remember(record: Session, id: string, role: string): boolean {
+    // User messages neither carry execution evidence nor need retention.
+    if (role !== 'assistant') return true;
     if (record.roles.size >= MAX_MESSAGE_ROLES && !record.roles.has(id)) {
       options.onObservationFailure('activity_capacity');
       return false;
     }
     record.roles.set(id, role);
-    if (completed) record.completed.add(id);
     return true;
+  }
+
+  /**
+   * A completed assistant without a running or pending tool is terminal: its role and
+   * parts cannot produce more progress, so retiring them keeps long serial generations
+   * inside the role and part bounds. A completed message with a live tool is kept
+   * whole, so a later re-read sees no change until that tool changes.
+   */
+  function retireMessage(record: Session, id: string): void {
+    const parts = record.execution?.parts;
+    const owned = parts ? [...parts].filter(([, part]) => part.messageID === id) : [];
+    const pinned = owned.some(
+      ([, part]) => part.kind === 'tool' && (part.status === 'running' || part.status === 'pending')
+    );
+    if (pinned) return;
+    for (const [partId] of owned) parts?.delete(partId);
+    record.roles.delete(id);
+  }
+
+  function creditCompleted(execution: Execution, completedAt: number): void {
+    execution.evidenceThrough = Math.max(execution.evidenceThrough ?? completedAt, completedAt);
   }
 
   function prune(): void {
@@ -227,11 +256,11 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       const interaction = [...execution.interactions.values()].some(
         request => request.callID === part.callID && part.callID !== undefined
       );
-      if (interaction || part.tool === 'question' || part.tool === 'suggest') {
+      if (interaction || part.interactive) {
         blockedTool = true;
         continue;
       }
-      if (part.tool === 'task' && part.childID) {
+      if (part.childID) {
         const child = sessions.get(part.childID);
         if (child?.execution && activity(child, new Set(visiting)) === 'waiting') {
           blockedTool = true;
@@ -280,29 +309,21 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
     return result;
   }
 
-  function observePart(record: Session, raw: unknown): 'new' | 'changed' | 'unchanged' {
-    if (!isRecord(raw) || typeof raw.id !== 'string' || typeof raw.messageID !== 'string')
-      return 'unchanged';
-    if (record.roles.get(raw.messageID) !== 'assistant') return 'unchanged';
-    const state = isRecord(raw.state) ? raw.state : {};
-    const type = raw.type;
-    if (type !== 'tool' && type !== 'text' && type !== 'reasoning') return 'unchanged';
+  function observePart(record: Session, part: ActivityPart): 'new' | 'changed' | 'unchanged' {
+    if (record.roles.get(part.messageId) !== 'assistant') return 'unchanged';
+    const tool = part.tool;
     // Historical terminal parts alone cannot create an execution.
-    const execution =
-      record.execution ??
-      (type === 'tool' && state.status === 'running' ? start(record) : undefined);
+    const execution = record.execution ?? (tool?.status === 'running' ? start(record) : undefined);
     if (!execution || execution.activity === 'stopping') return 'unchanged';
-    const previous = execution.parts.get(raw.id);
-    const metadata = isRecord(state.metadata) ? state.metadata : {};
-    const output = type === 'tool' ? (state.output ?? metadata.output) : raw.text;
-    const content = typeof output === 'string' ? output : '';
+    const previous = execution.parts.get(part.id);
+    const content = (tool ? tool.output : part.text) ?? '';
     const next: Part = {
-      kind: type,
-      messageID: raw.messageID,
-      callID: typeof raw.callID === 'string' ? raw.callID : undefined,
-      tool: typeof raw.tool === 'string' ? raw.tool : undefined,
-      childID: typeof metadata.sessionId === 'string' ? metadata.sessionId : undefined,
-      status: typeof state.status === 'string' ? state.status : undefined,
+      kind: part.kind,
+      messageID: part.messageId,
+      callID: tool?.callId,
+      interactive: tool?.interactive === true,
+      childID: tool?.childSessionId,
+      status: tool?.status,
       bytes: Buffer.byteLength(content),
       digest: hash(content),
     };
@@ -315,8 +336,8 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       options.onObservationFailure('activity_capacity');
       return 'unchanged';
     }
-    execution.parts.set(raw.id, next);
-    if (!changed || (!previous && next.bytes === 0 && type !== 'tool')) return 'unchanged';
+    execution.parts.set(part.id, next);
+    if (!changed || (!previous && next.bytes === 0 && !tool)) return 'unchanged';
     return previous ? 'changed' : 'new';
   }
 
@@ -339,6 +360,11 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
 
   function observe(event: KiloFeedEvent): void {
     if (disposed || event.nativeRuntimeId !== options.nativeRuntimeId) return;
+    const activity = kiloActivity(event.type, event.properties);
+    if (activity.length > 0) {
+      for (const item of activity) observeActivity({ ...event, activity: item });
+      return;
+    }
     const id = kiloEventSessionId(event.properties);
     if (!id) return;
     const properties = event.properties;
@@ -374,31 +400,6 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
         record.execution.status = 'idle';
         record.execution.retry = undefined;
       }
-    } else if (
-      event.type === 'message.updated' &&
-      typeof info?.id === 'string' &&
-      typeof info.role === 'string'
-    ) {
-      const time = isRecord(info.time) ? info.time : {};
-      if (!remember(record, info.id, info.role, time.completed !== undefined)) return;
-    } else if (event.type === 'message.part.updated') {
-      if (observePart(record, properties.part) !== 'unchanged') progress(record);
-    } else if (
-      event.type === 'message.part.delta' &&
-      typeof properties.messageID === 'string' &&
-      record.roles.get(properties.messageID) === 'assistant' &&
-      typeof properties.delta === 'string' &&
-      properties.delta.length > 0 &&
-      (properties.field === 'text' || properties.field === undefined)
-    ) {
-      const execution = start(record);
-      const part =
-        typeof properties.partID === 'string' ? execution.parts.get(properties.partID) : undefined;
-      if (part) {
-        part.bytes += Buffer.byteLength(properties.delta);
-        part.digest = undefined;
-      }
-      progress(record);
     } else if (event.type === 'session.turn.close' && record.execution) {
       const execution = record.execution;
       execution.openRequests = Math.max(0, execution.openRequests - 1);
@@ -433,6 +434,42 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
     refresh();
   }
 
+  /** CLI-neutral evidence of model work from the runtime's harness. */
+  function observeActivity(event: HarnessActivityEvent): void {
+    if (disposed || event.nativeRuntimeId !== options.nativeRuntimeId) return;
+    const id = activitySessionId(event.activity);
+    revision++;
+    if (snapshot !== undefined) tombstones.set(id, revision);
+    const record = session(id, event.directory);
+    record.revision = revision;
+    const activity = event.activity;
+    if (activity.type === 'message') {
+      const { message } = activity;
+      if (message.role === 'assistant') {
+        if (message.time?.completed !== undefined) {
+          // Live parts were already observed for this role, so completion itself adds
+          // no progress; it only fences out later replay of the same terminal history.
+          const execution = record.execution;
+          if (execution && record.roles.get(message.id) === 'assistant')
+            creditCompleted(execution, message.time.completed);
+          retireMessage(record, message.id);
+        } else if (!remember(record, message.id, message.role)) {
+          return;
+        }
+      }
+    } else if (activity.type === 'part') {
+      if (observePart(record, activity.part) !== 'unchanged') progress(record);
+    } else if (record.roles.get(activity.messageId) === 'assistant' && activity.text.length > 0) {
+      const part = start(record).parts.get(activity.partId);
+      if (part) {
+        part.bytes += Buffer.byteLength(activity.text);
+        part.digest = undefined;
+      }
+      progress(record);
+    }
+    refresh();
+  }
+
   function beginSnapshot(): number {
     if (snapshot !== undefined) throw new Error('Activity snapshot already in flight');
     snapshot = { id: ++snapshotSequence, revision };
@@ -456,13 +493,7 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
         record.parentID = item.parentID;
         const runningParts = item.messages
           .flatMap(m => m.parts)
-          .some(
-            part =>
-              isRecord(part) &&
-              part.type === 'tool' &&
-              isRecord(part.state) &&
-              ['running', 'pending'].includes(String(part.state.status))
-          );
+          .some(part => part.tool?.status === 'running' || part.tool?.status === 'pending');
         if (item.status === 'idle' && !runningParts) {
           finish(record);
           continue;
@@ -473,18 +504,46 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
         execution.interactions = new Map(item.interactions.map(request => [request.id, request]));
         const partIds = new Set<string>();
         for (const message of item.messages) {
-          const { id, role, time } = message.info;
-          if (!remember(record, id, role, time?.completed !== undefined)) return;
+          const { id, role, time } = message;
+          if (role !== 'assistant') continue;
+          const completedAt = typeof time?.completed === 'number' ? time.completed : undefined;
+          const live = record.roles.get(id) === 'assistant';
+          const pinnedLive = message.parts.some(
+            part => part.tool?.status === 'running' || part.tool?.status === 'pending'
+          );
+          if (completedAt !== undefined && !live && !pinnedLive) {
+            // Terminal history is not replayed as progress. A completion newer than
+            // this execution's retired frontier still proves work happened during a
+            // feed gap, so credit that source timestamp exactly once.
+            const recovered = message.parts.some(
+              part =>
+                part.kind === 'tool' ||
+                ((part.kind === 'text' || part.kind === 'reasoning') &&
+                  (part.text?.length ?? 0) > 0)
+            );
+            if (
+              recovered &&
+              knownExecution &&
+              completedAt >= execution.startedAt &&
+              completedAt > (execution.evidenceThrough ?? Number.NEGATIVE_INFINITY)
+            ) {
+              creditCompleted(execution, completedAt);
+              progress(record);
+            }
+            retireMessage(record, id);
+            continue;
+          }
+          if (!remember(record, id, role)) return;
           for (const part of message.parts) {
-            if (isRecord(part) && typeof part.id === 'string') partIds.add(part.id);
+            partIds.add(part.id);
             const change = observePart(record, part);
             // Recovery may first discover execution after it already produced output
             // or started a tool. Latch that evidence for safe resubmission without
             // treating historical hydration as fresh clock progress.
             if (
               !knownExecution &&
-              message.info.role === 'assistant' &&
-              message.info.time?.completed === undefined &&
+              message.role === 'assistant' &&
+              message.time?.completed === undefined &&
               change !== 'unchanged'
             ) {
               execution.progressed = true;
@@ -492,9 +551,13 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
             const newEvidence =
               change === 'new' &&
               knownExecution &&
-              message.info.time !== undefined &&
-              message.info.time.created >= execution.startedAt;
+              message.time !== undefined &&
+              message.time.created >= execution.startedAt;
             if (change === 'changed' || newEvidence) progress(record);
+          }
+          if (completedAt !== undefined) {
+            creditCompleted(execution, completedAt);
+            retireMessage(record, id);
           }
         }
         // The adapter includes each known in-flight message, so missing parts have ended.
@@ -546,17 +609,27 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
           ? [execution, ...stoppedChildren.map(child => child.execution)].find(item => item.retry)
               ?.retry
           : undefined;
-      options.onDeadline(target, reason, retry);
+      const stopped = Promise.withResolvers<boolean>();
+      const cancelled = () => stopped.resolve(false);
+      stop.signal.addEventListener('abort', cancelled, { once: true });
+      options.onDeadline(target, reason, retry, stopped.promise);
       void options.interrupt(target, reason, stop.signal).then(
         () => {
-          if (disposed) return;
+          stop.signal.removeEventListener('abort', cancelled);
+          if (disposed || stop.signal.aborted) {
+            stopped.resolve(false);
+            return;
+          }
           if (record.execution === execution) finish(record);
           for (const child of stoppedChildren) {
             if (child.record.execution === child.execution) finish(child.record);
           }
           prune();
+          stopped.resolve(true);
         },
         () => {
+          stop.signal.removeEventListener('abort', cancelled);
+          stopped.resolve(false);
           if (!disposed && record.execution === execution)
             options.onObservationFailure('abort_unconfirmed');
         }
@@ -566,6 +639,7 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
 
   return {
     observe,
+    observeActivity,
     beginSnapshot,
     reconcile,
     tick,
@@ -617,8 +691,8 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
               {
                 id: record.id,
                 directory: record.directory,
-                // Only in-flight messages: re-reading completed history makes every
-                // snapshot slower as a long execution accumulates steps.
+                // Only live messages: completed history is retired rather than re-read,
+                // so a long serial execution's snapshot does not grow with its steps.
                 messageIds: [
                   ...new Set([
                     ...[...record.execution.parts.values()].map(part => part.messageID),
@@ -626,7 +700,7 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
                       role === 'assistant' ? [id] : []
                     ),
                   ]),
-                ].filter(id => !record.completed.has(id)),
+                ],
               },
             ]
           : []

@@ -9,7 +9,7 @@ import {
   cloud_agent_sessions,
   github_branch_pull_requests,
 } from '@kilocode/db/schema';
-import type { RefreshGlanceableSessionsParams } from '@kilocode/notifications';
+import type { RefreshGlanceableSessionsParams } from '@kilocode/notifications/schemas';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import {
   buildGlanceableSnapshot,

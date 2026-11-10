@@ -100,6 +100,22 @@ export async function listAgentsForProfile(
   return rows.map(toResponse);
 }
 
+/**
+ * A profile's agents for a caller who holds the profile, ownership checked.
+ *
+ * The new-session role picker and the session's active-profile chip map custom
+ * modes from these agents only; reading the whole profile for them transfers
+ * every skill's markdown and companion files for nothing.
+ */
+export async function getProfileAgents(
+  db: WorkerDb,
+  profileId: string,
+  owner: ProfileOwner
+): Promise<ProfileAgentResponse[]> {
+  await verifyProfileOwnership(db, profileId, owner);
+  return listAgentsForProfile(db, profileId);
+}
+
 export async function createAgent(
   db: WorkerDb,
   profileId: string,

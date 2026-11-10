@@ -24,6 +24,7 @@ import { FirstTopupBonusPromo } from './FirstTopupBonusPromo';
 import { AlertTriangle, Coins } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { CreditExpiryNotice } from './CreditExpiryNotice';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -166,6 +167,7 @@ export default function CreditPurchaseOptions({
         )}
 
         <div className="flex flex-col space-y-4">
+          <CreditExpiryNotice />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {purchaseAmounts.map(amount => {
               const totalAmount = showFirstPurchasePromo
@@ -215,6 +217,7 @@ export default function CreditPurchaseOptions({
                     )}
                   </DialogDescription>
                 </DialogHeader>
+                <CreditExpiryNotice />
                 <form
                   onSubmit={handleCustomAmountSubmit}
                   action={buildTopupUrl(customAmount)}

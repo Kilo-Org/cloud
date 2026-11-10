@@ -5,13 +5,15 @@ import { usePathname, useSegments } from 'expo-router';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider, useKeyboardState } from 'react-native-keyboard-controller';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
 import { OfflineBanner } from '@/components/offline-banner';
+import { SheetTouchGuard } from '@/components/sheet-touch-guard';
+import { KeyboardMotionProvider } from '@/components/keyboard-motion-provider';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { SystemFontScaleProvider } from '@/lib/font-scale/system-font-scale';
 import { AuthProvider } from '@/lib/auth/auth-context';
@@ -63,7 +65,7 @@ export function AppRootProviders({
           keyboard surfaces — `KeyboardAvoidingView` on the session, history,
           quick-chat and detail screens — read it from here instead of listening
           to React Native's keyboard events. */}
-        <KeyboardProvider>
+        <KeyboardMotionProvider>
           <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
             <QueryClientProvider client={queryClient}>
               <QueryClientNativeLifecycle />
@@ -77,9 +79,7 @@ export function AppRootProviders({
                     {/* Use one renderer so iOS and Android both honor the app palette and safe area. */}
                     <ActionSheetProvider useCustomActionSheet>
                       <>
-                        {children}
-                        <OfflineBanner />
-                        <PortalHost />
+                        <AppCoveredContent>{children}</AppCoveredContent>
                         {/*
                         Toaster mounts last so it renders above PortalHost overlays (sheets/dropdowns
                         built on @rn-primitives/portal) — last sibling wins for overlapping overlays.
@@ -100,9 +100,25 @@ export function AppRootProviders({
               </AuthProvider>
             </QueryClientProvider>
           </TRPCProvider>
-        </KeyboardProvider>
+        </KeyboardMotionProvider>
       </GestureHandlerRootView>
     </SystemFontScaleProvider>
+  );
+}
+
+/**
+ * Everything a native sheet covers: the app tree, the offline banner and the
+ * portal overlays. `SheetTouchGuard` claims a touch that starts before the
+ * sheet's own window exists, the tab bar and those overlays included; see
+ * `@/lib/sheet-touch-guard` for the window it covers.
+ */
+function AppCoveredContent({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <SheetTouchGuard>
+      {children}
+      <OfflineBanner />
+      <PortalHost />
+    </SheetTouchGuard>
   );
 }
 

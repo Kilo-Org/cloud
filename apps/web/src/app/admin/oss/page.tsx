@@ -71,7 +71,6 @@ type ImportResult = {
  */
 function extractRepoName(githubUrl: string): string | null {
   try {
-    // Handle URLs without protocol
     let url = githubUrl.trim();
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
@@ -84,7 +83,6 @@ function extractRepoName(githubUrl: string): string | null {
     if (pathParts.length < 2) {
       return null;
     }
-    // Get repo name (second part of path), remove .git extension if present
     const repoName = pathParts[1].replace(/\.git$/, '');
     return repoName || null;
   } catch {
@@ -96,13 +94,12 @@ function parseCsv(text: string): { rows: CsvRow[]; skippedRows: SkippedRow[] } {
   const lines = text.trim().split('\n');
   const rows: CsvRow[] = [];
   const skippedRows: SkippedRow[] = [];
-  const seenRepos = new Set<string>(); // Track repos seen in this upload to detect duplicates
+  const seenRepos = new Set<string>();
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Skip header row if it looks like one
     if (
       i === 0 &&
       (line.toLowerCase().includes('github') || line.toLowerCase().includes('email'))
@@ -112,7 +109,6 @@ function parseCsv(text: string): { rows: CsvRow[]; skippedRows: SkippedRow[] } {
 
     const parts = line.split(',').map(p => p.trim());
 
-    // Require exactly 4 columns
     if (parts.length !== 4) {
       skippedRows.push({
         lineNumber: i + 1,
@@ -124,7 +120,6 @@ function parseCsv(text: string): { rows: CsvRow[]; skippedRows: SkippedRow[] } {
 
     const [githubUrl, email, creditsStr, tierStr] = parts;
 
-    // Validate GitHub URL
     if (!githubUrl) {
       skippedRows.push({
         lineNumber: i + 1,
@@ -144,7 +139,6 @@ function parseCsv(text: string): { rows: CsvRow[]; skippedRows: SkippedRow[] } {
       continue;
     }
 
-    // Check for duplicate repos within the same CSV upload
     const repoNameLower = repoName.toLowerCase();
     if (seenRepos.has(repoNameLower)) {
       skippedRows.push({
@@ -156,7 +150,6 @@ function parseCsv(text: string): { rows: CsvRow[]; skippedRows: SkippedRow[] } {
     }
     seenRepos.add(repoNameLower);
 
-    // Validate email
     if (!email || !email.includes('@')) {
       skippedRows.push({
         lineNumber: i + 1,
@@ -166,7 +159,6 @@ function parseCsv(text: string): { rows: CsvRow[]; skippedRows: SkippedRow[] } {
       continue;
     }
 
-    // Validate credits
     const creditsDollars = parseFloat(creditsStr);
     if (isNaN(creditsDollars) || creditsDollars < 0) {
       skippedRows.push({
@@ -177,7 +169,6 @@ function parseCsv(text: string): { rows: CsvRow[]; skippedRows: SkippedRow[] } {
       continue;
     }
 
-    // Validate tier
     const tier = parseInt(tierStr, 10);
     if (![1, 2, 3].includes(tier)) {
       skippedRows.push({
@@ -297,7 +288,6 @@ function CsvUploadSection() {
     downloadCsv(csvContent, 'skipped-rows.csv');
   };
 
-  // Extract repo name for display
   const getRepoName = (githubUrl: string) => extractRepoName(githubUrl) || 'Unknown';
 
   return (
@@ -511,7 +501,6 @@ function AddExistingOrgSection() {
         setDialogOpen(false);
         setSelectedOrg(null);
         setSearchQuery('');
-        // Invalidate the sponsorships list
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.ossSponsorship.listOssSponsorships.queryKey(),
         });
@@ -756,11 +745,9 @@ function SponsorshipsTable() {
 
   const sponsorships = useMemo(() => data ?? [], [data]);
 
-  // Filter and sort sponsorships
   const filteredAndSortedSponsorships = useMemo(() => {
     let result = [...sponsorships];
 
-    // Apply filters
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       result = result.filter(
@@ -799,7 +786,6 @@ function SponsorshipsTable() {
       result = result.filter(s => s.tier === filters.tier);
     }
 
-    // Apply sorting
     result.sort((a, b) => {
       let comparison = 0;
 

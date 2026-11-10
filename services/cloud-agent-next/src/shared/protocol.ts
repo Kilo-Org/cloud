@@ -92,6 +92,8 @@ export type KilocodeEventData = {
 export type AutocommitStartedData = {
   message: string;
   messageId?: string;
+  /** The repository the event is about, for a multi-repository turn. */
+  repository?: string;
 };
 
 /**
@@ -108,6 +110,8 @@ export type AutocommitCompletedData = {
   committedAt?: string;
   pushStatus?: 'pushed' | 'failed' | 'not_attempted' | 'unknown';
   commitMessageTruncated?: true;
+  /** The repository the event is about, for a multi-repository turn. */
+  repository?: string;
 };
 
 /**
@@ -136,9 +140,12 @@ export type PreparingStep =
   | 'branch'
   | 'devcontainer_setup'
   | 'setup_commands'
+  | 'session_setup_commands'
+  | 'start_commands'
   | 'workspace_restore'
   | 'workspace_backup'
   | 'sandbox_provision'
+  | 'environment_snapshot'
   | 'sandbox_boot'
   | 'snapshot_fallback'
   | 'kilo_server'
@@ -162,6 +169,8 @@ export type PreparationStepSnapshot = {
   completedAt?: number;
   revision: number;
   latestDetail?: string;
+  /** Capture time of the selected snapshot, in Unix epoch milliseconds. */
+  snapshotCapturedAt?: number;
   safeError?: string;
   command?: string;
   commandIndex?: number;
@@ -206,7 +215,7 @@ export type PreparingEventDataV2 = PreparingEventDataV2Base &
         commandCount?: number;
         parentStepId?: string;
       }
-    | { action: 'step_progress'; stepId: string; detail: string }
+    | { action: 'step_progress'; stepId: string; detail: string; snapshotCapturedAt?: number }
     | { action: 'step_output'; stepId: string; output: string }
     | { action: 'step_completed'; stepId: string; exitCode?: number }
     | { action: 'step_failed'; stepId: string; safeError: string; exitCode?: number }
@@ -250,6 +259,7 @@ export type SessionStatus =
 /** Data included in 'connected' events. */
 export type ConnectedEventData = {
   bootstrapPending?: boolean;
+  ancillaryOmittedItemCount?: number;
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
   activeMessageId?: string | null;

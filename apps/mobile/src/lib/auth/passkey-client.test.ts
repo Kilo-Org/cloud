@@ -318,6 +318,32 @@ describe('signInWithPasskey', () => {
     });
   });
 
+  it('ties the ticket exchange to a pending link and returns its result', async () => {
+    const api = fakeApi();
+    api.get.mockResolvedValue(assertion);
+    mockPostAuth
+      .mockResolvedValueOnce(optionsResponse)
+      .mockResolvedValueOnce(ticketResponse)
+      .mockResolvedValueOnce({
+        ok: true,
+        data: { token: 'at', pendingLink: { status: 'linked', provider: 'github' } },
+      });
+
+    const result = await signInWithPasskey(api, 'link-token');
+
+    expect(mockPostAuth).toHaveBeenNthCalledWith(3, '/api/auth/native/token', {
+      provider: 'passkey',
+      ticket: 'ticket-1',
+      supportsRefresh: true,
+      pendingLinkToken: 'link-token',
+    });
+    expect(result).toEqual({
+      status: 'ok',
+      token: 'at',
+      pendingLink: { status: 'linked', provider: 'github' },
+    });
+  });
+
   it('keeps a dismissed sheet retryable', async () => {
     const api = fakeApi();
     api.get.mockRejectedValue({ name: 'UserCancelledException' });

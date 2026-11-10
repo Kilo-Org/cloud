@@ -4,19 +4,49 @@ import {
   device_sessions,
   device_refresh_tokens,
   kilocode_users,
+  organizations,
+  user_auth_provider,
   native_attested_keys,
 } from '@kilocode/db/schema';
+import type { Organization } from '@workos-inc/node';
 import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import {
+  cleanupExpiredDeviceRefreshTokens,
   createDeviceSession,
   createDeviceSessionWithAttestedKey,
   issueSessionCredentials,
   rotateRefreshToken,
   revokeDeviceSession,
+  MAX_LIVE_APP_SESSIONS,
 } from './device-sessions';
 import { KeyCollisionError } from './native-admission';
 import type { User } from '@kilocode/db/schema';
+import {
+  isDeviceSessionActive,
+  resetDeviceSessionCacheForTest,
+} from '@kilocode/web-shared/lib/auth/device-session-cache';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/server';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import { getWorkOSOrganization } from '@/lib/user';
+
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+  isBlockedTLD: jest.fn(),
+}));
+
+jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/blacklist-domains-config') as object),
+  isEmailBlacklisted: jest.fn(),
+}));
+
+jest.mock('@/lib/user', () => ({
+  ...(jest.requireActual('@/lib/user') as object),
+  getWorkOSOrganization: jest.fn(),
+}));
+
+const mockIsEmailBlacklisted = jest.mocked(isEmailBlacklisted);
+const mockIsBlockedTLD = jest.mocked(isBlockedTLD);
+const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
 
 describe('device-sessions', () => {
   const testUserId = 'test-user-ds-' + Date.now();
@@ -25,6 +55,10 @@ describe('device-sessions', () => {
   let fakeUser: User;
 
   beforeEach(async () => {
+    mockIsEmailBlacklisted.mockResolvedValue(false);
+    mockIsBlockedTLD.mockResolvedValue(false);
+    mockGetWorkOSOrganization.mockResolvedValue(null);
+
     await db.insert(kilocode_users).values({
       id: testUserId,
       google_user_email: testUserEmail,
@@ -65,6 +99,76 @@ describe('device-sessions', () => {
       expect(row!.kilo_user_id).toBe(testUserId);
       expect(row!.user_agent).toBe('test-agent');
       expect(row!.revoked_at).toBeNull();
+    });
+
+    test('retires the least recently active app session and clears its cached state', async () => {
+      const sessionIds: string[] = [];
+      for (let index = 0; index < MAX_LIVE_APP_SESSIONS; index += 1) {
+        sessionIds.push(await createDeviceSession({ userId: testUserId }));
+      }
+
+      const oldestSessionId = sessionIds[0];
+      const loadSessionActive = jest.fn(async () => {
+        const [row] = await db
+          .select({ revoked_at: device_sessions.revoked_at })
+          .from(device_sessions)
+          .where(eq(device_sessions.id, oldestSessionId));
+        return row !== undefined && row.revoked_at === null;
+      });
+      resetDeviceSessionCacheForTest();
+      expect(await isDeviceSessionActive(oldestSessionId, testUserId, loadSessionActive)).toBe(
+        true
+      );
+
+      sessionIds.push(await createDeviceSession({ userId: testUserId }));
+
+      expect(await isDeviceSessionActive(oldestSessionId, testUserId, loadSessionActive)).toBe(
+        false
+      );
+      expect(loadSessionActive).toHaveBeenCalledTimes(2);
+
+      const rows = await db
+        .select({
+          id: device_sessions.id,
+          revoked_at: device_sessions.revoked_at,
+          revoked_reason: device_sessions.revoked_reason,
+        })
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+
+      const live = rows.filter(row => row.revoked_at === null);
+      expect(live).toHaveLength(MAX_LIVE_APP_SESSIONS);
+
+      const oldest = rows.find(row => row.id === oldestSessionId);
+      expect(oldest?.revoked_reason).toBe('session_limit');
+      expect(oldest?.revoked_at).not.toBeNull();
+      expect(live.map(row => row.id)).toContain(sessionIds[sessionIds.length - 1]);
+    });
+
+    test('does not count or retire device-auth sessions', async () => {
+      for (let index = 0; index < MAX_LIVE_APP_SESSIONS; index += 1) {
+        await createDeviceSession({ userId: testUserId });
+      }
+      const deviceAuthSessionId = await createDeviceSession({
+        userId: testUserId,
+        deviceAuthRequestId: '11111111-1111-4111-8111-111111111111',
+      });
+
+      const [row] = await db
+        .select({ revoked_at: device_sessions.revoked_at })
+        .from(device_sessions)
+        .where(eq(device_sessions.id, deviceAuthSessionId));
+
+      expect(row!.revoked_at).toBeNull();
+
+      // A device-auth session also never evicts an app session.
+      const live = await db
+        .select({ id: device_sessions.id })
+        .from(device_sessions)
+        .where(
+          and(eq(device_sessions.kilo_user_id, testUserId), isNull(device_sessions.revoked_at))
+        );
+      expect(live).toHaveLength(MAX_LIVE_APP_SESSIONS + 1);
     });
   });
 
@@ -258,6 +362,76 @@ describe('device-sessions', () => {
       const replay = await rotateRefreshToken(lost.refreshToken);
       expect(replay).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
       expect((await readSession(sessionId)).revoked_reason).toBe('refresh_reuse_detected');
+    });
+
+    test('a second presentation of a recovered token revokes the session without a new row', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const lost = await rotateRefreshToken(refreshToken);
+      expect(lost.ok).toBe(true);
+      if (!lost.ok) return;
+
+      // First presentation after the response was lost: recovers.
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+      if (!retry.ok) return;
+
+      const rowsAfterRecovery = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+
+      // A later presentation of the same token is a replay: refuse, revoke,
+      // and issue no replacement row.
+      const again = await rotateRefreshToken(refreshToken);
+      expect(again).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
+      expect((await readSession(sessionId)).revoked_reason).toBe('refresh_reuse_detected');
+
+      const rowsAfterReplay = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(rowsAfterReplay).toHaveLength(rowsAfterRecovery.length);
+    });
+
+    test('the consume time of a recovered token does not move', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const lost = await rotateRefreshToken(refreshToken);
+      expect(lost.ok).toBe(true);
+      if (!lost.ok) return;
+
+      // Pin the consume stamp to an exact value inside the grace window. A
+      // recovery that restamps the row would replace this value with the
+      // request's read time and the two reads would differ.
+      const pinnedConsumeAt = new Date(Date.now() - 60_000).toISOString();
+      await db
+        .update(device_refresh_tokens)
+        .set({ consumed_at: pinnedConsumeAt })
+        .where(
+          eq(
+            device_refresh_tokens.token_hash,
+            createHash('sha256').update(refreshToken).digest('hex')
+          )
+        );
+
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+
+      const afterRecovery = await db
+        .select({ consumed_at: device_refresh_tokens.consumed_at })
+        .from(device_refresh_tokens)
+        .where(
+          eq(
+            device_refresh_tokens.token_hash,
+            createHash('sha256').update(refreshToken).digest('hex')
+          )
+        );
+      expect(new Date(afterRecovery[0]!.consumed_at!).getTime()).toBe(
+        new Date(pinnedConsumeAt).getTime()
+      );
     });
 
     test('a stale request that read the token before the winning consume retires nothing', async () => {
@@ -508,6 +682,234 @@ describe('device-sessions', () => {
       expect(session!.revoked_at).toBeNull();
     });
 
+    test('refresh for a domain that is not allowed to sign in is refused and revokes the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      mockIsEmailBlacklisted.mockResolvedValueOnce(true);
+
+      const result = await rotateRefreshToken(refreshToken);
+      expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).not.toBeNull();
+      expect(session!.revoked_reason).toBe('domain_ineligible');
+
+      const tokens = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0]!.consumed_at).toBeNull();
+    });
+    test('domain refusal revokes only the presented device session', async () => {
+      const presentedSessionId = await createDeviceSession({ userId: testUserId });
+      const siblingSessionId = await createDeviceSession({ userId: testUserId });
+      const presentedCredentials = await issueSessionCredentials(fakeUser, presentedSessionId);
+      const siblingCredentials = await issueSessionCredentials(fakeUser, siblingSessionId);
+
+      mockIsEmailBlacklisted.mockResolvedValueOnce(true);
+
+      const result = await rotateRefreshToken(presentedCredentials.refreshToken);
+
+      expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
+      const [presentedSession] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, presentedSessionId));
+      const [siblingSession] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, siblingSessionId));
+      expect(presentedSession!.revoked_reason).toBe('domain_ineligible');
+      expect(siblingSession!.revoked_at).toBeNull();
+
+      const siblingRetry = await rotateRefreshToken(siblingCredentials.refreshToken);
+      expect(siblingRetry.ok).toBe(true);
+    });
+
+    test('refresh for a domain that requires SSO without an SSO link is refused and revokes the session', async () => {
+      const ssoDomain = `sso-${Date.now()}.example`;
+      const ssoEmail = `member@${ssoDomain}`;
+      await db
+        .update(kilocode_users)
+        .set({ google_user_email: ssoEmail })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(
+        { ...fakeUser, google_user_email: ssoEmail },
+        sessionId
+      );
+
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Rotation SSO Organization', sso_domain: ssoDomain })
+        .returning({ id: organizations.id });
+
+      try {
+        mockGetWorkOSOrganization.mockResolvedValueOnce({
+          id: 'org_rotation_sso_test',
+        } as unknown as Organization);
+
+        const result = await rotateRefreshToken(refreshToken);
+        expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
+        expect(mockGetWorkOSOrganization).toHaveBeenCalledWith(ssoDomain);
+
+        const [session] = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId));
+        expect(session!.revoked_at).not.toBeNull();
+        expect(session!.revoked_reason).toBe('domain_ineligible');
+
+        const tokens = await db
+          .select()
+          .from(device_refresh_tokens)
+          .where(eq(device_refresh_tokens.device_session_id, sessionId));
+        expect(tokens).toHaveLength(1);
+        expect(tokens[0]!.consumed_at).toBeNull();
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, organization!.id));
+      }
+    });
+
+    test('refresh for a domain that requires SSO keeps rotating when the account is linked to that SSO authority', async () => {
+      const ssoDomain = `sso-${Date.now()}.example`;
+      const ssoEmail = `member@${ssoDomain}`;
+      await db
+        .update(kilocode_users)
+        .set({ google_user_email: ssoEmail })
+        .where(eq(kilocode_users.id, testUserId));
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: testUserId,
+        provider: 'workos',
+        provider_account_id: `workos-${testUserId}`,
+        email: ssoEmail,
+        avatar_url: 'https://example.com/avatar.jpg',
+        hosted_domain: ssoDomain,
+      });
+
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(
+        { ...fakeUser, google_user_email: ssoEmail },
+        sessionId
+      );
+
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Rotation Linked SSO Organization', sso_domain: ssoDomain })
+        .returning({ id: organizations.id });
+
+      try {
+        mockGetWorkOSOrganization.mockResolvedValueOnce({
+          id: 'org_rotation_sso_linked',
+        } as unknown as Organization);
+
+        const result = await rotateRefreshToken(refreshToken);
+        expect(result.ok).toBe(true);
+
+        const [session] = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId));
+        expect(session!.revoked_at).toBeNull();
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, organization!.id));
+        await db.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, testUserId));
+      }
+    });
+
+    test('refresh fails without revoking when the SSO authority is misconfigured', async () => {
+      const ssoDomain = `sso-${Date.now()}.example`;
+      const ssoEmail = `member@${ssoDomain}`;
+      await db
+        .update(kilocode_users)
+        .set({ google_user_email: ssoEmail })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(
+        { ...fakeUser, google_user_email: ssoEmail },
+        sessionId
+      );
+
+      const organizationIds = await db
+        .insert(organizations)
+        .values([
+          { name: 'Rotation Ambiguous One', sso_domain: ssoDomain },
+          { name: 'Rotation Ambiguous Two', sso_domain: ssoDomain },
+        ])
+        .returning({ id: organizations.id });
+
+      try {
+        await expect(rotateRefreshToken(refreshToken)).rejects.toThrow();
+
+        const [session] = await db
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId));
+        expect(session!.revoked_at).toBeNull();
+
+        const tokens = await db
+          .select()
+          .from(device_refresh_tokens)
+          .where(eq(device_refresh_tokens.device_session_id, sessionId));
+        expect(tokens).toHaveLength(1);
+        expect(tokens[0]!.consumed_at).toBeNull();
+      } finally {
+        for (const organizationId of organizationIds) {
+          await db.delete(organizations).where(eq(organizations.id, organizationId.id));
+        }
+      }
+    });
+
+    test('preserves session credentials for a retryable policy lookup error', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+      const lookupError = new Error('Policy lookup unavailable');
+      mockIsEmailBlacklisted.mockRejectedValueOnce(lookupError);
+
+      await expect(rotateRefreshToken(refreshToken)).rejects.toBe(lookupError);
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).toBeNull();
+      expect(session!.revoked_reason).toBeNull();
+
+      const tokens = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0]!.consumed_at).toBeNull();
+
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+      if (retry.ok) {
+        expect(retry.refreshToken).not.toBe(refreshToken);
+      }
+    });
+
+    test('refresh with an eligible domain rotates and keeps the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const result = await rotateRefreshToken(refreshToken);
+
+      expect(result.ok).toBe(true);
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).toBeNull();
+    });
+
     test('each rotation issues a fresh 30-day refresh token', async () => {
       const sessionId = await createDeviceSession({ userId: testUserId });
       const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
@@ -586,6 +988,33 @@ describe('device-sessions', () => {
     });
   });
 
+  describe('cleanupExpiredDeviceRefreshTokens', () => {
+    test('deletes expired refresh tokens and keeps live ones', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      // An expired row alongside the live one.
+      const expiredHash = createHash('sha256').update('expired-token').digest('hex');
+      await db.insert(device_refresh_tokens).values({
+        token_hash: expiredHash,
+        device_session_id: sessionId,
+        expires_at: new Date(Date.now() - 1000).toISOString(),
+      });
+
+      const deleted = await cleanupExpiredDeviceRefreshTokens();
+
+      expect(deleted).toBeGreaterThanOrEqual(1);
+
+      const remaining = await db
+        .select({ token_hash: device_refresh_tokens.token_hash })
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      expect(remaining.map(row => row.token_hash)).toEqual([
+        createHash('sha256').update(refreshToken).digest('hex'),
+      ]);
+    });
+  });
+
   describe('createDeviceSessionWithAttestedKey', () => {
     const keyId = `ios-key-${Date.now()}`;
 
@@ -628,6 +1057,42 @@ describe('device-sessions', () => {
       );
       expect(result.expiresIn).toBe(3600);
       expect(result.token.length).toBeGreaterThan(0);
+    });
+
+    test('refreshes local session state after an attested sign-in', async () => {
+      const sessionIds: string[] = [];
+      for (let index = 0; index < MAX_LIVE_APP_SESSIONS; index += 1) {
+        sessionIds.push(await createDeviceSession({ userId: testUserId }));
+      }
+
+      const oldestSessionId = sessionIds[0];
+      const loadSessionActive = jest.fn(async () => {
+        const [row] = await db
+          .select({ revoked_at: device_sessions.revoked_at })
+          .from(device_sessions)
+          .where(eq(device_sessions.id, oldestSessionId));
+        return row !== undefined && row.revoked_at === null;
+      });
+      resetDeviceSessionCacheForTest();
+      expect(await isDeviceSessionActive(oldestSessionId, testUserId, loadSessionActive)).toBe(
+        true
+      );
+
+      await createDeviceSessionWithAttestedKey({
+        userId: testUserId,
+        user: fakeUser,
+        verification: {
+          ok: true,
+          platform: 'ios',
+          keyId: `ios-cap-key-${Date.now()}`,
+          publicKey: 'c3BraS1wdWJsaWMta2V5',
+        },
+      });
+
+      expect(await isDeviceSessionActive(oldestSessionId, testUserId, loadSessionActive)).toBe(
+        false
+      );
+      expect(loadSessionActive).toHaveBeenCalledTimes(2);
     });
 
     test('refuses a key already bound to another account and leaves no session', async () => {

@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -73,7 +74,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   const limitFieldError = saveError?.field === 'limit' ? saveError.message : touchedFieldError;
 
   const onSaved = () => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    notificationHaptic(Haptics.NotificationFeedbackType.Success);
     router.back();
   };
 

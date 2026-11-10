@@ -12,13 +12,17 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   preparation_timeout: 'Environment preparation timed out',
   workspace_setup_failed: 'Workspace setup failed',
   credential_upgrade_required: SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE,
+  repository_access_failed:
+    'A repository of this environment could not be accessed. Check that the integration covers every repository of the environment.',
   agent_unavailable: 'The agent became unavailable',
   billing_blocked: 'Sandbox billing requires additional credits',
   billing_unavailable:
     'Sandbox billing or capacity verification is unavailable. Try again shortly.',
   container_limit_reached:
     'Container limit reached. Stop an existing container before starting another.',
+  account_blocked: 'This account is blocked.',
   invalid_configuration: 'Sandbox configuration is invalid or unsupported',
+  sandbox_create_failed: 'The sandbox could not be created',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',
   agent_restarted: 'The agent restarted',
@@ -29,6 +33,13 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   prompt_failed: 'Prompt delivery failed',
   sandbox_stopped: 'The sandbox stopped while waiting for an answer',
   execution_limit: 'The turn exceeded its time limit',
+  byoc_credential_missing: 'Vercel compute credentials are no longer available',
+  byoc_vercel_not_ready: 'Vercel compute setup is not ready',
+  byoc_vercel_forbidden: 'Vercel rejected access to your compute account',
+  byoc_vercel_capacity: 'Vercel compute capacity is unavailable',
+  byoc_vercel_snapshot_missing: 'The Vercel runtime snapshot is missing. Run setup again.',
+  provider_identity_mismatch:
+    'Vercel Git containment requires verified provider identity and transport support.',
 };
 
 export function isControlPlaneFailureReason(value: string): value is ControlPlaneFailureReason {

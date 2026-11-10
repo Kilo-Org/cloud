@@ -3,10 +3,27 @@ import { isIP } from 'net';
 
 export const DEFAULT_GITLAB_INSTANCE_URL = 'https://gitlab.com';
 
+/**
+ * Name-resolution failures that mean the hostname does not exist rather than
+ * that resolution is temporarily unavailable.
+ */
+const PERMANENT_RESOLUTION_ERROR_CODES: Record<string, true> = {
+  ENOTFOUND: true,
+  EAI_NONAME: true,
+  EAI_FAIL: true,
+};
+
 export class GitLabInstanceUrlError extends Error {
-  constructor(message: string) {
+  /**
+   * True when the same URL may resolve on a later attempt because name
+   * resolution failed, rather than the URL violating a policy.
+   */
+  readonly transient: boolean;
+
+  constructor(message: string, options: { transient?: boolean } = {}) {
     super(message);
     this.name = 'GitLabInstanceUrlError';
+    this.transient = options.transient ?? false;
   }
 }
 
@@ -192,12 +209,18 @@ async function resolveHostnameSafely(
   let addresses: Array<{ address: string; family: number }>;
   try {
     addresses = await lookup(hostname, { all: true, verbatim: true });
-  } catch {
-    throw new GitLabInstanceUrlError('GitLab instance URL host could not be resolved.');
+  } catch (error) {
+    const code = (error as { code?: unknown } | null)?.code;
+    const permanent = typeof code === 'string' && PERMANENT_RESOLUTION_ERROR_CODES[code] === true;
+    throw new GitLabInstanceUrlError('GitLab instance URL host could not be resolved.', {
+      transient: !permanent,
+    });
   }
 
   if (addresses.length === 0) {
-    throw new GitLabInstanceUrlError('GitLab instance URL host could not be resolved.');
+    throw new GitLabInstanceUrlError('GitLab instance URL host could not be resolved.', {
+      transient: true,
+    });
   }
 
   for (const { address } of addresses) {

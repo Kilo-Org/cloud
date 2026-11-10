@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Users,
 } from '@/components/ui/icons';
 import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -35,8 +36,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
-import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
+import { providerLabel } from '@/lib/auth/provider-label';
+import { SESSION_SYNC_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -49,34 +51,12 @@ import {
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
-
-const PROVIDER_LABEL_KEYS = {
-  anaconda: 'profile.providerAnaconda',
-  apple: 'profile.providerApple',
-  discord: 'profile.providerDiscord',
-  email: 'common.email',
-  'fake-login': 'profile.providerTestAccount',
-  github: 'common.github',
-  gitlab: 'common.gitlab',
-  google: 'profile.providerGoogle',
-  linkedin: 'profile.providerLinkedin',
-  workos: 'profile.providerEnterpriseSso',
-} as const;
 
 // The app changelog lives on `main` and is written per store build by the
 // kilo-app Release workflow; never pin it to a version or a per-build copy.
 const CHANGELOG_URL = 'https://github.com/Kilo-Org/cloud/blob/main/apps/mobile/CHANGELOG.md';
-
-/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
-function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
-  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
-}
-
-function providerLabel(provider: string) {
-  const key = lookup(PROVIDER_LABEL_KEYS, provider);
-  return key ? i18n.t(key) : provider;
-}
 
 export function ProfileScreen() {
   const { signOut, token } = useAuth();
@@ -101,16 +81,9 @@ export function ProfileScreen() {
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
     enabled: isAuthenticated && afterIdle,
-    // The Linked accounts row must settle while the online manager reports
-    // offline: a paused read is pending without fetching, so `isLoading` is
-    // false and the section neither paints a row nor an error. This one either
-    // answers or fails once the control-plane deadline lands, and the error
-    // surface below then offers Retry.
-    networkMode: 'always',
-    // `networkMode: 'always'` also disables the derived reconnect refetch
-    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
-    // 'always'` when it is undefined), so ask for it explicitly.
-    refetchOnReconnect: true,
+    // A paused read leaves the Linked accounts row with neither content nor an
+    // error surface.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const {
     data: orgs,
@@ -120,16 +93,9 @@ export function ProfileScreen() {
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
     enabled: isAuthenticated && afterIdle,
-    // The Agents section resolves its scope from this list, so the read must
-    // settle the same way the linked-accounts one does: a read paused by the
-    // online manager is pending without fetching, and the inline error surface
-    // below never paints, leaving the organization section and the agent rows
-    // waiting on a request that never starts. Answer, or fail into Retry.
-    networkMode: 'always',
-    // `networkMode: 'always'` also disables the derived reconnect refetch
-    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
-    // 'always'` when it is undefined), so ask for it explicitly.
-    refetchOnReconnect: true,
+    // The Agents section resolves its scope from this list, so a paused read
+    // leaves the organization section and its rows waiting.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const agentScope = organizationContextLoaded
     ? getProfileAgentScope(organizationId, orgs)
@@ -137,7 +103,6 @@ export function ProfileScreen() {
   const { openPicker, picker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
-  const orgName = selectedOrg?.organizationName;
   // The Organization section stays on Profile in every credit-account context:
   // a Personal context still offers the account picker when the account has
   // memberships, so organization management is not gated behind the credits
@@ -176,7 +141,6 @@ export function ProfileScreen() {
         title={
           orgRole === 'member' ? t('profile.viewOrganization') : t('profile.manageOrganization')
         }
-        subtitle={orgName}
         hue="lime"
         className="rounded-lg bg-secondary px-3"
         disabled={!orgRole}
@@ -302,7 +266,7 @@ export function ProfileScreen() {
             }}
           />
           <ConfigureRow
-            icon={SlidersHorizontal}
+            icon={Users}
             title={t('profiles.title')}
             subtitle={t('profiles.entrySubtitle')}
             // Agents step: the row lists the agent profiles, and its two
@@ -325,7 +289,7 @@ export function ProfileScreen() {
           <ConfigureRow
             icon={GitMerge}
             title={t('common.prReview')}
-            subtitle={t('profile.prReviewSubtitle')}
+            subtitle={t('common.prReviewSubtitle')}
             hue="gold"
             className="rounded-lg bg-secondary px-3"
             last
@@ -362,6 +326,17 @@ export function ProfileScreen() {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('profile.app')}
           </Text>
+          {__DEV__ && SESSION_SYNC_URL && (
+            <ConfigureRow
+              icon={SlidersHorizontal}
+              title={t('nativeRemote.title')}
+              hue="sage"
+              className="rounded-lg bg-secondary px-3"
+              onPress={() => {
+                router.push('/(app)/native-remote' as Href);
+              }}
+            />
+          )}
           <ConfigureRow
             icon={SlidersHorizontal}
             title={t('common.preferences')}

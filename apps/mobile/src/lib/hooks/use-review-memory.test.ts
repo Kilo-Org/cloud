@@ -2,6 +2,9 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { i18n } from '@/i18n';
+
 import { useSetReviewMemoryEnabled } from './use-review-memory';
 
 const state = vi.hoisted(() => ({
@@ -88,11 +91,24 @@ describe('useSetReviewMemoryEnabled', () => {
     });
   });
 
-  it('reports a failed update', () => {
+  it('reports a failed update with localized copy, never the server sentence', () => {
     const options = mount('personal');
 
     options.onError?.(new Error('nope'));
 
-    expect(state.toast.error).toHaveBeenCalledWith('nope');
+    expect(state.toast.error).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
+  });
+
+  it('explains a known rejection with its own copy', () => {
+    const options = mount('personal');
+    const sentence = REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.review_memory_disabled;
+
+    options.onError?.(
+      Object.assign(new Error(sentence), {
+        data: { code: 'FORBIDDEN', message: sentence },
+      }) as unknown as Error
+    );
+
+    expect(state.toast.error).toHaveBeenCalledWith(i18n.t('codeReviewer.reviewMemory.offAction'));
   });
 });

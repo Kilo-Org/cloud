@@ -34,7 +34,9 @@ describe('oauth state', () => {
   });
 
   test('rejects tampered payloads and signatures', () => {
-    const state = createOAuthState('user_synthetic', 'oauth/synthetic');
+    const state = createOAuthState('user_synthetic', 'oauth/synthetic', undefined, {
+      provider: 'bitbucket',
+    });
     const [payload, signature] = state.split('.');
     for (const tampered of [`${payload}A.${signature}`, `${payload}.invalid`]) {
       expect(verifyOAuthStateDetailed(tampered)).toEqual({
@@ -59,12 +61,26 @@ describe('oauth state', () => {
     'null',
     '[]',
     '{}',
-    JSON.stringify({ owner: 1, uid: 'synthetic', iat: 0, nonce: 'nonce' }),
-    JSON.stringify({ owner: 'synthetic', uid: 1, iat: 0, nonce: 'nonce' }),
-    JSON.stringify({ owner: 'synthetic', uid: 'synthetic', iat: '0', nonce: 'nonce' }),
-    JSON.stringify({ owner: 'synthetic', uid: 'synthetic', iat: 0 }),
-    JSON.stringify({ owner: 'synthetic', uid: 'synthetic', iat: 0, nonce: '' }),
-    '{"owner":"synthetic","uid":"synthetic","iat":1e309,"nonce":"nonce"}',
+    JSON.stringify({ provider: 'bitbucket', owner: 1, uid: 'synthetic', iat: 0, nonce: 'nonce' }),
+    JSON.stringify({ provider: 'bitbucket', owner: 'synthetic', uid: 1, iat: 0, nonce: 'nonce' }),
+    JSON.stringify({
+      provider: 'bitbucket',
+      owner: 'synthetic',
+      uid: 'synthetic',
+      iat: '0',
+      nonce: 'nonce',
+    }),
+    JSON.stringify({ provider: 'bitbucket', owner: 'synthetic', uid: 'synthetic', iat: 0 }),
+    JSON.stringify({
+      provider: 'bitbucket',
+      owner: 'synthetic',
+      uid: 'synthetic',
+      iat: 0,
+      nonce: '',
+    }),
+    JSON.stringify({ provider: 'nope', owner: 'synthetic', uid: 'synthetic', iat: 0, nonce: 'n' }),
+    JSON.stringify({ owner: 'synthetic', uid: 'synthetic', iat: 0, nonce: 'nonce' }),
+    '{"provider":"bitbucket","owner":"synthetic","uid":"synthetic","iat":1e309,"nonce":"nonce"}',
   ])('rejects signed malformed payload: %s', payload => {
     const state = signPayload(payload);
     expect(verifyOAuthStateDetailed(state)).toEqual({
@@ -75,13 +91,21 @@ describe('oauth state', () => {
   });
 
   test('accepts the TTL boundary and rejects state one second later', () => {
-    const state = createOAuthState('user_synthetic', 'oauth/synthetic');
+    const state = createOAuthState('user_synthetic', 'oauth/synthetic', undefined, {
+      provider: 'bitbucket',
+    });
     jest.advanceTimersByTime(600_000);
     expect(verifyOAuthStateDetailed(state)).toEqual({
       status: 'valid',
-      state: { owner: 'user_synthetic', userId: 'oauth/synthetic', issuedAt: expect.any(Number) },
+      state: {
+        provider: 'bitbucket',
+        owner: 'user_synthetic',
+        userId: 'oauth/synthetic',
+        issuedAt: expect.any(Number),
+      },
     });
     expect(verifyOAuthState(state)).toEqual({
+      provider: 'bitbucket',
       owner: 'user_synthetic',
       userId: 'oauth/synthetic',
       issuedAt: expect.any(Number),
@@ -93,7 +117,9 @@ describe('oauth state', () => {
 
   test('rejects state issued in the future', () => {
     const now = Date.now();
-    const state = createOAuthState('user_synthetic', 'oauth/synthetic');
+    const state = createOAuthState('user_synthetic', 'oauth/synthetic', undefined, {
+      provider: 'bitbucket',
+    });
     jest.setSystemTime(now - 1_000);
     expect(verifyOAuthStateDetailed(state)).toEqual({
       status: 'invalid',
@@ -105,6 +131,7 @@ describe('oauth state', () => {
   test('keeps ignoring non-string optional return paths', () => {
     const state = signPayload(
       JSON.stringify({
+        provider: 'bitbucket',
         owner: 'user_synthetic',
         uid: 'oauth/synthetic',
         iat: Date.now() / 1000,
@@ -113,6 +140,7 @@ describe('oauth state', () => {
       })
     );
     expect(verifyOAuthState(state)).toEqual({
+      provider: 'bitbucket',
       owner: 'user_synthetic',
       userId: 'oauth/synthetic',
       issuedAt: expect.any(Number),
@@ -120,10 +148,15 @@ describe('oauth state', () => {
   });
 
   test('round-trips a validated return path', () => {
-    const state = createOAuthState('user_123', 'user_123', '/claw/new?step=linear');
+    const state = createOAuthState('user_123', 'user_123', '/claw/new?step=linear', {
+      provider: 'linear',
+      purpose: 'provider_install',
+    });
 
     expect(verifyOAuthState(state)).toEqual(
       expect.objectContaining({
+        provider: 'linear',
+        purpose: 'provider_install',
         owner: 'user_123',
         userId: 'user_123',
         returnTo: '/claw/new?step=linear',
@@ -132,10 +165,13 @@ describe('oauth state', () => {
   });
 
   test('drops invalid return paths when creating state', () => {
-    const state = createOAuthState('user_123', 'user_123', 'https://evil.example.com/path');
+    const state = createOAuthState('user_123', 'user_123', 'https://evil.example.com/path', {
+      provider: 'linear',
+    });
 
     expect(verifyOAuthState(state)).toEqual(
       expect.objectContaining({
+        provider: 'linear',
         owner: 'user_123',
         userId: 'user_123',
       })

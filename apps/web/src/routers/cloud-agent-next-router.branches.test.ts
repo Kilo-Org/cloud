@@ -53,7 +53,6 @@ jest.mock('@/lib/cloud-agent/order-repositories', () => ({
   orderRepositoriesByUsage: jest.fn(async ({ repositories }: any) => repositories),
 }));
 jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
-  generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: jest.fn(),
   generateCloudAgentAttachmentDownloadUrl: jest.fn(),
 }));

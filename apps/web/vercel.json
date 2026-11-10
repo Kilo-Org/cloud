@@ -3,6 +3,10 @@
   "skipMiddlewareRequestBody": true,
   "crons": [
     {
+      "path": "/api/cron/expire-credits",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/agent-briefing",
       "schedule": "* * * * *"
     },
@@ -11,20 +15,8 @@
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/cron/sync-model-stats",
-      "schedule": "0 */6 * * *"
-    },
-    {
       "path": "/api/cron/sync-enkrypt",
       "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/sync-providers",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/sync-direct-byok-providers",
-      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/cleanup-device-auth",
@@ -35,16 +27,20 @@
       "schedule": "*/15 * * * *"
     },
     {
-      "path": "/api/cron/cleanup-api-request-log",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/cleanup-webhook-events",
       "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/cleanup-admin-action-audit-logs",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-mcp-connect-events",
+      "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-pr-watches",
+      "schedule": "15 4 * * *"
     },
     {
       "path": "/api/cron/kilo-pass-yearly-monthly-base",
@@ -165,8 +161,47 @@
     {
       "path": "/api/cron/code-review-outcome-aggregate",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/backfill-byok-envelopes",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/backfill-safety-identifiers",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/recover-code-reviews",
+      "schedule": "*/15 * * * *"
     }
   ],
+  "schedules": {
+    "sync-model-stats": {
+      "schedule": "0 */6 * * *",
+      "path": "/api/cron/sync-model-stats",
+      "requestMethod": "GET"
+    },
+    "sync-providers": {
+      "schedule": "*/5 * * * *",
+      "path": "/api/cron/sync-providers",
+      "requestMethod": "GET"
+    },
+    "sync-direct-byok-providers": {
+      "schedule": "*/5 * * * *",
+      "path": "/api/cron/sync-direct-byok-providers",
+      "requestMethod": "GET"
+    },
+    "refresh-ai-gateway-metadata-cache": {
+      "schedule": "*/5 * * * *",
+      "path": "/api/cron/refresh-ai-gateway-metadata-cache",
+      "requestMethod": "GET"
+    },
+    "cleanup-api-request-log": {
+      "schedule": "*/5 * * * *",
+      "path": "/api/cron/cleanup-api-request-log",
+      "requestMethod": "GET"
+    }
+  },
   "build": {
     "env": {
       "GIT_LFS_SKIP_SMUDGE": "0"

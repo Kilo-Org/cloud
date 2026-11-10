@@ -1,0 +1,60 @@
+diff --git a/dist/index.js b/dist/index.js
+index aa814ad7a875d5f62d141cb8617ebbe033dd85d7..8a76a8dba54220963a65a84c5ff3552e00e13bf0 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -419,17 +419,17 @@ var ConsumerGroup = class {
+         }
+       } catch (error) {
+         if (this.isClientError(error)) {
+-          console.error(
+-            `Visibility extension failed with client error for receipt handle ${receiptHandle} (stopping retries):`,
+-            error
+-          );
++          console.error("Queue visibility extension failed", {
++            messageId,
++            reason: "client_error"
++          });
+           safeResolve();
+           return;
+         }
+-        console.error(
+-          `Failed to extend visibility for receipt handle ${receiptHandle} (will retry in ${RETRY_INTERVAL_MS / 1e3}s):`,
+-          error
+-        );
++        console.error("Queue visibility extension failed", {
++          messageId,
++          reason: "transient_error"
++        });
+         if (isRunning) {
+           timeoutId = setTimeout(() => extend(), RETRY_INTERVAL_MS);
+         } else {
+diff --git a/dist/index.mjs b/dist/index.mjs
+index b3b38aff94dd5f88d9ad8752e5ec7b02d16ae9e8..a7c28c209d65f29510151c02d214589f0442a5e6 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -356,17 +356,17 @@ var ConsumerGroup = class {
+         }
+       } catch (error) {
+         if (this.isClientError(error)) {
+-          console.error(
+-            `Visibility extension failed with client error for receipt handle ${receiptHandle} (stopping retries):`,
+-            error
+-          );
++          console.error("Queue visibility extension failed", {
++            messageId,
++            reason: "client_error"
++          });
+           safeResolve();
+           return;
+         }
+-        console.error(
+-          `Failed to extend visibility for receipt handle ${receiptHandle} (will retry in ${RETRY_INTERVAL_MS / 1e3}s):`,
+-          error
+-        );
++        console.error("Queue visibility extension failed", {
++          messageId,
++          reason: "transient_error"
++        });
+         if (isRunning) {
+           timeoutId = setTimeout(() => extend(), RETRY_INTERVAL_MS);
+         } else {

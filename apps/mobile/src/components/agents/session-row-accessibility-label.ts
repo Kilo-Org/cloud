@@ -15,8 +15,9 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
  * the screen-reader call site explicit. `nowMs` is the caller's sampled clock
  * so the spoken label ages with the visible one inside a memoized row.
  */
-export function formatSpokenTimeAgo(timestamp: string, nowMs?: number): string {
-  return timeAgo(parseTimestamp(timestamp), undefined, nowMs);
+export function formatSpokenTimeAgo(timestamp: string | null | undefined, nowMs?: number): string {
+  const date = parseTimestamp(timestamp);
+  return Number.isNaN(date.getTime()) ? '' : timeAgo(date, undefined, nowMs);
 }
 
 /**

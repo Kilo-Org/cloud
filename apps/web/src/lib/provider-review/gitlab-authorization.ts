@@ -20,7 +20,6 @@ import {
 } from '@kilocode/app-shared/provider-review';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
-import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import {
@@ -29,6 +28,12 @@ import {
   normalizeGitLabInstanceUrl,
 } from '@/lib/integrations/platforms/gitlab/instance-url';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { providerReviewErrorToTrpcError } from './error-mapping';
+import {
+  GITLAB_PROJECT_NOT_IN_CACHE_MESSAGE,
+  matchCachedGitLabProject,
+  readCachedGitLabRepositories,
+} from '@/lib/integrations/platforms/gitlab/project-scope';
 
 /**
  * The account that owns the GitLab integration. `userId` is the acting user
@@ -212,8 +217,36 @@ export type GitLabProjectAccess = {
   instanceUrl: string;
   /** The integration's repository full path, matched case-insensitively. */
   projectPath: string;
+  /** The integration the credential belongs to. */
+  integrationId: string;
+  /** The matched repository's provider id from that integration's cache. */
+  repositoryId: number;
   owner: GitLabReviewOwner;
 };
+
+/**
+ * Map one GitLab failure onto the router's error states. Classification is
+ * owner-aware first (a connection-level 403 is a reconnect, not the reader's
+ * permission), then every surface answers the kind with the shared code. A
+ * TRPCError is already an intentional refusal (invalid URL, closed or draft
+ * merge request) and passes through unchanged.
+ */
+export function gitlabReviewErrorToTrpcError(error: unknown, owner: GitLabReviewOwner): TRPCError {
+  if (error instanceof TRPCError) return error;
+  return providerReviewErrorToTrpcError(classifyGitLabErrorForOwner(error, owner));
+}
+
+/**
+ * The review-layer owner for a Kilo owner plus the acting user whose
+ * credential the token broker releases. Organization-owned connections keep
+ * the organization as the owner and name the acting user separately, so the
+ * broker can release the organization's credential for that user.
+ */
+export function gitlabReviewOwnerFor(owner: Owner, actingUserId: string): GitLabReviewOwner {
+  return owner.type === 'org'
+    ? { type: 'organization', organizationId: owner.id, userId: actingUserId }
+    : { type: 'user', userId: actingUserId };
+}
 
 function ownerToDbOwner(owner: GitLabReviewOwner): Owner {
   return owner.type === 'user'
@@ -279,25 +312,39 @@ async function resolveIntegration(
 }
 
 /**
- * Resolve the active integration for the owner and return a fresh token plus
- * the server-derived instance URL. The inbox has no project to verify, so it
- * uses this instead of authorizeProject.
+ * The connection's credentials plus the repository scope they are bounded by:
+ * the cached repository full paths, which a workspace-wide read intersects its
+ * rows with. A connection with an empty catalogue has no listable project.
+ */
+export type GitLabOwnerAccess = {
+  accessToken: string;
+  /** Server-derived instance base URL — never a caller-supplied value. */
+  instanceUrl: string;
+  /** The integration's cached repository full paths, in their stored casing. */
+  repositoryFullNames: string[];
+  owner: GitLabReviewOwner;
+};
+
+/**
+ * Resolve the active integration for the owner and return a fresh token, the
+ * server-derived instance URL, and the cached repository paths. The inbox has
+ * no single project to verify, so it uses this instead of authorizeProject and
+ * bounds its rows with the repository set returned here.
  */
 export async function authorizeOwner(
   owner: GitLabReviewOwner,
   instanceHint?: string
-): Promise<{ accessToken: string; instanceUrl: string; owner: GitLabReviewOwner }> {
+): Promise<GitLabOwnerAccess> {
   const { integration, instanceUrl } = await resolveIntegration(owner, instanceHint);
+  const repositoryFullNames = readCachedGitLabRepositories(integration).map(
+    repository => repository.full_name
+  );
   try {
     const accessToken = await getValidGitLabToken(integration, actorFor(owner));
-    return { accessToken, instanceUrl, owner };
+    return { accessToken, instanceUrl, repositoryFullNames, owner };
   } catch (error) {
     throw classifyGitLabErrorForOwner(error, owner);
   }
-}
-
-function cleanProjectPath(projectPath: string): string {
-  return projectPath.trim().replace(/^\/+|\/+$/g, '');
 }
 
 /**
@@ -313,28 +360,26 @@ export async function authorizeProject(
   projectPath: string,
   instanceHint?: string
 ): Promise<GitLabProjectAccess> {
-  const requested = cleanProjectPath(projectPath);
   const { integration, instanceUrl } = await resolveIntegration(owner, instanceHint);
 
-  let repositories: ReturnType<typeof requireNumericPlatformRepositories>;
-  try {
-    repositories = requireNumericPlatformRepositories(integration.repositories);
-  } catch {
-    repositories = null;
-  }
-  const match = repositories?.find(
-    repo => repo.full_name.toLowerCase() === requested.toLowerCase()
-  );
+  // The repository list is the project's authorization scope; the shared
+  // match rule and refusal copy live in platforms/gitlab/project-scope.ts so
+  // the integration-service branch listing refuses in the same words.
+  const match = matchCachedGitLabProject(integration, projectPath);
   if (!match) {
-    throw new GitLabReviewError(
-      'not_found',
-      'This project is not part of your connected GitLab repositories.'
-    );
+    throw new GitLabReviewError('not_found', GITLAB_PROJECT_NOT_IN_CACHE_MESSAGE);
   }
 
   try {
     const accessToken = await getValidGitLabToken(integration, actorFor(owner));
-    return { accessToken, instanceUrl, projectPath: match.full_name, owner };
+    return {
+      accessToken,
+      instanceUrl,
+      projectPath: match.full_name,
+      integrationId: integration.id,
+      repositoryId: match.id,
+      owner,
+    };
   } catch (error) {
     throw classifyGitLabErrorForOwner(error, owner);
   }

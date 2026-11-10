@@ -61,6 +61,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('expo-router', () => ({
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: () => ({
     push: (href: string) => navigation.history.push(href),
     back: () => navigation.history.pop(),
@@ -129,6 +130,19 @@ function renderScreen(): R {
   return renderer;
 }
 
+/**
+ * The detail strip's entries. The mocked platform is iOS, where an entry is
+ * typed as a button (see lib/a11y/tab-entry); the `tablist` container keeps
+ * them apart from the header's own buttons.
+ */
+function findingTabs(tree: R): TestRenderer.ReactTestInstance[] {
+  const strip = tree.root.findAllByProps({ accessibilityRole: 'tablist' })[0];
+  if (!strip) {
+    throw new Error('finding tabs not mounted');
+  }
+  return strip.findAllByProps({ role: 'button' });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -161,7 +175,7 @@ describe('FindingDetailScreen analysis pane render crash', () => {
     });
     analysisPanel.crashOnRender = true;
     const tree = renderScreen();
-    const tabs = tree.root.findAllByProps({ accessibilityRole: 'tab' });
+    const tabs = findingTabs(tree);
     act(tabs[1]?.props.onPress as () => void);
 
     const fallback = tree.root.findByType(QueryError);

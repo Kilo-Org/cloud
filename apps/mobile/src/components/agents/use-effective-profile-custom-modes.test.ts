@@ -3,51 +3,54 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useQuery } from '@tanstack/react-query';
 
-import { useEffectiveProfileCustomModes } from './use-effective-profile-custom-modes';
+import {
+  type EffectiveProfileCustomModes,
+  useEffectiveProfileCustomModes,
+} from './use-effective-profile-custom-modes';
 
-type QueryCall = {
-  tag: 'list' | 'listCombined' | 'get';
-  input: Record<string, unknown>;
-  enabled: boolean | undefined;
-};
+// Hoisted so the `vi.mock` factories below can record into them without hitting
+// the temporal dead zone while the mocked modules are imported.
+const calls = vi.hoisted(() => [] as { tag: 'list' | 'listCombined'; enabled?: boolean }[]);
 
-// Hoisted so the `vi.mock` factory below can record into it without hitting the
-// temporal dead zone while the mocked module is imported.
-const calls = vi.hoisted(
-  () =>
-    [] as {
-      tag: 'list' | 'listCombined' | 'get';
-      input: Record<string, unknown>;
-      enabled: boolean | undefined;
-    }[]
+/**
+ * Every `useAgentProfileAgents` call, so a test can prove the profile's agents
+ * read waits for the org ownership lookup and carries the right scope. The
+ * module is mocked as a whole: the hook under test decides which profile and
+ * scope to read, and the real read adds nothing those assertions need.
+ */
+const agentReads = vi.hoisted(
+  () => [] as { profileId: string; organizationId: string | undefined; enabled: boolean }[]
 );
 
-// Capture the `enabled` flag and input every query is built with, so a test can
-// prove the profile `get` waits for the org ownership lookup to resolve.
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {
       list: {
-        queryOptions: (input: Record<string, unknown>, options?: { enabled?: boolean }) => {
-          calls.push({ tag: 'list', input, enabled: options?.enabled });
+        queryOptions: (_input: Record<string, unknown>, options?: { enabled?: boolean }) => {
+          calls.push({ tag: 'list', enabled: options?.enabled });
           return { tag: 'list' };
         },
       },
       listCombined: {
-        queryOptions: (input: Record<string, unknown>, options?: { enabled?: boolean }) => {
-          calls.push({ tag: 'listCombined', input, enabled: options?.enabled });
+        queryOptions: (_input: Record<string, unknown>, options?: { enabled?: boolean }) => {
+          calls.push({ tag: 'listCombined', enabled: options?.enabled });
           return { tag: 'listCombined' };
-        },
-      },
-      get: {
-        queryOptions: (input: Record<string, unknown>, options?: { enabled?: boolean }) => {
-          calls.push({ tag: 'get', input, enabled: options?.enabled });
-          return { tag: 'get' };
         },
       },
     },
   }),
   trpcClient: {},
+}));
+
+vi.mock('@/lib/hooks/use-agent-profiles', () => ({
+  useAgentProfileAgents: (
+    profileId: string,
+    organizationId: string | undefined,
+    enabled: boolean
+  ) => {
+    agentReads.push({ profileId, organizationId, enabled });
+    return { data: undefined, isLoading: false };
+  },
 }));
 
 vi.mock('@tanstack/react-query', () => ({ useQuery: vi.fn() }));
@@ -71,18 +74,12 @@ function profileRow(id: string, isDefault = false) {
 
 type QueryResult = { data: unknown; isLoading: boolean };
 
-function mockQueries(results: {
-  list: QueryResult;
-  listCombined: QueryResult;
-  get: QueryResult;
-}): void {
+function mockQueries(results: { list: QueryResult; listCombined: QueryResult }): void {
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial query results; the hook reads only data/isLoading
   vi.mocked(useQuery).mockImplementation(
     ((options: { tag: keyof typeof results }) => results[options.tag]) as never
   );
 }
-
-type Result = ReturnType<typeof useEffectiveProfileCustomModes>;
 
 function Harness({
   organizationId,
@@ -91,7 +88,7 @@ function Harness({
 }: {
   organizationId?: string;
   profileId?: string | null;
-  resultRef: { current: Result | null };
+  resultRef: { current: EffectiveProfileCustomModes | null };
 }) {
   const result = useEffectiveProfileCustomModes(organizationId, profileId);
   resultRef.current = result;
@@ -101,8 +98,8 @@ function Harness({
 function mount(
   organizationId?: string,
   profileId?: string | null
-): { result: Result; get: QueryCall | undefined } {
-  const resultRef: { current: Result | null } = { current: null };
+): { result: EffectiveProfileCustomModes; agentsRead: (typeof agentReads)[number] | undefined } {
+  const resultRef: { current: EffectiveProfileCustomModes | null } = { current: null };
   act(() => {
     TestRenderer.create(React.createElement(Harness, { organizationId, profileId, resultRef }));
   });
@@ -110,31 +107,31 @@ function mount(
   if (result === null) {
     throw new Error('useEffectiveProfileCustomModes did not run');
   }
-  return { result, get: calls.find(call => call.tag === 'get') };
+  return { result, agentsRead: agentReads.at(-1) };
 }
 
 beforeEach(() => {
   calls.splice(0);
+  agentReads.splice(0);
   vi.mocked(useQuery).mockReset();
 });
 
 describe('useEffectiveProfileCustomModes', () => {
-  it('waits for the org ownership lookup before fetching an explicit profile', () => {
+  it('waits for the org ownership lookup before reading an explicit profile', () => {
     // The combined read is still in flight, so the profile's owner is unknown.
-    // Enabling the `get` now would fire without the organization id and throw
+    // Reading the agents now would fire without the organization id and throw
     // `Profile not found` for an org profile.
     mockQueries({
       list: { data: undefined, isLoading: false },
       listCombined: { data: undefined, isLoading: true },
-      get: { data: undefined, isLoading: false },
     });
 
-    const { get } = mount('org-1', 'p-recorded');
+    const { agentsRead } = mount('org-1', 'p-recorded');
 
-    expect(get?.enabled).toBe(false);
+    expect(agentsRead?.enabled).toBe(false);
   });
 
-  it('fetches an org profile with the organization id once the lookup resolves', () => {
+  it('reads an org profile with the organization id once the lookup resolves', () => {
     mockQueries({
       list: { data: undefined, isLoading: false },
       listCombined: {
@@ -145,39 +142,37 @@ describe('useEffectiveProfileCustomModes', () => {
         },
         isLoading: false,
       },
-      get: { data: { agents: [] }, isLoading: false },
     });
 
-    const { get } = mount('org-1', 'p-recorded');
+    const { agentsRead } = mount('org-1', 'p-recorded');
 
-    expect(get?.enabled).toBe(true);
-    expect(get?.input.organizationId).toBe('org-1');
+    expect(agentsRead?.enabled).toBe(true);
+    expect(agentsRead?.organizationId).toBe('org-1');
+    expect(agentsRead?.profileId).toBe('p-recorded');
   });
 
-  it('fetches a personal profile without the organization id', () => {
+  it('reads a personal profile without the organization id', () => {
     mockQueries({
       list: { data: [profileRow('p-default', true)], isLoading: false },
       listCombined: { data: undefined, isLoading: false },
-      get: { data: { agents: [] }, isLoading: false },
     });
 
-    const { get } = mount(undefined, 'p-personal');
+    const { agentsRead } = mount(undefined, 'p-personal');
 
-    expect(get?.enabled).toBe(true);
-    expect(get?.input.organizationId).toBeUndefined();
-    expect(get?.input.profileId).toBe('p-personal');
+    expect(agentsRead?.enabled).toBe(true);
+    expect(agentsRead?.organizationId).toBeUndefined();
+    expect(agentsRead?.profileId).toBe('p-personal');
   });
 
   it("falls back to the effective default profile's agents when none is recorded", () => {
     mockQueries({
       list: { data: [profileRow('p-default', true)], isLoading: false },
       listCombined: { data: undefined, isLoading: false },
-      get: { data: { agents: [] }, isLoading: false },
     });
 
-    const { get } = mount(undefined, null);
+    const { agentsRead } = mount(undefined, null);
 
-    expect(get?.enabled).toBe(true);
-    expect(get?.input.profileId).toBe('p-default');
+    expect(agentsRead?.enabled).toBe(true);
+    expect(agentsRead?.profileId).toBe('p-default');
   });
 });

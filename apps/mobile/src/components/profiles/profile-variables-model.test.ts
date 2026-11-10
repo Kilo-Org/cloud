@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyVariableEdit,
+  savedVariableKey,
   SECRET_MASK,
   validateVariableInput,
+  variableKeyPreview,
   variableRows,
 } from '@/components/profiles/profile-variables-model';
 
@@ -30,10 +32,41 @@ describe('variableRows', () => {
   });
 });
 
+describe('savedVariableKey', () => {
+  it('upper-cases the typed key and replaces everything outside A-Z0-9_', () => {
+    expect(savedVariableKey('  api key ')).toBe('API_KEY');
+    expect(savedVariableKey('API_की')).toBe('API___');
+    expect(savedVariableKey('a.b-c')).toBe('A_B_C');
+    expect(savedVariableKey('API_KEY')).toBe('API_KEY');
+  });
+
+  it('leads a digit-initial key with an underscore', () => {
+    expect(savedVariableKey('1var')).toBe('_1VAR');
+    expect(savedVariableKey('2024-report')).toBe('_2024_REPORT');
+  });
+});
+
+describe('variableKeyPreview', () => {
+  it('names the key a save will store when it differs from what was typed', () => {
+    // Two Devanagari characters become two underscores, so the reader must see
+    // the key the saved row will carry.
+    expect(variableKeyPreview('API_की')).toBe('API___');
+    expect(variableKeyPreview('api key')).toBe('API_KEY');
+    expect(variableKeyPreview('1var')).toBe('_1VAR');
+  });
+
+  it('stays silent for a key that saves unchanged or a blank field', () => {
+    expect(variableKeyPreview('API_KEY')).toBeNull();
+    expect(variableKeyPreview('  API_KEY  ')).toBeNull();
+    expect(variableKeyPreview('')).toBeNull();
+    expect(variableKeyPreview('   ')).toBeNull();
+  });
+});
+
 describe('validateVariableInput', () => {
-  it('accepts a non-empty key within the 1..256 bound', () => {
+  it('accepts a non-empty key within the 1..128 bound', () => {
     expect(validateVariableInput({ key: 'API_KEY', value: 'x' })).toBeNull();
-    expect(validateVariableInput({ key: 'a'.repeat(256), value: 'x' })).toBeNull();
+    expect(validateVariableInput({ key: 'a'.repeat(128), value: 'x' })).toBeNull();
   });
 
   it('requires a value only when the caller asks for it', () => {
@@ -55,7 +88,7 @@ describe('validateVariableInput', () => {
   it('keeps the key rules ahead of the value rule', () => {
     expect(validateVariableInput({ key: '', value: '' }, [], { requireValue: true })).toBe('empty');
     expect(
-      validateVariableInput({ key: 'a'.repeat(257), value: '' }, [], { requireValue: true })
+      validateVariableInput({ key: 'a'.repeat(129), value: '' }, [], { requireValue: true })
     ).toBe('too-long');
     expect(
       validateVariableInput({ key: 'foo-bar', value: '' }, ['FOO_BAR'], { requireValue: true })
@@ -67,8 +100,25 @@ describe('validateVariableInput', () => {
     expect(validateVariableInput({ key: '   ', value: 'x' })).toBe('empty');
   });
 
-  it('reports a key longer than 256 characters', () => {
-    expect(validateVariableInput({ key: 'a'.repeat(257), value: 'x' })).toBe('too-long');
+  it('reports a key longer than 128 characters', () => {
+    expect(validateVariableInput({ key: 'a'.repeat(129), value: 'x' })).toBe('too-long');
+  });
+
+  it('measures the key the save stores, including the leading underscore', () => {
+    // 128 characters exactly, but the stored key gains a leading `_`.
+    expect(validateVariableInput({ key: `1${'a'.repeat(127)}`, value: 'x' })).toBe('too-long');
+    expect(validateVariableInput({ key: `_${'a'.repeat(127)}`, value: 'x' })).toBeNull();
+  });
+
+  it('reports a key the sandbox runtime reserves, and accepts a stored one', () => {
+    expect(validateVariableInput({ key: 'HOME', value: 'x' })).toBe('reserved');
+    expect(validateVariableInput({ key: 'kilo_token', value: 'x' })).toBe('reserved');
+    expect(validateVariableInput({ key: 'xdg_cache', value: 'x' })).toBe('reserved');
+    expect(validateVariableInput({ key: 'API_KEY', value: 'x' })).toBeNull();
+    // The package list holds one lower-case name; an upper-cased key is not it.
+    expect(validateVariableInput({ key: 'PNPM_CONFIG_STORE_DIR', value: 'x' })).toBeNull();
+    // An edit resends the stored key, so the rule applies to a new key only.
+    expect(validateVariableInput({ key: 'HOME', value: 'x' }, [], { newKey: false })).toBeNull();
   });
 
   it('reports a key that cleans onto an existing stored key', () => {

@@ -1,16 +1,15 @@
-import * as z from 'zod';
-
 import { allFixtures } from './__fixtures__';
 import { sessionReplay } from './__fixtures__/session-replay';
 import { messageUpdatedDataSchema } from './schemas';
 import { createTestSession } from './test-helpers';
 
-const messageTimeSchema = messageUpdatedDataSchema.extend({
-  info: messageUpdatedDataSchema.shape.info.extend({
-    role: z.string(),
-    time: z.object({ created: z.number() }),
-  }),
-});
+/** The `created` a parsed message info carries, read the way the transcript does. */
+function createdTimeOf(info: Record<string, unknown> | undefined): number | undefined {
+  const time = info?.['time'];
+  if (typeof time !== 'object' || time === null) return undefined;
+  if (!('created' in time)) return undefined;
+  return typeof time.created === 'number' ? time.created : undefined;
+}
 
 describe.each(allFixtures)('fixture: $name', ({ description, events, expected }) => {
   it(description, () => {
@@ -51,16 +50,18 @@ describe('session replay fixture', () => {
         ) {
           return [];
         }
-        const result = messageTimeSchema.safeParse(event.data.properties);
+        // The captured payload is parsed by the production boundary, not a
+        // local extension: a change that rejects a real message event fails here.
+        const result = messageUpdatedDataSchema.safeParse(event.data.properties);
         return result.success ? [result.data.info] : [];
       })
       .filter(info => info.sessionID === 'ses_00000000000000000000000001');
     const rootUserEvent = rootMessageEvents.find(info => info.role === 'user');
     const rootAssistantEvent = rootMessageEvents.find(info => info.role === 'assistant');
 
-    expect(rootUserEvent?.time.created).toBe(1_772_214_640_111);
-    expect(rootAssistantEvent?.time.created).toBe(1_772_214_640_377);
-    expect(rootUserEvent?.time.created).toBeGreaterThanOrEqual(1_000_000_000_000);
-    expect(rootAssistantEvent?.time.created).toBeLessThan(10_000_000_000_000);
+    expect(createdTimeOf(rootUserEvent)).toBe(1_772_214_640_111);
+    expect(createdTimeOf(rootAssistantEvent)).toBe(1_772_214_640_377);
+    expect(createdTimeOf(rootUserEvent)).toBeGreaterThanOrEqual(1_000_000_000_000);
+    expect(createdTimeOf(rootAssistantEvent)).toBeLessThan(10_000_000_000_000);
   });
 });

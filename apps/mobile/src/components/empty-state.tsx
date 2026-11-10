@@ -28,10 +28,18 @@ type EmptyStateProps = {
   refreshControl?: ScrollViewProps['refreshControl'];
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
+  /** Overrides the glyph color. Defaults to the muted token, which reads a step
+   *  dimmer on a near-black dark tile than on the light one; a caller that keeps
+   *  the illustration as visible as its light cell passes its own token. */
+  iconColor?: string;
   iconSize?: number;
   iconStrokeWidth?: number;
   /** Set to 'header' when the title acts as the screen's heading (QueryError does). */
   titleAccessibilityRole?: 'header';
+  /** Title classes for the compact form only, which drops the icon bubble. A
+   *  caller whose state the icon would otherwise carry — an error — tints the
+   *  title here so the short form keeps the cue. */
+  compactTitleClassName?: string;
   /** Renders the short presentation (no icon bubble, tighter block gaps, and
    *  no top pin air above a `top`-placed stack) for a caller whose clear region
    *  cannot hold the full height; the title, the description and the action all
@@ -64,9 +72,11 @@ function EmptyStateBody({
   placement,
   compact: compactOverride,
   iconContainerClassName = DEFAULT_ICON_CONTAINER_CLASS,
+  iconColor,
   iconSize = 24,
   iconStrokeWidth = 1.5,
   titleAccessibilityRole,
+  compactTitleClassName,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
   // A centered state is handed the band between the page header and the fixed
@@ -100,11 +110,24 @@ function EmptyStateBody({
     >
       {compact ? null : (
         <View className={cn('items-center justify-center', iconContainerClassName)}>
-          <Icon size={iconSize} color={colors.mutedForeground} strokeWidth={iconStrokeWidth} />
+          <Icon
+            size={iconSize}
+            color={iconColor ?? colors.mutedForeground}
+            strokeWidth={iconStrokeWidth}
+          />
         </View>
       )}
       <View className="items-center gap-1">
-        <Text variant="large" accessibilityRole={titleAccessibilityRole}>
+        <Text
+          variant="large"
+          className={cn('text-center', compact ? compactTitleClassName : undefined)}
+          accessibilityRole={titleAccessibilityRole}
+          // A centered title is short and often narrower than the words allow:
+          // Android's default greedy wrap leaves the last word alone on its own
+          // line (the compact connect-gate title did). Balanced splits the title
+          // into even lines instead. Android-only; iOS ignores the prop.
+          textBreakStrategy="balanced"
+        >
           {title}
         </Text>
         {

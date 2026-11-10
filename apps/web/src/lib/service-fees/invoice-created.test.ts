@@ -1,5 +1,5 @@
 import { describe, expect, test, jest } from '@jest/globals';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 
 import { getKnownStripePriceIdsForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import { getKnownStripePriceIdsForKiloClaw } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
@@ -99,7 +99,7 @@ function pricedLine(priceId: string, amount: number, extra: Partial<Stripe.Invoi
     amount,
     pricing: {
       type: 'price_details',
-      unit_amount_decimal: String(amount),
+      unit_amount_decimal: Stripe.Decimal.from(amount),
       price_details: {
         price: priceId,
         product: extra.pricing?.price_details?.product ?? 'prod_pass',
@@ -293,7 +293,7 @@ describe('handleKiloPassInvoiceCreated', () => {
             id: 'il_seat',
             pricing: {
               type: 'price_details',
-              unit_amount_decimal: '72000',
+              unit_amount_decimal: Stripe.Decimal.from('72000'),
               price_details: { price: SEAT_PRICE_ID, product: SEAT_PRODUCT_ID },
             },
           }),
@@ -353,7 +353,7 @@ describe('handleKiloPassInvoiceCreated', () => {
             id: 'il_seat_only',
             pricing: {
               type: 'price_details',
-              unit_amount_decimal: '72000',
+              unit_amount_decimal: Stripe.Decimal.from('72000'),
               price_details: { price: SEAT_PRICE_ID, product: SEAT_PRODUCT_ID },
             },
           }),

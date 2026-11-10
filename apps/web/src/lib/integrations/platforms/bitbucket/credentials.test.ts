@@ -2,11 +2,14 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import type * as OrganizationAuditLogsModule from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { Owner } from '@/lib/integrations/core/types';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   kilocode_users,
+  organization_audit_logs,
   organization_memberships,
   organizations,
   platform_integrations,
@@ -19,6 +22,18 @@ import {
   buildBitbucketOAuthCredentialAad,
   storeBitbucketIntegration,
 } from './credentials';
+
+jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => {
+  const actual = jest.requireActual<typeof OrganizationAuditLogsModule>(
+    '@kilocode/web-shared/lib/organizations/organization-audit-logs'
+  );
+  return { ...actual, createAuditLog: jest.fn(actual.createAuditLog) };
+});
+
+const actualCreateAuditLog = jest.requireActual<typeof OrganizationAuditLogsModule>(
+  '@kilocode/web-shared/lib/organizations/organization-audit-logs'
+).createAuditLog;
+const mockCreateAuditLog = jest.mocked(createAuditLog);
 
 const testKeyPair = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -106,6 +121,7 @@ async function insertExistingBitbucketIntegration(kiloUserId: string) {
 
 describe('Bitbucket OAuth credential storage', () => {
   beforeEach(() => {
+    mockCreateAuditLog.mockImplementation(actualCreateAuditLog);
     mockBitbucketCredentialEncryptionConfig.keyId = 'bitbucket-credential-key-v1';
     mockBitbucketCredentialEncryptionConfig.publicKey = Buffer.from(testKeyPair.publicKey).toString(
       'base64'
@@ -113,6 +129,8 @@ describe('Bitbucket OAuth credential storage', () => {
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
+    await db.delete(organization_audit_logs);
     await db.delete(platform_oauth_credentials);
     await db.delete(platform_integrations);
     await db.delete(organizations);
@@ -388,5 +406,79 @@ describe('Bitbucket OAuth credential storage', () => {
     expect(credentials).toHaveLength(3);
     expect(integrations).toHaveLength(3);
     expect(new Set(credentials.map(credential => credential.platform_integration_id)).size).toBe(3);
+  });
+
+  it('writes one organization audit row for an organization connect', async () => {
+    const actor = await insertTestUser();
+    const organization = await createTestOrganization('Audited Connect Org', actor.id, 0);
+    const owner = { type: 'org', id: organization.id } as const;
+
+    const result = await storeBitbucketIntegration(integrationInput(owner, actor.id, 'org-audit'));
+
+    const audits = await db
+      .select()
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organization.id));
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toEqual(
+      expect.objectContaining({
+        action: 'organization.settings.change',
+        actor_id: actor.id,
+        actor_email: actor.google_user_email,
+        actor_name: actor.google_user_name,
+        organization_id: organization.id,
+      })
+    );
+    expect(audits[0]?.message).toBe(
+      `Bitbucket OAuth integration connected (integration ${result.integrationId}, workspace workspace-org-audit, slug workspace-org-audit)`
+    );
+    expect(audits[0]?.message).not.toContain('access-token-org-audit');
+    expect(audits[0]?.message).not.toContain('refresh-token-org-audit');
+  });
+
+  it('records a pending organization connect without workspace fields', async () => {
+    const actor = await insertTestUser();
+    const organization = await createTestOrganization('Pending Connect Org', actor.id, 0);
+    const owner = { type: 'org', id: organization.id } as const;
+    const input = integrationInput(owner, actor.id, 'org-pending');
+    input.availableWorkspaces.push({
+      uuid: '{workspace-org-pending-second}',
+      slug: 'workspace-org-pending-second',
+      name: 'Workspace org-pending-second',
+    });
+
+    const result = await storeBitbucketIntegration(input);
+
+    const audits = await db
+      .select()
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organization.id));
+    expect(audits).toHaveLength(1);
+    expect(result.status).toBe('workspace_selection_required');
+    expect(audits[0]?.message).toBe(
+      `Bitbucket OAuth integration connected (integration ${result.integrationId}, workspace selection pending)`
+    );
+  });
+
+  it('writes no organization audit row for a user connect', async () => {
+    const user = await insertTestUser();
+    await storeBitbucketIntegration(integrationInput({ type: 'user', id: user.id }, user.id));
+
+    await expect(db.select().from(organization_audit_logs)).resolves.toEqual([]);
+  });
+
+  it('rolls the connect back when the organization audit write fails', async () => {
+    const actor = await insertTestUser();
+    const organization = await createTestOrganization('Rolled Back Connect Org', actor.id, 0);
+    const owner = { type: 'org', id: organization.id } as const;
+    mockCreateAuditLog.mockRejectedValueOnce(new Error('audit write failed'));
+
+    await expect(
+      storeBitbucketIntegration(integrationInput(owner, actor.id, 'org-rollback'))
+    ).rejects.toThrow('audit write failed');
+
+    await expect(db.select().from(platform_integrations)).resolves.toEqual([]);
+    await expect(db.select().from(platform_oauth_credentials)).resolves.toEqual([]);
+    await expect(db.select().from(organization_audit_logs)).resolves.toEqual([]);
   });
 });

@@ -5,7 +5,7 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { and, eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import {
   buildAssistantMessageItem,
   buildFilePartItem,
@@ -15,6 +15,7 @@ import {
   parseSessionIngestServiceStatus,
   type SessionIngestItem,
 } from '../lib/mobile-sheet-fixtures';
+import { seedTokenSigningParams } from '../lib/token-signing';
 
 export const usage = '<email> [--causal-order]';
 
@@ -246,6 +247,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('NEXTAUTH_SECRET is not set for this worktree.');
   }
 
+  assertLocalSeedDatabase('app:mobile-markdown-fixture');
   const db = getSeedDb();
   const [user] = await db
     .select({
@@ -284,8 +286,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.id,
     pepper: user.apiTokenPepper,
     secret,
-    expiresInSeconds: 3600,
-    env: process.env.NODE_ENV ?? 'development',
+    ...seedTokenSigningParams(3600),
     extra: user.isAdmin ? { isAdmin: true } : undefined,
   });
 
@@ -383,5 +384,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       : 'This fixture represents: one finished agent turn whose text parts exercise markdown, Mermaid, and HTML in markdown, plus a Markdown read tool and file part.'
   );
   console.log('Suggested next step: open the deep link on a signed-in dev build.');
-  return { userId: user.id, sessionId: SESSION_ID, deepLink: `kiloapp://agent-chat/${SESSION_ID}` };
+  return {
+    userId: user.id,
+    sessionId: SESSION_ID,
+    deepLink: `kiloapp:///(app)/agent-chat/${SESSION_ID}`,
+  };
 }

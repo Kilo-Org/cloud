@@ -1,17 +1,19 @@
-import { DEFAULT_SECURITY_FINDING_FILTERS } from '@kilocode/app-shared/security-agent';
+/* eslint-disable max-lines -- one cohesive mounted suite over one mock harness: the list body states and the list surfaces share every fixture, and a second file would duplicate the mock set that must stay identical for both */
+import {
+  DEFAULT_SECURITY_FINDING_FILTERS,
+  toSecurityFindingParams,
+} from '@kilocode/app-shared/security-agent';
 import { FlashList } from '@shopify/flash-list';
 import { act, type ComponentProps, createElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import SecurityAgentFilterFindingsRoute from '@/app/(app)/security-agent/[scope]/filter';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { PickerSheet } from '@/components/picker-sheet';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { FindingListScreen } from './finding-list-screen';
+import { FindingRowSkeleton } from './finding-row-skeleton';
 
 type FindingFixture = {
   id: string;
@@ -24,6 +26,10 @@ const findings = vi.hoisted(() => ({
   data: undefined as FindingPages | undefined,
   isLoading: false,
   isError: false,
+  isFetching: false,
+  // TanStack Query's `fetchStatus`: `paused` is a read the online manager will
+  // not run, `fetching` one in flight, `idle` neither.
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   isFetchingNextPage: false,
   isFetchNextPageError: false,
   hasNextPage: false,
@@ -54,10 +60,13 @@ function capacityCopy(root: Root, key: 'capacityFull' | 'couldNotCheckCapacity')
     .findAllByType(Text)
     .filter(node => node.props.children === `securityAgent.analysis.${key}`);
 }
+const connectivity = vi.hoisted(() => ({ known: true }));
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   push: vi.fn(),
-  bridge: vi.fn(),
+  setParams: vi.fn(),
+  back: vi.fn(),
+  dismissTo: vi.fn(),
   toastError: vi.fn(),
 }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -68,8 +77,14 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: mocks.push, back: vi.fn() }),
+  useRouter: () => ({
+    push: mocks.push,
+    back: mocks.back,
+    setParams: mocks.setParams,
+    dismissTo: mocks.dismissTo,
+  }),
   useFocusEffect: vi.fn(),
+  useLocalSearchParams: () => ({ scope: 'personal' }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
@@ -85,7 +100,10 @@ vi.mock('@/components/picker-sheet', () => ({ PickerSheet: 'PickerSheet' }));
 vi.mock('@/components/security-agent/finding-filter-modal', () => ({
   FindingFilterModal: 'FindingFilterModal',
 }));
-vi.mock('@/components/security-agent/finding-row', () => ({ FindingRow: 'FindingRow' }));
+vi.mock('@/components/security-agent/finding-row', () => ({
+  FindingRow: 'FindingRow',
+  FINDING_ROW_FRAME_CLASS: 'frame',
+}));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -101,17 +119,12 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
     return findings;
   },
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => (connectivity.known ? 'online' : 'unknown'),
+}));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
-vi.mock('@/lib/security-finding-filter-bridge', () => ({
-  setSecurityFindingFilterBridge: mocks.bridge,
-}));
-vi.mock('@/lib/route-registry', () => ({
-  SECURITY_FILTER_ROUTE_KEY: 'security-filter',
-  securityFilterSlot: { get: () => undefined },
-  useRouteRegistry: vi.fn(),
-}));
 
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
 type Root = Mounted['renderer']['root'];
@@ -137,6 +150,8 @@ beforeEach(() => {
   findings.data = { pages: [{ findings: [] }] };
   findings.isLoading = false;
   findings.isError = false;
+  findings.isFetching = false;
+  findings.fetchStatus = 'idle';
   findings.isFetchingNextPage = false;
   findings.isFetchNextPageError = false;
   findings.hasNextPage = false;
@@ -144,6 +159,7 @@ beforeEach(() => {
   repositories.isLoading = false;
   repositories.isError = false;
   repositories.refetch.mockResolvedValue({});
+  connectivity.known = true;
   capacity.state = 'available';
   capacity.refetch.mockReset();
 });
@@ -171,14 +187,20 @@ describe('Security Agent list surfaces', () => {
     expect(empty.props.title).toBe('securityAgent.findingList.noMatchesTitle');
     const action = empty.props.action as ReactElement<{ onPress: () => void }>;
     act(action.props.onPress);
-    expect(root.findByType(EmptyState).props.title).toBe('securityAgent.findingList.emptyTitle');
+    // Clearing writes the default filters into this route's params, so the URL
+    // and the rendered list cannot disagree.
+    expect(mocks.setParams).toHaveBeenCalledWith(
+      toSecurityFindingParams(DEFAULT_SECURITY_FINDING_FILTERS)
+    );
     const filter = root.findByType(ScreenHeader).props.headerRight as ReactElement<{
       onPress: () => void;
     }>;
     act(filter.props.onPress);
-    expect(mocks.bridge).toHaveBeenLastCalledWith(
-      expect.objectContaining({ filters: DEFAULT_SECURITY_FINDING_FILTERS })
-    );
+    // The sheet is pushed with the filters the list currently shows.
+    expect(mocks.push).toHaveBeenLastCalledWith({
+      pathname: '/(app)/security-agent/[scope]/filter',
+      params: { scope: 'personal', severity: 'high' },
+    });
   });
 
   it('centers a load failure without cached rows and retains Retry and refresh', async () => {
@@ -192,37 +214,34 @@ describe('Security Agent list surfaces', () => {
     expect(findings.refetch).toHaveBeenCalledTimes(2);
   });
 
-  it('disables the filter and shows a repositories retry while the repositories fetch failed', async () => {
+  it('keeps the filter available and offers a repositories retry while that fetch failed', async () => {
     repositories.isError = true;
     const root = await mount();
     const filter = root.findByType(ScreenHeader).props.headerRight as ReactElement<{
       onPress: () => void;
-      disabled: boolean;
+      disabled?: boolean;
     }>;
-    expect(filter.props.disabled).toBe(true);
+    // The sheet owns its own loading/error state, so the control never becomes
+    // a silent no-op: the reader can always open it and retry from inside.
+    expect(filter.props.disabled).toBeUndefined();
 
     const errors = root.findAllByType(QueryError);
     expect(errors).toHaveLength(1);
     expect(errors[0]?.props.message).toBe('common.couldNotLoadRepositories');
     expect(errors[0]?.props.placement).toBe('top');
 
-    // The press stays a no-op while the repositories error stands.
     act(filter.props.onPress as () => void);
-    expect(mocks.bridge).not.toHaveBeenCalled();
-    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: '/(app)/security-agent/[scope]/filter',
+      params: { scope: 'personal' },
+    });
 
     act(errors[0]?.props.onRetry as () => void);
     expect(repositories.refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the filter enabled and no repositories error once the fetch succeeds', async () => {
+  it('shows no repositories error once the fetch succeeds', async () => {
     const root = await mount();
-    const filter = root.findByType(ScreenHeader).props.headerRight as ReactElement<{
-      onPress: () => void;
-      disabled: boolean;
-    }>;
-
-    expect(filter.props.disabled).toBe(false);
     expect(root.findAllByType(QueryError)).toHaveLength(0);
   });
 
@@ -235,13 +254,63 @@ describe('Security Agent list surfaces', () => {
     expect(capacity.refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps loading ahead of errors and empty content', async () => {
+  it('shows the skeleton for a first read in flight', async () => {
+    findings.data = undefined;
     findings.isLoading = true;
-    findings.isError = true;
+    findings.isFetching = true;
+    findings.fetchStatus = 'fetching';
     const root = await mount();
-    expect(root.findAllByType(Skeleton)).toHaveLength(3);
+    expect(root.findAllByType(FindingRowSkeleton)).toHaveLength(3);
     expect(root.findAllByType(EmptyState)).toHaveLength(0);
     expect(root.findAllByType(QueryError)).toHaveLength(0);
+  });
+
+  it('never claims an empty list when the read is paused, and names the connection', async () => {
+    // A resume whose page-one refetch is paused reports `isLoading: false` and
+    // `isError: false` with no rows. Claiming "No open findings" there is the
+    // defect: the reader gets the offline state with Retry instead.
+    findings.data = undefined;
+    findings.isLoading = false;
+    findings.fetchStatus = 'paused';
+    const root = await mount();
+
+    expect(root.findAllByType(EmptyState)).toHaveLength(0);
+    expect(root.findAllByType(FindingRowSkeleton)).toHaveLength(0);
+    const error = root.findByType(QueryError);
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe('securityAgent.findingList.couldNotLoad');
+    act(error.props.onRetry as () => void);
+    expect(findings.refetch).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the skeleton while a paused read has no settled connectivity', async () => {
+    connectivity.known = false;
+    findings.data = undefined;
+    findings.isLoading = false;
+    findings.fetchStatus = 'paused';
+    const root = await mount();
+
+    expect(root.findAllByType(FindingRowSkeleton)).toHaveLength(3);
+    expect(root.findAllByType(EmptyState)).toHaveLength(0);
+    expect(root.findAllByType(QueryError)).toHaveLength(0);
+  });
+
+  it('keeps the rows when a resume refetch is paused, and when it fails', async () => {
+    findings.data = { pages: [{ findings: [{ id: 'finding-1' }] }] };
+    findings.isLoading = false;
+    findings.isFetching = false;
+    findings.fetchStatus = 'paused';
+    const root = await mount();
+    expect(root.findByType(FlashList).props.data).toHaveLength(1);
+    expect(root.findAllByType(EmptyState)).toHaveLength(0);
+    expect(root.findAllByType(QueryError)).toHaveLength(0);
+
+    // The same cache state with a failed page-one refetch: the rows stay, and
+    // the failure shows inline rather than replacing the list.
+    findings.isError = true;
+    const failed = await mount();
+    expect(failed.findByType(FlashList).props.data).toHaveLength(1);
+    expect(failed.findAllByType(QueryError)).toHaveLength(0);
   });
 
   it.each([{ items: [] }, { items: [{ id: 'finding-1' }] }])(
@@ -321,11 +390,5 @@ describe('Security Agent list surfaces', () => {
     const header = await mountListHeader();
     expect(capacityCopy(header, 'capacityFull')).toHaveLength(0);
     expect(capacityCopy(header, 'couldNotCheckCapacity')).toHaveLength(0);
-  });
-
-  it('keeps expired filter guidance outside a scroller', async () => {
-    mounted = await renderWithProviders(<SecurityAgentFilterFindingsRoute />);
-    expect(mounted.renderer.root.findByType(EmptyState).props.placement).not.toBe('top');
-    expect(mounted.renderer.root.findAllByType(PickerSheet)).toHaveLength(0);
   });
 });

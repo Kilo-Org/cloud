@@ -4,9 +4,13 @@ import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organiza
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokCatalogModelIds,
+  getDirectByokModelsForUser,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import {
+  addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -18,6 +22,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
+import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
   getEnkryptBenchmarks,
   publishEnkryptModels,
@@ -59,10 +64,11 @@ async function tryGetUserFromAuth() {
  * Test using:
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
-export async function handleModelsRequest(): Promise<
-  NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>
-> {
+export async function handleModelsRequest(
+  request: Request
+): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const auth = await tryGetUserFromAuth();
+  const countryCode = requestCountryCode(request.headers);
   try {
     const result =
       auth?.organizationId && auth.user
@@ -70,7 +76,7 @@ export async function handleModelsRequest(): Promise<
             auth.organizationId,
             { type: 'member', kiloUserId: auth.user.id },
             'member',
-            readDb
+            { fromDb: readDb, countryCode }
           )
         : null;
     if (result && auth.user && auth.organizationId) {
@@ -84,7 +90,7 @@ export async function handleModelsRequest(): Promise<
       });
     }
 
-    const data = await getEnhancedOpenRouterModels();
+    const data = await getEnhancedOpenRouterModels({ countryCode });
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }
@@ -95,14 +101,19 @@ export async function handleModelsRequest(): Promise<
       });
     }
 
-    const [byokModels, enabledByokProviderIds, customRouters] = await Promise.all([
-      getDirectByokModelsForUser(auth.user.id),
-      getUserByokProviderIds(readDb, auth.user.id),
-      usableCustomRouters({ userId: auth.user.id, organizationId: null }),
-    ]);
+    const [byokModels, enabledByokProviderIds, directByokCatalogModelIds, customRouters] =
+      await Promise.all([
+        getDirectByokModelsForUser(auth.user.id),
+        getUserByokProviderIds(readDb, auth.user.id),
+        getDirectByokCatalogModelIds({ type: 'user', id: auth.user.id }),
+        usableCustomRouters({ userId: auth.user.id, organizationId: null }),
+      ]);
     const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
       { kiloUserId: auth.user.id, organizationId: null },
-      await addUserByokAvailability(models, enabledByokProviderIds)
+      addDirectByokCatalogAvailability(
+        await addUserByokAvailability(models, enabledByokProviderIds),
+        directByokCatalogModelIds
+      )
     );
     return await modelResponse({
       data: appendLocalFakeDeterministicCatalogModels(

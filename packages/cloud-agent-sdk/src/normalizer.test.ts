@@ -1,6 +1,7 @@
 import { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
 import { PREPARATION_OUTPUT_MAX_LENGTH, PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import {
+  preparingDataSchema,
   REMOTE_COMMAND_MAX_COMMANDS,
   REMOTE_COMMAND_MAX_HINTS,
   SESSION_QUEUE_MAX_IDS,
@@ -24,6 +25,23 @@ function createKilocode(type: string, properties: unknown, sessionId = 'ses-1'):
 }
 
 describe('normalize', () => {
+  it('normalizes string-encoded assistant errors in live native updates', () => {
+    expect(
+      normalizeCliEvent('message.updated', {
+        info: {
+          id: 'msg_assistant',
+          sessionID: 'ses_root',
+          role: 'assistant',
+          time: { created: 1 },
+          error: 'Interrupted',
+        },
+      })
+    ).toMatchObject({
+      type: 'message.updated',
+      info: { error: { name: 'UnknownError', data: { message: 'Interrupted' } } },
+    });
+  });
+
   describe('envelope unwrapping', () => {
     it('unwraps kilocode-wrapped events', () => {
       const raw = createKilocode('session.idle', { sessionID: 'sid-1' });
@@ -95,10 +113,59 @@ describe('normalize', () => {
         id: 'msg-1',
         sessionID: 'ses-1',
         role: 'assistant',
-        parts: [],
+        time: { created: 1 },
       };
       const result = normalize(createRaw('message.updated', { info }));
       expect(result).toEqual({ type: 'message.updated', info });
+    });
+
+    it('returns null when info carries no role', () => {
+      expect(
+        normalize(
+          createRaw('message.updated', {
+            info: { id: 'msg-1', sessionID: 'ses-1', time: { created: 1 } },
+          })
+        )
+      ).toBeNull();
+    });
+
+    it.each(['', 42, null])('returns null when info.role is %p', role => {
+      const info = { id: 'msg-1', sessionID: 'ses-1', role, time: { created: 1 } };
+      expect(normalize(createRaw('message.updated', { info }))).toBeNull();
+    });
+
+    it.each([undefined, null, 'today', {}, { created: '1' }])(
+      'returns null when info.time is %p',
+      time => {
+        const info = { id: 'msg-1', sessionID: 'ses-1', role: 'assistant', time };
+        expect(normalize(createRaw('message.updated', { info }))).toBeNull();
+      }
+    );
+
+    it('returns null when info.time.completed is not a number', () => {
+      const info = {
+        id: 'msg-1',
+        sessionID: 'ses-1',
+        role: 'assistant',
+        time: { created: 1, completed: 'soon' },
+      };
+      expect(normalize(createRaw('message.updated', { info }))).toBeNull();
+    });
+
+    it('keeps a user message that carries its created time', () => {
+      const info = { id: 'msg-1', sessionID: 'ses-1', role: 'user', time: { created: 2 } };
+      expect(normalize(createRaw('message.updated', { info }))).toEqual({
+        type: 'message.updated',
+        info,
+      });
+    });
+
+    it('keeps a message whose role is not user or assistant', () => {
+      const info = { id: 'msg-1', sessionID: 'ses-1', role: 'system', time: { created: 3 } };
+      expect(normalize(createRaw('message.updated', { info }))).toEqual({
+        type: 'message.updated',
+        info,
+      });
     });
 
     it('returns null when info is missing', () => {
@@ -189,6 +256,7 @@ describe('normalize', () => {
         sessionID: 'ses-1',
         messageID: 'msg-1',
         type: 'tool',
+        state: { status: 'running' },
       };
       const result = normalize(
         createRaw('message.part.updated', { part, time: 1_772_214_640_111 })
@@ -212,6 +280,41 @@ describe('normalize', () => {
       // for a null result, so it cannot prove the event was recognized.
       expect(result).toEqual({ type: 'message.part.updated', part });
       expect(Object.hasOwn(result as object, 'time')).toBe(false);
+    });
+
+    it('returns null for a tool part with no readable state', () => {
+      const base = { id: 'p-1', sessionID: 'ses-1', messageID: 'msg-1', type: 'tool' };
+      const states: unknown[] = [
+        undefined,
+        null,
+        [],
+        'running',
+        {},
+        { status: 42 },
+        { status: '' },
+      ];
+
+      for (const state of states) {
+        const part = state === undefined ? base : { ...base, state };
+        expect(normalize(createRaw('message.part.updated', { part }))).toBeNull();
+      }
+    });
+
+    it('keeps a tool part whose state carries a non-empty status string', () => {
+      const part = {
+        id: 'p-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+        state: { status: 'completed', attachments: 'not-an-array' },
+      };
+
+      // The state's identity is what the boundary checks; its contents are
+      // reduced at the chat-processor seam.
+      expect(normalize(createRaw('message.part.updated', { part }))).toEqual({
+        type: 'message.part.updated',
+        part,
+      });
     });
   });
 
@@ -554,7 +657,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'session.created',
-        info: { id: 'ses-1', parentID: undefined },
+        info: { id: 'ses-1', parentID: undefined, title: 'Test Session' },
       });
     });
 
@@ -623,7 +726,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'session.updated',
-        info: { id: 'ses-1', parentID: undefined },
+        info: { id: 'ses-1', parentID: undefined, title: 'Updated Session' },
       });
     });
 
@@ -1165,16 +1268,45 @@ describe('normalize', () => {
       });
     });
 
-    it('normalizes permission.asked with minimal fields', () => {
-      const data = { id: 'perm-2', permission: 'write' };
-      const result = normalize(createRaw('permission.asked', data));
-      expect(result).toEqual({
-        type: 'permission.asked',
-        requestId: 'perm-2',
+    it('reports a permission.asked whose scope fields are not the declared shapes', () => {
+      const malformed: Array<Record<string, unknown>> = [
+        { patterns: 'src/**' },
+        { patterns: [1] },
+        { metadata: ['command'] },
+        { metadata: null },
+        { always: 'bash' },
+      ];
+
+      for (const scope of malformed) {
+        const data = { id: 'perm-2', permission: 'write', ...scope };
+        const result = normalize(createRaw('permission.asked', data));
+        expect(result).toEqual({ type: 'permission.unreadable', requestId: 'perm-2' });
+      }
+    });
+
+    it('reports a permission.asked that omits a scope field', () => {
+      const complete: Record<string, unknown> = {
+        id: 'perm-2',
         permission: 'write',
-        patterns: [],
+        patterns: ['**/*'],
         metadata: {},
         always: [],
+      };
+
+      for (const field of ['patterns', 'metadata', 'always']) {
+        const { [field]: _omitted, ...data } = complete;
+        expect(normalize(createRaw('permission.asked', data))).toEqual({
+          type: 'permission.unreadable',
+          requestId: 'perm-2',
+        });
+      }
+    });
+
+    it('reports a malformed scope without the permission name', () => {
+      const data = { id: 'perm-4', patterns: ['**/*'], metadata: {}, always: [] };
+      expect(normalize(createRaw('permission.asked', data))).toEqual({
+        type: 'permission.unreadable',
+        requestId: 'perm-4',
       });
     });
 
@@ -1465,37 +1597,76 @@ describe('normalize', () => {
       });
     });
 
-    it.each([{ startedRevision: 2, parentStepId: 'phase:setup_commands:2' }, {}])(
-      'preserves optional preparation snapshot metadata %j',
-      metadata => {
-        const stepSnapshot = {
-          id: 'command:install',
-          key: 'setup_commands',
-          kind: 'setup_command',
-          label: 'Install dependencies',
-          status: 'completed',
-          startedAt: 1000,
-          completedAt: 2000,
+    it.each([
+      { startedRevision: 2, parentStepId: 'phase:setup_commands:2' },
+      { snapshotCapturedAt: 1_790_000_000_000 },
+      {},
+    ])('preserves optional preparation snapshot metadata %j', metadata => {
+      const stepSnapshot = {
+        id: 'command:install',
+        key: 'setup_commands',
+        kind: 'setup_command',
+        label: 'Install dependencies',
+        status: 'completed',
+        startedAt: 1000,
+        completedAt: 2000,
+        revision: 5,
+        ...metadata,
+      };
+      const result = normalize(
+        createRaw('preparing', {
+          step: 'setup_commands',
+          message: 'Preparation snapshot',
+          version: 2,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'msg-1',
           revision: 5,
-          ...metadata,
-        };
+          timestamp: 2000,
+          action: 'step_snapshot',
+          stepId: stepSnapshot.id,
+          stepSnapshot,
+        })
+      );
+      expect(result).toMatchObject({ type: 'preparing', action: 'step_snapshot', stepSnapshot });
+      if (result?.type !== 'preparing') throw new Error('Expected preparing event');
+      expect(result.stepSnapshot).toEqual(stepSnapshot);
+    });
+
+    it.each([0, 1_790_000_000_000, undefined])(
+      'preserves optional live snapshot capture time %j',
+      snapshotCapturedAt => {
         const result = normalize(
           createRaw('preparing', {
-            step: 'setup_commands',
-            message: 'Preparation snapshot',
+            step: 'environment_snapshot',
+            message: 'Using environment snapshot',
             version: 2,
             attemptId: 'attempt-1',
             triggerMessageId: 'msg-1',
-            revision: 5,
+            revision: 3,
             timestamp: 2000,
-            action: 'step_snapshot',
-            stepId: stepSnapshot.id,
-            stepSnapshot,
+            action: 'step_progress',
+            stepId: 'phase:environment_snapshot',
+            detail: 'Using environment snapshot',
+            ...(snapshotCapturedAt === undefined ? {} : { snapshotCapturedAt }),
           })
         );
-        expect(result).toMatchObject({ type: 'preparing', action: 'step_snapshot', stepSnapshot });
-        if (result?.type !== 'preparing') throw new Error('Expected preparing event');
-        expect(result.stepSnapshot).toEqual(stepSnapshot);
+        expect(result).toMatchObject({ type: 'preparing', action: 'step_progress' });
+        if (snapshotCapturedAt === undefined)
+          expect(result).not.toHaveProperty('snapshotCapturedAt');
+        else expect(result).toHaveProperty('snapshotCapturedAt', snapshotCapturedAt);
+      }
+    );
+
+    it.each([-1, 0.5, Infinity, NaN, 8_640_000_000_000_001, '2026-10-24'])(
+      'rejects invalid capture time %j',
+      snapshotCapturedAt => {
+        expect(
+          preparingDataSchema.safeParse({
+            step: 'environment_snapshot',
+            message: 'Snapshot',
+            snapshotCapturedAt,
+          }).success
+        ).toBe(false);
       }
     );
 
@@ -1617,6 +1788,17 @@ describe('normalize', () => {
   });
 
   describe('autocommit_completed', () => {
+    it('preserves the repository on commit events', () => {
+      expect(
+        normalize(
+          createRaw('autocommit_completed', {
+            messageId: 'msg-1',
+            success: true,
+            repository: 'acme/web',
+          })
+        )
+      ).toMatchObject({ repository: 'acme/web' });
+    });
     it('normalizes with all fields', () => {
       const data = {
         messageId: 'msg-1',
@@ -1880,6 +2062,33 @@ describe('normalize', () => {
   });
 
   describe('connected', () => {
+    it('preserves bounded ancillary bootstrap omissions beside the authoritative retry snapshot', () => {
+      const sessionStatus = { type: 'retry', attempt: 2, message: 'Retrying', next: 42 };
+      expect(
+        normalize(createRaw('connected', { sessionStatus, ancillaryOmittedItemCount: 7 }))
+      ).toEqual({
+        type: 'connected',
+        cloudSessionId: 'ses-1',
+        sessionStatus,
+        ancillaryOmittedItemCount: 7,
+      });
+    });
+
+    it.each([-1, '7', Infinity])(
+      'ignores a malformed ancillary omission count %p',
+      ancillaryOmittedItemCount => {
+        expect(
+          normalize(
+            createRaw('connected', { sessionStatus: { type: 'busy' }, ancillaryOmittedItemCount })
+          )
+        ).toEqual({
+          type: 'connected',
+          cloudSessionId: 'ses-1',
+          sessionStatus: { type: 'busy' },
+        });
+      }
+    );
+
     it('uses only the Cloud envelope session ID for refresh routing', () => {
       expect(
         normalize(createRaw('connected', { cloudSessionId: 'agent-other' }, 'agent-1'))
@@ -2269,6 +2478,43 @@ describe('normalize', () => {
   });
 
   describe('cloud.message.failed', () => {
+    it('retains valid billing details only for a billing-blocked message', () => {
+      const billingFailure = {
+        code: 'INSUFFICIENT_CREDITS',
+        payer: { type: 'org', id: 'org-1' },
+        retryable: true,
+        remainingMicrodollars: 4_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      };
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'billing_blocked',
+            billingFailure,
+          })
+        )
+      ).toMatchObject({ billingFailure });
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'connection_lost',
+            billingFailure,
+          })
+        )
+      ).not.toHaveProperty('billingFailure');
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'billing_blocked',
+            billingFailure: { ...billingFailure, payer: {} },
+          })
+        )
+      ).toMatchObject({ type: 'cloud.message.failed', messageId: 'msg' });
+    });
+
     it('retains explicit non-acceptance without requiring delivery', () => {
       expect(
         normalize(createRaw('cloud.message.failed', { messageId: 'msg', accepted: false }))
@@ -2471,6 +2717,11 @@ describe('normalizeCliEvent', () => {
       });
     });
 
+    it('returns null for a CLI message.updated whose assistant time is unreadable', () => {
+      const info = { id: 'msg-1', sessionID: 'ses-1', role: 'assistant' };
+      expect(normalizeCliEvent('message.updated', { info })).toBeNull();
+    });
+
     it('normalizes message.part.updated without envelope', () => {
       const part = {
         id: 'p-1',
@@ -2490,6 +2741,7 @@ describe('normalizeCliEvent', () => {
         sessionID: 'ses-1',
         messageID: 'msg-1',
         type: 'tool',
+        state: { status: 'running' },
       };
       expect(normalizeCliEvent('message.part.updated', { part, time: 42 })).toEqual({
         type: 'message.part.updated',
@@ -2546,7 +2798,7 @@ describe('normalizeCliEvent', () => {
         normalizeCliEvent('session.created', { info: { id: 'ses-1', title: 'CLI Session' } })
       ).toEqual({
         type: 'session.created',
-        info: { id: 'ses-1', parentID: undefined },
+        info: { id: 'ses-1', parentID: undefined, title: 'CLI Session' },
       });
     });
 

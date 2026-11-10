@@ -33,5 +33,6 @@ export const getRuntimeGatewayRoutingConfig = createCachedFetch<RuntimeGatewayRo
     };
   },
   60_000,
-  DEFAULT_RUNTIME_GATEWAY_ROUTING_CONFIG
+  DEFAULT_RUNTIME_GATEWAY_ROUTING_CONFIG,
+  { name: 'runtimeGatewayRoutingConfig' }
 );

@@ -1,5 +1,5 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { Search, Terminal } from '@/components/ui/icons';
+import { Search, Share2, Terminal } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -9,10 +9,13 @@ import { SessionListSectionHeader } from '@/components/agents/session-list-secti
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { CenteredState } from '@/components/centered-state';
 import { DestinationOptionRow } from '@/components/destination-option-row';
+import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { type ShareCliSpawnRow } from './share-cli-spawn';
@@ -28,6 +31,8 @@ type ShareDestinationListProps = {
   destinations: readonly ShareDestinationRow[];
   onSelect: (row: ShareDestinationRow) => void;
   onRetry: () => void;
+  /** The stale share's only way out: close the sheet and drop its staged id. */
+  onDismiss: () => void;
   instances: readonly ShareCliSpawnRow[];
   spawningConnectionId: string | null;
   instanceRowsDisabled: boolean;
@@ -116,6 +121,7 @@ export function ShareDestinationList({
   destinations,
   onSelect,
   onRetry,
+  onDismiss,
   instances,
   spawningConnectionId,
   instanceRowsDisabled,
@@ -178,7 +184,26 @@ export function ShareDestinationList({
   const noChoices = instances.length === 0;
   let body: ReactNode = null;
 
-  if (state.kind === 'stale-share' || state.kind === 'non-retryable-classification') {
+  if (state.kind === 'stale-share') {
+    body = (
+      <EmptyState
+        className="bg-background"
+        icon={Share2}
+        title={t('share.staleTitle')}
+        description={state.message}
+        action={
+          <Button
+            className={STATE_ACTION_CLASS}
+            variant="outline"
+            onPress={onDismiss}
+            accessibilityLabel={t('common.close')}
+          >
+            <Text>{t('common.close')}</Text>
+          </Button>
+        }
+      />
+    );
+  } else if (state.kind === 'non-retryable-classification') {
     body = (
       <CenteredState className="bg-background" contentContainerClassName="px-6">
         <Text className="text-center text-sm text-muted-foreground">{state.message}</Text>
@@ -211,6 +236,7 @@ export function ShareDestinationList({
 
     body = (
       <FlashList<ShareDestinationRow>
+        nestedScrollEnabled
         style={listStyle}
         data={state.kind === 'happy' ? filtered : []}
         keyExtractor={keyExtractor}

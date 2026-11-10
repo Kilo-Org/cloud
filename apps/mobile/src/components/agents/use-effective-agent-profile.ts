@@ -58,23 +58,33 @@ export function useEffectiveAgentProfile(
   const isOrg = organizationId !== undefined;
   const query = isOrg ? combined : personal;
 
-  const { allProfiles, effectiveDefaultId } = useMemo(() => {
+  const { allProfiles, effectiveDefaultId, effectiveDefaultProfile } = useMemo(() => {
     if (isOrg) {
       const data = combined.data;
       if (!data || !Array.isArray(data.orgProfiles) || !Array.isArray(data.personalProfiles)) {
-        return { allProfiles: [] as EffectiveAgentProfile[], effectiveDefaultId: null };
+        return {
+          allProfiles: [] as EffectiveAgentProfile[],
+          effectiveDefaultId: null,
+          effectiveDefaultProfile: null as EffectiveAgentProfile | null,
+        };
       }
+      const profiles = [...data.orgProfiles, ...data.personalProfiles].map(profile =>
+        toEffective(profile)
+      );
       return {
-        allProfiles: [...data.orgProfiles, ...data.personalProfiles].map(profile =>
-          toEffective(profile)
-        ),
+        allProfiles: profiles,
         effectiveDefaultId: data.effectiveDefaultId,
+        effectiveDefaultProfile:
+          profiles.find(profile => profile.id === data.effectiveDefaultId) ?? null,
       };
     }
-    const profiles = personal.data ?? [];
+    const rows = personal.data ?? [];
+    const profiles = rows.map(profile => toEffective(profile));
+    const defaultId = rows.find(profile => profile.isDefault)?.id ?? null;
     return {
-      allProfiles: profiles.map(profile => toEffective(profile)),
-      effectiveDefaultId: profiles.find(profile => profile.isDefault)?.id ?? null,
+      allProfiles: profiles,
+      effectiveDefaultId: defaultId,
+      effectiveDefaultProfile: profiles.find(profile => profile.id === defaultId) ?? null,
     };
   }, [isOrg, personal.data, combined.data]);
 
@@ -102,6 +112,7 @@ export function useEffectiveAgentProfile(
     profileId,
     allProfiles,
     effectiveDefaultId,
+    effectiveDefaultProfile,
     // The user's explicit pick, echoed for the picker's selected row.
     selectedProfileId: overrideProfileId ?? null,
     hasOverride: query.isError ? false : picker.hasOverride,

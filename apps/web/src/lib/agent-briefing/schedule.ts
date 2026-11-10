@@ -51,3 +51,34 @@ export function briefingWindow(schedule: BriefingSchedule, nightStart: Date): Br
     localDate: `${part('year')}-${part('month')}-${part('day')}`,
   };
 }
+
+export function scheduledBriefingWindow(schedule: BriefingSchedule, morning: Date): BriefingWindow {
+  let night = nextBriefingTime(
+    schedule.night_start,
+    schedule.timezone,
+    new Date(morning.getTime() - 36 * 3600_000)
+  );
+  let next = nextBriefingTime(schedule.night_start, schedule.timezone, night);
+  while (next < morning) {
+    night = next;
+    next = nextBriefingTime(schedule.night_start, schedule.timezone, night);
+  }
+  return briefingWindow(schedule, night);
+}
+
+export function latestScheduledBriefingWindow(
+  schedule: BriefingSchedule,
+  now: Date
+): BriefingWindow {
+  let morning = nextBriefingTime(
+    schedule.morning_start,
+    schedule.timezone,
+    new Date(now.getTime() - 36 * 3600_000)
+  );
+  let next = nextBriefingTime(schedule.morning_start, schedule.timezone, morning);
+  while (next <= now) {
+    morning = next;
+    next = nextBriefingTime(schedule.morning_start, schedule.timezone, morning);
+  }
+  return scheduledBriefingWindow(schedule, morning);
+}

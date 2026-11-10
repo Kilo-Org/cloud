@@ -44,7 +44,6 @@ const groups: ServiceGroup[] = [
     groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
     id: 'security-agent',
     label: 'Security Agent',
@@ -107,16 +106,30 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'cloudflare-session-ingest',
       'ai-gateway',
       'cloudflare-git-token-service',
+      'byok-kms',
     ],
   },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
+  'local-kms': { group: 'core', dependsOn: [] },
+  'byok-kms': { group: 'core', dependsOn: ['local-kms'] },
   stripe: { group: 'core', dependsOn: [] },
   'ai-gateway': {
     group: 'core',
     dependsOn: ['postgres', 'redis', 'redis-http'],
     dir: 'apps/ai-gateway',
+  },
+  // Applies WorkOS directory events by calling the app's internal SCIM
+  // endpoints, so it needs Next.js up and Postgres behind it — the same
+  // dependencies `user-data-export` declares for the same reason. Without a
+  // `WORKOS_API_KEY` in `services/scim-sync/.dev.vars` the poll fails and
+  // reports the failure, which is harmless: the alarm retries and nothing is
+  // applied.
+  'cloudflare-scim-sync': {
+    group: 'core',
+    dependsOn: ['postgres', 'nextjs'],
+    dir: 'services/scim-sync',
   },
   'user-data-export': {
     group: 'data-export',
@@ -288,16 +301,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'deletion-mock',
     dependsOn: [],
     dir: 'dev/local/scripts',
-  },
-  'cloudflare-gastown': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'cloudflare-git-token-service', 'container-usage-meter', 'nextjs'],
-    dir: 'services/gastown',
-  },
-  'cloudflare-wasteland': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'nextjs'],
-    dir: 'services/wasteland',
   },
 };
 
@@ -572,8 +575,15 @@ const INFRA_PORTS: Record<string, number> = {
   postgres: 5432,
   redis: 6379,
   'redis-http': 8079,
+  'local-kms': 8900,
   grafana: 4000,
 };
+
+const BYOK_KMS_SERVICE_BASE_PORT = 8901;
+
+export function byokKmsServicePort(offset: number = portOffset): number {
+  return BYOK_KMS_SERVICE_BASE_PORT + offset;
+}
 
 export function getInfraBasePort(serviceName: string): number | undefined {
   return INFRA_PORTS[serviceName];
@@ -604,15 +614,8 @@ export function getAllInfraProfiles(): string[] {
   return [...new Set(Object.values(INFRA_PROFILES))];
 }
 
-// Wrangler always pulls its container egress-interceptor sidecar
-// (cloudflare/proxy-everything) with --platform linux/amd64. On Apple Silicon
-// the emulated amd64 proxy crashes at startup ("setsockopt: protocol not
-// available" — its transparent-proxy socket options don't survive Rosetta),
-// which surfaces as "Failed to start container" for every local container.
-// Point wrangler at the same proxy version's linux/arm64 manifest instead:
-// pulling a single-platform manifest digest with --platform amd64 only warns.
-// Keep the digest in sync with DEFAULT_CONTAINER_EGRESS_INTERCEPTOR_IMAGE in
-// the pinned wrangler/miniflare version (tag 3cb1195).
+// Wrangler's amd64 egress proxy crashes under Apple Silicon emulation. Pin its
+// arm64 manifest; keep aligned with the pinned Wrangler/Miniflare proxy version.
 const CONTAINER_EGRESS_IMAGE_ARM64 =
   'cloudflare/proxy-everything:3cb1195@sha256:78c7910f4575a511d928d7824b1cbcaec6b7c4bf4dbb3fafaeeae3104030e73c';
 
@@ -832,6 +835,28 @@ function buildServiceDefs(): ServiceDef[] {
         port: INFRA_PORTS[name] + portOffset,
         dependsOn: meta.dependsOn,
         command: dockerComposeUp(name),
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'byok-kms') {
+      const byokKmsPort = byokKmsServicePort();
+      defs.push({
+        name,
+        type: 'process',
+        dir: '.',
+        port: byokKmsPort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'env',
+          `BYOK_KMS_SERVICE_PORT=${byokKmsPort}`,
+          `BYOK_KMS_ENDPOINT=http://127.0.0.1:${INFRA_PORTS['local-kms'] + portOffset}`,
+          'pnpm',
+          'exec',
+          'tsx',
+          'dev/byok-kms/server.ts',
+        ],
         group: meta.group,
       });
       continue;

@@ -4,12 +4,16 @@ import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import { getAllUserProviders, getWorkOSOrganization } from '@/lib/user';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { isNewAccountEligibleForMagicLink } from '@/lib/auth/email-signin-eligibility';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 jest.mock('@sentry/nextjs');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
 jest.mock('@/lib/user');
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy');
 jest.mock('@/lib/auth/email-signin-eligibility');
+jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
+  isClaudePlatformOAuthEnabled: jest.fn(async () => false),
+}));
 
 import { POST } from './route';
 
@@ -19,6 +23,7 @@ const mockGetAllUserProviders = jest.mocked(getAllUserProviders);
 const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
 const mockResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
 const mockIsNewAccountEligibleForMagicLink = jest.mocked(isNewAccountEligibleForMagicLink);
+const mockIsClaudePlatformOAuthEnabled = jest.mocked(isClaudePlatformOAuthEnabled);
 
 const request = (body: unknown) =>
   new NextRequest('http://localhost:3000/api/sso/organizations', {
@@ -35,6 +40,7 @@ describe('POST /api/sso/organizations', () => {
     >);
     mockGetAllUserProviders.mockResolvedValue({ kind: 'not_found' });
     mockIsNewAccountEligibleForMagicLink.mockResolvedValue(true);
+    mockIsClaudePlatformOAuthEnabled.mockResolvedValue(false);
     mockResolveSsoAuthorityForDomain.mockImplementation(async domain => ({
       status: 'not_required',
       domain,
@@ -84,6 +90,27 @@ describe('POST /api/sso/organizations', () => {
       providers: ['github', 'google', 'email'],
     });
   });
+
+  it.each([false, true])(
+    'filters only Claude from existing methods using the submitted discovery email (%s)',
+    async enabled => {
+      mockGetAllUserProviders.mockResolvedValue({
+        kind: 'found',
+        user: {
+          kiloUserId: 'user-1',
+          providers: ['claude', 'google'],
+          primaryEmail: 'different-primary@example.com',
+        },
+      });
+      mockIsClaudePlatformOAuthEnabled.mockResolvedValue(enabled);
+      const body = await (await POST(request({ email: 'employee@kilocode.ai' }))).json();
+      expect(body).toEqual({
+        kind: 'existing',
+        providers: enabled ? ['claude', 'google'] : ['google'],
+      });
+      expect(mockIsClaudePlatformOAuthEnabled).toHaveBeenCalledWith('employee@kilocode.ai');
+    }
+  );
 
   it('keeps Email for a normalized existing Gmail plus alias', async () => {
     mockGetAllUserProviders.mockResolvedValue({
@@ -145,6 +172,17 @@ describe('POST /api/sso/organizations', () => {
       providers: expect.arrayContaining(['google', 'email']),
     });
   });
+
+  it.each([false, true])(
+    'offers Claude to a new address only when the Claude platform OAuth flag is on (%s)',
+    async enabled => {
+      mockIsClaudePlatformOAuthEnabled.mockResolvedValue(enabled);
+      const body = await (await POST(request({ email: 'new@example.com' }))).json();
+      expect(body.kind).toBe('new');
+      expect(body.providers.includes('claude')).toBe(enabled);
+      expect(mockIsClaudePlatformOAuthEnabled).toHaveBeenCalledWith('new@example.com');
+    }
+  );
 
   it.each(['blacklisted@example.com', 'blocked@example.top'])(
     'omits Email for an unknown address rejected by static signup eligibility: %s',

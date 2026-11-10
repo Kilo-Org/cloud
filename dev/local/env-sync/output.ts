@@ -2,6 +2,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { withProcessLockAsync } from '../process-lock';
+import { writeSecretsFile } from '../secrets-file';
 import { mapWithConcurrency, resolveEnvSyncConcurrency } from './concurrency';
 import type {
   DevVarsFileChange,
@@ -181,21 +182,20 @@ function upsertEnvValue(filePath: string, key: string, value: string): void {
 
   const line = `${key}=${formatValue(value)}`;
   if (!content) {
-    fs.writeFileSync(filePath, `${line}\n`, 'utf-8');
+    writeSecretsFile(filePath, `${line}\n`);
     return;
   }
 
   const regex = new RegExp(`^${escapeRegex(key)}=.*$`, 'm');
   if (regex.test(content)) {
-    fs.writeFileSync(
+    writeSecretsFile(
       filePath,
-      content.replace(regex, () => line),
-      'utf-8'
+      content.replace(regex, () => line)
     );
     return;
   }
 
-  fs.writeFileSync(filePath, `${content.trimEnd()}\n${line}\n`, 'utf-8');
+  writeSecretsFile(filePath, `${content.trimEnd()}\n${line}\n`);
 }
 
 function applyEnvLocalAutoCreates(creates: EnvLocalAutoCreate[], repoRoot: string): void {
@@ -354,7 +354,7 @@ async function applyPlan(
     const devVarsPath = path.join(repoRoot, change.workerDir, '.dev.vars');
 
     if (change.newFileContent !== undefined) {
-      fs.writeFileSync(devVarsPath, change.newFileContent, 'utf-8');
+      writeSecretsFile(devVarsPath, change.newFileContent);
     } else {
       let content = fs.readFileSync(devVarsPath, 'utf-8');
       const appendLines: string[] = [];
@@ -373,7 +373,7 @@ async function applyPlan(
         content = content.trimEnd() + '\n' + appendLines.join('\n') + '\n';
       }
 
-      fs.writeFileSync(devVarsPath, content, 'utf-8');
+      writeSecretsFile(devVarsPath, content);
     }
   }
 
@@ -398,10 +398,10 @@ async function applyPlan(
           content = content.trimEnd() + `\n${line}\n`;
         }
       }
-      fs.writeFileSync(envDevLocalPath, content, 'utf-8');
+      writeSecretsFile(envDevLocalPath, content);
     } else {
       const lines = plan.envDevLocalChanges.map(c => `${c.key}=${formatValue(c.newValue)}`);
-      fs.writeFileSync(envDevLocalPath, lines.join('\n') + '\n', 'utf-8');
+      writeSecretsFile(envDevLocalPath, lines.join('\n') + '\n');
     }
   }
 }

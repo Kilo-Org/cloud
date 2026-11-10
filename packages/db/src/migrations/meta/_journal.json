@@ -2080,6 +2080,377 @@
       "when": 1792693880283,
       "tag": "0296_orange_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 297,
+      "version": "7",
+      "when": 1792780343168,
+      "tag": "0297_white_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 298,
+      "version": "7",
+      "when": 1792829491526,
+      "tag": "0298_youthful_vin_gonzales",
+      "breakpoints": true
+    },
+    {
+      "idx": 299,
+      "version": "7",
+      "when": 1792862877322,
+      "tag": "0299_lame_mojo",
+      "breakpoints": true
+    },
+    {
+      "idx": 300,
+      "version": "7",
+      "when": 1792869596255,
+      "tag": "0300_device_auth_client_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 301,
+      "version": "7",
+      "when": 1792876471766,
+      "tag": "0301_contributor_credit_window",
+      "breakpoints": true
+    },
+    {
+      "idx": 302,
+      "version": "7",
+      "when": 1792878599267,
+      "tag": "0302_loud_victor_mancha",
+      "breakpoints": true
+    },
+    {
+      "idx": 303,
+      "version": "7",
+      "when": 1793016204545,
+      "tag": "0303_rainy_wildside",
+      "breakpoints": true
+    },
+    {
+      "idx": 304,
+      "version": "7",
+      "when": 1793024513267,
+      "tag": "0304_fine_moonstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 305,
+      "version": "7",
+      "when": 1793045874155,
+      "tag": "0305_usage_metadata_non_inference_cost",
+      "breakpoints": true
+    },
+    {
+      "idx": 306,
+      "version": "7",
+      "when": 1793049243861,
+      "tag": "0306_byok_api_key_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 307,
+      "version": "7",
+      "when": 1793099416452,
+      "tag": "0307_review_window_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 308,
+      "version": "7",
+      "when": 1793102557863,
+      "tag": "0308_swift_wong",
+      "breakpoints": true
+    },
+    {
+      "idx": 309,
+      "version": "7",
+      "when": 1793104458886,
+      "tag": "0309_good_silk_fever",
+      "breakpoints": true
+    },
+    {
+      "idx": 310,
+      "version": "7",
+      "when": 1793107189542,
+      "tag": "0310_ancient_sauron",
+      "breakpoints": true
+    },
+    {
+      "idx": 311,
+      "version": "7",
+      "when": 1793108447651,
+      "tag": "0311_enkrypt_guardrail_charges",
+      "breakpoints": true
+    },
+    {
+      "idx": 312,
+      "version": "7",
+      "when": 1793169931649,
+      "tag": "0312_enkrypt_guardrail_added_latency",
+      "breakpoints": true
+    },
+    {
+      "idx": 313,
+      "version": "7",
+      "when": 1793206978720,
+      "tag": "0313_byok_api_key_envelope",
+      "breakpoints": true
+    },
+    {
+      "idx": 314,
+      "version": "7",
+      "when": 1793214084646,
+      "tag": "0314_scheduled_briefing_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 315,
+      "version": "7",
+      "when": 1793264832628,
+      "tag": "0315_restore_briefing_legacy_objects",
+      "breakpoints": true
+    },
+    {
+      "idx": 316,
+      "version": "7",
+      "when": 1793269770753,
+      "tag": "0316_mcp_guardrails_and_connect_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 317,
+      "version": "7",
+      "when": 1793273409577,
+      "tag": "0317_drop_briefing_legacy_objects",
+      "breakpoints": true
+    },
+    {
+      "idx": 318,
+      "version": "7",
+      "when": 1793355889639,
+      "tag": "0318_usage_view_non_inference_cost",
+      "breakpoints": true
+    },
+    {
+      "idx": 319,
+      "version": "7",
+      "when": 1793363681982,
+      "tag": "0319_little_tempest",
+      "breakpoints": true
+    },
+    {
+      "idx": 320,
+      "version": "7",
+      "when": 1793376562413,
+      "tag": "0320_furry_justice",
+      "breakpoints": true
+    },
+    {
+      "idx": 321,
+      "version": "7",
+      "when": 1793400149339,
+      "tag": "0321_blue_chamber",
+      "breakpoints": true
+    },
+    {
+      "idx": 322,
+      "version": "7",
+      "when": 1793405482598,
+      "tag": "0322_github_connection_role_org_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 323,
+      "version": "7",
+      "when": 1793629222598,
+      "tag": "0323_enkrypt_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 324,
+      "version": "7",
+      "when": 1793632306051,
+      "tag": "0324_admin_api_request_log_export_permission",
+      "breakpoints": true
+    },
+    {
+      "idx": 325,
+      "version": "7",
+      "when": 1793639233734,
+      "tag": "0325_curved_pride",
+      "breakpoints": true
+    },
+    {
+      "idx": 326,
+      "version": "7",
+      "when": 1793652176221,
+      "tag": "0326_bent_sandman",
+      "breakpoints": true
+    },
+    {
+      "idx": 327,
+      "version": "7",
+      "when": 1793654076574,
+      "tag": "0327_service_fee_rollback_refunds",
+      "breakpoints": true
+    },
+    {
+      "idx": 328,
+      "version": "7",
+      "when": 1793696097808,
+      "tag": "0328_drop_legacy_enkrypt_guardrail_charges",
+      "breakpoints": true
+    },
+    {
+      "idx": 329,
+      "version": "7",
+      "when": 1793702955328,
+      "tag": "0329_cloud_agent_pr_watches",
+      "breakpoints": true
+    },
+    {
+      "idx": 330,
+      "version": "7",
+      "when": 1793705066725,
+      "tag": "0330_windy_iron_monger",
+      "breakpoints": true
+    },
+    {
+      "idx": 331,
+      "version": "7",
+      "when": 1793714439654,
+      "tag": "0331_usage_metadata_inference_region",
+      "breakpoints": true
+    },
+    {
+      "idx": 332,
+      "version": "7",
+      "when": 1793739202346,
+      "tag": "0332_fuzzy_nightcrawler",
+      "breakpoints": true
+    },
+    {
+      "idx": 333,
+      "version": "7",
+      "when": 1793799686440,
+      "tag": "0333_enkrypt_usage_guardrail",
+      "breakpoints": true
+    },
+    {
+      "idx": 334,
+      "version": "7",
+      "when": 1793873563531,
+      "tag": "0334_enkrypt_inference_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 335,
+      "version": "7",
+      "when": 1793879248266,
+      "tag": "0335_environment_start_commands",
+      "breakpoints": true
+    },
+    {
+      "idx": 336,
+      "version": "7",
+      "when": 1793884330131,
+      "tag": "0336_mute_hannibal_king",
+      "breakpoints": true
+    },
+    {
+      "idx": 337,
+      "version": "7",
+      "when": 1793898901533,
+      "tag": "0337_session_step_up",
+      "breakpoints": true
+    },
+    {
+      "idx": 338,
+      "version": "7",
+      "when": 1793899074271,
+      "tag": "0338_support_access_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 339,
+      "version": "7",
+      "when": 1793911550611,
+      "tag": "0339_public_roland_deschain",
+      "breakpoints": true
+    },
+    {
+      "idx": 340,
+      "version": "7",
+      "when": 1793960900444,
+      "tag": "0340_cloud_agent_builtin_agent_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 341,
+      "version": "7",
+      "when": 1793981793196,
+      "tag": "0341_claude_billing_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 342,
+      "version": "7",
+      "when": 1794216638064,
+      "tag": "0342_ai_gateway_metadata_cache",
+      "breakpoints": true
+    },
+    {
+      "idx": 343,
+      "version": "7",
+      "when": 1794222552877,
+      "tag": "0343_enkrypt_usage_detectors_fired",
+      "breakpoints": true
+    },
+    {
+      "idx": 344,
+      "version": "7",
+      "when": 1794229727439,
+      "tag": "0344_open_jazinda",
+      "breakpoints": true
+    },
+    {
+      "idx": 345,
+      "version": "7",
+      "when": 1794239031730,
+      "tag": "0345_cloud_agent_stacked_workspaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 346,
+      "version": "7",
+      "when": 1794304398824,
+      "tag": "0346_sour_the_fury",
+      "breakpoints": true
+    },
+    {
+      "idx": 347,
+      "version": "7",
+      "when": 1794316861530,
+      "tag": "0347_drop_models_by_provider_gateway_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 348,
+      "version": "7",
+      "when": 1794318065561,
+      "tag": "0348_sparkling_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 349,
+      "version": "7",
+      "when": 1794319425521,
+      "tag": "0349_pending_auth_links",
+      "breakpoints": true
     }
   ]
 }

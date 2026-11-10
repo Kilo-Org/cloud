@@ -298,6 +298,10 @@ async function deploy() {
     await runWrangler(['deploy'], deployTimeoutMs);
     report('completed');
     phase = 'verify';
+    // A renewal that started during deploy already observed the pre-completion
+    // lock. Wait it out, then start a new renewal so the post-deploy read is
+    // fresh and still retries transient D1 failures.
+    await renewal?.catch(() => {});
     try {
       await renew();
     } catch {

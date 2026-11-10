@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_NAME_MAX_LENGTH,
+  ORGANIZATION_ROLES,
+} from '@kilocode/app-shared/organizations';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
 import type { Result } from '@kilocode/web-shared/lib/maybe-result';
 import { CompanyDomainSchema, isValidDomain } from './company-domain';
@@ -50,7 +53,10 @@ export const OrganizationNameSchema = z
   .string()
   .trim()
   .min(1, 'Organization name is required')
-  .max(100, 'Organization name must be 100 characters or fewer');
+  .max(
+    ORGANIZATION_NAME_MAX_LENGTH,
+    `Organization name must be ${ORGANIZATION_NAME_MAX_LENGTH} characters or fewer`
+  );
 
 export const OrganizationCreateRequestSchema = z.object({
   name: OrganizationNameSchema,
@@ -83,6 +89,12 @@ export const OrganizationSchema = z.object({
 export type UserOrganizationWithSeats = {
   organizationName: string;
   organizationId: Organization['id'];
+  /**
+   * The parent organization's id for a child org, `null` for a top-level one.
+   * `organizations.list` carries it so a screen can tell the two apart on its
+   * first frame, before the heavier membership payload arrives.
+   */
+  parentOrganizationId: Organization['parent_organization_id'];
   role: OrganizationRole;
   memberCount: number;
   balance: number;
@@ -90,6 +102,14 @@ export type UserOrganizationWithSeats = {
   plan: OrganizationPlan;
   created_at: Organization['created_at'];
   isSalesDemo?: boolean;
+  /**
+   * The organization subscription gate's own verdict
+   * (`classifyOrganizationEntitlement`): the trial passed its enforcement
+   * window and no seat subscription, sponsorship, or suppression replaced it.
+   * Clients read it instead of re-deriving the plan state from seats and
+   * balance, so the surfaced refusal always matches `requireActiveSubscriptionOrTrial`.
+   */
+  isTrialExpiredForEnforcement: boolean;
   seatCount: {
     used: number;
     total: number;
@@ -211,6 +231,34 @@ export type OrganizationSsoPolicyView = {
   configurationError: boolean;
 };
 
+/** SSO status an organization member may read: the card's states and its domain label. */
+export type OrganizationSsoStatusView = {
+  isDomainVerified: boolean;
+  hasConnection: boolean;
+  /**
+   * Name of the verified WorkOS domain when the organization holds one, otherwise the
+   * name of the first configured domain. `null` when no domain is configured.
+   */
+  domain: string | null;
+};
+
+/**
+ * SSO configuration read by a caller who may manage it: the status above plus the
+ * provider organization and each domain with its verification state. Domain
+ * `state` stays a plain string so a client component can compare it without
+ * pulling the provider SDK into the browser bundle.
+ */
+export type OrganizationSsoConfigView =
+  | ({ kind: 'status' } & OrganizationSsoStatusView)
+  | ({
+      kind: 'configuration';
+      workosOrganization: {
+        id: string;
+        name: string;
+        domains: { domain: string; state: string }[];
+      };
+    } & OrganizationSsoStatusView);
+
 export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
   callerRole: Exclude<OrganizationRole, 'member'>;
   members: OrganizationMember[];
@@ -239,6 +287,8 @@ export type AcceptInviteResult = Result<
     invitation: typeof organization_invitations.$inferSelect;
     organizationId: string;
     role: OrganizationRole;
+    /** True when this call inserted the membership, false when it already existed. */
+    membershipInserted: boolean;
   },
   string
 >;

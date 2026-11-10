@@ -5,7 +5,7 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { and, eq, or } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { isValidEmail } from '../lib/users';
 import {
@@ -16,6 +16,7 @@ import {
   parseSessionIngestServiceStatus,
   type SessionIngestItem,
 } from '../lib/mobile-sheet-fixtures';
+import { seedTokenSigningParams } from '../lib/token-signing';
 
 export const usage = '<email> [--legacy-runtime]';
 
@@ -345,6 +346,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     );
   }
 
+  assertLocalSeedDatabase('app:condensed-history');
   const normalizedEmail = normalizeSeedEmail(email);
   const db = getSeedDb();
   const matches = await db
@@ -381,8 +383,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.userId,
     pepper: user.apiTokenPepper,
     secret,
-    expiresInSeconds: TOKEN_EXPIRES_SECONDS,
-    env: process.env.NODE_ENV ?? 'development',
+    ...seedTokenSigningParams(TOKEN_EXPIRES_SECONDS),
     extra: user.isAdmin ? { isAdmin: true } : undefined,
   });
 
@@ -420,7 +421,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
   console.log('The 50-message page boundary splits a tool run between messages 10 and 11:');
   console.log('after the older page prepends, messages 9-11 merge into one 6-item condensed row.');
-  console.log('Open kiloapp://agent-chat/' + SESSION_ID + ' with Condense tool calls enabled.');
+  console.log(
+    'Open kiloapp:///(app)/agent-chat/' + SESSION_ID + ' with Condense tool calls enabled.'
+  );
 
   return {
     userId: user.userId,
@@ -430,6 +433,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     legacyRuntime,
     sessionIngestPort: serviceStatus.port,
     sessionIngestUrl,
-    deepLink: `kiloapp://agent-chat/${SESSION_ID}`,
+    deepLink: `kiloapp:///(app)/agent-chat/${SESSION_ID}`,
   };
 }

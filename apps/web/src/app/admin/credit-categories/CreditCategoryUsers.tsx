@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -31,7 +33,6 @@ interface CreditCategoryUsersProps {
   creditCategoryKey: string;
 }
 
-// Sortable button component
 function SortableButton({
   field,
   children,
@@ -76,7 +77,6 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Parse URL parameters, falling back to defaults for unsupported values
   const requestedPage = Number(searchParams.get('page') ?? '');
   const currentPage =
     Number.isInteger(requestedPage) && requestedPage > 0 && requestedPage <= MAX_PAGE_NUMBER
@@ -97,15 +97,9 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
     [currentSortBy, currentSortOrder]
   );
 
-  // Update URL with new parameters
   const updateUrl = useCallback(
     (params: Record<string, string>) => {
       const newSearchParams = new URLSearchParams(searchParams.toString());
-
-      // Reset to page 1 when search or sort changes
-      if (params.search !== undefined || params.sortBy !== undefined) {
-        params.page = '1';
-      }
 
       Object.entries(params).forEach(([key, value]) => {
         if (value) {
@@ -115,12 +109,13 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
         }
       });
 
-      router.push(`/admin/credit-categories/${creditCategoryKey}?${newSearchParams.toString()}`);
+      router.push(
+        `/admin/credit-categories/${encodeURIComponent(creditCategoryKey)}?${newSearchParams.toString()}`
+      );
     },
     [router, searchParams, creditCategoryKey]
   );
 
-  // Fetch data from API
   const fetchData = useCallback(
     async (params: Record<string, string>, isInitialLoad = false) => {
       if (isInitialLoad) {
@@ -132,8 +127,8 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
 
       try {
         const queryParams = new URLSearchParams(params);
-        const response = await fetch(
-          `/admin/api/credit-categories/${creditCategoryKey}?${queryParams.toString()}`
+        const response = await adminFetch(
+          `/admin/api/credit-categories/${encodeURIComponent(creditCategoryKey)}?${queryParams.toString()}`
         );
 
         if (!response.ok) {
@@ -159,7 +154,6 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
     [creditCategoryKey]
   );
 
-  // Handle search
   const handleSearchChange = useCallback(
     async (searchTerm: string) => {
       const params = {
@@ -176,7 +170,6 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
     [currentPageSize, currentSortBy, currentSortOrder, updateUrl, fetchData]
   );
 
-  // Handle sorting
   const handleSort = useCallback(
     async (field: SortableField) => {
       const newDirection =
@@ -196,7 +189,6 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
     [sortConfig, currentPageSize, currentSearch, updateUrl, fetchData]
   );
 
-  // Handle row click to navigate to user detail
   const handleRowClick = useCallback(
     (userId: string) => {
       router.push(`/admin/users/${encodeURIComponent(userId)}`);
@@ -204,7 +196,6 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
     [router]
   );
 
-  // Handle page change
   const handlePageChange = useCallback(
     async (page: number) => {
       const params = {
@@ -221,7 +212,6 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
     [currentPageSize, currentSearch, currentSortBy, currentSortOrder, updateUrl, fetchData]
   );
 
-  // Handle page size change
   const handlePageSizeChange = useCallback(
     async (pageSize: PageSize) => {
       const params = {
@@ -238,7 +228,6 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
     [currentSearch, currentSortBy, currentSortOrder, updateUrl, fetchData]
   );
 
-  // Load initial data
   useEffect(() => {
     if (data === undefined && !error) {
       const params = {

@@ -17,8 +17,11 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { AlertCircle, File as FileIcon, Share } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
+import { getDocumentPreviewTarget, previewRemoteDocument } from '@/lib/document-preview';
+import { cn } from '@/lib/utils';
 import {
   downloadRemoteFile,
   getSafeCacheFilename,
@@ -134,6 +137,11 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
   const [preview, setPreview] = useState<PreviewMode | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  // A device with no viewer keeps that verdict for the part: the sheet drops the
+  // preview choice and leaves the text and share choices it always had.
+  const [previewUnavailable, setPreviewUnavailable] = useState(false);
+  const documentTarget = getDocumentPreviewTarget(part.mime);
 
   const viewerVisibleRef = useRef(viewerVisible);
   const previewRef = useRef(preview);
@@ -192,29 +200,69 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
     setPreview(null);
   }
 
+  async function handlePreviewDocument() {
+    if (!url) {
+      return;
+    }
+    setPreviewing(true);
+    try {
+      const outcome = await previewRemoteDocument({
+        key: part.id,
+        url,
+        mimeType: part.mime,
+        filename: part.filename,
+      });
+      if (outcome === 'unavailable') {
+        setPreviewUnavailable(true);
+        toast.error(t('agentChat.filePart.previewUnavailable'));
+      } else if (outcome === 'failed') {
+        toast.error(t('agentChat.filePart.couldNotLoadFileRetry'));
+      }
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
   function handleChipTap() {
     if (url) {
       if (kind === 'markdown') {
         openPreview('markdown');
         return;
       }
+      const offerPreview = documentTarget !== null && !previewUnavailable;
+      const previewIndex = offerPreview ? 0 : -1;
+      const textIndex = previewIndex + 1;
+      const shareIndex = textIndex + 1;
+      const cancelIndex = shareIndex + 1;
+      const options = [
+        ...(offerPreview
+          ? [
+              // i18n-dup-ok: this label is the document chip's action, and the
+              // markdown chip reuses it as its accessibility label.
+              t('agentChat.filePart.preview', {
+                name: part.filename ?? t('common.file'),
+              }),
+            ]
+          : []),
+        t('agentChat.filePart.openAsText'),
+        t('agentChat.filePart.openInExternalApp'),
+        t('common.cancel'),
+      ];
       showActionSheetWithOptions(
         {
           ...themedSheet,
-          options: [
-            t('agentChat.filePart.openAsText'),
-            t('agentChat.filePart.openInExternalApp'),
-            t('common.cancel'),
-          ],
-          cancelButtonIndex: 2,
+          options,
+          cancelButtonIndex: cancelIndex,
         },
         index => {
-          if (index === undefined || index === 2) {
+          if (index === undefined || index === cancelIndex) {
             return;
           }
-          if (index === 0) {
+          if (index === previewIndex) {
+            void handlePreviewDocument();
+          } else if (index === textIndex) {
             openPreview('text');
-          } else if (index === 1) {
+          } else if (index === shareIndex) {
             void handleShare();
           }
         }
@@ -399,7 +447,10 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
           onPress={() => {
             resolved.retry?.();
           }}
-          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
+          className={cn(
+            STATE_ACTION_CLASS,
+            'my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900'
+          )}
           accessibilityRole="button"
           accessibilityLabel={t('agentChat.filePart.retryLoadingFile')}
         >
@@ -425,14 +476,14 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
       <Pressable
         onLongPress={onLongPress}
         onPress={handleChipTap}
-        disabled={sharing}
-        accessibilityState={{ busy: sharing || resolved.status === 'resolving' }}
+        disabled={sharing || previewing}
+        accessibilityState={{ busy: sharing || previewing || resolved.status === 'resolving' }}
         accessibilityRole="button"
         accessibilityLabel={getFilePartAccessibilityLabel(kind, part.filename)}
         className="my-1 flex-row items-center gap-2 rounded-lg bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
       >
-        {sharing || resolved.status === 'resolving' ? (
-          <ActivityIndicator />
+        {sharing || previewing || resolved.status === 'resolving' ? (
+          <ActivityIndicator size={14} color={colors.mutedForeground} />
         ) : (
           <FileIcon size={14} color={colors.mutedForeground} />
         )}
@@ -620,7 +671,10 @@ function FilePreviewModal({
             }}
             accessibilityRole="button"
             accessibilityLabel={t('agentChat.filePart.retryLoadingFile')}
-            className="rounded-md border border-border px-4 py-2 active:opacity-70"
+            className={cn(
+              STATE_ACTION_CLASS,
+              'rounded-md border border-border px-4 py-2 active:opacity-70'
+            )}
           >
             <Text className="text-center text-sm font-medium text-foreground">
               {t('common.retry')}

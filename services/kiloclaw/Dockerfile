@@ -3,7 +3,7 @@ ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
 # Bump APT_CACHE_BUST (any value change) to invalidate the base apt layer and
 # pick up the latest chromium / 1password-cli / etc. from Debian + vendor repos.
-ARG APT_CACHE_BUST=2026-10-21
+ARG APT_CACHE_BUST=2026-10-25
 
 FROM debian:trixie-slim AS runtime
 

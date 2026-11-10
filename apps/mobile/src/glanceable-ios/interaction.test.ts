@@ -82,6 +82,8 @@ const ASK: WaitingAsk = {
   organizationId: 'org-1',
   userId: 'user-1',
   recordedAt: 1_750_000_000_000,
+  statusUpdatedAt: null,
+  boundPermissionId: 'perm_1',
 };
 
 function event(source: string, target: string): UserInteractionEvent {
@@ -298,6 +300,24 @@ describe('handleGlanceableInteraction', () => {
       organizationId: 'org-1',
       answeredKiloSessionId: 'session-7',
       askEnded: true,
+    });
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it('drops a replaced request without ending the raise', async () => {
+    mocks.runGlanceableApprove.mockResolvedValue({ kind: 'gone', replaced: true });
+
+    await expect(approveFromCard()).resolves.toEqual({ kind: 'gone', replaced: true });
+
+    // The record goes so the card re-reads the live request.
+    expect(mocks.recordWaitingAsk).toHaveBeenCalledWith(null);
+    // The session still waits on that live request, so its tray row is not a
+    // stale one to skip.
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
+      userId: 'user-1',
+      organizationId: 'org-1',
+      answeredKiloSessionId: 'session-7',
+      askEnded: false,
     });
     expect(mocks.toastError).not.toHaveBeenCalled();
   });

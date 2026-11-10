@@ -40,11 +40,9 @@ import {
   getConfiguredAutoFreeModels,
   isAutoFreeEligibleModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import {
-  findKiloExclusiveModel,
-  isKiloExclusiveFreeModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
 import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
@@ -64,7 +62,6 @@ type ResolveAutoModelParams = {
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
   frontierDecision?: () => Promise<AutoRoutingDecision | null>;
   customRouterDecision?: (reference: CustomRouterReference) => Promise<CustomRouterResolution>;
-  legacyPoolRouter?: () => Promise<CustomRouterReference | null>;
   organizationContext?: Promise<{
     organizationId?: string;
     settings?: OrganizationSettings;
@@ -77,10 +74,9 @@ type ResolveAutoModelParams = {
  * configuration, falling back to `openrouter/free` when nothing is
  * configured, the configuration is invalid, or no configured model is eligible.
  *
- * Non-kilo-exclusive free models are only eligible when they appear in the
- * OpenRouter models cache. Kilo-exclusive free models are eligible when their
- * gateway supports the current `apiKind`; when `apiKind` is null no API-kind
- * filtering is applied.
+ * Other free models are only eligible when they appear in the OpenRouter
+ * models cache. Public custom LLMs are eligible when they serve the current `apiKind`; when `apiKind` is null no
+ * API-kind filtering is applied.
  */
 async function getEligibleAutoFreeModels(
   apiKind: GatewayRequest['kind'] | null
@@ -88,15 +84,15 @@ async function getEligibleAutoFreeModels(
   const configuredModels = await getConfiguredAutoFreeModels();
   if (!configuredModels) return [AUTO_FREE_FALLBACK_MODEL];
 
-  const openRouterModels = await getOpenRouterModelsFromDatabase();
+  const [openRouterModels, customLlmsById] = await Promise.all([
+    getOpenRouterModelsFromDatabase(),
+    getCustomLlmsById(),
+  ]);
   const eligibleModels = configuredModels.filter(({ model }) => {
-    if (!isAutoFreeEligibleModelId(model)) return false;
-    if (isKiloExclusiveFreeModel(model)) {
-      const kiloModel = findKiloExclusiveModel(model);
-      return (
-        kiloModel !== null &&
-        (apiKind === null || kiloModel.provider.supportedChatApis.some(k => k === apiKind))
-      );
+    const customLlm = customLlmsById.get(model.toLowerCase());
+    if (!isAutoFreeEligibleModelId(model, customLlm)) return false;
+    if (customLlm) {
+      return apiKind === null || getCustomLlmApiKinds(customLlm.definition).includes(apiKind);
     }
     return openRouterModels.has(model);
   });
@@ -365,15 +361,6 @@ export async function resolveAutoModel(
     };
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
-    if (params.legacyPoolRouter) {
-      let reference: CustomRouterReference | null;
-      try {
-        reference = await params.legacyPoolRouter();
-      } catch {
-        return { kind: 'auto_routing_unavailable' };
-      }
-      if (reference) return resolveCustomRouterModel(params, reference);
-    }
     const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
     let decision: AutoRoutingDecision | null = null;
     if (params.efficientDecision) {

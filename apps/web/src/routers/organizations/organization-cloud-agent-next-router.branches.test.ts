@@ -83,7 +83,6 @@ jest.mock('@/lib/cloud-agent/bitbucket-integration-helpers', () => ({
   fetchBitbucketRepositoriesForOrganization: jest.fn(),
 }));
 jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
-  fetchGitHubRepositoriesForOrganization: jest.fn(),
   fetchAllGitHubRepositoriesForOrganization: jest.fn(),
 }));
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
@@ -98,7 +97,6 @@ jest.mock('@/lib/cloud-agent/session-ownership', () => ({
   verifyOrgOwnsSessionV2ByCloudAgentId: jest.fn(),
 }));
 jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
-  generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: jest.fn(),
 }));
 

@@ -228,6 +228,16 @@ export type SemanticCandidates = (
   limit: number
 ) => Promise<Array<{ path: string; score: number }>>;
 
+/**
+ * The per-account search allowance, structurally the Workers rate-limit
+ * binding (`env.SEARCH_RATE_LIMITER`). One `limit()` call spends one unit for
+ * `key`; `success: false` means the allowance for that key is spent. Counts are
+ * approximate and per Cloudflare location, as the binding documents.
+ */
+export type SearchAllowance = {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+};
+
 /** Error whose fields map onto a JSON-RPC error response. */
 export class JsonRpcFailure extends Error {
   readonly code: number;

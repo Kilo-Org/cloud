@@ -4,8 +4,8 @@
     plus the App Actions declarations the launcher and the Assistant surface.
     `KiloActionActivity` is that entry point: it is exported, one intent-filter
     per action, and it hands whatever it receives to the shared JS dispatcher
-    (`KiloAppActionsModule`). The same four actions, destinations and results as
-    the iOS App Intents provider.
+    (`KiloAppActionsModule`). The same four actions and destinations as the iOS
+    App Intents provider; the app shows the outcome of each run.
 
     Assistant surfacing additionally needs the Play Console capability
     configuration, and the capability declarations the launcher and the

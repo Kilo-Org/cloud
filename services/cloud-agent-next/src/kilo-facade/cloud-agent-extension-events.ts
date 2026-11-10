@@ -7,6 +7,8 @@ export type PublicCloudAgentStatusStep =
   | 'branch'
   | 'devcontainer_setup'
   | 'setup_commands'
+  | 'session_setup_commands'
+  | 'start_commands'
   | 'sandbox_provision'
   | 'sandbox_boot'
   | 'kilo_server'
@@ -14,6 +16,19 @@ export type PublicCloudAgentStatusStep =
   | 'ready'
   | 'failed';
 
+/**
+ * Stable public Cloud Agent extension events carried by the global feed and by
+ * native session streams.
+ *
+ * `cloud.message.completed` and `cloud.message.failed` describe one message's
+ * lifecycle, never global session idleness. The terminal variants expose the
+ * message identity, terminal status, delivery state, and acceptance result.
+ * Raw `reason`/`error` text is intentionally not part of this contract; a
+ * client that needs a sanitized failure code reads it from the preparation
+ * snapshot on the system feed.
+ *
+ * Native session streams add `directory` beside these properties.
+ */
 export type PublicCloudAgentExtensionEvent =
   | {
       type: 'cloud.message.queued';
@@ -99,6 +114,8 @@ function isCloudStatusStep(value: unknown): value is PublicCloudAgentStatusStep 
     value === 'branch' ||
     value === 'devcontainer_setup' ||
     value === 'setup_commands' ||
+    value === 'session_setup_commands' ||
+    value === 'start_commands' ||
     value === 'sandbox_provision' ||
     value === 'sandbox_boot' ||
     value === 'kilo_server' ||

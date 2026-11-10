@@ -1,11 +1,16 @@
 /* eslint-disable max-lines -- the paste hook classifies empty vs unreadable across image, text, and URL states; one cohesive suite pins each reason. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useClipboardPaste } from './use-clipboard-paste';
+import {
+  type ClipboardPasteFailure,
+  clipboardPasteFailureMessage,
+  useClipboardPaste,
+} from './use-clipboard-paste';
 
 // ── Hoisted mocks ─────────────────────────────────────────────────────────
 
 const hasClipboardImageMock = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
+const hasClipboardTextMock = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
 const hasClipboardUrlMock = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
 const readClipboardImageFileMock = vi.hoisted(() =>
   vi.fn<() => Promise<{ uri: string; name: string; mimeType: string } | 'too-large' | null>>()
@@ -15,6 +20,7 @@ const setHasImageMock = vi.hoisted(() => vi.fn<(value: boolean) => void>());
 
 vi.mock('./clipboard-image', () => ({
   hasClipboardImage: hasClipboardImageMock,
+  hasClipboardText: hasClipboardTextMock,
   hasClipboardUrl: hasClipboardUrlMock,
   readClipboardImageFile: readClipboardImageFileMock,
   readClipboardText: readClipboardTextMock,
@@ -45,14 +51,13 @@ function makeOptions(overrides?: {
   enabled?: boolean;
   addFile?: () => Promise<void>;
   addText?: (text: string) => void;
-  onFailure?: (reason: 'empty' | 'unreadable' | 'too-large') => void;
+  onFailure?: (reason: ClipboardPasteFailure) => void;
 }) {
   return {
     enabled: overrides?.enabled ?? true,
     addFile: overrides?.addFile ?? vi.fn().mockResolvedValue(undefined),
     addText: overrides?.addText,
-    onFailure:
-      overrides?.onFailure ?? vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>(),
+    onFailure: overrides?.onFailure ?? vi.fn<(reason: ClipboardPasteFailure) => void>(),
   };
 }
 
@@ -86,6 +91,9 @@ function lastSetHasImageArg(): boolean | undefined {
 describe('useClipboardPaste', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The probe only answers differently in the denied case; every other test
+    // starts from a clipboard that really holds no text.
+    hasClipboardTextMock.mockResolvedValue(false);
   });
 
   // ── Happy: paste hides, later focus does not re-show ────────────────────
@@ -195,7 +203,7 @@ describe('useClipboardPaste', () => {
     hasClipboardImageMock.mockResolvedValue(true);
     readClipboardImageFileMock.mockResolvedValue(null);
 
-    const onFailure = vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
     const hook = useClipboardPaste(makeOptions({ onFailure }));
 
     // Refresh shows the image.
@@ -222,7 +230,7 @@ describe('useClipboardPaste', () => {
     readClipboardTextMock.mockResolvedValue('fallback text');
 
     const addText = vi.fn<(text: string) => void>();
-    const onFailure = vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
     const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
 
     hook.paste();
@@ -249,7 +257,7 @@ describe('useClipboardPaste', () => {
     readClipboardTextMock.mockResolvedValue('https://example.com/spec');
 
     const addText = vi.fn<(text: string) => void>();
-    const onFailure = vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
     const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
 
     hook.paste();
@@ -271,7 +279,7 @@ describe('useClipboardPaste', () => {
     readClipboardTextMock.mockResolvedValue('fallback text');
 
     const addText = vi.fn<(text: string) => void>();
-    const onFailure = vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
     const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
 
     hook.paste();
@@ -291,7 +299,7 @@ describe('useClipboardPaste', () => {
     readClipboardTextMock.mockResolvedValue('');
 
     const addText = vi.fn<(text: string) => void>();
-    const onFailure = vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
     const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
 
     hook.paste();
@@ -304,12 +312,71 @@ describe('useClipboardPaste', () => {
     expect(readClipboardTextMock).toHaveBeenCalledOnce();
   });
 
+  it('reports a denied text read instead of an empty clipboard', async () => {
+    hasClipboardImageMock.mockResolvedValue(false);
+    hasClipboardUrlMock.mockResolvedValue(false);
+    readClipboardImageFileMock.mockResolvedValue(null);
+    readClipboardTextMock.mockResolvedValue('');
+    hasClipboardTextMock.mockResolvedValue(true);
+
+    const addText = vi.fn<(text: string) => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
+    const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
+
+    hook.paste();
+    await flushUntilCalled(onFailure);
+
+    expect(onFailure).toHaveBeenCalledOnce();
+    expect(onFailure).toHaveBeenCalledWith('denied');
+    expect(addText).not.toHaveBeenCalled();
+    // The denial is the cause; the URL probe must not overwrite it.
+    expect(hasClipboardUrlMock).not.toHaveBeenCalled();
+  });
+
+  it('does not ask the text probe when the read returns text', async () => {
+    hasClipboardImageMock.mockResolvedValue(false);
+    readClipboardImageFileMock.mockResolvedValue(null);
+    readClipboardTextMock.mockResolvedValue('some text');
+
+    const addText = vi.fn<(text: string) => void>();
+    const hook = useClipboardPaste(makeOptions({ addText }));
+
+    hook.paste();
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(addText).toHaveBeenCalledWith('some text');
+    expect(hasClipboardTextMock).not.toHaveBeenCalled();
+  });
+
+  it('passes a long multi-line paste through untouched', async () => {
+    hasClipboardImageMock.mockResolvedValue(false);
+    readClipboardImageFileMock.mockResolvedValue(null);
+    const longText = Array.from(
+      { length: 80 },
+      (_unused, line) => `Line ${line + 1}: ${'x'.repeat(48)}`
+    ).join('\n');
+    readClipboardTextMock.mockResolvedValue(longText);
+
+    const addText = vi.fn<(text: string) => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
+    const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
+
+    hook.paste();
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(longText.length).toBeGreaterThan(4000);
+    expect(addText).toHaveBeenCalledWith(longText);
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
   it('keeps the image-only behavior when the caller omits addText', async () => {
     hasClipboardImageMock.mockResolvedValue(true);
     readClipboardImageFileMock.mockResolvedValue(null);
     readClipboardTextMock.mockResolvedValue('some text');
 
-    const onFailure = vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
     const hook = useClipboardPaste(makeOptions({ onFailure }));
 
     hook.paste();
@@ -325,7 +392,7 @@ describe('useClipboardPaste', () => {
     hasClipboardImageMock.mockResolvedValue(false);
     readClipboardImageFileMock.mockResolvedValue(null);
 
-    const onFailure = vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
     const hook = useClipboardPaste(makeOptions({ onFailure }));
 
     hook.paste();
@@ -344,7 +411,7 @@ describe('useClipboardPaste', () => {
     readClipboardTextMock.mockResolvedValue('');
 
     const addText = vi.fn<(text: string) => void>();
-    const onFailure = vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
     const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
 
     hook.paste();
@@ -361,7 +428,7 @@ describe('useClipboardPaste', () => {
     readClipboardTextMock.mockResolvedValue('');
 
     const addText = vi.fn<(text: string) => void>();
-    const onFailure = vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>();
+    const onFailure = vi.fn<(reason: ClipboardPasteFailure) => void>();
     const hook = useClipboardPaste(makeOptions({ addText, onFailure }));
 
     hook.paste();
@@ -516,5 +583,19 @@ describe('useClipboardPaste', () => {
     // Resolve paste to clean up.
     resolveRead({ uri: 'file:///cache/pasted.png', name: 'pasted.png', mimeType: 'image/png' });
     await flushMicrotasks();
+  });
+});
+
+describe('clipboardPasteFailureMessage', () => {
+  it('words an empty clipboard and a denied read differently', () => {
+    expect(clipboardPasteFailureMessage('empty')).toBe('Nothing to paste');
+    expect(clipboardPasteFailureMessage('denied')).toBe(
+      'Paste access was denied. Allow paste and try again.'
+    );
+  });
+
+  it('leaves the attachment failures to each composer', () => {
+    expect(clipboardPasteFailureMessage('unreadable')).toBeNull();
+    expect(clipboardPasteFailureMessage('too-large')).toBeNull();
   });
 });

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { WRAPPER_VERSION } from '../src/shared/wrapper-version.js';
+import { RUNTIME_DISTRIBUTION } from '../src/shared/runtime-distribution.js';
+import { RUNTIME_TOOLCHAIN } from '../src/shared/runtime-toolchain.js';
 import {
   applyDevVarsFallback,
+  builderInstallSteps,
   createAcceptedConfig,
   createRuntimeManifest,
   defaultRuntimeBuildId,
@@ -208,13 +211,43 @@ describe('Vercel snapshot operator pure logic', () => {
     });
   });
 
+  it('builds every builder install step from the pinned toolchain', () => {
+    const steps = builderInstallSteps();
+    expect(steps.map(step => step.label)).toEqual([
+      'install packages (dnf)',
+      `install ripgrep ${RUNTIME_TOOLCHAIN.rg.version}`,
+      `install bun ${RUNTIME_DISTRIBUTION.bun}`,
+      `install glab ${RUNTIME_DISTRIBUTION.glab}`,
+      `install gh ${RUNTIME_DISTRIBUTION.gh}`,
+      `install gh-stack ${RUNTIME_DISTRIBUTION.ghStack}`,
+      `install pnpm ${RUNTIME_DISTRIBUTION.pnpm}`,
+      `install kilo ${RUNTIME_TOOLCHAIN.kilo.version}`,
+      'verify runtime pins',
+    ]);
+    expect(steps[0].script).toContain('unzip');
+    for (const tool of ['rg', 'bun', 'glab', 'gh', 'pnpm', 'kilo'] as const) {
+      const script = steps.find(step => step.label.endsWith(` ${RUNTIME_TOOLCHAIN[tool].version}`));
+      expect(script?.script).toContain(`'${RUNTIME_TOOLCHAIN[tool].sha256}'`);
+      expect(script?.script).toContain('check_sha256');
+    }
+    for (const step of steps) {
+      expect(step.script).not.toContain('| bash');
+      expect(step.script).not.toContain('bash -s');
+    }
+    const ghStack = steps.find(step => step.label.startsWith('install gh-stack '));
+    expect(ghStack?.script).toContain('sha256sum -c -');
+    expect(steps.at(-1)?.script).toContain(`= '${RUNTIME_DISTRIBUTION.ghStackSha256}'`);
+    expect(steps.at(-1)?.script).toContain(`= '${RUNTIME_DISTRIBUTION.gh}'`);
+    expect(steps.at(-1)?.script).toContain(`in v${RUNTIME_DISTRIBUTION.nodeMajor}.*`);
+  });
+
   it('documents activation ordering and the post-activation rollback constraint', async () => {
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     await main(['help']);
 
     const output = write.mock.calls.map(([chunk]) => String(chunk)).join('');
-    expect(output).toContain('Deploy code with VERCEL_SANDBOX_ORG_IDS empty');
+    expect(output).toContain('Deploy code with BYOC_VERCEL_IDS empty');
     expect(output).toContain(
       'Disabling enrollment prevents new Vercel selection but does not stop already-pinned sessions'
     );

@@ -9,7 +9,7 @@ type Props = {
   sessionId: string;
 };
 export function StripeSessionStatusChecker({ organizationId, sessionId }: Props) {
-  const result = useStripeSessionStatus({ sessionId });
+  const result = useStripeSessionStatus({ organizationId, sessionId });
 
   if (result.status === 'pending' && result.isFetching) {
     return (

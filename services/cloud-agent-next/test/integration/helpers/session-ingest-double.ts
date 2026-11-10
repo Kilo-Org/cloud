@@ -20,9 +20,11 @@ import type {
   GetCloudAgentRootSessionMessagesResult,
   GetCloudAgentRootSessionSnapshotParams,
   GetCloudAgentRootSessionSnapshotResult,
+  GetCloudAgentWorkspaceResult,
   KiloSdkSessionInfo,
   KiloSdkStoredMessage,
   ListCloudAgentRootSessionsParams,
+  CloudAgentWorkspacesPage,
   ResolveCloudAgentRootSessionForKiloSessionParams,
   ResolveCloudAgentRootSessionForKiloSessionResult,
   SessionIngestBinding,
@@ -36,6 +38,7 @@ export const TEST_SESSION_INGEST_SNAPSHOTS_KEY = 'test:session-ingest:snapshots'
 export type TestSessionIngestRoot = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
+  workspaceId?: `worktree_${string}` | null;
   title?: string | null;
   created?: number;
   updated?: number;
@@ -61,6 +64,7 @@ function summary(root: TestSessionIngestRoot): CloudAgentRootSessionSummary {
   return {
     kiloSessionId: root.kiloSessionId,
     cloudAgentSessionId: root.cloudAgentSessionId,
+    workspaceId: root.workspaceId ?? null,
     userId: 'test_user',
     organizationId: root.organizationId ?? null,
     title: root.title ?? null,
@@ -155,6 +159,12 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
     ): Promise<CloudAgentRootSessionsPage> {
       return pageRoots(await readRoots(storage), params);
     },
+    async listCloudAgentWorkspaces(): Promise<CloudAgentWorkspacesPage> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
+    async getCloudAgentWorkspace(): Promise<GetCloudAgentWorkspaceResult> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
     async getCloudAgentRootSessionSnapshot(
       params: GetCloudAgentRootSessionSnapshotParams
     ): Promise<GetCloudAgentRootSessionSnapshotResult> {
@@ -210,13 +220,31 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
     async completeCloudAgentWorktreeDeletion(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
+    async deleteCloudAgentWorktreeContent(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
     async canDestroyCloudAgentWorktreeSandbox(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
     async createSessionForCloudAgent(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
+    async setGeneratedTitleForCloudAgent(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
+    async canGenerateTitleForCloudAgent(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
     async deleteSessionForCloudAgent(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
+    async deleteHostedWorkspaceSession(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
+    async assertHostedWorkspaceSessionDeletable(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
+    async getCloudAgentWorkspaceStatus(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
     async getSessionMessages(): Promise<never> {
@@ -230,5 +258,5 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
       throw new Error('connect is not implemented on the test SESSION_INGEST double');
     },
     ...methods,
-  } as SessionIngestBinding;
+  };
 }

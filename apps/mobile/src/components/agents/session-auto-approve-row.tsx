@@ -10,7 +10,7 @@ import { type SessionAutoApproveState } from './session-auto-approve';
  * Per-session auto-approve toggle: title + subtitle on the left, a native
  * `Switch` on the right. A selection haptic is a capability both iOS and
  * Android have, so there is one implementation: the screen that owns the
- * session state fires the single `Haptics.selectionAsync()` for the commit,
+ * session state fires the single `selectionHaptic()` for the commit,
  * and this row adds no platform-specific module of its own. Disabled and
  * labelled "unavailable" for a session that cannot receive permission asks.
  */

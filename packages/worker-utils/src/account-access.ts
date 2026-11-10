@@ -1,5 +1,6 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import {
+  blacklisted_domains,
   organization_memberships,
   organization_user_limits,
   organization_user_usage,
@@ -8,8 +9,7 @@ import {
   type OrganizationUserLimitType,
 } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
-import { and, eq, isNull, not, sql } from 'drizzle-orm';
-import * as z from 'zod';
+import { and, eq, inArray, isNull, not, sql } from 'drizzle-orm';
 
 // Account access rules shared by the Next.js gateway and Workers that authenticate Kilo users.
 
@@ -32,6 +32,8 @@ export function isApiTokenPepperCurrent(
   return !accountPepper || accountPepper === tokenPepper;
 }
 
+// A membership resolves only for a live organization: the join excludes a soft-deleted
+// organization, so the caller sees no role (and therefore no membership).
 export async function findOrganizationMemberRole(
   db: AccountDb,
   organizationId: string,
@@ -128,6 +130,7 @@ export async function findOrganizationMemberBalanceRow(
       and(
         eq(organizations.id, organizationId),
         eq(organization_memberships.kilo_user_id, userId),
+        isNull(organizations.deleted_at),
         not(eq(organization_memberships.role, 'billing_manager'))
       )
     )
@@ -170,62 +173,89 @@ export function canSpendPaidUsage(balance: number): boolean {
   return balance > 0;
 }
 
-// Admins maintain the blocked email domains in Redis; an empty list falls back to the
-// deployment's BLACKLIST_DOMAINS setting.
-export const BLACKLISTED_DOMAINS_REDIS_KEY = 'admin:blacklisted-domains';
+// Admins maintain the blocked email domains in the blacklisted_domains table. A blocked domain
+// also blocks its subdomains.
 
-export const BlacklistDomainsConfigSchema = z.object({
-  domains: z.array(z.string()),
-  updated_at: z.string().nullable(),
-  updated_by: z.string().nullable(),
-  updated_by_email: z.string().nullable(),
-});
+// The longest DNS name. A longer suffix cannot be a blocked domain, so skipping it bounds the
+// lookup for an arbitrarily long address without changing which addresses match.
+const MAX_DOMAIN_LENGTH = 253;
 
-export function blacklistedDomainsFromConfig(
-  raw: string | null,
-  fallbackDomains: string[]
-): string[] {
-  if (!raw) return fallbackDomains;
-  const { domains } = BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
-  return domains.length > 0 ? domains : fallbackDomains;
+/**
+ * The label-boundary suffixes of an address's host, longest first. An address without '@' only
+ * yields dotted suffixes, because the original matcher needed '@' for an exact-domain match.
+ */
+export function emailDomainSuffixes(email: string): string[] {
+  const normalizedEmail = email.toLowerCase();
+  const at = normalizedEmail.lastIndexOf('@');
+  const host = normalizedEmail.slice(at + 1);
+  const minStart = Math.max(0, host.length - MAX_DOMAIN_LENGTH);
+  const suffixes: string[] = [];
+  if (at !== -1 && minStart === 0 && host.length > 0) suffixes.push(host);
+  for (
+    let dot = host.indexOf('.', Math.max(0, minStart - 1));
+    dot !== -1 && dot + 1 < host.length;
+    dot = host.indexOf('.', dot + 1)
+  ) {
+    suffixes.push(host.slice(dot + 1));
+  }
+  return suffixes;
 }
 
-// The admin config is cached for a minute, so auth checks keep re-using the same
-// array. Index it once per array reference instead of scanning it per call: a
-// list with tens of thousands of entries costs one Set build per cache refresh,
-// not one scan per sign-in.
-const blacklistIndexCache = new WeakMap<readonly string[], Set<string>>();
-
-function blacklistIndex(domains: readonly string[]): Set<string> {
-  const cached = blacklistIndexCache.get(domains);
-  if (cached) return cached;
-
-  const index = new Set(domains.map(domain => domain.toLowerCase()));
-  blacklistIndexCache.set(domains, index);
-  return index;
+/** The given domains that are blocked, in one primary-key lookup. */
+export async function findBlacklistedDomains(
+  db: AccountDb,
+  domains: readonly string[]
+): Promise<Set<string>> {
+  if (domains.length === 0) return new Set();
+  const rows = await db
+    .select({ domain: blacklisted_domains.domain })
+    .from(blacklisted_domains)
+    .where(inArray(blacklisted_domains.domain, [...domains]));
+  return new Set(rows.map(row => row.domain));
 }
 
-// A blocked domain also blocks its subdomains.
+// Access checks may lag an admin change by this long, as they did when every process cached
+// the whole list for a minute.
+export const EMAIL_DOMAIN_BLACKLIST_CACHE_TTL_MS = 60_000;
+const EMAIL_DOMAIN_BLACKLIST_CACHE_LIMIT = 10_000;
+
+/**
+ * Caches blacklist answers in process, keyed by an address's longest suffix, which determines
+ * all its other suffixes. Only answers are cached, never a pending lookup, because a Worker
+ * cannot share one request's database I/O with another.
+ */
+export function createEmailDomainBlacklistCache({ now = () => Date.now() } = {}) {
+  const cache = new Map<string, { expiresAt: number; blocked: boolean }>();
+
+  return {
+    async isBlacklisted(db: AccountDb, email: string): Promise<boolean> {
+      const suffixes = emailDomainSuffixes(email);
+      if (suffixes.length === 0) return false;
+      const key = suffixes[0];
+      const hit = cache.get(key);
+      if (hit && hit.expiresAt > now()) return hit.blocked;
+
+      const blocked = (await findBlacklistedDomains(db, suffixes)).size > 0;
+      cache.delete(key);
+      cache.set(key, { expiresAt: now() + EMAIL_DOMAIN_BLACKLIST_CACHE_TTL_MS, blocked });
+      if (cache.size > EMAIL_DOMAIN_BLACKLIST_CACHE_LIMIT) {
+        const oldest = cache.keys().next().value;
+        if (oldest !== undefined) cache.delete(oldest);
+      }
+      return blocked;
+    },
+    clear(): void {
+      cache.clear();
+    },
+  };
+}
+
+// Matches an address against an in-memory list, such as the signup TLD blocklist.
 export function isEmailBlacklistedByDomain(
   email: string,
   blacklistedDomains: readonly string[] | undefined
 ): boolean {
   if (!blacklistedDomains?.length) return false;
-
-  const index = blacklistIndex(blacklistedDomains);
-  const normalizedEmail = email.toLowerCase();
-  const at = normalizedEmail.lastIndexOf('@');
-  const host = at === -1 ? normalizedEmail : normalizedEmail.slice(at + 1);
-  const labels = host.split('.');
-
-  // An address without '@' can only match on a dotted suffix, because the
-  // previous implementation needed '@' for an exact-domain match.
-  const firstLabel = at === -1 ? 1 : 0;
-
-  // Every label-boundary suffix of the host. '@' cannot appear inside a label,
-  // so these are exactly the strings the previous endsWith checks matched.
-  for (let i = firstLabel; i < labels.length; i++) {
-    if (index.has(labels.slice(i).join('.'))) return true;
-  }
-  return false;
+  const index = new Set(blacklistedDomains.map(domain => domain.toLowerCase()));
+  return emailDomainSuffixes(email).some(suffix => index.has(suffix));
 }

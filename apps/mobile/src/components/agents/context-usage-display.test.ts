@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- Migrated getHeaderSummary cases plus new no-info pill/a11y branches. */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import {
@@ -46,22 +48,36 @@ function pill(args: {
 const trackOnly: HeaderPillContent = {
   primary: null,
   secondary: null,
-  hasCost: false,
-  tone: 'neutral',
-  arcFraction: 0,
-  interactive: false,
-  usageUnavailable: false,
-};
-
-/** No info after loading has stopped: the dash marks the slot instead. */
-const unknownUsage: HeaderPillContent = {
-  primary: '—',
-  secondary: null,
-  hasCost: false,
+  costSlot: 'none',
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
   usageUnavailable: true,
+};
+
+/** A transcript without usage: the same ring, no dash slot. */
+const trackOnlyWhileLoading: HeaderPillContent = { ...trackOnly, usageUnavailable: false };
+
+/** No usage reported yet: both value slots stay open, the cost one with a dash. */
+const unreported: HeaderPillContent = {
+  primary: '—',
+  secondary: '—',
+  costSlot: 'unreported',
+  tone: 'neutral',
+  arcFraction: 0,
+  interactive: false,
+  usageUnavailable: true,
+};
+
+/**
+ * The same pill while the session still resolves: the two dashes keep the row's
+ * layout and paint invisible, with one bar across it, so the pill is already as
+ * wide as its settled form.
+ */
+const unreportedWhileLoading: HeaderPillContent = {
+  ...unreported,
+  costSlot: 'loading',
+  usageUnavailable: false,
 };
 
 describe('formatExactTokens', () => {
@@ -142,18 +158,18 @@ describe('formatRemainingTokens', () => {
 });
 
 describe('getHeaderPillContent', () => {
-  it('marks unknown usage with the dash, non-interactive, with no info and no transcript', () => {
-    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(unknownUsage);
-    expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(unknownUsage);
-    expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(unknownUsage);
+  it('keeps both value slots open, non-interactive, with no info and no transcript', () => {
+    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(unreported);
+    expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(unreported);
+    expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(unreported);
   });
 
-  it('keeps the loading placeholder label-free before the session resolves', () => {
+  it('holds a loading bar in the cost slot while the session resolves', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false, loading: true })).toEqual(
-      trackOnly
+      unreportedWhileLoading
     );
     expect(pill({ totalCostMicrodollars: null, hasMessages: false, loading: true })).toEqual(
-      trackOnly
+      unreportedWhileLoading
     );
   });
 
@@ -165,7 +181,7 @@ describe('getHeaderPillContent', () => {
     });
     expect(result).toMatchObject({
       secondary: '$0.08',
-      hasCost: true,
+      costSlot: 'label',
       tone: 'primary',
       arcFraction: 0.42,
       interactive: true,
@@ -176,7 +192,7 @@ describe('getHeaderPillContent', () => {
   it('omits secondary cost when cost is zero or null', () => {
     const base = {
       secondary: null,
-      hasCost: false,
+      costSlot: 'none',
       tone: 'primary' as const,
       arcFraction: 0.1,
       interactive: true,
@@ -221,7 +237,7 @@ describe('getHeaderPillContent', () => {
     });
     expect(result).toMatchObject({
       secondary: '$0.12',
-      hasCost: true,
+      costSlot: 'label',
       tone: 'neutral',
       arcFraction: undefined,
       interactive: true,
@@ -238,7 +254,7 @@ describe('getHeaderPillContent', () => {
       })
     ).toMatchObject({
       secondary: null,
-      hasCost: false,
+      costSlot: 'none',
       tone: 'neutral',
       arcFraction: undefined,
       interactive: true,
@@ -250,7 +266,7 @@ describe('getHeaderPillContent', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: true })).toEqual({
       primary: '$0.08',
       secondary: null,
-      hasCost: true,
+      costSlot: 'none',
       tone: 'neutral',
       arcFraction: 0,
       interactive: false,
@@ -258,16 +274,16 @@ describe('getHeaderPillContent', () => {
     });
   });
 
-  it('marks unknown usage with the dash when a transcript exists without cost', () => {
-    expect(pill({ totalCostMicrodollars: null, hasMessages: true })).toEqual(unknownUsage);
-    expect(pill({ totalCostMicrodollars: 0, hasMessages: true })).toEqual(unknownUsage);
+  it('keeps the plain ring when a transcript exists without cost', () => {
+    expect(pill({ totalCostMicrodollars: null, hasMessages: true })).toEqual(trackOnly);
+    expect(pill({ totalCostMicrodollars: 0, hasMessages: true })).toEqual(trackOnly);
     expect(pill({ totalCostMicrodollars: null, hasMessages: true, loading: true })).toEqual(
-      trackOnly
+      trackOnlyWhileLoading
     );
   });
 
   it('never surfaces a bare cost before a transcript exists', () => {
-    expect(pill({ totalCostMicrodollars: 700, hasMessages: false })).toEqual(unknownUsage);
+    expect(pill({ totalCostMicrodollars: 700, hasMessages: false })).toEqual(unreported);
   });
 });
 
@@ -416,7 +432,7 @@ describe('getMetricsAccessibilityLabel', () => {
         interactive: false,
         usageUnavailable: false,
       })
-    ).toBe('cost 8 cents');
+    ).toBe('Cost so far 8 cents.');
   });
 
   it('names usage unavailable when there is no info or cost', () => {
@@ -465,6 +481,115 @@ describe('getMetricsAccessibilityLabel', () => {
     });
     expect(label).not.toContain('CLI');
     expect(label.toLowerCase()).toContain('context details');
+  });
+});
+
+describe('getMetricsAccessibilityLabel locale terminators', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  /**
+   * The catalog carries the sentence terminator, so a locale that ends a
+   * sentence with its own mark announces that mark and never a stray ASCII
+   * period. The body may end a sentence and the tap intent may add another;
+   * two terminators in a row is the defect this guards against.
+   */
+  const ADJACENT_TERMINATORS = /[\p{Sentence_Terminal}\u2026]{2}/u;
+
+  /** The finding's Japanese announcement shape, terminator included. */
+  const JA_LABEL =
+    'コンテキストは100トークン使用、ウィンドウのサイズは不明、コスト 40 セント。' +
+    'タップするとコンテキストの詳細を表示します。';
+
+  it('ends each Japanese sentence with the Japanese full stop', async () => {
+    await i18n.changeLanguage('ja');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: info({ contextTokens: 100, contextWindow: undefined, percentage: undefined }),
+        totalCostMicrodollars: 400_000,
+        interactive: true,
+      })
+    ).toBe(JA_LABEL);
+  });
+
+  it('keeps the Japanese terminator when the window is known or usage is unavailable', async () => {
+    await i18n.changeLanguage('ja');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: info({ contextTokens: 64_000, contextWindow: 200_000, percentage: 32 }),
+        totalCostMicrodollars: 0,
+        interactive: false,
+      })
+    ).toBe('コンテキスト 200,000トークン中64,000トークン、32%使用。');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: undefined,
+        totalCostMicrodollars: 80_000,
+        interactive: false,
+        usageUnavailable: true,
+      })
+    ).toBe('コンテキスト使用状況を利用できません、コスト 8 セント。');
+  });
+
+  it('ends the loading cost sentence with the Japanese full stop before the hint', async () => {
+    await i18n.changeLanguage('ja');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: undefined,
+        totalCostMicrodollars: 80_000,
+        interactive: true,
+        usageUnavailable: false,
+      })
+    ).toBe('コスト 8 セント。タップするとコンテキストの詳細を表示します。');
+  });
+
+  it('keeps the tap hint a separate sentence where no body mark closes the sentence', async () => {
+    // "th" ends no sentence with a terminator, so the hint's own leading space
+    // is the only thing that keeps the two sentences apart.
+    await i18n.changeLanguage('th');
+    const args = {
+      info: info({ contextTokens: 100, contextWindow: undefined, percentage: undefined }),
+      totalCostMicrodollars: null,
+    } as const;
+    const body = getMetricsAccessibilityLabel({ ...args, interactive: false });
+    const hint = i18n.t('agentChat.contextUsage.tapToViewDetails');
+    expect(body.at(-1)).not.toMatch(/[\p{Sentence_Terminal}\u2026]/u);
+    expect(hint.startsWith(' ')).toBe(true);
+    expect(getMetricsAccessibilityLabel({ ...args, interactive: true })).toBe(`${body}${hint}`);
+  });
+
+  it('never puts two sentence terminators side by side in any supported locale', async () => {
+    expect(SUPPORTED_LANGUAGES.length).toBeGreaterThan(50);
+    const usages = [
+      {
+        tag: 'full',
+        info: info({ contextTokens: 64_000, contextWindow: 200_000, percentage: 32 }),
+      },
+      {
+        tag: 'unknown-window',
+        info: info({ contextTokens: 100, contextWindow: undefined, percentage: undefined }),
+      },
+      { tag: 'none', info: undefined },
+      { tag: 'loading', info: undefined, usageUnavailable: false },
+    ];
+    for (const language of SUPPORTED_LANGUAGES) {
+      await i18n.changeLanguage(language); // eslint-disable-line no-await-in-loop -- one catalog at a time mirrors the runtime switch
+      for (const interactive of [true, false]) {
+        for (const cost of [80_000, null]) {
+          for (const usage of usages) {
+            const where = `${language} info=${usage.tag} cost=${String(cost)}`;
+            const label = getMetricsAccessibilityLabel({
+              info: usage.info,
+              totalCostMicrodollars: cost,
+              interactive,
+              usageUnavailable: usage.usageUnavailable ?? true,
+            });
+            expect(label, where).not.toMatch(ADJACENT_TERMINATORS);
+          }
+        }
+      }
+    }
   });
 });
 

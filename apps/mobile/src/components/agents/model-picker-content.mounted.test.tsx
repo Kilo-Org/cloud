@@ -31,6 +31,9 @@ const slotState = vi.hoisted(() => ({ bridge: undefined as unknown }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0 }));
 
 const routerBack = vi.hoisted(() => vi.fn());
+// The keyboard the applied pick closes. Recorded so a test can prove the pick
+// takes the search field's keyboard with it instead of leaving it up.
+const keyboardDismiss = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/model-picker-rows', async importOriginal => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -107,6 +110,7 @@ vi.mock('@shopify/flash-list', async () => {
 vi.mock('react-native', () => ({
   // `withRtlInputAlignment` reads I18nManager on every render.
   I18nManager: { isRTL: false },
+  Keyboard: { dismiss: keyboardDismiss },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -173,6 +177,7 @@ function makeBridge(): ModelPickerBridge {
     options: Array.from({ length: TOTAL_OPTIONS }, (_, index) => makeOption(index)),
     currentValue: '',
     currentVariant: '',
+    acceptsVariant: true,
     selectionScope: {
       sessionId: 'unscoped',
       ownerConnectionId: null,
@@ -553,11 +558,160 @@ describe('ModelPickerContent deferred search', () => {
   });
 });
 
-// The composer's current model arrives as the bridge's `currentValue`. The row
-// for that id must carry `selected`, or the picker shows no visible selected
-// state for the model the composer is editing (model-selected finding: the
-// DeepSeek V4.1 Flash row read as star-only). `selected` is what renders the
-// trailing Check (see model-selector.mounted.test.tsx).
+// A row press taken from filtered results must apply in one press, with the
+// search field's keyboard closed as part of the pick — the same outcome as a
+// pick taken with the keyboard already dismissed.
+/**
+ * The press the real row's Pressable performs, and the option it belongs to.
+ * One named narrow of react-test-renderer's index-signature props.
+ */
+function rowProps(node: TestRenderer.ReactTestInstance): {
+  option: SessionModelOption;
+  onSelectModel: (option: SessionModelOption) => void;
+} {
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  return {
+    option: node.props.option as SessionModelOption,
+    onSelectModel: node.props.onSelectModel as (option: SessionModelOption) => void,
+  };
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+describe('ModelPickerContent pick while searching', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    buildSearchCalls.values.length = 0;
+    listCommitLengths.values.length = 0;
+    slotState.bridge = { ...makeBridge(), currentValue: 'remote-model-0' };
+    safeAreaInsets.bottom = 0;
+    routerBack.mockClear();
+    keyboardDismiss.mockClear();
+  });
+
+  it('applies the row it was pressed on and closes the keyboard with it', async () => {
+    const renderer = await mount();
+
+    await act(async () => {
+      typeSearch(renderer, FINAL_QUERY);
+      await Promise.resolve();
+    });
+    expect(listedDisplayIds(renderer)).toHaveLength(FINAL_MATCH_COUNT);
+
+    const target = findByType(renderer.root, 'ModelPickerOptionRow').find(
+      node => rowProps(node).option.displayId === 'model-170'
+    );
+    if (!target) {
+      throw new Error('the searched row was not rendered');
+    }
+
+    await act(async () => {
+      rowProps(target).onSelectModel(rowProps(target).option);
+      await Promise.resolve();
+    });
+
+    // One press applies the choice: a single-variant model closes the sheet,
+    // and the keyboard that was up for the search goes with the pick.
+    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(keyboardDismiss).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+// A caller that stores only a model id cannot keep a thinking effort, so the
+// rows must not offer one: a chip press commits and closes the sheet, and the
+// caller would drop the choice without saying so. Such a caller's model tap is
+// the whole selection and closes the sheet, like a single-variant model's.
+describe('ModelPickerContent thinking effort availability', () => {
+  const effortOption: SessionModelOption = {
+    ...makeOption(0),
+    id: 'effort-model',
+    displayId: 'model-effort',
+    variants: ['low', 'high'],
+  };
+
+  // The commit itself runs on the sheet's focus-effect cleanup, which this
+  // harness mocks out (see `expo-router`); the close is what the route owns.
+  function mountWith(acceptsVariant: boolean) {
+    slotState.bridge = {
+      ...makeBridge(),
+      options: [effortOption],
+      currentValue: effortOption.id,
+      currentVariant: 'low',
+      acceptsVariant,
+    };
+  }
+
+  function modelRow(renderer: TestRenderer.ReactTestRenderer) {
+    const row = findByType(renderer.root, 'ModelPickerOptionRow').find(
+      node => rowProps(node).option.id === effortOption.id
+    );
+    if (!row) {
+      throw new Error('the effort model row was not rendered');
+    }
+    return row;
+  }
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    buildSearchCalls.values.length = 0;
+    listCommitLengths.values.length = 0;
+    routerBack.mockClear();
+    keyboardDismiss.mockClear();
+  });
+
+  it('hands the row the caller availability the bridge carries', async () => {
+    mountWith(false);
+    const renderer = await mount();
+
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect(modelRow(renderer).props.acceptsVariant).toBe(false);
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('closes on the model tap when the caller keeps no variant', async () => {
+    mountWith(false);
+    const renderer = await mount();
+    const row = modelRow(renderer);
+
+    await act(async () => {
+      rowProps(row).onSelectModel(effortOption);
+      await Promise.resolve();
+    });
+
+    // The tap is the whole selection: no effort chooser follows it, and the
+    // sheet closes exactly as it does for a single-variant model.
+    expect(routerBack).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the sheet open for the effort choice when the caller keeps variants', async () => {
+    mountWith(true);
+    const renderer = await mount();
+    const row = modelRow(renderer);
+
+    await act(async () => {
+      rowProps(row).onSelectModel(effortOption);
+      await Promise.resolve();
+    });
+
+    expect(routerBack).not.toHaveBeenCalled();
+    expect(keyboardDismiss).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
 describe('ModelPickerContent selected row', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

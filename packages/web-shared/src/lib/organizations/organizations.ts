@@ -13,6 +13,8 @@ import {
   OrganizationSettingsSchema,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
+  agent_briefing_context_preferences,
+  cloud_agent_environments,
   cli_sessions_v2,
   kilocode_users,
   organization_invitations,
@@ -27,19 +29,26 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { and, asc, desc, eq, isNull, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, gt, or } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
 import { randomUUID } from 'crypto';
-import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import {
+  getDeliveredEmailAddress,
+  getLowerDomainFromEmail,
+  normalizeEmail,
+} from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
 import { classifyOrganizationEntitlement } from './trial-utils';
-import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { captureOrganizationMemberJoined } from '@kilocode/web-shared/lib/organizations/organization-member-analytics';
 import { failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import {
+  bumpOrganizationGroupPolicyRevision,
+  lockOrganizationGroupPolicy,
+} from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
 export async function getOrganizationById(
@@ -70,16 +79,30 @@ export async function findOrganizationByStripeCustomerId(
 export async function getUserOrganizationsWithSeats(
   userId: User['id']
 ): Promise<UserOrganizationWithSeats[]> {
+  // `organization_seats_purchases` is append-only, so the most recently created
+  // row is the organization's current subscription state — the same input the
+  // subscription gate classifies with.
+  const latestSeatPurchaseStatus = sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
+    SELECT ${organization_seats_purchases.subscription_status}
+    FROM ${organization_seats_purchases}
+    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+    ORDER BY ${organization_seats_purchases.created_at} DESC
+    LIMIT 1
+  )`;
   const results = await db
     .select({
       organizationId: organizations.id,
       organizationName: organizations.name,
+      parentOrganizationId: organizations.parent_organization_id,
       role: organization_memberships.role,
       totalMicrodollarsAcquired: organizations.total_microdollars_acquired,
       microdollarsUsed: organizations.microdollars_used,
       requireSeats: organizations.require_seats,
       plan: organizations.plan,
       createdAt: organizations.created_at,
+      freeTrialEndAt: organizations.free_trial_end_at,
+      settings: organizations.settings,
+      latestSeatPurchaseStatus,
       seatCountTotal: organizations.seat_count,
       total_member_count: sql<number>`(
         SELECT COUNT(*)::int FROM (
@@ -107,9 +130,11 @@ export async function getUserOrganizationsWithSeats(
       and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
     );
 
+  const now = new Date();
   return results.map(result => ({
     organizationName: result.organizationName,
     organizationId: result.organizationId,
+    parentOrganizationId: result.parentOrganizationId,
     role: result.role,
     memberCount: result.total_member_count,
     balance: result.totalMicrodollarsAcquired - result.microdollarsUsed,
@@ -117,6 +142,16 @@ export async function getUserOrganizationsWithSeats(
     plan: result.plan,
     created_at: result.createdAt,
     isSalesDemo: result.isSalesDemo,
+    isTrialExpiredForEnforcement: classifyOrganizationEntitlement({
+      organization: {
+        created_at: result.createdAt,
+        free_trial_end_at: result.freeTrialEndAt,
+        require_seats: result.requireSeats,
+        settings: result.settings,
+      },
+      latestSeatPurchaseStatus: result.latestSeatPurchaseStatus,
+      now,
+    }).isTrialExpiredForEnforcement,
     seatCount: {
       used: result.total_member_count,
       total: result.seatCountTotal,
@@ -360,7 +395,7 @@ export async function lockOrganizationMembershipMutation(
 export async function addSsoUserToOrganization(
   organizationId: Organization['id'],
   userId: User['id'],
-  options?: { isNewUser?: boolean }
+  options?: { isNewUser?: boolean; invitationToken?: string }
 ): Promise<boolean> {
   return db.transaction(async tx => {
     await lockOrganizationMembershipMutation(tx, organizationId, userId);
@@ -376,6 +411,45 @@ export async function addSsoUserToOrganization(
       .limit(1);
 
     if (removal) return false;
+
+    if (options?.invitationToken) {
+      const [invitation] = await tx
+        .select({
+          email: organization_invitations.email,
+          userEmail: kilocode_users.google_user_email,
+          normalizedUserEmail: kilocode_users.normalized_email,
+        })
+        .from(organization_invitations)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, userId))
+        .where(
+          and(
+            eq(organization_invitations.organization_id, organizationId),
+            eq(organization_invitations.token, options.invitationToken),
+            eq(organization_invitations.authentication_requirement, 'workos'),
+            eq(organization_invitations.sso_source_organization_id, organizationId),
+            isNull(organization_invitations.accepted_at),
+            gt(organization_invitations.expires_at, sql`NOW()`)
+          )
+        )
+        .limit(1);
+      if (
+        invitation &&
+        normalizeEmail(invitation.email) ===
+          (invitation.normalizedUserEmail ?? normalizeEmail(invitation.userEmail))
+      ) {
+        return false;
+      }
+    }
+
+    const membershipRule = await decideChildOrganizationMembership(tx, organizationId, { userId });
+    if (membershipRule !== 'permitted') {
+      warnExceptInTest(
+        `SSO join refused by the child-organization membership rule (${membershipRule})`,
+        { organizationId, userId }
+      );
+      return false;
+    }
+
     const added = await addUserToOrganization(organizationId, userId, 'member', tx);
 
     // A brand-new account provisioned through SSO exists only because of the
@@ -418,11 +492,33 @@ export async function updateUserRoleInOrganization(
 
     // If no membership was updated, check for pending invitations
     const [user] = await tx
-      .select({ email: kilocode_users.google_user_email })
+      .select({
+        email: kilocode_users.google_user_email,
+        normalizedEmail: kilocode_users.normalized_email,
+      })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, userId));
 
     if (!user) {
+      return { success: false, updated: 'none' };
+    }
+
+    const pendingInvitations = await tx
+      .select({ id: organization_invitations.id, email: organization_invitations.email })
+      .from(organization_invitations)
+      .where(
+        and(
+          eq(organization_invitations.organization_id, organizationId),
+          isNull(organization_invitations.accepted_at),
+          gt(organization_invitations.expires_at, sql`NOW()`)
+        )
+      );
+
+    const invitationIds = pendingInvitations
+      .filter(invitation => invitationAddressesAccount(invitation.email, user))
+      .map(invitation => invitation.id);
+
+    if (invitationIds.length === 0) {
       return { success: false, updated: 'none' };
     }
 
@@ -431,8 +527,7 @@ export async function updateUserRoleInOrganization(
       .set({ role })
       .where(
         and(
-          eq(organization_invitations.organization_id, organizationId),
-          eq(organization_invitations.email, user.email),
+          inArray(organization_invitations.id, invitationIds),
           isNull(organization_invitations.accepted_at),
           gt(organization_invitations.expires_at, sql`NOW()`)
         )
@@ -448,6 +543,184 @@ export async function updateUserRoleInOrganization(
   return txn ? run(txn) : db.transaction(run);
 }
 
+export const CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER =
+  'Child organizations can only invite people who are already members of the parent organization.';
+
+export const CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER =
+  'Only parent organization members can join a child organization.';
+
+/**
+ * The one relation that decides which account an invitation address belongs to:
+ * both addresses must have the same `normalizeEmail` form, so the dedupe,
+ * existing-member check, role change and acceptance treat a `+` alias, Gmail
+ * dots and casing as one person. The stored address itself keeps the spelling
+ * the inviter typed.
+ */
+function isSameInvitationAddress(invitationEmail: string, address: string): boolean {
+  return normalizeEmail(invitationEmail) === normalizeEmail(address);
+}
+
+/**
+ * `isSameInvitationAddress` for a stored account row. A row's stored normalized
+ * form is one more spelling of the same account, so an address change after
+ * signup does not make an invitation unclaimable.
+ */
+function invitationAddressesAccount(
+  invitationEmail: string,
+  account: { email: string; normalizedEmail: string | null }
+): boolean {
+  return (
+    isSameInvitationAddress(invitationEmail, account.email) ||
+    account.normalizedEmail === normalizeEmail(invitationEmail)
+  );
+}
+
+/**
+ * The account-matching relation for member rows. The query returns the rows that
+ * can match: the stored normalized form, a case variant of the address, and the
+ * rows that carry no stored normalized form. The relation itself decides. Rows
+ * without a stored normalized form are the only ones the database cannot narrow,
+ * and they are the legacy ones.
+ */
+async function organizationMembersMatchingEmail(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  email: string
+) {
+  const candidates = await tx
+    .select({
+      membershipId: organization_memberships.id,
+      userId: kilocode_users.id,
+      isBot: kilocode_users.is_bot,
+      email: kilocode_users.google_user_email,
+      normalizedEmail: kilocode_users.normalized_email,
+    })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        or(
+          eq(kilocode_users.normalized_email, normalizeEmail(email)),
+          isNull(kilocode_users.normalized_email),
+          sql`lower(${kilocode_users.google_user_email}) = ${getDeliveredEmailAddress(email)}`
+        )
+      )
+    );
+
+  return candidates.filter(candidate => invitationAddressesAccount(email, candidate));
+}
+
+/**
+ * The account that holds a live membership in the given parent organization and
+ * belongs to the given address, or `null` when the parent organization is gone or
+ * nobody there owns the address.
+ */
+async function parentOrganizationMemberIdForEmail(
+  tx: DrizzleTransaction,
+  parentOrganizationId: Organization['id'],
+  email: string
+): Promise<User['id'] | null> {
+  const [parentOrganization] = await tx
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.id, parentOrganizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  if (!parentOrganization) return null;
+
+  const members = await organizationMembersMatchingEmail(tx, parentOrganization.id, email);
+  const member = members.find(candidate => !candidate.isBot);
+  if (!member) return null;
+
+  // Re-read the row under a share lock: a membership removed between the read
+  // above and this statement no longer counts as a parent member.
+  const [lockedMembership] = await tx
+    .select({ id: organization_memberships.id })
+    .from(organization_memberships)
+    .where(eq(organization_memberships.id, member.membershipId))
+    .for('share');
+
+  return lockedMembership ? member.userId : null;
+}
+
+/**
+ * The identity a membership path can name: the account, or the address an
+ * invitation names before that account exists.
+ */
+type MembershipSubject = { userId: User['id'] } | { email: string };
+
+type ChildOrganizationMembershipDecision = 'permitted' | 'refused' | 'organization_missing';
+
+/**
+ * The module's child-organization membership rule, in one place: a child
+ * organization admits only live, non-bot members of its live parent. Invite,
+ * accept, and SSO provisioning all ask this before a membership row is created,
+ * so the three paths cannot disagree about who may become a member.
+ *
+ * An account subject is asked under the membership lock the other membership
+ * mutations take, so a removal that committed first leaves no member to find;
+ * an address subject keeps the invitation path's organization row lock and its
+ * share-lock read. None of the paths take a row lock on the parent relation, so
+ * a membership follows the hierarchy in place when the path's transaction
+ * started. A top-level target organization has no such requirement.
+ */
+async function decideChildOrganizationMembership(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  subject: MembershipSubject
+): Promise<ChildOrganizationMembershipDecision> {
+  // The invitation path takes the target organization row lock. The account
+  // paths deliberately take none: taking the row lock here would order this
+  // read against neighbors that wait for the organization group-policy lock
+  // first, and the membership lock below settles the account outcome against
+  // removals.
+  const parentRelation = tx
+    .select({ parentOrganizationId: organizations.parent_organization_id })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
+  const [organization] =
+    'email' in subject ? await parentRelation.for('update') : await parentRelation;
+  if (!organization) {
+    return 'organization_missing';
+  }
+  const parentOrganizationId = organization.parentOrganizationId;
+  if (!parentOrganizationId) {
+    return 'permitted';
+  }
+
+  if ('email' in subject) {
+    const parentMemberId = await parentOrganizationMemberIdForEmail(
+      tx,
+      parentOrganizationId,
+      subject.email
+    );
+    return parentMemberId ? 'permitted' : 'refused';
+  }
+
+  await lockOrganizationMembershipMutation(tx, parentOrganizationId, subject.userId);
+  const [parentMembership] = await tx
+    .select({ id: organization_memberships.id })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .innerJoin(
+      organizations,
+      and(
+        eq(organizations.id, organization_memberships.organization_id),
+        isNull(organizations.deleted_at)
+      )
+    )
+    .where(
+      and(
+        eq(organization_memberships.organization_id, parentOrganizationId),
+        eq(organization_memberships.kilo_user_id, subject.userId),
+        eq(kilocode_users.is_bot, false)
+      )
+    )
+    .limit(1);
+
+  return parentMembership ? 'permitted' : 'refused';
+}
+
 export async function inviteUserToOrganization(
   organizationId: Organization['id'],
   invitingUserId: User['id'],
@@ -456,18 +729,13 @@ export async function inviteUserToOrganization(
   txn?: DrizzleTransaction
 ): Promise<OrganizationInvitation> {
   const run = async (tx: DrizzleTransaction): Promise<OrganizationInvitation> => {
-    const [organization] = await tx
-      .select({ parentOrganizationId: organizations.parent_organization_id })
-      .from(organizations)
-      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
-      .for('update');
-    if (!organization) {
+    const membershipRule = await decideChildOrganizationMembership(tx, organizationId, { email });
+    if (membershipRule === 'organization_missing') {
       throw new Error('Organization SSO policy is misconfigured');
     }
-    // Child organizations manage membership through their parent organization,
-    // so direct invitations into a child org are not allowed.
-    if (organization.parentOrganizationId) {
-      throw new Error('Child organizations cannot invite members');
+    // A child org can invite only people who already belong to its live parent.
+    if (membershipRule === 'refused') {
+      throw new Error(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
     }
 
     const policy = await resolveEffectiveOrganizationSsoPolicy(organizationId, tx);
@@ -479,43 +747,28 @@ export async function inviteUserToOrganization(
     let ssoSourceOrganizationId: string | null = null;
     const emailDomain = getLowerDomainFromEmail(email);
     if (policy.status === 'required' && emailDomain === policy.domain) {
-      if (policy.source === 'self') {
-        throw new Error('User must join this organization through SSO');
-      }
       authenticationRequirement = 'workos';
       ssoSourceOrganizationId = policy.sourceOrganizationId;
     }
 
-    const existingInvitation = await tx
-      .select()
+    const pendingInvitations = await tx
+      .select({ email: organization_invitations.email })
       .from(organization_invitations)
       .where(
         and(
           eq(organization_invitations.organization_id, organizationId),
-          eq(organization_invitations.email, email),
           isNull(organization_invitations.accepted_at),
           gt(organization_invitations.expires_at, sql`NOW()`)
         )
-      )
-      .limit(1);
+      );
 
-    if (existingInvitation.length > 0) {
+    if (pendingInvitations.some(invitation => isSameInvitationAddress(invitation.email, email))) {
       throw new Error('User already has a pending invitation');
     }
 
-    const existingMember = await tx
-      .select()
-      .from(organization_memberships)
-      .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-      .where(
-        and(
-          eq(organization_memberships.organization_id, organizationId),
-          eq(kilocode_users.google_user_email, email)
-        )
-      )
-      .limit(1);
+    const existingMembers = await organizationMembersMatchingEmail(tx, organizationId, email);
 
-    if (existingMember.length > 0) {
+    if (existingMembers.length > 0) {
       throw new Error('User is already a member of this organization');
     }
 
@@ -615,9 +868,10 @@ export async function getOrganizationMembers(
         member.dailyUsageLimitUsdMicrodollars != null
           ? fromMicrodollars(member.dailyUsageLimitUsdMicrodollars)
           : null,
-      currentDailyUsageUsd: member.currentDailyUsageUsdMicrodollars
-        ? fromMicrodollars(member.currentDailyUsageUsdMicrodollars)
-        : null,
+      currentDailyUsageUsd:
+        member.currentDailyUsageUsdMicrodollars != null
+          ? fromMicrodollars(member.currentDailyUsageUsdMicrodollars)
+          : null,
     })),
     ...pendingInvitations.map(invitation => ({
       email: invitation.email,
@@ -636,10 +890,49 @@ export async function getOrganizationMembers(
   return members;
 }
 
+export const ORGANIZATION_INVITATION_SSO_AUTHENTICATION_REQUIRED =
+  'Invitation requires a current organization SSO session';
+
 export type InvitationAuthenticationContext = {
   provider?: string;
   ssoSourceOrganizationId?: string;
 };
+
+async function revokeStaleOrganizationInvitation(
+  tx: DrizzleTransaction,
+  invitation: OrganizationInvitation,
+  userId: User['id']
+): Promise<boolean> {
+  const [removal] = await tx
+    .select({ removedAt: organization_membership_removals.removed_at })
+    .from(organization_membership_removals)
+    .where(
+      and(
+        eq(organization_membership_removals.organization_id, invitation.organization_id),
+        eq(organization_membership_removals.kilo_user_id, userId)
+      )
+    )
+    .limit(1);
+
+  if (removal && new Date(invitation.created_at) <= new Date(removal.removedAt)) {
+    await tx
+      .update(organization_invitations)
+      .set({ expires_at: sql`NOW()` })
+      .where(eq(organization_invitations.id, invitation.id));
+    await tx
+      .update(external_side_effect_outbox)
+      .set({
+        status: 'failed',
+        claimed_at: null,
+        next_attempt_at: null,
+        last_error: 'revoked',
+      })
+      .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+    return true;
+  }
+
+  return false;
+}
 
 export async function acceptOrganizationInvite(
   userId: User['id'],
@@ -649,10 +942,32 @@ export async function acceptOrganizationInvite(
   try {
     let joinedDistinctId: string | null = null;
     const result = await db.transaction(async tx => {
+      const [candidate] = await tx
+        .select({ organizationId: organization_invitations.organization_id })
+        .from(organization_invitations)
+        .where(eq(organization_invitations.token, inviteToken))
+        .limit(1);
+
+      if (!candidate) {
+        return failureResult('Invitation not found');
+      }
+
+      // Take the membership-mutation advisory lock, then the policy lock, before
+      // the invitation and organization row locks. Member removal holds the
+      // membership lock while deleting pending invitations, and SSO joins and
+      // settings writes take the same advisory locks before row locks.
+      await lockOrganizationMembershipMutation(tx, candidate.organizationId, userId);
+      await lockOrganizationGroupPolicy(tx, candidate.organizationId);
+
       const [invitation] = await tx
         .select()
         .from(organization_invitations)
-        .where(eq(organization_invitations.token, inviteToken))
+        .where(
+          and(
+            eq(organization_invitations.token, inviteToken),
+            eq(organization_invitations.organization_id, candidate.organizationId)
+          )
+        )
         .for('update');
 
       if (!invitation) {
@@ -685,8 +1000,7 @@ export async function acceptOrganizationInvite(
 
       joinedDistinctId = acceptingUser.email;
 
-      const acceptedEmail = acceptingUser.normalizedEmail ?? normalizeEmail(acceptingUser.email);
-      if (acceptedEmail !== normalizeEmail(invitation.email)) {
+      if (!invitationAddressesAccount(invitation.email, acceptingUser)) {
         return failureResult('Invitation is for a different email address');
       }
 
@@ -700,10 +1014,13 @@ export async function acceptOrganizationInvite(
       if (!organization) {
         return failureResult('Organization not found');
       }
-      // Child organizations manage membership through their parent organization.
-      // Reject any invitation (including pre-existing ones) into a child org.
-      if (organization.parent_organization_id) {
-        return failureResult('Child organizations cannot accept invitations');
+      // Joining a child org still requires a live parent membership, including
+      // invitations created before the invitee left the parent.
+      const membershipRule = await decideChildOrganizationMembership(tx, organization.id, {
+        userId,
+      });
+      if (membershipRule !== 'permitted') {
+        return failureResult(CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER);
       }
 
       const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organization.id, tx);
@@ -716,17 +1033,22 @@ export async function acceptOrganizationInvite(
         if (
           ssoPolicy.status !== 'required' ||
           acceptingUserDomain !== ssoPolicy.domain ||
-          invitation.sso_source_organization_id !== ssoPolicy.sourceOrganizationId ||
+          invitation.sso_source_organization_id !== ssoPolicy.sourceOrganizationId
+        ) {
+          return failureResult('Invitation requires authentication through organization SSO');
+        }
+        if (
           authentication.provider !== 'workos' ||
           authentication.ssoSourceOrganizationId !== ssoPolicy.sourceOrganizationId
         ) {
-          return failureResult('Invitation requires authentication through organization SSO');
+          if (await revokeStaleOrganizationInvitation(tx, invitation, userId)) {
+            return failureResult('Invitation is no longer valid');
+          }
+          return failureResult(ORGANIZATION_INVITATION_SSO_AUTHENTICATION_REQUIRED);
         }
       } else if (ssoPolicy.status === 'required' && acceptingUserDomain === ssoPolicy.domain) {
         return failureResult('Invitation requires authentication through organization SSO');
       }
-
-      await lockOrganizationMembershipMutation(tx, invitation.organization_id, userId);
 
       const existingMembership = await tx
         .select()
@@ -757,44 +1079,20 @@ export async function acceptOrganizationInvite(
       }
 
       // The invitation must be newer than the removal record to be accepted.
-      const [removal] = await tx
-        .select({ removedAt: organization_membership_removals.removed_at })
-        .from(organization_membership_removals)
-        .where(
-          and(
-            eq(organization_membership_removals.organization_id, invitation.organization_id),
-            eq(organization_membership_removals.kilo_user_id, userId)
-          )
-        )
-        .limit(1);
-
-      if (removal && new Date(invitation.created_at) <= new Date(removal.removedAt)) {
-        // The invitation is refused, so it must not linger as live in the
-        // invitation list or produce a later invite email: expire it and mark
-        // its outbox row terminal (same shape as the deleteInvite procedure).
-        await tx
-          .update(organization_invitations)
-          .set({ expires_at: sql`NOW()` })
-          .where(eq(organization_invitations.id, invitation.id));
-        await tx
-          .update(external_side_effect_outbox)
-          .set({
-            status: 'failed',
-            claimed_at: null,
-            next_attempt_at: null,
-            last_error: 'revoked',
-          })
-          .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+      if (await revokeStaleOrganizationInvitation(tx, invitation, userId)) {
         return failureResult('Invitation is no longer valid');
       }
 
-      // Add user to organization
       await tx.insert(organization_memberships).values({
         organization_id: invitation.organization_id,
         kilo_user_id: userId,
         role: invitation.role,
         invited_by: invitation.invited_by,
       });
+
+      // A real membership insert changes group-policy evaluation, so advance the
+      // same revision signal addUserToOrganization uses for the SSO path.
+      await bumpOrganizationGroupPolicyRevision(tx, invitation.organization_id, userId);
 
       await skipCustomerSourceSurveyForOrgJoin(userId, tx);
 
@@ -838,7 +1136,7 @@ export async function acceptOrganizationInvite(
         tx,
       });
 
-      logExceptInTest(`Invitation ${inviteToken} accepted by ${userId}`);
+      logExceptInTest(`Invitation ${invitation.id} accepted by ${userId}`);
       return successResult({
         invitation: updatedInvitation,
         organizationId: invitation.organization_id,
@@ -897,14 +1195,15 @@ export async function updateOrganizationSettings(
   settings: OrganizationSettings,
   txn?: DrizzleTransaction
 ): Promise<OrganizationSettings> {
+  const validated = OrganizationSettingsSchema.parse(settings);
   await (txn || db)
     .update(organizations)
     .set({
-      settings,
+      settings: validated,
     })
     .where(eq(organizations.id, organizationId));
 
-  return settings;
+  return validated;
 }
 
 // Atomically update the recommendations-digest flag inside the settings JSONB
@@ -949,11 +1248,22 @@ export async function markOrganizationAsDeleted(
 
     await tx
       .update(cli_sessions_v2)
-      .set({ public_id: null })
+      .set({
+        public_id: null,
+        briefing_excerpt: null,
+        briefing_excerpt_scope_changed_at: sql`now()`,
+      })
       .where(eq(cli_sessions_v2.organization_id, organizationId));
+    await tx
+      .update(agent_briefing_context_preferences)
+      .set({ enabled: false })
+      .where(eq(agent_briefing_context_preferences.organization_id, organizationId));
     await tx
       .delete(provider_oauth_attempts)
       .where(eq(provider_oauth_attempts.owned_by_organization_id, organizationId));
+    await tx
+      .delete(cloud_agent_environments)
+      .where(eq(cloud_agent_environments.owned_by_organization_id, organizationId));
     await tx
       .update(organizations)
       .set({ ...auto_deleted_at })

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all models from OpenRouter (raw, unfiltered data)
     const openRouterResponse = await getRawOpenRouterModels();
-    const enhancedOpenRouterResponse = await getEnhancedOpenRouterModels();
+    const enhancedOpenRouterResponse = await getEnhancedOpenRouterModels({ countryCode: null });
 
     // Create a map of enhanced models for pricing lookup (includes Kilo free models with $0 pricing)
     const enhancedModelsMap = new Map(

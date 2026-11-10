@@ -12,6 +12,7 @@ const connection = vi.hoisted(() => ({
   isConnected: () => true,
   retryConnection: () => undefined,
 }));
+const folderPickerSlotClear = vi.hoisted(() => vi.fn());
 const bridge = vi.hoisted(() => ({
   connectionId: 'conn-1',
   projectName: 'my-project',
@@ -20,6 +21,18 @@ const bridge = vi.hoisted(() => ({
 }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const router = vi.hoisted(() => ({ back: vi.fn() }));
+// Live BackHandler harness: every armed listener registers here so a test can
+// press hardware Back and observe exactly what the sheet's listener does.
+const backHandlers = vi.hoisted(() => {
+  const listeners = new Set<() => boolean>();
+  return {
+    listeners,
+    press(): boolean[] {
+      return [...listeners].map(listener => listener());
+    },
+  };
+});
+const navigation = vi.hoisted(() => ({ isFocused: (): boolean => true }));
 
 // FlashList renders through a callback, so a host-string mock would drop every
 // row and empty state. This mock mirrors the real list: rows via renderItem,
@@ -53,9 +66,20 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  BackHandler: {
+    addEventListener: (_event: string, listener: () => boolean) => {
+      backHandlers.listeners.add(listener);
+      return {
+        remove: () => {
+          backHandlers.listeners.delete(listener);
+        },
+      };
+    },
+  },
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
+  useNavigation: () => navigation,
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
@@ -85,7 +109,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/route-registry', () => ({
   folderPickerSlot: {
     get: () => bridge,
-    clear: vi.fn(),
+    clear: folderPickerSlotClear,
   },
   UNFENCED_ROUTE_KEY: 'unscoped',
   useRouteRegistry: vi.fn(),
@@ -161,6 +185,8 @@ describe('FolderPickerScreen body', () => {
     bridge.onSelect.mockClear();
     router.back.mockClear();
     insets.bottom = 0;
+    backHandlers.listeners.clear();
+    navigation.isFocused = () => true;
   });
 
   it('renders one FlashList in the skeleton phase, with skeleton rows as the empty content', async () => {
@@ -253,3 +279,4 @@ describe('FolderPickerScreen body', () => {
     });
   });
 });
+// Hardware Back behavior lives in folder-picker.back.mounted.test.tsx.

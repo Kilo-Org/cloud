@@ -1,8 +1,15 @@
-import { useLocalSearchParams } from 'expo-router';
-
+import {
+  InvalidSecurityScopeRoute,
+  useSecurityAgentScope,
+} from '@/components/security-agent/security-agent-scope-route';
 import { RepositorySettingsScreen } from '@/components/security-agent/repository-settings-screen';
 
 export default function SecurityAgentRepositorySettingsRoute() {
-  const { scope } = useLocalSearchParams<{ scope: string }>();
+  const scope = useSecurityAgentScope();
+
+  if (!scope) {
+    return <InvalidSecurityScopeRoute />;
+  }
+
   return <RepositorySettingsScreen scope={scope} />;
 }

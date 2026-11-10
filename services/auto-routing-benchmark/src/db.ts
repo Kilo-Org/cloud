@@ -68,11 +68,11 @@ export type ConfigDeciderModelRow = Omit<typeof configDeciderModels.$inferSelect
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 
 // D1 rejects statements with too many bound variables. A model summary insert
-// binds 14 values per row (including variant), so 7 rows keeps each INSERT
+// binds 18 values per row (including variant), so 5 rows keeps each INSERT
 // below the 100-variable ceiling while still batching the delete plus inserts.
-const MODEL_SUMMARY_INSERT_BATCH_SIZE = 7;
+const MODEL_SUMMARY_INSERT_BATCH_SIZE = 5;
 
-const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 8;
+const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 7;
 
 // Run model rows bind 5 values per row. Keep each INSERT comfortably under D1's
 // 100-variable ceiling; the profile drain claims batches of up to 33 entries,
@@ -108,6 +108,10 @@ export function mapSummaryRow(row: ModelSummaryRow): BenchmarkModelSummary {
     routeKey: row.route_key as BenchmarkModelSummary['routeKey'],
     accuracy: row.accuracy,
     avgCostUsd: row.avg_cost_usd,
+    avgInputTokens: row.avg_input_tokens,
+    avgCachedInputTokens: row.avg_cached_input_tokens,
+    avgOutputTokens: row.avg_output_tokens,
+    avgReasoningTokens: row.avg_reasoning_tokens,
     avgLatencyMs: row.avg_latency_ms,
     p50LatencyMs: row.p50_latency_ms,
     p95LatencyMs: row.p95_latency_ms,
@@ -319,6 +323,10 @@ export async function insertRun(
           route_key: s.routeKey,
           accuracy: s.accuracy,
           avg_cost_usd: s.avgCostUsd,
+          avg_input_tokens: s.avgInputTokens ?? null,
+          avg_cached_input_tokens: s.avgCachedInputTokens ?? null,
+          avg_output_tokens: s.avgOutputTokens ?? null,
+          avg_reasoning_tokens: s.avgReasoningTokens ?? null,
           avg_latency_ms: s.avgLatencyMs,
           p50_latency_ms: s.p50LatencyMs,
           p95_latency_ms: s.p95LatencyMs,
@@ -366,6 +374,10 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
         score: row.score,
         latency_ms: row.latency_ms,
         cost_usd: row.cost_usd,
+        input_tokens: row.input_tokens,
+        cached_input_tokens: row.cached_input_tokens,
+        output_tokens: row.output_tokens,
+        reasoning_tokens: row.reasoning_tokens,
         error: row.error,
         fallback_reason: row.fallback_reason,
         route_hit: row.route_hit,
@@ -445,10 +457,12 @@ export async function reuseDeciderCaseResults(
           )
           INSERT INTO case_results (
             run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+            input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
             error, fallback_reason, route_hit, retried, exit_code, output_prefix,
             event_count, last_event_types, rep, timed_out, prompt_revision
           )
           SELECT ?, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+            input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
             error, fallback_reason, route_hit, retried, exit_code, output_prefix,
             event_count, last_event_types, rep, timed_out, prompt_revision
           FROM ranked WHERE reuse_rank = 1
@@ -646,6 +660,10 @@ const PendingDeciderOutputSchema = z.object({
   result: z.object({
     text: z.string(),
     costUsd: z.number().nullable(),
+    inputTokens: z.number().int().nonnegative().nullable().default(null),
+    cachedInputTokens: z.number().int().nonnegative().nullable().default(null),
+    outputTokens: z.number().int().nonnegative().nullable().default(null),
+    reasoningTokens: z.number().int().nonnegative().nullable().default(null),
     latencyMs: z.number(),
     exitCode: z.number(),
     stderrTail: z.string(),
@@ -856,6 +874,10 @@ export async function replaceModelSummaries(
           route_key: s.routeKey,
           accuracy: s.accuracy,
           avg_cost_usd: s.avgCostUsd,
+          avg_input_tokens: s.avgInputTokens ?? null,
+          avg_cached_input_tokens: s.avgCachedInputTokens ?? null,
+          avg_output_tokens: s.avgOutputTokens ?? null,
+          avg_reasoning_tokens: s.avgReasoningTokens ?? null,
           avg_latency_ms: s.avgLatencyMs,
           p50_latency_ms: s.p50LatencyMs,
           p95_latency_ms: s.p95LatencyMs,
@@ -1164,11 +1186,14 @@ export async function copyRemeasureBaselines(
     .prepare(`
       INSERT INTO case_results (
         run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+        input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
         error, fallback_reason, route_hit, retried, exit_code, output_prefix,
         event_count, last_event_types, rep, timed_out, prompt_revision
       )
       SELECT r.run_id, source.model, source.variant, source.case_id, source.route_key,
-        source.score, source.latency_ms, source.cost_usd, source.error, source.fallback_reason,
+        source.score, source.latency_ms, source.cost_usd, source.input_tokens,
+        source.cached_input_tokens, source.output_tokens, source.reasoning_tokens,
+        source.error, source.fallback_reason,
         source.route_hit, source.retried, source.exit_code, source.output_prefix,
         source.event_count, source.last_event_types, source.rep, source.timed_out,
         source.prompt_revision
@@ -1931,6 +1956,10 @@ export async function getLatestSummariesByModel(
       route_key: modelSummaries.route_key,
       accuracy: modelSummaries.accuracy,
       avg_cost_usd: modelSummaries.avg_cost_usd,
+      avg_input_tokens: modelSummaries.avg_input_tokens,
+      avg_cached_input_tokens: modelSummaries.avg_cached_input_tokens,
+      avg_output_tokens: modelSummaries.avg_output_tokens,
+      avg_reasoning_tokens: modelSummaries.avg_reasoning_tokens,
       avg_latency_ms: modelSummaries.avg_latency_ms,
       p50_latency_ms: modelSummaries.p50_latency_ms,
       p95_latency_ms: modelSummaries.p95_latency_ms,
@@ -2004,6 +2033,7 @@ export function routingTableToRows(
     published_at: publishedAt,
     generated_at: table.generatedAt,
     min_accuracy: table.minAccuracy,
+    accuracy_noise_band: table.accuracyNoiseBand ?? null,
     switch_cost_factor: table.switchCostFactor,
     best_accuracy_switch_threshold: table.bestAccuracySwitchThreshold,
     production_token_profile: table.productionTokenProfile ?? null,
@@ -2033,6 +2063,8 @@ export function routingTableToRows(
         variant: variantToStorage(variantKey),
         pricing: c.pricing ?? null,
         estimated_request_cost_usd: c.estimatedRequestCostUsd ?? null,
+        p50_latency_ms: c.p50LatencyMs ?? null,
+        p50_ttft_ms: c.p50TtftMs ?? null,
       });
     });
   }
@@ -2059,6 +2091,8 @@ export function rowsToRoutingTable(
       ...(row.cases != null ? { cases: row.cases } : {}),
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
+      ...(row.p50_latency_ms != null ? { p50LatencyMs: row.p50_latency_ms } : {}),
+      ...(row.p50_ttft_ms != null ? { p50TtftMs: row.p50_ttft_ms } : {}),
       ...(row.pricing != null || row.estimated_request_cost_usd != null
         ? { pricing: row.pricing ?? null }
         : {}),
@@ -2074,6 +2108,9 @@ export function rowsToRoutingTable(
     version: tableRow.run_id,
     generatedAt: tableRow.generated_at,
     minAccuracy: tableRow.min_accuracy,
+    ...(tableRow.accuracy_noise_band != null
+      ? { accuracyNoiseBand: tableRow.accuracy_noise_band }
+      : {}),
     switchCostFactor: tableRow.switch_cost_factor,
     bestAccuracySwitchThreshold: tableRow.best_accuracy_switch_threshold,
     ...(tableRow.production_token_profile != null ||
@@ -2116,6 +2153,7 @@ export async function saveRoutingTable(
           published_at: tableRow.published_at,
           generated_at: tableRow.generated_at,
           min_accuracy: tableRow.min_accuracy,
+          accuracy_noise_band: tableRow.accuracy_noise_band,
           switch_cost_factor: tableRow.switch_cost_factor,
           best_accuracy_switch_threshold: tableRow.best_accuracy_switch_threshold,
           production_token_profile: tableRow.production_token_profile,

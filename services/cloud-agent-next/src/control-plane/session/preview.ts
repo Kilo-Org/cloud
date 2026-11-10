@@ -1,30 +1,34 @@
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { isControlSession } from '../../session-identity.js';
-import { isTerminalSessionPlatform } from '../../terminal/access.js';
-import type { ResolvedPreviewTarget, PreviewTargetResult } from '../sandbox/preview-target.js';
+import { isTerminalSessionEligible } from '../../terminal/access.js';
+import type {
+  ResolvedPreviewTarget,
+  PreviewSandboxScope,
+  PreviewTargetResult,
+} from '../sandbox/preview-target.js';
 
 export type ControlPlanePreviewDeps = {
   getMetadata: () => SessionMetadata | null;
-  resolveTarget: (sandboxId: string) => Promise<PreviewTargetResult>;
+  resolveTarget: (sandboxId: string, scope: PreviewSandboxScope) => Promise<PreviewTargetResult>;
 };
 
 /**
- * Owns preview eligibility and which sandbox serves the session. Route and
- * allocation state belong to the Sandbox DO's `previewTarget` read.
+ * Session-shaped preview URLs remain aliases for their stored workspace.
  */
 export function createControlPlanePreview(deps: ControlPlanePreviewDeps) {
   async function resolve(): Promise<ResolvedPreviewTarget> {
     const metadata = deps.getMetadata();
     if (metadata === null) return { status: 'not_ready' };
-    if (
-      !isControlSession(metadata.identity.sessionId) ||
-      !isTerminalSessionPlatform(metadata.identity.createdOnPlatform)
-    ) {
+    if (!isControlSession(metadata.identity.sessionId) || !isTerminalSessionEligible(metadata)) {
       return { status: 'ineligible' };
     }
     const sandboxId = metadata.workspace?.sandboxId;
     if (sandboxId === undefined || sandboxId.length === 0) return { status: 'not_ready' };
-    return deps.resolveTarget(sandboxId);
+    return deps.resolveTarget(sandboxId, {
+      ownerId: metadata.identity.userId,
+      organizationId: metadata.identity.orgId ?? null,
+      scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    });
   }
 
   return { resolve };

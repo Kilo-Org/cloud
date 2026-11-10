@@ -1,7 +1,12 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import {
+  device_auth_requests,
+  device_sessions,
+  kilocode_users,
+  pending_auth_links,
+} from '@kilocode/db/schema';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import {
   generateUserCode,
@@ -18,7 +23,12 @@ import {
   cleanupExpiredDeviceAuthRequests,
   DeviceAuthPendingLimitError,
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
+  DEVICE_AUTH_PENDING_LOCK_WAIT_MS,
+  DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
+  DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
+  getDeviceAuthPendingLink,
 } from './device-auth';
+import { createPendingLink } from '@/lib/auth/pending-link';
 import { issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 
@@ -266,6 +276,157 @@ describe('Device Auth', () => {
       await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
         DEVICE_AUTH_PENDING_LIMIT_MESSAGE
       );
+    });
+
+    test('keeps the live pending rows of one address within the limit under concurrent requests', async () => {
+      const ipAddress = `10.${(Date.now() * 13) % 254}.${(Date.now() * 17) % 254}.7`;
+      const concurrentRequests = 12;
+      const livePendingLimit = 5;
+
+      // Clean up any leftover rows.
+      await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
+
+      const results = await Promise.allSettled(
+        Array.from({ length: concurrentRequests }, () => createDeviceAuthRequest({ ipAddress }))
+      );
+
+      expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(
+        livePendingLimit
+      );
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          expect(result.reason).toBeInstanceOf(DeviceAuthPendingLimitError);
+        }
+      }
+
+      const [rows] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(device_auth_requests)
+        .where(
+          and(
+            eq(device_auth_requests.ip_address, ipAddress),
+            eq(device_auth_requests.status, 'pending'),
+            gt(device_auth_requests.expires_at, new Date().toISOString())
+          )
+        );
+      expect(rows?.count).toBe(livePendingLimit);
+    });
+
+    test('refuses a request that cannot take the address lock within the wait bound', async () => {
+      const lockedAddress = `10.${(Date.now() * 19) % 254}.${(Date.now() * 23) % 254}.9`;
+      const otherAddress = `10.${(Date.now() * 29) % 254}.${(Date.now() * 31) % 254}.11`;
+      for (const address of [lockedAddress, otherAddress]) {
+        await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, address));
+      }
+
+      // Hold the address's advisory lock in a transaction of its own, on the key
+      // the module takes (same namespace literal as PENDING_LIMIT_LOCK_NAMESPACE).
+      const lockHeld = Promise.withResolvers<void>();
+      const releaseLock = Promise.withResolvers<void>();
+      const lockHolder = db.transaction(async tx => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext('device_auth_request_pending'), hashtext(${lockedAddress}))`
+        );
+        lockHeld.resolve();
+        await releaseLock.promise;
+      });
+      await lockHeld.promise;
+
+      try {
+        const waitingStartedAt = Date.now();
+        const waiting = createDeviceAuthRequest({ ipAddress: lockedAddress });
+        // Observe the outcome without leaving an unhandled rejection when an
+        // earlier assertion below fails.
+        const waitingOutcome = waiting.then(
+          () => null,
+          (error: unknown) => error
+        );
+
+        // A request from another address is admitted while this address's lock is held.
+        const otherStartedAt = Date.now();
+        const other = await createDeviceAuthRequest({ ipAddress: otherAddress });
+        expect(other.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+        expect(Date.now() - otherStartedAt).toBeLessThan(1_000);
+
+        // The wait ends at the bound with the pending-limit refusal.
+        expect(await waitingOutcome).toBeInstanceOf(DeviceAuthPendingLimitError);
+        const waitedMs = Date.now() - waitingStartedAt;
+        expect(waitedMs).toBeGreaterThanOrEqual(DEVICE_AUTH_PENDING_LOCK_WAIT_MS - 250);
+        expect(waitedMs).toBeLessThan(DEVICE_AUTH_PENDING_LOCK_WAIT_MS + 10_000);
+
+        const [lockedRows] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(device_auth_requests)
+          .where(eq(device_auth_requests.ip_address, lockedAddress));
+        expect(lockedRows?.count).toBe(0);
+
+        releaseLock.resolve();
+        await lockHolder;
+
+        // Once the lock is free, the same address is admitted again.
+        const afterRelease = await createDeviceAuthRequest({ ipAddress: lockedAddress });
+        expect(afterRelease.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+      } finally {
+        releaseLock.resolve();
+        await lockHolder;
+      }
+    }, 30_000);
+  });
+
+  describe('requesting client', () => {
+    const requestingClient = {
+      clientId: 'client-abc',
+      clientName: 'Claude Desktop',
+      redirectOrigin: 'https://client.test',
+    };
+
+    test('stores the named client and gives it back on the approved poll', async () => {
+      const { code, userCode } = await createDeviceAuthRequest({ requestingClient });
+      expect(await getDeviceAuthRequest(userCode)).toMatchObject({
+        requesting_client_id: 'client-abc',
+        requesting_client_name: 'Claude Desktop',
+        requesting_redirect_origin: 'https://client.test',
+      });
+
+      await approveDeviceAuthRequest(userCode, testUserId, { confirmedClientId: 'client-abc' });
+
+      await expect(pollDeviceAuthRequest(code)).resolves.toMatchObject({
+        status: 'approved',
+        userId: testUserId,
+        requestingClient,
+        clientConfirmed: true,
+      });
+    });
+
+    test.each([
+      ['no confirmation', undefined],
+      ['a different client', 'client-other'],
+    ])('refuses %s and leaves the request pending', async (_label, confirmedClientId) => {
+      const { userCode } = await createDeviceAuthRequest({ requestingClient });
+
+      await expect(
+        approveDeviceAuthRequest(userCode, testUserId, {
+          ...(confirmedClientId ? { confirmedClientId } : {}),
+        })
+      ).rejects.toThrow(DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE);
+
+      expect(await getDeviceAuthRequest(userCode)).toMatchObject({
+        status: 'pending',
+        kilo_user_id: null,
+        client_confirmed_at: null,
+      });
+    });
+
+    test('approves a request that names no client without a confirmation', async () => {
+      const { code, userCode } = await createDeviceAuthRequest({});
+
+      await approveDeviceAuthRequest(userCode, testUserId);
+
+      await expect(pollDeviceAuthRequest(code)).resolves.toMatchObject({
+        status: 'approved',
+        requestingClient: null,
+        clientConfirmed: false,
+      });
     });
   });
 
@@ -646,6 +807,77 @@ describe('Device Auth', () => {
       const retry = await consumeDeviceAuthByDeviceCode(deviceCode);
       expect(retry.status).toBe('approved');
       expect(retry.token).toBeDefined();
+    });
+
+    test('requires an explicit pending link choice and clears the link when declined', async () => {
+      const { secret } = await createPendingLink({
+        kiloUserId: testUserId,
+        kind: 'existing_account',
+        identity: {
+          google_user_email: testUserEmail,
+          google_user_name: 'Test User',
+          google_user_image_url: '',
+          hosted_domain: '@@github@@',
+          provider: 'github',
+          provider_account_id: 'github-device-consent',
+          display_name: 'octocat',
+        },
+        emailCodeAllowed: true,
+      });
+      const { userCode } = await createDeviceAuthRequest({ pendingLinkToken: secret });
+
+      await expect(getDeviceAuthPendingLink(userCode)).resolves.toEqual({
+        provider: 'github',
+        email: testUserEmail,
+        displayName: 'octocat',
+      });
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
+        DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE
+      );
+
+      await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: false });
+      const request = await getDeviceAuthRequest(userCode);
+      expect(request?.status).toBe('approved');
+      expect(request?.pending_link_secret_hash).toBeNull();
+    });
+
+    test('completes the pending link only after credential issuance succeeds', async () => {
+      const { secret, pendingLink } = await createPendingLink({
+        kiloUserId: testUserId,
+        kind: 'existing_account',
+        identity: {
+          google_user_email: testUserEmail,
+          google_user_name: 'Test User',
+          google_user_image_url: '',
+          hosted_domain: '@@github@@',
+          provider: 'github',
+          provider_account_id: 'github-device-after-issuance',
+          display_name: null,
+        },
+        emailCodeAllowed: true,
+      });
+      const { userCode, deviceCode } = await createDeviceAuthRequest({
+        pendingLinkToken: secret,
+      });
+      await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: true });
+
+      mockedIssueSessionCredentials.mockRejectedValueOnce(new Error('issuance failed'));
+      await expect(
+        consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true })
+      ).rejects.toThrow('issuance failed');
+
+      const [pendingRow] = await db
+        .select()
+        .from(pending_auth_links)
+        .where(eq(pending_auth_links.id, pendingLink.id));
+      expect(pendingRow.consumed_at).toBeNull();
+
+      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
+        (_realIssueSessionCredentials as any)(...args)
+      );
+      const retry = await consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true });
+      expect(retry.status).toBe('approved');
+      expect(retry.pendingLink).toEqual({ status: 'linked', provider: 'github' });
     });
 
     test('manually restored approved row is redeemable again', async () => {

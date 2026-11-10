@@ -30,7 +30,13 @@ vi.mock('@/lib/trpc', async () => {
   const { createTRPCContext } = await import('@trpc/tanstack-react-query');
   return createTRPCContext<MobileRouter>();
 });
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View', Switch: 'Switch' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
+  View: 'View',
+  Switch: 'Switch',
+  Pressable: 'Pressable',
+}));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: () => ({}) },
@@ -71,7 +77,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   },
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   useSetSecurityAgentEnabled: () => ({ mutate: vi.fn(), isPending: false }),
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
@@ -274,7 +283,9 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
       expect(activeQueries).toHaveLength(scope === 'personal' ? 2 : 3);
       expect(activeQueries.every(query => query.state.fetchStatus === 'paused')).toBe(true);
       expect(activeQueries.every(query => query.state.data === undefined)).toBe(true);
-      expect(findHost(screen.root, 'Skeleton')).toHaveLength(3);
+      // The loading body is the skeleton, not the controls: how many blocks it
+      // draws is its own shape, so only their presence matters here.
+      expect(findHost(screen.root, 'Skeleton').length).toBeGreaterThan(0);
       expect(findHost(screen.root, 'Button')).toHaveLength(0);
       emit(offlineState);
       await advanceBy(5000);

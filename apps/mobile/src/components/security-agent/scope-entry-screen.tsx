@@ -4,11 +4,18 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
-import { selectScopeEntryView } from '@/components/security-agent/scope-entry-render';
+import {
+  isInstallStateRefusal,
+  selectScopeEntryLoadFailure,
+  selectScopeEntryView,
+} from '@/components/security-agent/scope-entry-render';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
+import {
+  DashboardLoadingView,
+  DashboardScreen,
+} from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
 import { SettingsOverviewScreen } from '@/components/security-agent/settings-overview-screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,53 +30,78 @@ import {
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useSecurityScopeTitle } from '@/lib/hooks/use-security-scope-title';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 
-function ScopeEntrySkeleton() {
+/**
+ * The pending body reserves the centred setup state's shape — icon circle,
+ * title line, two description lines, full-width button — so the placeholder
+ * names the size and the position of the content that replaces it instead of
+ * painting a bar and a card at the top of the screen. The entry uses it while a
+ * resolved config already points at a setup state; an unanswered config paints
+ * the dashboard frame instead (`DashboardLoadingView`).
+ *
+ * Sizes are the loaded state's, in px: the `ShieldCheck` mark, the `text-base`
+ * title line, two `text-sm` description lines, the `mt-3` the button carries,
+ * and the button's `min-h-[44px]` default at the shared `rounded-md`.
+ */
+function ScopeEntryBodySkeleton() {
+  return (
+    <View className="flex-1 items-center justify-center px-6">
+      <View className="w-full items-center gap-3">
+        <Skeleton className="size-[28px] rounded-full" />
+        <Skeleton className="h-[20px] w-40 rounded" />
+        <Skeleton className="h-[14px] w-full rounded" />
+        <Skeleton className="h-[14px] w-2/3 rounded" />
+        <Skeleton className="mt-3 h-[44px] w-full rounded-md" />
+      </View>
+    </View>
+  );
+}
+
+function ScopeEntrySkeleton({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('common.securityAgent')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-10 w-full rounded-lg" />
-        <View className="flex-row flex-wrap gap-3">
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-          <Skeleton className="h-24 w-[47%] rounded-lg" />
-        </View>
-        <Skeleton className="h-32 w-full rounded-lg" />
-        <Skeleton className="h-48 w-full rounded-lg" />
-      </View>
+      <ScreenHeader className="px-6" title={scopeTitle} eyebrow={t('common.securityAgent')} />
+      <ScopeEntryBodySkeleton />
     </View>
   );
 }
 
 export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
+  const scopeTitle = useSecurityScopeTitle(scope);
   const permission = useSecurityAgentPermissionStatus(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
   const capability = useSecurityAgentCapability(scope);
   const recovery = useRetrySecurityAgentSettings(scope);
-  const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const connectivity = useCommittedConnectivityStatus();
+  const isConnectivityKnown = connectivity !== 'unknown';
   const access = classifyOrganizationScopeAccess({
     isOrganizationScope: !isPersonalSecurityScope(scope),
     errors: [permission.error, config.error, repositories.error],
   });
 
-  // Pending includes uncached queries paused by NetInfo. Cached query errors
-  // must not replace usable settings or a resolved capability with an error screen.
-  const isLoading = permission.isPending || config.isPending || capability.status === 'loading';
-  // The GitHub status read is the only input that decides between the connect
-  // and re-authorize setup screens, so its failure is fatal unless the enabled
-  // destination is already known from the config read.
-  const isGithubStatusUnknown = !permission.data && permission.isError;
+  // The config decides the destination. Once it is cached its owner is known,
+  // so the GitHub status and role reads only refine the setup gates and the
+  // controls — a pending, paused or failed one must not replace a destination
+  // that renders fine. Those reads are still fatal while the config itself is
+  // unread, or while the setup gates genuinely depend on them (agent disabled).
+  const configSettled = config.data !== undefined;
   const isEnabledResolved = config.data?.isEnabled ?? false;
-  const isError =
-    (!config.data && config.isError) ||
-    capability.status === 'error' ||
-    (isGithubStatusUnknown && !isEnabledResolved);
+  const isGithubStatusResolved = permission.data !== undefined;
+  // Only a status read that failed without a value is a failure of this screen.
+  const isGithubStatusUnknown = !isGithubStatusResolved && permission.isError;
+  const isConfigUnread = !config.data && config.isError;
+  const isLoading =
+    config.isPending ||
+    (!isEnabledResolved && (permission.isPending || capability.status === 'loading'));
+  const isError = configSettled
+    ? !isEnabledResolved && (isGithubStatusUnknown || capability.status === 'error')
+    : isConfigUnread || capability.status === 'error' || permission.isError;
   const isPaused =
     permission.fetchStatus === 'paused' ||
     config.fetchStatus === 'paused' ||
@@ -83,7 +115,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     isLoading,
     isError,
     isDenied: access !== 'granted',
-    isGithubStatusUnknown,
+    isGithubStatusResolved,
     hasIntegration,
     hasPermissions,
     isEnabled,
@@ -98,6 +130,14 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const [isMinting, setIsMinting] = useState(false);
   const cancelledRef = useRef(false);
   const mintUrlRef = useRef<string | null>(null);
+  // Starting a GitHub installation for an organization is an organization-manage
+  // role's action, and the server is the only authority on that role:
+  // `githubApps.mintInstallState` resolves the caller through
+  // `ensureOrganizationAccess`, which also elevates a Kilo admin and accepts a
+  // parent-organization role — neither is visible in the device's membership
+  // read. So the press is offered until the server answers, and its
+  // `UNAUTHORIZED` answer retires the press for the role notice.
+  const [installRefused, setInstallRefused] = useState(false);
 
   // A failed mint must not replace the setup screen with an error-only page:
   // the setup state (with the audit-report action) stays usable and the press
@@ -112,6 +152,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         setMintUrl(null);
         mintUrlRef.current = null;
         setIsMinting(true);
+        setInstallRefused(false);
       }
       try {
         const { token } = await trpcClient.githubApps.mintInstallState.mutate({
@@ -122,9 +163,15 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         mintUrlRef.current = url;
         if (!cancelledRef.current) {
           setMintUrl(url);
+          setInstallRefused(false);
         }
         return true;
-      } catch {
+      } catch (error) {
+        // A refused role is the answer this screen acts on; a transport or
+        // server failure leaves the press in place to retry.
+        if (!cancelledRef.current && isInstallStateRefusal(error)) {
+          setInstallRefused(true);
+        }
         return false;
       } finally {
         if (isInitial && !cancelledRef.current) {
@@ -173,7 +220,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   if (view === 'denied') {
     return (
       <ScopeAccessDeniedScreen
-        title={t('common.securityAgent')}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
         kind={access === 'not-found' ? 'not-found' : 'denied'}
         onRetry={() => void recovery.retry()}
         isRetrying={recovery.isRetrying}
@@ -181,30 +229,70 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     );
   }
 
+  // A settled, enabled config already names the destination, so a paused or
+  // failing secondary read only delays its chrome and must never replace it.
+  // Without that destination the setup gates do depend on those reads, so a
+  // paused one stays the retriable failure it describes.
+  const isDestinationKnown = configSettled && isEnabledResolved;
   const isLoadFailureView =
-    view === 'error' || (isLoading && (isError || (isPaused && isConnectivityKnown)));
+    view === 'error' ||
+    (!isDestinationKnown && isLoading && (isError || (isPaused && isConnectivityKnown)));
+
+  // What the entry paints while it waits. An unanswered config can still land on
+  // any of this screen's views, and the dashboard is the common one: its frame
+  // keeps the header actions, the filter row and the tile slots in place instead
+  // of showing a centered placeholder the destination then moves. A config that
+  // already answered and left only its gates pending points at a setup state, so
+  // that pending frame stays the neutral one.
+  const pendingView = configSettled ? (
+    <ScopeEntrySkeleton scope={scope} />
+  ) : (
+    <DashboardLoadingView scope={scope} />
+  );
 
   if (isLoadFailureView) {
     // A retry in flight must be visible: the failure screen is swapped for the
     // loading skeleton, so progress does not depend on a text-less button
-    // spinner, and a failure returns to the error screen with fresh feedback
-    // instead of the identical frame the tap started from. A retry that
-    // resolves the other reads still lands on their own view, as before.
+    // spinner. The screen the retry returns to names the cause of the latest
+    // failure: a connection cause adds the retry-failed wording, while a server
+    // answer keeps the server wording, so that frame can repeat the one the tap
+    // started from. A retry that resolves the other reads still lands on their
+    // own view, as before.
     if (recovery.isRetrying) {
-      return <ScopeEntrySkeleton />;
+      return pendingView;
     }
+    // Only the reads that produced this screen carry the cause. A read that
+    // still holds cached data, or that resolved, must not vote on it.
+    const failedReads: unknown[] = [];
+    if (isConfigUnread) {
+      failedReads.push(config.error);
+    }
+    if (capability.status === 'error') {
+      failedReads.push(capability.error);
+    }
+    if (isGithubStatusUnknown) {
+      failedReads.push(permission.error);
+    }
+    const failure = selectScopeEntryLoadFailure({
+      errors: failedReads,
+      isPaused,
+      connectivity,
+      lastAttemptFailed: recovery.lastAttemptFailed,
+    });
     return (
       <PlatformErrorScreen
-        title={t('common.securityAgent')}
+        title={scopeTitle}
+        eyebrow={t('common.securityAgent')}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
-        message={recovery.lastAttemptFailed ? t('securityAgent.scopeEntry.retryFailed') : undefined}
+        variant={failure.variant}
+        message={failure.descriptionKey ? t(failure.descriptionKey) : undefined}
         onRetry={() => void recovery.retry()}
       />
     );
   }
 
   if (view === 'loading') {
-    return <ScopeEntrySkeleton />;
+    return pendingView;
   }
 
   // Audit-report access shouldn't depend on the agent being connected or
@@ -222,19 +310,27 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         <View className="flex-1 bg-background">
           <ScreenHeader
             className="px-6"
-            title={t('common.securityAgent')}
+            title={scopeTitle}
+            eyebrow={t('common.securityAgent')}
             headerRight={auditAction}
           />
           {!connectUrl && isMinting ? (
-            <View className="gap-3 px-6 pt-4">
-              <Skeleton className="h-10 w-full rounded-lg" />
-              <Skeleton className="h-32 w-full rounded-lg" />
-            </View>
+            <ScopeEntryBodySkeleton />
           ) : (
             <SecurityAgentSetup
               title={t('securityAgent.scopeEntry.connectTitle')}
               description={t('securityAgent.scopeEntry.connectDescription')}
               buttonLabel={t('securityAgent.scopeEntry.installApp')}
+              // The Code Reviewer's connect gate shows the same role rule, but
+              // its sentence also restates that the provider is unconnected,
+              // which this heading already says; the narrower notice leaves one
+              // message on the screen. It is a personal scope's mint that takes
+              // no organization role, so only the server's refusal sets it.
+              readOnlyNotice={
+                installRefused
+                  ? t('securityAgent.scopeEntry.connectOwnerOnly', { platform: t('common.github') })
+                  : undefined
+              }
               url={connectUrl ?? undefined}
               resolveUrl={async () => {
                 const minted = await performMint();
@@ -254,14 +350,12 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         <View className="flex-1 bg-background">
           <ScreenHeader
             className="px-6"
-            title={t('common.securityAgent')}
+            title={scopeTitle}
+            eyebrow={t('common.securityAgent')}
             headerRight={auditAction}
           />
           {!reauthUrl && !connectUrl && isMinting ? (
-            <View className="gap-3 px-6 pt-4">
-              <Skeleton className="h-10 w-full rounded-lg" />
-              <Skeleton className="h-32 w-full rounded-lg" />
-            </View>
+            <ScopeEntryBodySkeleton />
           ) : (
             <SecurityAgentSetup
               title={t('securityAgent.scopeEntry.reauthorizeTitle')}

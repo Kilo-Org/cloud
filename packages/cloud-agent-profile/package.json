@@ -5,8 +5,10 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./setup-script": "./src/setup-script.ts",
     "./import": "./src/import/index.ts",
-    "./import/testing": "./src/import/test-fixtures.ts"
+    "./import/testing": "./src/import/test-fixtures.ts",
+    "./skills-sh": "./src/skills-sh.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -17,6 +19,7 @@
   "dependencies": {
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "fflate": "0.8.3",
     "jsonc-parser": "3.3.1",

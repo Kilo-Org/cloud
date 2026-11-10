@@ -27,7 +27,7 @@ import type {
   ControlPlaneControlSession,
   ControlPlaneTerminalInput,
 } from '../../shared/control-plane-protocol.js';
-import { isTerminalSessionPlatform } from '../../terminal/access.js';
+import { isTerminalSessionEligible } from '../../terminal/access.js';
 
 const TERMINAL_PREFIX = 'control_terminal:';
 const TERMINAL_OPERATION_PREFIX = 'control_terminal_operation:';
@@ -188,7 +188,7 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
   async function readyContext(): Promise<OperationResult<ReadyTerminalContext>> {
     const metadata = deps.getMetadata();
     if (metadata === null) return { success: false, error: 'Session not found' };
-    if (!isTerminalSessionPlatform(metadata.identity.createdOnPlatform)) {
+    if (!isTerminalSessionEligible(metadata)) {
       return denied('terminals are only available for interactive Cloud Agent sessions');
     }
     const directory = deps.getDirectory();
@@ -557,6 +557,7 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     handleClose: bridge.handleClose,
     handleError: bridge.handleError,
     closeAll: bridge.closeAll,
+    closeBrowserSockets: bridge.closeBrowserSockets,
     closeRuntime: bridge.closeRuntime,
     closeTerminal: bridge.closeTerminal,
   };

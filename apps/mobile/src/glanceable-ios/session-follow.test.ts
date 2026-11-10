@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { sessionLiveActivityRelevance } from '@kilocode/notifications';
+import { sessionLiveActivityRelevance } from '@kilocode/notifications/schemas';
 
 import {
   _resetLiveActivitySwitchForTests,
@@ -10,6 +10,13 @@ import {
   setNotificationPermissionGrantedValue,
 } from '@/lib/glanceable/live-activity-switch';
 
+import {
+  _resetSessionCardScopeStoreForTests,
+  _setSessionCardScopeStoreForTests,
+  _settleSessionCardScopeWritesForTests,
+  readSessionCardScopes,
+  rememberSessionCardScope,
+} from './session-card-scope';
 import {
   _resetSessionFollowForTests,
   discoverSessionCards,
@@ -19,12 +26,16 @@ import {
   followSession,
   getSessionFollowsRevision,
   isSessionFollowed,
-  restoreFollowedSessionCards,
   SESSION_FINISHED_DISMISS_MS,
   subscribeSessionFollows,
   syncFollowedSessionCards,
   unfollowSession,
 } from './session-follow';
+import {
+  restoreFollowedSessionCards,
+  type SessionRestoreScope,
+  type SessionRestoreScopeReader,
+} from './session-follow-restore';
 import { sessionCardStaleAfterSeconds } from './session-card-facts';
 import {
   renderSessionCardPress,
@@ -103,6 +114,29 @@ vi.mock('@/lib/glanceable/sink-registry', () => ({
 
 const NOW = Date.parse('2026-10-12T10:00:00.000Z');
 const CTX = { userId: 'user-1', organizationId: 'org-1' };
+
+/** The stored account a restore would read, as the reader it calls. */
+function storedScope(scope: SessionRestoreScope): SessionRestoreScopeReader {
+  return () => Promise.resolve(scope);
+}
+
+// The follow scope records, as the keychain would hold them. A suite that needs
+// an unreadable store replaces `scopeReadsFail`.
+const storedScopes = new Map<string, string>();
+let scopeReadsFail = false;
+const scopeStore = {
+  getItemAsync: (key: string): Promise<string | null> => {
+    if (scopeReadsFail) {
+      return Promise.reject(new Error('keychain unavailable'));
+    }
+    return Promise.resolve(storedScopes.get(key) ?? null);
+  },
+  setItemAsync: (key: string, value: string): Promise<void> => {
+    storedScopes.set(key, value);
+    return Promise.resolve();
+  },
+};
+
 const RUNNING = {
   id: 'session-1',
   title: 'Migrate the billing webhooks',
@@ -140,6 +174,10 @@ beforeEach(() => {
   _resetSessionFollowForTests();
   _resetLiveActivitySwitchForTests();
   setNotificationPermissionGrantedValue(true);
+  _resetSessionCardScopeStoreForTests();
+  _setSessionCardScopeStoreForTests(scopeStore);
+  storedScopes.clear();
+  scopeReadsFail = false;
 });
 
 describe('followSession', () => {
@@ -207,6 +245,37 @@ describe('followSession', () => {
   });
 });
 
+describe('the follow scope record', () => {
+  it('keeps a followed card across a fresh process', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    // A fresh process: the native card and its record outlive the map.
+    _resetSessionFollowForTests();
+
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
+
+    expect(isSessionFollowed('session-1')).toBe(true);
+    expect(mocks.registerSessionActivityToken).toHaveBeenCalledWith(
+      'activity-0',
+      mocks.instances[0],
+      { sessionId: 'session-1', ...CTX }
+    );
+  });
+
+  it('forgets the record together with every card a teardown ends', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    const recorded = await readSessionCardScopes();
+    expect(recorded?.get('session-1')).toEqual(CTX);
+
+    endAllSessionCards();
+    await _settleSessionCardScopeWritesForTests();
+
+    const cleared = await readSessionCardScopes();
+    expect(cleared?.size).toBe(0);
+  });
+});
+
 describe('unfollowSession', () => {
   it('ends the card at once and releases its token', async () => {
     followSession(RUNNING, CTX, NOW);
@@ -237,19 +306,125 @@ describe('discoverSessionCards', () => {
     expect(duplicate.end).toHaveBeenCalledWith('immediate', undefined, expect.any(Date), undefined);
   });
 
-  it('registers every discovered card again when the account is known', () => {
+  it('registers a card again when the account is known and it is in scope', async () => {
     mocks.instances = [fakeActivity('native-1', { sessionId: 'session-1' })];
+    rememberSessionCardScope('session-1', CTX);
+    await _settleSessionCardScopeWritesForTests();
 
-    restoreFollowedSessionCards(null);
+    await restoreFollowedSessionCards(storedScope({ kind: 'unreadable' }));
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
 
-    restoreFollowedSessionCards(CTX);
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
     expect(mocks.registerSessionActivityToken).toHaveBeenCalledWith(
       'native-1',
       mocks.instances[0],
       { sessionId: 'session-1', ...CTX }
     );
     expect(mocks.retrySessionActivityTokens).toHaveBeenCalled();
+  });
+
+  it('ends a card recorded for another account in the same organization', async () => {
+    const card = fakeActivity('native-1', { sessionId: 'session-1', statusKind: 'running' });
+    mocks.instances = [card];
+    rememberSessionCardScope('session-1', { userId: 'user-2', organizationId: 'org-1' });
+    await _settleSessionCardScopeWritesForTests();
+
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
+
+    expect(card.end).toHaveBeenCalledWith('immediate', undefined, expect.any(Date), undefined);
+    expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
+    expect(isSessionFollowed('session-1')).toBe(false);
+    await _settleSessionCardScopeWritesForTests();
+    const pruned = await readSessionCardScopes();
+    expect(pruned?.has('session-1')).toBe(false);
+  });
+
+  it('ends a card recorded for another organization', async () => {
+    const card = fakeActivity('native-1', { sessionId: 'session-1', statusKind: 'running' });
+    mocks.instances = [card];
+    rememberSessionCardScope('session-1', { userId: 'user-1', organizationId: 'org-2' });
+    await _settleSessionCardScopeWritesForTests();
+
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
+
+    expect(card.end).toHaveBeenCalledWith('immediate', undefined, expect.any(Date), undefined);
+    expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
+  });
+
+  it('ends a card no record names, and leaves every card alone when the records cannot be read', async () => {
+    const unrecorded = fakeActivity('native-1', { sessionId: 'session-1' });
+    mocks.instances = [unrecorded];
+
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
+    expect(unrecorded.end).toHaveBeenCalledWith(
+      'immediate',
+      undefined,
+      expect.any(Date),
+      undefined
+    );
+    expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
+    // The ended card must leave the followed set, or the session screen keeps
+    // offering Unfollow for a card that is gone.
+    expect(isSessionFollowed('session-1')).toBe(false);
+
+    // A locked keychain is not a scope: nothing is ended, nothing is registered.
+    const card = fakeActivity('native-2', { sessionId: 'session-2' });
+    mocks.instances = [card];
+    rememberSessionCardScope('session-2', CTX);
+    await _settleSessionCardScopeWritesForTests();
+    scopeReadsFail = true;
+
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
+
+    expect(card.end).not.toHaveBeenCalled();
+    expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
+  });
+
+  it('keeps the scope records when ActivityKit cannot be read', async () => {
+    rememberSessionCardScope('session-1', CTX);
+    await _settleSessionCardScopeWritesForTests();
+    mocks.getInstances.mockImplementation(() => {
+      throw new Error('ActivityKit unavailable');
+    });
+
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
+    await _settleSessionCardScopeWritesForTests();
+
+    // A read that proved nothing must not cost the card its record.
+    const records = await readSessionCardScopes();
+    expect(records?.get('session-1')).toEqual(CTX);
+  });
+
+  it('keeps the records when its own discovery failed but a later one read ActivityKit', async () => {
+    rememberSessionCardScope('session-1', CTX);
+    await _settleSessionCardScopeWritesForTests();
+    const gate = Promise.withResolvers<undefined>();
+    let firstRead = true;
+    _setSessionCardScopeStoreForTests({
+      getItemAsync: async (key: string) => {
+        if (firstRead) {
+          firstRead = false;
+          await gate.promise;
+        }
+        return storedScopes.get(key) ?? null;
+      },
+      setItemAsync: scopeStore.setItemAsync,
+    });
+    mocks.getInstances.mockImplementationOnce(() => {
+      throw new Error('ActivityKit unavailable');
+    });
+
+    const restoring = restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
+    // A second discovery, as a foreground restore would run, reads ActivityKit
+    // successfully while the first restore still waits on its own record read.
+    mocks.instances = [fakeActivity('native-9', { sessionId: 'session-9' })];
+    discoverSessionCards();
+    gate.resolve(undefined);
+    await restoring;
+    await _settleSessionCardScopeWritesForTests();
+
+    const kept = await readSessionCardScopes();
+    expect(kept?.get('session-1')).toEqual(CTX);
   });
 });
 
@@ -468,18 +643,120 @@ describe('session card tokens', () => {
     await expect(mocks.cleanupTokens.mock.calls[0]?.[1]).resolves.toBe('reported-token');
   });
 
-  it('retires the token scope before ending the cards when the switch is off at restore', () => {
+  it('retires the token scope before ending the cards when the switch is off at restore', async () => {
     followSession(RUNNING, CTX, NOW);
     const [card] = mocks.instances;
     setLiveActivityEnabledValue(false);
 
-    restoreFollowedSessionCards(CTX);
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
 
     expect(mocks.cleanupTokens).toHaveBeenCalledWith('scope');
     expect(card?.end).toHaveBeenCalledWith('immediate');
     expect(mocks.cleanupTokens.mock.invocationCallOrder[0]).toBeLessThan(
       card?.end.mock.invocationCallOrder[0] ?? 0
     );
+  });
+});
+
+describe('a restore with no stored account', () => {
+  it('ends every card, releases its token, and clears its record', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    // A fresh process: the native card and its record outlive the followed map.
+    _resetSessionFollowForTests();
+    mocks.registerSessionActivityToken.mockClear();
+    const [card] = mocks.instances;
+
+    await restoreFollowedSessionCards(storedScope({ kind: 'signedOut' }));
+
+    expect(card?.end).toHaveBeenCalledWith('immediate');
+    expect(mocks.releaseSessionActivity).toHaveBeenCalledWith('activity-0');
+    expect(mocks.cleanupTokens).toHaveBeenCalledWith('scope');
+    expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
+    expect(isSessionFollowed('session-1')).toBe(false);
+    await _settleSessionCardScopeWritesForTests();
+    const cleared = await readSessionCardScopes();
+    expect(cleared?.size).toBe(0);
+  });
+
+  it('leaves every card and its record when the keychain cannot be read', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    _resetSessionFollowForTests();
+    mocks.registerSessionActivityToken.mockClear();
+    const [card] = mocks.instances;
+
+    await restoreFollowedSessionCards(storedScope({ kind: 'unreadable' }));
+
+    expect(card?.end).not.toHaveBeenCalled();
+    expect(mocks.cleanupTokens).not.toHaveBeenCalled();
+    expect(isSessionFollowed('session-1')).toBe(true);
+    await _settleSessionCardScopeWritesForTests();
+    const kept = await readSessionCardScopes();
+    expect(kept?.get('session-1')).toEqual(CTX);
+  });
+});
+
+describe('a restore with no live card', () => {
+  it('reads no stored account and ends nothing', async () => {
+    const readScope = vi.fn<SessionRestoreScopeReader>();
+
+    await restoreFollowedSessionCards(readScope);
+
+    expect(readScope).not.toHaveBeenCalled();
+    expect(mocks.cleanupTokens).not.toHaveBeenCalled();
+    expect(mocks.releaseSessionActivity).not.toHaveBeenCalled();
+  });
+
+  it('drops the records a card left behind without reading the account', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    // A fresh process after the card ended: the record outlives it.
+    _resetSessionFollowForTests();
+    mocks.instances = [];
+    const readScope = vi.fn<SessionRestoreScopeReader>();
+
+    await restoreFollowedSessionCards(readScope);
+    await _settleSessionCardScopeWritesForTests();
+
+    expect(readScope).not.toHaveBeenCalled();
+    const cleared = await readSessionCardScopes();
+    expect(cleared?.size).toBe(0);
+  });
+
+  it('reads the stored account when ActivityKit cannot be read', async () => {
+    mocks.getInstances.mockImplementation(() => {
+      throw new Error('ActivityKit unavailable');
+    });
+    const readScope = vi.fn<SessionRestoreScopeReader>(() =>
+      Promise.resolve({ kind: 'signedOut' })
+    );
+
+    await restoreFollowedSessionCards(readScope);
+
+    expect(readScope).toHaveBeenCalledTimes(1);
+    expect(mocks.cleanupTokens).toHaveBeenCalledWith('scope');
+  });
+
+  it('keeps the record of a follow that lands during the restore', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    // A second follow lands while the restore waits between discovery (which
+    // saw only the first card) and its scope writes: the reader runs after the
+    // record read, and answers only once the follow's scope write has landed,
+    // the worst order for the prune.
+    const second = { ...RUNNING, id: 'session-2' };
+    const restore = restoreFollowedSessionCards(async () => {
+      followSession(second, CTX, NOW);
+      await _settleSessionCardScopeWritesForTests();
+      return { kind: 'account', ctx: CTX };
+    });
+    await restore;
+    await _settleSessionCardScopeWritesForTests();
+
+    expect(isSessionFollowed('session-2')).toBe(true);
+    const records = await readSessionCardScopes();
+    expect(records?.get('session-2')).toEqual(CTX);
   });
 });
 

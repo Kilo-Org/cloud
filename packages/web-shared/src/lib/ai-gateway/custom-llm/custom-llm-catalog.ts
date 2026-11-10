@@ -1,6 +1,7 @@
 import 'server-only';
 import { custom_llm2, type CustomLlm2 } from '@kilocode/db/schema';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 
@@ -10,11 +11,39 @@ export type CustomLlm = {
   encrypted_api_key: CustomLlm2['encrypted_api_key'];
 };
 
+export type PublicCustomLlmDefinition = CustomLlmDefinition & {
+  public: NonNullable<CustomLlmDefinition['public']>;
+};
+
+export function isPublicCustomLlm(
+  definition: CustomLlmDefinition
+): definition is PublicCustomLlmDefinition {
+  return definition.public !== undefined;
+}
+
+/**
+ * A row that fails the definition schema is dropped from the catalog, which
+ * removes an admin-configured model, so it reports through the same channel as a
+ * failed read: an error log every time, and a Sentry event at most once per row
+ * per report window, because the catalog refreshes every minute and a stored
+ * definition does not fix itself.
+ */
+function reportUnparseableCustomLlm(publicId: string, error: unknown): void {
+  console.error('Failed to parse custom llm definition', publicId, error);
+  // The claim map is shared with other reports, whose keys are row ids, so the key
+  // is namespaced (public ids cannot contain `:`).
+  if (!claimReportWindow(`custom-llm:${publicId}`, Date.now())) return;
+  captureException(error, {
+    tags: { source: 'custom_llm_catalog' },
+    extra: { public_id: publicId },
+  });
+}
+
 export function parseCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   return rows.flatMap(row => {
     const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
     if (!parsed.success) {
-      console.log('Failed to parse custom llm definition', row.public_id, parsed.error);
+      reportUnparseableCustomLlm(row.public_id, parsed.error);
       return [];
     }
     return [
@@ -119,10 +148,20 @@ export function resetCustomLlmCacheForTest() {
   lastFailureAt = null;
 }
 
+/** A custom LLM for the id, or null when there is none or the catalog is unavailable. */
 export async function findCustomLlm(modelId: string): Promise<CustomLlm | null> {
   return (await getCustomLlmsById()).get(modelId.trim().toLowerCase()) ?? null;
 }
 
 export async function isCustomLlm(modelId: string): Promise<boolean> {
   return (await findCustomLlm(modelId)) !== null;
+}
+
+/** The inference providers a public custom LLM declares, or null for any other id. */
+export async function getPublicCustomLlmInferenceProviders(
+  modelId: string
+): Promise<ReadonlySet<string> | null> {
+  const customLlm = await findCustomLlm(modelId);
+  if (!customLlm || !isPublicCustomLlm(customLlm.definition)) return null;
+  return new Set(customLlm.definition.public.inference_providers);
 }

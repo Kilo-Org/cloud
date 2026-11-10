@@ -23,6 +23,12 @@ type ProfileOwnerType = 'user' | 'organization';
 type OwnerBearing = { ownerType?: ProfileOwnerType };
 
 /**
+ * Every owner a create can carry, in the order the form offers them. A route
+ * param allowlist and `ownerChoices` both read this one list.
+ */
+export const PROFILE_OWNER_CHOICES: readonly ProfileOwnerChoice[] = ['personal', 'organization'];
+
+/**
  * The owner choices a create screen offers. An organization context offers
  * Personal and Organization; a personal context offers Personal only
  * (`ProfilesListDialog.tsx:431-459`).
@@ -30,7 +36,7 @@ type OwnerBearing = { ownerType?: ProfileOwnerType };
 export function ownerChoices(
   organizationId: string | null | undefined
 ): readonly ProfileOwnerChoice[] {
-  return hasOrganizationContext(organizationId) ? ['personal', 'organization'] : ['personal'];
+  return hasOrganizationContext(organizationId) ? PROFILE_OWNER_CHOICES : ['personal'];
 }
 
 /** Whether an organization context is active, i.e. ownership is a choice. */

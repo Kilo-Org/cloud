@@ -1,5 +1,6 @@
 import type { Organization, User } from '@kilocode/db/schema';
 import {
+  claude_billing_connections,
   cli_sessions_v2,
   external_side_effect_outbox,
   kilocode_users,
@@ -10,6 +11,7 @@ import {
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, gt, isNull } from 'drizzle-orm';
+import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
@@ -54,6 +56,25 @@ export async function removeUserFromOrganization(
           and(
             eq(cli_sessions_v2.kilo_user_id, userId),
             eq(cli_sessions_v2.organization_id, organizationId)
+          )
+        );
+
+      // The person's own Claude billing link in this organization ends with
+      // the membership: nobody else can remove it, and it must stop billing.
+      // The profile stays, so rejoining and linking again reuses it.
+      await tx
+        .update(claude_billing_connections)
+        .set({
+          status: ClaudeBillingConnectionStatus.Removed,
+          connection_id: null,
+          connected_at: null,
+          last_refusal_code: null,
+          last_refusal_at: null,
+        })
+        .where(
+          and(
+            eq(claude_billing_connections.kilo_user_id, userId),
+            eq(claude_billing_connections.organization_id, organizationId)
           )
         );
 

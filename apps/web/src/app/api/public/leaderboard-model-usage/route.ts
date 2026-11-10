@@ -9,7 +9,10 @@ import { LEADERBOARD_MODEL_USAGE_REDIS_KEY } from '@kilocode/web-shared/lib/redi
 const LEADERBOARD_MODEL_USAGE_QUERY = `
 select
     to_char(mu.usage_date, 'YYYY-MM-DD') as usage_date
-    , coalesce(mu.requested_model, mu.model) as "model"
+    , case
+        when mu.requested_model like '~%' then coalesce(mu.model, mu.requested_model)
+        else coalesce(mu.requested_model, mu.model)
+      end as "model"
     , case
         when mu.feature ilike '%claw%' then 'kiloclaw'
         when mu.mode ilike '%code%' then 'code'
@@ -25,7 +28,11 @@ where
     mu.usage_date >= dateadd(week, -1, current_date())
     and mu.usage_date < current_date()
     and mu.total_input_tokens > 0
-    and mu.provider != 'custom'
+    and (
+        mu.provider != 'custom'
+        or coalesce(mu.requested_model, mu.model) = 'reflection/beam-free'
+        or coalesce(mu.requested_model, mu.model) = 'stealth/glyph-cluster'
+    )
 group by 1, 2, 3
 order by 1 desc, 4 desc;
 `;

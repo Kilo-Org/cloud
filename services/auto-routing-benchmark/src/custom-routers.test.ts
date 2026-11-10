@@ -1,5 +1,9 @@
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  PLATFORM_MEASUREMENTS_PATH,
+  PlatformMeasurementsResponseSchema,
+} from '@kilocode/auto-routing-contracts';
 import type {
   BenchmarkConfig,
   ClientCustomRouterEntry,
@@ -10,6 +14,7 @@ import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { assembleCustomRouterTable, lookupCustomRouterStatuses } from './custom-routers';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity } from './run';
+import { app } from './index';
 
 const CONFIG: BenchmarkConfig = {
   router: 'efficient',
@@ -194,7 +199,7 @@ describe('custom router tables and statuses (real SQLite)', () => {
     expect(candidates(table)).toEqual([expect.objectContaining({ accuracy: 0.8, stale: true })]);
     const status = await lookupCustomRouterStatuses(db, CONFIG, clientOnly, source);
     expect(status.entries[0]?.variants).toEqual([
-      { variant: 'low', status: 'stale', failureReason: null },
+      { variant: 'low', status: 'stale', failureReason: null, linked: false },
     ]);
   });
 
@@ -273,17 +278,176 @@ describe('custom router tables and statuses (real SQLite)', () => {
       {
         key: LOCAL,
         variants: [
-          { variant: 'low', status: 'stale', failureReason: null },
-          { variant: 'high', status: 'missing', failureReason: null },
+          { variant: 'low', status: 'stale', failureReason: null, linked: false },
+          { variant: 'high', status: 'missing', failureReason: null, linked: false },
         ],
       },
       {
         key: 'gateway:vendor/gw',
-        variants: [{ variant: null, status: 'stale', failureReason: null }],
+        variants: [{ variant: null, status: 'stale', failureReason: null, linked: false }],
       },
     ]);
     expect(
       sqlite.prepare('SELECT status FROM benchmark_profiles WHERE engine_identity = ?').all(ENGINE)
     ).toEqual([{ status: 'pending' }]);
+  });
+
+  it('reuses same-name platform variants while unmatched variants retain client measurements', async () => {
+    clientProfile({ id: 'local-low', accuracy: 0.75, updatedAt: '2026-10-10' });
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'platform-ready', accuracy: 0.95 });
+    const context = {
+      ...clientOnly,
+      entries: [{ ...localModel, variants: ['low'], measuredAs: 'vendor/gw' }],
+    };
+    const unmatched = await assembleCustomRouterTable(db, CONFIG, context, source);
+    expect(candidates(unmatched.table)).toEqual([
+      expect.objectContaining({ model: LOCAL, variant: 'low', accuracy: 0.75 }),
+    ]);
+    const linkedContext = {
+      ...context,
+      entries: [{ ...localModel, variants: [], measuredAs: 'vendor/gw' }],
+    };
+    const linked = await assembleCustomRouterTable(db, CONFIG, linkedContext, source);
+    expect(linked.table?.routes[ROUTE]).toEqual([
+      expect.objectContaining({ model: LOCAL, variant: null, accuracy: 0.95, avgCostUsd: 0 }),
+    ]);
+    expect(
+      (await lookupCustomRouterStatuses(db, CONFIG, linkedContext, source)).entries[0]?.variants
+    ).toEqual([{ variant: null, linked: true, status: 'ready', failureReason: null }]);
+  });
+
+  it('reprices linked summaries exactly from token means and older summaries by price ratio', async () => {
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'platform-ready', accuracy: 0.95 });
+    const context = {
+      ...clientOnly,
+      entries: [
+        {
+          ...localModel,
+          variants: [],
+          measuredAs: 'vendor/gw',
+          pricing: { inputPerMTokUsd: 2, outputPerMTokUsd: 4, cacheReadPerMTokUsd: 1 },
+        },
+      ],
+    };
+    const ratio = await assembleCustomRouterTable(db, CONFIG, context, source);
+    expect(ratio.table?.routes[ROUTE]?.[0]?.avgCostUsd).toBeCloseTo(0.002);
+    sqlite.exec(`UPDATE model_summaries SET avg_input_tokens = 100, avg_cached_input_tokens = 50,
+      avg_output_tokens = 20, avg_reasoning_tokens = 10`);
+    const exact = await assembleCustomRouterTable(db, CONFIG, context, source);
+    expect(exact.table?.routes[ROUTE]?.[0]).toMatchObject({
+      model: LOCAL,
+      pricing: {
+        promptUsdPerToken: 0.000002,
+        completionUsdPerToken: 0.000004,
+        cacheReadUsdPerToken: 0.000001,
+      },
+    });
+    expect(exact.table?.routes[ROUTE]?.[0]?.avgCostUsd).toBeCloseTo(0.00037);
+  });
+
+  it('serves linked history as stale after the platform model leaves the catalog without admission', async () => {
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'platform-ready', accuracy: 0.95 });
+    const context = {
+      ...clientOnly,
+      entries: [{ ...localModel, variants: [], measuredAs: 'vendor/gw' }],
+    };
+    const removed = { ...source, fetchImpl: async () => Response.json({ data: [] }) };
+    const { table } = await assembleCustomRouterTable(db, CONFIG, context, removed);
+    expect(table?.routes[ROUTE]?.[0]).toMatchObject({ model: LOCAL, stale: true, avgCostUsd: 0 });
+    const status = await lookupCustomRouterStatuses(db, CONFIG, context, removed);
+    expect(status.entries[0]?.variants).toEqual([
+      { variant: null, linked: true, status: 'stale', failureReason: null },
+    ]);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
+      n: 0,
+    });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 1 });
+  });
+
+  it('uses the direct gateway entry price and candidate name for linked measurements', async () => {
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'platform-ready', accuracy: 0.95 });
+    const context: CustomRouterBenchmarkContext = {
+      ...clientOnly,
+      entries: [{ kind: 'gateway', model: 'owner/model', measuredAs: 'vendor/gw' }],
+      clientEvalEntryKeys: ['gateway:owner/model'],
+    };
+    const { table } = await assembleCustomRouterTable(db, CONFIG, context, {
+      ...source,
+      fetchImpl: async () =>
+        Response.json({
+          data: [
+            { id: 'vendor/gw', pricing: { prompt: 0.000001, completion: 0.000002 } },
+            { id: 'owner/model', pricing: { prompt: 0.000003, completion: 0.000006 } },
+          ],
+        }),
+    });
+    expect(table?.routes[ROUTE]?.[0]).toMatchObject({ model: 'owner/model' });
+    expect(table?.routes[ROUTE]?.[0]?.avgCostUsd).toBeCloseTo(0.003);
+  });
+
+  it('omits a linked summary when neither tokens nor a platform price can reprice it', async () => {
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'platform-ready', accuracy: 0.95 });
+    const { table } = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      {
+        ...clientOnly,
+        entries: [
+          {
+            ...localModel,
+            variants: [],
+            measuredAs: 'vendor/gw',
+            pricing: { inputPerMTokUsd: 2, outputPerMTokUsd: 4 },
+          },
+        ],
+      },
+      { ...source, fetchImpl: async () => Response.json({ data: [{ id: 'vendor/gw' }] }) }
+    );
+    expect(table).toBeNull();
+  });
+
+  it('lists ready platform measurements across identities only for the requested base router', async () => {
+    platformProfile({ engine: OLD_ENGINE, status: 'ready', runId: 'old-ready' });
+    platformProfile({ engine: ENGINE, status: 'pending', runId: null });
+    sqlite.exec(`INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+      status, run_id, requested_at, updated_at)
+      VALUES ('frontier', 'other/model', 'high', 'older', 1, 'ready', 'frontier-ready', 'a', 'a')`);
+    const env = {
+      BENCH_DB: db,
+      INTERNAL_API_SECRET_PROD: { get: async () => 'test-secret' },
+    } as unknown as Env;
+    const response = await app.request(
+      `https://bench.test${PLATFORM_MEASUREMENTS_PATH}?router=efficient`,
+      { headers: { authorization: 'Bearer test-secret' } },
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(PlatformMeasurementsResponseSchema.parse(await response.json())).toEqual({
+      baseRouter: 'efficient',
+      models: [{ model: 'vendor/gw', variants: [null] }],
+    });
+    const denied = await app.request(`https://bench.test${PLATFORM_MEASUREMENTS_PATH}`, {}, env);
+    expect(denied.status).toBe(401);
+  });
+
+  it('omits a ready virtual auto model that a linked entry cannot name', async () => {
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'platform-ready' });
+    sqlite.exec(`INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+      status, run_id, requested_at, updated_at)
+      VALUES ('efficient', 'kilo-auto/free', '', 'older', 1, 'ready', 'virtual-ready', 'a', 'a')`);
+    const env = {
+      BENCH_DB: db,
+      INTERNAL_API_SECRET_PROD: { get: async () => 'test-secret' },
+    } as unknown as Env;
+    const response = await app.request(
+      `https://bench.test${PLATFORM_MEASUREMENTS_PATH}?router=efficient`,
+      { headers: { authorization: 'Bearer test-secret' } },
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      baseRouter: 'efficient',
+      models: [{ model: 'vendor/gw', variants: [null] }],
+    });
   });
 });

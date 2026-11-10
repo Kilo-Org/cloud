@@ -38,6 +38,20 @@ const SECRET_PATTERNS: { pattern: RegExp; replacement: string }[] = [
       /(--[A-Za-z0-9-]*(?:token|password|secret|key|apikey|api-key|passphrase|credential)[A-Za-z0-9-]*(?:\s+|=))(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s\r\n]+)/gi,
     replacement: `$1${REDACTED}`,
   },
+  {
+    // npm credential keys (`_authToken`, base64 `_auth`, `_password`) can be
+    // separated from their value by whitespace or `=`.
+    pattern:
+      /(\b_(?:authToken|auth|password)(?:\s*=\s*|\s+))(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s\r\n]+)/gi,
+    replacement: `$1${REDACTED}`,
+  },
+  {
+    // curl/basic-auth shorthand carries the credential as user:password. A
+    // bare `-u <name>` (for example `git push -u origin`) is not a credential.
+    pattern:
+      /(^|\s)((?:-u|--user)(?:\s+|=))(?:"[^"\r\n]*:[^"\r\n]*"|'[^'\r\n]*:[^'\r\n]*'|[^\s\r\n:]+:[^\s\r\n]+)/gi,
+    replacement: `$1$2${REDACTED}`,
+  },
 ];
 
 export function redactSecrets(text: string, knownSecrets: readonly string[] = []): string {

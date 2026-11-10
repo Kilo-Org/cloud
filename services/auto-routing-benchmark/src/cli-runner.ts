@@ -7,6 +7,10 @@ import { materializeLongContext } from './datasets/long-context';
 export type CliRunResult = {
   text: string;
   costUsd: number | null;
+  inputTokens: number | null;
+  cachedInputTokens: number | null;
+  outputTokens: number | null;
+  reasoningTokens: number | null;
   latencyMs: number;
   exitCode: number;
   stderrTail: string;
@@ -15,6 +19,22 @@ export type CliRunResult = {
   timedOut: boolean;
   unavailableModelId?: string;
 };
+
+export type AttemptUsage = Pick<
+  CliRunResult,
+  'costUsd' | 'inputTokens' | 'cachedInputTokens' | 'outputTokens' | 'reasoningTokens'
+>;
+
+// A retried case bills both attempts, so its cost and token totals cover both.
+export function addPriorAttempt(result: CliRunResult, prior: AttemptUsage): void {
+  const add = (current: number | null, previous: number | null) =>
+    current === null && previous === null ? null : (current ?? 0) + (previous ?? 0);
+  result.costUsd = add(result.costUsd, prior.costUsd);
+  result.inputTokens = add(result.inputTokens, prior.inputTokens);
+  result.cachedInputTokens = add(result.cachedInputTokens, prior.cachedInputTokens);
+  result.outputTokens = add(result.outputTokens, prior.outputTokens);
+  result.reasoningTokens = add(result.reasoningTokens, prior.reasoningTokens);
+}
 
 export const DECIDER_CLI_TIMEOUT_MS = 180_000;
 
@@ -58,6 +78,50 @@ export function isCatalogLoadFailureResult(
   return (
     /\bfailed to load (?:the )?(?:kilo )?model catalog\b/i.test(diagnostic) ||
     /\bno models are currently available\b/i.test(diagnostic)
+  );
+}
+
+const THROTTLE_DIAGNOSTIC = /(?:\b429\b|rate.?limit|throttl)/i;
+const UNAVAILABLE_DIAGNOSTIC =
+  /\b(?:internal server error|bad gateway|service unavailable|gateway timeout|temporarily unavailable|HTTP 5\d\d)\b/i;
+
+export function hasThrottleDiagnostic(result: Pick<CliRunResult, 'stderrTail'>): boolean {
+  return THROTTLE_DIAGNOSTIC.test(stripVTControlCharacters(result.stderrTail));
+}
+
+/**
+ * A throttle or a provider outage on an unbilled call. Either can also end a
+ * multi-step run after partial assistant text: the run still ends on that error
+ * with no billed answer, so it is a transient provider failure, not a model failure.
+ */
+export function isUnbilledTransientProviderResult(
+  result: Pick<
+    CliRunResult,
+    'text' | 'stderrTail' | 'costUsd' | 'exitCode' | 'lastEventTypes' | 'timedOut'
+  >
+): boolean {
+  if ((result.costUsd ?? 0) !== 0 || result.timedOut) return false;
+  const diagnostic = stripVTControlCharacters(result.stderrTail);
+  if (!THROTTLE_DIAGNOSTIC.test(diagnostic) && !UNAVAILABLE_DIAGNOSTIC.test(diagnostic)) {
+    return false;
+  }
+  return (
+    result.text.length === 0 || (result.exitCode !== 0 && result.lastEventTypes.at(-1) === 'error')
+  );
+}
+
+/**
+ * The CLI process died from a signal before it emitted any event: no model
+ * call produced output, so the run says nothing about the model.
+ */
+export function isKilledBeforeEventsResult(
+  result: Pick<CliRunResult, 'text' | 'exitCode' | 'eventCount' | 'timedOut'>
+): boolean {
+  return (
+    result.exitCode === -1 &&
+    !result.timedOut &&
+    result.eventCount === 0 &&
+    result.text.length === 0
   );
 }
 
@@ -131,7 +195,11 @@ export async function runDeciderCaseViaCli(
     reasoningEffort?: string | null;
     resultCallback?: {
       url: string;
-      execution: PaidExecutionKey & { retried?: boolean; priorCostUsd?: number | null };
+      execution: PaidExecutionKey & {
+        retried?: boolean;
+        priorCostUsd?: number | null;
+        priorUsage?: Omit<AttemptUsage, 'costUsd'> | null;
+      };
     };
   }
 ): Promise<CliRunResult> {
@@ -171,7 +239,16 @@ export function parseContainerRunResponse(
   startedAt: number,
   requestedModel: string
 ): CliRunResult {
-  const { text, costUsd, eventCount, lastEventTypes } = parseKiloRunEvents(body.stdoutLines ?? []);
+  const {
+    text,
+    costUsd,
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+    reasoningTokens,
+    eventCount,
+    lastEventTypes,
+  } = parseKiloRunEvents(body.stdoutLines ?? []);
   const providerThrottled = (body.stdoutLines ?? []).some(line => {
     try {
       const event: unknown = JSON.parse(line);
@@ -180,7 +257,7 @@ export function parseContainerRunResponse(
         event !== null &&
         'type' in event &&
         event.type === 'error' &&
-        /(?:\b429\b|rate.?limit|throttl)/i.test(line)
+        THROTTLE_DIAGNOSTIC.test(line)
       );
     } catch {
       return false;
@@ -241,6 +318,10 @@ export function parseContainerRunResponse(
   const result: CliRunResult = {
     text,
     costUsd,
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+    reasoningTokens,
     latencyMs: body.durationMs ?? Date.now() - startedAt,
     exitCode: body.exitCode,
     stderrTail: providerThrottled

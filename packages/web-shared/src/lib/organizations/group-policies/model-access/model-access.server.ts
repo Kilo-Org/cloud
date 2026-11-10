@@ -8,7 +8,6 @@ import { modelsByProvider, organizations } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, isNull } from 'drizzle-orm';
-import { getKiloExclusiveInferenceProviders } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -17,6 +16,7 @@ import {
   withoutVirtualProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
+  getModelInferenceProviders,
   isModelRestrictionExempt,
   type CustomLlmGrantee,
 } from '@kilocode/web-shared/lib/model-allow.server';
@@ -163,6 +163,14 @@ export async function getEffectiveModelDecision(
   providerLookup: ProviderLookup = getProviderSlugsForModel
 ): Promise<EffectiveModelDecision> {
   const normalizedModelId = normalizeModelId(modelId);
+  // An unrestricted grant admits every model, and `evaluateEffectiveModelAccessPolicy`
+  // only ever pairs it with `requireModelInCurrentSnapshot: false`. Neither the
+  // exemption nor the pinned-provider lookup below can change that decision, because
+  // the set the provider lookup pins is never empty: a public custom LLM declares at
+  // least one inference provider. Resolving them per model is pure cost.
+  if (policy.memberGrant.mode === 'unrestricted') {
+    return { allowed: true };
+  }
   if (await isModelRestrictionExempt(modelId, policy.customLlmGrantee)) {
     return { allowed: true };
   }
@@ -172,9 +180,9 @@ export async function getEffectiveModelDecision(
   ) {
     return { allowed: false, denialSource: 'organization_model' };
   }
-  const exclusiveProviders = getKiloExclusiveInferenceProviders(modelId);
+  const pinnedProviders = await getModelInferenceProviders(modelId);
   const currentModelProviders =
-    exclusiveProviders ??
+    pinnedProviders ??
     (policy.requireModelInCurrentSnapshot ? await providerLookup(modelId) : undefined);
   if (currentModelProviders?.size === 0) {
     return { allowed: false, denialSource: 'organization_model' };
@@ -198,9 +206,6 @@ export async function getEffectiveModelDecision(
       : { allowed: false, denialSource: 'organization_provider' };
   }
 
-  if (policy.memberGrant.mode === 'unrestricted') {
-    return { allowed: true };
-  }
   if (policy.memberGrant.mode === 'organization_baseline') {
     return await decisionWithinOrganizationBaseline();
   }
@@ -230,6 +235,36 @@ export async function getEffectiveModelDecision(
   return { allowed: false, denialSource: 'no_grant' };
 }
 
+/**
+ * Whether `decision` admits a request served by one of the organization's provider keys sent
+ * through Vercel that the provider allow-list cannot restrict, because the key's provider has no
+ * OpenRouter slug. Such a key names a provider the organization configured itself, so only the
+ * model restrictions and grants apply. Routing drops Vercel provider keys that the allow-list can
+ * name but does not admit (see `isVercelUserByokProviderAllowed`). Catalog-mode direct BYOK keys
+ * are decided per provider instead (see `isModelAllowedForProviderKey`).
+ */
+export function allowsInferenceProviderUserByok(decision: EffectiveModelDecision): boolean {
+  return decision.allowed || decision.denialSource === 'organization_provider';
+}
+
+/**
+ * Whether the policy admits `modelId` served by the organization's own key for `providerSlug`, as
+ * a catalog-mode direct BYOK key serves it. The key's provider is the only route, whichever
+ * providers the snapshot lists for the model, so provider allow-lists and grants are checked
+ * against it alone. A policy that requires the model in the current snapshot still does.
+ */
+export async function isModelAllowedForProviderKey(
+  policy: EffectiveOrganizationModelPolicy,
+  modelId: string,
+  providerSlug: string,
+  providerLookup: ProviderLookup = getProviderSlugsForModel
+): Promise<boolean> {
+  const decision = await getEffectiveModelDecision(policy, modelId, async lookupModelId =>
+    (await providerLookup(lookupModelId)).size > 0 ? new Set([providerSlug]) : new Set()
+  );
+  return decision.allowed;
+}
+
 export async function isModelRouteAllowed(
   policy: EffectiveOrganizationModelPolicy,
   modelId: string,
@@ -252,12 +287,18 @@ export async function isModelRouteAllowed(
 export async function resolveOrganizationMemberModelPolicy(params: {
   organizationId: string;
   kiloUserId: string;
+  /** See `allowNonMember` on the member policy subject. */
+  allowNonMember?: boolean;
   fromDb?: typeof db;
 }): Promise<EffectiveOrganizationModelPolicy> {
   return evaluateEffectiveModelAccessPolicy(
     await getOrganizationGroupPolicyContext({
       organizationId: params.organizationId,
-      subject: { type: 'member', kiloUserId: params.kiloUserId },
+      subject: {
+        type: 'member',
+        kiloUserId: params.kiloUserId,
+        allowNonMember: params.allowNonMember,
+      },
       fromDb: params.fromDb,
     })
   );
@@ -282,6 +323,7 @@ export async function resolveOrganizationDefaultModelPolicy(params: {
 export async function resolveOrganizationMemberModelDecision(params: {
   organizationId: string;
   kiloUserId: string;
+  allowNonMember?: boolean;
   modelId: string;
   providerLookup?: ProviderLookup;
   fromDb?: typeof db;

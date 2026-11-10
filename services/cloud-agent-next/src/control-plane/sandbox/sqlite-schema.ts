@@ -19,6 +19,8 @@ export const allocation = sqliteTable('allocation', {
   last_activity_at: integer('last_activity_at'),
   create_deadline_at: integer('create_deadline_at'),
   first_connect_deadline_at: integer('first_connect_deadline_at'),
+  /** Create attempts the current preparing episode made; see AllocationState. */
+  create_attempt: integer('create_attempt').notNull().default(0),
   stop_attempt: integer('stop_attempt').notNull(),
   stop_pending: integer('stop_pending', { mode: 'boolean' }).notNull(),
   stop_at: integer('stop_at'),
@@ -32,16 +34,32 @@ export const routes = sqliteTable('routes', {
   // A reference to scope_grants.id, not a credential snapshot.
   grant: text('grant'),
   credential_source: text('credential_source'),
-  /** Keyed hash naming the repository snapshot this route may use; null when none applies. */
+  /**
+   * Retired repository snapshot key. Kept for the rollback window; no longer
+   * written or read.
+   */
   repo_key: text('repo_key'),
+  /** JSON of the admitted environment reference; null when the session has none. */
+  environment: text('environment'),
   state: text('state').notNull(),
   attempt_id: text('attempt_id').notNull(),
   attempt_deadline_at: integer('attempt_deadline_at'),
   reason: text('reason'),
+  billing_failure: text('billing_failure'),
   updated_at: integer('updated_at').notNull(),
 });
 
 export const scopeGrants = sqliteTable('scope_grants', {
   id: text('id').primaryKey(),
   grant: text('grant').notNull(),
+});
+
+export const workspaceDiskSnapshots = sqliteTable('workspace_disk_snapshots', {
+  workspace_id: text('workspace_id').primaryKey(),
+  data: text('data', { mode: 'json' }).notNull(),
+});
+
+export const workspaceDiskAllocation = sqliteTable('workspace_disk_allocation', {
+  id: text('id').primaryKey(),
+  data: text('data', { mode: 'json' }).notNull(),
 });

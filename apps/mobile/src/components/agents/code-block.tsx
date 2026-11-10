@@ -14,6 +14,7 @@ import { UITextView } from '@bsky.app/react-native-uitextview';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { renderChunkChildren, renderSelectableChunkChildren } from './code-block-chunk-content';
@@ -22,6 +23,8 @@ import {
   CODE_CHUNK_MOUNT_BATCH,
   CODE_FIRST_PAINT_CHUNKS,
   nextChunkMountCount,
+  releaseFenceChunkWalk,
+  retainFenceChunkWalk,
 } from './code-block-model';
 import { useMonoScrollSheet } from './mono-scroll-block';
 import {
@@ -174,6 +177,19 @@ function CodeBlockImpl({
     () => chunkCodeLines(displayText, language, mountedChunkCount),
     [displayText, language, mountedChunkCount]
   );
+  // Drop this fence's resumable walk when the fence unmounts or its text is
+  // replaced. A walk keeps every highlighted token it placed, so without this
+  // the fences a user scrolled past pinned their highlighted code for the life
+  // of the process. A fence still on screen keeps its walk, so a FlashList
+  // remount mounts without re-highlighting its lines; a block that renders the
+  // same fence as this one counts as a holder too, so one of them going away
+  // does not drop the walk the other is still using.
+  useEffect(() => {
+    retainFenceChunkWalk(displayText, language);
+    return () => {
+      releaseFenceChunkWalk(displayText, language);
+    };
+  }, [displayText, language]);
   // Add one batch per commit until the fence is fully mounted. Each batch is
   // CODE_CHUNK_MOUNT_BATCH chunks, so the spans applied in one frame stay
   // bounded however long the file is. `hasMoreChunks` proves at least one chunk
@@ -245,8 +261,11 @@ function CodeBlockImpl({
               selectable
               uiTextView
               className={CODE_LINE_CLASSNAME}
+              // Direction and ink for the native text view's own paragraph
+              // style: the selectable chunk wraps like the plain one and its
+              // continuations start under the first line in an RTL interface.
               // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
-              style={{ color: textBase }}
+              style={{ color: textBase, ...LTR_TEXT_DIRECTION }}
             >
               {renderSelectableChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
             </SelectableCodeText>
@@ -261,7 +280,7 @@ function CodeBlockImpl({
               selectable={effectiveSelectable}
               className={CODE_LINE_CLASSNAME}
               // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
-              style={{ color: textBase }}
+              style={{ color: textBase, ...LTR_TEXT_DIRECTION }}
             >
               {renderChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
             </RNText>

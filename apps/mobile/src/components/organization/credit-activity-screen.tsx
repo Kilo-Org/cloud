@@ -2,20 +2,21 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useLocalSearchParams } from 'expo-router';
 import { Receipt } from '@/components/ui/icons';
-import { memo, type ReactNode, useCallback, useEffect } from 'react';
+import { memo, type ReactNode, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
-import { QueryError } from '@/components/query-error';
+import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate, formatMoney } from '@/lib/format';
 import {
   type CreditTransaction,
@@ -24,7 +25,8 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
-import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
+import { normalizeCreditActivityOrgParam, reconcileOrgDeepLink } from '@/lib/org-deep-link';
+import { trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 // FlashList takes `contentContainerStyle` (no className), so the FlatList's
@@ -96,14 +98,16 @@ const CreditRow = memo(function CreditRow({
           {formatMoney(Math.abs(amount), i18n.language)}
         </Text>
       </View>
-      <View className="flex-row items-center justify-between">
+      <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <Text className="text-xs text-muted-foreground">
           {formatDate(parseTimestamp(transaction.created_at), i18n.language)}
         </Text>
         {transaction.expiry_date != null && (
           <Text className="text-xs text-muted-foreground">
-            {t('organization.creditActivity.expires', {
-              date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language),
+            {t('organization.creditActivity.expiresUtc', {
+              date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language, {
+                timeZone: 'UTC',
+              }),
             })}
           </Text>
         )}
@@ -112,20 +116,10 @@ const CreditRow = memo(function CreditRow({
   );
 });
 
-function firstSearchParam(value: string | string[] | undefined): string | undefined {
-  if (!Array.isArray(value) && value !== undefined && value.length > 0) {
-    return value;
-  }
-  if (Array.isArray(value) && value[0] !== undefined && value[0].length > 0) {
-    return value[0];
-  }
-  return undefined;
-}
-
 export function OrganizationCreditActivityScreen() {
   const { t } = useTranslation();
   const { org: orgParamRaw } = useLocalSearchParams<{ org?: string | string[] }>();
-  const orgParam = firstSearchParam(orgParamRaw);
+  const orgParam = normalizeCreditActivityOrgParam(orgParamRaw);
 
   const { organizationId: contextOrganizationId, isLoaded, setOrganizationId } = useOrganization();
   // When `org` is present, resolve role/membership against the param only — never
@@ -141,11 +135,20 @@ export function OrganizationCreditActivityScreen() {
     orgs: orgsLoading ? undefined : (orgs ?? []),
   });
 
+  // The linked organization becomes the selection once per mounted screen, the
+  // same way the organization hub applies a deep-linked id. The selection's
+  // writer is memoized on the current selection, so an effect keyed on it would
+  // otherwise re-write the param after the reader switches accounts on another
+  // screen, silently reverting that switch.
+  const appliedOverrideRef = useRef<string | null>(null);
   useEffect(() => {
     // Wait for SecureStore hydration so the deep-link selection always wins over stored org.
-    if (isLoaded && reconcile.shouldPersistOverride && reconcile.effectiveOrganizationId != null) {
-      setOrganizationId(reconcile.effectiveOrganizationId);
+    const target = reconcile.shouldPersistOverride ? reconcile.effectiveOrganizationId : null;
+    if (!isLoaded || target == null || appliedOverrideRef.current === target) {
+      return;
     }
+    appliedOverrideRef.current = target;
+    setOrganizationId(target);
   }, [
     isLoaded,
     reconcile.shouldPersistOverride,
@@ -197,13 +200,14 @@ export function OrganizationCreditActivityScreen() {
     errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
 
   // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
-  // permission state. Any other error stays the retryable neutral state.
-  let errorVariant: 'neutral' | 'server' | 'not-found' | 'permission' = 'neutral';
-  if (errorCode === 'NOT_FOUND') {
-    errorVariant = 'not-found';
-  } else if (errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
-    errorVariant = 'permission';
-  }
+  // permission state, and a request that ran out its deadline keeps the
+  // retryable slow-response state. Any other error stays the retryable neutral
+  // state.
+  const classified = trpcErrorVariant(query.error);
+  const errorVariant: QueryErrorVariant =
+    classified === 'not-found' || classified === 'permission' || classified === 'timeout'
+      ? classified
+      : 'neutral';
 
   // A later-page failure must keep the already-loaded rows and offer an inline
   // retry instead of replacing the list. Read `isFetchNextPageError`, not
@@ -267,6 +271,7 @@ export function OrganizationCreditActivityScreen() {
             <Button
               variant="outline"
               size="sm"
+              className={STATE_ACTION_CLASS}
               onPress={() => void query.fetchNextPage()}
               loading={query.isFetchingNextPage}
               accessibilityLabel={t('common.retry')}

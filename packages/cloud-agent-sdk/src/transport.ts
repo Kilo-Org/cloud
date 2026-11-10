@@ -6,8 +6,7 @@
  */
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { Images } from '@kilocode/app-shared/images-schema';
-import type { CloudAgentSessionId, KiloSessionId } from './types';
+import type { CloudAgentSessionId, KiloSessionId, SessionSnapshot } from './types';
 import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
 
 /**
@@ -106,6 +105,9 @@ type SendCommandPayload = {
   command: string;
   /** Verbatim args after the command name; kilo expands $1/$2/$ARGUMENTS. */
   arguments: string;
+  mode?: string;
+  model?: ModelRef;
+  variant?: string;
 };
 type TransportSendPayload = SendPromptPayload | SendCommandPayload;
 
@@ -116,13 +118,20 @@ type CloudAgentPromptPayload = {
   model: string;
   variant?: string;
 };
-type CloudAgentSendPayload = CloudAgentPromptPayload | SendCommandPayload;
+type CloudAgentCommandPayload = {
+  type: 'command';
+  command: string;
+  arguments: string;
+  mode?: string;
+  model?: string;
+  variant?: string;
+};
+type CloudAgentSendPayload = CloudAgentPromptPayload | CloudAgentCommandPayload;
 
 type TransportSendInput = {
   payload: TransportSendPayload;
   messageId?: string | undefined;
   attachments?: CloudAgentAttachments | undefined;
-  images?: Images | undefined;
   remoteModelOverride?: RemoteModelOverride | undefined;
   /**
    * Ready file parts to append to the remote CLI's `send_message` `parts`
@@ -179,6 +188,12 @@ type Transport = {
   acceptSuggestion?: (payload: { requestId: string; index: number }) => Promise<unknown>;
   /** Dismiss a `suggest` tool request. Requires Kilo CLI >= v7.2.7 on the remote side. */
   dismissSuggestion?: (payload: { requestId: string }) => Promise<unknown>;
+  /**
+   * Seed native part positions from a history page fetched outside the
+   * transport, such as a child session page, so later live deltas for a
+   * message that is still streaming continue after its stored parts.
+   */
+  observeProjected?: (messages: SessionSnapshot['messages']) => void;
 };
 
 /** Factory signature — creates a transport wired to the given sink. */
@@ -193,9 +208,13 @@ type CloudAgentApi = {
   send: (payload: {
     sessionId: CloudAgentSessionId;
     payload: CloudAgentSendPayload;
-    messageId?: string;
+    /**
+     * Durable user-message identity minted by the caller. The Cloud Agent
+     * replays a repeated id instead of admitting a second turn, so it must be
+     * the same value on a retry of the same turn.
+     */
+    messageId: string;
     attachments?: CloudAgentAttachments;
-    images?: Images;
   }) => Promise<unknown>;
   interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;
   /**
@@ -222,6 +241,7 @@ type CloudAgentApi = {
 
 export type {
   CloudAgentApi,
+  CloudAgentCommandPayload,
   CloudAgentPromptPayload,
   CloudAgentSendPayload,
   CloudAgentStreamTicket,

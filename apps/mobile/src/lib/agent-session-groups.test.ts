@@ -115,4 +115,28 @@ describe('groupAgentSessionsByDate', () => {
     const older = groups.find(g => g.label === 'Older');
     expect(older?.sessions.map(s => s.session_id)).toEqual(['20d', '60d', '90d']);
   });
+
+  it('reads each selected timestamp once per session, whatever the list size', () => {
+    // The selected timestamp is the input to the sort, the section boundary
+    // checks and the in-section order, so it has to be read (and parsed) once
+    // per row. Reading it inside a comparator makes the work grow with the
+    // comparison count instead.
+    const rowCount = 40;
+    let reads = 0;
+    const input = Array.from({ length: rowCount }, (_, index) => {
+      const stamp = iso(index % 20);
+      return {
+        session_id: `s-${index}`,
+        created_at: stamp,
+        get updated_at() {
+          reads += 1;
+          return stamp;
+        },
+      };
+    });
+
+    groupAgentSessionsByDate(input, 'updated_at', NOW);
+
+    expect(reads).toBe(rowCount);
+  });
 });

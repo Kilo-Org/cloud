@@ -5,6 +5,7 @@ import {
   CustomLlmCredentialsSchema,
   CustomLlmDefinitionSchema,
   CustomLlmPublicIdSchema,
+  type CustomLlmDefinition,
   type EncryptedData,
 } from '@kilocode/db/schema-types';
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
@@ -14,7 +15,7 @@ import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encrypti
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 
 const publicIdSchema = z.string().trim().min(1, 'public_id is required');
 
@@ -22,10 +23,17 @@ function badRequest(message: string): never {
   throw new TRPCError({ code: 'BAD_REQUEST', message });
 }
 
+/** The gateway treats a model with a free id as free, so Kilo must never charge for one. */
+function assertPricingMatchesPublicId(publicId: string, definition: CustomLlmDefinition) {
+  if (isFreeModel(publicId) && definition.pricing) {
+    badRequest(`public_id "${publicId}" is a free model id, so pricing must not be set`);
+  }
+}
+
 /**
  * Routing resolves custom LLMs before any other upstream, so a new id must not
- * hide an OpenRouter, Kilo-exclusive or direct BYOK model. Existing rows keep
- * their id, so this only runs when an id is claimed.
+ * hide an OpenRouter or direct BYOK model. Existing rows keep their id, so this
+ * only runs when an id is claimed.
  */
 async function assertPublicIdIsClaimable(publicId: string) {
   const parsedPublicId = CustomLlmPublicIdSchema.safeParse(publicId);
@@ -38,9 +46,6 @@ async function assertPublicIdIsClaimable(publicId: string) {
   );
   if (directByokProvider) {
     badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
-  }
-  if (isKiloExclusiveModel(modelId)) {
-    badRequest(`public_id "${modelId}" is a Kilo-exclusive model`);
   }
   if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
     badRequest(`public_id "${modelId}" already exists in the OpenRouter model list`);
@@ -90,6 +95,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
   }),
 
   upsert: adminProcedure.input(UpsertCustomLlmSchema).mutation(async ({ input }) => {
+    assertPricingMatchesPublicId(input.public_id, input.definition);
     const existing = await db.query.custom_llm2.findFirst({
       where: eq(custom_llm2.public_id, input.public_id),
     });
@@ -159,6 +165,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
         message: `Custom LLM with public_id "${input.source_public_id}" not found`,
       });
     }
+    assertPricingMatchesPublicId(input.public_id, source.definition);
     await assertPublicIdIsClaimable(input.public_id);
 
     const [inserted] = await db

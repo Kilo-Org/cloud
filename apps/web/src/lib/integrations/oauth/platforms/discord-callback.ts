@@ -2,10 +2,20 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { getCallbackReportParams } from '@/lib/integrations/oauth/callback-params';
-import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integrations/discord-service';
-import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
+import {
+  DiscordGuildAlreadyConnectedError,
+  exchangeDiscordCode,
+  upsertDiscordInstallation,
+} from '@/lib/integrations/discord-service';
+import { parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
+import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
+import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -14,6 +24,7 @@ import {
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
   cancelMissingCodeProviderOAuthAttempt,
+  organizationAccessDenialErrorCode,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 
@@ -42,7 +53,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       captureMessage('Discord OAuth error', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
-        extra: { error, state },
+        extra: { error, ...safeCallbackContext(searchParams) },
       });
 
       return NextResponse.redirect(
@@ -63,7 +74,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       captureMessage('Discord callback missing code', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
-        extra: { state, allParams: getCallbackReportParams(searchParams) },
+        extra: safeCallbackContext(searchParams),
       });
 
       return NextResponse.redirect(
@@ -80,7 +91,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       captureMessage('Discord callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
-        extra: { code: '***', state, allParams: getCallbackReportParams(searchParams) },
+        extra: safeCallbackContext(searchParams),
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
@@ -107,9 +118,11 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
-    // 6. Verify user has access to the owner
+    // 6. Verify the user may change the owner's Discord connection. An organization
+    // connection carries a shared bot token and model policy, so it needs the
+    // organization role that governs the integration, not just membership.
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
+      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
     } else {
       // For user-owned integrations, verify it's the same user
       if (user.id !== owner.id) {
@@ -117,7 +130,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       }
     }
 
-    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+    if (verified.provider !== PLATFORM.DISCORD || verified.purpose !== 'provider_install') {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
@@ -137,8 +150,47 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     // 7. Exchange code for access token
     const oauthData = await exchangeDiscordCode(code);
 
-    // 8. Store installation in database
-    await upsertDiscordInstallation(owner, oauthData);
+    // 8. Store installation in database. The organization path is the only caller
+    // allowed to move an existing organization connection to another server, and
+    // only after the organization role check above. The per-server lock keeps two
+    // concurrent connections of one server from each passing the ownership check.
+    const guildId = oauthData.guild?.id
+      ? parseDiscordSnowflake(oauthData.guild.id, 'guild ID')
+      : null;
+    // Resolve the owner's model policy before the lock, so the transaction only
+    // performs the ownership check and the installation write.
+    const defaultModel =
+      owner.type === 'org' ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL) : undefined;
+    try {
+      const store = (database?: DrizzleTransaction) =>
+        upsertDiscordInstallation(
+          owner,
+          oauthData,
+          { allowGuildRebind: owner.type === 'org', defaultModel },
+          database
+        );
+
+      if (guildId) {
+        await withWorkspaceInstallationLock(PLATFORM.DISCORD, owner, guildId, store);
+      } else {
+        await store();
+      }
+    } catch (error) {
+      if (error instanceof DiscordGuildAlreadyConnectedError) {
+        return NextResponse.redirect(
+          new URL(
+            buildIntegrationOAuthRedirectPathFromState(
+              PLATFORM.DISCORD,
+              state,
+              'error=workspace_already_connected'
+            ),
+            APP_URL
+          )
+        );
+      }
+
+      throw error;
+    }
 
     // 9. Redirect to success page
     const successPath = verified.returnTo
@@ -153,15 +205,26 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const state = searchParams.get('state');
 
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (denialCode) {
+      return NextResponse.redirect(
+        new URL(
+          buildIntegrationOAuthRedirectPathFromState(
+            PLATFORM.DISCORD,
+            state,
+            `error=${denialCode}`
+          ),
+          APP_URL
+        )
+      );
+    }
+
     captureException(error, {
       tags: {
         endpoint: 'discord/callback',
         source: 'discord_oauth',
       },
-      extra: {
-        state,
-        hasCode: !!searchParams.get('code'),
-      },
+      extra: safeCallbackContext(searchParams),
     });
 
     return NextResponse.redirect(

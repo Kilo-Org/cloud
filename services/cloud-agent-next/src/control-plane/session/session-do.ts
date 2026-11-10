@@ -1,3 +1,9 @@
+import { environmentReferenceSchema } from '../../environment-build/reference.js';
+import {
+  workspaceSnapshotIdentity,
+  type WorkspaceSnapshotIdentity,
+} from '../sandbox/workspace-snapshot.js';
+import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -11,26 +17,33 @@ import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-author
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
   authorizeCloudAgentChild,
+  authorizeCloudAgentWorkspaceSibling,
   issueCloudAgentMcpGrant,
   assertCloudAgentParentAuthority,
+  CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
+  type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
 import {
   CloudAgentAuthoritySchema,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
+import { sessionCallbackContext } from './callback-context.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
   type CloudAgentChildSessionLineage,
   type CloudAgentWorktreeLocation,
 } from '@kilocode/session-ingest-contracts';
-import { asc } from 'drizzle-orm';
+import { asc, eq, gt } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
+import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import { resolveSecret } from '../../auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
+import { getSandboxProviderBinding } from '../../persistence/session-metadata.js';
+import { sameSandboxProviderBinding } from '../../sandbox-provider-binding.js';
 import { logger } from '../../logger.js';
 import type { WrapperPty } from '../../terminal/types.js';
 import type { OperationResult } from '../../persistence/types.js';
@@ -38,8 +51,7 @@ import {
   CurrentSessionMetadataSchema,
   parseSessionMetadata,
   serializeSessionMetadata,
-  hasRetiredDevcontainerRuntime,
-  DEVCONTAINER_RETIRED_MESSAGE,
+  retiredRuntimeMessage,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import {
@@ -55,22 +67,22 @@ import {
 import { sessionRuntimeLocator } from '../../sandbox-control/worktree-ownership.js';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
 import { applyControlPlanePreparingEvent } from '../../sandbox-session/control-plane-preparing.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import {
   applyPendingInteractionEvent,
   pendingInteractionsSchema,
-  persistSandboxControlSessionEvent,
   type PendingInteractions,
 } from '../../sandbox-session/sandbox-control-event.js';
 import { handleCommandsAvailable } from '../../session/ingest-handlers/commands-available.js';
 import { createMessageId } from '../../session/message-id.js';
+import { generateSessionTitle } from '../../session/generate-session-title.js';
 import type {
   SafeMessageResultResponse,
   MessageResultRPCResponse,
 } from '../../session/message-result.js';
-import type { LatestAssistantMessage } from '../../session/types.js';
-import { createEventQueries, type EventQueries } from '../../session/queries/index.js';
+import { createSessionEventQueries, type SessionEventQueries } from './event-queries.js';
 import { createPreparationProgressRecorder } from '../../session/preparation-progress.js';
-import { sessionIdFromDoName } from '../../session-identity.js';
+import { isControlSession, sessionIdFromDoName } from '../../session-identity.js';
 import {
   finalizePreparationAttempt,
   getPreparationSnapshots,
@@ -82,6 +94,7 @@ import {
 import type {
   CommandsAvailableData,
   PreparationAttempt,
+  PreparingStep,
   SessionStatus,
 } from '../../shared/protocol.js';
 import {
@@ -112,13 +125,36 @@ import {
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneSetupCommandKind,
   type ControlPlaneSetupEvent,
   type ControlPlaneStatusResult,
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
 } from '../../shared/control-plane-protocol.js';
+import {
+  worktreeBranchOperationResultSchema,
+  type ControlPlaneWorktreeGitInput,
+  type WorktreeBranchOperationResult,
+} from '../../shared/worktree-git-operations.js';
+import {
+  matchesExpectedWorktree,
+  nextRepositoryBase,
+  withRepositoryBase,
+  type AdoptWorktreeBaseRequest,
+  type AdoptWorktreeBaseResponse,
+  type WorktreeBranchOperationInput,
+  type WorktreeBranchOperationResponse,
+} from '../../session/worktree-branch-operation.js';
+
+/** Bounded wake for a branch operation: idle sandboxes prepare async. */
+const WORKTREE_GIT_PREPARE_TIMEOUT_MS = 90_000;
+const WORKTREE_GIT_PREPARE_POLL_MS = 500;
 import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
+import type {
+  WorkspaceBillingProjection,
+  WorkspaceRuntimeStatus,
+} from '../../shared/workspace-runtime-status.js';
 import type { SessionId } from '../../types/ids.js';
 import type { Env } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
@@ -129,13 +165,9 @@ import {
   type QueuedMessageSnapshot,
 } from '../../websocket/stream.js';
 import {
-  isDeliverableNativeEvent,
-  isMaterializedNativeEvent,
   NATIVE_DELIVERY_LIMITS,
   toNativePublicEvent,
-  type NativeEventSubscription,
 } from '../../kilo-facade/native-event-source.js';
-import { createNativeEventOutbox } from './native-outbox.js';
 import { sandboxControlPeerNamespace } from '../peer-bindings.js';
 import migrations from './drizzle/migrations';
 import {
@@ -166,7 +198,13 @@ import {
 } from '../worktree-changes-ready.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
-import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
+import type {
+  PreviewSandboxScope,
+  PreviewTargetResult,
+  ResolvedPreviewTarget,
+} from '../sandbox/preview-target.js';
+import { isTerminalSessionEligible } from '../../terminal/access.js';
+import type { ListPreviewServicesOutput } from '../../shared/preview-services.js';
 import { readWorktreeChildSessions } from './worktree-child-sessions.js';
 import {
   buildControlPlaneMessageReport,
@@ -189,7 +227,27 @@ import type {
   GetWorktreeFileOutput,
   RefreshWorktreeChangesOutput,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
-import { controlPlaneMessages, events } from './sqlite-schema.js';
+import {
+  cloudAgentChildSessions,
+  controlPlaneMessages,
+  events,
+  historyImport,
+} from './sqlite-schema.js';
+import {
+  decodeSessionHistoryCursor,
+  readSessionMessagesPage,
+  sessionHistoryPageInputSchema,
+  type SessionMessagesPage,
+} from './history.js';
+import {
+  HISTORY_HYDRATION_WAIT_MS,
+  hydrateSessionHistory,
+  markHistoryHydrated,
+  readHistoryHydration,
+} from './history-hydration.js';
+import { persistSessionEvent, readNativeEventPayload } from './native-events.js';
+import { createPartTextBuffer, type PartTextBuffer } from './part-text-buffer.js';
+import { readOwnedHistoryLineage, readStoredHistoryLineage } from './history-lineage.js';
 import { parseWipeLocator, runTransactionalWipe, type WipeLocator } from './transactional-wipe.js';
 import {
   buildControlPlaneSessionRegistration,
@@ -222,7 +280,12 @@ const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 const ROOT_STATUS_KEY = 'session_root_status';
-const NATIVE_DELIVERY_GENERATION_KEY = 'native_delivery_generation';
+const EVENT_RECEIPT_PREFIX = 'native_event_receipt/';
+/**
+ * A delivery is retried only until `expiresAt`, but an attempt can wait in this DO's queue past it.
+ * Receipts outlive the deadline so a late attempt still applies once and its retry cannot repeat it.
+ */
+const EVENT_RECEIPT_RETENTION_MS = 5 * 60_000;
 
 /**
  * Kilo's last root `session.status` type; `settled` once an accepted message settled after it,
@@ -244,9 +307,55 @@ const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
   CONTROL_PLANE_SETUP_EVENTS.finished,
 ]);
 
+/**
+ * The command kind a setup event belongs to. Missing on older wrappers, which
+ * only send these events for the fatal, pre-command-policy setup path.
+ */
+type SetupCommandKind = ControlPlaneSetupCommandKind;
+
+const SETUP_COMMAND_PHASES: Record<SetupCommandKind, string> = {
+  build: 'setup_commands',
+  session_setup: 'session_setup_commands',
+  start: 'start_commands',
+};
+const SETUP_COMMAND_PHASE_TITLES: Record<SetupCommandKind, string> = {
+  build: 'Running build commands',
+  session_setup: 'Running session setup',
+  start: 'Running start commands',
+};
+const SETUP_COMMAND_LABELS: Record<SetupCommandKind, string> = {
+  build: 'Build command',
+  session_setup: 'Session setup command',
+  start: 'Start command',
+};
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function setupCommandPhase(kind: SetupCommandKind | undefined): string {
+  return kind === undefined ? 'setup_commands' : SETUP_COMMAND_PHASES[kind];
+}
+
+function setupCommandPhaseTitle(kind: SetupCommandKind | undefined): string {
+  return kind === undefined ? 'Running setup commands' : SETUP_COMMAND_PHASE_TITLES[kind];
+}
+
+function setupCommandLabel(
+  kind: SetupCommandKind | undefined,
+  command: number,
+  commandText: string | undefined
+): string {
+  const name = kind === undefined ? 'Setup command' : SETUP_COMMAND_LABELS[kind];
+  return commandText === undefined
+    ? `${name} ${command}`
+    : `${name} ${command} · \`${commandText}\``;
+}
+
 /** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
 const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'sandbox_provision',
+  environment_snapshot: 'environment_snapshot',
   sandbox_start: 'sandbox_boot',
   snapshot_fallback: 'snapshot_fallback',
   clone: 'cloning',
@@ -260,6 +369,7 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
 
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'Creating sandbox',
+  environment_snapshot: 'Checking the environment snapshot',
   sandbox_start: 'Starting sandbox',
   snapshot_fallback: 'Retrying without a snapshot',
   clone: 'Cloning repository',
@@ -311,9 +421,47 @@ export const controlPlaneSessionRegistrationSchema = z
     credentials: controlPlaneCredentialSourceSchema,
     /** Worker-selected provider pin (H1/H2); the DO applies it, never re-decides it. */
     sandboxSelection: controlPlaneSandboxSelectionSchema.optional(),
+    /** The admitted repository environment; DO-private, for snapshot selection only. */
+    environment: environmentReferenceSchema.optional(),
   })
   .strict();
 export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSessionRegistrationSchema>;
+
+function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {
+  return registration === null
+    ? null
+    : workspaceSnapshotIdentity(
+        registration.sandboxId,
+        registration.spec.directory,
+        registration.credentials
+      );
+}
+
+const cloudAgentChildSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+
+const cloudAgentChildSessionRegistrationSchema = z
+  .object({
+    cloudAgentSessionId: cloudAgentChildSessionIdSchema,
+    initialMessageId: z.string().min(1).max(200).optional(),
+    worktreeId: cloudAgentWorktreeIdSchema.optional(),
+  })
+  .strict();
+
+const cloudAgentChildSessionListSchema = z
+  .object({
+    limit: z.number().int().min(1).max(50),
+    cursor: z.uuid().optional(),
+  })
+  .strict();
+
+export type CloudAgentChildSessionPage = {
+  sessions: Array<{
+    cloudAgentSessionId: string;
+    initialMessageId?: string;
+    worktreeId?: string;
+  }>;
+  nextCursor?: string;
+};
 
 export type ControlPlaneSendResult =
   | { type: 'ok' }
@@ -358,6 +506,9 @@ export type ControlPlaneSessionSnapshot =
       }>;
       /** Durability watermark: latest stored event id, or null when none. */
       latestEventId: number | null;
+      updateCursor: number;
+      totalCostMicrodollars: number;
+      title?: string;
     };
 
 /**
@@ -393,16 +544,36 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   } | null>;
   /** B10: forwards one worktree-change request to the wrapper. */
   worktreeCapture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;
+  /** Forwards one Sync/Restack branch operation to the wrapper. */
+  worktreeGit(input: ControlPlaneWorktreeGitInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one terminal request to the wrapper. */
   terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one allowlisted native read to the live wrapper. */
   kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult>;
   /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
-  previewTarget(sessionId: string): Promise<PreviewTargetResult>;
+  previewTarget(scope: PreviewSandboxScope): Promise<PreviewTargetResult>;
+  /** Lists live listening services through the bound wrapper (never wakes an allocation). */
+  previewServices(scope: PreviewSandboxScope): Promise<ListPreviewServicesOutput>;
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
-  getStatusSnapshot(): Promise<SandboxStatusSnapshot>;
+  getStatusSnapshot(identity?: WorkspaceSnapshotIdentity | null): Promise<SandboxStatusSnapshot>;
+  /** Passive billing projection for the workspace that owns this sandbox. */
+  getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null>;
+  /**
+   * Removes the workspace snapshot descriptor for this session's workspace on
+   * explicit user action ("Start fresh"). The Sandbox DO only deletes on this
+   * call, never as a side effect of work; the next start uses the environment
+   * snapshot or the base image.
+   */
+  removeWorkspaceSnapshot(payload: ControlPlaneSessionRefPayload): Promise<{ success: true }>;
+  /**
+   * The capture time of the workspace snapshot descriptor that a "Start fresh"
+   * action would discard, or null when the workspace has none.
+   */
+  getWorkspaceSnapshotRecovery(
+    payload: ControlPlaneSessionRefPayload
+  ): Promise<{ capturedAt: number | null } | null>;
   fetch(request: Request): Promise<Response>;
 };
 
@@ -415,6 +586,11 @@ export type NativeSnapshot = {
   sessionStatus?: SessionStatus;
   questions?: unknown[];
   permissions?: unknown[];
+  /**
+   * The requested root Kilo session is not this DO's registration. `fence: null`
+   * is also an empty log, so a stopped registration needs its own signal.
+   */
+  stopped?: boolean;
 };
 
 export type NativeSnapshotCursor = {
@@ -449,6 +625,9 @@ function rowToMessage(row: SessionMessageRow): SessionMessage {
     acceptedAt: row.accepted_at,
     settledAt: row.settled_at,
     reason: row.reason,
+    ...(row.billing_failure == null
+      ? {}
+      : { billingFailure: readCustomerBillingFailure(row.billing_failure) }),
     ...(container === undefined ? {} : { container }),
   };
 }
@@ -462,6 +641,8 @@ function messageToRow(message: SessionMessage): SessionMessageRow {
     accepted_at: message.acceptedAt,
     settled_at: message.settledAt,
     reason: message.reason,
+    billing_failure:
+      message.billingFailure === undefined ? null : JSON.stringify(message.billingFailure),
     container: message.container === undefined ? null : JSON.stringify(message.container),
   };
 }
@@ -489,7 +670,7 @@ function repositoryFingerprint(repository: SessionMetadata['repository']): strin
     case 'github':
       return `github:${repository.repo}:${repository.githubIntegrationId ?? ''}:${
         repository.githubAccessPurpose ?? 'workflow'
-      }`;
+      }:${repository.allowUserAuthorization === true ? 'user' : 'installation'}`;
     case 'bitbucket':
       return `bitbucket:${repository.workspaceUuid}:${repository.repositoryUuid}:${
         repository.bitbucketIntegrationId ?? ''
@@ -549,7 +730,9 @@ function unavailableStatusSnapshot(): SandboxStatusSnapshot {
 export class SandboxSessionV2 extends DurableObject<Env> {
   readonly sessionId: SessionId;
   private readonly db: DrizzleSqliteDODatabase;
-  private readonly eventQueries: EventQueries;
+  private readonly eventQueries: SessionEventQueries;
+  /** Streamed part text not yet in its row. Flush it before reading stored history. */
+  private readonly partText: PartTextBuffer;
   private readonly initialized: Promise<void>;
   private readonly operations: { tail: Promise<unknown> } = { tail: Promise.resolve() };
   private registration: ControlPlaneSessionRegistration | null = null;
@@ -562,27 +745,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
-  private nativeDeliveryGeneration = 0;
-  private readonly nativeOutbox = createNativeEventOutbox({
-    identity: () => {
-      const kiloUserId = this.metadata?.identity.userId;
-      const kiloSessionId = this.registration?.spec.kiloSessionId;
-      if (kiloUserId === undefined || kiloSessionId === undefined) return null;
-      return { kiloUserId, kiloSessionId, cloudAgentSessionId: this.sessionId };
-    },
-    generation: () => this.nativeDeliveryGeneration,
-    send: (batch, deadlineAt) =>
-      withDORetry(
-        () => this.env.USER_KILO_FACADE.get(this.env.USER_KILO_FACADE.idFromName(batch.kiloUserId)),
-        facade => facade.publishNativeEventBatch({ ...batch, deadlineAt }),
-        'publishNativeEventBatch',
-        { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt } }
-      ),
-    waitUntil: work => this.ctx.waitUntil(work),
-    diagnostic: reason =>
-      logger.withFields({ sessionId: this.sessionId, reason }).warn('Native event continuity lost'),
-  });
   private rootStatus: RootStatus | undefined;
+  private readonly historyHydrations = new Map<string, Promise<void>>();
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
@@ -618,7 +782,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     super(ctx, env);
     this.sessionId = sessionIdFromDoName(ctx.id.name ?? ctx.id.toString()) as SessionId;
     this.db = drizzle(ctx.storage, { logger: false });
-    this.eventQueries = createEventQueries(this.db, ctx.storage.sql);
+    this.eventQueries = createSessionEventQueries(this.db, ctx.storage);
+    this.partText = createPartTextBuffer({
+      queries: this.eventQueries,
+      onFlushError: error =>
+        logger
+          .withFields({ sessionId: this.sessionId, error: errorMessage(error) })
+          .error('Streamed part text flush failed'),
+    });
     this.reportOutbox = createReportOutbox({
       storage: ctx.storage,
       getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE,
@@ -627,18 +798,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       getMetadata: () => this.metadata,
       getCallbackQueue: () => this.env.CALLBACK_QUEUE,
-      getRecentAssistantMessagesForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
-        this.eventQueries.getRecentAssistantMessagesForUserMessage(
+      getRecentAssistantAnswersForUserMessage: (sessionId, kiloSessionId, parentMessageId) => {
+        this.partText.flush();
+        return this.eventQueries.getRecentAssistantAnswersForUserMessage(
           sessionId,
           kiloSessionId,
           parentMessageId
-        ),
-      getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
-        this.eventQueries.getAssistantMessageForUserMessage(
+        );
+      },
+      getAssistantAnswerForUserMessage: (sessionId, kiloSessionId, parentMessageId) => {
+        this.partText.flush();
+        return this.eventQueries.getAssistantAnswerForUserMessage(
           sessionId,
           kiloSessionId,
           parentMessageId
-        ),
+        );
+      },
     });
     this.worktreeChanges = createControlPlaneWorktreeChanges({
       storage: ctx.storage,
@@ -663,7 +838,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
     this.preview = createControlPlanePreview({
       getMetadata: () => this.metadata,
-      resolveTarget: sandboxId => this.previewTargetFor(sandboxId),
+      resolveTarget: (sandboxId, scope) => this.previewTargetFor(sandboxId, scope),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
@@ -682,14 +857,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return peer.terminal(input);
   }
 
-  private async previewTargetFor(sandboxId: string): Promise<PreviewTargetResult> {
+  private async previewTargetFor(
+    sandboxId: string,
+    scope: PreviewSandboxScope
+  ): Promise<PreviewTargetResult> {
     const peer = this.sandboxPeerFor(sandboxId);
     if (peer === null) {
       return { status: 'not_running' };
     }
     return withDORetry(
       () => this.sandboxPeerFor(sandboxId) ?? peer,
-      stub => stub.previewTarget(this.sessionId),
+      stub => stub.previewTarget(scope),
       'previewTarget'
     );
   }
@@ -718,6 +896,272 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return peer.worktreeCapture(input);
   }
 
+  /**
+   * Runs a Sync or Restack against the worktree's own sandbox.
+   *
+   * The target is derived from this session only: callers cannot name a sandbox
+   * or directory. An idle sandbox is woken through the existing preparation
+   * path (no synthetic turn); preparation is bounded so the caller learns
+   * rather than waiting for the provider. The wrapper owns the active-turn and
+   * directory locks and answers `refused`, so the DO never forces a rewrite
+   * over a running turn.
+   */
+  async syncWorktreeBranch(
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    return this.runWorktreeBranchOperation('sync', input);
+  }
+
+  async restackWorktreeBranch(
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    return this.runWorktreeBranchOperation('restack', input);
+  }
+
+  private async runWorktreeBranchOperation(
+    operation: 'sync' | 'restack',
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    await this.initialized;
+    const metadata = this.metadata;
+    const registration = this.registration;
+    const worktreeId = metadata?.workspace?.worktreeId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const directory = registration?.spec.directory;
+    if (
+      metadata === null ||
+      registration === null ||
+      worktreeId === undefined ||
+      kiloSessionId === undefined ||
+      directory === undefined ||
+      metadata.identity.createdOnPlatform !== 'cloud-agent-web' ||
+      metadata.workspace?.sandboxKind === 'shared' ||
+      metadata.workspace?.sandboxRoute !== undefined
+    ) {
+      return {
+        ok: false,
+        code: 'not_a_worktree_session',
+        message: 'Sync and Restack run only in a browser workspace session with its own sandbox',
+        retryable: false,
+      };
+    }
+
+    const baseBranch = input.baseBranch ?? metadata.repository?.baseBranch;
+    const upstreamSha = input.upstreamSha ?? metadata.repository?.baseSha;
+
+    const ready = await this.ensureReadyForBranchOperation();
+    if (!ready.ok) {
+      return { ok: false, code: 'sandbox_not_ready', message: ready.message, retryable: true };
+    }
+
+    const sandboxId = metadata.workspace?.sandboxId;
+    if (sandboxId === undefined) {
+      return {
+        ok: false,
+        code: 'sandbox_not_ready',
+        message: 'Sandbox is not available',
+        retryable: true,
+      };
+    }
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return {
+        ok: false,
+        code: 'sandbox_not_ready',
+        message: 'Sandbox is not available',
+        retryable: true,
+      };
+    }
+    let result: ControlPlaneControlResult;
+    try {
+      result = await peer.worktreeGit({
+        session: {
+          sessionId: this.sessionId,
+          kiloSessionId,
+          directory,
+        },
+        payload: {
+          operation,
+          ...(baseBranch === undefined ? {} : { baseBranch }),
+          ...(upstreamSha === undefined ? {} : { upstreamSha }),
+        },
+      });
+    } catch (error) {
+      // The wrapper may have completed a lease push before the reply was lost.
+      // Surface the ambiguity; the Worker must not retry this mutation.
+      return {
+        ok: false,
+        code: 'operation_outcome_unknown',
+        message: error instanceof Error ? error.message : 'Worktree operation outcome is unknown',
+        retryable: false,
+      };
+    }
+    if (!result.ok) {
+      return {
+        ok: false,
+        code:
+          result.error.code === 'operation_outcome_unknown'
+            ? 'operation_outcome_unknown'
+            : 'operation_failed',
+        message: result.error.message,
+        retryable: result.error.retryable,
+      };
+    }
+    const parsed = worktreeBranchOperationResultSchema.safeParse(result.result);
+    if (!parsed.success) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Worktree branch operation returned an invalid result');
+      return {
+        ok: false,
+        code: 'invalid_result',
+        message: 'The sandbox returned an invalid branch operation result',
+        retryable: false,
+      };
+    }
+    const outcome = parsed.data;
+    if (
+      (outcome.status === 'changed' || outcome.status === 'unchanged') &&
+      !(operation === 'restack' && outcome.operation === 'sync')
+    ) {
+      await this.persistWorktreeBranchOperation(outcome);
+    }
+    return { ok: true, result: outcome };
+  }
+
+  private async persistWorktreeBranchOperation(
+    outcome: Extract<WorktreeBranchOperationResult, { status: 'changed' | 'unchanged' }>
+  ): Promise<void> {
+    const metadata = this.metadata;
+    if (metadata?.repository === undefined) return;
+    const nextBase = nextRepositoryBase({
+      current: {
+        ...(metadata.repository.baseBranch === undefined
+          ? {}
+          : { baseBranch: metadata.repository.baseBranch }),
+        ...(metadata.repository.baseSha === undefined
+          ? {}
+          : { baseSha: metadata.repository.baseSha }),
+      },
+      result: { baseBranch: outcome.baseBranch, baseSha: outcome.baseSha },
+    });
+    await this.persistAdoptedBase(nextBase, outcome.branch);
+  }
+
+  /**
+   * Internal metadata-only adoption for a sibling session that shares the
+   * worktree. It never wakes the sandbox or creates a turn: the next capture
+   * reads the updated grouped metadata, so a sibling cannot overwrite the
+   * shared Changes snapshot with its old base.
+   */
+  async adoptWorktreeBase(input: AdoptWorktreeBaseRequest): Promise<AdoptWorktreeBaseResponse> {
+    await this.initialized;
+    if (!matchesExpectedWorktree(this.metadata, input.expectedWorktreeId)) {
+      return {
+        ok: false,
+        code: 'worktree_mismatch',
+        message: 'This session does not belong to the expected worktree',
+      };
+    }
+    const persisted = await this.persistAdoptedBase({
+      baseBranch: input.baseBranch,
+      baseSha: input.baseSha,
+    });
+    return persisted
+      ? { ok: true }
+      : {
+          ok: false,
+          code: 'invalid_metadata',
+          message: 'Adopted base did not produce valid session metadata',
+        };
+  }
+
+  /**
+   * Writes a base + effective prompt + route spec through the queue. Callers
+   * have already resolved the effective values; a null result keeps the
+   * current value upstream in `nextRepositoryBase`.
+   */
+  private async persistAdoptedBase(
+    nextBase: { baseBranch?: string; baseSha?: string },
+    fallbackBranch?: string
+  ): Promise<boolean> {
+    const metadata = this.metadata;
+    if (metadata?.repository === undefined) return false;
+    const next = withRepositoryBase(metadata, nextBase, fallbackBranch);
+    const validated = CurrentSessionMetadataSchema.safeParse(next);
+    if (!validated.success) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Worktree base adoption produced invalid session metadata');
+      return false;
+    }
+    await this.enqueue(async () => {
+      await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(validated.data));
+      this.metadata = validated.data;
+      if (this.registration !== null) {
+        const spec = {
+          ...this.registration.spec,
+          ...(validated.data.repository?.baseBranch === undefined
+            ? {}
+            : { baseBranch: validated.data.repository.baseBranch }),
+          ...(validated.data.repository?.baseSha === undefined
+            ? {}
+            : { baseSha: validated.data.repository.baseSha }),
+        };
+        const registration = { ...this.registration, spec };
+        await this.ctx.storage.put(REGISTRATION_KEY, registration);
+        this.registration = registration;
+      }
+    });
+    return true;
+  }
+
+  /** Wakes an idle sandbox through the ordinary preparation path. */
+  private async ensureReadyForBranchOperation(): Promise<
+    { ok: true } | { ok: false; message: string }
+  > {
+    const prepared = await this.prepareSandbox();
+    if (prepared !== null) {
+      await this.applyView(prepared, this.transportPass());
+      if (prepared.state === 'ready') return { ok: true };
+      if (prepared.state === 'failed') return { ok: false, message: prepared.reason };
+    }
+    const deadline = Date.now() + WORKTREE_GIT_PREPARE_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      if (this.route.state === 'ready') return { ok: true };
+      const failed = this.branchOperationRouteFailure();
+      if (failed !== undefined) return { ok: false, message: failed };
+      const peer = this.sandboxPeer();
+      if (peer !== null) {
+        try {
+          const status = await peer.status({ sessionId: this.sessionId });
+          if (status.view.state !== 'preparing') {
+            await this.applyView(status.view, this.transportPass());
+          }
+        } catch {
+          // A transient Sandbox RPC failure is retried within the bound.
+        }
+        if (this.routeIsReady()) return { ok: true };
+        const afterPoll = this.branchOperationRouteFailure();
+        if (afterPoll !== undefined) return { ok: false, message: afterPoll };
+      }
+      await new Promise(resolve => setTimeout(resolve, WORKTREE_GIT_PREPARE_POLL_MS));
+    }
+    return {
+      ok: false,
+      message: 'Sandbox preparation did not finish within 90 seconds',
+    };
+  }
+
+  private branchOperationRouteFailure(): string | undefined {
+    const route = this.route;
+    return route.state === 'failed' ? route.reason : undefined;
+  }
+
+  private routeIsReady(): boolean {
+    return this.route.state === 'ready';
+  }
+
   private async initializeStorage(): Promise<void> {
     const generation = await this.ctx.storage.get<unknown>(GENERATION_KEY);
     if (generation !== GENERATION) {
@@ -726,18 +1170,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.ctx.storage.deleteAll();
       await this.ctx.storage.put(GENERATION_KEY, GENERATION);
       await migrate(this.db, migrations);
-      this.nativeDeliveryGeneration = 1;
-      await this.ctx.storage.put(NATIVE_DELIVERY_GENERATION_KEY, this.nativeDeliveryGeneration);
       return;
     }
     await migrate(this.db, migrations);
-    const nativeGeneration = z
-      .number()
-      .int()
-      .nonnegative()
-      .safeParse(await this.ctx.storage.get<unknown>(NATIVE_DELIVERY_GENERATION_KEY));
-    this.nativeDeliveryGeneration = (nativeGeneration.success ? nativeGeneration.data : 0) + 1;
-    await this.ctx.storage.put(NATIVE_DELIVERY_GENERATION_KEY, this.nativeDeliveryGeneration);
     const raw = await this.ctx.storage.get<unknown>(REGISTRATION_KEY);
     const parsed = controlPlaneSessionRegistrationSchema.safeParse(raw);
     this.registration = parsed.success ? parsed.data : null;
@@ -790,6 +1225,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     const registration = controlPlaneSessionRegistrationSchema.parse(input);
     await this.enqueue(async () => {
+      if (this.registration === null) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
     });
@@ -840,7 +1276,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         sandboxSelection,
         this.env.AGENT_ENV_VARS_PRIVATE_KEY,
         {
-          containmentEnabled: this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false',
+          containmentEnabled: true,
           workerUrl: this.env.WORKER_URL,
         }
       );
@@ -851,6 +1287,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (sealed.type === 'failure') return sealed.failure;
 
     await this.enqueue(async () => {
+      if (validated.data.clone === undefined) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
       await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(validated.data));
@@ -902,7 +1339,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         sandboxSelection,
         this.env.AGENT_ENV_VARS_PRIVATE_KEY,
         {
-          containmentEnabled: this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false',
+          containmentEnabled: true,
           workerUrl: this.env.WORKER_URL,
         }
       );
@@ -912,6 +1349,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const sealed = await this.unsealAuthorization(runtimeAuthorizationSeal, metadata);
     if (sealed.type === 'failure') return sealed.failure;
     await this.enqueue(async () => {
+      if (metadata.clone === undefined) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
       await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(metadata));
@@ -930,25 +1368,125 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.metadata;
   }
 
-  async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
+  async assertCloudAgentManagementAuthority(authority: unknown): Promise<void> {
     await this.initialized;
-    const scope = CloudAgentAuthoritySchema.parse(authority);
-    const authorization = RuntimeAuthorizationSchema.parse(
+    const scope = CloudAgentAuthoritySchema.safeParse(authority);
+    const authorization = RuntimeAuthorizationSchema.safeParse(
       await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
     );
-    assertCloudAgentParentAuthority(this.metadata, authorization, scope);
+    if (!scope.success || !authorization.success) {
+      throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+    }
+    assertCloudAgentParentAuthority(this.metadata, authorization.data, scope.data);
+  }
+
+  async recordCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
+    await this.initialized;
+    const child = cloudAgentChildSessionRegistrationSchema.parse(input);
+    if (this.metadata?.allowSubagentSessions !== true) {
+      throw new Error('Cloud Agent child registry denied');
+    }
+    if (child.cloudAgentSessionId === this.sessionId) {
+      throw new Error('Cloud Agent child registry requires another session');
+    }
+    this.db
+      .insert(cloudAgentChildSessions)
+      .values({
+        child_session_id: child.cloudAgentSessionId,
+        initial_message_id: child.initialMessageId ?? null,
+        worktree_id: child.worktreeId ?? null,
+        created_at: Date.now(),
+      })
+      .onConflictDoNothing()
+      .run();
+    return { success: true };
+  }
+
+  async forgetCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
+    await this.initialized;
+    const childSessionId = cloudAgentChildSessionIdSchema.parse(input);
+    this.db
+      .delete(cloudAgentChildSessions)
+      .where(eq(cloudAgentChildSessions.child_session_id, childSessionId))
+      .run();
+    return { success: true };
+  }
+
+  async listCloudAgentChildSessions(input: unknown): Promise<CloudAgentChildSessionPage> {
+    await this.initialized;
+    const page = cloudAgentChildSessionListSchema.parse(input);
+    const cursorSessionId = page.cursor === undefined ? undefined : `workspace_${page.cursor}`;
+    const rows = this.db
+      .select({
+        cloudAgentSessionId: cloudAgentChildSessions.child_session_id,
+        initialMessageId: cloudAgentChildSessions.initial_message_id,
+        worktreeId: cloudAgentChildSessions.worktree_id,
+      })
+      .from(cloudAgentChildSessions)
+      .where(
+        cursorSessionId === undefined
+          ? undefined
+          : gt(cloudAgentChildSessions.child_session_id, cursorSessionId)
+      )
+      .orderBy(asc(cloudAgentChildSessions.child_session_id))
+      .limit(page.limit + 1)
+      .all();
+    const visible = rows.slice(0, page.limit);
+    const last = visible.at(-1);
+    const nextCursor =
+      rows.length > page.limit && last !== undefined
+        ? last.cloudAgentSessionId.slice('workspace_'.length)
+        : undefined;
+    return {
+      sessions: visible.map(row => ({
+        cloudAgentSessionId: row.cloudAgentSessionId,
+        ...(row.initialMessageId === null ? {} : { initialMessageId: row.initialMessageId }),
+        ...(row.worktreeId === null ? {} : { worktreeId: row.worktreeId }),
+      })),
+      ...(nextCursor === undefined ? {} : { nextCursor }),
+    };
+  }
+
+  async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
+    return (await this.getCloudAgentSpawnContext(authority)).token;
+  }
+
+  async getCloudAgentSpawnContext(
+    authority: CloudAgentAuthority
+  ): Promise<{ token: string; createdOnPlatform: string | undefined }> {
+    await this.initialized;
+    const scope = CloudAgentAuthoritySchema.safeParse(authority);
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!scope.success || !authorization.success) {
+      throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+    }
+    assertCloudAgentParentAuthority(this.metadata, authorization.data, scope.data);
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
     if (!secret) throw new Error('Authentication unavailable');
     const issued = await renewRuntimeAuthorization({
-      authorization,
+      authorization: authorization.data,
       secret,
       connectionString: this.env.HYPERDRIVE.connectionString,
+    }).catch(error => {
+      if (
+        error instanceof RuntimeAuthorizationRevokedError ||
+        error instanceof RuntimeAuthorizationExpiredError
+      ) {
+        throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+      }
+      throw error;
     });
-    const current = RuntimeAuthorizationSchema.parse(
+    const current = RuntimeAuthorizationSchema.safeParse(
       await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
     );
-    assertCloudAgentParentAuthority(this.metadata, current, scope);
-    return issued.token;
+    if (!current.success) throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+    assertCloudAgentParentAuthority(this.metadata, current.data, scope.data);
+    return {
+      token: issued.token,
+      createdOnPlatform: this.metadata?.identity.createdOnPlatform,
+    };
   }
 
   async authorizeCloudAgentChild(input: {
@@ -967,14 +1505,31 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async issueCloudAgentMcpGrant(): Promise<
-    { url: string; token: string; expiresAt: number } | undefined
-  > {
+  async authorizeCloudAgentWorkspaceSibling(input: {
+    siblingSessionId: string;
+  }): Promise<{ token: string; seal: string }> {
+    await this.initialized;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return authorizeCloudAgentWorkspaceSibling({
+      parentSessionId: this.metadata?.identity.sessionId ?? '',
+      siblingSessionId: input.siblingSessionId,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  async issueCloudAgentMcpGrant(
+    workspace?: WorkspaceMcpBinding
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
     await this.initialized;
     if (this.metadata?.allowSubagentSessions !== true) return undefined;
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
     if (!secret) throw new Error('Authentication unavailable');
     return issueCloudAgentMcpGrant({
+      workspace,
       secret,
       connectionString: this.env.HYPERDRIVE.connectionString,
       metadata: () => this.getMetadata(),
@@ -1001,11 +1556,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const authorization = RuntimeAuthorizationSchema.safeParse(
       await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
     );
-    const containment = this.registration?.sandboxSelection?.containment;
-    const contained =
-      containment === undefined
-        ? this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
-        : containment.kilocode || containment.github;
     return issuePersistedRuntimeProxyGrant({
       env: this.env,
       storage: this.ctx.storage,
@@ -1013,7 +1563,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       authorization: authorization.success ? authorization.data : null,
       fence,
       token,
-      mode: contained ? 'contained' : 'direct',
+      mode: 'contained',
     });
   }
 
@@ -1300,6 +1850,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
       existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
+      sameSandboxProviderBinding(
+        getSandboxProviderBinding(existing),
+        getSandboxProviderBinding(metadata)
+      ) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
       (existing.workspace?.egressMode ?? 'unrestricted') ===
         (metadata.workspace?.egressMode ?? 'unrestricted') &&
@@ -1309,6 +1863,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         JSON.stringify(metadata.workspace?.egressAllowlist ?? []) &&
       JSON.stringify(this.registration.sandboxSelection?.egressAllowlist ?? []) ===
         JSON.stringify(sandboxSelection.egressAllowlist ?? []) &&
+      (existing.workspace?.egressAudit ?? false) === (metadata.workspace?.egressAudit ?? false) &&
+      (this.registration.sandboxSelection?.egressAudit ?? false) ===
+        (sandboxSelection.egressAudit ?? false) &&
       (existing.initialMessage?.id ?? null) === (messageId ?? null) &&
       (existing.clone?.cloneUpToMessageId ?? null) === (metadata.clone?.cloneUpToMessageId ?? null)
     );
@@ -1363,9 +1920,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // A delete queued ahead of this task made the session not-found; do not
       // persist a queued row against wiped storage.
       if (this.registration === null) return { type: 'session-not-found' };
-      const admitted = await this.admitMessage(parsed);
+      const admitted = await this.admitMessage(await this.withSessionCallbackContext(parsed));
       return admitted === 'queue-full' ? { type: 'queue-full' } : { type: 'ok' };
     });
+  }
+
+  /**
+   * Gives an interactive chat the server-signed values it needs to route a
+   * child callback back to itself. The token is derived from the session's
+   * immutable identity, so a retry and a replay produce the same context.
+   */
+  private async withSessionCallbackContext(
+    intent: ControlPlanePromptPayload
+  ): Promise<ControlPlanePromptPayload> {
+    if (intent.turn.type !== 'prompt') return intent;
+    const context = sessionCallbackContext(this.metadata);
+    return context === undefined ? intent : { ...intent, context };
   }
 
   /**
@@ -1396,6 +1966,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.persistMessages(reduction.changed);
       for (const message of reduction.changed) this.emitQueued(message);
       this.ensureReportAnchor(reduction.changed[0]);
+      if (this.messages.length === 1 && this.metadata !== null) {
+        this.ctx.waitUntil(generateSessionTitle(this.env, this.metadata, parsed.turn));
+      }
     }
     await this.armAlarm();
     if (!this.messages.some(message => message.state === 'queued')) return 'ok';
@@ -1543,10 +2116,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   async nativeSnapshot(input: {
     fromId?: number;
+    kiloSessionId: string;
     continuation?: NativeSnapshotCursor;
   }): Promise<NativeSnapshot> {
     await this.initialized;
-    if (this.registration === null) return { oversized: false, fence: null, events: [] };
+    if (this.registration === null || this.registration.spec.kiloSessionId !== input.kiloSessionId)
+      return { oversized: false, fence: null, events: [], stopped: true };
+    this.partText.flush();
     const kiloSessionId = this.registration.spec.kiloSessionId;
     const fence =
       input.continuation === undefined
@@ -1612,63 +2188,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return detailsBytes + eventsBytes > NATIVE_DELIVERY_LIMITS.batchBytes
       ? { oversized: true, fence, events: [] }
       : snapshot;
-  }
-
-  /**
-   * The per-user Kilo facade subscribes to this session's native events. The
-   * fence is the delivery watermark at subscribe time: the facade's snapshot is
-   * complete through it, and later events arrive as pushes.
-   */
-  async subscribeNativeEvents(input: {
-    kiloSessionId: string;
-    attachmentId: string;
-  }): Promise<NativeEventSubscription> {
-    await this.initialized;
-    if (this.registration === null || this.registration.spec.kiloSessionId !== input.kiloSessionId)
-      return {
-        registered: false,
-        fence: null,
-        kiloSessionId: input.kiloSessionId,
-        continuity: { generation: this.nativeDeliveryGeneration, sequence: 0 },
-      };
-    const continuity = this.nativeOutbox.subscribe(input.attachmentId);
-    return {
-      registered: true,
-      fence: this.eventQueries.getLatestEventId(),
-      kiloSessionId: input.kiloSessionId,
-      continuity,
-    };
-  }
-
-  async refreshNativeEvents(input: {
-    kiloSessionId: string;
-    attachmentId: string;
-    generation: number;
-  }): Promise<boolean> {
-    await this.initialized;
-    return (
-      this.registration?.spec.kiloSessionId === input.kiloSessionId &&
-      this.nativeOutbox.refresh(input.attachmentId, input.generation)
-    );
-  }
-
-  async releaseNativeEvents(input: { attachmentId: string }): Promise<void> {
-    await this.initialized;
-    this.nativeOutbox.release(input.attachmentId);
-  }
-
-  private publishNativeEvent(stored: StoredEvent): void {
-    const kiloSessionId = this.registration?.spec.kiloSessionId;
-    if (kiloSessionId === undefined || this.metadata?.identity.userId === undefined) return;
-    const event = formatStreamEvent(stored, this.sessionId);
-    if (!isDeliverableNativeEvent(event, true)) return;
-    const native = toNativePublicEvent(event, kiloSessionId);
-    if (native === null) return;
-    this.nativeOutbox.enqueue({
-      eventId: stored.id,
-      materialized: isMaterializedNativeEvent(event),
-      event: native,
-    });
   }
 
   /** The pending questions and permissions this session waits on (C1 adapter). */
@@ -1751,7 +2270,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.settleMessages(
           this.messages.filter(m => m.state === 'accepted').map(m => m.messageId),
           'failed',
-          parsed.reason
+          parsed.reason,
+          undefined,
+          'coordinator',
+          parsed.billingFailure
         );
         await this.applyView({ state: 'unknown' });
         await this.armAlarm();
@@ -1774,7 +2296,34 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // A delete queued ahead of this notification wiped the session.
       if (this.registration === null) return;
-      for (const event of parsed.events) {
+      const delivery = parsed.delivery;
+      const receiptKey =
+        delivery === undefined
+          ? undefined
+          : `${EVENT_RECEIPT_PREFIX}${String(delivery.expiresAt).padStart(16, '0')}/${delivery.id}`;
+      const retainedFrom = Date.now() - EVENT_RECEIPT_RETENTION_MS;
+      for (const [key] of this.ctx.storage.kv.list({
+        prefix: EVENT_RECEIPT_PREFIX,
+        end: `${EVENT_RECEIPT_PREFIX}${String(retainedFrom).padStart(16, '0')}/`,
+        limit: 100,
+      }))
+        this.ctx.storage.kv.delete(key);
+      if (delivery !== undefined && delivery.expiresAt <= retainedFrom) {
+        logger
+          .withFields({ sessionId: this.sessionId, eventCount: parsed.events.length })
+          .warn('Dropped native event delivery past receipt retention');
+        return;
+      }
+      const nextEvent =
+        receiptKey === undefined
+          ? 0
+          : z
+              .number()
+              .int()
+              .nonnegative()
+              .parse(this.ctx.storage.kv.get(receiptKey) ?? 0);
+      for (const [index, event] of parsed.events.entries()) {
+        if (index < nextEvent) continue;
         if (event.type === 'commands.available') {
           await handleCommandsAvailable(event.properties, {
             setAvailableCommands: async commands => {
@@ -1803,12 +2352,30 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
         }
         await this.recordRootStatus(event);
-        persistSandboxControlSessionEvent({
-          sessionId: this.sessionId,
-          payload: event,
-          eventQueries: this.eventQueries,
-          broadcast: stored => this.broadcast(stored),
-        });
+        // A retried batch can be partially applied; commit its receipt with the row mutation.
+        const stored = this.partText.transaction(() =>
+          this.ctx.storage.transactionSync(() => {
+            const persisted = persistSessionEvent({
+              sessionId: this.sessionId,
+              event,
+              queries: this.eventQueries,
+              partText: this.partText,
+            });
+            if (receiptKey !== undefined) this.ctx.storage.kv.put(receiptKey, index + 1);
+            return persisted;
+          })
+        );
+        if (stored !== null) this.broadcast(stored);
+        if (event.type === 'session.created' && this.registration !== null) {
+          const info = z
+            .object({ id: z.string(), parentID: z.string() })
+            .safeParse(event.properties.info);
+          if (
+            info.success &&
+            readStoredHistoryLineage(this.db, this.registration.spec.kiloSessionId, info.data.id)
+          )
+            markHistoryHydrated(this.ctx.storage, info.data.id);
+        }
         this.worktreeChanges.onEvent(event.type, event.properties);
       }
     });
@@ -1931,6 +2498,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async getSession(): Promise<ControlPlaneSessionSnapshot> {
     await this.initialized;
     if (this.registration === null) return { type: 'session-not-found' };
+    this.partText.flush();
+    const native = this.eventQueries.findByEntityId(
+      `session/${this.registration.spec.kiloSessionId}`
+    );
+    const info = z
+      .object({ title: z.string().optional() })
+      .safeParse(
+        native === null ? undefined : readNativeEventPayload(native.payload)?.properties.info
+      );
     return {
       type: 'found',
       sessionId: this.sessionId,
@@ -1944,7 +2520,139 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         reason: message.reason,
       })),
       latestEventId: this.eventQueries.getLatestEventId(),
+      updateCursor: this.eventQueries.getUpdateCursor(),
+      totalCostMicrodollars: this.eventQueries.getTotalCostMicrodollars(
+        this.sessionId,
+        this.registration.spec.kiloSessionId
+      ),
+      ...(info.success && info.data.title !== undefined ? { title: info.data.title } : {}),
     };
+  }
+
+  async getSessionMessagesPage(
+    input: {
+      cursor?: string;
+      limit?: number;
+      kiloSessionId?: string;
+      expectedRootKiloSessionId?: string;
+    } = {}
+  ): Promise<SessionMessagesPage | null> {
+    await this.initialized;
+    const parsed = sessionHistoryPageInputSchema.parse(input);
+    const registration = this.registration;
+    const rootKiloSessionId = registration?.spec.kiloSessionId;
+    if (
+      rootKiloSessionId === undefined ||
+      registration === null ||
+      (input.expectedRootKiloSessionId !== undefined &&
+        input.expectedRootKiloSessionId !== rootKiloSessionId)
+    )
+      return null;
+    const kiloSessionId = parsed.kiloSessionId ?? rootKiloSessionId;
+    if (parsed.cursor !== undefined) {
+      const cursor = decodeSessionHistoryCursor(parsed.cursor);
+      if (
+        cursor.sessionId !== this.sessionId ||
+        cursor.rootKiloSessionId !== rootKiloSessionId ||
+        cursor.kiloSessionId !== kiloSessionId
+      ) {
+        throw new Error('Session history cursor belongs to another session');
+      }
+    }
+    const isRoot = kiloSessionId === rootKiloSessionId;
+    const storedLineage = isRoot
+      ? undefined
+      : readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId);
+    const lineage =
+      isRoot || storedLineage !== undefined
+        ? storedLineage
+        : await withTimeout(
+            readOwnedHistoryLineage({
+              env: this.env,
+              userId: registration.credentials.userId,
+              sessionId: this.sessionId,
+              rootKiloSessionId,
+              kiloSessionId,
+            }),
+            5000,
+            'Session history lineage lookup timed out'
+          );
+    if ((!isRoot && lineage == null) || this.registration !== registration) return null;
+    await this.ensureClientHistory(kiloSessionId);
+    if (this.registration !== registration) return null;
+    this.partText.flush();
+    return readSessionMessagesPage({
+      db: this.db,
+      storage: this.ctx.storage,
+      queries: this.eventQueries,
+      sessionId: this.sessionId,
+      rootKiloSessionId,
+      ...parsed,
+      kiloSessionId,
+      metadata: isRoot ? this.metadata : null,
+      parentID: lineage?.parentID,
+      omittedItemCount:
+        readHistoryHydration(this.ctx.storage, isRoot ? undefined : kiloSessionId)
+          ?.omittedItemCount ?? 0,
+    });
+  }
+
+  private async ensureClientHistory(
+    kiloSessionId = this.registration?.spec.kiloSessionId
+  ): Promise<void> {
+    const registration = this.registration;
+    const metadata = this.metadata;
+    if (
+      registration === null ||
+      kiloSessionId === undefined ||
+      metadata === null ||
+      readHistoryHydration(
+        this.ctx.storage,
+        kiloSessionId === registration.spec.kiloSessionId ? undefined : kiloSessionId
+      )?.phase === 'complete'
+    )
+      return;
+    // Session-ingest holds only v1 history; native v2 history lives only in this DO.
+    if (
+      this.eventQueries.findByEntityId(`conversation-source/${registration.spec.kiloSessionId}`) !==
+      null
+    )
+      return;
+    let hydration = this.historyHydrations.get(kiloSessionId);
+    if (hydration === undefined) {
+      hydration = (async () => {
+        const internalSecret = await resolveSecret(this.env.INTERNAL_API_SECRET_PROD);
+        if (this.registration !== registration) return;
+        await hydrateSessionHistory({
+          db: this.db,
+          storage: this.ctx.storage,
+          ingest: this.env.SESSION_INGEST,
+          queries: this.eventQueries,
+          partText: this.partText,
+          sessionId: this.sessionId,
+          kiloSessionId,
+          rootKiloSessionId: registration.spec.kiloSessionId,
+          userId: metadata.identity.userId,
+          internalSecret: internalSecret ?? '',
+          isCurrent: () => this.registration === registration,
+          broadcast: event => this.broadcast(event),
+        });
+      })().finally(() => {
+        if (this.historyHydrations.get(kiloSessionId) === hydration)
+          this.historyHydrations.delete(kiloSessionId);
+      });
+      this.historyHydrations.set(kiloSessionId, hydration);
+    }
+    try {
+      // A slow hydration keeps running; the next read joins it rather than restarting it.
+      await withTimeout(
+        hydration,
+        HISTORY_HYDRATION_WAIT_MS,
+        'Session history hydration is still in progress'
+      );
+    } catch (error) {
+      if (this.registration !== null) throw error;
+    }
   }
 
   /**
@@ -1958,10 +2666,56 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
     if (peer === null) return unavailableStatusSnapshot();
     try {
-      return await peer.getStatusSnapshot();
+      return await peer.getStatusSnapshot(statusWorkspaceIdentity(this.registration));
     } catch {
       return unavailableStatusSnapshot();
     }
+  }
+
+  /**
+   * Worker-facing workspace status RPC. Composes the passive sandbox snapshot
+   * with the sandbox's stored billing projection; it never prepares a route,
+   * delivers a message or starts the container.
+   */
+  async getWorkspaceRuntimeStatus(): Promise<WorkspaceRuntimeStatus> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { sandbox: unavailableStatusSnapshot(), billing: null };
+    const [sandbox, billing] = await Promise.all([
+      peer
+        .getStatusSnapshot(statusWorkspaceIdentity(this.registration))
+        .catch(() => unavailableStatusSnapshot()),
+      peer.getWorkspaceBillingProjection().catch(() => null),
+    ]);
+    return { sandbox, billing };
+  }
+
+  /**
+   * Explicit user action ("Start fresh"): remove the workspace snapshot
+   * descriptor so the next start uses the environment snapshot or base image.
+   * The Sandbox DO owns the descriptor and never deletes it on its own.
+   * A session with no registered sandbox has nothing to discard.
+   */
+  async removeWorkspaceSnapshot(): Promise<{ success: true }> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { success: true };
+    return await peer.removeWorkspaceSnapshot({ sessionId: this.sessionId });
+  }
+
+  /**
+   * The capture time a "Start fresh" action would discard, or null when the
+   * workspace has no snapshot descriptor. Mirrors the sandbox's descriptor
+   * read; it never mutates it.
+   */
+  async getWorkspaceSnapshotRecovery(): Promise<{ capturedAt: number | null } | null> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return null;
+    return await peer.getWorkspaceSnapshotRecovery({ sessionId: this.sessionId });
   }
 
   /** The preparation attempts the stream replays, for the first transcript page. */
@@ -1992,18 +2746,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       cloudAgentSessionId: this.sessionId,
     };
     return { type: 'found', result };
-  }
-
-  /**
-   * Latest assistant message for the session's Kilo session (legacy
-   * `getLatestAssistantMessage`). Reads the shared event log; the Kilo session
-   * id is the route spec's identity.
-   */
-  async getLatestAssistantMessage(): Promise<LatestAssistantMessage | null> {
-    await this.initialized;
-    const kiloSessionId = this.registration?.spec.kiloSessionId;
-    if (kiloSessionId === undefined) return null;
-    return this.eventQueries.getLatestAssistantMessage(this.sessionId, kiloSessionId);
   }
 
   /**
@@ -2102,9 +2844,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   /**
-   * C1c security: closes this session's stream sockets when its owner leaves an
-   * organization (legacy `closeOrgStreams`). Reads the org from the same
-   * persisted session metadata and only closes on a match.
+   * C1c: closes the browser sockets of this session — the event stream and the
+   * browser side of each bridged terminal — and returns how many it closed.
+   * Reads the organization from the same persisted session metadata and only
+   * closes on a match.
    */
   async closeOrgStreams(organizationId: string): Promise<number> {
     await this.initialized;
@@ -2115,6 +2858,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       socket.close(1000, 'session access revoked');
       closed++;
     }
+    closed += this.terminals.closeBrowserSockets(1000, 'session access revoked');
     return closed;
   }
 
@@ -2247,6 +2991,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * runs under the serial queue.
    */
   private async tearDownSession(): Promise<void> {
+    const parentSessionId = this.metadata?.parentCloudAgentSessionId;
+    const ownerId = this.metadata?.identity.userId;
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Session deleted');
     // A late capture after this must not write the deleted worktree's diff.
     this.worktreeChanges.suppress();
@@ -2257,6 +3003,31 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.repairOutboxes(Number.MAX_SAFE_INTEGER);
     this.logDiscardedObligations();
     await this.resetSessionStorage();
+    if (
+      parentSessionId !== undefined &&
+      parentSessionId !== this.sessionId &&
+      ownerId !== undefined
+    ) {
+      await this.pruneChildRegistryEntry(ownerId, parentSessionId);
+    }
+  }
+
+  private async pruneChildRegistryEntry(ownerId: string, parentSessionId: string): Promise<void> {
+    try {
+      await withDORetry(
+        () => getSandboxSessionStub(this.env, ownerId, parentSessionId),
+        stub => stub.forgetCloudAgentChildSession(this.sessionId),
+        'forgetCloudAgentChildSession'
+      );
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          parentSessionId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to prune deleted child from parent session registry');
+    }
   }
 
   /** Names the obligations a delete could not deliver; never logs secrets. */
@@ -2277,9 +3048,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Wipe this DO back to its fresh V2 state: no registration, no messages, no
-   * events, no outbox, and the V2 migrations re-applied. The generation key is
-   * restored so a later instance runs the normal V2 init rather than the
-   * old-plane wipe.
+   * events, no child registry, no outbox, and the V2 migrations re-applied. The
+   * generation key is restored so a later instance runs the normal V2 init
+   * rather than the old-plane wipe.
    *
    * An issuer whose handle was accepted on a shared scope keeps a locator
    * tombstone so the facade can still resolve that handle through a survivor;
@@ -2287,6 +3058,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   private async resetSessionStorage(): Promise<void> {
     const locator = await this.acceptedHandleLocatorForWipe();
+    // A later flush must not write buffered text back into wiped storage.
+    this.partText.clear();
     if (locator === null) {
       await this.resetSessionStorageByDeleteAll();
       return;
@@ -2302,7 +3075,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   /**
-   * Tombstone-first transactional wipe: write the locator, delete the two
+   * Tombstone-first transactional wipe: write the locator, delete the
    * application tables through Drizzle, delete every other KV key, and restore
    * the generation in one synchronous transaction. The schema and the
    * `__drizzle_migrations` bookkeeping survive, so no re-migration is needed.
@@ -2319,6 +3092,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       deleteApplicationTables: () => {
         this.db.delete(controlPlaneMessages).run();
         this.db.delete(events).run();
+        this.db.delete(cloudAgentChildSessions).run();
+        this.db.delete(historyImport).run();
       },
     });
     this.clearSessionInMemoryState();
@@ -2350,7 +3125,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private clearSessionInMemoryState(): void {
-    this.nativeOutbox.close();
     this.registration = null;
     this.metadata = null;
     this.wipeLocator = null;
@@ -2361,6 +3135,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.pendingInteractions = undefined;
     this.availableCommands = { commands: [] };
     this.rootStatus = undefined;
+    this.historyHydrations.clear();
     this.worktreePreparationGeneration = undefined;
     this.preparationRecorders.clear();
   }
@@ -2400,9 +3175,41 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.preview.resolve();
   }
 
+  /**
+   * Worker-facing live preview discovery. Eligibility and the sandbox owner are
+   * decided here; the Sandbox DO checks route/allocation state and relays the
+   * scan to the bound wrapper. A stopped or idle sandbox is reported as
+   * `not_running`/`not_ready` and is never started or woken.
+   */
+  async listPreviewServices(): Promise<ListPreviewServicesOutput> {
+    await this.initialized;
+    const metadata = this.metadata;
+    if (metadata === null) return { services: [], status: 'not_ready' };
+    if (!isControlSession(metadata.identity.sessionId) || !isTerminalSessionEligible(metadata)) {
+      return { services: [], status: 'unsupported' };
+    }
+    const sandboxId = metadata.workspace?.sandboxId;
+    if (sandboxId === undefined || sandboxId.length === 0) {
+      return { services: [], status: 'not_ready' };
+    }
+    const scope: PreviewSandboxScope = {
+      ownerId: metadata.identity.userId,
+      organizationId: metadata.identity.orgId ?? null,
+      scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    };
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { services: [], status: 'not_running' };
+    return withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      stub => stub.previewServices(scope),
+      'previewServices'
+    );
+  }
+
   async fetch(request: Request): Promise<Response> {
     await this.initialized;
-    const pathname = new URL(request.url).pathname;
+    const url = new URL(request.url);
+    const pathname = url.pathname;
     if (pathname === '/terminal/browser') {
       return this.terminals.handleBrowserUpgrade(request);
     }
@@ -2411,7 +3218,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     if (pathname !== '/stream') return new Response('Not found', { status: 404 });
     if (this.registration === null) return new Response('Session not found', { status: 404 });
-    if (new URL(request.url).searchParams.get('sandboxStatus') === 'true') {
+    const requestedKiloSessionId = url.searchParams.get('kiloSessionId');
+    if (
+      requestedKiloSessionId !== null &&
+      requestedKiloSessionId !== this.registration.spec.kiloSessionId
+    )
+      return new Response('Session not found', { status: 404 });
+    if (url.searchParams.get('sandboxStatus') === 'true') {
       if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
         return new Response('Expected WebSocket upgrade', { status: 426 });
       const sandboxId = this.registration.sandboxId;
@@ -2419,6 +3232,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const url = new URL('https://sandbox.internal/status-stream');
       url.searchParams.set('sessionId', this.sessionId);
       url.searchParams.set('ownerId', this.metadata.identity.userId);
+      const identity = statusWorkspaceIdentity(this.registration);
+      if (identity !== null) {
+        url.searchParams.set('workspaceId', identity.workspaceId);
+        url.searchParams.set('directory', identity.directory);
+        if (identity.orgId !== undefined) url.searchParams.set('orgId', identity.orgId);
+      }
       try {
         return await withDORetry(
           () => {
@@ -2433,6 +3252,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         return new Response('Sandbox unavailable', { status: 503 });
       }
     }
+    try {
+      // Replay ends with bootstrap.complete, so history must land before the replay starts.
+      await this.ensureClientHistory();
+    } catch (error) {
+      // The live stream does not need old history; hydration resumes on the next read.
+      logger
+        .withFields({ sessionId: this.sessionId, error: errorMessage(error) })
+        .warn('Session history hydration failed before stream connect');
+    }
+    if (this.registration === null) return new Response('Session not found', { status: 404 });
+    // Replay sends the stored part row; later deltas must extend all text sent before it.
+    this.partText.flush();
     return this.streamHandler().handleStreamRequest(request);
   }
 
@@ -2470,6 +3301,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       readPendingInteractions: () => this.readPendingInteractions(),
       getAvailableCommands: async () => this.availableCommands,
       getPreparationSnapshots: async () => getPreparationSnapshots(this.eventQueries),
+      getUpdateCursor: () => this.eventQueries.getUpdateCursor(),
+      getAncillaryBootstrap: async () => this.eventQueries.readAncillaryBootstrap(),
     });
   }
 
@@ -2542,7 +3375,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             (view.state === 'preparing' ? view.detail : undefined) ??
               (route.step === undefined
                 ? 'Preparing environment'
-                : PREPARING_STEP_MESSAGE[route.step])
+                : PREPARING_STEP_MESSAGE[route.step]),
+            view.state === 'preparing' ? view.snapshotCapturedAt : undefined
           );
         }
         return;
@@ -2577,7 +3411,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           openMessages(this.messages).map(message => message.messageId),
           'failed',
           route.reason,
-          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype }
+          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype },
+          'coordinator',
+          route.billingFailure
         );
         return;
     }
@@ -2600,7 +3436,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private async deliverQueued(pass = this.transportPass()): Promise<void> {
-    if (await this.failRetiredQueuedMessages()) return;
+    if (await this.failRetiredPendingMessages()) return;
     const queued = this.messages.filter(message => message.state === 'queued');
     if (queued.length === 0) return;
     const peer = this.sandboxPeer();
@@ -2646,6 +3482,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           fromState: 'queued',
           toState: 'accepted',
           lifecycleEventInserted: false,
+          runtimeHarness: message.container?.runtimeHarness,
         });
       }
       await this.armAlarm();
@@ -2692,19 +3529,21 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.persistQueuedContainer(container);
   }
 
-  private async failRetiredQueuedMessages(): Promise<boolean> {
-    if (this.metadata === null || !hasRetiredDevcontainerRuntime(this.metadata)) return false;
+  private async failRetiredPendingMessages(): Promise<boolean> {
+    if (this.metadata === null) return false;
+    const reason = retiredRuntimeMessage(this.metadata);
+    if (reason === null) return false;
     await this.settleMessages(
-      this.messages.filter(message => message.state === 'queued').map(message => message.messageId),
+      openMessages(this.messages).map(message => message.messageId),
       'failed',
-      DEVCONTAINER_RETIRED_MESSAGE
+      reason
     );
     this.finishWorktreePreparation();
     return true;
   }
 
   private async prepareSandbox(pass = this.transportPass()): Promise<ControlPlaneRouteView | null> {
-    if (await this.failRetiredQueuedMessages()) return null;
+    if (await this.failRetiredPendingMessages()) return null;
     const peer = this.sandboxPeer();
     const registration = this.registration;
     if (registration === null) return null;
@@ -2722,6 +3561,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             ...(registration.sandboxSelection
               ? { sandboxSelection: registration.sandboxSelection }
               : {}),
+            ...(registration.environment ? { environment: registration.environment } : {}),
           }),
         'session.prepare',
         this.sandboxRpcConfig(pass)
@@ -2737,6 +3577,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     pass: TransportPass,
     ownerHint?: ControlPlaneRouteUpdate
   ): Promise<void> {
+    if (await this.failRetiredPendingMessages()) return;
     if (!this.messages.some(message => message.state === 'queued')) return;
     let view = await this.readSandboxView(pass);
     if (view === null) return;
@@ -2750,7 +3591,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           .filter(message => message.state === 'accepted')
           .map(message => message.messageId),
         'failed',
-        ownerHint.reason
+        ownerHint.reason,
+        undefined,
+        'coordinator',
+        ownerHint.billingFailure
       );
     }
     if (ownerHint && view.state !== 'unknown' && view.attemptId !== this.currentAttemptId()) {
@@ -2792,6 +3636,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private async readSandboxView(pass: TransportPass): Promise<ControlPlaneRouteView | null> {
+    if (await this.failRetiredPendingMessages()) return null;
     const peer = this.sandboxPeer();
     if (peer === null) {
       await this.scheduleTransportRecovery(pass);
@@ -2876,17 +3721,21 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Render a wrapper setup-command lifecycle event into the active preparation
-   * attempt. Each command is its own `setup_command` step under the
-   * `setup_commands` phase (mirroring the legacy bootstrap), so the preparation
-   * UI shows the numbered command, its output, and its terminal state.
+   * attempt. Each command is its own `setup_command` step under the phase for
+   * its kind (`setup_commands` for builds and legacy events,
+   * `session_setup_commands`, `start_commands`), so the preparation UI shows
+   * the numbered command, its text, its output, and its terminal state. Clients
+   * derive the failed-command rows from these steps.
    */
   private recordSetupEvent(event: ControlPlaneSetupEvent): void {
     if (this.route.state !== 'preparing') return;
     const attemptId = this.route.attemptId;
     const attempt = readPreparationAttempt(this.eventQueries, attemptId);
     if (attempt?.status !== 'running') return;
+    const kind = event.properties.kind;
+    const phaseKey = setupCommandPhase(kind);
     let steps = readPreparationSteps(this.eventQueries, attemptId);
-    let phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+    let phase = steps.findLast(step => step.kind === 'phase' && (step.key as string) === phaseKey);
     const latestPhase = steps.findLast(step => step.kind === 'phase');
     if (
       phase === undefined ||
@@ -2895,18 +3744,31 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           event.type === CONTROL_PLANE_SETUP_EVENTS.output))
     ) {
       this.preparationRecorder(attemptId, attempt.triggerMessageId).onProgress(
-        'setup_commands',
-        'Running setup commands'
+        phaseKey,
+        setupCommandPhaseTitle(kind)
       );
       steps = readPreparationSteps(this.eventQueries, attemptId);
-      phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+      phase = steps.findLast(step => step.kind === 'phase' && (step.key as string) === phaseKey);
     }
     if (phase === undefined) return;
     const command = event.properties.command;
     const commandId = `setup_command:${command - 1}`;
-    const stepId = phase.id === 'phase:setup_commands' ? commandId : `${phase.id}:${commandId}`;
+    const stepId =
+      phase.id === `phase:${phaseKey}` && phaseKey === 'setup_commands'
+        ? commandId
+        : `${phase.id}:${commandId}`;
     const existingStep = steps.find(step => step.id === stepId);
     if (existingStep !== undefined && existingStep.status !== 'running') return;
+    const commandText =
+      (event.type === CONTROL_PLANE_SETUP_EVENTS.started
+        ? event.properties.commandText
+        : undefined) ?? nonEmptyString(existingStep?.command);
+    const commandCount =
+      existingStep?.commandCount ??
+      (event.type === CONTROL_PLANE_SETUP_EVENTS.started
+        ? event.properties.commandCount
+        : undefined) ??
+      command;
     const base = {
       version: 2 as const,
       attemptId,
@@ -2914,7 +3776,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       revision:
         (readPreparationAttempt(this.eventQueries, attemptId)?.revision ?? attempt.revision) + 1,
       timestamp: Date.now(),
-      step: 'setup_commands' as const,
+      step: phaseKey as PreparingStep,
     };
     const apply = (data: Record<string, unknown>): boolean =>
       applyControlPlanePreparingEvent({
@@ -2925,7 +3787,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       });
 
     if (existingStep === undefined) {
-      const label = `Setup command ${command}`;
+      const label = setupCommandLabel(kind, command, commandText);
       if (
         !apply({
           ...base,
@@ -2935,10 +3797,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           kind: 'setup_command',
           label,
           commandIndex: command - 1,
+          commandCount,
           parentStepId: phase.id,
-          ...(event.type === CONTROL_PLANE_SETUP_EVENTS.started
-            ? { commandCount: event.properties.commandCount }
-            : {}),
+          ...(commandText === undefined ? {} : { command: commandText }),
         })
       )
         return;
@@ -2948,7 +3809,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (event.type === CONTROL_PLANE_SETUP_EVENTS.output) {
       apply({
         ...base,
-        message: `Setup command ${command} output`,
+        message: `${setupCommandLabel(kind, command, undefined)} output`,
         action: 'step_output',
         stepId,
         output: event.properties.output,
@@ -2958,10 +3819,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (event.type === CONTROL_PLANE_SETUP_EVENTS.finished) {
       const { exitCode, safeError } = event.properties;
       const failed = safeError !== undefined || exitCode !== 0;
-      const failedMessage = safeError ?? `Setup command ${command} failed`;
+      const failedMessage = safeError ?? `${setupCommandLabel(kind, command, undefined)} failed`;
       apply({
         ...base,
-        message: failed ? failedMessage : 'Setup command finished',
+        message: failed ? failedMessage : `${setupCommandLabel(kind, command, undefined)} finished`,
         action: failed ? 'step_failed' : 'step_completed',
         stepId,
         ...(failed ? { safeError: failedMessage } : {}),
@@ -2991,10 +3852,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     status: Extract<SessionMessageState, 'completed' | 'failed' | 'cancelled'>,
     reason: string | undefined,
     facts?: ControlPlaneReportFacts,
-    source: ControlPlaneMessageSource = 'coordinator'
+    source: ControlPlaneMessageSource = 'coordinator',
+    billingFailure?: CustomerBillingFailure
   ): Promise<void> {
     await this.applySettlement(
-      settleMessages(this.messages, messageIds, status, reason, Date.now()),
+      settleMessages(this.messages, messageIds, status, reason, Date.now(), billingFailure),
       facts,
       source
     );
@@ -3035,6 +3897,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         terminalAt: message.settledAt,
         lifecycleEventInserted,
         cause: message.reason === null ? undefined : diagnosticCause(message.reason),
+        runtimeHarness: message.container?.runtimeHarness,
       });
     }
     // Persist the callback, attempt delivery now, then arm only what remains:
@@ -3118,6 +3981,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         content: renderTurnContent(message.intent),
         delivery: 'queued',
       },
+      `cloud-message/queued/${message.messageId}`,
       message.createdAt
     );
   }
@@ -3126,6 +3990,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.emitSynthetic(
       'cloud.message.sent',
       { messageId: message.messageId, delivery: 'sent' },
+      `cloud-message/sent/${message.messageId}`,
       message.acceptedAt ?? message.createdAt
     );
   }
@@ -3153,6 +4018,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               status: 'failed',
               delivery: accepted ? 'sent' : 'queued',
               accepted,
+              ...(message.billingFailure === undefined
+                ? {}
+                : { billingFailure: message.billingFailure }),
               ...(message.reason === null
                 ? {}
                 : { reason: message.reason, error: messageFailureText(message.reason) }),
@@ -3183,27 +4051,43 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     step?: string;
     message?: string;
   }): void {
-    this.emitSynthetic('cloud.status', { cloudStatus: status });
+    this.emitSynthetic('cloud.status', { cloudStatus: status }, 'cloud-status');
   }
 
+  /** One row per entity keeps synthetic state replayable by cursor without unbounded growth. */
   private emitSynthetic(
     streamEventType: StoredEvent['stream_event_type'],
     data: unknown,
+    entityId: string,
     timestamp: number = Date.now()
   ): void {
+    const payload = JSON.stringify(data);
+    const id = this.eventQueries.upsert({
+      executionId: '',
+      sessionId: this.sessionId,
+      streamEventType,
+      payload,
+      timestamp,
+      entityId,
+    });
     this.broadcast({
-      id: 0,
+      id,
       execution_id: '',
       session_id: this.sessionId,
       stream_event_type: streamEventType,
-      payload: JSON.stringify(data),
+      payload,
       timestamp,
     });
   }
 
   private broadcast(event: StoredEvent): void {
-    this.streamHandler().broadcastEvent(event);
-    this.publishNativeEvent(event);
+    const stored =
+      event.id > 0 && event.mutation_cursor === undefined
+        ? this.eventQueries.findById(event.id)
+        : null;
+    this.streamHandler().broadcastEvent(
+      stored === null ? event : { ...event, mutation_cursor: stored.mutation_cursor }
+    );
   }
 
   private deriveCloudStatus(): {
@@ -3248,10 +4132,33 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   private deriveSessionStatus(): SessionStatus | undefined {
     const root = this.rootStatus;
-    if (root === undefined || !root.settled) return undefined;
-    if (root.type !== 'busy' && root.type !== 'retry') return undefined;
-    if (this.messages.some(message => message.state === 'accepted')) return undefined;
-    return { type: 'idle' };
+    const accepted = this.messages.some(message => message.state === 'accepted');
+    if (root?.settled && (root.type === 'busy' || root.type === 'retry'))
+      return { type: accepted ? 'busy' : 'idle' };
+    const kiloSessionId = this.registration?.spec.kiloSessionId;
+    const stored =
+      kiloSessionId === undefined ? null : this.eventQueries.getLatestNativeStatus(kiloSessionId);
+    const parsed = z
+      .discriminatedUnion('type', [
+        z.object({ type: z.literal('busy') }),
+        z.object({ type: z.literal('idle') }),
+        z.object({
+          type: z.literal('retry'),
+          attempt: z.number(),
+          message: z.string(),
+          next: z.number(),
+        }),
+        z.object({
+          type: z.literal('offline'),
+          requestID: z.string(),
+          message: z.string(),
+        }),
+      ])
+      .safeParse(
+        stored === null ? undefined : readNativeEventPayload(stored.payload)?.properties.status
+      );
+    if (accepted && (!parsed.success || parsed.data.type === 'idle')) return { type: 'busy' };
+    return parsed.success ? parsed.data : undefined;
   }
 
   private deriveQueuedMessages(): QueuedMessageSnapshot[] {
@@ -3274,6 +4181,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             status: 'failed',
             delivery: message.acceptedAt === null ? 'queued' : 'sent',
             accepted: message.acceptedAt !== null,
+            ...(message.billingFailure === undefined
+              ? {}
+              : { billingFailure: message.billingFailure }),
             ...(message.reason === null
               ? { error: 'The message failed' }
               : { reason: message.reason, error: messageFailureText(message.reason) }),

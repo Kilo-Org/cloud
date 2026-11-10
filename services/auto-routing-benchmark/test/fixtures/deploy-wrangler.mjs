@@ -95,6 +95,13 @@ try {
         event('renew_transient');
         output = count('renew_transient') % 2 === 1 ? 'failure' : 'malformed';
       }
+      const afterDeploy = Number(
+        process.env.BENCHMARK_DEPLOY_FIXTURE_RENEW_FAILURES_AFTER_DEPLOY ?? 0
+      );
+      if (count('deploy_completed') > 0 && count('renew_after_deploy_transient') < afterDeploy) {
+        event('renew_after_deploy_transient');
+        output = 'failure';
+      }
     }
     if (process.env.BENCHMARK_DEPLOY_FIXTURE_BAD_JSON === kind) output = 'malformed';
     if (output === 'failure') {
@@ -143,15 +150,15 @@ try {
       .get();
     if (!lock?.token || lock.lease_until <= Date.now() || live.n !== 0 || count('migrations') !== 1)
       event('unguarded_deploy');
-    event('deploy_started');
-    process.stdout.write('untrusted-stdout-canary');
-    process.stderr.write('untrusted-stderr-canary');
     const onSignal = () => {
       event('deploy_aborted');
       db.close();
       process.exit(1);
     };
     process.on('SIGTERM', onSignal);
+    event('deploy_started');
+    process.stdout.write('untrusted-stdout-canary');
+    process.stderr.write('untrusted-stderr-canary');
     await sleep(Number(process.env.BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS ?? 0));
     process.off('SIGTERM', onSignal);
     if (process.env.BENCHMARK_DEPLOY_FIXTURE_DEPLOY_FAIL === '1') {

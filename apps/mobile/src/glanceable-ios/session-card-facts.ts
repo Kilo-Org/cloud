@@ -9,7 +9,7 @@ import {
   SESSION_CARD_QUIET_AFTER_MS,
   type SessionLiveActivityContentState,
   type SessionLiveActivityRow,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 
 import { SESSION_CARD_STALE_AFTER_SECONDS } from './session-card-press';
 import { type SessionLiveActivityProps } from './session-live-activity';

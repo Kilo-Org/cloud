@@ -3,6 +3,7 @@ import {
   assistantReportsNoActionableOutput,
 } from '../../src/shared/assistant-failure.js';
 import { GITHUB_REVIEW_TOOL_PERMISSION_KEY } from '../../src/shared/github-review-target.js';
+import type { ActivityTool } from './control-plane/harness-activity.js';
 
 export const PUBLICATION_RECOVERY_PROMPT =
   'Reminder: the review summary has not been published yet. When your review is complete, publish it with the code_review_publish_review_summary tool, passing only the summary wording rather than using gh.';
@@ -56,15 +57,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * `{ verified: true, commentId }`; an error part carries the tool's error code.
  * Anything else is ignored.
  */
-export function classifyPublicationToolPart(part: unknown): PublicationRecoverySignal | null {
-  if (!isRecord(part) || part.tool !== GITHUB_REVIEW_TOOL_PERMISSION_KEY) return null;
-  const toolState = part.state;
-  if (!isRecord(toolState)) return null;
-  if (toolState.status === 'completed') {
-    if (typeof toolState.output !== 'string') return null;
+export function classifyPublicationToolPart(tool: ActivityTool): PublicationRecoverySignal | null {
+  if (tool.name !== GITHUB_REVIEW_TOOL_PERMISSION_KEY) return null;
+  if (tool.status === 'completed') {
+    if (tool.output === undefined) return null;
     let parsed: unknown;
     try {
-      parsed = JSON.parse(toolState.output);
+      parsed = JSON.parse(tool.output);
     } catch {
       return null;
     }
@@ -73,9 +72,8 @@ export function classifyPublicationToolPart(part: unknown): PublicationRecoveryS
     }
     return { kind: 'verified', commentId: parsed.commentId };
   }
-  if (toolState.status === 'error') {
-    const raw = typeof toolState.error === 'string' ? toolState.error : '';
-    const code = raw.split(':')[0]?.trim();
+  if (tool.status === 'error') {
+    const code = (tool.error ?? '').split(':')[0]?.trim();
     return { kind: 'error', code: code && code.length > 0 ? code : 'unverified' };
   }
   return null;

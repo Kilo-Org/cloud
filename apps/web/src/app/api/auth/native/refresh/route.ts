@@ -15,7 +15,7 @@ const requestSchema = z.object({
  *   200 { token, refreshToken, expiresIn }
  *   401 { error: 'INVALID_REFRESH_TOKEN' }  — unknown, expired, or reused refresh token
  *   401 { error: 'SESSION_REVOKED' }        — the parent device session was revoked
- *   401 { error: 'USER_BLOCKED' }           — the user's account is blocked
+ *   401 { error: 'USER_BLOCKED' }           — the account is not eligible to renew
  *   400                                      — invalid request body
  */
 export const POST = withRestTiming('/api/auth/native/refresh', async (request: Request) => {

@@ -8,11 +8,13 @@ import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   messageIdSchema,
   persistedKiloSdkMessageHistorySchema,
   sessionDiffReadSchema,
   sessionIdSchema,
   sessionShareOptionsSchema,
+  storedSessionIdSchema,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
@@ -41,6 +43,11 @@ import { applyReportedSessionTitle, reportSessionTitleSchema } from '../services
 import { signSessionShareToken } from '../services/session-share-token';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
+import { clearSessionLocalState } from '../services/session-local-state';
+import {
+  lockAndAssertWorkspaceRootSurvives,
+  HostedWorkspaceSessionDeleteError,
+} from '../services/hosted-workspace-session';
 
 export type ApiContext = {
   Bindings: Env;
@@ -93,28 +100,6 @@ function notifyUserSessionEventFromContext(
 
 type SessionDeleteRow = typeof cli_sessions_v2.$inferSelect;
 
-async function clearSessionLocalState(
-  env: Env,
-  kiloUserId: string,
-  sessionId: string
-): Promise<void> {
-  await withDORetry(
-    () => getSessionAccessCacheDO(env, { kiloUserId }),
-    sessionCache => sessionCache.remove(sessionId),
-    'SessionAccessCacheDO.remove'
-  );
-  await withDORetry(
-    () => getSessionIngestDO(env, { kiloUserId, sessionId }),
-    stub => stub.clear(),
-    'SessionIngestDO.clear'
-  );
-  await withDORetry(
-    () => getUserConnectionDO(env, { kiloUserId }),
-    stub => stub.clearSession(sessionId),
-    'UserConnectionDO.clearSession'
-  );
-}
-
 function notifySessionDeleted(
   c: Context<ApiContext>,
   kiloUserId: string,
@@ -150,6 +135,12 @@ async function deleteOwnedLeafSession(
   sessionId: string
 ) {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  // The worktree deletion owns its members' rows while it runs; deleting one
+  // here would race that delete and strand local session state.
+  if (await isWorktreeSessionDeleting(db, kiloUserId, sessionId)) {
+    return c.json({ success: false, error: 'worktree_deleting' }, 409);
+  }
+
   const existingRows = await db
     .select()
     .from(cli_sessions_v2)
@@ -164,55 +155,69 @@ async function deleteOwnedLeafSession(
     return c.json({ success: false, error: 'session_not_found', cleanup: 'done' }, 404);
   }
 
-  const outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
-    if (existing.cloud_agent_session_scope_id) {
-      await tx
-        .select({ sessionId: cli_sessions_v2.session_id })
+  let outcome: 'deleted' | 'gone' | 'not_leaf';
+  try {
+    outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
+      if (existing.cloud_agent_session_scope_id) {
+        await tx
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.cloud_agent_session_id, existing.cloud_agent_session_scope_id),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              isNull(cli_sessions_v2.parent_session_id)
+            )
+          )
+          .limit(1)
+          .for('update');
+      }
+
+      const lockedRows = await tx
+        .select()
         .from(cli_sessions_v2)
         .where(
           and(
-            eq(cli_sessions_v2.cloud_agent_session_id, existing.cloud_agent_session_scope_id),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            isNull(cli_sessions_v2.parent_session_id)
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
           )
         )
         .limit(1)
         .for('update');
-    }
+      if (!lockedRows[0]) {
+        return 'gone';
+      }
 
-    const lockedRows = await tx
-      .select()
-      .from(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      )
-      .limit(1)
-      .for('update');
-    if (!lockedRows[0]) {
-      return 'gone';
-    }
-
-    const childRows = await tx
-      .select({ session_id: cli_sessions_v2.session_id })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.parent_session_id, sessionId),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+      const childRows = await tx
+        .select({ session_id: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.parent_session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
         )
-      )
-      .limit(1);
-    if (childRows[0]) {
-      return 'not_leaf';
-    }
+        .limit(1);
+      if (childRows[0]) {
+        return 'not_leaf';
+      }
 
-    await tx
-      .delete(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      );
-    return 'deleted';
-  });
+      await tx
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+      return 'deleted';
+    });
+  } catch (error) {
+    if (error instanceof HostedWorkspaceSessionDeleteError) {
+      return c.json({ success: false, error: error.code }, 409);
+    }
+    throw error;
+  }
 
   if (outcome === 'not_leaf') {
     return c.json({ success: false, error: 'session_not_leaf' }, 409);
@@ -236,6 +241,29 @@ const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
+
+  // Reject known retired ids before inserting. If this initial probe fails,
+  // the required post-insert tombstone check must still confirm availability.
+  try {
+    const retired = await withDORetry(
+      () =>
+        getSessionIngestDO(c.env, {
+          kiloUserId: c.get('user_id'),
+          sessionId: body.sessionId,
+        }),
+      stub => stub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+    if (retired) {
+      return c.json({ success: false, error: 'session_retired' }, 409);
+    }
+  } catch (error) {
+    console.error('Failed to probe session availability before create', {
+      kiloUserId: c.get('user_id'),
+      sessionId: body.sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   // Persist a placeholder session row.
   // This is intentionally minimal; we only need a working Hyperdrive -> Postgres path.
@@ -266,6 +294,43 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   }
 
   const { createdRow } = result;
+
+  // Worktree deletion writes this tombstone before deleting rows. Checking after
+  // insertion prevents a still-running runtime from recreating deleted history.
+  let ingestDeleted: boolean;
+  try {
+    ingestDeleted = await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: body.sessionId }),
+      async sessionStub => sessionStub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+  } catch (error) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    throw error;
+  }
+
+  if (ingestDeleted) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    return c.json({ success: false, error: 'session_deleted' }, 409);
+  }
 
   if (createdRow) {
     const session = mapSessionEventRow(createdRow);
@@ -420,35 +485,54 @@ api.delete('/session/:sessionId', async c => {
   const deletionSessionScopeId = deletedRows.find(
     row => row.session_id === parsed.data
   )?.cloud_agent_session_scope_id;
+  const deletionTarget = deletedRows.find(row => row.session_id === parsed.data);
 
-  await db.transaction(async tx => {
-    if (deletionSessionScopeId) {
-      // Bootstrap and metadata mutations lock the session scope root before children.
-      // Match that order even when deleting a subtree rooted at a child.
-      await tx
-        .select({ sessionId: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.cloud_agent_session_id, deletionSessionScopeId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            isNull(cli_sessions_v2.parent_session_id)
+  try {
+    await db.transaction(async tx => {
+      if (deletionTarget) {
+        await lockAndAssertWorkspaceRootSurvives(tx, {
+          kiloUserId,
+          row: {
+            session_id: deletionTarget.session_id,
+            cloud_agent_session_id: deletionTarget.cloud_agent_session_id,
+            cloud_agent_worktree_id: deletionTarget.cloud_agent_worktree_id,
+            parent_session_id: deletionTarget.parent_session_id,
+          },
+        });
+      }
+      if (deletionSessionScopeId) {
+        // Bootstrap and metadata mutations lock the session scope root before children.
+        // Match that order even when deleting a subtree rooted at a child.
+        await tx
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.cloud_agent_session_id, deletionSessionScopeId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              isNull(cli_sessions_v2.parent_session_id)
+            )
           )
-        )
-        .limit(1)
-        .for('update');
+          .limit(1)
+          .for('update');
+      }
+      for (const sessionId of orderedSessionIds) {
+        await tx
+          .delete(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+            )
+          );
+      }
+    });
+  } catch (error) {
+    if (error instanceof HostedWorkspaceSessionDeleteError) {
+      return c.json({ success: false, error: error.code }, 409);
     }
-    for (const sessionId of orderedSessionIds) {
-      await tx
-        .delete(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-          )
-        );
-    }
-  });
+    throw error;
+  }
 
   const deletedAt = new Date().toISOString();
   const deletedRowsBySessionId = new Map(deletedRows.map(row => [row.session_id, row]));
@@ -507,9 +591,15 @@ api.post('/session/:sessionId/ingest', async c => {
   return c.json(result.body, result.status);
 });
 
+/**
+ * The stored session snapshot for one Kilo session the user can read. Its id
+ * takes `storedSessionIdSchema` for the same reason the message page does: a
+ * session created before the canonical `ses_…` shape keeps the id it was
+ * created with, and its stored transcript is exported by that id.
+ */
 api.get('/session/:sessionId/export', async c => {
   const rawSessionId = c.req.param('sessionId');
-  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  const parsed = storedSessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
@@ -543,9 +633,14 @@ api.get('/session/:sessionId/export', async c => {
 /**
  * The stored cumulative session diff (`session_diff` item) for one Kilo
  * session the user can read. Reads only that row, never the transcript.
+ *
+ * The id takes `storedSessionIdSchema`, like every other read of a stored
+ * session: a session created before the canonical `ses_…` shape keeps the id it
+ * was created with, and the details surface of such a session reads its
+ * changes through this route.
  */
 api.get('/session/:sessionId/diff', async c => {
-  const parsed = sessionIdSchema.safeParse(c.req.param('sessionId'));
+  const parsed = storedSessionIdSchema.safeParse(c.req.param('sessionId'));
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
@@ -583,10 +678,15 @@ api.get('/session/:sessionId/diff', async c => {
  * read to `SessionIngestDO.readKiloSdkMessages`. Mobile uses the default
  * page size of 50; the existing max of 100 is honored for callers that
  * request more.
+ *
+ * The id takes `storedSessionIdSchema`: a session created before the
+ * canonical `ses_…` shape was issued keeps the id it was created with, and
+ * this read is what shows its stored transcript. The access check below, not
+ * the id shape, decides who may read it.
  */
 api.get('/session/:sessionId/messages', async c => {
   const rawSessionId = c.req.param('sessionId');
-  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  const parsed = storedSessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
@@ -613,7 +713,7 @@ api.get('/session/:sessionId/messages', async c => {
   const beforeParsed =
     beforeParam === undefined
       ? { success: true as const, data: undefined }
-      : z.string().min(1).max(1024).safeParse(beforeParam);
+      : z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).safeParse(beforeParam);
   if (!beforeParsed.success) {
     return c.json({ success: false, error: 'Invalid before' }, 400);
   }

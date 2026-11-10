@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useNowTicker } from '@/app/(app)/claw/kilo-chat/components/BotStatus';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -34,7 +35,15 @@ export default function RequestLoggingOptInsContent() {
   const [targetId, setTargetId] = useState('');
   const [scope, setScope] = useState<'all' | 'errors_only'>('all');
   const [reason, setReason] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const now = useNowTicker(10_000);
+  const optInCount = optIns?.length ?? 0;
+  const isOverCapacity = optInCount > 10;
+  const activeOptInCount =
+    optIns?.filter(entry => !entry.expires_at || new Date(entry.expires_at).getTime() > now)
+      .length ?? 0;
+  const isAtLimit = activeOptInCount >= 10;
 
   const invalidateList = () => queryClient.invalidateQueries({ queryKey: listOptions.queryKey });
   const createMutation = useMutation(
@@ -43,6 +52,7 @@ export default function RequestLoggingOptInsContent() {
         toast.success('Request logging enabled');
         setTargetId('');
         setReason('');
+        setExpiresAt('');
         void invalidateList();
       },
       onError: error => toast.error(error.message || 'Request logging could not be enabled.'),
@@ -62,11 +72,15 @@ export default function RequestLoggingOptInsContent() {
 
   function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isLoading || isAtLimit || createMutation.isPending) {
+      return;
+    }
     createMutation.mutate({
       target_type: targetType,
       target_id: targetId,
       reason,
       errors_only: scope === 'errors_only',
+      expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
     });
   }
 
@@ -84,24 +98,17 @@ export default function RequestLoggingOptInsContent() {
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <div>
-        <h1 className="type-title">Request Logging Opt-ins</h1>
-        <p className="text-muted-foreground mt-1 type-body">
-          Enable AI gateway request and response logging for a specific account or organization.
-        </p>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle>Create opt-in</CardTitle>
+          <CardTitle>Enable request logging</CardTitle>
           <CardDescription>
-            Logging may capture customer prompts and model responses. Add a clear support or
-            investigation reason.
+            Logs gateway requests and responses for an account or organization, including customer
+            prompts. Add a clear support or investigation reason.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form
-            className="grid gap-4 md:grid-cols-[180px_minmax(240px,1fr)_180px_minmax(280px,2fr)_auto] md:items-end"
+            className="grid gap-4 md:grid-cols-2 md:items-end xl:grid-cols-3"
             onSubmit={handleCreate}
           >
             <div className="grid gap-2">
@@ -150,24 +157,55 @@ export default function RequestLoggingOptInsContent() {
                 className="min-h-9"
               />
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="expires-at">End date (optional, local time)</Label>
+              <Input
+                id="expires-at"
+                type="datetime-local"
+                value={expiresAt}
+                onChange={event => setExpiresAt(event.target.value)}
+                aria-describedby="expires-at-help"
+              />
+              <p id="expires-at-help" className="text-muted-foreground text-sm">
+                Leave blank for no expiration.
+              </p>
+            </div>
             <Button
               type="submit"
-              disabled={createMutation.isPending || !targetId.trim() || !reason.trim()}
+              disabled={
+                isLoading ||
+                isAtLimit ||
+                createMutation.isPending ||
+                !targetId.trim() ||
+                !reason.trim()
+              }
+              aria-describedby="opt-in-limit"
             >
               {createMutation.isPending ? 'Enabling…' : 'Enable logging'}
             </Button>
           </form>
+          <p id="opt-in-limit" className="text-muted-foreground mt-4 text-sm" role="status">
+            {isLoading ? 'Loading active opt-ins…' : `${activeOptInCount} of 10 active opt-ins.`}{' '}
+            {isAtLimit
+              ? 'Delete an active opt-in or wait for one to expire to enable logging.'
+              : 'Expired opt-ins do not count toward this limit.'}
+          </p>
+          {isOverCapacity && (
+            <p className="text-destructive mt-2 text-sm" role="status">
+              Request logging is disabled while {optInCount} opt-ins are stored. Delete opt-ins
+              until 10 or fewer remain.
+            </p>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Active opt-ins</CardTitle>
+          <CardTitle>Request logging opt-ins</CardTitle>
           <CardDescription>
-            Requests are logged only when the account or organization is opted in. Errors-only
-            opt-ins log responses with an upstream status of 400 or higher, a response read error,
-            or invalid tool call arguments. When both an account and its organization match, the
-            broader opt-in wins.
+            Errors-only opt-ins log responses with status 400 or higher, a response read error,
+            invalid tool call arguments, or a guardrail rejection. When an account and its
+            organization both match, the broader opt-in wins.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -180,20 +218,21 @@ export default function RequestLoggingOptInsContent() {
                 <TableHead>Reason</TableHead>
                 <TableHead>Added by</TableHead>
                 <TableHead>Added</TableHead>
+                <TableHead>Expires (local time)</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground">
+                  <TableCell colSpan={8} className="text-muted-foreground">
                     Loading opt-ins…
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && optIns?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground">
+                  <TableCell colSpan={8} className="text-muted-foreground">
                     No request logging opt-ins.
                   </TableCell>
                 </TableRow>
@@ -213,6 +252,11 @@ export default function RequestLoggingOptInsContent() {
                   <TableCell>{entry.added_by_email}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {new Date(entry.added_at).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {entry.expires_at
+                      ? new Date(entry.expires_at).toLocaleString()
+                      : 'No expiration'}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

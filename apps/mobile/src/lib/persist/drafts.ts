@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { utf8ByteLength } from '@/lib/utf8-utils';
+import { forgetShapeMismatch, reportShapeMismatch } from '@/lib/persist/draft-read-report';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 
 /**
@@ -20,20 +21,30 @@ import * as encryptedKv from '@/lib/persist/encrypted-kv';
  * over 64 KB are skipped (never written partially); a scope holds at most
  * 100 entries, evicting the oldest `updated_at` above the cap.
  *
- * A corrupt or unreadable stored value loads as null (start empty) and is
- * reported to Sentry with no toast: there is no user action that re-reads a
- * draft, so the failure is structurally non-retryable and the composer is
- * already usable empty. Callers pass a shape validator, so a valid-JSON value
- * that does not match its contract (e.g. a number where composer text is
- * expected) is treated as corrupt and discarded the same way.
+ * A corrupt or unreadable stored value loads as null (start empty), is
+ * reported to Sentry with no toast, and is then removed. Every composer mount
+ * re-reads its draft (`useFencedDraftLoad`), so an entry this build can never
+ * load would otherwise be read, byte-counted and reported again on each mount
+ * for the life of the install; removing it makes one entry one event and every
+ * later mount start from an absent key.
+ *
+ * A valid-JSON value that fails the caller's shape validator is not corrupt:
+ * another build of the app can read it, so it may be that build's draft (a
+ * downgrade, or a field this build has not learned yet) and removing it would
+ * discard the user's text for good. It loads as null and stays stored, and its
+ * report is claimed once per process per key, so the per-mount read does not
+ * file an event each time. A write that replaces the value, an eviction, or an
+ * explicit clear releases the claim, because the next mismatch is new
+ * information.
  *
  * Every asynchronous write (debounced timer, flush, clear) is caught at this
  * boundary: a storage failure is reported to Sentry and swallowed, so the
  * fire-and-forget `void` call sites can never leak an unhandled rejection.
  *
- * Serialization is contained before any timer exists: a value that cannot be
- * JSON-serialized (a circular reference, or a top-level undefined) is
- * reported to Sentry and skipped without scheduling a write.
+ * Serialization runs when the debounce fires, not on the keystroke that reset
+ * it: a value that cannot be JSON-serialized (a circular reference, or a
+ * top-level undefined) is reported to Sentry then and skipped, and a value over
+ * the byte cap is skipped the same way, so neither ever reaches storage.
  */
 
 export const DRAFT_DEBOUNCE_MS = 500;
@@ -64,6 +75,17 @@ export function agentComposerDraftKey(sessionId: string): string {
 
 /** New-session prompt draft entity key. */
 export const NEW_SESSION_DRAFT_KEY = 'agent-composer:new';
+
+/**
+ * New-session repository draft entity key, scoped to the account's active
+ * organization instead of sharing the prompt's key: the picker lists
+ * organization-scoped repositories, so a selection made in one organization
+ * must never seed another organization's form. `null` is the personal scope,
+ * which is also the key an explicit Personal choice reads.
+ */
+export function newSessionRepositoryDraftKey(organizationId: string | null): string {
+  return `agent-composer:new:repository:${organizationId ?? 'personal'}`;
+}
 
 /** Durable pending share-intent payloads (map + insertion order) entity key. */
 export const SHARE_PAYLOADS_DRAFT_KEY = 'share-payloads';
@@ -190,18 +212,18 @@ export function resolvePrefillOverDraft(
   return draftText;
 }
 
-/** The epoch-fenced write payload for one draft write. */
+/** The epoch-fenced write payload for one draft write, serialized at write time. */
 type DraftWritePayload = {
   epoch: number;
   userId: string;
   entityKey: string;
-  serialized: string;
+  value: unknown;
 };
 
 type PendingSave = {
   timer: ReturnType<typeof setTimeout>;
   epoch: number;
-  serialized: string;
+  value: unknown;
 };
 
 // One pending debounced write per full storage key. The timer, epoch, and
@@ -229,8 +251,10 @@ function reportDraftFailure(
 /**
  * Loads one draft. Returns the parsed JSON value, or null when the key is
  * absent, the value is corrupt/unreadable, the value exceeds the 64 KB cap,
- * or the parsed value fails the caller's shape validator — all but the absent
- * case load as empty and report corruption to Sentry. The value shape is the
+ * or the parsed value fails the caller's shape validator. The corrupt and
+ * oversize cases report once and remove the entry so the next mount reads
+ * nothing; the shape-mismatch case keeps the entry (another build may read it)
+ * and reports at most once per process per key. The value shape is the
  * caller's contract: composer text stores a JSON string, and pending-review
  * stores a JSON `PendingReviewItem[]`.
  */
@@ -242,8 +266,11 @@ export async function loadDraft<T>(
   if (!userId) {
     return null;
   }
+  // Held outside the try so a failure after the read can drop the exact entry
+  // it could not load; a failed read leaves nothing to drop.
+  let raw: string | null = null;
   try {
-    const raw = await encryptedKv.getItem(draftScope(userId), entityKey);
+    raw = await encryptedKv.getItem(draftScope(userId), entityKey);
     if (raw === null) {
       return null;
     }
@@ -253,30 +280,29 @@ export async function loadDraft<T>(
         'read',
         'draft-read-size-limit'
       );
+      await clearDraftIfStill(userId, entityKey, raw);
       return null;
     }
     const parsed: unknown = JSON.parse(raw);
     if (!isValid(parsed)) {
-      reportDraftFailure(
-        new Error('stored draft does not match its expected shape'),
-        'read',
-        'draft-read-shape-mismatch'
-      );
+      reportShapeMismatch(draftScope(userId), entityKey);
       return null;
     }
     return parsed;
   } catch (error) {
     reportDraftFailure(error, 'read');
+    if (raw !== null) {
+      await clearDraftIfStill(userId, entityKey, raw);
+    }
     return null;
   }
 }
 
-async function writeDraft({
-  epoch,
-  userId,
-  entityKey,
-  serialized,
-}: DraftWritePayload): Promise<void> {
+async function writeDraft({ epoch, userId, entityKey, value }: DraftWritePayload): Promise<void> {
+  const serialized = serializeDraft(value);
+  if (serialized === null) {
+    return;
+  }
   const key = fullKey(userId, entityKey);
   await chainSave(key, async () => {
     // The authoritative fence lives inside the chained run: a write queued
@@ -285,6 +311,9 @@ async function writeDraft({
       return;
     }
     await encryptedKv.setItem(draftScope(userId), entityKey, serialized);
+    // A write replaces whatever could not be read, so the next mismatch on
+    // this key is a new value rather than a repeat.
+    forgetShapeMismatch(draftScope(userId), entityKey);
     await evictOldestBeyondCap(draftScope(userId));
   });
 }
@@ -315,22 +344,23 @@ async function evictOldestBeyondCap(scope: string): Promise<void> {
   await Promise.all(
     oldest.map(async entry => {
       await encryptedKv.removeItem(scope, entry.k);
+      forgetShapeMismatch(scope, entry.k);
     })
   );
 }
 
 /**
- * Schedules a debounced save of one JSON-serializable draft value, keyed on
- * the full storage key. Values over 64 KB are skipped (never written
- * partially; a previously stored draft stays untouched). Unserializable
- * values (circular references, top-level undefined) are reported to Sentry
- * and skipped. Returns nothing — the write is fire-and-forget; use
- * {@link flushDraft} to force it.
+ * Serializes one draft value at write time, or answers null when there is
+ * nothing safe to write.
+ *
+ * This runs when the debounce fires rather than on every keystroke that resets
+ * it: the composer saves the whole draft on every text change, so serializing
+ * there multiplied the work by the length of the text on each character typed.
+ * Values over 64 KB are skipped (never written partially; a previously stored
+ * draft stays untouched), and unserializable values (circular references,
+ * top-level undefined) are reported to Sentry and skipped.
  */
-export function saveDraft(userId: string, entityKey: string, value: unknown): void {
-  if (!userId) {
-    return;
-  }
+function serializeDraft(value: unknown): string | null {
   try {
     // JSON.stringify produces no string for a top-level undefined, function,
     // or symbol; reject those before the byte-cap check, which needs a string.
@@ -341,27 +371,40 @@ export function saveDraft(userId: string, entityKey: string, value: unknown): vo
         'write',
         'draft-write-unsupported-value'
       );
-      return;
+      return null;
     }
     if (utf8ByteLength(serialized) > DRAFT_MAX_BYTES) {
-      return;
+      return null;
     }
-    const key = fullKey(userId, entityKey);
-    const previous = pendingSaves.get(key);
-    if (previous) {
-      clearTimeout(previous.timer);
-    }
-    const epoch = currentAuthEpoch();
-    const timer = setTimeout(() => {
-      pendingSaves.delete(key);
-      void writeDraftSafely({ epoch, userId, entityKey, serialized });
-    }, DRAFT_DEBOUNCE_MS);
-    pendingSaves.set(key, { timer, epoch, serialized });
+    return serialized;
   } catch (error) {
-    // Serialization and byte sizing run before any timer exists; contain
-    // every failure here so saveDraft never throws synchronously.
     reportDraftFailure(error, 'write');
+    return null;
   }
+}
+
+/**
+ * Schedules a debounced save of one JSON-serializable draft value, keyed on
+ * the full storage key. The value is serialized and byte-capped when the
+ * debounce fires (see {@link serializeDraft}), so a keystroke costs one timer
+ * reset whatever the text's length. Returns nothing — the write is
+ * fire-and-forget; use {@link flushDraft} to force it.
+ */
+export function saveDraft(userId: string, entityKey: string, value: unknown): void {
+  if (!userId) {
+    return;
+  }
+  const key = fullKey(userId, entityKey);
+  const previous = pendingSaves.get(key);
+  if (previous) {
+    clearTimeout(previous.timer);
+  }
+  const epoch = currentAuthEpoch();
+  const timer = setTimeout(() => {
+    pendingSaves.delete(key);
+    void writeDraftSafely({ epoch, userId, entityKey, value });
+  }, DRAFT_DEBOUNCE_MS);
+  pendingSaves.set(key, { timer, epoch, value });
 }
 
 /**
@@ -407,6 +450,7 @@ export async function clearDraft(userId: string, entityKey: string): Promise<boo
     await chainSave(key, async () => {
       await encryptedKv.removeItem(draftScope(userId), entityKey);
     });
+    forgetShapeMismatch(draftScope(userId), entityKey);
     return true;
   } catch (error) {
     reportDraftFailure(error, 'clear');
@@ -423,7 +467,9 @@ export async function clearDraft(userId: string, entityKey: string): Promise<boo
  * is registered after a newer write sees the newer value and skips, and a
  * clear registered before leaves the newer write intact. Remove failures are
  * reported to Sentry and swallowed. Used by the pending share id, where
- * clearing an older id must never delete a just-written id.
+ * clearing an older id must never delete a just-written id, and by
+ * {@link loadDraft}, which drops a value it could not load only while that
+ * value is still the stored one.
  */
 export async function clearDraftIfStill(
   userId: string,
@@ -439,6 +485,7 @@ export async function clearDraftIfStill(
       const current = await encryptedKv.getItem(draftScope(userId), entityKey);
       if (current === expectedSerialized) {
         await encryptedKv.removeItem(draftScope(userId), entityKey);
+        forgetShapeMismatch(draftScope(userId), entityKey);
       }
     });
   } catch (error) {

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  GH_STACK_INSTALL_PATH,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
   RUNTIME_REQUIRED_BINARIES,
   WRAPPER_BUNDLES,
   runtimeInstallPath,
 } from '../src/shared/runtime-distribution.js';
+import { RUNTIME_TOOLCHAIN } from '../src/shared/runtime-toolchain.js';
 import {
   hashRuntimeArtifacts,
   runtimeDistributionSourceFiles,
@@ -20,7 +22,9 @@ describe('runtime distribution contract', () => {
       bun: '1.4.4',
       pnpm: '12.14.0',
       glab: '1.124.0',
-      gh: '2.102.0',
+      gh: '2.103.3',
+      ghStack: '0.3.0',
+      ghStackSha256: '957e822cfa7e435cd84a297cd96c419b58e51e3ac58be249762c24bd9e45099b',
     });
   });
 
@@ -30,6 +34,7 @@ describe('runtime distribution contract', () => {
       'src/bitbucket-review-cli.ts',
       'src/github-review-publish-mcp.ts',
       'src/control-plane/main.ts',
+      'src/environment-builder/main.ts',
     ]);
     expect(new Set(WRAPPER_BUNDLES.map(bundle => bundle.installName)).size).toBe(
       WRAPPER_BUNDLES.length
@@ -43,6 +48,7 @@ describe('runtime distribution contract', () => {
       'bb',
       'github-review-publish-mcp',
       'kilocode-control-plane-wrapper.js',
+      'kilocode-environment-builder.js',
       'kilocode-control-plane-supervisor.sh',
       'kilo-git-credential',
     ]);
@@ -70,14 +76,29 @@ describe('runtime distribution contract', () => {
       }))
     );
     const script = runtimeVerificationScript(artifacts);
-    expect(script).toContain(`test "$(bun --version)" = '1.4.4'`);
-    expect(script).toContain(`test "$(pnpm --version)" = '12.14.0'`);
+    for (const version of [
+      RUNTIME_DISTRIBUTION.bun,
+      RUNTIME_DISTRIBUTION.pnpm,
+      RUNTIME_DISTRIBUTION.gh,
+      RUNTIME_DISTRIBUTION.glab,
+      RUNTIME_TOOLCHAIN.rg.version,
+      RUNTIME_TOOLCHAIN.kilo.version,
+    ]) {
+      expect(script).toContain(`= '${version}'`);
+    }
     expect(script).toContain('grep -oE');
     expect(script).not.toContain('grep -qF');
-    expect(script).toContain(`= '1.124.0'`);
-    expect(script).toContain(`= '2.102.0'`);
+    expect(script).toContain(
+      `test "$(sha256sum '${GH_STACK_INSTALL_PATH}' | cut -d' ' -f1)" = '${RUNTIME_DISTRIBUTION.ghStackSha256}'`
+    );
     for (const binary of RUNTIME_REQUIRED_BINARIES) {
       expect(script).toContain(`command -v ${binary} >/dev/null`);
+    }
+    for (const tool of ['bun', 'rg', 'gh', 'glab', 'pnpm', 'kilo'] as const) {
+      const pin = RUNTIME_TOOLCHAIN[tool];
+      const path =
+        pin.kind === 'archive' ? `'${pin.installPath}'` : `"$npm_root/${pin.installedPath}"`;
+      expect(script).toContain(`check_sha256 ${path} '${pin.installedSha256[0]}'`);
     }
     for (const artifact of artifacts) {
       expect(script).toContain(`sha256sum '${artifact.installPath}'`);

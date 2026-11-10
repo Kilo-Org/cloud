@@ -1,9 +1,10 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { main } from './prepare-runtime-deploy.js';
+import { main, waitForRuntimeHandoff } from './prepare-runtime-deploy.js';
+import type { ArtifactObjectStore } from '../src/sandbox-control/runtime-artifact-keys.js';
 
 const { lookup } = vi.hoisted(() => ({
   lookup: vi.fn(async () => {
@@ -15,6 +16,7 @@ vi.mock('./runtime-publish-store.js', () => ({
 }));
 const temporary: string[] = [];
 afterEach(async () => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   lookup.mockClear();
   for (const root of temporary.splice(0)) await fs.rm(root, { recursive: true, force: true });
@@ -54,7 +56,6 @@ async function checkout(config: string, recipe?: string, mode = 'downloaded') {
     '-m',
     'fixture',
   ]);
-  vi.stubEnv('RUNTIME_PUBLICATION_ENABLED', 'true');
   vi.stubEnv('RUNTIME_R2_ACCOUNT_ID', 'c'.repeat(32));
   vi.stubEnv('RUNTIME_R2_BUCKET', 'runtime-test');
   vi.stubEnv('RUNTIME_R2_ACCESS_KEY_ID', 'fixture-key');
@@ -84,14 +85,6 @@ for (const recipe of [undefined, 'FROM debian:trixie-slim\nCOPY undeclared /tmp/
       fs.stat(path.join(f.root, 'wrangler.runtime-generated.json'))
     ).rejects.toHaveProperty('code', 'ENOENT');
   });
-it('fails a downloaded deployment promptly when publication is disabled', async () => {
-  const f = await checkout(config());
-  vi.stubEnv('RUNTIME_PUBLICATION_ENABLED', '');
-  await expect(main(['production', f.sha], f.root)).rejects.toThrow(
-    'Runtime publication is not enabled'
-  );
-  expect(lookup).not.toHaveBeenCalled();
-});
 it('rejects malformed JSONC before writing a deploy configuration', async () => {
   const f = await checkout(config().slice(0, -1), undefined, 'preinstalled');
   await expect(main(['production', f.sha], f.root)).rejects.toThrow('Invalid wrangler.jsonc');
@@ -99,6 +92,47 @@ it('rejects malformed JSONC before writing a deploy configuration', async () => 
   await expect(
     fs.stat(path.join(f.root, 'wrangler.runtime-generated.json'))
   ).rejects.toHaveProperty('code', 'ENOENT');
+});
+describe('exact-SHA handoff wait', () => {
+  const sha = 'e'.repeat(40);
+  const handoffStore = (reads: Array<Uint8Array | null>) => {
+    const getBytes = vi.fn(async () => (reads.length > 1 ? reads.shift() : reads[0]) ?? null);
+    return { getBytes, putIfAbsent: vi.fn() } satisfies ArtifactObjectStore;
+  };
+
+  it('fails on the first probe once the publication can no longer produce a handoff', async () => {
+    const store = handoffStore([null]);
+    const probe = vi.fn(async () => 'Runtime publication finished without a handoff');
+    await expect(waitForRuntimeHandoff(store, sha, probe)).rejects.toThrow(
+      'Runtime publication finished without a handoff'
+    );
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a handoff written just before the publication run completed', async () => {
+    const store = handoffStore([null, new Uint8Array([1])]);
+    await expect(
+      waitForRuntimeHandoff(store, sha, async () => 'finished without a handoff')
+    ).resolves.toBeUndefined();
+  });
+
+  it('keeps polling while the publication is still running', async () => {
+    vi.useFakeTimers();
+    const store = handoffStore([null, null, null, new Uint8Array([1])]);
+    const probe = vi.fn(async () => null);
+    const wait = waitForRuntimeHandoff(store, sha, probe);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await expect(wait).resolves.toBeUndefined();
+    expect(probe).toHaveBeenCalledTimes(1);
+  });
+
+  it('still bounds the wait when publication status is unavailable', async () => {
+    vi.useFakeTimers();
+    const wait = waitForRuntimeHandoff(handoffStore([null]), sha);
+    const rejection = expect(wait).rejects.toThrow('did not complete within 45 minutes');
+    await vi.advanceTimersByTimeAsync(46 * 60_000);
+    await rejection;
+  });
 });
 it('accepts JSONC comments and trailing commas without runtime storage in preinstalled mode', async () => {
   const f = await checkout(

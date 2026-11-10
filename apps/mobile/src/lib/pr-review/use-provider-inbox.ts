@@ -33,6 +33,7 @@ import {
 import { usePrInbox } from '@/lib/pr-review/use-pr-inbox';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
+import { classifyInboxOrganizationScopeAccess } from '@/lib/pr-review/inbox-organization-access';
 
 // Same ceiling as the GitHub inbox: a pathological inbox cannot walk one
 // provider's cursor forever.
@@ -377,8 +378,17 @@ export function useProviderInbox(enabled: boolean) {
     runInboxRetry(bitbucketSource, bitbucket);
   };
 
+  // A lost organization outranks whatever the providers report; the pure
+  // classifier documents which reads carry that verdict.
+  const organizationScopeAccess = classifyInboxOrganizationScopeAccess({
+    organizationId,
+    statusErrors: [gitlabStatus.error, bitbucketReadiness.error],
+    inboxErrors: [gitlab.error, bitbucket.error],
+  });
+
   return {
     ...merged,
+    organizationScopeAccess,
     // Revoked authorization needs the connect flow, not an inbox-page retry.
     githubNeedsReconnect: enabled && githubAuthorization.data?.revoked === true,
     isFetching:

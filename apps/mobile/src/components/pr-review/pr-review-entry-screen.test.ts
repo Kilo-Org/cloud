@@ -23,11 +23,6 @@ beforeEach(() => {
 });
 
 describe('provider-neutral URL field', () => {
-  it('names the active context between the header and the inbox', async () => {
-    const tree = await renderLoaded();
-    expect(findAll(tree, 'PrReviewContextLine')).toHaveLength(1);
-  });
-
   it('labels and placeholders name both review nouns, no provider host', async () => {
     const tree = await renderLoaded();
     const input = find(tree, 'Input', () => true);

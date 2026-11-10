@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
+import { OwnerTypeSchema, type OwnerType } from './owner';
 import { ClassifierSubtaskTypeSchema, ClassifierTaskTypeSchema } from './taxonomy';
 
 // ADR 0005: docs/adr/0005-custom-auto-routers.md
@@ -12,14 +13,25 @@ export const MAX_CUSTOM_ROUTER_ENTRIES = 20;
 export const MAX_CUSTOM_ROUTER_NAME_LENGTH = 100;
 export const CUSTOM_ROUTER_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
-export const CustomRouterScopeSchema = z.enum(['user', 'org']);
-export type CustomRouterScope = z.infer<typeof CustomRouterScopeSchema>;
+// Entry fields are client-supplied and stored verbatim, so each one carries an explicit bound.
+// Every limit sits far above the real catalogs: gateway and CLI provider/model IDs are well under
+// half of them, real context windows stay under 2M tokens, and real prices under $1k per MTok.
+export const MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH = 200;
+export const MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH = 100;
+export const MAX_CLIENT_VARIANTS = 20;
+export const MAX_CLIENT_VARIANT_LENGTH = 100;
+export const MAX_CLIENT_INPUT_MODALITIES = 10;
+export const MAX_CLIENT_INPUT_MODALITY_LENGTH = 50;
+export const MAX_CLIENT_CONTEXT_LENGTH = 10_000_000;
+export const MAX_CLIENT_PRICE_PER_MTOK_USD = 1_000_000;
+// `gateway:<model>` or `client:<provider>/<model>` at the bounds above.
+export const MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH = 320;
 
 export const CustomRouterSlugSchema = z.string().regex(CUSTOM_ROUTER_SLUG_PATTERN);
 
 export const CustomRouterReferenceSchema = z
   .object({
-    scope: CustomRouterScopeSchema,
+    scope: OwnerTypeSchema,
     slug: CustomRouterSlugSchema,
   })
   .superRefine((reference, ctx) => {
@@ -39,11 +51,11 @@ export function parseCustomRouterModelId(model: string): CustomRouterReference |
   return CustomRouterReferenceSchema.safeParse(reference).success ? reference : null;
 }
 
-export function customRouterModelId(scope: CustomRouterScope, slug: string): string {
+export function customRouterModelId(scope: OwnerType, slug: string): string {
   return `${scope === 'org' ? ORG_CUSTOM_ROUTER_MODEL_PREFIX : CUSTOM_ROUTER_MODEL_PREFIX}${slug}`;
 }
 
-function addReservedSlugIssue(scope: CustomRouterScope, slug: string, ctx: z.RefinementCtx): void {
+function addReservedSlugIssue(scope: OwnerType, slug: string, ctx: z.RefinementCtx): void {
   if (scope === 'user' && slug === RESERVED_USER_CUSTOM_ROUTER_SLUG) {
     ctx.addIssue({
       code: 'custom',
@@ -62,13 +74,25 @@ const ClientProviderIdSchema = z
   .min(1)
   .refine(provider => !provider.includes('/'), 'Provider ID must not contain /');
 
-export const GatewayCustomRouterEntrySchema = z.object({
+const GatewayModelIdSchema = ModelIdSchema.refine(
+  model => !model.startsWith(CLIENT_CANDIDATE_PREFIX),
+  'Gateway model ID must not start with client:'
+);
+
+// A platform model whose global measurement a linked entry reuses for its same-name variants.
+export const MeasuredAsModelIdSchema = GatewayModelIdSchema.refine(
+  model => !model.toLowerCase().startsWith('kilo-auto/'),
+  'measuredAs must name a concrete platform model'
+);
+
+// The client prefix is reserved so candidate model strings stay injective.
+const GatewayCustomRouterEntryRefSchema = z.object({
   kind: z.literal('gateway'),
-  // The client prefix is reserved so candidate model strings stay injective.
-  model: ModelIdSchema.refine(
-    model => !model.startsWith(CLIENT_CANDIDATE_PREFIX),
-    'Gateway model ID must not start with client:'
-  ),
+  model: GatewayModelIdSchema,
+});
+
+export const GatewayCustomRouterEntrySchema = GatewayCustomRouterEntryRefSchema.extend({
+  measuredAs: MeasuredAsModelIdSchema.optional(),
 });
 export type GatewayCustomRouterEntry = z.infer<typeof GatewayCustomRouterEntrySchema>;
 
@@ -98,6 +122,7 @@ export const ClientCustomRouterEntrySchema = z.object({
   capabilities: ClientModelCapabilitiesSchema,
   // Null means the model costs $0.
   pricing: ClientModelPricingSchema.nullable(),
+  measuredAs: MeasuredAsModelIdSchema.optional(),
 });
 export type ClientCustomRouterEntry = z.infer<typeof ClientCustomRouterEntrySchema>;
 
@@ -114,7 +139,7 @@ export const CustomRouterClientEntryIdSchema = z.object({
 export type CustomRouterClientEntryId = z.infer<typeof CustomRouterClientEntryIdSchema>;
 
 export const CustomRouterEntryRefSchema = z.discriminatedUnion('kind', [
-  GatewayCustomRouterEntrySchema,
+  GatewayCustomRouterEntryRefSchema,
   CustomRouterClientEntryIdSchema.extend({ kind: z.literal('client') }),
 ]);
 export type CustomRouterEntryRef = z.infer<typeof CustomRouterEntryRefSchema>;
@@ -139,7 +164,7 @@ export function customRouterCandidateModel(entry: CustomRouterEntryRef): string 
 
 export function parseCustomRouterCandidateModel(model: string): CustomRouterEntryRef | null {
   if (!model.startsWith(CLIENT_CANDIDATE_PREFIX)) {
-    const gateway = GatewayCustomRouterEntrySchema.safeParse({ kind: 'gateway', model });
+    const gateway = GatewayCustomRouterEntryRefSchema.safeParse({ kind: 'gateway', model });
     return gateway.success ? gateway.data : null;
   }
   const id = model.slice(CLIENT_CANDIDATE_PREFIX.length);
@@ -168,6 +193,122 @@ export const CustomRouterEntriesSchema = z
     });
   });
 
+function addEntryBudgetIssue(
+  ctx: z.RefinementCtx,
+  path: (string | number)[],
+  message: string
+): void {
+  ctx.addIssue({ code: 'custom', path, message });
+}
+
+/**
+ * Client-supplied entries carry an explicit budget on write. Read schemas stay permissive so rows
+ * stored before the budget existed keep parsing in the worker and in list responses.
+ */
+function addEntryBudgetIssues(
+  entry: CustomRouterEntry,
+  ctx: z.RefinementCtx,
+  prefix: readonly (string | number)[] = []
+): void {
+  const path = (...parts: (string | number)[]) => [...prefix, ...parts];
+  if (
+    entry.measuredAs !== undefined &&
+    entry.measuredAs.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH
+  ) {
+    addEntryBudgetIssue(
+      ctx,
+      path('measuredAs'),
+      `Too big: expected measuredAs to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
+    );
+  }
+  if (entry.kind === 'gateway') {
+    if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
+      addEntryBudgetIssue(
+        ctx,
+        path('model'),
+        `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
+      );
+    }
+    return;
+  }
+  if (entry.provider.length > MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH) {
+    addEntryBudgetIssue(
+      ctx,
+      path('provider'),
+      `Too big: expected provider to have <=${MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH} characters`
+    );
+  }
+  if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
+    addEntryBudgetIssue(
+      ctx,
+      path('model'),
+      `Too big: expected model to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
+    );
+  }
+  if (entry.variants.length > MAX_CLIENT_VARIANTS) {
+    addEntryBudgetIssue(
+      ctx,
+      path('variants'),
+      `Too big: expected at most ${MAX_CLIENT_VARIANTS} variants`
+    );
+  }
+  entry.variants.forEach((variant, index) => {
+    if (variant.length > MAX_CLIENT_VARIANT_LENGTH) {
+      addEntryBudgetIssue(
+        ctx,
+        path('variants', index),
+        `Too big: expected a variant to have <=${MAX_CLIENT_VARIANT_LENGTH} characters`
+      );
+    }
+  });
+  const { contextLength, inputModalities } = entry.capabilities;
+  if (contextLength !== null && contextLength > MAX_CLIENT_CONTEXT_LENGTH) {
+    addEntryBudgetIssue(
+      ctx,
+      path('capabilities', 'contextLength'),
+      `Too big: expected contextLength to be <=${MAX_CLIENT_CONTEXT_LENGTH}`
+    );
+  }
+  if (inputModalities.length > MAX_CLIENT_INPUT_MODALITIES) {
+    addEntryBudgetIssue(
+      ctx,
+      path('capabilities', 'inputModalities'),
+      `Too big: expected at most ${MAX_CLIENT_INPUT_MODALITIES} input modalities`
+    );
+  }
+  inputModalities.forEach((modality, index) => {
+    if (modality.length > MAX_CLIENT_INPUT_MODALITY_LENGTH) {
+      addEntryBudgetIssue(
+        ctx,
+        path('capabilities', 'inputModalities', index),
+        `Too big: expected a modality to have <=${MAX_CLIENT_INPUT_MODALITY_LENGTH} characters`
+      );
+    }
+  });
+  if (entry.pricing) {
+    for (const [field, value] of Object.entries(entry.pricing)) {
+      if (value === undefined) continue;
+      if (!Number.isFinite(value) || value > MAX_CLIENT_PRICE_PER_MTOK_USD) {
+        addEntryBudgetIssue(
+          ctx,
+          path('pricing', field),
+          `Expected ${field} to be finite and <=${MAX_CLIENT_PRICE_PER_MTOK_USD}`
+        );
+      }
+    }
+  }
+}
+
+export const CustomRouterWriteEntriesSchema = CustomRouterEntriesSchema.superRefine(
+  (entries, ctx) => {
+    entries.forEach((entry, index) => addEntryBudgetIssues(entry, ctx, [index]));
+  }
+);
+
+const ClientCustomRouterWriteEntrySchema = ClientCustomRouterEntrySchema.superRefine((entry, ctx) =>
+  addEntryBudgetIssues(entry, ctx)
+);
+
 function addDefaultEntryIssue(
   entries: readonly CustomRouterEntryRef[],
   defaultEntryKey: string,
@@ -184,11 +325,14 @@ function addDefaultEntryIssue(
 
 const CustomRouterNameSchema = z.string().trim().min(1).max(MAX_CUSTOM_ROUTER_NAME_LENGTH);
 const EntryKeySchema = z.string().min(1);
+// Write requests carry the entry budget; stored definitions and responses keep parsing rows that
+// predate it, so the read schemas stay permissive.
+const WriteEntryKeySchema = EntryKeySchema.max(MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH);
 
 export const CustomRouterDefinitionSchema = z
   .object({
     id: z.uuid(),
-    ownerType: CustomRouterScopeSchema,
+    ownerType: OwnerTypeSchema,
     ownerId: z.string().trim().min(1),
     slug: CustomRouterSlugSchema,
     name: CustomRouterNameSchema,
@@ -196,8 +340,6 @@ export const CustomRouterDefinitionSchema = z
     mode: AutoRoutingModeSchema,
     entries: CustomRouterEntriesSchema,
     defaultEntryKey: EntryKeySchema,
-    legacyPool: z.boolean().optional(),
-    legacyModeInherited: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
     addReservedSlugIssue(definition.ownerType, definition.slug, ctx);
@@ -480,11 +622,11 @@ export type ClientEvalResultResponse = z.infer<typeof ClientEvalResultResponseSc
 
 export const AUTO_ROUTING_CUSTOM_ROUTERS_PATH = '/api/auto-routing/custom-routers';
 
-export function customRouterPath(scope: CustomRouterScope, slug: string): string {
+export function customRouterPath(scope: OwnerType, slug: string): string {
   return `${AUTO_ROUTING_CUSTOM_ROUTERS_PATH}/${scope}/${slug}`;
 }
 
-export function customRouterClientEntriesPath(scope: CustomRouterScope, slug: string): string {
+export function customRouterClientEntriesPath(scope: OwnerType, slug: string): string {
   return `${customRouterPath(scope, slug)}/client-entries`;
 }
 
@@ -502,8 +644,49 @@ export const CustomRouterVariantStatusSchema = z.object({
   variant: VariantSchema,
   status: CustomRouterEntryStatusSchema,
   failureReason: z.string().nullable(),
+  // True when the variant reuses the platform measurement of the entry's `measuredAs` model.
+  linked: z.boolean().default(false),
 });
 export type CustomRouterVariantStatus = z.infer<typeof CustomRouterVariantStatusSchema>;
+
+// Platform models with a ready measurement for one base router: the candidates an entry can link
+// to. Variants list the measured variant names; null is the default variant.
+export const PlatformMeasurementsResponseSchema = z.object({
+  baseRouter: AutoRouterSchema,
+  models: z.array(
+    z.object({
+      model: MeasuredAsModelIdSchema,
+      variants: z.array(VariantSchema),
+    })
+  ),
+});
+export type PlatformMeasurementsResponse = z.infer<typeof PlatformMeasurementsResponseSchema>;
+
+export const AUTO_ROUTING_PLATFORM_MEASUREMENTS_PATH = '/api/auto-routing/platform-measurements';
+
+// Case and `.`/`_`/`:` versus `-` differ across catalogs: models.dev `claude-opus-4-5`, Kilo
+// `claude-opus-4.5`.
+function linkKey(id: string): string {
+  return id.toLowerCase().replace(/[._:]/g, '-');
+}
+
+/**
+ * The platform model an entry most likely runs, for the owner to confirm. An exact provider/model
+ * match wins; otherwise the model name alone, when it names exactly one platform model.
+ */
+export function suggestMeasuredAs(
+  entry: { provider: string | null; model: string },
+  platformModels: readonly string[]
+): string | null {
+  const full = linkKey(entry.provider === null ? entry.model : `${entry.provider}/${entry.model}`);
+  const exact = platformModels.find(model => linkKey(model) === full);
+  if (exact) return exact;
+  const name = linkKey(entry.model.slice(entry.model.lastIndexOf('/') + 1));
+  const byName = platformModels.filter(
+    model => linkKey(model.slice(model.lastIndexOf('/') + 1)) === name
+  );
+  return byName.length === 1 ? (byName[0] ?? null) : null;
+}
 
 export const CustomRouterListEntrySchema = z.object({
   key: EntryKeySchema,
@@ -516,7 +699,7 @@ export type CustomRouterListEntry = z.infer<typeof CustomRouterListEntrySchema>;
 
 export const CustomRouterSummarySchema = z.object({
   id: RouterIdSchema,
-  scope: CustomRouterScopeSchema,
+  scope: OwnerTypeSchema,
   slug: CustomRouterSlugSchema,
   name: z.string(),
   modelId: z.string().min(1),
@@ -525,8 +708,6 @@ export const CustomRouterSummarySchema = z.object({
   defaultEntryKey: EntryKeySchema,
   canEdit: z.boolean(),
   entries: z.array(CustomRouterListEntrySchema),
-  legacyPool: z.boolean().optional(),
-  legacyModeInherited: z.boolean().optional(),
 });
 export type CustomRouterSummary = z.infer<typeof CustomRouterSummarySchema>;
 
@@ -544,13 +725,13 @@ export type CustomRouterResponse = z.infer<typeof CustomRouterResponseSchema>;
 
 export const CreateCustomRouterRequestSchema = z
   .object({
-    scope: CustomRouterScopeSchema,
+    scope: OwnerTypeSchema,
     slug: CustomRouterSlugSchema,
     name: CustomRouterNameSchema,
     baseRouter: AutoRouterSchema,
     mode: AutoRoutingModeSchema,
-    entries: CustomRouterEntriesSchema,
-    defaultEntryKey: EntryKeySchema,
+    entries: CustomRouterWriteEntriesSchema,
+    defaultEntryKey: WriteEntryKeySchema,
   })
   .superRefine((request, ctx) => {
     addReservedSlugIssue(request.scope, request.slug, ctx);
@@ -564,8 +745,8 @@ export const UpdateCustomRouterRequestSchema = z
     name: CustomRouterNameSchema.optional(),
     baseRouter: AutoRouterSchema.optional(),
     mode: AutoRoutingModeSchema.optional(),
-    entries: CustomRouterEntriesSchema.optional(),
-    defaultEntryKey: EntryKeySchema.optional(),
+    entries: CustomRouterWriteEntriesSchema.optional(),
+    defaultEntryKey: WriteEntryKeySchema.optional(),
   })
   .superRefine((request, ctx) => {
     if (Object.values(request).every(value => value === undefined)) {
@@ -587,7 +768,7 @@ export const UpdateCustomRouterRequestSchema = z
 export type UpdateCustomRouterRequest = z.infer<typeof UpdateCustomRouterRequestSchema>;
 
 export const RegisterClientEntryRequestSchema = z.object({
-  entry: ClientCustomRouterEntrySchema,
+  entry: ClientCustomRouterWriteEntrySchema,
 });
 export type RegisterClientEntryRequest = z.infer<typeof RegisterClientEntryRequestSchema>;
 
@@ -597,14 +778,17 @@ export type RegisterClientEntryRequest = z.infer<typeof RegisterClientEntryReque
 
 export const CUSTOM_ROUTER_TABLE_PATH = '/admin/custom-router-table';
 export const CUSTOM_ROUTER_STATUS_PATH = '/admin/custom-router-status';
+// GET ?router=<base router>; answers with PlatformMeasurementsResponseSchema.
+export const PLATFORM_MEASUREMENTS_PATH = '/admin/platform-measurements';
 
 const customRouterBenchmarkContextShape = {
-  ownerType: CustomRouterScopeSchema,
+  ownerType: OwnerTypeSchema,
   ownerId: z.string().trim().min(1),
   baseRouter: AutoRouterSchema,
   entries: CustomRouterEntriesSchema,
   // Keys of the entries the owner's CLI measures: every client entry, and each gateway entry the
-  // platform key cannot serve. Their measurements are owner-scoped client profiles.
+  // platform key cannot serve. Their measurements are owner-scoped client profiles, except the
+  // variants a `measuredAs` link serves from the platform measurement.
   clientEvalEntryKeys: z.array(EntryKeySchema),
 };
 

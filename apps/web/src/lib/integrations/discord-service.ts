@@ -1,8 +1,8 @@
 import 'server-only';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -14,7 +14,8 @@ import {
 } from '@kilocode/web-shared/lib/config.server';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
-import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
+import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 
 // Discord OAuth2 scopes for the bot integration
@@ -27,6 +28,33 @@ const DISCORD_SCOPES = ['bot', 'guilds', 'applications.commands'];
 const DISCORD_BOT_PERMISSIONS = '277025770560';
 
 const DISCORD_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.DISCORD);
+
+/**
+ * Raised when the Discord server selected in the OAuth consent belongs to a
+ * different Kilo owner. Event routing resolves an installation by server id, so
+ * one server cannot act for two owners.
+ */
+export class DiscordGuildAlreadyConnectedError extends Error {
+  constructor(guildName: string) {
+    super(
+      `The Discord server ${guildName} is already connected to a different Kilo account. Disconnect it there before connecting it here.`
+    );
+    this.name = 'DiscordGuildAlreadyConnectedError';
+  }
+}
+
+/**
+ * Raised when a connection would move an organization's Discord integration to
+ * a different server without the authorization that replacement requires.
+ */
+export class DiscordGuildRebindNotAllowedError extends Error {
+  constructor() {
+    super(
+      'This organization is already connected to a different Discord server. Disconnect it before connecting another server.'
+    );
+    this.name = 'DiscordGuildRebindNotAllowedError';
+  }
+}
 
 /**
  * Discord OAuth2 token response shape
@@ -115,16 +143,50 @@ export async function exchangeDiscordCode(code: string): Promise<DiscordOAuth2Re
 /**
  * Get Discord installation for an owner
  */
-export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
-  const [integration] = await db
+export async function getInstallation(
+  owner: Owner,
+  database: typeof db | DrizzleTransaction = db
+): Promise<PlatformIntegration | null> {
+  const [integration] = await database
     .select()
     .from(platform_integrations)
     .where(
       and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.DISCORD))
     )
+    // A row that records the server in `platform_installation_id` is the one
+    // inbound events resolve to. Prefer it over a row that carries the server id
+    // only in `platform_account_id`, so an update targets the same row and the
+    // owner keeps one connection.
+    .orderBy(
+      sql`${platform_integrations.platform_installation_id} IS NULL`,
+      platform_integrations.id
+    )
     .limit(1);
 
   return integration || null;
+}
+
+/**
+ * A row can record its server in `platform_account_id` while
+ * `platform_installation_id` is empty. The lifecycle still supports that row
+ * shape, so the lookups below cover it wherever a server is resolved.
+ */
+function legacyDiscordGuildCondition(guildId: string) {
+  return and(
+    eq(platform_integrations.platform_account_id, guildId),
+    isNull(platform_integrations.platform_installation_id)
+  );
+}
+
+/**
+ * Rows that record a server: its canonical row, plus a legacy row that carries
+ * the server id only in `platform_account_id`.
+ */
+function recordsDiscordGuildCondition(guildId: string) {
+  return or(
+    eq(platform_integrations.platform_installation_id, guildId),
+    legacyDiscordGuildCondition(guildId)
+  );
 }
 
 /**
@@ -140,12 +202,85 @@ export async function getInstallationByGuildId(
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.DISCORD),
-        eq(platform_integrations.platform_installation_id, guildId)
+        recordsDiscordGuildCondition(guildId)
       )
+    )
+    // A row that records the server in `platform_installation_id` is the one
+    // inbound events resolve to. Prefer it over a legacy row that carries the
+    // server id only in `platform_account_id`.
+    .orderBy(
+      sql`${platform_integrations.platform_installation_id} IS NULL`,
+      platform_integrations.id
     )
     .limit(1);
 
   return integration || null;
+}
+
+/**
+ * Find a Discord installation that already records `guildId` for a different
+ * Kilo owner. Callers use this before persisting a connection so each server
+ * stays bound to one owner and the write is refused without touching either row.
+ *
+ * A server resolves to the row that holds it as its canonical installation id.
+ * Only when no such row exists do rows that record the server in
+ * `platform_account_id` take part, matching how `upsertDiscordInstallation`
+ * reads the bound server of an existing row.
+ */
+export async function getConflictingDiscordInstallation(
+  owner: Owner,
+  guildId: string,
+  database: typeof db | DrizzleTransaction = db
+): Promise<PlatformIntegration | null> {
+  const canonical = await database
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.DISCORD),
+        eq(platform_integrations.platform_installation_id, guildId)
+      )
+    )
+    .limit(2);
+
+  const foreignCanonical = canonical.find(integration => !isOwnedBy(integration, owner));
+  if (foreignCanonical) {
+    return foreignCanonical;
+  }
+  if (canonical.length > 0) {
+    return null;
+  }
+
+  const [conflicting] = await database
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.DISCORD),
+        legacyDiscordGuildCondition(guildId),
+        isOwnedByAnotherOwner(owner)
+      )
+    )
+    .limit(1);
+
+  return conflicting ?? null;
+}
+
+function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
+  return owner.type === 'user'
+    ? integration.owned_by_user_id === owner.id && integration.owned_by_organization_id === null
+    : integration.owned_by_organization_id === owner.id && integration.owned_by_user_id === null;
+}
+
+/**
+ * The complement of `isOwnedBy` as a filter. `NOT` over the nullable owner columns
+ * would drop rows, so each owner is compared with `IS NOT DISTINCT FROM` and the
+ * other owner column with `IS NULL`.
+ */
+function isOwnedByAnotherOwner(owner: Owner) {
+  return owner.type === 'user'
+    ? sql`NOT (${platform_integrations.owned_by_user_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_organization_id} IS NULL)`
+    : sql`NOT (${platform_integrations.owned_by_organization_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_user_id} IS NULL)`;
 }
 
 /**
@@ -163,10 +298,20 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 
 /**
  * Persist the selected Discord installation while preserving owner configuration.
+ *
+ * A server bound to a different Kilo owner is refused outright. An organization
+ * connection holds a shared bot token and model policy, so moving it to another
+ * server requires `allowGuildRebind`, which callers set only after verifying the
+ * organization role that controls the integration.
  */
 export async function upsertDiscordInstallation(
   owner: Owner,
-  oauthResponse: DiscordOAuth2Response
+  oauthResponse: DiscordOAuth2Response,
+  {
+    allowGuildRebind = false,
+    defaultModel,
+  }: { allowGuildRebind?: boolean; defaultModel?: string | null } = {},
+  database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration> {
   if (!oauthResponse.guild?.id) {
     throw new Error(
@@ -174,10 +319,29 @@ export async function upsertDiscordInstallation(
     );
   }
 
-  const existing = await getInstallation(owner);
-
   const guildId = parseDiscordSnowflake(oauthResponse.guild.id, 'guild ID');
   const guildName = oauthResponse.guild.name || 'Unknown Server';
+
+  const conflicting = await getConflictingDiscordInstallation(owner, guildId, database);
+  if (conflicting) {
+    throw new DiscordGuildAlreadyConnectedError(guildName);
+  }
+
+  const existing = await getInstallation(owner, database);
+
+  // Rows created before 80a295f26 recorded the server only in `platform_account_id`.
+  const boundGuildId = existing?.platform_installation_id ?? existing?.platform_account_id ?? null;
+
+  if (
+    existing &&
+    !allowGuildRebind &&
+    owner.type === 'org' &&
+    boundGuildId &&
+    boundGuildId !== guildId
+  ) {
+    throw new DiscordGuildRebindNotAllowedError();
+  }
+
   const scopes = oauthResponse.scope?.split(' ') || null;
 
   // Note: We intentionally do NOT store the OAuth2 access_token or refresh_token.
@@ -192,7 +356,7 @@ export async function upsertDiscordInstallation(
       guild_icon: oauthResponse.guild.icon,
     };
 
-    const [updated] = await db
+    const [updated] = await database
       .update(platform_integrations)
       .set({
         platform_installation_id: guildId,
@@ -209,19 +373,24 @@ export async function upsertDiscordInstallation(
     return updated;
   }
 
-  // For org integrations, get a model that respects org access policy.
+  // For org integrations, use a model that respects org access policy. A null
+  // result means the policy allows none of the candidates, so the installation
+  // stores no model and the bot reports that no model is configured. Callers
+  // inside a lock resolve it beforehand; without one it is resolved here.
   // For user integrations, use the shared bot default model.
-  const defaultModel =
-    owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-      : DEFAULT_BOT_MODEL;
+  const resolvedModel =
+    owner.type === 'user'
+      ? DEFAULT_BOT_MODEL
+      : defaultModel !== undefined
+        ? defaultModel
+        : await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL);
 
   const metadata = {
     guild_icon: oauthResponse.guild.icon,
-    model_slug: defaultModel,
+    ...(resolvedModel ? { model_slug: resolvedModel } : {}),
   };
 
-  const [created] = await db
+  const [created] = await database
     .insert(platform_integrations)
     .values({
       owned_by_user_id: owner.type === 'user' ? owner.id : null,
@@ -337,6 +506,9 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
  * Get the model for a Discord integration.
  * Reads model_slug from the given installation's metadata, falling back to
  * the platform default for installations created before model config existed.
+ * For organization-owned integrations, a stored model is resolved through the
+ * organization's current policy at read time, so a policy change applies to the
+ * next message; a user-owned integration keeps its stored model.
  */
 export async function getModel(owner: Owner): Promise<string | null> {
   const integration = await getInstallation(owner);
@@ -346,7 +518,10 @@ export async function getModel(owner: Owner): Promise<string | null> {
 
   const metadata = integration.metadata as { model_slug?: string } | null;
   if (metadata?.model_slug) {
-    return metadata.model_slug;
+    return resolveOrganizationBotModel({
+      organizationId: owner.type === 'org' ? owner.id : null,
+      storedModelSlug: metadata.model_slug,
+    });
   }
 
   // Pre-existing installation without a stored model — resolve a default

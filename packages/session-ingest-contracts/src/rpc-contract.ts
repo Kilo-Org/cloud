@@ -1,9 +1,15 @@
 import { z } from 'zod';
-import { cloudAgentChildSessionLineageSchema } from './cloud-agent-session-scope';
+import {
+  cloudAgentChildSessionLineageSchema,
+  cloudAgentSessionIdSchema,
+  cloudAgentWorktreeIdSchema,
+  type CloudAgentWorktreeId,
+} from './cloud-agent-session-scope';
+import { storedSessionIdSchema } from './kilo-session-id';
+
+export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
-export const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
-export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;
 
 export const cloudAgentWorktreeLocationSchema = z
   .object({
@@ -13,6 +19,9 @@ export const cloudAgentWorktreeLocationSchema = z
   .strict();
 export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocationSchema>;
 export const WORKTREE_RUNTIME_HISTORY_UNAVAILABLE = 'worktree_runtime_history_unavailable';
+export const WORKTREE_UNREGISTERED_CHILD_SESSIONS = 'worktree_unregistered_child_sessions';
+export const WORKTREE_CHILD_LINEAGE_CONFLICT = 'worktree_child_lineage_conflict';
+export const WORKTREE_MEMBERSHIP_CHANGED = 'worktree_membership_changed';
 
 export const cloudAgentWorktreeDeletionManifestSchema = z
   .object({
@@ -21,10 +30,11 @@ export const cloudAgentWorktreeDeletionManifestSchema = z
       z
         .object({
           sessionId: sessionIdSchema,
-          cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]).nullable(),
+          cloudAgentSessionId: cloudAgentSessionIdSchema.nullable(),
         })
         .strict()
     ),
+    completedRuntimeLocations: z.array(cloudAgentWorktreeLocationSchema).optional(),
   })
   .strict();
 export type CloudAgentWorktreeDeletionManifest = z.infer<
@@ -36,6 +46,9 @@ export const cloudAgentWorktreeDeletionSchema = z
     worktreeId: cloudAgentWorktreeIdSchema,
     kiloUserId: z.string().min(1),
     organizationId: z.uuid().optional(),
+    // Begin-only precondition: the worktree must still have exactly one root
+    // session and it must be this session. Descendants are allowed.
+    onlyIfSoleSessionId: sessionIdSchema.optional(),
   })
   .strict();
 export type CloudAgentWorktreeDeletionParams = z.infer<typeof cloudAgentWorktreeDeletionSchema>;
@@ -49,9 +62,14 @@ export const cloudAgentWorktreeDeletionStateSchema = z
   .strict();
 export type CloudAgentWorktreeDeletionState = z.infer<typeof cloudAgentWorktreeDeletionStateSchema>;
 
+export type CloudAgentWorktreeDeletionResult = {
+  success: true;
+  deletedSessionIds: string[];
+};
+
 export const retireCloudAgentWorktreeIfSoleMemberSchema = cloudAgentWorktreeDeletionSchema
   .extend({
-    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
   })
   .strict();
 export type RetireCloudAgentWorktreeIfSoleMemberParams = z.infer<
@@ -72,10 +90,11 @@ export const recordCloudAgentWorktreeCleanupSchema = cloudAgentWorktreeDeletionS
     runtimeLocations: z.array(cloudAgentWorktreeLocationSchema).optional(),
     directory: z.string().min(1).max(4096).optional(),
     sessionIds: z.array(sessionIdSchema).optional(),
+    completedRuntimeLocation: cloudAgentWorktreeLocationSchema.optional(),
     childSessions: z
       .array(
         cloudAgentChildSessionLineageSchema.extend({
-          cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+          cloudAgentSessionId: cloudAgentSessionIdSchema,
         })
       )
       .optional(),
@@ -105,6 +124,10 @@ export const unresolvedCloudAgentSandboxOwnerSchema = z
         z
           .object({
             sessionId: sessionIdSchema.nullable(),
+            // Read straight from the historical `cli_sessions_v2` column, which
+            // still holds owner ids minted before the `workspace_` shape. This
+            // reader reports foreign owners, so it must accept them rather than
+            // fail the whole teardown answer.
             cloudAgentSessionId: z.string().min(1),
           })
           .strict()
@@ -130,26 +153,41 @@ export type CanDestroyCloudAgentWorktreeSandboxResult = z.infer<
   typeof canDestroyCloudAgentWorktreeSandboxResultSchema
 >;
 
-export const messageIdSchema = z
-  .string()
-  .startsWith('msg')
-  .refine(id => !id.includes('/') && !id.includes('\u0000'), {
-    message: 'message IDs must not contain / or U+0000',
-  });
-export const partIdSchema = z
-  .string()
-  .startsWith('prt')
-  .refine(id => !id.includes('/') && !id.includes('\u0000'), {
-    message: 'part IDs must not contain / or U+0000',
-  });
+// Message and part ids become storage and item identities, so both refuse `/`
+// and U+0000.
+function createIdSchema(prefix: string, label: string) {
+  return z
+    .string()
+    .startsWith(prefix)
+    .refine(id => !id.includes('/') && !id.includes('\u0000'), {
+      message: `${label} must not contain / or U+0000`,
+    });
+}
+export const messageIdSchema = createIdSchema('msg', 'message IDs');
+export const partIdSchema = createIdSchema('prt', 'part IDs');
 const sdkMetadataSchema = z.record(z.string(), z.unknown());
 
 export const createSessionForCloudAgentSchema = z.object({
   sessionId: sessionIdSchema,
   kiloUserId: z.string().min(1),
+  // Any non-empty id: this live create input records the caller's session
+  // identity, and requiring the `workspace_` shape here would reject callers
+  // that predate it.
   cloudAgentSessionId: z.string().min(1),
   cloudAgentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
   cloudAgentWorktreeLocation: cloudAgentWorktreeLocationSchema.optional(),
+  /**
+   * The workspace this worktree is stacked on. Recorded on the first
+   * registration only; later sibling registrations leave it untouched.
+   */
+  parentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
+  /** The branch the new working branch starts from. Null means the default branch. */
+  baseBranch: z.string().min(1).max(256).optional(),
+  /** The exact commit the working branch starts from, resolved by the web router. */
+  baseSha: z
+    .string()
+    .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+    .optional(),
   organizationId: z.string().optional(),
   createdOnPlatform: z.string().min(1),
   title: z.string().optional(),
@@ -182,7 +220,8 @@ export type SessionCloneRejectionCode =
   | 'source_digest_changed'
   | 'destination_conflict'
   | 'clone_setup_failed'
-  | 'clone_cut_not_found';
+  | 'clone_cut_not_found'
+  | 'session_retired';
 
 /**
  * Clone acknowledgement carried by the `ready` result. `sessionId` is the
@@ -215,6 +254,51 @@ export const deleteSessionForCloudAgentSchema = z.object({
   cloneSourceSessionId: sessionIdSchema.optional(),
 });
 export type DeleteSessionForCloudAgentParams = z.input<typeof deleteSessionForCloudAgentSchema>;
+
+/**
+ * Stable conflict returned when a destructive session delete would remove the
+ * last hosted root session of an active workspace. Removing the final root is
+ * only allowed through the separate whole-workspace deletion operation.
+ */
+export const WORKSPACE_REQUIRES_ROOT_SESSION = 'workspace_requires_root_session';
+/** Stable conflict returned while a workspace is being destructively deleted. */
+export const WORKSPACE_DELETING = 'workspace_deleting';
+/** Stable conflict returned when a workspace cannot serve another root session. */
+export const WORKSPACE_UNAVAILABLE = 'workspace_unavailable';
+/** Stable conflict returned when a workspace's derived identity is inconsistent. */
+export const WORKSPACE_IDENTITY_CONFLICT = 'workspace_identity_conflict';
+
+export const deleteHostedWorkspaceSessionSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema,
+    sessionId: sessionIdSchema,
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
+  })
+  .strict();
+export type DeleteHostedWorkspaceSessionParams = z.input<typeof deleteHostedWorkspaceSessionSchema>;
+
+export type DeleteHostedWorkspaceSessionResult = {
+  success: true;
+  sessionId: string;
+  deletedSessionIds: string[];
+};
+
+export const assertHostedWorkspaceSessionDeletableSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    sessionId: sessionIdSchema,
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
+  })
+  .strict();
+export type AssertHostedWorkspaceSessionDeletableParams = z.input<
+  typeof assertHostedWorkspaceSessionDeletableSchema
+>;
+
+export type AssertHostedWorkspaceSessionDeletableResult = {
+  /** The workspace whose final-root invariant was checked, if any. */
+  workspaceId: CloudAgentWorktreeId | null;
+};
 
 export const resolveCloudAgentRootSessionSchema = z.object({
   kiloUserId: z.string().min(1),
@@ -306,13 +390,12 @@ export const kiloSdkSessionSnapshotOutcomeSchema = z.discriminatedUnion('kind', 
   z.object({ kind: z.literal('retryable_failure') }),
   z.object({ kind: z.literal('invalid_data') }),
 ]);
-export type KiloSdkSessionSnapshotRead = z.infer<typeof kiloSdkSessionSnapshotOutcomeSchema>;
-export type KiloSdkSessionSnapshotOutcome = KiloSdkSessionSnapshotRead;
+export type KiloSdkSessionSnapshotOutcome = z.infer<typeof kiloSdkSessionSnapshotOutcomeSchema>;
 
 export type CloudAgentRootSessionSnapshot = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
-  snapshot: KiloSdkSessionSnapshotRead;
+  snapshot: KiloSdkSessionSnapshotOutcome;
 };
 export type GetCloudAgentRootSessionSnapshotParams =
   ResolveCloudAgentRootSessionForKiloSessionParams;
@@ -345,49 +428,118 @@ export const cloudAgentRootSessionsCursorSchema = z
   .strict();
 export type CloudAgentRootSessionsCursor = z.infer<typeof cloudAgentRootSessionsCursorSchema>;
 
-function encodeBase64Url(value: string): string {
-  const bytes = new TextEncoder().encode(value);
+/** Carries a JSON text as the unpadded base64url an opaque cursor puts on the wire. */
+function encodeBase64Url(text: string): string {
+  const bytes = new TextEncoder().encode(text);
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-export function encodeCloudAgentRootSessionsCursor(
-  cursor: Omit<CloudAgentRootSessionsCursor, 'version'>
-): string {
-  const parsed = cloudAgentRootSessionsCursorSchema.parse({ version: 1, ...cursor });
-  return encodeBase64Url(JSON.stringify(parsed));
-}
-
-export function decodeCloudAgentRootSessionsCursor(cursor: string): CloudAgentRootSessionsCursor {
-  if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) {
-    throw new Error('Invalid Cloud Agent root sessions cursor');
-  }
-  const base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
+/**
+ * Reads the JSON text back out of an unpadded base64url value. Callers keep the
+ * pre-validation that fits their cursor — length, charset, and any canonical
+ * re-encode check — and choose whether invalid UTF-8 is fatal.
+ */
+function decodeBase64Url(value: string, options: { fatalUtf8: boolean }): string {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
   const paddingLength = (4 - (base64.length % 4)) % 4;
   const binary = atob(base64 + '='.repeat(paddingLength));
   const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
-  const parsed = cloudAgentRootSessionsCursorSchema.parse(
-    JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes))
-  );
-  if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
-    throw new Error('Invalid Cloud Agent root sessions cursor');
+  return new TextDecoder('utf-8', { fatal: options.fatalUtf8, ignoreBOM: false }).decode(bytes);
+}
+
+const OPAQUE_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9_-]{1,256}$/;
+
+/**
+ * One codec for every opaque cursor whose wire form is a canonical unpadded
+ * base64url JSON payload: the same charset and length guard, a fatal UTF-8
+ * decode, and a canonical re-encode comparison. `label` is the whole error
+ * message, so each cursor family keeps its own text.
+ */
+function opaqueCursorCodec<S extends z.ZodType>(
+  schema: S,
+  label: string
+): {
+  encode(value: z.input<S>): string;
+  decode(cursor: string): z.output<S>;
+  validate(cursor: string): boolean;
+} {
+  function decode(cursor: string): z.output<S> {
+    if (!OPAQUE_CURSOR_WIRE_PATTERN.test(cursor)) {
+      throw new Error(label);
+    }
+    const parsed = schema.parse(JSON.parse(decodeBase64Url(cursor, { fatalUtf8: true })));
+    if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
+      throw new Error(label);
+    }
+    return parsed;
   }
-  return parsed;
+  return {
+    encode: value => encodeBase64Url(JSON.stringify(schema.parse(value))),
+    decode,
+    validate: cursor => {
+      try {
+        decode(cursor);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
+const rootSessionsCursorCodec = opaqueCursorCodec(
+  cloudAgentRootSessionsCursorSchema,
+  'Invalid Cloud Agent root sessions cursor'
+);
+
+export function encodeCloudAgentRootSessionsCursor(
+  cursor: Omit<CloudAgentRootSessionsCursor, 'version'>
+): string {
+  return rootSessionsCursorCodec.encode({ version: 1, ...cursor });
+}
+
+export function decodeCloudAgentRootSessionsCursor(cursor: string): CloudAgentRootSessionsCursor {
+  return rootSessionsCursorCodec.decode(cursor);
 }
 
 export function validateCloudAgentRootSessionsCursor(cursor: string): boolean {
-  try {
-    decodeCloudAgentRootSessionsCursor(cursor);
-    return true;
-  } catch {
-    return false;
-  }
+  return rootSessionsCursorCodec.validate(cursor);
+}
+
+export const cloudAgentWorkspacesCursorSchema = z
+  .object({
+    version: z.literal(1),
+    updatedAt: cloudAgentRootSessionsCursorTimestampSchema,
+    workspaceId: cloudAgentWorktreeIdSchema,
+  })
+  .strict();
+export type CloudAgentWorkspacesCursor = z.infer<typeof cloudAgentWorkspacesCursorSchema>;
+
+const workspacesCursorCodec = opaqueCursorCodec(
+  cloudAgentWorkspacesCursorSchema,
+  'Invalid Cloud Agent workspaces cursor'
+);
+
+export function encodeCloudAgentWorkspacesCursor(
+  cursor: Omit<CloudAgentWorkspacesCursor, 'version'>
+): string {
+  return workspacesCursorCodec.encode({ version: 1, ...cursor });
+}
+
+export function decodeCloudAgentWorkspacesCursor(cursor: string): CloudAgentWorkspacesCursor {
+  return workspacesCursorCodec.decode(cursor);
+}
+
+export function validateCloudAgentWorkspacesCursor(cursor: string): boolean {
+  return workspacesCursorCodec.validate(cursor);
 }
 
 export const listCloudAgentRootSessionsSchema = z
   .object({
     kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema.optional(),
     limit: z.number().int().min(1).max(100).optional().default(100),
     cursor: z.string().min(1).max(256).optional(),
     start: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
@@ -406,6 +558,7 @@ export type ListCloudAgentRootSessionsParams = z.input<typeof listCloudAgentRoot
 export type CloudAgentRootSessionSummary = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
+  workspaceId: CloudAgentWorktreeId | null;
   userId: string;
   organizationId: string | null;
   title: string | null;
@@ -420,6 +573,118 @@ export type CloudAgentRootSessionsPage = {
   items: CloudAgentRootSessionSummary[];
   nextCursor: string | null;
 };
+
+export const listCloudAgentWorkspacesSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema.optional(),
+    limit: z.number().int().min(1).max(50).optional().default(50),
+    sessionLimit: z.number().int().min(1).max(100).optional().default(10),
+    cursor: z.string().min(1).max(256).optional(),
+    repositoryUrl: z.string().min(1).max(2048).optional(),
+  })
+  .strict()
+  .superRefine((params, ctx) => {
+    if (params.cursor !== undefined && !validateCloudAgentWorkspacesCursor(params.cursor)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['cursor'],
+        message: 'cursor is not a valid Cloud Agent workspaces cursor',
+      });
+    }
+  });
+export type ListCloudAgentWorkspacesParams = z.input<typeof listCloudAgentWorkspacesSchema>;
+
+export const getCloudAgentWorkspaceSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema,
+    sessionLimit: z.number().int().min(1).max(100).optional().default(100),
+    sessionCursor: z.string().min(1).max(256).optional(),
+  })
+  .strict()
+  .superRefine((params, ctx) => {
+    if (
+      params.sessionCursor !== undefined &&
+      !validateCloudAgentRootSessionsCursor(params.sessionCursor)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sessionCursor'],
+        message: 'sessionCursor is not a valid Cloud Agent root sessions cursor',
+      });
+    }
+  });
+export type GetCloudAgentWorkspaceParams = z.input<typeof getCloudAgentWorkspaceSchema>;
+
+export type CloudAgentWorkspaceSummary = {
+  workspaceId: CloudAgentWorktreeId;
+  userId: string;
+  organizationId: string | null;
+  name: string | null;
+  repositoryProvider: 'github' | 'gitlab' | 'bitbucket' | 'git' | null;
+  gitUrl: string | null;
+  gitBranch: string | null;
+  profileId: string | null;
+  deletionState: 'active' | 'deleting' | 'deleted';
+  created: number;
+  updated: number;
+  lastActivity: number;
+  sessions: CloudAgentRootSessionSummary[];
+  nextSessionCursor: string | null;
+};
+
+export type CloudAgentWorkspacesPage = {
+  items: CloudAgentWorkspaceSummary[];
+  nextCursor: string | null;
+};
+
+export type GetCloudAgentWorkspaceResult = CloudAgentWorkspaceSummary | null;
+
+export const getCloudAgentWorkspaceStatusSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema,
+    authorizedWorkspace: z
+      .object({
+        userId: z.string().min(1),
+        organizationId: z.string().nullable(),
+        deletionState: z.enum(['active', 'deleting', 'deleted']),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type GetCloudAgentWorkspaceStatusParams = z.input<typeof getCloudAgentWorkspaceStatusSchema>;
+
+/**
+ * Passive, workspace-keyed lifecycle projection. Every value is read from
+ * stored catalog/journal rows or the non-idle stored turn status of a hosted
+ * root session; computing it allocates no compute, prepares no runtime and
+ * opens no billing interval.
+ */
+export type CloudAgentWorkspaceStatus = {
+  workspaceId: CloudAgentWorktreeId;
+  userId: string;
+  organizationId: string | null;
+  deletionState: 'active' | 'deleting' | 'deleted';
+  /** Hosted root or descendant sessions whose stored turn status is not idle. */
+  activeSessionCount: number;
+  deletion: {
+    started: boolean;
+    completed: boolean;
+    startedAt: number | null;
+    phase: 'not_started' | 'runtime_cleanup' | 'finalizing' | 'completed';
+    /** Sessions the journal manifest will remove, including descendants. */
+    sessionCount: number;
+    runtimeLocationCount: number;
+    completedRuntimeLocationCount: number;
+    remainingRuntimeLocationCount: number;
+    /** Populated only by a completed tombstone. */
+    deletedSessionIds: string[];
+  };
+};
+export type GetCloudAgentWorkspaceStatusResult = CloudAgentWorkspaceStatus | null;
 
 export const sdkApiErrorSchema = z.object({
   name: z.literal('APIError'),
@@ -486,7 +751,10 @@ export const MAX_SESSION_DIFF_READ_BYTES = 8 * 1024 * 1024;
 
 export const sessionDiffReadSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('value'), files: z.array(sessionDiffFileSchema) }),
-  z.object({ kind: z.literal('too_large'), maximumBytes: z.number() }),
+  z.object({
+    kind: z.literal('too_large'),
+    maximumBytes: z.number().int().positive(),
+  }),
   z.object({ kind: z.literal('retryable_failure') }),
   z.object({ kind: z.literal('invalid_data') }),
 ]);
@@ -494,7 +762,10 @@ export type SessionDiffRead = z.infer<typeof sessionDiffReadSchema>;
 
 const kiloSdkUserMessageBaseShape = {
   id: messageIdSchema,
-  sessionID: sessionIdSchema,
+  // The stored message's own session id, as the store addressed the session when
+  // it was written. A session created before the canonical shape was issued
+  // keeps its own id, so the stored transcript must still parse under it.
+  sessionID: storedSessionIdSchema,
   role: z.literal('user'),
   time: z.object({ created: z.number() }),
   /**
@@ -548,7 +819,8 @@ export type KiloSdkUserMessage = z.infer<typeof kiloSdkUserMessageSchema>;
 
 export const kiloSdkAssistantMessageSchema = z.object({
   id: messageIdSchema,
-  sessionID: sessionIdSchema,
+  /** Same stored-session rule as the user message above. */
+  sessionID: storedSessionIdSchema,
   role: z.literal('assistant'),
   time: z.object({ created: z.number(), completed: z.number().optional() }),
   error: sdkAssistantErrorSchema.optional(),
@@ -575,7 +847,8 @@ export type KiloSdkMessageInfo = z.infer<typeof kiloSdkMessageSchema>;
 
 const sdkPartBaseShape = {
   id: partIdSchema,
-  sessionID: sessionIdSchema,
+  /** Same stored-session rule as the stored messages. */
+  sessionID: storedSessionIdSchema,
   messageID: messageIdSchema,
 };
 const sdkPartBaseSchema = z.object(sdkPartBaseShape);
@@ -748,16 +1021,18 @@ export const kiloSdkMessageHistoryPageSchema = z.object({
 });
 export type KiloSdkMessageHistoryPage = z.infer<typeof kiloSdkMessageHistoryPageSchema>;
 
+const KILO_SDK_HISTORY_FAILURE_PHASES = ['message_scan', 'page_parts'] as const;
+
 export const kiloSdkHistoryTooLargeSchema = z.object({
   kind: z.literal('too_large'),
   maximumBytes: z.number().int().positive(),
-  phase: z.enum(['message_scan', 'page_parts']),
+  phase: z.enum(KILO_SDK_HISTORY_FAILURE_PHASES),
 });
 export type KiloSdkHistoryTooLarge = z.infer<typeof kiloSdkHistoryTooLargeSchema>;
 
 export const kiloSdkHistoryRetryableFailureSchema = z.object({
   kind: z.literal('retryable_failure'),
-  phase: z.enum(['message_scan', 'page_parts']),
+  phase: z.enum(KILO_SDK_HISTORY_FAILURE_PHASES),
 });
 export type KiloSdkHistoryRetryableFailure = z.infer<typeof kiloSdkHistoryRetryableFailureSchema>;
 
@@ -880,19 +1155,27 @@ function normalizePersistedKiloSdkMessageHistory(value: unknown): unknown {
     (count, message) => count + message.omittedItemCount,
     0
   );
-  const omittedItemCount = z.number().int().nonnegative().safeParse(value['omittedItemCount']);
+  const suppliedOmittedItemCount = z
+    .number()
+    .int()
+    .nonnegative()
+    .safeParse(value['omittedItemCount']);
+  let mergedOmittedItemCount: unknown;
+  if (additionalOmittedItemCount === 0) {
+    // Nothing was dropped, so the property keeps whatever the caller supplied.
+    mergedOmittedItemCount = undefined;
+  } else if (suppliedOmittedItemCount.success) {
+    mergedOmittedItemCount = suppliedOmittedItemCount.data + additionalOmittedItemCount;
+  } else if (value['omittedItemCount'] === undefined) {
+    mergedOmittedItemCount = additionalOmittedItemCount;
+  } else {
+    // Keep an invalid supplied value so the history schema still rejects it.
+    mergedOmittedItemCount = value['omittedItemCount'];
+  }
   return {
     ...value,
     messages: normalizedMessages.map(message => message.message),
-    ...(additionalOmittedItemCount === 0
-      ? {}
-      : {
-          omittedItemCount: omittedItemCount.success
-            ? omittedItemCount.data + additionalOmittedItemCount
-            : value['omittedItemCount'] === undefined
-              ? additionalOmittedItemCount
-              : value['omittedItemCount'],
-        }),
+    ...(mergedOmittedItemCount === undefined ? {} : { omittedItemCount: mergedOmittedItemCount }),
   };
 }
 
@@ -902,33 +1185,81 @@ export const persistedKiloSdkMessageHistorySchema = z.preprocess(
 );
 export type KiloSdkMessageHistory = z.infer<typeof kiloSdkMessageHistorySchema>;
 
-export const kiloSdkMessagesLegacyCursorSchema = z
+/**
+ * Longest message identity, in the bytes its JSON serialization contributes to
+ * an encoded cursor, that the cursor may carry. Escapes count: a `"` in the id
+ * is two bytes once serialized. The wire length below is derived from this.
+ */
+export const MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES = 64;
+
+const utf8Encoder = new TextEncoder();
+
+/**
+ * True when a message identity fits the cursor id length. Ingest uses the same
+ * rule so every stored identity can be encoded back into a cursor.
+ */
+export function fitsKiloSdkMessagesCursorId(id: string): boolean {
+  return (
+    utf8Encoder.encode(JSON.stringify(id).slice(1, -1)).length <=
+    MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES
+  );
+}
+
+/**
+ * Worst-case JSON envelope of a valid cursor: the empty id plus the longest
+ * decimal a non-negative finite double serializes to (`1.7976931348623157e+308`).
+ */
+const MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_BYTES = '{"id":"","time":1.7976931348623157e+308}'
+  .length;
+
+/**
+ * Longest encoded cursor a valid cursor can produce, counting base64 padding.
+ * Request schemas cap the wire value at this length and the decoder rejects
+ * anything longer before it allocates or parses the decoded payload.
+ */
+export const MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH =
+  4 *
+  Math.ceil(
+    (MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_BYTES + MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES) / 3
+  );
+
+/** Base64 and base64url alphabets, plus the optional trailing padding. */
+const KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9+/_-]+={0,2}$/;
+
+export const kiloSdkMessagesCursorSchema = z
   .object({
-    id: messageIdSchema,
+    id: messageIdSchema.refine(fitsKiloSdkMessagesCursorId, {
+      message: 'message cursor ids must fit the cursor id byte limit',
+    }),
     time: z.number().nonnegative(),
   })
   .strict();
-export type KiloSdkMessagesLegacyCursor = z.infer<typeof kiloSdkMessagesLegacyCursorSchema>;
-
-export const kiloSdkMessagesCursorSchema = kiloSdkMessagesLegacyCursorSchema;
-export type KiloSdkMessagesCursor = KiloSdkMessagesLegacyCursor;
+export type KiloSdkMessagesCursor = z.infer<typeof kiloSdkMessagesCursorSchema>;
 
 export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
-  const parsed = kiloSdkMessagesCursorSchema.parse(cursor);
-  const bytes = new TextEncoder().encode(JSON.stringify(parsed));
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return encodeBase64Url(JSON.stringify(kiloSdkMessagesCursorSchema.parse(cursor)));
+}
+
+/**
+ * Encodes a cursor when it satisfies the contract, and returns `null` when it
+ * does not. History reads use this so a stored identity outside the contract
+ * ends the page instead of failing it.
+ */
+export function tryEncodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string | null {
+  const parsed = kiloSdkMessagesCursorSchema.safeParse(cursor);
+  return parsed.success ? encodeBase64Url(JSON.stringify(parsed.data)) : null;
 }
 
 export function decodeKiloSdkMessagesCursor(cursor: string): KiloSdkMessagesCursor {
-  const base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
-  const paddingLength = (4 - (base64.length % 4)) % 4;
-  const binary = atob(base64 + '='.repeat(paddingLength));
-  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
-  return kiloSdkMessagesCursorSchema.parse(JSON.parse(new TextDecoder().decode(bytes)));
+  if (
+    cursor.length > MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH ||
+    !KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN.test(cursor)
+  ) {
+    throw new Error('message cursor is not valid');
+  }
+  return kiloSdkMessagesCursorSchema.parse(
+    JSON.parse(decodeBase64Url(cursor, { fatalUtf8: false }))
+  );
 }
 
 export function validateKiloSdkMessagesCursor(cursor: string): boolean {
@@ -943,7 +1274,7 @@ export function validateKiloSdkMessagesCursor(cursor: string): boolean {
 export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessionSchema
   .extend({
     limit: z.number().int().nonnegative().max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE).optional(),
-    before: z.string().min(1).optional(),
+    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
   })
   .superRefine((params, ctx) => {
     if (params.before !== undefined && (params.limit === undefined || params.limit === 0)) {
@@ -984,20 +1315,25 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
  * (50) when omitted so the request is always bounded before reaching the DO.
  * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
  * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
- * `before` requires a positive `limit`; the default guarantees this unless
- * the caller explicitly supplies a non-positive `limit`.
+ * `before` is capped at `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized
+ * value never reaches the decoder.
+ *
+ * `kiloSessionId` takes `storedSessionIdSchema`, not `sessionIdSchema`: the
+ * store still addresses sessions created before the canonical id shape was
+ * issued, and their transcript must stay readable. The access check below owns
+ * authorization, not the id shape.
  */
 export const getSessionMessagesSchema = z
   .object({
     kiloUserId: z.string().min(1),
-    kiloSessionId: sessionIdSchema,
+    kiloSessionId: storedSessionIdSchema,
     limit: z
       .number()
       .int()
       .positive()
       .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
       .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    before: z.string().min(1).optional(),
+    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
   })
   .superRefine((params, ctx) => {
     if (params.before === undefined) return;
@@ -1028,14 +1364,34 @@ export type SessionIngestRpcMethods = {
   ) => Promise<CloudAgentWorktreeDeletionState>;
   completeCloudAgentWorktreeDeletion: (
     params: CloudAgentWorktreeDeletionParams
-  ) => Promise<{ success: true; deletedSessionIds: string[] }>;
+  ) => Promise<CloudAgentWorktreeDeletionResult>;
+  deleteCloudAgentWorktreeContent: (
+    params: CloudAgentWorktreeDeletionParams
+  ) => Promise<CloudAgentWorktreeDeletionResult>;
   canDestroyCloudAgentWorktreeSandbox: (
     params: CanDestroyCloudAgentWorktreeSandboxParams
   ) => Promise<CanDestroyCloudAgentWorktreeSandboxResult>;
   createSessionForCloudAgent: (
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;
+  setGeneratedTitleForCloudAgent: (params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+    title: string;
+  }) => Promise<{ applied: boolean }>;
+  canGenerateTitleForCloudAgent: (params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<boolean>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
+  deleteHostedWorkspaceSession: (
+    params: DeleteHostedWorkspaceSessionParams
+  ) => Promise<DeleteHostedWorkspaceSessionResult>;
+  assertHostedWorkspaceSessionDeletable: (
+    params: AssertHostedWorkspaceSessionDeletableParams
+  ) => Promise<AssertHostedWorkspaceSessionDeletableResult>;
   resolveCloudAgentRootSessionForKiloSession: (
     params: ResolveCloudAgentRootSessionForKiloSessionParams
   ) => Promise<ResolveCloudAgentRootSessionForKiloSessionResult>;
@@ -1045,6 +1401,15 @@ export type SessionIngestRpcMethods = {
   listCloudAgentRootSessions: (
     params: ListCloudAgentRootSessionsParams
   ) => Promise<CloudAgentRootSessionsPage>;
+  listCloudAgentWorkspaces: (
+    params: ListCloudAgentWorkspacesParams
+  ) => Promise<CloudAgentWorkspacesPage>;
+  getCloudAgentWorkspace: (
+    params: GetCloudAgentWorkspaceParams
+  ) => Promise<GetCloudAgentWorkspaceResult>;
+  getCloudAgentWorkspaceStatus: (
+    params: GetCloudAgentWorkspaceStatusParams
+  ) => Promise<GetCloudAgentWorkspaceStatusResult>;
   getCloudAgentRootSessionMessages: (
     params: GetCloudAgentRootSessionMessagesParams
   ) => Promise<GetCloudAgentRootSessionMessagesResult>;

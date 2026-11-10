@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   getStoredSessionCards: vi.fn<
     () => {
       sessionId: string;
+      userId?: string | null;
       organizationId: string | null;
       approvalKey: string | null;
       finishedUntil?: number;
@@ -187,7 +188,7 @@ describe('every end path releases the session row', () => {
 describe('restoreFollowedSessionCardsFromStorage', () => {
   it('cancels nothing when the keychain cannot be read, and says so', async () => {
     mocks.getStoredSessionCards.mockReturnValue([
-      { sessionId: 'session-1', organizationId: 'org-1', approvalKey: null },
+      { sessionId: 'session-1', userId: 'user-1', organizationId: 'org-1', approvalKey: null },
     ]);
     _setStoredContextReaderForTests(() => 'unavailable');
 
@@ -201,7 +202,7 @@ describe('restoreFollowedSessionCardsFromStorage', () => {
 
   it('ends every follow when the keychain says no account is signed in', async () => {
     mocks.getStoredSessionCards.mockReturnValue([
-      { sessionId: 'session-1', organizationId: 'org-1', approvalKey: null },
+      { sessionId: 'session-1', userId: 'user-1', organizationId: 'org-1', approvalKey: null },
     ]);
     _setStoredContextReaderForTests(() => null);
 
@@ -219,6 +220,7 @@ describe('a finished card in its window', () => {
     mocks.getStoredSessionCards.mockReturnValue([
       {
         sessionId: 'session-1',
+        userId: 'user-1',
         organizationId: 'org-1',
         approvalKey: null,
         finishedUntil: NOW + 60_000,
@@ -237,7 +239,13 @@ describe('a finished card in its window', () => {
   it('is removed once its window passed (API 24-25 has no system timeout)', () => {
     _resetSessionFollowForTests();
     mocks.getStoredSessionCards.mockReturnValue([
-      { sessionId: 'session-1', organizationId: 'org-1', approvalKey: null, finishedUntil: NOW },
+      {
+        sessionId: 'session-1',
+        userId: 'user-1',
+        organizationId: 'org-1',
+        approvalKey: null,
+        finishedUntil: NOW,
+      },
     ]);
 
     restoreFollowedSessionCards(CTX, NOW);
@@ -251,6 +259,7 @@ describe('a finished card in its window', () => {
     mocks.getStoredSessionCards.mockReturnValue([
       {
         sessionId: 'session-1',
+        userId: 'user-1',
         organizationId: 'org-1',
         approvalKey: null,
         finishedUntil: NOW + 60_000,

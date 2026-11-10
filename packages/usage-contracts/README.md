@@ -10,6 +10,24 @@ alignment checks belong in web-shared
 fields, safe integer limits, ISO timestamps, optional bouncer data, and unknown-key
 stripping when changing the contract.
 
+## Exa usage
+
+`exa.ts` defines the record that the Exa route passes to `recordExaUsage` and
+that `/api/internal/exa-usage/record` accepts. It is separate from the LLM
+usage record and rejects unknown keys. `id` and `occurredAt` are the writer's
+idempotency key, so every resend must reuse them.
+
+## Enkrypt usage
+
+`enkrypt.ts` defines the write that the AI gateway hands to
+`/api/internal/enkrypt-usage/record` and that the writer persists. It rejects
+unknown keys, accepts any GUID as `organizationId`, and defaults an omitted
+`guardrail` to `input` so older senders stay compatible. Senders omit
+`detectorsFired` when no detector fired, so only writes with a detection need a
+writer that knows the field. `id` and `occurredAt`
+are the writer's idempotency key. Its enum literals are checked against the
+database types in `usage-record-contract-alignment.ts`.
+
 ## Classifier usage
 
 The auto-routing Worker constructs `auto-routing/classifier` usage records and

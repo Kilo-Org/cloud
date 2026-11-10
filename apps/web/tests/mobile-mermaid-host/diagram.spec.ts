@@ -17,7 +17,7 @@ const DATA_IMAGE = `data:image/svg+xml;base64,${Buffer.from(IMAGE_SVG).toString(
 type HostWindow = typeof window & {
   kiloRenderDiagram: (diagram: { source: string; dark: boolean; background: string }) => void;
   ReactNativeWebView: { postMessage: (message: string) => void };
-  diagramMessages: Array<{ kind: string; height?: number }>;
+  diagramMessages: Array<{ kind: string; height?: number; source?: string }>;
   policyViolations: Array<{ directive: string; blockedURI: string }>;
 };
 
@@ -131,6 +131,40 @@ test('renders a flowchart with the bundled script', async ({ page, host }) => {
   await expect(page.locator('#d')).toContainText('Finish');
   expect(host.resources).toContain(host.scriptUrl);
   expect(host.requests).toEqual([]);
+});
+
+test('redraws a loaded page instead of loading another one', async ({ page, host }) => {
+  // The app keeps one page per diagram and pushes a color change or a new source
+  // into it, so the vendored script is read once; a second page would be a
+  // second copy of it.
+  await renderDiagram(page, 'flowchart TD\n  A[Start] --> B[Finish]');
+  await expectRenderedDiagram(page);
+  const reportedBefore = await page.evaluate(() => (window as HostWindow).diagramMessages.length);
+
+  const source = 'flowchart LR\n  C[Left] --> D[Right]';
+  await page.evaluate(source => {
+    (window as HostWindow).kiloRenderDiagram({ source, dark: true, background: '#111111' });
+  }, source);
+
+  // One diagram in the host, not the previous one beside it.
+  await expect(page.locator('#d > svg')).toHaveCount(1);
+  await expect(page.locator('#d')).toContainText('Left');
+  await expect(page.locator('#d')).not.toContainText('Start');
+  // The new report names the source it belongs to, so the app can ignore a
+  // report from a diagram it already replaced.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        ([from, wanted]) =>
+          (window as HostWindow).diagramMessages
+            .slice(from as number)
+            .some(message => message.kind === 'height' && message.source === wanted),
+        [reportedBefore, source] as const
+      )
+    )
+    .toBe(true);
+  expect(await page.evaluate(() => (window as HostWindow).policyViolations)).toEqual([]);
+  expect(host.resources.filter(url => url === host.scriptUrl)).toHaveLength(1);
 });
 
 test('completes an image-shape fixture', async ({ page, host }) => {

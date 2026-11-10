@@ -51,6 +51,7 @@ export function BriefingSettingsScreen() {
                 key={`${item.context.id}:${item.model}:${item.maxDurationSeconds}:${item.maxSpendMicrodollars}`}
                 preference={item}
                 defaultModel={available.defaultModel}
+                timezone={available.timezone}
               />
             ))}
         </ScrollView>

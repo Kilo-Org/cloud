@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 import { applyCustomPricingToPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 
 const CACHE_CONTROL = 'public, max-age=0, s-maxage=60, stale-while-revalidate=60';
@@ -20,7 +21,10 @@ export async function handleModelEndpointsRequest(
     );
   }
 
-  const models = await getOpenRouterModelsMetadataFromDatabase();
+  const [models, customPricingConfig] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    getCustomPricingConfig(),
+  ]);
   const storedModel = models[modelId];
 
   if (!storedModel) {
@@ -40,6 +44,7 @@ export async function handleModelEndpointsRequest(
           return {
             ...endpoint,
             pricing: applyCustomPricingToPricing(
+              customPricingConfig,
               storedModel.id,
               displayPricing ?? endpoint.pricing
             ),

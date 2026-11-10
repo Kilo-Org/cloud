@@ -62,6 +62,7 @@ vi.mock('react-native-keyboard-controller', () => ({
   KeyboardProvider: 'KeyboardProvider',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   KeyboardChatScrollView: 'KeyboardChatScrollView',
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   useKeyboardState: (selector?: (state: KeyboardStateSnapshot) => unknown) => {
     const snapshot: KeyboardStateSnapshot = {
       height: 0,
@@ -71,6 +72,11 @@ vi.mock('react-native-keyboard-controller', () => ({
     };
     return selector ? selector(snapshot) : snapshot;
   },
+}));
+
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  KeyboardMotionProvider: 'KeyboardMotionProvider',
+  useKeyboardMotionProgress: () => ({ value: 0 }),
 }));
 
 // `react-native-enriched-markdown` and `react-native-webview` are native views.

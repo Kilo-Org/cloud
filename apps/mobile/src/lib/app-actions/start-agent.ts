@@ -13,12 +13,20 @@ import { normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { i18n } from '@/i18n';
-import { type AppActionResult, parseActionRepository } from '@/lib/app-actions/app-action-contract';
+import {
+  type AppActionResult,
+  type ParsedActionRepository,
+} from '@/lib/app-actions/app-action-contract';
 import {
   prepareAgentSession,
   type PrepareAgentSessionInput,
   type PrepareAgentSessionOutcome,
 } from '@/lib/app-actions/prepare-agent-session';
+import {
+  noRepositoryFailure,
+  preflightStartAgent,
+  unsupportedRepositoryFailure,
+} from '@/lib/app-actions/start-agent-preflight';
 import { type StartAgentRuntime } from '@/lib/app-actions/start-agent-runtime';
 import { parseStoredModelPreference } from '@/lib/hooks/agent-model-preference';
 import { pickAutoSelectedModel } from '@/lib/hooks/auto-select-model';
@@ -38,16 +46,30 @@ export type StartAgentInput = {
   model?: string;
   variant?: string;
   organizationId?: string;
+  /** A repository value already prepared for the session start. */
+  resolvedRepository?: NewSessionRepository;
 };
+/** Result of resolving a repository for a start request. */
+export type StartAgentRepositoryResolution =
+  | { ok: true; repository: NewSessionRepository }
+  | { ok: false; result: AppActionResult };
 
-/** The terminal codes a `StartAgent` run can report. */
-type StartAgentFailureCode =
-  | 'empty-prompt'
-  | 'unknown-repository'
-  | 'unsupported-repository'
-  | 'no-repository'
-  | 'start-cancelled'
-  | 'start-failed';
+/** Resolve one action repository into the shape used by session creation. */
+export async function resolveStartAgentRepository(
+  input: Pick<StartAgentInput, 'prompt' | 'repository' | 'sessionId'>
+): Promise<StartAgentRepositoryResolution> {
+  const preflight = preflightStartAgent(input);
+  if (!preflight.ok) {
+    return { ok: false, result: preflight.result };
+  }
+  try {
+    // Keep secure storage and the native outbox out of the shared in-app import graph.
+    const runtime = await import('@/lib/app-actions/start-agent-runtime');
+    return await resolveActionRepository(preflight.named, runtime);
+  } catch {
+    return { ok: false, result: retryableStartFailure() };
+  }
+}
 
 /**
  * Run one `StartAgent` intent: resolve the repository, the model, the
@@ -58,14 +80,17 @@ type StartAgentFailureCode =
 export async function startAgent(input: StartAgentInput): Promise<AppActionResult> {
   const failedToCreate = i18n.t('agentChat.newSession.failedToCreate');
   try {
-    const sessionId = nonBlank(input.sessionId);
-    if (sessionId === null && input.prompt.trim().length === 0) {
-      return startAgentFailure('empty-prompt', false, i18n.t('appActions.start.promptRequired'));
+    const preflight = preflightStartAgent(input);
+    if (!preflight.ok) {
+      return preflight.result;
     }
+    const sessionId = nonBlank(input.sessionId);
     // Lazy: the in-app creators import this module, so the native half of the
     // action path must never enter their graph.
     const runtime = await import('@/lib/app-actions/start-agent-runtime');
-    const repository = await resolveActionRepository(input.repository, runtime);
+    const repository: ActionRepositoryResolution = input.resolvedRepository
+      ? { ok: true, repository: input.resolvedRepository }
+      : await resolveActionRepository(preflight.named, runtime);
     if (!repository.ok) {
       return repository.result;
     }
@@ -74,7 +99,13 @@ export async function startAgent(input: StartAgentInput): Promise<AppActionResul
       : await resolveAutoModel(runtime);
     if (selection === null) {
       // No usable model: nothing about this intent can succeed on a retry.
-      return startAgentFailure('start-failed', false, failedToCreate);
+      return {
+        ok: false,
+        action: 'StartAgent',
+        code: 'start-failed',
+        retryable: false,
+        message: failedToCreate,
+      };
     }
     const userId = await runtime.currentUserId();
     if (userId === null) {
@@ -98,7 +129,13 @@ export async function startAgent(input: StartAgentInput): Promise<AppActionResul
     }
     return outcome.retryable
       ? retryableStartFailure()
-      : startAgentFailure('start-failed', false, failedToCreate);
+      : {
+          ok: false,
+          action: 'StartAgent',
+          code: 'start-failed',
+          retryable: false,
+          message: failedToCreate,
+        };
   } catch {
     // Any resolution failure (transport, storage, an unexpected throw) is a
     // start failure the user can retry.
@@ -162,16 +199,13 @@ function successResult(
 
 /** A `start-failed` result the user can retry. */
 function retryableStartFailure(): AppActionResult {
-  return startAgentFailure('start-failed', true, i18n.t('agentChat.session.serviceUnavailable'));
-}
-
-/** A terminal `StartAgent` result: no session was created. */
-function startAgentFailure(
-  code: StartAgentFailureCode,
-  retryable: boolean,
-  message: string
-): AppActionResult {
-  return { ok: false, action: 'StartAgent', code, retryable, message };
+  return {
+    ok: false,
+    action: 'StartAgent',
+    code: 'start-failed',
+    retryable: true,
+    message: i18n.t('agentChat.session.serviceUnavailable'),
+  };
 }
 
 /** One resolved repository, or the result to report instead. */
@@ -180,52 +214,25 @@ type ActionRepositoryResolution =
   | { ok: false; result: AppActionResult };
 
 /**
- * Resolve the repository a `StartAgent` request targets: the named one first,
- * otherwise the most recent session's repository. A named repository that
- * cannot be parsed, or a Bitbucket one (see `parseActionRepository`), fails
- * the run instead of silently starting somewhere else.
+ * Resolve the repository a `StartAgent` request targets: the one the request
+ * named, which the preflight already parsed and checked, otherwise the most
+ * recent session's repository.
  */
 async function resolveActionRepository(
-  raw: string | undefined,
+  named: ParsedActionRepository | null,
   runtime: StartAgentRuntime
 ): Promise<ActionRepositoryResolution> {
-  const named = nonBlank(raw);
-  const parsed =
-    named === null ? await runtime.mostRecentRepository() : parseActionRepository(named);
+  const parsed = named ?? (await runtime.mostRecentRepository());
   if (parsed === null) {
-    return named === null
-      ? { ok: false, result: noRepositoryFailure() }
-      : {
-          ok: false,
-          result: startAgentFailure(
-            'unknown-repository',
-            false,
-            i18n.t('appActions.start.repositoryUnknown', { repository: named })
-          ),
-        };
+    return { ok: false, result: noRepositoryFailure() };
   }
   if (parsed.kind === 'unsupported') {
-    return {
-      ok: false,
-      result: startAgentFailure(
-        'unsupported-repository',
-        false,
-        i18n.t('appActions.start.repositoryUnsupported', { repository: parsed.fullName })
-      ),
-    };
+    return { ok: false, result: unsupportedRepositoryFailure(parsed.fullName) };
   }
   return {
     ok: true,
     repository: { platform: parsed.kind, fullName: parsed.fullName, isPrivate: false },
   };
-}
-
-/**
- * The empty state: no repository is named and none was used recently, so no
- * provider is known and the message names none.
- */
-function noRepositoryFailure(): AppActionResult {
-  return startAgentFailure('no-repository', false, i18n.t('appActions.start.repositoryRequired'));
 }
 
 /**

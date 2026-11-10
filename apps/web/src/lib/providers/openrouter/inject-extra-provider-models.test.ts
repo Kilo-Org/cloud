@@ -11,7 +11,7 @@ import type {
   OpenRouterModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 const MODEL_SLUG = 'nvidia/nemotron-3-super-120b-a12b';
 
@@ -69,7 +69,7 @@ describe('injectExtraProviderModels', () => {
         models: [] as OpenRouterModel[],
       },
     ];
-    const vercelModels: Record<string, StoredModel> = {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
       [MODEL_SLUG]: {
         id: MODEL_SLUG,
         name: 'NVIDIA Nemotron 3 Super',
@@ -123,7 +123,7 @@ describe('injectExtraProviderModels', () => {
         models: [] as OpenRouterModel[],
       },
     ];
-    const vercelModels: Record<string, StoredModel> = {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
       [MODEL_SLUG]: {
         id: MODEL_SLUG,
         name: model.name,
@@ -161,7 +161,7 @@ describe('injectExtraProviderModels', () => {
       },
     ];
     const vercelModelId = 'nvidia/nemotron-3-super';
-    const vercelModels: Record<string, StoredModel> = {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
       [vercelModelId]: {
         id: vercelModelId,
         name: model.name,
@@ -205,7 +205,7 @@ describe('injectVercelOnlyProviders', () => {
 
   test('adds providers that only serve snapshot models through Vercel', () => {
     const providerModelData = nvidiaProviderModelData();
-    const vercelModels: Record<string, StoredModel> = {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
       [MODEL_SLUG]: {
         id: MODEL_SLUG,
         name: 'NVIDIA Nemotron 3 Super',
@@ -255,9 +255,36 @@ describe('injectVercelOnlyProviders', () => {
     });
   });
 
+  test.each([
+    ['meituan', 'Meituan LongCat'],
+    ['deepinfra', 'DeepInfra'],
+    ['future-provider', 'Future Provider'],
+    ['future_provider', 'Future Provider'],
+    ['future--__provider', 'Future Provider'],
+  ])('beautifies the synthesized provider %s', (providerId, displayName) => {
+    const providerModelData = nvidiaProviderModelData();
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [{ provider_name: providerId }],
+      },
+    };
+
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+
+    const synthesized = providerModelData.find(({ provider }) => provider.slug === providerId);
+    expect(synthesized?.provider).toMatchObject({
+      name: displayName,
+      displayName,
+      slug: providerId,
+    });
+    expect(synthesized?.models[0]?.endpoint?.provider_display_name).toBe(displayName);
+  });
+
   test('derives a display name without policy links for unknown providers', () => {
     const providerModelData = nvidiaProviderModelData();
-    const vercelModels: Record<string, StoredModel> = {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
       [MODEL_SLUG]: {
         id: MODEL_SLUG,
         name: 'NVIDIA Nemotron 3 Super',
@@ -280,7 +307,7 @@ describe('injectVercelOnlyProviders', () => {
 
   test('treats missing Vercel data policy guarantees as training and retaining prompts', () => {
     const providerModelData = nvidiaProviderModelData();
-    const vercelModels: Record<string, StoredModel> = {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
       [MODEL_SLUG]: {
         id: MODEL_SLUG,
         name: 'NVIDIA Nemotron 3 Super',
@@ -309,7 +336,7 @@ describe('injectVercelOnlyProviders', () => {
 
   test('does not add providers already known under an OpenRouter slug', () => {
     const providerModelData = nvidiaProviderModelData();
-    const vercelModels: Record<string, StoredModel> = {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
       [MODEL_SLUG]: {
         id: MODEL_SLUG,
         name: 'NVIDIA Nemotron 3 Super',
@@ -327,7 +354,7 @@ describe('injectVercelOnlyProviders', () => {
 
   test('ignores Vercel models that are not in the snapshot', () => {
     const providerModelData = nvidiaProviderModelData();
-    const vercelModels: Record<string, StoredModel> = {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
       'vendor/vercel-only-model': {
         id: 'vendor/vercel-only-model',
         name: 'Vercel Only Model',
@@ -342,7 +369,7 @@ describe('injectVercelOnlyProviders', () => {
 
   test('skips provider ids that routing would lowercase', () => {
     const providerModelData = nvidiaProviderModelData();
-    const vercelModels: Record<string, StoredModel> = {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
       [MODEL_SLUG]: {
         id: MODEL_SLUG,
         name: 'NVIDIA Nemotron 3 Super',

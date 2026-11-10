@@ -1,6 +1,9 @@
+import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
+import { environmentSetupCommandCountSchema } from '../shared/setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
+  RuntimeBuiltinAgentsSchema,
   RuntimeKiloCommandsSchema,
 } from '../shared/runtime-profile.js';
 export * from '../shared/runtime-profile.js';
@@ -82,26 +85,6 @@ export const AttachmentsSchema = z.object({
     .describe('Ordered array of specific UUID attachment filenames to download'),
 });
 export type Attachments = z.infer<typeof AttachmentsSchema>;
-
-const imageFilenameSchema = z
-  .string()
-  .min(1)
-  .max(128)
-  .regex(
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(png|jpg|jpeg|webp|gif)$/,
-    'Image filename must be a UUID with extension png, jpg, jpeg, webp, or gif'
-  );
-
-/** Legacy public image decoder retained only for API request compatibility. */
-export const ImagesSchema = z.object({
-  path: attachmentMessageUuidSchema,
-  files: z
-    .array(imageFilenameSchema)
-    .min(1)
-    .max(5)
-    .describe('Ordered array of specific UUID image filenames to download'),
-});
-export type Images = z.infer<typeof ImagesSchema>;
 
 /**
  * Schema for encrypted secret envelope (RSA + AES envelope encryption).
@@ -288,7 +271,7 @@ const SharedSessionProfileFields = {
     })
     .optional(),
   encryptedSecrets: EncryptedSecretsSchema.optional(),
-  setupCommands: z.array(z.string().max(500)).max(Limits.MAX_SETUP_COMMANDS).optional(),
+  setupCommands: setupCommandsSchema.optional(),
   mcpServers: z
     .record(z.string().max(100), MCPServerConfigSchema)
     .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
@@ -297,10 +280,21 @@ const SharedSessionProfileFields = {
     .optional(),
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
+  builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
 };
 
 export const SessionProfileBundleSchema = z.object({
   ...SharedSessionProfileFields,
+  /**
+   * The environment's start commands. They run after setup in every prepared
+   * workspace, including one whose environment snapshot already ran setup.
+   */
+  startCommands: setupCommandsSchema.optional(),
+  /**
+   * How many leading `setupCommands` are the environment's own. A session that
+   * adopts an environment snapshot skips them, because the snapshot ran them.
+   */
+  environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
   kiloCommands: RuntimeKiloCommandsSchema.optional(),
   runtimeInstructions: RuntimeInstructionsSchema.optional(),
 });

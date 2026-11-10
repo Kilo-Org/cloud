@@ -52,10 +52,12 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
 
   const botRequest = cloneGitHubRequest(request, rawBody);
-  const installationId = getGitHubInstallationId(rawBody);
 
   const response = await handleGitHubWebhook(cloneGitHubRequest(request, rawBody), 'standard');
   if (!response.ok) return response;
+
+  // The delivery is authenticated from here on, so its payload may be read.
+  const installationId = getGitHubInstallationId(rawBody);
   if (!installationId) return response;
   try {
     await assertGitHubInstallationRuntimeAuthorized(installationId, 'standard');

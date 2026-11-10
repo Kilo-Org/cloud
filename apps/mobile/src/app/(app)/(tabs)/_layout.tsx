@@ -11,7 +11,7 @@ import { SessionPreviewOverlay } from '@/components/agents/session-preview-overl
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
-import { TabSwitchInputGate } from '@/components/tab-screen-input-gate';
+import { TabSwitchInputSettle } from '@/components/tab-screen-input-gate';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -176,9 +176,9 @@ export default function TabsLayout() {
   const tabsLayout = (
     <StateSurfaceInsets bottomInset={hideTabs ? 0 : tabBarHeight}>
       <Tabs
+        screenLayout={TabSwitchInputSettle}
         screenOptions={{
           headerShown: false,
-          freezeOnBlur: true,
           // The row palette colours a destination inside a screen; a tab tint
           // says which tab is selected — a state, not a destination. One accent
           // per tab would put six accents on the bar and fight the rows below
@@ -320,7 +320,7 @@ export default function TabsLayout() {
   );
   return (
     <TabBarLabelContext value={labelState}>
-      <TabSwitchInputGate>{tabsLayout}</TabSwitchInputGate>
+      {tabsLayout}
       <SessionPreviewOverlay />
     </TabBarLabelContext>
   );

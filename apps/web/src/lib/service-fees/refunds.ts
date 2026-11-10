@@ -28,6 +28,21 @@ export const SERVICE_FEE_REFUND_FEE_METADATA_KEY = 'serviceFeeRefundFeeMinor';
 
 const PAGE_SIZE = 100;
 const COUNTED_REFUND_STATUSES = new Set(['succeeded', 'pending']);
+const DEAD_REFUND_STATUSES = new Set(['failed', 'canceled']);
+
+/** A refund that moved, or is moving, money: the statuses fee allocation sums. */
+export function isCountedRefund(refund: Pick<Stripe.Refund, 'status'>): boolean {
+  return COUNTED_REFUND_STATUSES.has(refund.status ?? '');
+}
+
+/**
+ * A refund that has not failed or been canceled, including ones that still
+ * need customer action. Use this wherever an unfinished refund must block a
+ * duplicate or count against a fee-only decision.
+ */
+export function isLiveRefund(refund: Pick<Stripe.Refund, 'status'>): boolean {
+  return !DEAD_REFUND_STATUSES.has(refund.status ?? '');
+}
 
 export class ServiceFeeObservationNotReadyError extends Error {
   readonly name = 'ServiceFeeObservationNotReadyError';
@@ -240,6 +255,53 @@ export function parseServiceFeeRefundAllocationMetadata(
   const feeMinor = parseMinorMetadata(metadata[SERVICE_FEE_REFUND_FEE_METADATA_KEY]);
   if (productMinor === null || feeMinor === null) return null;
   return { productMinor, feeMinor };
+}
+
+export async function listAllChargeRefunds(
+  stripe: Pick<ServiceFeeRefundStripeClient, 'refunds'>,
+  chargeId: string
+): Promise<Stripe.Refund[]> {
+  return listAllPages(startingAfter =>
+    stripe.refunds.list({
+      charge: chargeId,
+      limit: PAGE_SIZE,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    })
+  );
+}
+
+/**
+ * True when the charge's refunds returned only service fee and left the
+ * purchase intact, so they must not trigger adverse-payment handling. Every
+ * live refund must claim fee only in its metadata and its amount must equal
+ * that fee, the fee refunds together cannot exceed the charged fee, and the
+ * charge cannot be fully refunded.
+ */
+export async function isServiceFeeOnlyRefundedCharge(params: {
+  charge: Pick<Stripe.Charge, 'id' | 'amount' | 'amount_refunded'>;
+  chargedFeeMinor: number;
+  stripe: Pick<ServiceFeeRefundStripeClient, 'refunds'>;
+}): Promise<boolean> {
+  if (params.chargedFeeMinor <= 0 || params.charge.amount_refunded >= params.charge.amount) {
+    return false;
+  }
+  const live = (await listAllChargeRefunds(params.stripe, params.charge.id)).filter(isLiveRefund);
+  if (live.length === 0) return false;
+
+  let feeRefundedMinor = 0;
+  for (const refund of live) {
+    const allocation = parseServiceFeeRefundAllocationMetadata(refund.metadata);
+    if (
+      !allocation ||
+      allocation.productMinor !== 0 ||
+      allocation.feeMinor <= 0 ||
+      refund.amount !== allocation.feeMinor
+    ) {
+      return false;
+    }
+    feeRefundedMinor += refund.amount;
+  }
+  return feeRefundedMinor <= params.chargedFeeMinor;
 }
 
 /**
@@ -631,7 +693,7 @@ async function listChargeRefunds(
 function sumRefundMetadataAllocations(
   refunds: readonly Stripe.Refund[]
 ): ServiceFeeRefundAllocation | null {
-  const counted = refunds.filter(refund => COUNTED_REFUND_STATUSES.has(refund.status ?? ''));
+  const counted = refunds.filter(isCountedRefund);
   if (counted.length === 0) return null;
 
   let productMinor = 0;
@@ -694,8 +756,8 @@ async function listInvoiceCreditNotes(
   stripe: ServiceFeeRefundStripeClient | undefined,
   current?: ServiceFeeCreditNoteObservation
 ): Promise<{ items: ServiceFeeCreditNoteObservation[]; complete: boolean }> {
-  const listCreditNotes = stripe?.creditNotes?.list;
-  if (!listCreditNotes) {
+  const creditNotes = stripe?.creditNotes;
+  if (!creditNotes) {
     return {
       items: current ? [current] : [],
       complete: Boolean(current && current.lines && !current.lines.has_more),
@@ -703,7 +765,7 @@ async function listInvoiceCreditNotes(
   }
 
   const items = await listAllPages(startingAfter =>
-    listCreditNotes({
+    creditNotes.list({
       invoice: invoiceId,
       limit: PAGE_SIZE,
       ...(startingAfter ? { starting_after: startingAfter } : {}),
@@ -719,12 +781,12 @@ async function listCreditNoteLines(
   if (creditNote.lines && !creditNote.lines.has_more) {
     return { items: creditNote.lines.data, complete: true };
   }
-  const listLineItems = stripe?.creditNotes?.listLineItems;
-  if (!listLineItems) {
+  const creditNotes = stripe?.creditNotes;
+  if (!creditNotes) {
     return { items: creditNote.lines?.data ?? [], complete: false };
   }
   const items = await listAllPages(startingAfter =>
-    listLineItems(creditNote.id, {
+    creditNotes.listLineItems(creditNote.id, {
       limit: PAGE_SIZE,
       ...(startingAfter ? { starting_after: startingAfter } : {}),
     })
@@ -736,12 +798,12 @@ async function listInvoiceLines(
   invoiceId: string,
   stripe: ServiceFeeRefundStripeClient | undefined
 ): Promise<{ items: Stripe.InvoiceLineItem[]; complete: boolean }> {
-  const listLineItems = stripe?.invoices?.listLineItems;
-  if (!listLineItems) {
+  const invoices = stripe?.invoices;
+  if (!invoices) {
     return { items: [], complete: false };
   }
   const items = await listAllPages(startingAfter =>
-    listLineItems(invoiceId, {
+    invoices.listLineItems(invoiceId, {
       limit: PAGE_SIZE,
       ...(startingAfter ? { starting_after: startingAfter } : {}),
     })

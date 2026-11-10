@@ -24,7 +24,7 @@ import { organization_seats_purchases, type OrganizationSeatsPurchase } from '@k
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, desc, ne } from 'drizzle-orm';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
-import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationBillingProcedure,
@@ -33,7 +33,8 @@ import {
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
+import type { StripeSubscription } from '@kilocode/web-shared/lib/stripe-subscription';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { BillingCycleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
@@ -64,21 +65,33 @@ const UpdateSeatCountInputSchema = OrganizationIdInputSchema.extend({
   newSeatCount: z.number().int().min(1),
 });
 
-const OrganizationSubscriptionResponseSchema = z.object({
-  subscription: z.custom<Stripe.Subscription>().nullable(),
-  seatsUsed: z.number(),
-  totalSeats: z.number(),
-  nextSeatCount: z.number().int().nonnegative().nullable(),
-  nextSeatCountEffectiveAt: z.string().datetime().nullable(),
-  paidSeatItemId: z.string().nullable(),
-  latestSeatPurchaseStatus: z.custom<OrganizationSeatsPurchase['subscription_status']>().nullable(),
-});
+type OrganizationSubscriptionResponse = {
+  subscription: StripeSubscription | null;
+  seatsUsed: number;
+  totalSeats: number;
+  nextSeatCount: number | null;
+  nextSeatCountEffectiveAt: string | null;
+  paidSeatItemId: string | null;
+  latestSeatPurchaseStatus: OrganizationSeatsPurchase['subscription_status'] | null;
+};
+
+const OrganizationSubscriptionResponseSchema: z.ZodType<OrganizationSubscriptionResponse> =
+  z.object({
+    subscription: z.custom<StripeSubscription>().nullable(),
+    seatsUsed: z.number(),
+    totalSeats: z.number(),
+    nextSeatCount: z.number().int().nonnegative().nullable(),
+    nextSeatCountEffectiveAt: z.string().datetime().nullable(),
+    paidSeatItemId: z.string().nullable(),
+    latestSeatPurchaseStatus: z
+      .custom<OrganizationSeatsPurchase['subscription_status']>()
+      .nullable(),
+  });
 
 const OrganizationSeatPurchaseStatusResponseSchema = z.object({
   latestSeatPurchaseStatus: z.custom<OrganizationSeatsPurchase['subscription_status']>().nullable(),
 });
 
-type OrganizationSubscriptionResponse = z.infer<typeof OrganizationSubscriptionResponseSchema>;
 type OrganizationSeatPurchaseStatusResponse = z.infer<
   typeof OrganizationSeatPurchaseStatusResponseSchema
 >;
@@ -87,6 +100,34 @@ const SubscriptionActionResponseSchema = z.object({
   success: z.boolean(),
   message: z.string().optional(),
 });
+
+/** The single answer for a checkout that is not resolvable or not paid. */
+function checkoutSessionNotFound(): TRPCError {
+  return new TRPCError({
+    code: 'NOT_FOUND',
+    message: 'Checkout session not found or payment not completed',
+  });
+}
+
+/**
+ * Runs one Stripe read and answers {@link checkoutSessionNotFound} when the
+ * provider says the object does not exist. Every other provider failure keeps
+ * its own error, so a transport or credential problem is not reported as a
+ * missing checkout.
+ */
+async function readStripeOrNotFound<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    if (
+      error instanceof Stripe.errors.StripeInvalidRequestError &&
+      error.code === 'resource_missing'
+    ) {
+      throw checkoutSessionNotFound();
+    }
+    throw error;
+  }
+}
 
 const UpdateSeatCountResponseSchema = z.object({
   success: z.boolean(),
@@ -139,7 +180,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
 
       // Fetch the subscription information from Stripe — including ended
       // subscriptions so the overview card can show the resubscribe UI.
-      let subscription: Stripe.Subscription | null = null;
+      let subscription: StripeSubscription | null = null;
       try {
         subscription = await retrieveSubscription(latestPurchase.subscription_stripe_id);
       } catch (error) {
@@ -232,28 +273,34 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return { defaultSeatCount, billingCycle };
     }),
 
-  getByStripeSessionId: baseProcedure
-    .input(z.object({ sessionId: z.string().min(1) }))
-    .query(async ({ input }) => {
-      const { sessionId } = input;
+  getByStripeSessionId: organizationMemberProcedure
+    .input(OrganizationIdInputSchema.extend({ sessionId: z.string().min(1) }))
+    .query(async ({ input }): Promise<{ status: string }> => {
+      const { organizationId, sessionId } = input;
 
-      const session = await client.checkout.sessions.retrieve(sessionId);
+      const organization = await getOrganizationById(organizationId);
+      const ownerCustomerId = organization?.stripe_customer_id;
+      if (!ownerCustomerId) {
+        throw checkoutSessionNotFound();
+      }
+
+      const session = await readStripeOrNotFound(() =>
+        client.checkout.sessions.retrieve(sessionId)
+      );
+      const sessionCustomerId =
+        typeof session.customer === 'string' ? session.customer : (session.customer?.id ?? null);
+      if (sessionCustomerId !== ownerCustomerId) {
+        throw checkoutSessionNotFound();
+      }
+
       const paymentStatus = session.payment_status;
       if (paymentStatus !== 'paid') {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: `Session not found or payment not completed for id ${sessionId}`,
-        });
+        throw checkoutSessionNotFound();
       }
-      if (session.subscription && typeof session.subscription === 'string') {
-        // make sure subscription exists as well
-        const res = await retrieveSubscription(session.subscription);
-        if (!res) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: `Subscription not found for session ${sessionId}`,
-          });
-        }
+      const sessionSubscription = session.subscription;
+      if (typeof sessionSubscription === 'string') {
+        // The subscription must still exist for the checkout to have completed.
+        await readStripeOrNotFound(() => retrieveSubscription(sessionSubscription));
       }
       return { status: paymentStatus };
     }),
@@ -589,19 +636,30 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
           from_subscription: subscription.id,
         });
       } catch (error) {
-        // Concurrent requests may both pass the existing-schedule check above
-        // but only one can create a schedule. Catch the Stripe rejection for the
-        // second and return a clean client error instead of a 500.
         if (
           error instanceof Error &&
           'type' in error &&
-          (error as { code?: string }).code === 'resource_already_exists'
+          error.type === 'StripeInvalidRequestError'
         ) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message:
-              'A billing cycle change is already scheduled. Cancel the existing change before scheduling a new one.',
-          });
+          const current = await retrieveSubscription(subscription.id).catch(() => null);
+          const attached =
+            typeof current?.schedule === 'string'
+              ? await client.subscriptionSchedules.retrieve(current.schedule).catch(() => null)
+              : current?.schedule;
+          const attachedSubscriptionId =
+            typeof attached?.subscription === 'string'
+              ? attached.subscription
+              : attached?.subscription?.id;
+          if (
+            attachedSubscriptionId === subscription.id &&
+            (attached?.status === 'active' || attached?.status === 'not_started')
+          ) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message:
+                'A billing cycle change is already scheduled. Cancel the existing change before scheduling a new one.',
+            });
+          }
         }
         throw error;
       }

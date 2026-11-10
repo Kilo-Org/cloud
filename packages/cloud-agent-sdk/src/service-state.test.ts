@@ -909,6 +909,26 @@ describe('createServiceState', () => {
       ]);
     });
 
+    it('accumulates session setup and start command messages into setupLog', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'preparing',
+        step: 'session_setup_commands',
+        message: 'Running session setup command 1 of 1: npm install',
+      });
+      state.process({
+        type: 'preparing',
+        step: 'start_commands',
+        message: 'Running start command 1 of 1: npm run dev',
+      });
+
+      expect(state.getSetupLog()).toEqual([
+        'Running session setup command 1 of 1: npm install',
+        'Running start command 1 of 1: npm run dev',
+      ]);
+    });
+
     it('clears setupLog on ready', () => {
       const state = createServiceState(makeConfig());
 
@@ -1042,6 +1062,40 @@ describe('createServiceState', () => {
           triggerMessageId: 'message-2',
           status: 'running',
         }),
+      ]);
+    });
+
+    it('clearPreparationAttempts empties the rows and a new attempt starts fresh', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      expect(state.getPreparationAttempts()).toHaveLength(1);
+
+      state.clearPreparationAttempts();
+
+      expect(state.getPreparationAttempts()).toEqual([]);
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-2',
+        triggerMessageId: 'message-2',
+        revision: 1,
+        timestamp: 2_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({ id: 'attempt-2', status: 'running' }),
       ]);
     });
 
@@ -1400,6 +1454,75 @@ describe('createServiceState', () => {
       expect(reconnected.getPreparationAttempts()).toEqual(state.getPreparationAttempts());
       expect(reconnected.getCloudStatus()).toEqual({ type: 'ready' });
     });
+
+    it.each([0, 1_790_000_000_000, undefined])(
+      'preserves selected snapshot time %j through live updates and normalized replay',
+      snapshotCapturedAt => {
+        const state = createServiceState(makeConfig());
+        const base = {
+          type: 'preparing' as const,
+          version: 2 as const,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'message-1',
+          step: 'environment_snapshot',
+          message: 'Using environment snapshot',
+          timestamp: 2_000,
+        };
+        state.process({ ...base, action: 'attempt_started', revision: 1 });
+        state.process({
+          ...base,
+          action: 'step_started',
+          revision: 2,
+          stepId: 'snapshot',
+          kind: 'phase',
+          label: 'environment snapshot',
+        });
+        state.process({
+          ...base,
+          action: 'step_progress',
+          revision: 3,
+          stepId: 'snapshot',
+          detail: base.message,
+          ...(snapshotCapturedAt === undefined ? {} : { snapshotCapturedAt }),
+        });
+        state.process({
+          ...base,
+          action: 'step_progress',
+          revision: 4,
+          stepId: 'snapshot',
+          detail: `${base.message}; a replacement build is running`,
+        });
+        state.process({ ...base, action: 'attempt_completed', revision: 5 });
+        const attempt = state.getPreparationAttempts()[0];
+        if (!attempt) throw new Error('Expected preparation attempt');
+        if (snapshotCapturedAt === undefined)
+          expect(attempt.steps[0]).not.toHaveProperty('snapshotCapturedAt');
+        else expect(attempt.steps[0]).toHaveProperty('snapshotCapturedAt', snapshotCapturedAt);
+        const reconnected = createServiceState(makeConfig());
+        reconnected.process({
+          type: 'preparing',
+          ...preparingDataSchema.parse({
+            ...base,
+            action: 'attempt_snapshot',
+            revision: 5,
+            attempt,
+          }),
+        });
+        for (const stepSnapshot of attempt.steps) {
+          reconnected.process({
+            type: 'preparing',
+            ...preparingDataSchema.parse({
+              ...base,
+              action: 'step_snapshot',
+              revision: stepSnapshot.revision,
+              stepId: stepSnapshot.id,
+              stepSnapshot,
+            }),
+          });
+        }
+        expect(reconnected.getPreparationAttempts()).toEqual(state.getPreparationAttempts());
+      }
+    );
 
     it('keeps only the most recent step output and marks the step truncated', () => {
       const state = createServiceState(makeConfig());
@@ -2108,6 +2231,14 @@ describe('createServiceState', () => {
       });
     });
 
+    it('retains repository identity and deduplicates within each repository', () => {
+      const state = createServiceState(makeConfig());
+      for (const repository of ['acme/web', 'acme/api', 'acme/web']) {
+        state.process({ type: 'autocommit_completed', success: true, ...localCommit, repository });
+      }
+      expect(state.getCommits().map(commit => commit.repository)).toEqual(['acme/web', 'acme/api']);
+    });
+
     it('deduplicates immutable facts and keeps multiple commits at one anchor', () => {
       const state = createServiceState(makeConfig());
       const second = {
@@ -2556,6 +2687,96 @@ describe('createServiceState', () => {
       state.process({ type: 'permission.replied', requestId: 'perm-1' });
 
       expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
+    });
+  });
+
+  describe('permission.unreadable', () => {
+    it('tracks a request whose scope could not be read', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+
+      expect(state.getUnreadablePermissions()).toEqual([{ requestId: 'perm-1' }]);
+      expect(state.snapshot().unreadablePermissions).toEqual([{ requestId: 'perm-1' }]);
+      expect(state.getPermission()).toBeNull();
+    });
+
+    it('keeps one notice per request id', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'permission.unreadable', requestId: 'perm-2' });
+
+      expect(state.getUnreadablePermissions()).toEqual([
+        { requestId: 'perm-1' },
+        { requestId: 'perm-2' },
+      ]);
+    });
+
+    it('clears the notice on permission.replied', () => {
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onPermissionResolved }));
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'permission.replied', requestId: 'perm-1' });
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
+      expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
+    });
+
+    it('drops the notice when a readable request for the same id arrives', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({
+        type: 'permission.asked',
+        requestId: 'perm-1',
+        permission: 'file-edit',
+        patterns: ['**/*'],
+        metadata: {},
+        always: [],
+      });
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
+      expect(state.getPermission()?.requestId).toBe('perm-1');
+    });
+
+    it('replaces a readable card when the same request arrives unreadable', () => {
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onPermissionResolved }));
+
+      state.process({
+        type: 'permission.asked',
+        requestId: 'perm-1',
+        permission: 'file-edit',
+        patterns: ['**/*'],
+        metadata: {},
+        always: [],
+      });
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+
+      expect(state.getPermission()).toBeNull();
+      expect(state.getUnreadablePermissions()).toEqual([{ requestId: 'perm-1' }]);
+      expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
+    });
+
+    it('clears the notice when the session reconnects', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
+    });
+
+    it('clears the notice on reset', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.reset();
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
     });
   });
 

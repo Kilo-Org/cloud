@@ -27,6 +27,24 @@ describe('inviteEmailError', () => {
     expect(inviteEmailError('first.last+tag@sub.example.co.uk')).toBeNull();
     expect(inviteEmailError('  dev@example.com \n')).toBeNull();
   });
+
+  it('accepts the longest address a mail system delivers and rejects one character more', () => {
+    // 64-character local part, then three 63-character labels: 254 characters,
+    // the RFC 5321 path maximum the procedure's `.max(254)` mirrors.
+    const longest = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(61)}`;
+    expect(longest).toHaveLength(254);
+    expect(inviteEmailError(longest)).toBeNull();
+
+    const oneMore = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(62)}`;
+    expect(oneMore).toHaveLength(255);
+    expect(inviteEmailError(oneMore)).toBe(invalidCopy);
+  });
+
+  it('rejects an address whose local part is far past the length maximum', () => {
+    // The shape the sheet used to enable Send for: well-formed enough for the
+    // syntax rule, longer than any address a mail system can deliver.
+    expect(inviteEmailError(`${'a'.repeat(2004)}@example.com`)).toBe(invalidCopy);
+  });
 });
 
 describe('inviteErrorCopy', () => {
@@ -44,19 +62,26 @@ describe('inviteErrorCopy', () => {
   });
 
   it('names a taken address on the form rather than blaming the field', () => {
-    // CONFLICT covers both an invitation that is already pending and an
-    // address that already belongs to a member.
-    for (const message of [
-      'This email already has a pending invitation',
-      'This user is already a member of this organization',
-    ]) {
+    // Both sentences the invite procedure raises as CONFLICT, each with the
+    // reason it actually gives.
+    const cases: [string, string][] = [
+      ['This email already has a pending invitation', 'pendingInvitation'],
+      ['This user is already a member of this organization', 'alreadyMember'],
+    ];
+    for (const [message, key] of cases) {
       expect(
         inviteErrorCopy(Object.assign(new Error(message), { data: { code: 'CONFLICT' } }))
       ).toEqual({
         field: 'form',
-        message: i18n.t('organization.inviteMember.alreadyInvited'),
+        message: i18n.t(`organization.inviteMember.${key}`),
       });
     }
+  });
+
+  it('keeps the shared already-invited line for a conflict the app does not name', () => {
+    expect(
+      inviteErrorCopy(Object.assign(new Error('Invite conflict'), { data: { code: 'CONFLICT' } }))
+    ).toEqual({ field: 'form', message: i18n.t('organization.inviteMember.alreadyInvited') });
   });
 
   it('falls back to the generic line for every other failure', () => {

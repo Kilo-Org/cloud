@@ -22,6 +22,16 @@ import {
 } from '@/components/ui/table';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   useCustomLlms,
   useCopyCustomLlm,
   useUpsertCustomLlm,
@@ -36,7 +46,8 @@ import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/sch
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 import { toast } from 'sonner';
-import { ChevronRight, Copy as CopyIcon, Plus, Pencil } from 'lucide-react';
+import { ChevronRight, Copy as CopyIcon, Globe, Lock, Plus, Pencil } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import Editor, { type EditorProps } from '@monaco-editor/react';
 
 const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
@@ -85,6 +96,18 @@ const CREDENTIAL_FORMATS: { title: string; description: ReactNode; example: stri
 }`,
   },
   {
+    title: 'Google Cloud service account',
+    description: <>Paste the service account key JSON and add the type.</>,
+    example: `{
+  "type": "service_account",
+  "project_id": "my-project",
+  "private_key_id": "...",
+  "private_key": "-----BEGIN PRIVATE KEY-----\\n...",
+  "client_email": "...",
+  ...
+}`,
+  },
+  {
     title: 'Amazon Bedrock IAM access keys',
     description: (
       <>
@@ -93,9 +116,8 @@ const CREDENTIAL_FORMATS: { title: string; description: ReactNode; example: stri
         <code className="text-foreground break-all">
           https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1
         </code>
-        . Requests are signed with AWS SigV4. Bedrock API keys use{' '}
-        <code className="text-foreground">api_key</code> on OpenAI-compatible routes and{' '}
-        <code className="text-foreground">x-api-key</code> on Anthropic Messages routes.
+        . Requests are signed with AWS SigV4. For a Bedrock API key, use an API key credential
+        instead.
       </>
     ),
     example: `{
@@ -111,6 +133,8 @@ type EditorState = {
   open: boolean;
   mode: 'create' | 'edit';
   publicId: string;
+  wasPublic: boolean;
+  wasPriced: boolean;
   credentialsJson: string;
   definitionJson: string;
   validationError: string | null;
@@ -118,6 +142,8 @@ type EditorState = {
 
 type CopyState = {
   sourcePublicId: string;
+  sourceIsPublic: boolean;
+  sourceIsPriced: boolean;
   publicId: string;
   displayName: string;
   internalId: string;
@@ -142,10 +168,31 @@ const INITIAL_CREDENTIALS: CustomLlmCredentials = {
   api_key: '',
 };
 
+type UpsertInput = {
+  public_id: string;
+  definition: CustomLlmDefinition;
+  credentials: CustomLlmCredentials | undefined;
+};
+
+type CopyInput = {
+  source_public_id: string;
+  public_id: string;
+  display_name: string;
+  internal_id: string | undefined;
+};
+
+/** A save that makes a custom LLM public, or starts charging for a public one, which needs confirmation. */
+type PendingChange = { priced: boolean; alreadyPublic: boolean } & (
+  | { kind: 'upsert'; input: UpsertInput }
+  | { kind: 'copy'; input: CopyInput }
+);
+
 const initialEditorState: EditorState = {
   open: false,
   mode: 'create',
   publicId: '',
+  wasPublic: false,
+  wasPriced: false,
   credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
   definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
   validationError: null,
@@ -158,12 +205,15 @@ export function CustomLlmsContent() {
   const deleteMutation = useDeleteCustomLlm();
   const [editor, setEditor] = useState<EditorState>(initialEditorState);
   const [copy, setCopy] = useState<CopyState | null>(null);
+  const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
 
   const openCreate = useCallback(() => {
     setEditor({
       open: true,
       mode: 'create',
       publicId: '',
+      wasPublic: false,
+      wasPriced: false,
       credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
       definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
       validationError: null,
@@ -175,6 +225,8 @@ export function CustomLlmsContent() {
       open: true,
       mode: 'edit',
       publicId,
+      wasPublic: definition.public !== undefined,
+      wasPriced: definition.pricing !== undefined,
       credentialsJson: '',
       definitionJson: JSON.stringify(definition, null, 2),
       validationError: null,
@@ -185,22 +237,54 @@ export function CustomLlmsContent() {
     setEditor(initialEditorState);
   }, []);
 
-  const openCopy = useCallback(
-    (sourcePublicId: string, sourceDisplayName: string, sourceInternalId: string | undefined) => {
-      setCopy({
-        sourcePublicId,
-        publicId: sourcePublicId,
-        displayName: sourceDisplayName,
-        internalId: sourceInternalId ?? '',
-        validationError: null,
-      });
-    },
-    []
-  );
+  const openCopy = useCallback((sourcePublicId: string, source: CustomLlmDefinition) => {
+    setCopy({
+      sourcePublicId,
+      sourceIsPublic: source.public !== undefined,
+      sourceIsPriced: source.pricing !== undefined,
+      publicId: sourcePublicId,
+      displayName: source.display_name,
+      internalId: source.internal_id ?? '',
+      validationError: null,
+    });
+  }, []);
 
   const closeCopy = useCallback(() => {
     setCopy(null);
   }, []);
+
+  const submitCopy = useCallback(
+    async (input: CopyInput) => {
+      try {
+        await copyMutation.mutateAsync(input);
+        toast.success('Custom LLM copied');
+        closeCopy();
+      } catch (error) {
+        setCopy(prev =>
+          prev
+            ? {
+                ...prev,
+                validationError: { field: null, message: formatZodError(error) },
+              }
+            : prev
+        );
+      }
+    },
+    [copyMutation, closeCopy]
+  );
+
+  const submitUpsert = useCallback(
+    async (input: UpsertInput) => {
+      try {
+        await upsertMutation.mutateAsync(input);
+        toast.success(editor.mode === 'create' ? 'Custom LLM created' : 'Custom LLM updated');
+        closeEditor();
+      } catch (error) {
+        toast.error(formatZodError(error));
+      }
+    },
+    [editor.mode, upsertMutation, closeEditor]
+  );
 
   const handleCopy = useCallback(async () => {
     if (!copy) return;
@@ -246,26 +330,18 @@ export function CustomLlmsContent() {
       return;
     }
 
-    try {
-      await copyMutation.mutateAsync({
-        source_public_id: copy.sourcePublicId,
-        public_id: publicId,
-        display_name: displayName,
-        internal_id: internalId || undefined,
-      });
-      toast.success('Custom LLM copied');
-      closeCopy();
-    } catch (error) {
-      setCopy(prev =>
-        prev
-          ? {
-              ...prev,
-              validationError: { field: null, message: formatZodError(error) },
-            }
-          : prev
-      );
+    const input: CopyInput = {
+      source_public_id: copy.sourcePublicId,
+      public_id: publicId,
+      display_name: displayName,
+      internal_id: internalId || undefined,
+    };
+    if (copy.sourceIsPublic) {
+      setPendingChange({ kind: 'copy', input, priced: copy.sourceIsPriced, alreadyPublic: false });
+      return;
     }
-  }, [copy, copyMutation, closeCopy]);
+    await submitCopy(input);
+  }, [copy, submitCopy]);
 
   const handleSave = useCallback(async () => {
     const trimmedPublicId = editor.publicId.trim();
@@ -313,7 +389,11 @@ export function CustomLlmsContent() {
       return;
     }
 
-    const defResult = StrictCustomLlmDefinitionSchema.safeParse(parsedDefinition);
+    // The strict copy rejects unknown keys but drops cross-field rules, so check both.
+    const strictDefResult = StrictCustomLlmDefinitionSchema.safeParse(parsedDefinition);
+    const defResult = strictDefResult.success
+      ? CustomLlmDefinitionSchema.safeParse(parsedDefinition)
+      : strictDefResult;
     if (!defResult.success) {
       setEditor(prev => ({ ...prev, validationError: formatZodError(defResult.error) }));
       return;
@@ -327,18 +407,26 @@ export function CustomLlmsContent() {
       return;
     }
 
-    try {
-      await upsertMutation.mutateAsync({
-        public_id: trimmedPublicId,
-        definition: defResult.data,
-        credentials: parsedCredentials,
-      });
-      toast.success(editor.mode === 'create' ? 'Custom LLM created' : 'Custom LLM updated');
-      closeEditor();
-    } catch (error) {
-      toast.error(formatZodError(error));
+    const input: UpsertInput = {
+      public_id: trimmedPublicId,
+      definition: defResult.data,
+      credentials: parsedCredentials,
+    };
+    const priced = input.definition.pricing !== undefined;
+    const startsCharging = editor.wasPublic && priced && !editor.wasPriced;
+    if (input.definition.public !== undefined && (!editor.wasPublic || startsCharging)) {
+      setPendingChange({ kind: 'upsert', input, priced, alreadyPublic: editor.wasPublic });
+      return;
     }
-  }, [editor, upsertMutation, closeEditor]);
+    await submitUpsert(input);
+  }, [editor, submitUpsert]);
+
+  const confirmPendingChange = useCallback(async () => {
+    const change = pendingChange;
+    setPendingChange(null);
+    if (change?.kind === 'upsert') await submitUpsert(change.input);
+    if (change?.kind === 'copy') await submitCopy(change.input);
+  }, [pendingChange, submitUpsert, submitCopy]);
 
   const handleDelete = useCallback(
     async (publicId: string) => {
@@ -354,20 +442,15 @@ export function CustomLlmsContent() {
 
   return (
     <div className="flex w-full flex-col gap-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Custom LLMs</h2>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-muted-foreground text-sm">
+          Models served directly from an upstream with Kilo-managed, encrypted credentials.
+        </p>
+        <Button onClick={openCreate} size="sm">
+          <Plus />
           Add Custom LLM
         </Button>
       </div>
-
-      <p className="text-muted-foreground">
-        Manage custom LLM definitions stored in the <code>custom_llm2</code> table. Each entry has a{' '}
-        <code>public_id</code>, encrypted credentials (such as API keys, Google Cloud
-        service-account keys, or Amazon Bedrock IAM access keys), and a JSON <code>definition</code>{' '}
-        validated against <code>CustomLlmDefinitionSchema</code>.
-      </p>
 
       {isLoading ? (
         <div className="text-center">Loading...</div>
@@ -377,6 +460,7 @@ export function CustomLlmsContent() {
             <TableRow>
               <TableHead>Public ID</TableHead>
               <TableHead>Display Name</TableHead>
+              <TableHead>Access</TableHead>
               <TableHead>Internal ID</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -384,7 +468,7 @@ export function CustomLlmsContent() {
           <TableBody>
             {data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground text-center">
+                <TableCell colSpan={5} className="text-muted-foreground text-center">
                   No custom LLMs defined yet.
                 </TableCell>
               </TableRow>
@@ -393,6 +477,19 @@ export function CustomLlmsContent() {
               <TableRow key={item.public_id}>
                 <TableCell className="font-mono text-sm">{item.public_id}</TableCell>
                 <TableCell>{item.definition.display_name}</TableCell>
+                <TableCell>
+                  {item.definition.public ? (
+                    <Badge variant="new">
+                      <Globe />
+                      Public
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">
+                      <Lock />
+                      Private
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="font-mono text-sm">
                   {item.definition.internal_id ?? 'Not set'}
                 </TableCell>
@@ -410,13 +507,7 @@ export function CustomLlmsContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        openCopy(
-                          item.public_id,
-                          item.definition.display_name,
-                          item.definition.internal_id
-                        )
-                      }
+                      onClick={() => openCopy(item.public_id, item.definition)}
                       aria-label={`Copy ${item.public_id}`}
                       title="Copy custom LLM"
                     >
@@ -531,19 +622,60 @@ export function CustomLlmsContent() {
                   options={{ ...JSON_EDITOR_OPTIONS, ariaLabel: 'Custom LLM definition JSON' }}
                 />
               </div>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Set <code>disable_url_suffix</code> to <code>true</code> to use{' '}
-                <code>base_url</code> exactly, without suffixes such as <code>/messages</code>. Add{' '}
-                <code>&quot;internal_id&quot;: &quot;provider-model&quot;</code> to send an upstream{' '}
-                <code>model</code>; omit <code>internal_id</code> to remove <code>model</code> from
-                the outbound request body.
-              </p>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
-                must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
-                <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
-                OpenRouter or Kilo-exclusive model.
-              </p>
+              <details className="group mt-2 text-xs">
+                <summary className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm select-none focus-visible:ring-[3px] focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+                  <ChevronRight
+                    className="size-3.5 transition-transform group-open:rotate-90"
+                    aria-hidden="true"
+                  />
+                  Definition rules
+                </summary>
+                <ul className="bg-muted text-muted-foreground mt-2 flex list-disc flex-col gap-1.5 rounded-md p-3 pl-7">
+                  <li>
+                    Public IDs use lowercase letters, digits, and <code>. / -</code>, and must not
+                    start with <code>kilo/</code>, <code>kilo-auto/</code>, <code>kilocode/</code>,
+                    or a direct BYOK provider prefix, or be an OpenRouter model.
+                  </li>
+                  <li>
+                    <code>internal_id</code> is sent upstream as <code>model</code>; without it,{' '}
+                    <code>model</code> is removed from the request body.{' '}
+                    <code>disable_url_suffix</code> uses <code>base_url</code> without suffixes such
+                    as <code>/messages</code>.
+                  </li>
+                  <li>
+                    <code>api_kinds</code> lists the served APIs (<code>chat_completions</code>,{' '}
+                    <code>messages</code>, <code>responses</code>). It must include the one{' '}
+                    <code>opencode_settings.ai_sdk_provider</code> picks: Messages for{' '}
+                    <code>anthropic</code>, Responses for <code>openai</code>, otherwise Chat
+                    Completions, which is also the only API served without it.
+                  </li>
+                  <li>
+                    IDs ending in <code>-free</code> or starting with <code>stealth/</code> are free
+                    and must not set <code>pricing</code>; public free models work signed out. Other
+                    models need <code>pricing</code> tiers in the custom pricing format, or users
+                    are billed only what the upstream reports.
+                  </li>
+                  <li>
+                    With <code>pricing</code>, set{' '}
+                    <code>&quot;may_train_on_prompts&quot;: false</code> only for zero data
+                    retention upstreams.
+                  </li>
+                  <li>
+                    Grant access with <code>organization_ids</code> or <code>group_ids</code>, or
+                    replace them with{' '}
+                    <code>
+                      &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
+                      &quot;description&quot;: &quot;…&quot; {'}'}
+                    </code>{' '}
+                    to offer it to everyone, subject to organization provider allow lists. Without
+                    any of these, nobody can use the model.
+                  </li>
+                  <li>
+                    Routing picks up changes within about a minute; public models and new providers
+                    appear in the model list after the next provider sync.
+                  </li>
+                </ul>
+              </details>
             </div>
 
             {editor.validationError && (
@@ -563,6 +695,58 @@ export function CustomLlmsContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={pendingChange !== null}
+        onOpenChange={open => {
+          if (!open) setPendingChange(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingChange?.alreadyPublic
+                ? 'Start charging for this public custom LLM?'
+                : 'Make this custom LLM public?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="flex flex-col gap-2">
+                {pendingChange?.alreadyPublic ? (
+                  <p>
+                    Signed-in Kilo users will be billed for{' '}
+                    <code className="font-mono">{pendingChange.input.public_id}</code> at the
+                    definition&apos;s pricing.
+                  </p>
+                ) : pendingChange?.priced ? (
+                  <p>
+                    Every signed-in Kilo user will be able to use{' '}
+                    <code className="font-mono">{pendingChange.input.public_id}</code> at the
+                    definition&apos;s pricing.
+                  </p>
+                ) : (
+                  <p>
+                    Every Kilo user will be able to use{' '}
+                    <code className="font-mono">{pendingChange?.input.public_id}</code> without
+                    being charged. Kilo pays for all usage. Unless the public ID ends in{' '}
+                    <code>-free</code> or starts with <code>stealth/</code>, only signed-in users
+                    with credits can use it.
+                  </p>
+                )}
+                <p>
+                  Test this definition with a local web app before saving it. A broken definition
+                  fails requests for everyone who can use it.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPendingChange}>
+              {pendingChange?.alreadyPublic ? 'Start charging' : 'Make public'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={copy !== null}

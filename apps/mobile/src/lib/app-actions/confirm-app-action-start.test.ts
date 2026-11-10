@@ -58,12 +58,11 @@ describe('confirmAppActionStart', () => {
     expect(message).toContain('fix the build');
   });
 
-  it('bounds the repository label while the run keeps its full value', async () => {
-    const repository = 'owner/'.concat('r'.repeat(400));
+  it('renders repository text in full', async () => {
+    const repository = `gitlab: group/${'r'.repeat(400)}`;
     void confirmAppActionStart({ prompt: 'fix the build', repository });
     const { message } = await openedAlert();
-    expect(message).toContain(`${repository.slice(0, 240)}…`);
-    expect(message).not.toContain(repository);
+    expect(message).toContain(repository);
   });
 
   it('names the recent repository when the request names none', async () => {
@@ -72,10 +71,30 @@ describe('confirmAppActionStart', () => {
     expect(message).toContain('your most recent repository');
   });
 
+  it('names the continued session', async () => {
+    void confirmAppActionStart({
+      prompt: 'Review the build',
+      repository: 'owner/repo',
+      sessionId: 'ses_original',
+    });
+    const { message } = await openedAlert();
+    expect(message).toContain('owner/repo');
+    expect(message).toContain('ses_original');
+  });
+
   it('resolves false when the person cancels', async () => {
     const answer = confirmAppActionStart({ prompt: 'fix the build' });
     const { buttons } = await openedAlert();
     buttons[0]?.onPress();
+    await expect(answer).resolves.toBe(false);
+  });
+  it('resolves false when the confirmation is dismissed', async () => {
+    const answer = confirmAppActionStart({ prompt: 'fix the build' });
+    await openedAlert();
+    const call = mocks.alert.mock.calls.at(0);
+    const options = call?.[3] as { onDismiss: () => void } | undefined;
+    expect(options?.onDismiss).toBeTypeOf('function');
+    options?.onDismiss();
     await expect(answer).resolves.toBe(false);
   });
 

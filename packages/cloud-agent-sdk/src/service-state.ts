@@ -4,17 +4,31 @@
  *
  * Processes ServiceEvents from the normalizer and provides a reactive snapshot
  * of the current service state via subscribe().
+ *
+ * Preparation diagnostics use the PREPARATION_MAX_* history budgets in schemas.ts:
+ * setup messages follow arrival order, attempts follow startedAt, and steps follow
+ * causal start order. Each list retains its newest entries. Output tails use the
+ * UTF-8 byte budget in limits.ts.
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
+import { upsertByRequestId } from './pending-requests';
 import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
-import { knownSessionStatus, sessionCommitDataSchema, type KnownSessionStatus } from './schemas';
+import {
+  PREPARATION_MAX_ATTEMPTS,
+  PREPARATION_MAX_SETUP_LOG_ENTRIES,
+  PREPARATION_MAX_STEPS,
+  knownSessionStatus,
+  sessionCommitDataSchema,
+  type KnownSessionStatus,
+} from './schemas';
 import type {
   SessionInfo,
   SessionActivity,
   AgentStatus,
   QuestionState,
   PermissionState,
+  UnreadablePermissionState,
   ServiceStateSnapshot,
   SuggestionAction,
   SuggestionState,
@@ -119,8 +133,12 @@ type ServiceState = {
   getPreparationAttempts(): readonly PreparationAttempt[];
   getCommits(): readonly SessionCommit[];
   clearCommits(): void;
+  /** Drop the preparation rows held by the live state. */
+  clearPreparationAttempts(): void;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
+  /** Pending permission requests this app could not read, oldest first. */
+  getUnreadablePermissions(): readonly UnreadablePermissionState[];
   getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
   getPendingMessages(): ReadonlyMap<string, MessageDeliveryState>;
@@ -155,23 +173,6 @@ type ServiceReplayBatch = {
   hadSessionInfo: boolean;
 };
 
-/**
- * FIFO upsert. A repeat of the same requestId replaces the entry in place —
- * the wrapper replays pending requests after a snapshot, and a replay must
- * not enqueue a duplicate card. A new requestId goes to the back, so the
- * oldest pending request is always the head.
- */
-function upsertByRequestId<T extends { requestId: string }>(
-  list: readonly T[],
-  next: T
-): readonly T[] {
-  const index = list.findIndex(entry => entry.requestId === next.requestId);
-  if (index === -1) return [...list, next];
-  const copy = [...list];
-  copy[index] = next;
-  return copy;
-}
-
 function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   let config = initialConfig;
   let rootSessionId = config.rootSessionId;
@@ -180,11 +181,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   let cloudStatus: CloudStatus | null = null;
   let setupLog: string[] = [];
   let preparationAttempts: PreparationAttempt[] = [];
+  let pendingPreparationSteps: Extract<ServiceEvent, { type: 'preparing' }>[] = [];
   let commits: readonly SessionCommit[] = [];
   const seenCommits = new Set<string>();
   let sessionInfo: SessionInfo | null = null;
   let questions: readonly QuestionState[] = [];
   let permissions: readonly PermissionState[] = [];
+  let unreadablePermissions: readonly UnreadablePermissionState[] = [];
   let suggestion: SuggestionState | null = null;
   const pendingMessages = new Map<string, MessageDeliveryState>();
   let activeMessageId: string | null = null;
@@ -422,12 +425,26 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       metadata,
       always,
     });
+    // A readable request supersedes an unreadable notice for the same id.
+    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
     config.onPermissionAsked?.(requestId, permissionType, patterns, metadata, always);
+    notify();
+  }
+
+  function processPermissionUnreadable(requestId: string): void {
+    // The scope could not be read, so no consent card may stand for this id: a
+    // card already shown for it would describe a scope the app no longer holds.
+    if (permissions.some(entry => entry.requestId === requestId)) {
+      permissions = permissions.filter(entry => entry.requestId !== requestId);
+      config.onPermissionResolved?.(requestId);
+    }
+    unreadablePermissions = upsertByRequestId(unreadablePermissions, { requestId });
     notify();
   }
 
   function processPermissionResolved(requestId: string): void {
     permissions = permissions.filter(entry => entry.requestId !== requestId);
+    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
     config.onPermissionResolved?.(requestId);
     notify();
   }
@@ -458,7 +475,17 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
 
   function processPreparing(event: Extract<ServiceEvent, { type: 'preparing' }>): void {
     if (event.version === 2 && event.attemptId && event.triggerMessageId && event.action) {
-      const attempt = processPreparationEvent(event);
+      let attempt = processPreparationEvent(event);
+      if (attempt) {
+        const attemptId = attempt.id;
+        const pending = pendingPreparationSteps.filter(step => step.attemptId === attemptId);
+        pendingPreparationSteps = pendingPreparationSteps.filter(
+          step => step.attemptId !== attemptId
+        );
+        for (const step of pending) {
+          attempt = processPreparationEvent(step) ?? attempt;
+        }
+      }
       // Only an event that actually advanced the attempt may move cloudStatus.
       // Stale duplicates and replayed snapshots of a finished attempt would
       // otherwise flip a ready session back to 'preparing' and permanently
@@ -486,8 +513,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       config.onPreparationFailed?.(event.message);
     } else {
       cloudStatus = { type: 'preparing', step: event.step, message: event.message };
-      if (event.step === 'setup_commands' && event.message) {
-        setupLog = [...setupLog, event.message];
+      if (
+        (event.step === 'setup_commands' ||
+          event.step === 'session_setup_commands' ||
+          event.step === 'start_commands') &&
+        event.message
+      ) {
+        setupLog = [...setupLog.slice(-(PREPARATION_MAX_SETUP_LOG_ENTRIES - 1)), event.message];
       }
     }
     notify();
@@ -557,11 +589,10 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
           ? settleRunningSteps(handedOff.steps, 'completed')
           : (existing?.steps ?? []),
       };
-      preparationAttempts = [
-        ...preparationAttempts.filter(item => item.id !== attempt.id),
-        attempt,
-      ].sort((a, b) => a.startedAt - b.startedAt);
-      return attempt;
+      preparationAttempts = [...preparationAttempts.filter(item => item.id !== attempt.id), attempt]
+        .sort((a, b) => a.startedAt - b.startedAt)
+        .slice(-PREPARATION_MAX_ATTEMPTS);
+      return preparationAttempts.includes(attempt) ? attempt : null;
     }
     if (event.action === 'attempt_snapshot' && event.attempt) {
       if (existing && existing.revision > event.attempt.revision) return null;
@@ -576,13 +607,29 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         revision: snapshot.revision,
         steps: existing?.steps ?? [],
       };
-      preparationAttempts = [
-        ...preparationAttempts.filter(item => item.id !== attempt.id),
-        attempt,
-      ].sort((a, b) => a.startedAt - b.startedAt);
-      return attempt;
+      preparationAttempts = [...preparationAttempts.filter(item => item.id !== attempt.id), attempt]
+        .sort((a, b) => a.startedAt - b.startedAt)
+        .slice(-PREPARATION_MAX_ATTEMPTS);
+      return preparationAttempts.includes(attempt) ? attempt : null;
     }
-    if (!existing) return null;
+    if (!existing) {
+      // Materialized step rows can precede their parent attempt in cursor replay.
+      if (event.action === 'step_snapshot' && event.stepId && event.stepSnapshot) {
+        const pending = pendingPreparationSteps.find(
+          step => step.attemptId === event.attemptId && step.stepId === event.stepId
+        );
+        if (pending?.stepSnapshot && pending.stepSnapshot.revision > event.stepSnapshot.revision) {
+          return null;
+        }
+        pendingPreparationSteps = [
+          ...pendingPreparationSteps.filter(
+            step => step.attemptId !== event.attemptId || step.stepId !== event.stepId
+          ),
+          event,
+        ].slice(-(PREPARATION_MAX_ATTEMPTS * PREPARATION_MAX_STEPS));
+      }
+      return null;
+    }
     if (event.action === 'attempt_completed' || event.action === 'attempt_failed') {
       if (existing.revision >= event.revision || existing.status !== 'running') return null;
       const status = event.action === 'attempt_completed' ? 'completed' : 'failed';
@@ -627,7 +674,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       existingStep.status === 'running'
     ) {
       if (event.action === 'step_progress' && event.detail !== undefined) {
-        nextStep = { ...existingStep, latestDetail: event.detail, revision: event.revision };
+        nextStep = {
+          ...existingStep,
+          latestDetail: event.detail,
+          ...(event.snapshotCapturedAt === undefined
+            ? {}
+            : { snapshotCapturedAt: event.snapshotCapturedAt }),
+          revision: event.revision,
+        };
       } else if (event.action === 'step_output' && event.output !== undefined) {
         const tail = utf8Tail(
           `${existingStep.outputTail ?? ''}${event.output}`,
@@ -663,15 +717,17 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     const attempt: PreparationAttempt = {
       ...existing,
       revision: Math.max(existing.revision, step.revision),
-      steps: [...existing.steps.filter(item => item.id !== step.id), step].sort(
-        (a, b) =>
-          Number(a.startedRevision !== undefined) - Number(b.startedRevision !== undefined) ||
-          (a.startedRevision !== undefined && b.startedRevision !== undefined
-            ? a.startedRevision - b.startedRevision
-            : 0) ||
-          a.startedAt - b.startedAt ||
-          a.id.localeCompare(b.id)
-      ),
+      steps: [...existing.steps.filter(item => item.id !== step.id), step]
+        .sort(
+          (a, b) =>
+            Number(a.startedRevision !== undefined) - Number(b.startedRevision !== undefined) ||
+            (a.startedRevision !== undefined && b.startedRevision !== undefined
+              ? a.startedRevision - b.startedRevision
+              : 0) ||
+            a.startedAt - b.startedAt ||
+            a.id.localeCompare(b.id)
+        )
+        .slice(-PREPARATION_MAX_STEPS),
     };
     preparationAttempts = preparationAttempts.map(item =>
       item.id === existing.id ? attempt : item
@@ -705,8 +761,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     const parsedCommit = sessionCommitDataSchema.safeParse(event);
     const commitHash = parsedCommit.success ? parsedCommit.data.commitHash : undefined;
     if (parsedCommit.success) {
-      if (seenCommits.has(parsedCommit.data.commitHash)) return;
-      seenCommits.add(parsedCommit.data.commitHash);
+      const identity = JSON.stringify([parsedCommit.data.repository, parsedCommit.data.commitHash]);
+      if (seenCommits.has(identity)) return;
+      seenCommits.add(identity);
       commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }];
     }
     if (event.success || commitHash) {
@@ -893,12 +950,16 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   function clearPendingInteractions(): void {
     const clearedQuestions = questions;
     const clearedPermissions = permissions;
+    const clearedUnreadablePermissions = unreadablePermissions;
     const clearedSuggestion = suggestion;
     questions = [];
     permissions = [];
+    unreadablePermissions = [];
     suggestion = null;
     for (const entry of clearedQuestions) config.onQuestionResolved?.(entry.requestId);
     for (const entry of clearedPermissions) config.onPermissionResolved?.(entry.requestId);
+    for (const entry of clearedUnreadablePermissions)
+      config.onPermissionResolved?.(entry.requestId);
     if (clearedSuggestion) config.onSuggestionResolved?.(clearedSuggestion.requestId);
   }
 
@@ -990,6 +1051,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         break;
       case 'permission.replied':
         processPermissionResolved(event.requestId);
+        break;
+      case 'permission.unreadable':
+        processPermissionUnreadable(event.requestId);
         break;
       case 'suggestion.shown':
         processSuggestionShown(event);
@@ -1132,8 +1196,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       commits = [];
       notify();
     },
+    clearPreparationAttempts(): void {
+      preparationAttempts = [];
+      pendingPreparationSteps = [];
+      notify();
+    },
     getQuestion: () => questions[0] ?? null,
     getPermission: () => permissions[0] ?? null,
+    getUnreadablePermissions: () => unreadablePermissions,
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
     getPendingMessages: () => pendingMessages,
@@ -1167,6 +1237,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       sessionInfo,
       question: questions[0] ?? null,
       permission: permissions[0] ?? null,
+      unreadablePermissions,
       suggestion,
       pendingMessages,
     }),
@@ -1201,11 +1272,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       cloudStatus = null;
       setupLog = [];
       preparationAttempts = [];
+      pendingPreparationSteps = [];
       commits = [];
       seenCommits.clear();
       sessionInfo = null;
       questions = [];
       permissions = [];
+      unreadablePermissions = [];
       suggestion = null;
       pendingMessages.clear();
       activeMessageId = null;

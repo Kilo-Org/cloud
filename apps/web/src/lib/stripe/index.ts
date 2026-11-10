@@ -1,7 +1,11 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only'; // This file imports the database and can therefore only be used on the server side.
 import Stripe from 'stripe';
-import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { client, invalidateStripePaymentMethodCache } from '@kilocode/web-shared/lib/stripe-client';
+import {
+  getStripeChargeInvoice,
+  getStripeInvoiceChargeId,
+} from '@kilocode/web-shared/lib/stripe-invoice-payments';
 import { captureException } from '@sentry/nextjs';
 import { db, auto_deleted_at } from '@kilocode/web-shared/lib/drizzle';
 import type { User, PaymentMethod, Organization } from '@kilocode/db/schema';
@@ -50,7 +54,10 @@ import {
 import type { UnifiedInvoice } from '@/types/billing';
 import type { StripeConfig } from '@kilocode/web-shared/lib/credits';
 import { processTopUp } from '@kilocode/web-shared/lib/credits';
+import type { PaidCreditGrant } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import {
   STRIPE_SUB_QUERY_STRING_KEY,
   TOPUP_CANCELED_QUERY_STRING_KEY,
@@ -138,6 +145,7 @@ import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/dr
 import { handleKiloPassInvoiceCreated } from '@/lib/service-fees/invoice-created';
 import { getEffectiveOrganizationServiceFeeExemption } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
 import {
+  isServiceFeeOnlyRefundedCharge,
   observeServiceFeeChargeRefunded,
   observeServiceFeeCreditNote,
 } from '@/lib/service-fees/refunds';
@@ -176,12 +184,11 @@ function getAffiliateDisputeSaleKind(invoice: Stripe.Invoice): AffiliateDisputeS
 
 async function getAffiliateDisputeChargeContext(
   chargeId: string,
-  preFetchedCharge?: Stripe.Charge & { invoice?: string | Stripe.Invoice | null }
+  preFetchedCharge?: Stripe.Charge
 ): Promise<AffiliateDisputeChargeContext | null> {
-  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
-    preFetchedCharge ?? (await client.charges.retrieve(chargeId, { expand: ['invoice'] }));
-  const invoice = charge.invoice;
-  if (!invoice || typeof invoice === 'string') {
+  const charge = preFetchedCharge ?? (await client.charges.retrieve(chargeId));
+  const invoice = await getStripeChargeInvoice(client, charge);
+  if (!invoice) {
     return null;
   }
 
@@ -199,16 +206,10 @@ async function getAffiliateDisputeChargeContext(
 
 async function suspendOrganizationKiloPassForAdverseCharge(
   chargeId: string,
-  preFetchedCharge?: Stripe.Charge & { invoice?: string | Stripe.Invoice | null }
+  preFetchedCharge?: Stripe.Charge
 ) {
-  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } = preFetchedCharge
-    ? preFetchedCharge
-    : await client.charges.retrieve(chargeId, { expand: ['invoice'] });
-  const invoiceReference = charge.invoice;
-  const invoice =
-    typeof invoiceReference === 'string'
-      ? await client.invoices.retrieve(invoiceReference)
-      : invoiceReference;
+  const charge = preFetchedCharge ?? (await client.charges.retrieve(chargeId));
+  const invoice = await getStripeChargeInvoice(client, charge);
   if (invoice && invoiceLooksLikeOrganizationKiloPass(invoice)) {
     await handleOrganizationKiloPassPaymentAdverseForInvoice(invoice);
   }
@@ -582,6 +583,7 @@ export type StripeTopupMetadata = {
   kiloUserId?: User['id'];
   organizationId?: Organization['id'] | null;
   amountCents?: string;
+  paid_credit_policy?: string;
   serviceFeeAssessmentKey?: string;
   serviceFeeVersion?: string;
   serviceFeeFlow?: string;
@@ -685,6 +687,9 @@ export async function detachAllPaymentMethods(user: User) {
       await client.paymentMethods.detach(paymentMethod.id);
     })
   );
+  // Cards changed for this customer; the next payment-method read must ask
+  // Stripe again instead of serving the answer cached before the removal.
+  invalidateStripePaymentMethodCache(user.stripe_customer_id);
 
   // Also clear auto-top-up settings
   await db
@@ -769,11 +774,17 @@ export async function ensurePaymentMethodStored(
   } catch (error) {
     const context = {
       tags: { source: 'stripe_payment_method_storage' },
-      extra: { kiloUserId, paymentMethod, organizationId },
+      extra: {
+        kiloUserId,
+        paymentMethodId: paymentMethod.id,
+        paymentMethodType: paymentMethod.type,
+        organizationId,
+      },
     };
-    captureException(error, context);
+    const safeError = sanitizeErrorForTelemetry(error);
+    captureException(safeError, context);
     if (process.env.NODE_ENV !== 'test')
-      console.error('Error saving payment method for user ' + kiloUserId, error, context);
+      console.error('Error saving payment method for user ' + kiloUserId, safeError, context);
     return null;
   }
 }
@@ -829,7 +840,11 @@ async function handleAutoTopUpSetup(
   paymentIntent: Stripe.PaymentIntent,
   creditAmountInCents: number,
   config: StripeConfig,
-  emailAmounts: { serviceFeeCents?: number; grossPaidCents?: number } = {}
+  emailAmounts: {
+    serviceFeeCents?: number;
+    grossPaidCents?: number;
+    paidCredit?: PaidCreditGrant;
+  } = {}
 ) {
   logExceptInTest(
     `Processing auto-topup-setup for user ${user.id} from payment intent ${paymentIntent.id}`
@@ -846,7 +861,7 @@ async function handleAutoTopUpSetup(
       'Missing auto top-up payment method despite setup_future_usage: "off_session"',
       {
         kilo_user_id: user.id,
-        paymentIntent,
+        payment_intent_id: paymentIntent.id,
         ...config,
       }
     );
@@ -889,6 +904,7 @@ async function handleAutoTopUpSetup(
   const setupTopUpOk = await processTopUp(user, creditAmountInCents, config, {
     serviceFeeCents: emailAmounts.serviceFeeCents,
     grossPaidCents: emailAmounts.grossPaidCents,
+    paidCredit: emailAmounts.paidCredit,
   });
   if (!setupTopUpOk) {
     sentryLogger('stripe', 'info')('Auto-topup-setup already registered or failed to insert', {
@@ -918,7 +934,7 @@ async function handleOrgAutoTopUpSetup(
       'Missing org auto top-up payment method despite setup_future_usage: "off_session"',
       {
         organizationId,
-        paymentIntent,
+        payment_intent_id: paymentIntent.id,
         ...config,
       }
     );
@@ -964,6 +980,15 @@ async function handleOrgAutoTopUpSetup(
     .where(eq(organizations.id, organizationId));
 }
 
+function getSafeStripeChargeLogContext(charge: Stripe.Charge, paymentIntent: Stripe.PaymentIntent) {
+  return {
+    chargeId: charge.id,
+    paymentIntentId: paymentIntent.id,
+    customerId: stripeReferenceId(charge.customer) ?? null,
+    paymentIntentType: paymentIntent.metadata.type ?? null,
+  };
+}
+
 async function handleSuccessfulCharge(
   event: Stripe.ChargeSucceededEvent
 ): Promise<Stripe.PaymentIntent> {
@@ -995,7 +1020,7 @@ export async function handleSuccessfulChargeWithPayment(
       sentryLogger('stripe', 'warning')('Org top-up missing kiloUserId in PaymentIntent metadata', {
         payment_intent_id: paymentIntent.id,
         charge_id: charge.id,
-        metadata: paymentIntent.metadata,
+        organization_id: organizationId,
       });
       return;
     }
@@ -1026,6 +1051,7 @@ export async function handleSuccessfulChargeWithPayment(
         isAutoTopUp: paymentIntent.metadata.type === 'org-auto-topup-setup',
         serviceFeeCents: settlement.chargedFeeMinor,
         grossPaidCents: settlement.grossPaidMinor,
+        paidCredit: settlement.paidCredit,
       }
     );
 
@@ -1052,9 +1078,8 @@ export async function handleSuccessfulChargeWithPayment(
   const user = await findUserByStripeCustomerId(charge.customer as string);
   if (!user) {
     warnExceptInTest(
-      `No user found for charge ${charge.id} with customer ID ${charge.customer as string}. Skipping processing.`,
-      paymentIntent,
-      charge
+      'No user found for Stripe charge; skipping processing.',
+      getSafeStripeChargeLogContext(charge, paymentIntent)
     );
     return;
   }
@@ -1094,6 +1119,7 @@ export async function handleSuccessfulChargeWithPayment(
       await handleAutoTopUpSetup(user, paymentIntent, settlement.principalMinor, config, {
         serviceFeeCents: settlement.chargedFeeMinor,
         grossPaidCents: settlement.grossPaidMinor,
+        paidCredit: settlement.paidCredit,
       });
     } else if (isKiloclawEarlybird) {
       await recordKiloclawEarlybirdPurchase(user, charge);
@@ -1101,9 +1127,7 @@ export async function handleSuccessfulChargeWithPayment(
       // Unknown charge type - log warning but don't process
       warnExceptInTest(
         'Unknown charge type (not stripe-checkout-topup, not auto-topup-setup). Ignoring.',
-        charge.customer,
-        charge,
-        paymentIntent
+        getSafeStripeChargeLogContext(charge, paymentIntent)
       );
     }
     return;
@@ -1122,6 +1146,7 @@ export async function handleSuccessfulChargeWithPayment(
   const topUpOk = await processTopUp(user, settlement.principalMinor, config, {
     serviceFeeCents: settlement.chargedFeeMinor,
     grossPaidCents: settlement.grossPaidMinor,
+    paidCredit: settlement.paidCredit,
   });
   if (!topUpOk) {
     sentryLogger('stripe', 'warning')('Ignoring already registered top-up', {
@@ -1253,24 +1278,21 @@ async function handlePaymentMethodEvent(
     | Stripe.PaymentMethodUpdatedEvent
 ) {
   const paymentMethod = event.data.object;
-  const user = await findUserByStripeCustomer(paymentMethod.customer);
-  if (process.env.NODE_ENV !== 'test') console.log(event.type, user?.id, paymentMethod);
-
-  if (!user) return;
-
   if (event.type === 'payment_method.detached') {
-    // Soft delete using Drizzle - set deleted_at timestamp
     await db
       .update(payment_methods)
       .set({ ...auto_deleted_at })
-      .where(
-        and(eq(payment_methods.stripe_id, paymentMethod.id), eq(payment_methods.user_id, user.id))
-      );
-  } else if (event.type === 'payment_method.attached') {
-    await ensurePaymentMethodStored(user.id, paymentMethod);
-  } else {
-    await ensurePaymentMethodStored(user.id, paymentMethod);
+      .where(eq(payment_methods.stripe_id, paymentMethod.id));
+    const stripeCustomerId = stripeReferenceId(paymentMethod.customer);
+    if (stripeCustomerId) invalidateStripePaymentMethodCache(stripeCustomerId);
+    return;
   }
+
+  const user = await findUserByStripeCustomer(paymentMethod.customer);
+  if (!user) return;
+  await ensurePaymentMethodStored(user.id, paymentMethod);
+  // Attaching or updating a card changes the answer for this customer.
+  invalidateStripePaymentMethodCache(user.stripe_customer_id);
 }
 
 type AutoTopUpOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
@@ -1324,7 +1346,7 @@ async function syncStripeDisputeCaseFromWebhook(params: {
 
   let disputeCharge: DisputeChargeWithInvoice;
   try {
-    disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+    disputeCharge = await client.charges.retrieve(chargeId);
   } catch (error) {
     await observeStripeDisputeCreated({
       eventId: params.eventId,
@@ -1358,9 +1380,8 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       // One payment is reported once: a charge tied to an invoice is reported by the
       // `invoice.paid` case below, and a standalone charge (the top-up and auto-top-up setup
       // charges this handler credits) is reported here.
-      const chargeInvoiceId =
-        'invoice' in charge && typeof charge.invoice === 'string' ? charge.invoice : null;
-      if (!chargeInvoiceId) {
+      const chargeInvoice = await getStripeChargeInvoice(client, charge);
+      if (!chargeInvoice) {
         await reportWebhookCreditEvent(
           {
             kiloUserId: paymentIntent.metadata.kiloUserId,
@@ -1437,8 +1458,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         invoice.metadata?.type === 'auto-topup' || invoice.metadata?.type === 'org-auto-topup';
       if (invoice.amount_paid > 0 && (isSubscriptionInvoice || isAutoTopUpInvoice)) {
         const subscriptionMetadata = invoice.parent?.subscription_details?.metadata;
-        const invoiceChargeId =
-          'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
+        const invoiceChargeId = await getStripeInvoiceChargeId(client, invoice);
         await reportWebhookCreditEvent(
           {
             kiloUserId: invoice.metadata?.kiloUserId ?? subscriptionMetadata?.kiloUserId,
@@ -1484,9 +1504,10 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       const isOrgAutoTopup = invoice.metadata?.type === 'org-auto-topup';
 
       if (isUserAutoTopup || isOrgAutoTopup) {
-        const chargeId =
-          'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
-        if (!chargeId) break;
+        const chargeId = await getStripeInvoiceChargeId(client, invoice);
+        if (!chargeId) {
+          throw new Error(`Paid auto-top-up invoice ${invoice.id} has no settled charge`);
+        }
 
         const config: StripeConfig = { type: 'stripe', stripe_payment_id: chargeId };
 
@@ -1525,6 +1546,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
               isAutoTopUp: true,
               serviceFeeCents: settlement.chargedFeeMinor,
               grossPaidCents: settlement.grossPaidMinor,
+              paidCredit: settlement.paidCredit,
             });
 
             if (!autoTopUpOk) {
@@ -1601,6 +1623,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
                 isAutoTopUp: true,
                 serviceFeeCents: settlement.chargedFeeMinor,
                 grossPaidCents: settlement.grossPaidMinor,
+                paidCredit: settlement.paidCredit,
               }
             );
 
@@ -1740,11 +1763,22 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      await observeServiceFeeChargeRefunded({
+      const invoice = await getStripeChargeInvoice(client, charge);
+      const feeRefund = await observeServiceFeeChargeRefunded({
         store: createServiceFeeStores().assessments,
-        charge,
+        charge: { ...charge, invoice: invoice?.id ?? null },
         stripe: client,
       });
+      if (
+        feeRefund.assessment &&
+        (await isServiceFeeOnlyRefundedCharge({
+          charge,
+          chargedFeeMinor: feeRefund.assessment.chargedFeeMinor,
+          stripe: client,
+        }))
+      ) {
+        break;
+      }
       await suspendOrganizationKiloPassForAdverseCharge(charge.id);
       const referralAdverseCharge = await getAffiliateDisputeChargeContext(charge.id);
       if (!referralAdverseCharge) {
@@ -2113,6 +2147,7 @@ export async function createAutoTopUpSetupCheckoutSession(
   amountCents: number = 5000
 ): Promise<string | null> {
   const amountDollars = amountCents / 100;
+  const paidCreditTerms = getPaidCreditTerms('stripe');
   const feeDeps = createStripeTopUpFeeDeps();
   const prepared = await prepareTopUpCheckoutFee({
     flow: 'personal_auto_top_up_setup',
@@ -2127,6 +2162,14 @@ export async function createAutoTopUpSetupCheckoutSession(
     prepared,
     buildSessionParams: feeLine => ({
       mode: 'payment',
+      ...(paidCreditTerms === 'one_year' && {
+        custom_text: {
+          submit: {
+            message:
+              'Purchased credits expire one year after purchase. Existing credits keep their current terms. Promotional and bonus credits may expire sooner.',
+          },
+        },
+      }),
       customer: stripeCustomerId,
       billing_address_collection: 'required',
       line_items: [
@@ -2157,7 +2200,7 @@ export async function createAutoTopUpSetupCheckoutSession(
       success_url: `${APP_URL}/payments/auto-topup/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${APP_URL}/profile?auto_topup_setup=cancelled`,
       metadata: mergeServiceFeeCommercialMetadata(
-        { type: 'auto-topup-setup', kiloUserId },
+        { type: 'auto-topup-setup', kiloUserId, paid_credit_policy: paidCreditTerms },
         prepared.commercialMetadata
       ),
       payment_intent_data: {
@@ -2166,6 +2209,7 @@ export async function createAutoTopUpSetupCheckoutSession(
             type: 'auto-topup-setup',
             kiloUserId,
             amountCents: String(amountCents),
+            paid_credit_policy: paidCreditTerms,
           },
           prepared.commercialMetadata
         ),
@@ -2193,6 +2237,7 @@ export async function getStripeTopUpCheckoutUrl(
   attempt?: ChargeAttemptContext
 ): Promise<string | null> {
   const feeDeps = createStripeTopUpFeeDeps();
+  const paidCreditTerms = getPaidCreditTerms('stripe');
   const defaultPriceId = amount ? null : getEnvVariable('STRIPE_TOP_UP_PRICE_ID');
   const principalMinor = amount
     ? Math.round(amount * 100)
@@ -2256,6 +2301,14 @@ export async function getStripeTopUpCheckoutUrl(
     prepared,
     buildSessionParams: feeLine => ({
       mode: 'payment',
+      ...(paidCreditTerms === 'one_year' && {
+        custom_text: {
+          submit: {
+            message:
+              'Purchased credits expire one year after purchase. Existing credits keep their current terms. Promotional and bonus credits may expire sooner.',
+          },
+        },
+      }),
       customer: stripeCustomerId,
       billing_address_collection: 'required',
       line_items: feeLine ? [principalLine, feeLine] : [principalLine],
@@ -2276,6 +2329,7 @@ export async function getStripeTopUpCheckoutUrl(
         {
           type: 'stripe-checkout-topup',
           kiloUserId,
+          paid_credit_policy: paidCreditTerms,
           ...(organizationId ? { organizationId } : {}),
         },
         prepared.commercialMetadata
@@ -2287,6 +2341,7 @@ export async function getStripeTopUpCheckoutUrl(
             kiloUserId,
             organizationId: organizationId ?? null,
             amountCents: String(principalMinor),
+            paid_credit_policy: paidCreditTerms,
           } satisfies StripeTopupMetadata,
           prepared.commercialMetadata
         ),

@@ -1,7 +1,9 @@
 /* eslint-disable max-lines -- one harness covers the dispatcher's action branches, the StartAgent confirmation order, and the native replay */
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { REPO_PLATFORM_LABEL_KEYS } from '@/lib/picker-bridge';
 
 import { type AppActionRequest, type AppActionResult } from './app-action-contract';
 import {
@@ -19,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   registerNativeAppActionDispatcher: vi.fn(),
   captureException: vi.fn(),
   confirmStart: vi.fn(),
+  resolveRepository: vi.fn(),
   startAgent: vi.fn(),
 }));
 
@@ -30,7 +33,10 @@ vi.mock('./native-bridge', () => ({
 // real action path and the confirmation lazily. This suite stubs both so a run
 // loads neither the create graph nor the native alert; the real classification
 // is `start-agent.test.ts`'s.
-vi.mock('./start-agent', () => ({ startAgent: mocks.startAgent }));
+vi.mock('./start-agent', () => ({
+  resolveStartAgentRepository: mocks.resolveRepository,
+  startAgent: mocks.startAgent,
+}));
 
 vi.mock('./confirm-app-action-start', () => ({ confirmAppActionStart: mocks.confirmStart }));
 
@@ -42,6 +48,12 @@ const CONFIRMED = Promise.resolve(true);
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.confirmStart.mockReturnValue(CONFIRMED);
+  mocks.resolveRepository.mockImplementation(({ repository }: { repository?: string }) =>
+    Promise.resolve({
+      ok: true,
+      repository: { platform: 'github', fullName: repository ?? 'owner/recent', isPrivate: false },
+    })
+  );
   takePendingAppAction();
 });
 
@@ -82,6 +94,95 @@ describe('dispatchAppActionRequest', () => {
     );
     expect(confirmStart).toHaveBeenCalledExactlyOnceWith({ prompt: 'fix the build' });
     expect(startAgent).toHaveBeenCalledOnce();
+  });
+
+  it('uses the resolved repository throughout the action', async () => {
+    const repository = {
+      platform: 'gitlab',
+      fullName: 'group/sub/project',
+      isPrivate: true,
+    } as const;
+    const order: string[] = [];
+    const resolveRepository = vi.fn(() => {
+      order.push('resolve');
+      return Promise.resolve({ ok: true as const, repository });
+    });
+    const confirmStart = vi.fn(() => {
+      order.push('confirm');
+      return Promise.resolve(true);
+    });
+    const startAgent = vi.fn(() => {
+      order.push('start');
+      return Promise.resolve({
+        ok: true as const,
+        action: 'StartAgent' as const,
+        sessionId: 'ses_11',
+        message: '',
+      });
+    });
+    await dispatchAppActionRequest(
+      {
+        action: 'StartAgent',
+        prompt: 'inspect this project',
+        repository: 'https://gitlab.com/group/sub/project',
+      },
+      { resolveRepository, confirmStart, startAgent }
+    );
+    expect(confirmStart).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'inspect this project',
+      repository: `${i18n.t(REPO_PLATFORM_LABEL_KEYS.gitlab)}: group/sub/project`,
+    });
+    expect(startAgent).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'inspect this project',
+      repository: 'https://gitlab.com/group/sub/project',
+      resolvedRepository: repository,
+    });
+    expect(order).toEqual(['resolve', 'confirm', 'start']);
+  });
+
+  it('uses the localized repository provider label', async () => {
+    const repository = {
+      platform: 'bitbucket',
+      fullName: 'workspace/project',
+      isPrivate: false,
+    } as const;
+    const confirmStart = vi.fn().mockResolvedValue(false);
+    await dispatchAppActionRequest(
+      { action: 'StartAgent', prompt: 'inspect this project' },
+      {
+        resolveRepository: () => Promise.resolve({ ok: true, repository }),
+        confirmStart,
+        startAgent: vi.fn(),
+      }
+    );
+    expect(confirmStart).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'inspect this project',
+      repository: `${i18n.t(REPO_PLATFORM_LABEL_KEYS.bitbucket)}: workspace/project`,
+    });
+  });
+
+  it('returns repository resolution refusals', async () => {
+    const confirmStart = vi.fn();
+    const startAgent = vi.fn();
+    const refusal: AppActionResult = {
+      ok: false,
+      action: 'StartAgent',
+      retryable: false,
+      code: 'no-repository',
+      message: 'No repository',
+    };
+    await expect(
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: 'inspect this project' },
+        {
+          resolveRepository: () => Promise.resolve({ ok: false, result: refusal }),
+          confirmStart,
+          startAgent,
+        }
+      )
+    ).resolves.toEqual(refusal);
+    expect(confirmStart).not.toHaveBeenCalled();
+    expect(startAgent).not.toHaveBeenCalled();
   });
 
   it('does not run StartAgent before the confirmation answers', async () => {
@@ -125,15 +226,15 @@ describe('dispatchAppActionRequest', () => {
     expect(getPendingAppAction()).toBeNull();
   });
 
-  it('reports a cancelled confirmation when the prompt cannot be shown', async () => {
+  it('reports a retryable confirmation failure', async () => {
     const startAgent = vi.fn();
     const result = await dispatchAppActionRequest(
       { action: 'StartAgent', prompt: 'fix the build' },
       { confirmStart: () => Promise.reject(new Error('no alert surface')), startAgent }
     );
-    expect(result).toMatchObject({ ok: false, code: 'start-cancelled', retryable: false });
+    expect(result).toMatchObject({ ok: false, code: 'start-failed', retryable: true });
     expect(startAgent).not.toHaveBeenCalled();
-    expect(mocks.captureException).not.toHaveBeenCalled();
+    expect(mocks.captureException).toHaveBeenCalledOnce();
   });
 
   it('reports a StartAgent failure without parking a session', async () => {
@@ -168,6 +269,47 @@ describe('dispatchAppActionRequest', () => {
       message: i18n.t('agentChat.session.serviceUnavailable'),
     });
     expect(mocks.captureException).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { prompt: '   ', code: 'empty-prompt' },
+    { prompt: 'x'.repeat(CLOUD_AGENT_PROMPT_MAX_LENGTH + 1), code: 'prompt-too-long' },
+    {
+      prompt: 'Review the build',
+      repository: 'https://git.example.com/owner/repo',
+      code: 'unknown-repository',
+    },
+  ])('classifies $code', async ({ code, ...input }) => {
+    const confirmStart = vi.fn();
+    const startAgent = vi.fn();
+    await expect(
+      dispatchAppActionRequest({ action: 'StartAgent', ...input }, { confirmStart, startAgent })
+    ).resolves.toMatchObject({ ok: false, code, retryable: false });
+    expect(confirmStart).not.toHaveBeenCalled();
+    expect(startAgent).not.toHaveBeenCalled();
+    expect(getPendingAppAction()).toBeNull();
+  });
+
+  it('confirms a continued session', async () => {
+    const confirmStart = vi.fn().mockResolvedValue(true);
+    const result: AppActionResult = {
+      ok: true,
+      action: 'StartAgent',
+      sessionId: 'ses_continued',
+      message: '',
+    };
+    const startAgent = vi.fn().mockResolvedValue(result);
+    await expect(
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: '', sessionId: 'ses_original' },
+        { confirmStart, startAgent }
+      )
+    ).resolves.toEqual(result);
+    expect(confirmStart).toHaveBeenCalledExactlyOnceWith({
+      prompt: '',
+      sessionId: 'ses_original',
+    });
+    expect(takePendingAppAction()).toEqual({ action: 'OpenSession', sessionId: 'ses_continued' });
   });
 
   it('parks OpenNeedsInput for the tabs consumer', async () => {
@@ -321,17 +463,6 @@ describe('registerAppActionDispatcher', () => {
   });
 
   it('answers a blank StartAgent payload with the empty-prompt refusal', async () => {
-    // The OS caller named START_AGENT, so the payload is a request the action
-    // path classifies — not an unrecognized payload the handler throws on. The
-    // refusal is the real result the native side reports through
-    // `completeAppAction`, instead of the entry point timing out.
-    mocks.startAgent.mockResolvedValue({
-      ok: false,
-      action: 'StartAgent',
-      retryable: false,
-      code: 'empty-prompt',
-      message: i18n.t('appActions.start.promptRequired'),
-    });
     const registered: ((payload: unknown) => Promise<AppActionResult>)[] = [];
     mocks.registerNativeAppActionDispatcher.mockImplementation(
       (handler: (payload: unknown) => Promise<AppActionResult>) => {
@@ -347,7 +478,8 @@ describe('registerAppActionDispatcher', () => {
       code: 'empty-prompt',
       message: i18n.t('appActions.start.promptRequired'),
     });
-    expect(mocks.startAgent).toHaveBeenCalledExactlyOnceWith({ prompt: '   ' });
+    expect(mocks.confirmStart).not.toHaveBeenCalled();
+    expect(mocks.startAgent).not.toHaveBeenCalled();
   });
 
   it('works with no native module at all', async () => {

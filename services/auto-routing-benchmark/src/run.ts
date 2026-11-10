@@ -19,6 +19,7 @@ import {
   taxonomyRouteKey,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
+import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 import * as z from 'zod';
 import { getBenchmarkConfig } from './config';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
@@ -89,11 +90,16 @@ import {
   filterSummariesByProvenance,
 } from './routing-table-builder';
 import {
+  addPriorAttempt,
+  type AttemptUsage,
   DECIDER_CLI_TIMEOUT_MS,
   destroyDeciderCliContainer,
+  hasThrottleDiagnostic,
   isRetryableContainerAvailabilityError,
   isExactModelUnavailableResult,
   isCatalogLoadFailureResult,
+  isKilledBeforeEventsResult,
+  isUnbilledTransientProviderResult,
   isUnsupportedModelResult,
   parseContainerRunResponse,
   runDeciderCaseViaCli,
@@ -102,7 +108,7 @@ import {
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import {
   catalogCandidatePrices,
-  catalogSupportsBenchmarkPair,
+  benchmarkPairUnavailableReason,
   fetchBenchmarkModelCatalog,
 } from './platform-models';
 import { pickClassifierWinner } from './winner';
@@ -122,6 +128,7 @@ import {
   getPaidCasePromptRevision,
   cooldownProviders,
   deferChunk,
+  deferThrottledChunk,
   failChunk,
   failScheduledEntry,
   finishChunk,
@@ -138,6 +145,7 @@ import {
   schedulerBackoffSeconds,
   startChunk,
   SCHEDULER_MAX_ATTEMPTS,
+  SCHEDULER_MAX_THROTTLE_DEFERRALS,
   type SchedulerClaim,
   type SchedulerConfig,
 } from './scheduler';
@@ -217,14 +225,6 @@ export const BENCHMARK_CLASSIFIER_PARALLELISM = 80;
 // can exceed that because each classifier case is its own message, so dispatch
 // must be sliced.
 const QUEUE_SEND_BATCH_LIMIT = 100;
-
-export function chunkArray<T>(items: readonly T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size));
-  }
-  return chunks;
-}
 
 // Enqueues messages in sendBatch-sized slices. A mid-dispatch failure leaves a
 // partially-enqueued run that can never reach its expected result count, so the
@@ -1052,20 +1052,23 @@ export async function drainQueue(
   const remeasures = await listQueuedRemeasures(env.BENCH_DB, current, queue);
   if (pending.length === 0 && remeasures.length === 0) return null;
   const catalog = await fetchExecutableBenchmarkModelCatalog(env, resolveRunIdentity(config));
-  const unavailable = pending.filter(
-    row =>
-      !catalogSupportsBenchmarkPair(catalog, {
-        model: row.model,
-        variant: variantFromStorage(row.variant),
-      })
+  const checked = pending.map(row => ({
+    row,
+    reason: benchmarkPairUnavailableReason(catalog, {
+      model: row.model,
+      variant: variantFromStorage(row.variant),
+    }),
+  }));
+  const unavailable = checked.flatMap(({ row, reason }) =>
+    reason === null ? [] : [{ row, reason }]
   );
   if (unavailable.length > 0) {
     await env.BENCH_DB.batch(
-      unavailable.map(row =>
+      unavailable.map(({ row, reason }) =>
         env.BENCH_DB.prepare(
           "UPDATE benchmark_profiles SET status = 'failed', failure_reason = ?, updated_at = ? WHERE router = ? AND model = ? AND variant = ? AND engine_identity = ? AND repetitions = ? AND status = 'pending'"
         ).bind(
-          'Model or variant is unavailable in the executable benchmark catalog.',
+          reason,
           new Date().toISOString(),
           router,
           row.model,
@@ -1076,12 +1079,7 @@ export async function drainQueue(
       )
     );
   }
-  const available = pending.filter(row =>
-    catalogSupportsBenchmarkPair(catalog, {
-      model: row.model,
-      variant: variantFromStorage(row.variant),
-    })
-  );
+  const available = checked.flatMap(({ row, reason }) => (reason === null ? [row] : []));
   // Queued re-measures of ready rows are reserved ahead of the pending backlog, so an
   // operator's repair starts on the next drain instead of waiting for the backlog.
   const queued = [
@@ -1318,6 +1316,15 @@ const ContainerCaseResultSchema = z.object({
     attemptStartedAt: z.number().int().nonnegative().optional(),
     retried: z.boolean().optional(),
     priorCostUsd: z.number().nonnegative().nullable().optional(),
+    priorUsage: z
+      .object({
+        inputTokens: z.number().nonnegative().nullable(),
+        cachedInputTokens: z.number().nonnegative().nullable(),
+        outputTokens: z.number().nonnegative().nullable(),
+        reasoningTokens: z.number().nonnegative().nullable(),
+      })
+      .nullable()
+      .optional(),
   }),
   outcome: z.discriminatedUnion('kind', [
     z.object({
@@ -1410,6 +1417,10 @@ async function recordDeciderOutput(
       score: grade.score,
       latency_ms: result.latencyMs,
       cost_usd: result.costUsd,
+      input_tokens: result.inputTokens,
+      cached_input_tokens: result.cachedInputTokens,
+      output_tokens: result.outputTokens,
+      reasoning_tokens: result.reasoningTokens,
       error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
       fallback_reason: null,
       route_hit: null,
@@ -1502,9 +1513,7 @@ async function recoverPendingOutputJob(env: Env, message: BenchmarkJobMessage): 
   if (
     isCatalogLoadFailureResult(pending.result) ||
     isUnsupportedModelResult(pending.result, message.model) ||
-    (pending.result.text.length === 0 &&
-      (pending.result.costUsd ?? 0) === 0 &&
-      /(?:\b429\b|rate.?limit|throttl)/i.test(pending.result.stderrTail))
+    isUnbilledTransientProviderResult(pending.result)
   ) {
     await deletePendingDeciderOutput(env.BENCH_DB, key);
     skipRecovery(
@@ -1595,10 +1604,13 @@ export async function acceptContainerCaseResult(env: Env, body: unknown): Promis
   } else {
     const result = parseContainerRunResponse(outcome.response, Date.now(), execution.model);
     if (execution.retried) {
-      result.costUsd =
-        result.costUsd === null && execution.priorCostUsd == null
-          ? null
-          : (result.costUsd ?? 0) + (execution.priorCostUsd ?? 0);
+      addPriorAttempt(result, {
+        costUsd: execution.priorCostUsd ?? null,
+        inputTokens: execution.priorUsage?.inputTokens ?? null,
+        cachedInputTokens: execution.priorUsage?.cachedInputTokens ?? null,
+        outputTokens: execution.priorUsage?.outputTokens ?? null,
+        reasoningTokens: execution.priorUsage?.reasoningTokens ?? null,
+      });
     }
     stored = await savePendingDeciderOutput(
       env.BENCH_DB,
@@ -1678,6 +1690,17 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
             Math.min(PAID_OUTPUT_RECHECK_MS, outputDeadline - Date.now()) / 1000
           ),
         }
+      );
+    } else if (
+      error instanceof BenchmarkThrottleError &&
+      claim.throttle_deferrals < SCHEDULER_MAX_THROTTLE_DEFERRALS
+    ) {
+      const delaySeconds = schedulerBackoffSeconds(claim.throttle_deferrals + 1);
+      await deferThrottledChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
+      await cooldownProviders(env.BENCH_DB, claim, Date.now() + delaySeconds * 1000);
+      await env.BENCH_QUEUE.send(
+        { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
+        { delaySeconds }
       );
     } else if (
       error instanceof AmbiguousBenchmarkExecutionError ||
@@ -1861,6 +1884,10 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
             score: gradeClassifierOutput(benchCase.expected, classification),
             latency_ms: Math.round(performance.now() - startedAt),
             cost_usd: cost,
+            input_tokens: null,
+            cached_input_tokens: null,
+            output_tokens: null,
+            reasoning_tokens: null,
             error: null,
             fallback_reason: null,
             route_hit:
@@ -2135,6 +2162,7 @@ async function processDeciderJob(
         attemptStartedAt = startedAt;
         let retried = false;
         let priorCostUsd: number | null = null;
+        let priorUsage: Omit<AttemptUsage, 'costUsd'> | null = null;
         console.log(
           JSON.stringify({
             event: 'benchmark_case_execution_started',
@@ -2160,7 +2188,13 @@ async function processDeciderJob(
             variant: cliVariant,
             resultCallback: {
               url: env.BENCH_RESULT_URL,
-              execution: { ...execution, attemptStartedAt: startedAt, retried, priorCostUsd },
+              execution: {
+                ...execution,
+                attemptStartedAt: startedAt,
+                retried,
+                priorCostUsd,
+                priorUsage,
+              },
             },
           }).catch(error => {
             if (isRetryableContainerAvailabilityError(error)) throw error;
@@ -2168,15 +2202,16 @@ async function processDeciderJob(
           });
         const first = await invokeCli();
         // The CLI occasionally ends a session with no assistant text at all
-        // (transient empty completion: a lone step_finish with cost 0). Mirror
-        // the production classifier's policy and retry once.
+        // (transient empty completion: a lone step_finish with cost 0), or dies from
+        // a signal before its first event. Mirror the production classifier's policy
+        // and retry once.
+        const emptyCompletion = first.exitCode === 0 && first.text.length === 0;
         if (
           isExactModelUnavailableResult(first, message.model) ||
           isCatalogLoadFailureResult(first) ||
           isUnsupportedModelResult(first, message.model) ||
-          first.exitCode !== 0 ||
-          first.text.length > 0 ||
-          /(?:\b429\b|rate.?limit|throttl)/i.test(first.stderrTail)
+          !(emptyCompletion || isKilledBeforeEventsResult(first)) ||
+          hasThrottleDiagnostic(first)
         ) {
           return { result: first, retried: false, attemptStartedAt: startedAt };
         }
@@ -2187,6 +2222,12 @@ async function processDeciderJob(
         attemptStartedAt = startedAt;
         retried = true;
         priorCostUsd = first.costUsd;
+        priorUsage = {
+          inputTokens: first.inputTokens,
+          cachedInputTokens: first.cachedInputTokens,
+          outputTokens: first.outputTokens,
+          reasoningTokens: first.reasoningTokens,
+        };
         await deletePendingDeciderOutput(env.BENCH_DB, pendingKey);
         console.log(
           JSON.stringify({
@@ -2203,10 +2244,7 @@ async function processDeciderJob(
           })
         );
         const retry = await invokeCli();
-        retry.costUsd =
-          retry.costUsd === null && first.costUsd === null
-            ? null
-            : (retry.costUsd ?? 0) + (first.costUsd ?? 0);
+        addPriorAttempt(retry, first);
         return { result: retry, retried: true, attemptStartedAt: startedAt };
       };
       try {
@@ -2216,10 +2254,7 @@ async function processDeciderJob(
         const output = pending ?? (await runPaidCase());
         const { result, retried } = output;
         attemptStartedAt = output.attemptStartedAt;
-        const throttled =
-          result.text.length === 0 &&
-          (result.costUsd ?? 0) === 0 &&
-          /(?:\b429\b|rate.?limit|throttl)/i.test(result.stderrTail);
+        const throttled = isUnbilledTransientProviderResult(result);
         const unsupported = isUnsupportedModelResult(result, message.model);
         if (isCatalogLoadFailureResult(result) || unsupported || throttled) {
           const { token: _token, ...unbilled } = execution;
@@ -2230,7 +2265,9 @@ async function processDeciderJob(
             await deletePendingDeciderOutput(env.BENCH_DB, pendingKey);
           }
           if (throttled) {
-            throw new BenchmarkThrottleError('Provider throttled an unbilled benchmark request');
+            throw new BenchmarkThrottleError(
+              'Provider throttled or failed an unbilled benchmark request'
+            );
           }
           throw new BenchmarkCatalogLoadError(
             unsupported
@@ -2305,6 +2342,10 @@ function failedRow(
     score: 0,
     latency_ms: Math.round(performance.now() - startedAt),
     cost_usd: error instanceof ClassifierRunError ? error.cost : null,
+    input_tokens: null,
+    cached_input_tokens: null,
+    output_tokens: null,
+    reasoning_tokens: null,
     error: JSON.stringify(formatError(error)).slice(0, 500),
     fallback_reason: null,
     // A failed classification missed its route; decider rows carry no route hit.
@@ -2586,6 +2627,20 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
         ? (latencies[Math.min(latencies.length - 1, Math.ceil(0.95 * latencies.length) - 1)] ??
           null)
         : null;
+    const averageTokens = (
+      field: 'input_tokens' | 'cached_input_tokens' | 'output_tokens' | 'reasoning_tokens'
+    ): number | null => {
+      let total = 0;
+      let count = 0;
+      for (const row of group) {
+        const value = row[field];
+        if (value !== null) {
+          total += value;
+          count++;
+        }
+      }
+      return count > 0 ? total / count : null;
+    };
     return {
       model,
       variant: variantFromStorage(storedVariant),
@@ -2594,6 +2649,10 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
       avgCostUsd: costs.length
         ? Number((costs.reduce((a, r) => a + (r.cost_usd ?? 0), 0) / costs.length).toFixed(8))
         : null,
+      avgInputTokens: averageTokens('input_tokens'),
+      avgCachedInputTokens: averageTokens('cached_input_tokens'),
+      avgOutputTokens: averageTokens('output_tokens'),
+      avgReasoningTokens: averageTokens('reasoning_tokens'),
       avgLatencyMs: Math.round(group.reduce((a, r) => a + r.latency_ms, 0) / group.length),
       p50LatencyMs: latencies[Math.floor(latencies.length / 2)] ?? null,
       p95LatencyMs,

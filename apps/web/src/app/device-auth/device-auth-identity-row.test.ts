@@ -29,6 +29,8 @@ function renderDeviceAuth(): string {
       code: 'ABCD-1234',
       viewerToken: 'viewer-token',
       isAppMode: true,
+      requestingClient: null,
+      pendingLink: null,
       user: { name: 'Ada Lovelace', email: 'ada@kilo.ai', imageUrl: '' },
     })
   );

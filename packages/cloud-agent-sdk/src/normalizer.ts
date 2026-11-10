@@ -7,8 +7,6 @@ import { z } from 'zod';
 import type { Part, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
-  SessionGoal,
-  SessionGoalStatus,
   CloudStatus,
   SuggestionAction,
   SlashCommandInfo,
@@ -18,8 +16,10 @@ import type {
 import {
   cloudWorktreeChangesReadyDataSchema,
   isValidCloudAgentEvent,
+  projectSessionGoal,
   kilocodePayloadSchema,
   messageUpdatedDataSchema,
+  normalizeAssistantMessageError,
   messagePartUpdatedDataSchema,
   messagePartDeltaDataSchema,
   messagePartRemovedDataSchema,
@@ -35,6 +35,7 @@ import {
   questionRepliedDataSchema,
   questionRejectedDataSchema,
   permissionAskedDataSchema,
+  permissionAskedIdentitySchema,
   permissionRepliedDataSchema,
   suggestionShownDataSchema,
   suggestionAcceptedDataSchema,
@@ -53,12 +54,24 @@ import {
   cloudMessageFailedDataSchema,
   type CloudAgentEvent,
   type SessionStatus,
+  type CustomerBillingFailure,
 } from './schemas';
 
 /** Chat events — data mutations for messages and parts. */
-export type ChatEvent =
+export type ChatEventVersion = {
+  sourceId: string;
+  eventId?: number;
+  cursor: number;
+};
+
+export type ChatEvent = (
   | { type: 'message.updated'; info: Message }
-  | { type: 'message.part.updated'; part: Part; time?: number | undefined }
+  | {
+      type: 'message.part.updated';
+      part: Part;
+      time?: number | undefined;
+      textOmitted?: boolean;
+    }
   | {
       type: 'message.part.delta';
       sessionId: string;
@@ -77,7 +90,8 @@ export type ChatEvent =
       type: 'message.removed';
       sessionId: string;
       messageId: string;
-    };
+    }
+) & { version?: ChatEventVersion };
 
 /** Service events — lifecycle, status, questions, autocommit, preparation. */
 export type ServiceEvent =
@@ -101,6 +115,16 @@ export type ServiceEvent =
       patterns: string[];
       metadata: Record<string, unknown>;
       always: string[];
+    }
+  | {
+      /**
+       * A permission request is waiting that this app cannot read: its scope
+       * did not parse, so no consent card can be offered for it. The request is
+       * still pending for the CLI, so the user is told it exists rather than
+       * seeing it vanish.
+       */
+      type: 'permission.unreadable';
+      requestId: string;
     }
   | { type: 'permission.replied'; requestId: string }
   | {
@@ -143,6 +167,7 @@ export type ServiceEvent =
       commandIndex?: number | undefined;
       commandCount?: number | undefined;
       detail?: string | undefined;
+      snapshotCapturedAt?: number | undefined;
       output?: string | undefined;
       safeError?: string | undefined;
       exitCode?: number | undefined;
@@ -162,6 +187,7 @@ export type ServiceEvent =
   | { type: 'autocommit_started'; messageId: string; message?: string | undefined }
   | {
       type: 'autocommit_completed';
+      repository?: string | undefined;
       messageId: string;
       success: boolean;
       message?: string | undefined;
@@ -179,6 +205,7 @@ export type ServiceEvent =
   | {
       type: 'connected';
       bootstrapPending?: boolean | undefined;
+      ancillaryOmittedItemCount?: number | undefined;
       cloudSessionId?: string;
       sessionStatus?: SessionStatus | undefined;
       cloudStatus?: CloudStatus | undefined;
@@ -217,6 +244,7 @@ export type ServiceEvent =
       executionId?: string | undefined;
       delivery?: 'queued' | 'sent' | undefined;
       accepted?: boolean | undefined;
+      billingFailure?: CustomerBillingFailure;
       error: string;
       reason: 'interrupted' | 'exhausted' | 'execution';
       attempts?: number | undefined;
@@ -264,51 +292,7 @@ const sessionModelSchema = z.object({
   variant: z.string().optional(),
 });
 
-const SESSION_GOAL_STATUSES = new Set<SessionGoalStatus>([
-  'active',
-  'complete',
-  'blocked',
-  'paused',
-]);
-
-/** Validate a candidate `kilo.goal` value. Returns undefined when malformed. */
-function parseSessionGoal(raw: unknown): SessionGoal | undefined {
-  if (typeof raw !== 'object' || raw === null) return undefined;
-  const goal = raw as Record<string, unknown>;
-  const text = goal['text'];
-  if (typeof text !== 'string' || text.length === 0) return undefined;
-  const status = goal['status'];
-  if (typeof status !== 'string' || !SESSION_GOAL_STATUSES.has(status as SessionGoalStatus)) {
-    return undefined;
-  }
-  const reasonRaw = goal['reason'];
-  const reason = typeof reasonRaw === 'string' && reasonRaw.length > 0 ? reasonRaw : undefined;
-  return {
-    text,
-    status: status as SessionGoalStatus,
-    ...(reason === undefined ? {} : { reason }),
-  };
-}
-
-/**
- * Project the CLI session goal from `session.info.metadata`. The CLI stores it
- * under the dotted key `kilo.goal`; accept a nested `kilo.goal` object too.
- * Malformed metadata drops the goal without throwing.
- */
-export function projectSessionGoal(rawMetadata: unknown): SessionGoal | undefined {
-  if (typeof rawMetadata !== 'object' || rawMetadata === null) return undefined;
-  const metadata = rawMetadata as Record<string, unknown>;
-  const candidates: unknown[] = [metadata['kilo.goal']];
-  const kilo = metadata['kilo'];
-  if (typeof kilo === 'object' && kilo !== null) {
-    candidates.push((kilo as Record<string, unknown>)['goal']);
-  }
-  for (const candidate of candidates) {
-    const goal = parseSessionGoal(candidate);
-    if (goal) return goal;
-  }
-  return undefined;
-}
+export { projectSessionGoal } from './schemas';
 
 const connectedServiceDataSchema = connectedDataSchema.extend({
   activeMessageId: z.string().nullable().optional().catch(undefined),
@@ -328,6 +312,7 @@ function normalizeSessionInfo(rawInfo: { id: string; [key: string]: unknown }): 
   return {
     id: rawInfo.id,
     parentID: rawInfo['parentID'] != null ? String(rawInfo['parentID']) : undefined,
+    ...(typeof rawInfo['title'] === 'string' ? { title: rawInfo['title'] } : {}),
     ...(model.success ? { model: model.data } : {}),
     ...(goal === undefined ? {} : { goal }),
   };
@@ -338,7 +323,10 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     case 'message.updated': {
       const r = messageUpdatedDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'message.updated', info: r.data.info as Message };
+      const info = messageUpdatedDataSchema.shape.info.parse(
+        normalizeAssistantMessageError(r.data.info)
+      );
+      return { type: 'message.updated', info: info as Message };
     }
 
     case 'message.part.updated': {
@@ -468,15 +456,23 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
 
     case 'permission.asked': {
       const r = permissionAskedDataSchema.safeParse(data);
-      if (!r.success) return null;
-      return {
-        type: 'permission.asked',
-        requestId: r.data.id,
-        permission: r.data.permission,
-        patterns: r.data.patterns,
-        metadata: r.data.metadata,
-        always: r.data.always,
-      };
+      if (r.success) {
+        return {
+          type: 'permission.asked',
+          requestId: r.data.id,
+          permission: r.data.permission,
+          patterns: r.data.patterns,
+          metadata: r.data.metadata,
+          always: r.data.always,
+        };
+      }
+      // A request whose scope does not parse cannot be offered as a decision:
+      // forwarding an empty scope would describe settings the app never read.
+      // It is not dropped either, because the CLI keeps waiting for an answer
+      // the app would otherwise never mention.
+      const identity = permissionAskedIdentitySchema.safeParse(data);
+      if (!identity.success) return null;
+      return { type: 'permission.unreadable', requestId: identity.data.id };
     }
 
     case 'permission.replied': {
@@ -564,6 +560,9 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
               ...(r.data.commandIndex === undefined ? {} : { commandIndex: r.data.commandIndex }),
               ...(r.data.commandCount === undefined ? {} : { commandCount: r.data.commandCount }),
               ...(r.data.detail === undefined ? {} : { detail: r.data.detail }),
+              ...(r.data.snapshotCapturedAt === undefined
+                ? {}
+                : { snapshotCapturedAt: r.data.snapshotCapturedAt }),
               ...(r.data.output === undefined ? {} : { output: r.data.output }),
               ...(r.data.safeError === undefined ? {} : { safeError: r.data.safeError }),
               ...(r.data.exitCode === undefined ? {} : { exitCode: r.data.exitCode }),
@@ -585,6 +584,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       if (!r.success) return null;
       return {
         type: 'autocommit_completed',
+        repository: r.data.repository,
         messageId: r.data.messageId,
         success: r.data.success,
         message: r.data.message,
@@ -610,6 +610,9 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       return {
         type: 'connected',
         ...(r.data.bootstrapPending !== undefined && { bootstrapPending: r.data.bootstrapPending }),
+        ...(r.data.ancillaryOmittedItemCount !== undefined && {
+          ancillaryOmittedItemCount: r.data.ancillaryOmittedItemCount,
+        }),
         ...(r.data.sessionStatus !== undefined && { sessionStatus: r.data.sessionStatus }),
         ...(r.data.cloudStatus !== undefined && { cloudStatus: r.data.cloudStatus }),
         ...(r.data.activeMessageId !== undefined && { activeMessageId: r.data.activeMessageId }),
@@ -695,6 +698,10 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         error,
         reason,
         attempts,
+        ...((rawReason === 'billing_blocked' || rawReason === 'billing_unavailable') &&
+        r.data.billingFailure !== undefined
+          ? { billingFailure: r.data.billingFailure }
+          : {}),
       };
     }
 

@@ -7,9 +7,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodeBlock } from './code-block';
 import {
   chunkTokenLines,
+  clearFenceWalkCacheForTests,
   CODE_CHUNK_MOUNT_BATCH,
   CODE_CHUNK_TOKENS,
   CODE_FIRST_PAINT_CHUNKS,
+  fenceWalkCacheStatsForTests,
   tokenizeCodeLines,
 } from './code-block-model';
 import { type MonoScrollTextMode } from './mono-scroll-block-model';
@@ -740,6 +742,101 @@ describe('CodeBlock long-press pass-through', () => {
     const track = vi.fn(() => () => undefined);
     const renderer = await mount(withSheet('scroll', track, blockElement()));
     expect(pressables(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+});
+
+describe('CodeBlock fence walk lifetime', () => {
+  beforeEach(() => {
+    clearFenceWalkCacheForTests();
+  });
+
+  it('releases the fence walk when the block unmounts', async () => {
+    // Regression: a walk stayed in the module-level cache for the life of the
+    // process, so a transcript of long fences pinned highlighted copies of its
+    // code after the user scrolled past it.
+    const renderer = await mount(blockElement({ code: 'const kept = 1;', language: null }));
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+  });
+
+  it('keeps the fence walk while the block is mounted', async () => {
+    const renderer = await mount(blockElement({ code: 'const kept = 1;', language: null }));
+    act(() => {
+      renderer.update(blockElement({ code: 'const kept = 1;', language: null }));
+    });
+
+    // A re-render of the same fence reuses the walk, so a FlashList remount and
+    // an unrelated prop change do not re-highlight the fence's lines.
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+    await unmount(renderer);
+  });
+
+  it('keeps the walk while another mounted block renders the same fence', async () => {
+    // The cache is keyed by the fence's value, so two blocks showing the same
+    // fence share one walk; one of them going away must not drop it for the
+    // other, which would re-highlight its prefix on its next mount batch.
+    const twoBlocks = React.createElement(
+      React.Fragment,
+      null,
+      blockElement({ code: 'const shared = 1;', language: null }),
+      blockElement({ code: 'const shared = 1;', language: null })
+    );
+    const renderer = await mount(twoBlocks);
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    act(() => {
+      renderer.update(blockElement({ code: 'const shared = 1;', language: null }));
+    });
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+  });
+
+  it('keeps the walk when one block replaces another for the same fence', async () => {
+    // A list row can unmount while an identical fence mounts in the same
+    // commit, and that commit's effect cleanups run before its effect creates:
+    // the release must not drop the walk the mounting block is about to use.
+    const code = 'const swapped = 1;';
+    const at = (key: string) =>
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(CodeBlock, { key, code, language: null })
+      );
+    const renderer = await mount(at('first'));
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    act(() => {
+      renderer.update(at('second'));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+    await unmount(renderer);
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+  });
+
+  it('releases the previous fence walk when the fence text is replaced', async () => {
+    const renderer = await mount(blockElement({ code: 'const first = 1;', language: null }));
+    act(() => {
+      renderer.update(blockElement({ code: 'const second = 2;', language: null }));
+    });
+    // The replaced fence's walk is dropped on the task after the commit that
+    // released it, so a block mounting the same fence in that commit keeps it.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const { entries } = fenceWalkCacheStatsForTests();
+    expect(entries).toBe(1);
+    // The one entry left is the fence now rendered, not the replaced one.
+    expect(fenceWalkCacheStatsForTests().weight).toBeGreaterThan(0);
     await unmount(renderer);
   });
 });

@@ -5,6 +5,7 @@ import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { type ReviewConfigData, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { reviewerSaveFailure } from '@/lib/code-reviewer-save-error';
 import {
   getRepoSelectionSender,
   isRepoSelectionEpochCurrent,
@@ -90,7 +91,11 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
         }
         sender.pendingSelection = null;
       }
-      announcingToast.error(error.message);
+      // Same reason as the full config save: the server's sentence is English
+      // and may name a refusal the app explains itself.
+      announcingToast.error(
+        reviewerSaveFailure(error, i18n.t('codeReviewer.configSaveFailed')).message
+      );
     },
     onSuccess: (_result, vars) => {
       if (!isRepoSelectionEpochCurrent(vars.authEpoch)) {

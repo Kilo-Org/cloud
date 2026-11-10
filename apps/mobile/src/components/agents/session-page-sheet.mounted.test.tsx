@@ -191,6 +191,11 @@ describe('SessionPageSheet mounted', () => {
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface')[0];
     // The padding keeps the content below the system status bar.
     expect(surface?.props.style).toEqual({ paddingTop: 24 });
+    // The surface clears the status bar, so the sheet must not reserve that inset
+    // too: Android reads a dialog window's insets only after the sheet measured
+    // itself, and the sheet then shrank by the status bar and moved its whole
+    // content — header included — after it had already appeared.
+    expect(sheet(renderer.root).props.contentOwnsTopInset).toBe(true);
 
     renderer.unmount();
   });
@@ -219,6 +224,23 @@ describe('SessionPageSheet mounted', () => {
     const sheetNode = sheet(renderer.root);
     expect(sheetNode.props.dismissGestures).toBe(true);
     expect(sheetNode.props.enablePanDownToClose).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('keeps the drag off a sheet that asks before closing', async () => {
+    // A drag has already taken the native sheet down when the question is asked,
+    // so a refused request could only answer Keep editing into an empty window.
+    const onRequestDismiss = vi.fn(() => false);
+    const renderer = await mountSheet({ dismissible: true, onRequestDismiss });
+
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.dismissGestures).toBe(false);
+    // The dismissal paths that ask first stay reachable, and the caller still
+    // decides the answer.
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
+    expect(booleanHandler(sheetNode.props.onRequestDismiss)()).toBe(false);
+    expect(onRequestDismiss).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

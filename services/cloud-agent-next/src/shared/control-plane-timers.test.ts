@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
@@ -35,6 +36,38 @@ describe('control-plane idle timers', () => {
   });
 });
 
+describe('control-plane preparation attempt budget', () => {
+  it('outlasts every step of one preparation attempt in sequence', () => {
+    const { sandbox, wrapper } = CONTROL_PLANE_TIMERS;
+    // Environment snapshot starts use the wider repository startup bound.
+    const createMs = Math.max(sandbox.providerCreateMs, DEADLINE_MS.repositoryStartup);
+    const steps =
+      // A transient create failure creates again inside the same attempt.
+      createMs +
+      sandbox.providerCreateRetryMs +
+      createMs +
+      sandbox.wrapperFirstConnectMs +
+      sandbox.wrapperHelloMs +
+      wrapper.restoreMs +
+      wrapper.cloneMs +
+      // Kilo runtime start and the Kilo session each retry once inside the
+      // attempt, so each can consume two of its own bounds.
+      2 * wrapper.kiloRuntimeStartMs +
+      2 * wrapper.kiloSessionMs;
+
+    expect(sandbox.routePreparationMs).toBeGreaterThanOrEqual(steps);
+  });
+
+  it('keeps the attempt budget real when the development divisor shrinks step timers', () => {
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' });
+
+    expect(scaled.sandbox.routePreparationMs).toBe(CONTROL_PLANE_TIMERS.sandbox.routePreparationMs);
+    expect(scaled.sandbox.routePreparationMs).toBeGreaterThanOrEqual(
+      scaled.wrapper.cloneMs + scaled.wrapper.restoreMs
+    );
+  });
+});
+
 describe('sandbox idle policy for route origins', () => {
   it('keeps the interactive window for a sandbox without routes', () => {
     expect(sandboxIdlePolicyForOrigins([])).toBe('interactive');
@@ -50,6 +83,11 @@ describe('sandbox idle policy for route origins', () => {
   it('keeps the interactive window for desktop routes', () => {
     expect(sandboxIdlePolicyForOrigins(['desktop'])).toBe('interactive');
     expect(sandboxIdlePolicyForOrigins(['scheduled', 'desktop'])).toBe('interactive');
+  });
+
+  it('keeps the interactive window for Agent Manager routes', () => {
+    expect(sandboxIdlePolicyForOrigins(['agent-manager'])).toBe('interactive');
+    expect(sandboxIdlePolicyForOrigins(['cloud-agent-web', 'agent-manager'])).toBe('interactive');
   });
 
   it.each([

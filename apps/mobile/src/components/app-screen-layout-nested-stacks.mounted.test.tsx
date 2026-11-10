@@ -18,12 +18,11 @@ vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: ReactElement }) => children,
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
-// The Profile stack wraps its navigator in the tab's own recovery boundary,
-// which reads the query client and renders the full error surface. Recovery is
-// covered by that boundary's suite; here it only needs to pass the scene
-// through so the gate under the Stack stays the subject.
-vi.mock('@/components/profile-stack-error-boundary', () => ({
-  ProfileStackErrorBoundary: ({ children }: { children: ReactElement }) => children,
+// Tab stacks wrap their navigator in a local recovery boundary. Recovery is
+// covered by the shared boundary suite; here it passes the scene through so
+// the gate under each Stack stays the subject.
+vi.mock('@/components/tab-stack-error-boundary', () => ({
+  TabStackErrorBoundary: ({ children }: { children: ReactElement }) => children,
 }));
 vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
   SecurityAgentCommandObserver: 'SecurityAgentCommandObserver',
@@ -61,6 +60,8 @@ const scenes = vi.hoisted(() => {
     navigation: {
       isFocused: () => boolean;
       addListener: (event: string, listener: () => void) => () => void;
+      getState: () => { index: number; routes: { key: string; name: string }[] };
+      reset: () => void;
     };
     setFocused: (next: boolean) => void;
     listenerCount: () => number;
@@ -77,6 +78,10 @@ const scenes = vi.hoisted(() => {
           listeners.set(event, registered);
           return () => registered.delete(listener);
         },
+        // The gate is this suite's subject; the Security Agent layout's own
+        // repair reads a Stack that already has its dashboard, so it no-ops.
+        getState: () => ({ index: 0, routes: [{ key: 'dashboard', name: 'index' }] }),
+        reset: () => undefined,
       },
       setFocused(next: boolean) {
         focused = next;

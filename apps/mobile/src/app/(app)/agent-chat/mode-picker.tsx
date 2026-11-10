@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
 import { useState } from 'react';
@@ -43,7 +43,7 @@ export default function ModePickerScreen() {
   const [bridge] = useState(() => modePickerSlot.get(routeKey));
 
   function handleSelect(mode: AgentMode) {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     bridge?.onSelect(mode);
     modePickerSlot.clear(routeKey);
     router.back();
@@ -114,6 +114,7 @@ export default function ModePickerScreen() {
     >
       {custom.length === 0 ? (
         <FlashList
+          nestedScrollEnabled
           style={[listStyle, { backgroundColor: colors.background }]}
           data={MODE_OPTIONS}
           keyExtractor={item => item.value}
@@ -121,7 +122,7 @@ export default function ModePickerScreen() {
           ItemSeparatorComponent={() => separator}
         />
       ) : (
-        <ScrollView className="flex-1 bg-background">
+        <ScrollView nestedScrollEnabled className="flex-1 bg-background">
           {MODE_OPTIONS.map((item, index) => (
             <View key={item.value}>
               {index > 0 ? separator : null}

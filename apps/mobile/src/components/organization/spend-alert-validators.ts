@@ -80,6 +80,14 @@ export function multiplierBasisPoints(multiplier: number): number {
   return Math.round(multiplier * 100);
 }
 
+/**
+ * The empty limit field's sample amount, written with the same separators the
+ * field reads, so the sample can be typed back as shown.
+ */
+export function thresholdPlaceholder(): string {
+  return formatNumber(25, i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 /** A window read back from the wire, narrowed to the three the wire accepts. */
 export function toWindowHours(value: number | null | undefined): SpendAlertWindowHours {
   if (value === 168 || value === 720) {

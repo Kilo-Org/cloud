@@ -138,10 +138,14 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useFocusEffect: () => undefined,
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({
+    canGoBack: () => false,
     push: () => undefined,
     replace: () => undefined,
+    setParams: () => undefined,
   }),
   useScrollToTop: () => undefined,
 }));
@@ -149,6 +153,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  History: 'History',
   ChevronDown: 'ChevronDown',
   Plus: 'Plus',
   Bot: 'Bot',
@@ -171,6 +176,7 @@ vi.mock('@/components/agents/session-list-content', () => ({
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
 }));
+vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
 vi.mock('@/components/agents/platform-filter-modal', () => ({
   SessionFilterModal: 'SessionFilterModal',
 }));

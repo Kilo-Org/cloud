@@ -1,11 +1,10 @@
 import { TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 
+import { CONTROL_PLANE_TIMEOUT_MESSAGE } from '@kilocode/app-shared/control-plane';
 import { RequestDeadlineError, withDeadline } from '@kilocode/event-service';
-import {
-  isMobileClient,
-  type MinimumVersionHeaders,
-} from '@kilocode/web-shared/lib/trpc/min-version';
+import type { AppHeaderList } from '@kilocode/web-shared/lib/app-headers';
+import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
 import {
   buildTimingLine,
   readClientDimensions,
@@ -57,7 +56,7 @@ export type ControlPlaneBudgetOptions<TResult> = {
   /** tRPC procedure path, logged on expiry. Never carries a query string. */
   path: string;
   type: ProcedureType;
-  headersList?: MinimumVersionHeaders | null;
+  headersList?: AppHeaderList | null;
   next: () => Promise<TResult>;
   /**
    * `performance.now()` when this request's budget started. Context creation
@@ -150,7 +149,7 @@ export async function withControlPlaneBudget<TResult>({
     });
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'Control-plane request timed out',
+      message: CONTROL_PLANE_TIMEOUT_MESSAGE,
       cause,
     });
   };
@@ -190,7 +189,7 @@ function logControlPlaneBudgetExceeded({
 }: {
   path: string;
   procedureType: ProcedureType;
-  headersList?: MinimumVersionHeaders | null;
+  headersList?: AppHeaderList | null;
   durationMs: number;
 }): void {
   try {

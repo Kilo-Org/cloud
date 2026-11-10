@@ -303,6 +303,53 @@ describe('private resumable pool notices', () => {
     expect(sendEmail).toHaveBeenCalledTimes(2);
   });
 
+  it('returns the saved partial campaign when cutover passes between recipients', async () => {
+    let now = Date.parse(cutoverAt) - 1;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const sendEmail = jest.fn<() => Promise<SendResult>>().mockImplementation(async () => {
+      now = Date.parse(cutoverAt);
+      return { sent: true };
+    });
+    await runPoolNotifications({ cutoverAt, stateDir, send: false, owners, sendEmail });
+
+    const result = await runPoolNotifications({
+      cutoverAt,
+      stateDir,
+      send: true,
+      owners,
+      sendEmail,
+    });
+    expect(result).toMatchObject({
+      mode: 'send',
+      sent: 1,
+      remaining: 1,
+      ambiguous: 0,
+      failed: 0,
+    });
+    expect(result.targetStatuses.map(target => target.status).sort()).toEqual(['pending', 'sent']);
+    const plan = await readPlan();
+    expect(
+      Object.values(plan.targets)
+        .map(target => target.status)
+        .sort()
+    ).toEqual(['pending', 'sent']);
+    expect(plan.cutoverAt).toBe(cutoverAt);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    await expect(lstat(join(stateDir, 'notification.lock'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await expect(
+      runPoolNotifications({
+        cutoverAt: '2099-11-02T12:00:00Z',
+        stateDir,
+        send: true,
+        owners,
+        sendEmail,
+      })
+    ).rejects.toThrow(/differs from the saved plan/);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
   it('continues independent deliveries after an unknown outcome and never retries it implicitly', async () => {
     const sendEmail = jest
       .fn<() => Promise<SendResult>>()

@@ -343,4 +343,7 @@ export const BALANCE_REQUIRED_MUTATIONS = new Set([
   'sendMessageV2',
   'start',
   'send',
+  'createHostedWorkspace',
+  'createHostedWorkspaceSession',
+  'continueHostedWorkspace',
 ]);

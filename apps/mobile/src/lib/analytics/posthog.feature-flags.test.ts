@@ -64,7 +64,7 @@ vi.mock('@/lib/feature-flags', async importOriginal => {
     getFeatureFlagDefinition: (key: string) =>
       key === 'mobile-test-feature'
         ? { key, minAppVersion: '1.0.11', defaultValue: true }
-        : undefined,
+        : actual.getFeatureFlagDefinition(key),
   };
 });
 

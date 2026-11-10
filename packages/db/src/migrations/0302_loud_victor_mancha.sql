@@ -1,0 +1,1 @@
+ALTER TABLE "cloud_agent_environments" ADD COLUMN "configuration_revision" integer DEFAULT 1 NOT NULL;

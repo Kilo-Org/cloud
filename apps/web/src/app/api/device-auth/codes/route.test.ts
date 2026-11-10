@@ -13,18 +13,64 @@ jest.mock('@/lib/device-auth/device-auth', () => {
   };
 });
 
+jest.mock('@/lib/auth/pending-link', () => ({
+  getPendingLinkBySecret: jest.fn(),
+}));
+
 import {
   createDeviceAuthRequest,
   DeviceAuthPendingLimitError,
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
 } from '@/lib/device-auth/device-auth';
 import { POST } from './route';
+import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
 
 const mockCreate = jest.mocked(createDeviceAuthRequest);
+const mockGetPendingLink = jest.mocked(getPendingLinkBySecret);
 
 describe('POST /api/device-auth/codes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  test('refuses a pending link token that names no live pending link', async () => {
+    mockGetPendingLink.mockResolvedValue(null);
+
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: JSON.stringify({ pendingLinkToken: 'dead-secret' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'PENDING_LINK_EXPIRED' });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test('stores a live pending link token with the device code', async () => {
+    mockGetPendingLink.mockResolvedValue({ id: 'pending-1' } as never);
+    mockCreate.mockResolvedValue({
+      code: 'poll-secret',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: JSON.stringify({ pendingLinkToken: 'live-secret' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ pendingLinkToken: 'live-secret' })
+    );
   });
 
   test('returns code as the poll secret plus user_code, device_code, verificationUrl, and expiresIn', async () => {
@@ -34,6 +80,7 @@ describe('POST /api/device-auth/codes', () => {
       userCode: 'ABCD-EFGH',
       deviceCode: 'base64url-device-secret',
       expiresAt,
+      requestingClient: null,
     });
 
     const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
@@ -63,6 +110,7 @@ describe('POST /api/device-auth/codes', () => {
       userCode: 'WXYZ-1234',
       deviceCode: 'super-long-secret-that-should-not-leak',
       expiresAt,
+      requestingClient: null,
     });
 
     const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
@@ -103,5 +151,141 @@ describe('POST /api/device-auth/codes', () => {
     });
 
     await expect(POST(req)).rejects.toThrow('unexpected');
+  });
+
+  test('stores the requesting client named by the body and echoes it', async () => {
+    const requestingClient = {
+      clientId: 'client-abc',
+      clientName: 'Claude Desktop',
+      redirectOrigin: 'https://client.test',
+    };
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient,
+    });
+
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: JSON.stringify({
+        requesting_client: {
+          client_id: 'client-abc',
+          client_name: 'Claude Desktop',
+          redirect_origin: 'https://client.test',
+        },
+      }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ requestingClient }));
+    expect(data.requestingClient).toEqual(requestingClient);
+  });
+
+  test('opens a plain pairing for a body that names no client', async () => {
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', { method: 'POST' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ requestingClient: expect.anything() })
+    );
+    expect((await response.json()).requestingClient).toBeNull();
+  });
+
+  test.each([
+    [
+      'an empty client id',
+      { client_id: '', client_name: 'Acme', redirect_origin: 'https://a.test' },
+    ],
+    [
+      'a control character in the name',
+      { client_id: 'client-abc', client_name: 'Acme\u0007', redirect_origin: 'https://a.test' },
+    ],
+    [
+      'an oversized redirect origin',
+      {
+        client_id: 'client-abc',
+        client_name: 'Acme',
+        redirect_origin: `https://${'a'.repeat(300)}`,
+      },
+    ],
+    [
+      'a redirect origin with a path',
+      { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'https://a.test/cb' },
+    ],
+    [
+      'a relative redirect origin',
+      { client_id: 'client-abc', client_name: 'Acme', redirect_origin: '/cb' },
+    ],
+    [
+      'a redirect origin that is prose',
+      { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'the trusted app' },
+    ],
+    [
+      'a bare web scheme',
+      { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'https:' },
+    ],
+    [
+      'a bare script scheme',
+      { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'javascript:' },
+    ],
+  ])('refuses a client description with %s', async (_label, requesting_client) => {
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body: JSON.stringify({ requesting_client }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test('accepts a native app scheme as the redirect origin', async () => {
+    const requestingClient = {
+      clientId: 'client-abc',
+      clientName: 'Example App',
+      redirectOrigin: 'cursor://anysphere.cursor',
+    };
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient,
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body: JSON.stringify({
+          requesting_client: {
+            client_id: 'client-abc',
+            client_name: 'Example App',
+            redirect_origin: 'cursor://anysphere.cursor',
+          },
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).requestingClient).toEqual(requestingClient);
   });
 });

@@ -144,8 +144,7 @@ let cached: SlackCredentialKeyset | undefined;
 
 /**
  * Resolves the keyset, memoized per process. Throws `SlackCredentialKeysetError`
- * when unconfigured or invalid — callers on the install path treat that as
- * non-fatal while the new store is still write-only.
+ * when the keyset is unconfigured or invalid.
  */
 export function requireSlackCredentialKeyset(): SlackCredentialKeyset {
   if (cached) return cached;

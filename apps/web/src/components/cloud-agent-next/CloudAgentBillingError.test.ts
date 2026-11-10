@@ -13,14 +13,11 @@ import {
 type BillingErrorProps = ComponentProps<typeof CloudAgentBillingError>;
 
 const personal = { payerName: 'Your account', action: { href: '/credits', label: 'Add credits' } };
-const orgMember = {
+const orgBillingManager = {
   payerName: 'Acme Engineering',
-  action: {
-    href: '/organizations/org-1/payment-details',
-    label: 'View organization billing',
-    memberGuidance: true,
-  },
+  action: { href: '/organizations/org-1', label: 'Add organization credits' },
 };
+const orgMember = { payerName: 'Acme Engineering', memberGuidance: true };
 
 function renderBillingError(props: BillingErrorProps): string {
   return renderToStaticMarkup(createElement(CloudAgentBillingError, props));
@@ -39,15 +36,17 @@ describe('CloudAgentBillingError', () => {
       presentation: personal,
     });
     expect(html).toContain('role="alert"');
-    expect(html).toContain('Your account needs more credits to start Cloud Agent compute.');
-    expect(html).toContain('Available: $1.25 · Need more than $2.00');
-    expect(html).toContain('Your prompt did not start.');
+    expect(html).toContain(
+      'Your account needs more credits for Cloud Agent compute. Add credits, then send a new message.'
+    );
+    expect(html).toContain('Available: $1.25 · Need at least $2.00');
+    expect(html).not.toContain('Your prompt did not start.');
     expect(html).toContain('Add credits');
   });
 
   it.each([
     ['remainingMicrodollars', 'Available: $1.00'],
-    ['minimumRequiredMicrodollars', 'Need more than $2.00'],
+    ['minimumRequiredMicrodollars', 'Need at least $2.00'],
   ] as const)('renders %s independently', (key, text) => {
     const html = renderBillingError({
       failure: {
@@ -56,12 +55,26 @@ describe('CloudAgentBillingError', () => {
         retryable: false,
         [key]: key === 'remainingMicrodollars' ? 1_000_000 : 2_000_000,
       },
-      presentation: orgMember,
+      presentation: orgBillingManager,
     });
     expect(html).toContain(text);
     expect(html).toContain('Acme Engineering');
-    expect(html).toContain('View organization billing');
+    expect(html).toContain('Add organization credits');
+  });
+
+  it('names the roles that can pay a member organization without navigating there', () => {
+    const html = renderBillingError({
+      failure: {
+        code: 'INSUFFICIENT_CREDITS',
+        payer: { type: 'org', id: 'org-1' },
+        retryable: false,
+      },
+      presentation: orgMember,
+    });
+    expect(html).toContain('Acme Engineering cannot cover Cloud Agent compute.');
+    expect(html).toContain('check your daily spending limit');
     expect(html).toContain('An organization owner, admin, or billing manager can add credits.');
+    expect(html).not.toContain('<button');
   });
 
   it.each([
@@ -71,7 +84,7 @@ describe('CloudAgentBillingError', () => {
     ],
     [
       'BILLING_UNAVAILABLE',
-      'Cloud Agent cannot verify compute billing right now. Your prompt has not started and you have not been charged.',
+      'Cloud Agent cannot verify compute billing right now. Try again shortly.',
     ],
   ] as const)('renders exact %s core copy without an action', (code, copy) => {
     const html = renderBillingError({
@@ -91,6 +104,21 @@ describe('CloudAgentBillingError', () => {
     ).toBe('/cloud/chat?sessionId=ses-1&tab=chat');
   });
 
+  it.each([
+    [4_999_999, '$4.999999'],
+    [4_999_990, '$4.99999'],
+  ])('does not round a rejected balance of %i up to the minimum', (balance, available) => {
+    expect(
+      billingBalanceCopy({
+        code: 'INSUFFICIENT_CREDITS',
+        payer: { type: 'user', id: 'u1' },
+        retryable: true,
+        remainingMicrodollars: balance,
+        minimumRequiredMicrodollars: 5_000_000,
+      })
+    ).toBe(`Available: ${available} · Need at least $5.00`);
+  });
+
   it('makes an equal balance threshold unambiguous', () => {
     expect(
       billingBalanceCopy({
@@ -100,6 +128,6 @@ describe('CloudAgentBillingError', () => {
         remainingMicrodollars: 5_000_000,
         minimumRequiredMicrodollars: 5_000_000,
       })
-    ).toBe('Available: $5.00 · Need more than $5.00');
+    ).toBe('Available: $5.00 · Need at least $5.00');
   });
 });

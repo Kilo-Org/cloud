@@ -17,12 +17,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  useProfiles,
-  useCombinedProfiles,
-  useRepoBindings,
-  type ProfileSummaryWithOwner,
-} from '@/hooks/useCloudAgentProfiles';
-import { resolveProfileLayers } from '@kilocode/cloud-agent-profile';
+  contextSegmentClassName,
+  interactiveContextSegmentClassName,
+  SegmentText,
+} from '@/components/cloud-agent-next/session-context-segments';
+import { type ProfileSummaryWithOwner } from '@/hooks/useCloudAgentProfiles';
+import { useSessionProfileLayers } from '@/hooks/useSessionProfileLayers';
+import { useCloudAgentSettingsDeepLink } from '@/components/cloud-agent-next/settings/useCloudAgentSettingsDeepLink';
 import { ProfilesListDialog } from './ProfilesListDialog';
 
 type ProfilePickerPopoverProps = {
@@ -31,6 +32,8 @@ type ProfilePickerPopoverProps = {
   onOverrideProfileSelect: (id: string | null) => void;
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
+  /** The session's environment. A V2 environment skips the repo binding; the effective default still applies. */
+  environment?: { repositories?: unknown } | null;
 };
 
 export function ProfilePickerPopover({
@@ -39,96 +42,55 @@ export function ProfilePickerPopover({
   onOverrideProfileSelect,
   repoFullName,
   platform,
+  environment,
 }: ProfilePickerPopoverProps) {
   const [open, setOpen] = useState(false);
   const [pickingOverride, setPickingOverride] = useState(false);
   const [showManageProfiles, setShowManageProfiles] = useState(false);
   const [openToNewProfile, setOpenToNewProfile] = useState(false);
   const [editProfileId, setEditProfileId] = useState<string | null>(null);
+  const { setSection, clearSection } = useCloudAgentSettingsDeepLink();
 
   // Reset override-picker mode whenever the popover closes.
   useEffect(() => {
     if (!open) setPickingOverride(false);
   }, [open]);
 
+  const openManageProfiles = () => {
+    setShowManageProfiles(true);
+    setSection('profiles');
+  };
+
+  const closeManageProfiles = () => {
+    setShowManageProfiles(false);
+    setOpenToNewProfile(false);
+    setEditProfileId(null);
+    clearSection();
+  };
+
   const openEditDialog = (profileId: string) => {
     setOpen(false);
     setOpenToNewProfile(false);
     setEditProfileId(profileId);
-    setShowManageProfiles(true);
+    openManageProfiles();
   };
 
   const {
-    data: combinedData,
-    isLoading: combinedProfilesLoading,
-    error: combinedProfilesError,
-    refetch: refetchCombinedProfiles,
-  } = useCombinedProfiles({
-    organizationId: organizationId ?? '',
-    enabled: !!organizationId,
+    allProfiles,
+    profilesData,
+    profilesLoading,
+    profilesError,
+    refetchProfiles,
+    layers,
+    baseProfile,
+    topProfile,
+  } = useSessionProfileLayers({
+    organizationId,
+    selectedOverrideProfileId,
+    repoFullName,
+    platform,
+    environment,
   });
-  const {
-    data: personalProfilesData,
-    isLoading: personalProfilesLoading,
-    error: personalProfilesError,
-    refetch: refetchPersonalProfiles,
-  } = useProfiles({
-    organizationId: undefined,
-    enabled: !organizationId,
-  });
-  const profilesLoading = organizationId ? combinedProfilesLoading : personalProfilesLoading;
-  const profilesError = organizationId ? combinedProfilesError : personalProfilesError;
-  // React Query keeps `error` set while retaining `data` when a background
-  // refetch fails (a window-focus refetch, or the invalidation refetch a profile
-  // mutation triggers). Only surface the retry state when there is nothing
-  // cached to show, so a transient failure never blanks a working picker.
-  const profilesData = organizationId ? combinedData : personalProfilesData;
-  const refetchProfiles = organizationId ? refetchCombinedProfiles : refetchPersonalProfiles;
-
-  const allProfiles: ProfileSummaryWithOwner[] = useMemo(
-    () =>
-      organizationId
-        ? (combinedData?.allProfiles ?? [])
-        : (personalProfilesData ?? []).map(p => ({ ...p, ownerType: 'user' as const })),
-    [organizationId, combinedData, personalProfilesData]
-  );
-
-  const effectiveDefaultProfileId = organizationId
-    ? (combinedData?.effectiveDefaultId ?? null)
-    : (personalProfilesData?.find(p => p.isDefault)?.id ?? null);
-
-  const { data: repoBindings } = useRepoBindings({ organizationId });
-
-  const repoBindingProfileId = useMemo(() => {
-    if (!repoFullName || !repoBindings) return null;
-    const binding = repoBindings.find(
-      b =>
-        b.repoFullName.toLowerCase() === repoFullName.toLowerCase() &&
-        (!platform || b.platform === platform)
-    );
-    return binding?.profileId ?? null;
-  }, [repoFullName, repoBindings, platform]);
-
-  // Shared resolution logic — same rules as the server-side merge.
-  const layers = useMemo(
-    () =>
-      resolveProfileLayers({
-        repoBindingProfileId,
-        effectiveDefaultProfileId,
-        explicitOverrideProfileId: selectedOverrideProfileId,
-      }),
-    [repoBindingProfileId, effectiveDefaultProfileId, selectedOverrideProfileId]
-  );
-
-  const baseProfile = useMemo(
-    () => (layers.base ? (allProfiles.find(p => p.id === layers.base?.profileId) ?? null) : null),
-    [allProfiles, layers.base]
-  );
-
-  const topProfile = useMemo(
-    () => (layers.top ? (allProfiles.find(p => p.id === layers.top?.profileId) ?? null) : null),
-    [allProfiles, layers.top]
-  );
   const topSource = layers.top?.source ?? null;
 
   // Profiles offered as override candidates. The base profile is omitted
@@ -156,15 +118,19 @@ export function ProfilePickerPopover({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
+            type="button"
             className={cn(
-              'inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
-              'border border-border/50 bg-muted/30 hover:bg-muted/60 hover:border-border',
-              'text-muted-foreground hover:text-foreground',
-              open && 'border-border bg-muted/60 text-foreground'
+              contextSegmentClassName,
+              interactiveContextSegmentClassName,
+              open && 'bg-muted/60 text-foreground'
             )}
           >
-            <Layers className="h-3 w-3 shrink-0" />
-            {chipName ? <span className="font-medium">{chipName}</span> : <span>No profile</span>}
+            <Layers className="size-3.5 shrink-0" aria-hidden="true" />
+            {chipName ? (
+              <SegmentText className="max-w-48 font-medium">{chipName}</SegmentText>
+            ) : (
+              <span>No profile</span>
+            )}
             <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
           </button>
         </PopoverTrigger>
@@ -213,7 +179,7 @@ export function ProfilePickerPopover({
               onClick={() => {
                 setOpen(false);
                 setOpenToNewProfile(true);
-                setShowManageProfiles(true);
+                openManageProfiles();
               }}
             >
               <Plus className="h-3 w-3 shrink-0" />
@@ -224,7 +190,7 @@ export function ProfilePickerPopover({
               onClick={() => {
                 setOpen(false);
                 setOpenToNewProfile(false);
-                setShowManageProfiles(true);
+                openManageProfiles();
               }}
             >
               <FolderCog className="h-3 w-3 shrink-0" />
@@ -237,16 +203,18 @@ export function ProfilePickerPopover({
       <ProfilesListDialog
         organizationId={organizationId}
         open={showManageProfiles}
-        onOpenChange={open => {
-          setShowManageProfiles(open);
-          if (!open) {
-            setOpenToNewProfile(false);
-            setEditProfileId(null);
+        onOpenChange={nextOpen => {
+          if (nextOpen) {
+            setShowManageProfiles(true);
+            setSection('profiles');
+            return;
           }
+          closeManageProfiles();
         }}
+        onSectionChange={setSection}
         onProfileSelect={id => {
           onOverrideProfileSelect(id);
-          setShowManageProfiles(false);
+          closeManageProfiles();
         }}
         openToNewProfile={openToNewProfile}
         initialSelectedProfileId={editProfileId}

@@ -63,9 +63,15 @@ supports only USD for seat billing.
   subscription," which includes additional statuses such as
   past-due or incomplete.
 - **Active subscription purchase**: A purchase record whose
-  `subscription_status` is not `ended`. Used for access checks and
-  trial enforcement — an organization with at least one active
-  subscription purchase is considered subscribed.
+  `subscription_status` represents a live paid subscription:
+  `active`, `trialing`, or `past_due` (the payment processor is
+  still retrying payment). Used for access checks and trial
+  enforcement — an organization with at least one active
+  subscription purchase is considered subscribed. Every other
+  stored status, including `ended`, `pending_cancel`,
+  `incomplete`, `incomplete_expired`, `canceled`, `unpaid`,
+  `paused`, and any status the system does not recognize, is not an
+  active subscription purchase.
 - **Known paid seat prices**: The set of payment processor price
   identifiers corresponding to the four seat pricing tiers (Teams
   monthly, Teams annual, Enterprise monthly, Enterprise annual).
@@ -112,7 +118,7 @@ supports only USD for seat billing.
   are exempt from trial expiration.
 - **Suppressed trial messaging**: An organization setting
   (`suppress_trial_messaging`) that, when enabled, treats the
-  organization as if it has an active subscription for trial
+  organization as if it has an active subscription purchase for trial
   enforcement purposes.
 - **Trial stages**: Progressive classifications of an
   organization's trial status based on the floored `daysRemaining`
@@ -131,16 +137,19 @@ their members access to the platform. Two plan tiers exist -- Teams
 and Enterprise -- each with distinct per-seat pricing. Both monthly
 and annual billing cycles are available for each tier, with annual
 billing discounted to 10 months' worth of the monthly rate (12 months
-for the price of 10). All self-service signups begin on the Enterprise
-plan with a 14-day free trial; users choose their plan tier (Teams or
-Enterprise) and billing cycle (monthly or annual) when converting to a
-paid subscription. Seat counts are tracked per organization and
-enforced against active members and pending invitations. Organizations
-without an active subscription operate under a time-limited free trial
-with escalating restrictions: informational banners, then a
-dismissible read-only lock, then a non-dismissible hard lock that
-blocks all server-side mutations. A "billing manager" role exists that
-grants billing access without consuming a seat.
+for the price of 10). Self-service creation of top-level organizations
+starts them on the Enterprise plan with a 14-day free trial; users
+choose their plan tier (Teams or Enterprise) and billing cycle (monthly
+or annual) when converting to a paid subscription. New child
+organizations start on their parent's plan at creation, whether Teams or
+Enterprise. Seat counts are tracked per organization and enforced
+against active members and pending invitations. Organizations without
+an active subscription purchase that are subject to trial enforcement
+operate under a time-limited free trial with escalating restrictions:
+informational banners, then a dismissible read-only lock, then a
+non-dismissible hard lock that blocks all server-side mutations. A
+"billing manager" role exists that grants billing access without
+consuming a seat.
 
 ## Rules
 
@@ -150,10 +159,12 @@ grants billing access without consuming a seat.
    Enterprise.
 2. The system MUST default the organization plan to Teams at the
    data layer when no plan is explicitly provided by the creation
-   flow. (Self-service creation always provides Enterprise; see
-   rule 3.)
-3. The self-service creation flow MUST create all new organizations
-   on the Enterprise plan with a 14-day free trial.
+   flow, even if a parent is specified. (Self-service creation of
+   top-level organizations explicitly provides Enterprise; see rule 3.
+   Child creation explicitly provides the parent's plan; see rule 10.)
+3. The self-service creation flow MUST create new top-level
+   organizations on the Enterprise plan with a 14-day free trial.
+   Child organizations follow rule 10 instead.
 4. The user MUST NOT be offered a choice of plan or billing cycle
    during trial creation; plan tier and billing cycle selection
    occurs only when converting to a paid subscription.
@@ -173,6 +184,12 @@ grants billing access without consuming a seat.
 9. If the organization later transitions back to Enterprise, the
    system MUST reactivate the previously stored Enterprise-only
    settings without requiring reconfiguration.
+10. When a new child organization is created, the system MUST create
+    it with its parent organization's current plan. This is a
+    one-time default at creation: later changes to the parent's plan
+    MUST NOT propagate to existing child organizations, attaching an
+    existing organization to a parent MUST NOT change its plan, and
+    the child's plan remains independently editable.
 
 ### Seat Pricing
 
@@ -384,6 +401,10 @@ grants billing access without consuming a seat.
    subscription. If two concurrent requests both pass the
    existing-schedule check, the second MUST fail rather than create
    a duplicate schedule.
+   When the payment processor confirms another active or pending
+   change for that same subscription, the losing request MUST return
+   a client-correctable error, not an internal server error, and MUST
+   leave the winning schedule unchanged.
 2. A billing cycle change MUST take effect at the next renewal date;
    it MUST NOT be applied immediately.
 3. The system MUST NOT prorate or issue immediate charges or credits
@@ -430,10 +451,11 @@ grants billing access without consuming a seat.
 ### Require-Seats Flag and Subscription Enforcement
 
 1. The system MUST treat organizations with the require-seats flag
-   set to false as having an active subscription for all access
-   checks (bypassing trial and subscription requirements).
+   set to false as having an active subscription purchase for all
+   access checks (bypassing trial and subscription requirements).
 2. The system MUST set the require-seats flag to true for all new
-   organization signups, including enterprise trials.
+   top-level organization signups, including Enterprise trials. When
+   creating a child organization, the system MUST set the flag to false.
 3. The system MUST allow platform administrators (users with the
    site-wide admin role) to manually set the require-seats flag to
    false for any organization at the administrator's discretion,
@@ -443,12 +465,13 @@ grants billing access without consuming a seat.
    when it either has require-seats disabled OR has an active
    subscription purchase.
 5. The system MUST classify an organization's status as "incomplete"
-   when it has require-seats enabled AND has no active subscription.
+   when it has require-seats enabled AND has no active subscription
+   purchase.
 
 ### Free Trial
 
-1. The system MUST place organizations without an active
-   subscription into a free trial period.
+1. Organizations without an active subscription purchase and subject
+   to trial enforcement MUST operate under a free trial period.
 2. The system MUST compute trial expiration from an explicit end
    date when set, or fall back to the organization creation date
    plus a configurable number of days (default: 14).
@@ -477,7 +500,7 @@ grants billing access without consuming a seat.
 8. The system MUST evaluate trial expiration status on every
    mutation request and MUST block server-side mutations with a
    forbidden error when the trial is currently hard-expired and no
-   active subscription exists.
+   active subscription purchase exists.
 9. The system MUST exempt organizations participating in the OSS
    sponsorship program (see Definitions) from trial expiration
    (never hard-locked).
@@ -596,6 +619,25 @@ in the current codebase:
    purchase records. (Currently records gross only.)
 
 ## Changelog
+
+### 2026-11-08 -- Active subscription purchase definition
+
+- Redefined "active subscription purchase" to the stored statuses
+  that represent a live paid subscription: `active`, `trialing`,
+  and `past_due` (payment is being retried). Read every other stored
+  status as not an active subscription purchase, so trial
+  enforcement stays in force.
+- Updated the Require-Seats and Free Trial rules that reference the
+  term, and the suppressed-trial-messaging definition, to the same
+  wording.
+
+### 2026-11-04 -- Child organization plan inheritance
+
+- Added Organization Plans rule 10: new child organizations are
+  created with their parent's current plan as a creation-time
+  default. Clarified the Teams data-layer default, scoped the
+  Enterprise trial default to top-level self-service creation, and
+  clarified seat and trial enforcement for new child organizations.
 
 ### 2026-05-28 -- Organization EFW review boundary
 

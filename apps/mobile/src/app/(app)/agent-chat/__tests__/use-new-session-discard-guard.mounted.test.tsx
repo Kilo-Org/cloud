@@ -18,6 +18,7 @@ import {
   pressDialogButton,
   renderedLabels,
   resetGuardHarness,
+  setPickerTopRoute,
   toastErrorMock,
   triggerPreventRemoveInAct,
   usePreventRemoveHolder,
@@ -27,6 +28,9 @@ import {
 describe('useNewSessionDiscardGuard', () => {
   beforeEach(() => {
     resetGuardHarness();
+    dispatchMock.mockImplementation(() => {
+      expect(usePreventRemoveHolder.preventRemove).toBe(false);
+    });
   });
 
   it.each(PLATFORMS)('guards the leave while the prompt is non-empty (%s)', os => {
@@ -88,22 +92,53 @@ describe('useNewSessionDiscardGuard', () => {
     });
   });
 
-  it('leaves without a confirm when the prompt is empty', () => {
+  it.each(PLATFORMS)('leaves an empty composer without cancelling native Back (%s)', os => {
+    platform.os = os;
     const { renderer } = mountGuard(false, noOpDiscard);
 
-    // The removal is held for every prompt state: a Back that lands while a
-    // picker is presenting arrives before this screen re-rendered, so the guard
-    // reads the live stack when the removal happens instead of at render.
-    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
-
-    const action = triggerPreventRemoveInAct();
-
-    // No picker above and nothing to lose: the leave is replayed unchanged.
-    expect(dispatchMock).toHaveBeenCalledTimes(1);
-    expect(dispatchMock).toHaveBeenCalledWith(action);
-    expect(alertMock).not.toHaveBeenCalled();
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
+    expect(dispatchMock).not.toHaveBeenCalled();
     expect(renderedLabels(renderer)).not.toContain('Discard draft?');
 
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('protects an opening picker and restores native Back after it closes', () => {
+    const { renderer } = mountGuard(false, noOpDiscard);
+
+    setPickerTopRoute('agent-chat/model-picker');
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
+    triggerPreventRemoveInAct();
+    expect(backMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).not.toHaveBeenCalled();
+
+    setPickerTopRoute('agent-chat/new');
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
+
+    setPickerTopRoute('agent-chat/repo-picker');
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
+    triggerPreventRemoveInAct();
+    expect(backMock).toHaveBeenCalledTimes(2);
+    expect(dispatchMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps protecting a draft after closing its picker', () => {
+    const { renderer } = mountGuardWithPicker(true);
+
+    triggerPreventRemoveInAct();
+    expect(backMock).toHaveBeenCalledTimes(1);
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+
+    setPickerTopRoute('agent-chat/new');
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
+    triggerPreventRemoveInAct();
+    expect(renderedLabels(renderer)).toContain('Discard draft?');
+    expect(dispatchMock).not.toHaveBeenCalled();
     act(() => {
       renderer.unmount();
     });

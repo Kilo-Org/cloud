@@ -1,4 +1,4 @@
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
@@ -64,12 +64,6 @@ export function getFallbackReasoningOptions(model: string): ReasoningOption[] | 
   }
   if (isStepModel(model)) {
     return effortOptions('low', 'medium', 'high');
-  }
-  if (model === 'stealth/glyph-cluster') {
-    return effortOptions('low', 'medium', 'high', 'xhigh');
-  }
-  if (model.startsWith('reflection/beam')) {
-    return effortOptions('low', 'medium', 'high', 'xhigh', 'max');
   }
   return undefined;
 }

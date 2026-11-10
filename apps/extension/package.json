@@ -11,7 +11,9 @@
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox --mv3",
     "e2e": "pnpm run e2e:chrome && pnpm run e2e:firefox",
-    "e2e:chrome": "VITE_POSTHOG_API_KEY=e2e-test-key pnpm run build && playwright test -c playwright.config.ts --grep-invert \"firefox build installs\"",
+    "e2e:build:chrome": "VITE_POSTHOG_API_KEY=e2e-test-key pnpm run build",
+    "e2e:chrome": "pnpm run e2e:build:chrome && pnpm run e2e:chrome:shard",
+    "e2e:chrome:shard": "playwright test -c playwright.config.ts --grep-invert \"firefox build installs\"",
     "e2e:debug": "pnpm run build && pnpm run build:firefox && playwright test -c playwright.config.ts --debug",
     "e2e:firefox": "echo 'Running Firefox extension e2e via Selenium/geckodriver' && tsx tests/e2e/firefox-selenium-e2e.ts",
     "e2e:local": "node scripts/run-e2e-local.mjs",
@@ -24,8 +26,8 @@
     "format:check": "pnpm -w exec oxfmt --list-different apps/extension",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "validate:firefox": "npx --loglevel error -y -p node@22 node ./node_modules/web-ext/bin/web-ext.js lint --source-dir .output/firefox-mv3 --no-input",
-    "verify": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test",
+    "validate:firefox": "web-ext lint --source-dir .output/firefox-mv3 --no-input",
+    "verify": "pnpm run typecheck && pnpm run lint && pnpm run test",
     "postinstall": "wxt prepare"
   },
   "dependencies": {

@@ -1,12 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
+import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import Sortable, { type SortableGridRenderItemInfo } from 'react-native-sortables';
 
 import { EmptyState } from '@/components/empty-state';
+import { ContextControl } from '@/components/context-control';
 import { useLiveSessionContext } from '@/components/home/live-session-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -14,12 +16,14 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { TodoListRow } from '@/components/todos/todo-list-row';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { ChevronDown, ChevronRight, ListTodo, Plus } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { IconButton } from '@/components/ui/icon-button';
+import { ChevronDown, History, ListTodo, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { todoListPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
@@ -48,6 +52,7 @@ function ListRowsSkeleton() {
 export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }>) {
   const { t } = useTranslation();
   const router = useRouter();
+  const sideInsetStyle = useSideInsetStyle();
   const colors = useThemeColors();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -90,7 +95,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
           .query(trpc.todos.items.list.queryOptions({ listId: list.id }))
           .catch(() => null);
         const deleteList = () => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
           remove.mutate({ id: list.id });
         };
         if (items?.length === 0) {
@@ -161,7 +166,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
             if (fromIndex === toIndex) {
               return;
             }
-            void Haptics.selectionAsync();
+            selectionHaptic();
             move.mutate({
               id: key,
               beforeId: data[toIndex - 1]?.id ?? null,
@@ -181,7 +186,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
             {showArchived ? (
               <ChevronDown size={16} color={colors.mutedForeground} />
             ) : (
-              <ChevronRight size={16} color={colors.mutedForeground} />
+              <DirectionalChevronRight size={16} color={colors.mutedForeground} />
             )}
             <Text variant="eyebrow">
               {t('todos.lists.archived', { count: archivedLists.length })}
@@ -210,16 +215,34 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
         title={t('common.agents')}
         size="large"
         showBackButton={false}
-        className="px-[22px]"
-        headerRight={
-          context.isReady ? (
-            <IconButton onPress={openNewList} accessibilityLabel={t('todos.lists.newList')}>
-              <Plus size={22} color={colors.foreground} />
+        className="px-[22px] pb-0"
+        inlineActions={
+          <View className="min-w-0 shrink flex-row items-center">
+            <View className="min-w-0 shrink">
+              <ContextControl />
+            </View>
+            <IconButton
+              accessibilityLabel={t('agents.sessionList.pastSessions')}
+              onPress={() => {
+                router.push('/(app)/(tabs)/(2_agents)/history' as Href);
+              }}
+            >
+              <History size={20} color={colors.mutedForeground} />
             </IconButton>
-          ) : undefined
+          </View>
         }
+        allowInlineActionsStacking={false}
       />
-      {tabHeader}
+      <View style={sideInsetStyle}>
+        <View className="mx-[22px] min-h-[48px] flex-row items-center justify-between border-b border-border">
+          {tabHeader}
+          {context.isReady ? (
+            <IconButton onPress={openNewList} accessibilityLabel={t('todos.lists.newList')}>
+              <Plus size={20} color={colors.foreground} />
+            </IconButton>
+          ) : null}
+        </View>
+      </View>
       <TabScreenScrollView>{body}</TabScreenScrollView>
       {dialog}
     </View>

@@ -14,8 +14,35 @@ import { reportTrpcError } from '@/lib/force-update-signal';
 import { reportAppError } from '@/lib/telemetry/app-error-reporting';
 import { isPermissionDeniedError, isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 
+const acceptedActiveSessionsDataSchema = z.object({
+  sessions: z.array(z.looseObject({ id: z.string() })),
+});
+
+/**
+ * The session ids of one accepted (non-manual) `activeSessions.list` result,
+ * read defensively: a later refactor of the router's output shape must leave
+ * the metadata without provenance (surfaces resolve empty) instead of
+ * crashing every observer of the query cache.
+ */
+function acceptedActiveSessionsRowIds(data: unknown): readonly string[] {
+  const parsed = acceptedActiveSessionsDataSchema.safeParse(data);
+  if (parsed.success) {
+    return parsed.data.sessions.map(row => row.id);
+  }
+  return [];
+}
+
 export type ActiveSessionsQueryMetadata = Readonly<{
   acceptedRevision: number;
+  /**
+   * The session ids the last accepted (non-manual) server answer listed. A
+   * later manual cache write (a socket write, the floor poll) replaces the
+   * cache without a server answer, so this set is what an empty live cache is
+   * compared against: cache empty while these are still listed means the
+   * emptiness was never confirmed by the server, and the surface keeps its
+   * last rows from the query cache until the confirmation answer lands.
+   */
+  acceptedSessionIds: ReadonlySet<string>;
   terminalError: Readonly<{
     error: unknown;
     kind: 'retryable' | 'non-retryable';
@@ -24,8 +51,10 @@ export type ActiveSessionsQueryMetadata = Readonly<{
 
 // Old/manual-only cache entries have no server provenance. They cannot establish
 // empty success; keep this fallback while those entries can occur.
+const EMPTY_SESSION_ID_SET: ReadonlySet<string> = new Set();
 const EMPTY_ACTIVE_SESSIONS_METADATA: ActiveSessionsQueryMetadata = {
   acceptedRevision: 0,
+  acceptedSessionIds: EMPTY_SESSION_ID_SET,
   terminalError: null,
 };
 const activeSessionsMetadata = new WeakMap<Query, ActiveSessionsQueryMetadata>();
@@ -67,6 +96,20 @@ export function captureActiveSessionsQueryRefresh(client: QueryClient, queryKey:
   };
 }
 
+/**
+ * True once this scope settled on something the server said: an accepted
+ * `activeSessions.list` result, or a failure its surface can retry. A socket
+ * write alone establishes neither — it is a manual cache write, so a scope
+ * whose only traffic is socket writes has no outcome and keeps painting its
+ * loading placeholder.
+ */
+export function hasActiveSessionsServerOutcome(client: QueryClient, queryKey: QueryKey): boolean {
+  const metadata = getActiveSessionsQueryMetadata(
+    client.getQueryCache().build(client, { queryKey })
+  );
+  return metadata.acceptedRevision > 0 || metadata.terminalError !== null;
+}
+
 /** Keep canceled account/attachment work out of Query's success reducer. */
 export function fenceActiveSessionsQuery<TData, TKey extends QueryKey>(
   queryFn: QueryFunction<TData, TKey>,
@@ -101,6 +144,7 @@ function observeActiveSessionsQueryOutcomes(queryCache: QueryCache): void {
     ) {
       activeSessionsMetadata.set(query, {
         acceptedRevision: previous.acceptedRevision + 1,
+        acceptedSessionIds: new Set(acceptedActiveSessionsRowIds(event.action.data)),
         terminalError: null,
       });
     } else if (
@@ -225,7 +269,7 @@ export function createKiloAppQueryClient(): QueryClient {
         // (invalidateQueries, refetchQueries, refetchInterval, pull-to-refresh)
         // still refetches, and call sites that pass `staleTime: 0` still override.
         staleTime: DEFAULT_QUERY_STALE_TIME_MS,
-        // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also woke frozen background tabs.
+        // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also refetched unfocused tabs.
         refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
           const code = (error as { data?: { code?: string } } | null)?.data?.code;

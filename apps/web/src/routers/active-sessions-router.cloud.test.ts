@@ -698,7 +698,9 @@ describe('active-sessions-router.list cloud merge', () => {
     expect(result.sessions[0]?.status).toBe('question');
   });
 
-  it('worker fetch failure + flag on → cloud rows still returned', async () => {
+  it('worker fetch failure + flag on → a user with live rows still gets them', async () => {
+    // The merged answer is what decides: with a live cloud row the read is
+    // complete enough to return, so the tray keeps the row the DB can prove.
     const sessionId = nextId('worker-fail');
     const casId = nextId('cas');
     await seedCloudSession({
@@ -711,9 +713,28 @@ describe('active-sessions-router.list cloud merge', () => {
 
     fetchSpy = mockWorkerFailure();
     const caller = await createCallerForUser(regularUser.id);
-    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
 
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
     expect(result.sessions.map(s => s.id)).toEqual([sessionId]);
+  });
+
+  it('worker fetch failure + flag on → nothing provable reads as a retryable failure', async () => {
+    // An unreadable worker answers "no live rows", which the wire cannot tell
+    // from a user with nothing running and the app would report a live CLI
+    // session as gone across a worker restart. Fail the answer instead.
+    fetchSpy = mockWorkerFailure();
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(
+      caller.activeSessions.list({ includeCloudAgentSessions: true })
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+  });
+
+  it('worker fetch failure without the cloud flag keeps the legacy empty answer', async () => {
+    fetchSpy = mockWorkerFailure();
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(caller.activeSessions.list({})).resolves.toEqual({ sessions: [] });
   });
 
   it('flag on + no heartbeat ids → cloud-only response (no empty inArray)', async () => {

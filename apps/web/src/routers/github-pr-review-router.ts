@@ -35,6 +35,8 @@ import {
   CONVERSATION_COMMENTS_MAX_PAGES,
   CONVERSATION_COMMENTS_PAGE_SIZE,
   FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
   FILES_MAX_PAGES,
   FILES_PAGE_SIZE,
   INBOX_PAGE_SIZE,
@@ -1114,6 +1116,8 @@ export async function assertTermsAccepted(userId: string): Promise<void> {
  * - `duplicate_in_flight` / `duplicate_reconcile_in_progress`: CONFLICT
  *   `operation_in_progress` (never re-execute).
  * - `takeover` / `duplicate_reconcile_pending`: reconcile before any effect.
+ * - `organization_mismatch`: CONFLICT `operation_key_reuse_mismatch`; the row
+ *   was admitted in another organization scope and carries no row.
  *
  * The ledger identity is `(user, domain, operation_key)`, so `admitOperation`
  * returns the row for that key regardless of intent. Before ANY outcome is
@@ -1134,6 +1138,10 @@ async function runPrLedgerMutation<T>(
     taxonomy: 'reconcile-first',
     leaseSeconds: PR_LEDGER_LEASE_SECONDS,
   });
+
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: PR_OPERATION_KEY_REUSE_MISMATCH_MESSAGE });
+  }
 
   if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
     throw new TRPCError({
@@ -1663,6 +1671,20 @@ async function assertViewerOwnsComment(args: {
   return 'owned';
 }
 
+/**
+ * One file read behind `getFileLines` holds at most the shared byte budget,
+ * whichever observation of the blob supplies the number. A file above it is a
+ * typed `PAYLOAD_TOO_LARGE` rejection; a window is never truncated.
+ */
+function assertFileWithinReadBudget(bytes: number): void {
+  if (bytes > FILE_READ_MAX_BYTES) {
+    throw new TRPCError({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: FILE_READ_TOO_LARGE_MESSAGE,
+    });
+  }
+}
+
 // One page of a REST listing, plus the provider's own "there is more" signal:
 // `Link: rel="next"` is present exactly while another page exists.
 type CheckListPage = { items: unknown[]; linkHasNext: boolean | undefined };
@@ -1831,20 +1853,52 @@ export const githubPrReviewRouter = createTRPCRouter({
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
-        const response = await octokit.repos.getContent({
+        // The window is capped at FILE_LINES_MAX lines and the body at
+        // FILE_READ_MAX_BYTES. The contents metadata reports the blob size and,
+        // for a blob inside GitHub's inline limit, carries the body itself, so
+        // one request answers the read; only a body the metadata leaves out is
+        // fetched from the raw endpoint, and either body is measured against
+        // the budget before any line is sliced.
+        const metadata = await octokit.repos.getContent({
           owner: input.owner,
           repo: input.repo,
           path: input.path,
           ref: input.ref,
-          mediaType: { format: 'raw' },
         });
-        const data = response.data as unknown;
-        if (typeof data !== 'string') {
+        const entry = metadata.data as unknown;
+        if (Array.isArray(entry)) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Requested path is not a file',
           });
         }
+        const { size, encoding, content } = (entry ?? {}) as {
+          size?: number;
+          encoding?: string;
+          content?: string;
+        };
+        assertFileWithinReadBudget(typeof size === 'number' ? size : 0);
+        let data: string;
+        if (encoding === 'base64' && typeof content === 'string') {
+          data = Buffer.from(content, 'base64').toString('utf8');
+        } else {
+          const response = await octokit.repos.getContent({
+            owner: input.owner,
+            repo: input.repo,
+            path: input.path,
+            ref: input.ref,
+            mediaType: { format: 'raw' },
+          });
+          const raw = response.data as unknown;
+          if (typeof raw !== 'string') {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Requested path is not a file',
+            });
+          }
+          data = raw;
+        }
+        assertFileWithinReadBudget(Buffer.byteLength(data));
         const cappedEnd = Math.min(input.endLine, input.startLine + FILE_LINES_MAX - 1);
         return sliceFileLines({
           rawContent: data,

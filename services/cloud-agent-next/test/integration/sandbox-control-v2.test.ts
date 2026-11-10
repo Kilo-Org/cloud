@@ -13,17 +13,13 @@ import {
   verifySandboxLaunchCredential,
 } from '../../src/sandbox-control/credential.js';
 import { CONTROL_PLANE_PROTOCOL_VERSION } from '../../src/shared/control-plane-protocol.js';
+import type { RuntimeSkillInput } from '../../src/shared/runtime-profile.js';
 import type { Env } from '../../src/types.js';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  clearBillingContext,
-  getBillingContext,
-  updateBillingContext,
-  type ContainerUsageRpcMethods,
-} from '@kilocode/container-usage';
+import { type ContainerUsageRpcMethods } from '@kilocode/container-usage';
 import type {
   SandboxControlV2,
   StoredProviderPin,
@@ -32,12 +28,6 @@ import {
   allocation as allocationTable,
   routes as routesTable,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
-import { listScopeGrants, writeScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
-import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
-import {
-  buildControlNetworkPolicy,
-  type SessionCredentialGrant,
-} from '../../src/sandbox-control/session-credentials.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -45,13 +35,10 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
-import {
-  ContainerCapacityUnavailableError,
-  ContainerConcurrencyLimitError,
-} from '../../src/container-concurrency.js';
-import { VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/sandbox-control/vercel-billing.js';
-import { encodeVercelProviderRef } from '../../src/sandbox-control/vercel-provider.js';
-import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
+import { ContainerCapacityUnavailableError } from '../../src/container-concurrency.js';
+import { containerLimitError } from '../../src/container-limit-test-helpers.js';
+import { BILLING_HEARTBEAT_CALLBACK as VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/metered-billing-lifecycle.js';
+import { encodeCloudflareProviderRef } from '../../src/sandbox-control/provider-ref.js';
 import type { ContainersLaunchInput } from '../../src/sandbox-containers/SandboxContainers.js';
 import {
   VERCEL_BILLING_SCHEDULE_KEY,
@@ -80,49 +67,13 @@ type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
   .SANDBOX_CONTROL;
 
-const GRANT_TARGET = 'https://worker.example.com';
-/** Kilo token that decodes to `runtimeAuthorization`, enabling the runtime proxy. */
+/** Test token with a runtime authorization claim, enabling the runtime proxy. */
 const RUNTIME_AUTHORIZED_KILO_TOKEN =
   'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
-const GRANT_MEMBER = {
-  sessionId: 'workspace_11111111-1111-1111-1111-111111111111',
-  kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
-};
-
-/** A schema-valid contained Vercel grant carrying a bound runtime-proxy handle. */
-function containedGrant(
-  sandboxId: string,
-  options: { scopeId: string; handle: string; preparedAt: number; expiresAt: number }
-): SessionCredentialGrant {
-  const targets = {
-    backendBaseUrl: GRANT_TARGET,
-    providerBaseUrl: GRANT_TARGET,
-    sessionIngestBaseUrl: GRANT_TARGET,
-  };
-  return {
-    version: 1,
-    containmentEnabled: true,
-    scopeId: options.scopeId,
-    sandboxId,
-    directory: `/workspace/${options.scopeId}`,
-    userId: 'owner-1',
-    provider: 'vercel',
-    outboundContainerId: 'outbound-1',
-    members: [{ ...GRANT_MEMBER }],
-    kilo: {
-      alias: createControlPlaneCredential(sandboxId, 'kilo'),
-      token: RUNTIME_AUTHORIZED_KILO_TOKEN,
-      targets,
-      runtimeProxy: { targets, members: [{ ...GRANT_MEMBER, handle: options.handle }] },
-      capabilities: {},
-    },
-    preparedAt: options.preparedAt,
-    expiresAt: options.expiresAt,
-  };
-}
 
 type FakeProviderOptions = {
   failFirstCreate?: boolean;
+  failFirstLaunch?: string;
   gateCreate?: boolean;
   gateLaunch?: boolean;
   gateStop?: boolean;
@@ -175,6 +126,9 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
     },
     async launch(_ref, { env }) {
       provider.launchEnvs.push({ ...env });
+      if (options.failFirstLaunch !== undefined && provider.launchEnvs.length === 1) {
+        throw new Error(options.failFirstLaunch);
+      }
       if (options.gateLaunch) {
         await new Promise<void>((resolve, reject) => {
           provider.launchGates.push(error => (error === undefined ? resolve() : reject(error)));
@@ -213,10 +167,15 @@ type StartOptions = {
   configuration?: SandboxProviderConfiguration;
   meter?: ContainerUsageRpcMethods;
   preparingRoute?: string;
+  preparingRouteDeadlineAt?: number;
   admissionError?: string;
+  billingAdmissionMs?: number;
   egressMode?: EgressMode;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
   sandboxKind?: StoredProviderPin['sandboxKind'];
+  /** Shrink sandbox timers (e.g. `providerCreateMs`) for expiry tests. */
+  timers?: Partial<typeof TIMERS>;
 };
 
 /** Injects the fake adapter, then triggers `ensure` through a real DO RPC so
@@ -230,50 +189,43 @@ async function startAllocation(
   await runInDurableObject(stub, async (instance, state) => {
     await instance.getAllocationState();
     if (options.meter !== undefined) await state.storage.put('control_plane_owner', 'owner-1');
-    const realAdmission = (
-      instance as unknown as { admitVercelCreate(pin: unknown): Promise<unknown> }
-    ).admitVercelCreate.bind(instance);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
+      ...(options.billingAdmissionMs === undefined
+        ? {}
+        : { sandboxTimers: () => ({ ...TIMERS, billingAdmissionMs: options.billingAdmissionMs }) }),
       ...(options.meter === undefined
         ? {}
-        : { env: { ...instance.env, CONTAINER_USAGE_METER: options.meter } }),
-      ...(options.admissionError === undefined
+        : {
+            env: {
+              ...instance.env,
+              ...(options.meter === undefined ? {} : { CONTAINER_USAGE_METER: options.meter }),
+            },
+          }),
+      ...(options.timers === undefined
         ? {}
-        : options.admissionError === 'hang'
-          ? {
-              admitVercelCreate: () => new Promise(() => undefined),
-              sandboxTimers: () => ({ ...TIMERS, providerStopAttemptMs: 20 }),
-            }
-          : options.admissionError === 'throw-after-open'
-            ? {
-                admitVercelCreate: async (pin: unknown) => {
-                  await realAdmission(pin);
-                  throw new Error('Meter response lost after context write');
-                },
-              }
-            : {
-                admitVercelCreate: async () => {
-                  throw new Error(options.admissionError);
-                },
-              }),
+        : { sandboxTimers: () => ({ ...TIMERS, ...options.timers }) }),
     });
   });
   if (options.preparingRoute !== undefined) {
     await insertPreparingRoute(stub, {
       sessionId: options.preparingRoute,
-      attemptDeadlineAt: Date.now() + MINUTE,
+      attemptDeadlineAt: options.preparingRouteDeadlineAt ?? Date.now() + MINUTE,
     });
   }
   await stub.ensureAllocation({
-    provider: options.provider ?? 'cloudflare',
+    provider: options.provider ?? 'cloudflare-containers',
+    ...(options.provider === 'vercel'
+      ? { byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' } }
+      : {}),
     ...(options.configuration === undefined ? {} : { configuration: options.configuration }),
     allocationName: options.allocationName ?? sandboxId,
     ...(options.billing === undefined ? {} : { billing: options.billing }),
     ...(options.containment === undefined ? {} : { containment: options.containment }),
     ...(options.egressMode === undefined ? {} : { egressMode: options.egressMode }),
     ...(options.egressAllowlist === undefined ? {} : { egressAllowlist: options.egressAllowlist }),
+    ...(options.egressAudit === undefined ? {} : { egressAudit: options.egressAudit }),
     ...(options.sandboxKind === undefined ? {} : { sandboxKind: options.sandboxKind }),
   });
   return stub;
@@ -475,6 +427,69 @@ afterEach(async () => {
 
 describe('SandboxControlV2 allocation lifecycle', () => {
   it.each([
+    { stage: 'create', failure: { failFirstCreate: true } },
+    { stage: 'launch', failure: { failFirstLaunch: 'transient launch failure' } },
+  ])(
+    'refreshes the durable Vercel name after a $stage failure and retry tick',
+    async ({ failure }) => {
+      const provider = createFakeProvider(failure);
+      const stub = await startAllocation(provider, {
+        provider: 'vercel',
+        preparingRoute: 'workspace_vercel_retry',
+      });
+      await waitFor(() => expect(provider.createInputs).toHaveLength(1));
+      const first = provider.createInputs[0];
+      if (!first) throw new Error('Missing first Vercel create');
+      await waitFor(async () => {
+        const state = await readState(stub);
+        expect(state.kind).toBe('creating');
+        expect(state.allocationId).not.toBe(first.intentId);
+        expect(state.providerRef).toBeNull();
+      });
+      const waiting = await readState(stub);
+      expect(JSON.parse((await readProviderPin(stub)) ?? '{}').allocationName).toBe(
+        `sbx-${waiting.allocationId?.replaceAll('-', '')}`
+      );
+
+      await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+      await runAlarm(stub);
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+      expect(provider.createInputs).toHaveLength(2);
+      const second = provider.createInputs[1];
+      if (!second) throw new Error('Missing retried Vercel create');
+      expect(second.intentId).not.toBe(waiting.allocationId);
+      expect(second.allocationName).toBe(`sbx-${second.intentId.replaceAll('-', '')}`);
+      expect(second.allocationName).not.toBe(first.allocationName);
+      expect((await stub.status({ sessionId: 'workspace_vercel_retry' })).view.state).not.toBe(
+        'failed'
+      );
+      await evictAllDurableObjects();
+      expect(JSON.parse((await readProviderPin(stub)) ?? '{}').allocationName).toBe(
+        second.allocationName
+      );
+    }
+  );
+
+  it('uses a new durable Vercel sandbox name for each allocation', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, { provider: 'vercel' });
+    await awaitStarting(provider, stub);
+    const first = provider.createInputs[0];
+    if (!first) throw new Error('Missing first Vercel create');
+    await stub.reportProviderGone();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    await startAllocation(provider, { provider: 'vercel' });
+    await waitFor(() => expect(provider.createInputs).toHaveLength(2));
+    const second = provider.createInputs[1];
+    expect(second?.allocationName).not.toBe(first.allocationName);
+    const saved = JSON.parse((await readProviderPin(stub)) ?? '{}');
+    expect(saved.allocationName).toBe(second?.allocationName);
+    await evictAllDurableObjects();
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').allocationName).toBe(
+      second?.allocationName
+    );
+  });
+  it.each([
     { provider: 'cloudflare' },
     { provider: 'cloudflare-containers' },
     { provider: 'cloudflare-containers', instance: 'standard-3' },
@@ -645,48 +660,75 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     );
   });
 
-  it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
-    'does not call the %s provider when database admission is unavailable',
-    async providerKind => {
-      const sandboxId = `ses-${'b'.repeat(48)}`;
-      const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
-      const stub = sandboxNamespace.getByName(sandboxId);
-      await runInDurableObject(stub, instance => {
-        Object.assign(instance, {
-          env: {
-            ...instance.env,
-            CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'false',
-            HYPERDRIVE: undefined,
-          },
-        });
-      });
-      const provider = createFakeProvider();
-      await startAllocation(provider, {
-        sandboxId,
-        provider: providerKind,
-        preparingRoute: sessionId,
-        billing: {
-          sandboxId,
-          subject: { type: 'user', id: 'owner-1' },
-          actor: { type: 'user', id: 'owner-1' },
-          sessionId,
-          metadata: { origin: 'cloud-agent' },
-        },
-      });
-      await waitFor(async () =>
-        expect((await stub.status({ sessionId })).view).toMatchObject({
-          state: 'failed',
-          reason: 'billing_unavailable',
-        })
-      );
-      expect((await readState(stub)).kind).not.toBe('creating');
-      expect(provider.createCalls).toBe(0);
-      expect(provider.launchEnvs).toHaveLength(0);
-    }
-  );
+  it('fails a persisted retired Cloudflare pin after eviction without retrying or waiting for the route deadline', async () => {
+    const sandboxId = 'sbx__retired_pin_after_eviction';
+    const provider = createFakeProvider({ failFirstCreate: true });
+    const stub = await startAllocation(provider, {
+      sandboxId,
+      provider: 'cloudflare',
+    });
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').provider).toBe('cloudflare');
+
+    await evictAllDurableObjects();
+
+    const sessionId = 'workspace_retired_pin';
+    await insertPreparingRoute(stub, {
+      sessionId,
+      attemptDeadlineAt: Date.now() + MINUTE,
+    });
+    const directPrepare = {
+      spec: {
+        sessionId,
+        kiloSessionId: `kilo-${sessionId}`,
+        directory: `/workspace/${sessionId}`,
+        attemptId: `${sessionId}-a1`,
+      },
+      credentials: {
+        userId: 'owner-1',
+        kiloSessionId: `kilo-${sessionId}`,
+        kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
+      },
+    };
+    expect(await stub.prepare(directPrepare)).toMatchObject({ state: 'preparing' });
+
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId })).view).toMatchObject({
+        state: 'failed',
+        reason: 'invalid_configuration',
+      })
+    );
+    const stopped = await readState(stub);
+    expect(stopped.kind).toBe('stopped');
+    expect(stopped.allocationId).toBeNull();
+    expect(await readAlarm(stub)).toBeNull();
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').provider).toBe('cloudflare');
+    expect(await stub.getProviderRuntime()).toEqual({
+      provider: 'cloudflare',
+      allocationName: sandboxId,
+    });
+    expect((await stub.getStatusSnapshot()).provider).toBe('Cloudflare');
+  });
+
+  it('fails a container limit denial from the sandbox start without retrying the create', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await releaseGate(stub, () =>
+      provider.launchGates[0](new Error(`remote: ${containerLimitError('user', 20).message}`))
+    );
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'container_limit_reached',
+      })
+    );
+    await waitFor(async () => expect((await readState(stub)).kind).not.toBe('creating'));
+    expect(provider.createCalls).toBe(1);
+  });
 
   it.each([
-    [new ContainerConcurrencyLimitError('personal', 20), 'container_limit_reached'],
+    [containerLimitError(), 'container_limit_reached'],
     [new ContainerCapacityUnavailableError(), 'billing_unavailable'],
   ] as const)(
     'fails capacity denial from the sandbox start without retrying creation: %s',
@@ -707,6 +749,361 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       expect(provider.createCalls).toBe(1);
     }
   );
+
+  it('does not reopen native admission after an alarm fails a retry during preflight', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      throw new ProviderCreationError('meter_unavailable');
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    await waitFor(async () => {
+      await runInDurableObject(stub, instance => {
+        expect((instance as unknown as { createInFlight: boolean }).createInFlight).toBe(false);
+      });
+    });
+    let releasePreflight: () => void = () => {};
+    let enteredPreflight = false;
+    const preflight = new Promise<void>(resolve => {
+      releasePreflight = resolve;
+    });
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        wrapperLaunchEnv: async () => {
+          enteredPreflight = true;
+          await preflight;
+          return {};
+        },
+      });
+    });
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(enteredPreflight).toBe(true));
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sessionPeerFor: () => ({
+          notify: async () => {
+            releasePreflight();
+            // Permit the off-queue create continuation to run during notification.
+            for (let i = 0; i < 10; i++) await Promise.resolve();
+          },
+        }),
+      });
+    });
+    try {
+      await runInDurableObject(stub, async (_instance, state) => {
+        const saved = await state.storage.get<{ attemptId: string }>(
+          'native_billing_admission_deadline'
+        );
+        await state.storage.put('native_billing_admission_deadline', {
+          ...saved,
+          deadlineAt: Date.now() - 1,
+        });
+      });
+      await runAlarm(stub);
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+      });
+    } finally {
+      await releaseGate(stub, releasePreflight);
+    }
+    await waitFor(async () => {
+      await runInDurableObject(stub, instance => {
+        expect((instance as unknown as { createInFlight: boolean }).createInFlight).toBe(false);
+      });
+    });
+    expect(provider.createCalls).toBe(1);
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('skips native admission when its deadline has no useful time left', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 500,
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+      })
+    );
+    expect(provider.createCalls).toBe(0);
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('bounds stopping retries without reporting a billing admission failure', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      throw new ProviderCreationError('stopping');
+    };
+    const startedAt = Date.now();
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 1_500,
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    await waitFor(async () => {
+      expect(
+        await runInDurableObject(stub, (_instance, state) =>
+          state.storage.get('native_billing_admission_deadline')
+        )
+      ).toBeUndefined();
+    });
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, startedAt + 1_600 - Date.now())));
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+      state: 'failed',
+      reason: 'sandbox_create_failed',
+    });
+    expect((await stub.status({ sessionId: 'waiting' })).view).not.toHaveProperty('billingFailure');
+  });
+
+  it('reconstructs the stored in-flight admission deadline without extending it', async () => {
+    const provider = createFakeProvider();
+    let rejectCreate: (error: Error) => void = () => {};
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      return new Promise((_resolve, reject) => {
+        rejectCreate = reject;
+      });
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 30_000,
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    const deadline = await runInDurableObject(stub, async (_instance, state) => {
+      const saved = await state.storage.get<{ attemptId: string; deadlineAt: number }>(
+        'native_billing_admission_deadline'
+      );
+      expect(saved).toBeDefined();
+      expect(await state.storage.getAlarm()).toBe(saved?.deadlineAt);
+      const allocation = drizzle(state.storage).select().from(allocationTable).get();
+      return { saved, allocation };
+    });
+    // Eviction waits for waitUntil tasks in this harness. Restore the captured
+    // durable in-flight state after draining the task, then reconstruct it.
+    await runInDurableObject(stub, () => {
+      rejectCreate(new ProviderCreationError('meter_unavailable'));
+    });
+    await waitFor(async () => {
+      await runInDurableObject(stub, instance => {
+        expect((instance as unknown as { createInFlight: boolean }).createInFlight).toBe(false);
+      });
+    });
+    await runInDurableObject(stub, async (_instance, state) => {
+      if (!deadline.allocation) throw new Error('Missing allocation snapshot');
+      drizzle(state.storage).update(allocationTable).set(deadline.allocation).run();
+    });
+    await evictDurableObject(stub);
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      expect(await state.storage.getAlarm()).toBe(deadline.saved?.deadlineAt);
+      await state.storage.put('native_billing_admission_deadline', {
+        ...deadline.saved,
+        deadlineAt: Date.now() - 1,
+      });
+    });
+    await runAlarm(stub);
+    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+      state: 'failed',
+      reason: 'billing_unavailable',
+    });
+    expect(provider.createCalls).toBe(1);
+  });
+
+  it('retries a transient native meter outage within the original preparation attempt', async () => {
+    const provider = createFakeProvider();
+    const create = provider.adapter.create;
+    provider.adapter.create = async intent => {
+      if (provider.createCalls === 0) {
+        provider.createCalls += 1;
+        throw new ProviderCreationError('meter_unavailable');
+      }
+      return create(intent);
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      preparingRouteDeadlineAt: Date.now() + TIMERS.routePreparationMs,
+    });
+    await waitFor(async () => {
+      const state = await readState(stub);
+      expect(provider.createCalls).toBe(1);
+      expect(state.createDeadlineAt).toBeLessThan(Date.now() + TIMERS.providerCreateMs);
+    });
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    expect(provider.createCalls).toBe(2);
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+  });
+
+  it('reports billing unavailable when immediate meter failures exhaust native create retries', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      throw new ProviderCreationError('meter_unavailable');
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billing: {
+        sandboxId: SANDBOX_ID,
+        subject: { type: 'user', id: 'owner-1' },
+        actor: { type: 'user', id: 'owner-1' },
+        sessionId: 'waiting',
+        metadata: { origin: 'cloud-agent' },
+      },
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    const deadline = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.get<{ deadlineAt: number }>('native_billing_admission_deadline')
+    );
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+        billingFailure: {
+          code: 'BILLING_UNAVAILABLE',
+          payer: { type: 'user', id: 'owner-1' },
+          retryable: true,
+        },
+      })
+    );
+    expect(provider.createCalls).toBe(2);
+    expect(provider.launchEnvs).toHaveLength(0);
+    expect(Date.now()).toBeLessThan(deadline?.deadlineAt ?? 0);
+  });
+
+  it('bounds a hanging native admission and permits a fresh preparation after recovery', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async intent => {
+      provider.createCalls += 1;
+      provider.createInputs.push(intent);
+      return new Promise(() => {});
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 1_500,
+      billing: {
+        sandboxId: SANDBOX_ID,
+        subject: { type: 'user', id: 'owner-1' },
+        actor: { type: 'user', id: 'owner-1' },
+        sessionId: 'waiting',
+        metadata: { origin: 'cloud-agent' },
+      },
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+        billingFailure: {
+          code: 'BILLING_UNAVAILABLE',
+          payer: { type: 'user', id: 'owner-1' },
+          retryable: true,
+        },
+      })
+    );
+    expect(provider.launchEnvs).toHaveLength(0);
+
+    provider.adapter.create = async intent => ({ providerRef: `mem_${intent.intentId}` });
+    await insertPreparingRoute(stub, {
+      sessionId: 'recovered',
+      attemptDeadlineAt: Date.now() + TIMERS.routePreparationMs,
+    });
+    await stub.ensureAllocation({
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+  });
+
+  it('keeps the first native admission deadline when a later retry hangs', async () => {
+    const provider = createFakeProvider();
+    provider.adapter.create = async () => {
+      provider.createCalls += 1;
+      if (provider.createCalls === 1) throw new ProviderCreationError('meter_unavailable');
+      return new Promise(() => {});
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      billingAdmissionMs: 2_000,
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(1));
+    const deadline = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.get<{ deadlineAt: number }>('native_billing_admission_deadline')
+    );
+    expect(deadline).toBeDefined();
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'billing_unavailable',
+      })
+    );
+    expect(provider.createCalls).toBe(2);
+    expect(Date.now()).toBeLessThan((deadline?.deadlineAt ?? 0) + 1_000);
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('gives healthy admission a fresh budget after a nonbilling startup retry', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const create = provider.adapter.create;
+    provider.adapter.create = async intent => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+      return create(intent);
+    };
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+      preparingRouteDeadlineAt: Date.now() + TIMERS.routePreparationMs - 90_000,
+    });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await releaseGate(stub, () => provider.launchGates[0](new Error('Transient startup failure')));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('creating'));
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get('native_billing_admission_deadline')
+      )
+    ).toBeUndefined();
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.launchGates).toHaveLength(2));
+    expect(provider.createCalls).toBe(2);
+    await releaseGate(stub, () => provider.launchGates[1]());
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+  });
 
   it('ignores a permanent late launch rejection after hello has acquired the allocation', async () => {
     const provider = createFakeProvider({ gateLaunch: true });
@@ -729,6 +1126,55 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
     expect((await stub.status({ sessionId: 'sibling' })).view.state).toBe('ready');
     expect(provider.stopCalls).toEqual([]);
+    wrapper.close();
+  });
+
+  it('routes a fenced native billing stop through the allocation owner with recovery details', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      provider: 'cloudflare-containers',
+      configuration: { provider: 'cloudflare-containers', instance: 'standard-4' },
+      preparingRoute: 'waiting',
+    });
+    const updates: unknown[] = [];
+    await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put('control_plane_owner', 'owner-1');
+      Object.assign(instance, {
+        sessionPeerFor: () => ({
+          onRoute: async (update: unknown) => {
+            updates.push(update);
+          },
+        }),
+      });
+    });
+    await awaitStarting(provider, stub);
+    const { wrapper } = await connectAndHello(provider, stub);
+    wrapper.send({ type: 'session.ready', sessionId: 'waiting' });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('ready')
+    );
+    const billingFailure = {
+      code: 'INSUFFICIENT_CREDITS' as const,
+      payer: { type: 'user' as const, id: 'owner-1' },
+      retryable: true,
+      remainingMicrodollars: 4_000_000,
+      minimumRequiredMicrodollars: 5_000_000,
+    };
+    await stub.requestBillingStop({ allocationRef: 'stale-ref', billingFailure });
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+
+    await stub.requestBillingStop({ allocationRef: provider.refs[0], billingFailure });
+    await waitFor(() =>
+      expect(updates).toContainEqual({
+        state: 'lost',
+        attemptId: expect.any(String),
+        reason: 'billing_blocked',
+        billingFailure,
+      })
+    );
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+    expect((await readState(stub)).kind).not.toBe('connected');
     wrapper.close();
   });
 
@@ -1203,6 +1649,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         const socket = {
           readyState: WebSocket.OPEN,
           deserializeAttachment: () => attachment,
+          serializeAttachment: (next: object) => Object.assign(attachment, next),
           send,
         } as unknown as WebSocket;
         const target = instance as unknown as { applyEvent(event: unknown): Promise<void> };
@@ -1232,7 +1679,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
 
     const starting = await readState(stub);
-    expect(starting.provider).toBe('cloudflare');
+    expect(starting.provider).toBe('cloudflare-containers');
     expect(await readAlarm(stub)).toBe(starting.firstConnectDeadlineAt);
 
     const { credential, allocationId } = launchIdentity(provider);
@@ -1256,7 +1703,11 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await awaitLaunch(provider);
 
     expect(provider.createInputs[0]?.billing).toEqual(billing);
-    expect(provider.createInputs[0]?.containment).toEqual({ kilocode: true });
+    expect(provider.createInputs[0]?.containment).toEqual({
+      kilocode: true,
+      github: true,
+      worktreeScoped: true,
+    });
   });
 
   it('stops the sandbox when the wrapper never connects within the first-connect window', async () => {
@@ -1737,6 +2188,37 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     }
   );
 
+  it('reports versions observed at upgrade for a Vercel allocation with an unknown type', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, { provider: 'vercel' });
+    await awaitLaunch(provider);
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_owner', 'owner-1')
+    );
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      kiloCliVersion: '7.4.20',
+      wrapperVersion: '2.4.0',
+    });
+    expect(await wrapper.hello({ wrapperId: 'wr_vercel', allocationId })).toMatchObject({
+      type: 'welcome',
+    });
+
+    expect(await stub.getStatusSnapshot()).toMatchObject({
+      provider: 'Vercel',
+      runtime: {
+        sandboxType: 'unknown',
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+        startedAt: null,
+        stoppedAt: null,
+      },
+    });
+    wrapper.close();
+  });
+
   it.each([
     { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
     { provider: 'vercel', resources: { vcpus: 4, memory: 8192 } },
@@ -1748,11 +2230,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       provider: configuration.provider,
       configuration,
     });
-    if (configuration.provider === 'cloudflare-containers') {
-      await awaitStarting(provider, stub);
-    } else {
-      await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'));
-    }
+    await awaitStarting(provider, stub);
     expect((await stub.getAllocationState()).configuration).toEqual(configuration);
     await evictAllDurableObjects();
     expect((await stub.getAllocationState()).configuration).toEqual(configuration);
@@ -1764,7 +2242,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await awaitLaunch(provider);
     const { allocationId } = await connectAndHello(provider, stub);
     const before = await readState(stub);
-    expect(before.provider).toBe('cloudflare');
+    expect(before.provider).toBe('cloudflare-containers');
 
     await evictAllDurableObjects();
     // No fake re-install: the reloaded instance must rebuild from the pin.
@@ -1773,12 +2251,15 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const after = await readState(stub);
     expect(after.providerRef).toBe(before.providerRef);
     expect(after.allocationId).toBe(allocationId);
-    expect(after.provider).toBe('cloudflare');
+    expect(after.provider).toBe('cloudflare-containers');
     const runtime = await runInDurableObject(stub, instance => instance.getProviderRuntime());
-    expect(runtime).toEqual({ provider: 'cloudflare', allocationName: CUSTOM_ALLOCATION_NAME });
+    expect(runtime).toEqual({
+      provider: 'cloudflare-containers',
+      allocationName: CUSTOM_ALLOCATION_NAME,
+    });
     const pin = await readProviderPin(stub);
     expect(pin === null ? null : JSON.parse(pin)).toMatchObject({
-      provider: 'cloudflare',
+      provider: 'cloudflare-containers',
       allocationName: CUSTOM_ALLOCATION_NAME,
     });
   });
@@ -1930,7 +2411,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(provider.stopCalls).toHaveLength(maxAttempts);
   });
 
-  it('preserves an unsettled billing continuation during the legacy storage cutover', async () => {
+  it('preserves retired Vercel billing history without rearming its continuation during legacy cutover', async () => {
     const sandboxId = `ses-${'e'.repeat(48)}`;
     let stub = sandboxNamespace.getByName(sandboxId);
     const billing = {
@@ -1964,8 +2445,9 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     }));
     expect(retained.schedule?.[VERCEL_BILLING_SETTLEMENT_CALLBACK]?.dueAtMs).toBe(dueAtMs);
     expect(retained.acknowledgement).toBe('generation-1');
-    expect(await readAlarm(stub)).toBe(dueAtMs);
-    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').billing).toMatchObject(billing);
+    expect(await readAlarm(stub)).toBeNull();
+    const { enforcementRequested: _retiredFlag, ...expectedBilling } = billing;
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').billing).toEqual(expectedBilling);
   });
 
   it('keeps a legacy sandbox recoverable when its optional billing input is malformed', async () => {
@@ -1983,985 +2465,29 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(JSON.parse((await readProviderPin(stub)) ?? '{}').billing).toBeNull();
   });
 
-  it.each(['acked', 'insufficient', 'uncertain', 'budget'] as const)(
-    'admits Vercel create only after %s billing admission settles',
-    async result => {
-      const sandboxId = `ses-${(result === 'acked' ? 'a' : result === 'insufficient' ? 'b' : result === 'budget' ? 'd' : 'c').repeat(48)}`;
-      const provider = createFakeProvider({ gateStop: result === 'budget' });
-      const providerRef = encodeVercelProviderRef({ sandboxName: sandboxId, sessionId: 'vsess_1' });
-      provider.adapter.create = async intent => {
-        provider.createCalls++;
-        provider.createInputs.push(intent);
-        return { providerRef };
-      };
-      const starts: string[] = [];
-      const stops: number[] = [];
-      const heartbeats: number[] = [];
-      const meter: ContainerUsageRpcMethods = {
-        async recordStart(input) {
-          starts.push(input.instanceId);
-          if (result === 'uncertain') throw new Error('Meter unavailable');
-          if (result === 'insufficient')
-            return {
-              success: false,
-              error: { code: 'insufficient_credits', message: 'No credits' },
-            };
-          return { success: true, ack: { intervalId: 'interval-1', durable: 'pg', dedup: false } };
-        },
-        async recordHeartbeat(input) {
-          heartbeats.push(input.usageSinceLast);
-          return {
-            intervalId: 'interval-1',
-            durable: 'pg',
-            dedup: false,
-            budget: { verdict: result === 'budget' ? 'stop' : 'continue' },
-          };
-        },
-        async recordStop(input) {
-          stops.push(input.usageSinceLast);
-          return { intervalId: 'interval-1', durable: 'pg', dedup: false };
-        },
-      };
-      const stub = await startAllocation(provider, {
-        sandboxId,
-        provider: 'vercel',
-        configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
-        billing: {
-          sandboxId,
-          subject: { type: 'user', id: 'owner-1' },
-          actor: { type: 'user', id: 'owner-1' },
-          sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-          metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
-        },
-        meter,
-        ...(result === 'insufficient'
-          ? { preparingRoute: 'workspace_11111111-1111-4111-8111-111111111111' }
-          : {}),
-      });
-      await waitFor(() => expect(starts).toContain(sandboxId));
-      if (result === 'acked' || result === 'budget') {
-        await waitFor(() => expect(provider.createCalls).toBe(1));
-      } else {
-        await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
-        expect(provider.createCalls).toBe(0);
-      }
-      const billing = await runInDurableObject(stub, async (_instance, state) => ({
-        context: await getBillingContext(state.storage),
-        schedule: await state.storage.get<BillingScheduleEntries>(VERCEL_BILLING_SCHEDULE_KEY),
-      }));
-      expect(billing.context === undefined).toBe(result === 'insufficient');
-      expect(billing.schedule?.[VERCEL_BILLING_SETTLEMENT_CALLBACK] !== undefined).toBe(
-        result !== 'insufficient'
-      );
-      if (result === 'insufficient') {
-        const row = await runInDurableObject(stub, async (_instance, state) => {
-          const db = drizzle(state.storage, { logger: false });
-          return db.select().from(routesTable);
-        });
-        expect(row[0]).toMatchObject({ state: 'failed', reason: 'billing_blocked' });
-      }
-      if (result === 'acked' || result === 'budget') {
-        const createdAtMs = Date.now() - 20_000;
-        const terminalAtMs = createdAtMs + 10_000;
-        await runInDurableObject(stub, instance =>
-          (
-            instance as unknown as {
-              recordVercelBillingLifetime: (evidence: {
-                providerRef: string;
-                createdAtMs: number;
-              }) => Promise<void>;
-            }
-          ).recordVercelBillingLifetime({ providerRef, createdAtMs })
-        );
-        await stub.ensureAllocation();
-        await runInDurableObject(stub, async instance => {
-          const context = await getBillingContext(instance.ctx.storage);
-          if (context === undefined) throw new Error('Billing interval was not opened');
-          await (
-            instance as unknown as {
-              billingSchedule: {
-                schedule(callback: string, at: number, generation: string): Promise<void>;
-              };
-            }
-          ).billingSchedule.schedule(
-            VERCEL_BILLING_SETTLEMENT_CALLBACK,
-            Date.now() - 1,
-            context.generation
-          );
-        });
-        await runAlarm(stub);
-        await waitFor(() => expect(heartbeats).toHaveLength(1));
-        expect(heartbeats[0]).toBeGreaterThanOrEqual(19);
-        if (result === 'budget') {
-          await waitFor(() => expect(provider.stopCalls).toContain(providerRef));
-          const generation = billing.context?.generation;
-          if (generation === undefined) throw new Error('Expected active budget-stop generation');
-          await runInDurableObject(stub, instance =>
-            (
-              instance as unknown as {
-                billingSchedule: {
-                  schedule(callback: string, at: number, generation: string): Promise<void>;
-                };
-              }
-            ).billingSchedule.schedule('billingForceStop', Date.now() - 1, generation)
-          );
-          await runAlarm(stub);
-          const forceSchedule = await runInDurableObject(stub, (_instance, state) =>
-            state.storage.get<BillingScheduleEntries>(VERCEL_BILLING_SCHEDULE_KEY)
-          );
-          expect(forceSchedule?.billingForceStop).toBeDefined();
-          await releaseGate(stub, () => provider.stopGates.shift()?.('terminal'));
-          await waitFor(async () => {
-            expect(
-              await runInDurableObject(stub, (_instance, state) => getBillingContext(state.storage))
-            ).toBeUndefined();
-          });
-          return;
-        }
-        await runInDurableObject(stub, instance =>
-          (
-            instance as unknown as {
-              recordVercelBillingLifetime: (evidence: {
-                providerRef: string;
-                createdAtMs: number;
-                terminalAtMs: number;
-              }) => Promise<void>;
-            }
-          ).recordVercelBillingLifetime({ providerRef, createdAtMs, terminalAtMs })
-        );
-        await runAlarm(stub);
-        await waitFor(() => expect(stops).toHaveLength(1));
-        expect(stops[0]).toBe(0);
-        await waitFor(async () => {
-          const context = await runInDurableObject(stub, (_instance, state) =>
-            getBillingContext(state.storage)
-          );
-          expect(context).toBeUndefined();
-        });
-      }
-    }
-  );
-
-  it('settles an uncertain pre-create generation before retrying a preparing route', async () => {
-    const sandboxId = `ses-${'f'.repeat(48)}`;
-    const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
-    let starts = 0;
-    let stops = 0;
-    let meterUnavailable = true;
-    const meter: ContainerUsageRpcMethods = {
-      async recordStart(input) {
-        starts++;
-        if (meterUnavailable) throw new Error('Meter temporarily unavailable');
-        return {
-          success: true,
-          ack: { intervalId: `${input.startEpochMs}`, durable: 'pg', dedup: false },
-        };
-      },
-      async recordHeartbeat() {
-        return {
-          intervalId: 'interval-1',
-          durable: 'pg',
-          dedup: false,
-          budget: { verdict: 'continue' },
-        };
-      },
-      async recordStop() {
-        stops++;
-        return { intervalId: 'interval-1', durable: 'pg', dedup: false };
-      },
-    };
-    const provider = createFakeProvider();
+  it('retries a transient launch failure after the retry pause', async () => {
+    const provider = createFakeProvider({
+      failFirstLaunch: 'runtime bootstrap failed without a phase receipt',
+    });
     const stub = await startAllocation(provider, {
-      sandboxId,
-      provider: 'vercel',
-      configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
-      billing: {
-        sandboxId,
-        subject: { type: 'user', id: 'owner-1' },
-        actor: { type: 'user', id: 'owner-1' },
-        sessionId,
-        metadata: { origin: 'cloud-agent' },
-        enforcementRequested: true,
-      },
-      meter,
-      preparingRoute: sessionId,
+      preparingRoute: 'workspace_cold_retry',
+      timers: { providerCreateRetryMs: 1 },
     });
-    await waitFor(() => expect(starts).toBeGreaterThanOrEqual(1));
-    await waitFor(async () => expect((await readState(stub)).kind).not.toBe('stopped'));
-    await waitFor(async () =>
-      expect(
-        await runInDurableObject(stub, instance =>
-          Promise.resolve((instance as unknown as { createInFlight: boolean }).createInFlight)
-        )
-      ).toBe(false)
-    );
-    const generation = await runInDurableObject(stub, (_instance, state) =>
-      getBillingContext(state.storage)
-    );
-    if (generation === undefined) throw new Error('Expected an uncertain billing generation');
-    expect(generation.measurementStarted).toBe(false);
-    expect(provider.createCalls).toBe(0);
-    meterUnavailable = false;
-    await runInDurableObject(stub, async (instance, state) => {
-      const current = await getBillingContext(state.storage);
-      if (current?.generation !== generation.generation) return;
-      await (
-        instance as unknown as {
-          billingSchedule: {
-            schedule(callback: string, at: number, generation: string): Promise<void>;
-          };
-        }
-      ).billingSchedule.schedule(
-        VERCEL_BILLING_SETTLEMENT_CALLBACK,
-        Date.now() - 1,
-        generation.generation
-      );
-    });
-    await runAlarm(stub);
-    await waitFor(() => expect(stops).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const firstAttempt = launchIdentity(provider);
+    // The first attempt fails after committing its ref; cleanup stops that ref
+    // and the reducer enters the short retry pause with a null ref.
     await waitFor(async () => {
-      const current = await runInDurableObject(stub, (_instance, state) =>
-        getBillingContext(state.storage)
-      );
-      expect(current?.generation).not.toBe(generation.generation);
-    });
-    if (provider.createCalls === 0) {
-      await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
-      await runAlarm(stub);
-    }
-    await waitFor(() => expect(provider.createCalls).toBe(1));
-    expect(starts).toBeGreaterThan(1);
-  }, 20_000);
-
-  it.each(['disconnected', 'stopping'] as const)(
-    'retires a %s allocation with missing billing while preserving its preparing route',
-    async existingState => {
-      const sandboxId = `ses-${'d'.repeat(47)}${existingState === 'stopping' ? 'b' : 'a'}`;
-      const meter: ContainerUsageRpcMethods = {
-        async recordStart() {
-          return { success: true, ack: { intervalId: 'interval-1', durable: 'pg', dedup: false } };
-        },
-        async recordHeartbeat() {
-          return {
-            intervalId: 'interval-1',
-            durable: 'pg',
-            dedup: false,
-            budget: { verdict: 'continue' },
-          };
-        },
-        async recordStop() {
-          return { intervalId: 'interval-1', durable: 'pg', dedup: false };
-        },
-      };
-      const provider = createFakeProvider({ gateStop: existingState === 'stopping' });
-      provider.adapter.applyContainedCredentials = async ref => {
-        if (ref === provider.refs[0]) throw new Error('Old sandbox is retiring');
-      };
-      const stub = await startAllocation(provider, {
-        sandboxId,
-        provider: 'vercel',
-        configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
-        billing: {
-          sandboxId,
-          subject: { type: 'user', id: 'owner-1' },
-          actor: { type: 'user', id: 'owner-1' },
-          sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-          metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
-        },
-        meter,
-      });
-      await awaitStarting(provider, stub);
-      if (existingState === 'disconnected') {
-        await runInDurableObject(stub, async instance => {
-          const state = await instance.getAllocationState();
-          if (state.allocationId === null) throw new Error('Missing allocation');
-          const applyEvent = (
-            instance as unknown as {
-              applyEvent(event: {
-                type: 'hello-accepted' | 'socket-closed';
-                at: number;
-                allocationId: string;
-                connectionId: string;
-                wrapperId?: string;
-                origin?: 'peer' | 'heartbeat_timeout';
-              }): Promise<void>;
-            }
-          ).applyEvent.bind(instance);
-          await applyEvent({
-            type: 'hello-accepted',
-            at: Date.now(),
-            allocationId: state.allocationId,
-            connectionId: 'conn-1',
-            wrapperId: 'wr-1',
-          });
-          await applyEvent({
-            type: 'socket-closed',
-            at: Date.now(),
-            allocationId: state.allocationId,
-            connectionId: 'conn-1',
-            origin: 'peer',
-          });
-        });
-      } else {
-        await runInDurableObject(stub, instance =>
-          (
-            instance as unknown as {
-              applyEvent(event: {
-                type: 'stop-requested';
-                at: number;
-                reason: 'sandbox_stopped';
-              }): Promise<void>;
-            }
-          ).applyEvent({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' })
-        );
-        await waitFor(() => expect(provider.stopGates).toHaveLength(1));
-      }
-      await runInDurableObject(stub, (_instance, state) => clearBillingContext(state.storage));
-      await insertPreparingRoute(stub, {
-        sessionId: 'workspace_missing_billing',
-        attemptDeadlineAt: Date.now() + MINUTE,
-      });
-      const stopReasons: string[] = [];
-      await runInDurableObject(stub, instance => {
-        const original = (
-          instance as unknown as {
-            applyEvent(event: { type: string; reason?: string }): Promise<void>;
-          }
-        ).applyEvent.bind(instance);
-        Object.assign(instance, {
-          applyEvent: async (event: { type: string; reason?: string }) => {
-            if (event.type === 'stop-requested' && event.reason !== undefined)
-              stopReasons.push(event.reason);
-            await original(event);
-          },
-        });
-        return Promise.resolve();
-      });
-      const result = await stub.prepare({
-        spec: {
-          sessionId: 'workspace_missing_billing',
-          kiloSessionId: 'kilo-missing-billing',
-          directory: '/workspace/test',
-          attemptId: 'attempt-1',
-        },
-        credentials: {
-          userId: 'owner-1',
-          kiloSessionId: 'kilo-missing-billing',
-          kiloToken: 'test-token',
-          scopeId: 'scope-1',
-        },
-      });
-      expect(result).toMatchObject({ state: 'preparing' });
-      if (existingState === 'disconnected') expect(stopReasons).toContain('sandbox_lost');
-      if (existingState === 'stopping') {
-        await releaseGate(stub, () => provider.stopGates.shift()?.('terminal'));
-      }
-      await waitFor(() => expect(provider.createCalls).toBe(2));
-      const route = await runInDurableObject(stub, async (_instance, state) => {
-        const db = drizzle(state.storage, { logger: false });
-        return db
-          .select()
-          .from(routesTable)
-          .where(eq(routesTable.session_id, 'workspace_missing_billing'));
-      });
-      expect(route[0]).toMatchObject({ state: 'preparing', reason: null });
-    },
-    20_000
-  );
-
-  it('reads current stored grants after eviction and adapter construction, excluding expired grants', async () => {
-    // The DO id must be a valid sandbox id (legacy-shared `__` shape); the
-    // allocation name is what the real Vercel REST client validates.
-    const sandboxId = 'sbx__chunk3_grant_reader';
-    const allocationName = 'ses-chunk3-grant-reader';
-    const stub = sandboxNamespace.getByName(sandboxId);
-    const now = Date.now();
-    const active = containedGrant(sandboxId, {
-      scopeId: 'scope-active',
-      handle: 'handle_active',
-      preparedAt: now,
-      expiresAt: now + MINUTE,
-    });
-    const expired = containedGrant(sandboxId, {
-      scopeId: 'scope-expired',
-      handle: 'handle_expired',
-      preparedAt: now - 2 * MINUTE,
-      expiresAt: now - MINUTE,
-    });
-    const next = containedGrant(sandboxId, {
-      scopeId: 'scope-next',
-      handle: 'handle_next',
-      preparedAt: now,
-      expiresAt: now + MINUTE,
-    });
-    const captured: string[] = [];
-    const fetchStub = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      captured.push(typeof init?.body === 'string' ? init.body : '');
-      return new Response('provider error', { status: 500 });
-    });
-    const vercelEnv = {
-      VERCEL_TOKEN: 'vercel-token',
-      VERCEL_TEAM_ID: 'team_1',
-      VERCEL_PROJECT_ID: 'prj_1',
-      VERCEL_SANDBOX_SNAPSHOT_ID: 'snap_1',
-      VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build_1',
-      VERCEL_SANDBOX_RUNTIME: 'node24',
-      VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '600000',
-      VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
-    };
-
-    await runInDurableObject(stub, async instance => {
-      await instance.getAllocationState();
-      Object.assign(instance, { env: { ...instance.env, ...vercelEnv } });
-      vi.stubGlobal('fetch', fetchStub);
-    });
-
-    // With no owner, admission is unavailable: this persists the Vercel pin
-    // without a provider create.
-    await stub.ensureAllocation({
-      provider: 'vercel',
-      configuration: { provider: 'vercel' },
-      allocationName,
-    });
-    await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'));
-    expect(captured).toHaveLength(0);
-
-    await runInDurableObject(stub, async (_instance, state) => {
-      await state.storage.put('control_plane_owner', 'owner-1');
-      const db = drizzle(state.storage, { logger: false });
-      writeScopeGrant(db, active);
-      writeScopeGrant(db, expired);
-    });
-
-    await evictDurableObject(stub);
-
-    await runInDurableObject(stub, async (instance, state) => {
-      await instance.getAllocationState();
-      Object.assign(instance, { env: { ...instance.env, ...vercelEnv } });
-      const db = drizzle(state.storage, { logger: false });
-      const realFactory = (
-        instance as unknown as {
-          createProviderAdapter(pin: StoredProviderPin): ProviderAdapter;
-        }
-      ).createProviderAdapter.bind(instance);
-      Object.assign(instance, {
-        createProviderAdapter(pin: StoredProviderPin) {
-          expect(listScopeGrants(db)).toEqual(expect.arrayContaining([active, expired]));
-          const adapter = realFactory(pin);
-          for (const grant of listScopeGrants(db)) {
-            writeScopeGrant(db, {
-              ...grant,
-              preparedAt: now - 2 * MINUTE,
-              expiresAt: now - 1,
-            });
-          }
-          writeScopeGrant(db, next);
-          return adapter;
-        },
-      });
-      captured.length = 0;
-    });
-
-    await stub.ensureAllocation({
-      provider: 'vercel',
-      configuration: { provider: 'vercel' },
-      allocationName,
-    });
-    await waitFor(() => expect(captured.length).toBeGreaterThan(0));
-
-    const body = JSON.parse(captured[0] ?? '{}') as { networkPolicy: unknown };
-    expect(body.networkPolicy).toEqual(buildControlNetworkPolicy([next]));
-    expect(JSON.stringify(body.networkPolicy)).toContain('handle_next');
-    expect(JSON.stringify(body.networkPolicy)).not.toContain('handle_active');
-    expect(JSON.stringify(body.networkPolicy)).not.toContain('handle_expired');
-  }, 20_000);
-
-  it('rejects a blocked billing route before sending wrapper preparation', async () => {
-    const sandboxId = `ses-${'d'.repeat(47)}c`;
-    const meter: ContainerUsageRpcMethods = {
-      async recordStart() {
-        return { success: true, ack: { intervalId: 'interval-1', durable: 'pg', dedup: false } };
-      },
-      async recordHeartbeat() {
-        return {
-          intervalId: 'interval-1',
-          durable: 'pg',
-          dedup: false,
-          budget: { verdict: 'continue' },
-        };
-      },
-      async recordStop() {
-        return { intervalId: 'interval-1', durable: 'pg', dedup: false };
-      },
-    };
-    const provider = createFakeProvider();
-    const stub = await startAllocation(provider, {
-      sandboxId,
-      provider: 'vercel',
-      configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
-      billing: {
-        sandboxId,
-        subject: { type: 'user', id: 'owner-1' },
-        actor: { type: 'user', id: 'owner-1' },
-        sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-        metadata: { origin: 'cloud-agent' },
-        enforcementRequested: true,
-      },
-      meter,
-    });
-    await awaitStarting(provider, stub);
-    const sent: string[] = [];
-    await runInDurableObject(stub, async instance => {
-      const control = instance as unknown as {
-        ensureVercelBillingRuntime(): Promise<
-          { lifecycle: { isBillingBlocked(): Promise<boolean> } } | undefined
-        >;
-      };
-      const runtime = await control.ensureVercelBillingRuntime();
-      if (runtime === undefined) throw new Error('missing Vercel billing runtime');
-      Object.assign(runtime.lifecycle, { isBillingBlocked: async () => true });
-      Object.assign(instance, { sendSessionPrepare: () => sent.push('prepare') });
-    });
-    const result = await stub.prepare({
-      spec: {
-        sessionId: 'workspace_blocked_billing',
-        kiloSessionId: 'kilo-blocked',
-        directory: '/workspace/test',
-        attemptId: 'attempt-1',
-      },
-      credentials: {
-        userId: 'owner-1',
-        kiloSessionId: 'kilo-blocked',
-        kiloToken: 'test-token',
-        scopeId: 'scope-1',
-      },
-    });
-    expect(result).toMatchObject({ state: 'failed', reason: 'billing_blocked' });
-    expect(sent).toEqual([]);
-    const route = await runInDurableObject(stub, async (_instance, state) => {
-      const db = drizzle(state.storage, { logger: false });
-      return db
-        .select()
-        .from(routesTable)
-        .where(eq(routesTable.session_id, 'workspace_blocked_billing'));
-    });
-    expect(route[0]).toMatchObject({ state: 'failed', reason: 'billing_blocked' });
-  });
-
-  it.each([
-    ['Invalid billing state', 'failed', 'billing_unavailable'],
-    ['Vercel billing admission timed out', 'failed', 'billing_unavailable'],
-    ['hang', 'preparing', null],
-  ] as const)(
-    'classifies thrown admission error %s without masking a definite failure as retry',
-    async (error, routeState, reason) => {
-      const sandboxId = `ses-${(error === 'hang' ? 'b' : error === 'Invalid billing state' ? 'a' : 'c').repeat(47)}d`;
-      const provider = createFakeProvider();
-      const meter: ContainerUsageRpcMethods = {
-        async recordStart() {
-          throw new Error('The admission override should run');
-        },
-        async recordHeartbeat() {
-          throw new Error('The admission override should run');
-        },
-        async recordStop() {
-          throw new Error('The admission override should run');
-        },
-      };
-      const stub = await startAllocation(provider, {
-        sandboxId,
-        provider: 'vercel',
-        configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
-        billing: {
-          sandboxId,
-          subject: { type: 'user', id: 'owner-1' },
-          actor: { type: 'user', id: 'owner-1' },
-          sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-          metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
-        },
-        meter,
-        preparingRoute: 'workspace_admission_error',
-        admissionError: error,
-      });
-      await waitFor(async () => {
-        const rows = await runInDurableObject(stub, async (_instance, state) => {
-          const db = drizzle(state.storage, { logger: false });
-          return db
-            .select()
-            .from(routesTable)
-            .where(eq(routesTable.session_id, 'workspace_admission_error'));
-        });
-        expect(rows[0]).toMatchObject({ state: routeState, reason });
-      });
-      expect(provider.createCalls).toBe(0);
-      expect((await readState(stub)).kind).toBe(routeState === 'failed' ? 'stopped' : 'creating');
-    }
-  );
-
-  it('expires a route even when billing continuation fails', async () => {
-    const provider = createFakeProvider();
-    const stub = await startAllocation(provider);
-    await awaitStarting(provider, stub);
-    await insertPreparingRoute(stub, {
-      sessionId: 'workspace_alarm',
-      attemptDeadlineAt: Date.now() - 1,
-    });
-    await runInDurableObject(stub, instance => {
-      Object.assign(instance, {
-        runBillingAlarm: async () => {
-          throw new Error('Meter unavailable');
-        },
-      });
-      return Promise.resolve();
+      const state = await readState(stub);
+      expect(state.allocationId).not.toBe(firstAttempt.allocationId);
+      expect(state.providerRef).toBeNull();
     });
     await runAlarm(stub);
-    const row = await runInDurableObject(stub, async (_instance, state) => {
-      const db = drizzle(state.storage, { logger: false });
-      return db.select().from(routesTable).where(eq(routesTable.session_id, 'workspace_alarm'));
-    });
-    expect(row[0]).toMatchObject({ state: 'failed', reason: 'preparation_timeout' });
-  });
-
-  it.each(['provider-gone', 'confirmed-stop'] as const)(
-    'settles measured billing before reallocating a preparing route after %s',
-    async termination => {
-      const sandboxId = `ses-${(termination === 'provider-gone' ? 'b' : 'c').repeat(47)}a`;
-      let stops = 0;
-      const meter: ContainerUsageRpcMethods = {
-        async recordStart() {
-          return { success: true, ack: { intervalId: 'interval-1', durable: 'pg', dedup: false } };
-        },
-        async recordHeartbeat() {
-          return {
-            intervalId: 'interval-1',
-            durable: 'pg',
-            dedup: false,
-            budget: { verdict: 'continue' },
-          };
-        },
-        async recordStop() {
-          stops++;
-          return { intervalId: 'interval-1', durable: 'pg', dedup: false };
-        },
-      };
-      const provider = createFakeProvider();
-      const stub = await startAllocation(provider, {
-        sandboxId,
-        provider: 'vercel',
-        configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
-        billing: {
-          sandboxId,
-          subject: { type: 'user', id: 'owner-1' },
-          actor: { type: 'user', id: 'owner-1' },
-          sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-          metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
-        },
-        meter,
-      });
-      await awaitStarting(provider, stub);
-      const providerRef = provider.refs[0];
-      if (providerRef === undefined) throw new Error('Missing created provider reference');
-      await runInDurableObject(stub, instance =>
-        (
-          instance as unknown as {
-            recordVercelBillingLifetime(evidence: {
-              providerRef: string;
-              createdAtMs: number;
-            }): Promise<void>;
-          }
-        ).recordVercelBillingLifetime({ providerRef, createdAtMs: Date.now() - 20_000 })
-      );
-      await stub.ensureAllocation();
-      await waitFor(async () => {
-        const context = await runInDurableObject(stub, (_instance, state) =>
-          getBillingContext(state.storage)
-        );
-        expect(context?.measurementStarted).toBe(true);
-      });
-      await insertPreparingRoute(stub, {
-        sessionId: 'workspace_recover',
-        attemptDeadlineAt: Date.now() + MINUTE,
-      });
-      if (termination === 'provider-gone') {
-        await stub.reportProviderGone();
-      } else {
-        await runInDurableObject(stub, instance =>
-          (
-            instance as unknown as {
-              applyEvent(event: {
-                type: 'stop-requested';
-                at: number;
-                reason: 'sandbox_stopped';
-              }): Promise<void>;
-            }
-          ).applyEvent({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' })
-        );
-      }
-      await waitFor(() => expect(stops).toBeGreaterThanOrEqual(1));
-      if (provider.createCalls === 1) {
-        await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
-        await runAlarm(stub);
-      }
-      await waitFor(() => expect(provider.createCalls).toBe(2));
-    },
-    20_000
-  );
-
-  it.each(['stop', 'observation'] as const)(
-    'settles a bound Vercel ref after launch fails via %s before retrying its route',
-    async terminalEvidence => {
-      const sandboxId = `ses-${(terminalEvidence === 'stop' ? 'a' : 'b').repeat(47)}e`;
-      let stops = 0;
-      const meter: ContainerUsageRpcMethods = {
-        async recordStart() {
-          return { success: true, ack: { intervalId: 'interval-1', durable: 'pg', dedup: false } };
-        },
-        async recordHeartbeat() {
-          return {
-            intervalId: 'interval-1',
-            durable: 'pg',
-            dedup: false,
-            budget: { verdict: 'continue' },
-          };
-        },
-        async recordStop() {
-          stops++;
-          return { intervalId: 'interval-1', durable: 'pg', dedup: false };
-        },
-      };
-      const provider = createFakeProvider({ gateLaunch: true });
-      provider.stopResults.push('retryable', 'terminal');
-      if (terminalEvidence === 'observation') {
-        provider.adapter.observe = async () => ({ status: 'terminal' });
-      }
-      const stub = await startAllocation(provider, {
-        sandboxId,
-        provider: 'vercel',
-        configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
-        billing: {
-          sandboxId,
-          subject: { type: 'user', id: 'owner-1' },
-          actor: { type: 'user', id: 'owner-1' },
-          sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-          metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
-        },
-        meter,
-        preparingRoute: 'workspace_retry_launch',
-      });
-      await awaitLaunch(provider);
-      const ref = provider.refs[0];
-      if (ref === undefined) throw new Error('Expected a created Vercel ref');
-      await runInDurableObject(stub, instance =>
-        (
-          instance as unknown as {
-            recordVercelBillingLifetime(evidence: {
-              providerRef: string;
-              createdAtMs: number;
-            }): Promise<void>;
-          }
-        ).recordVercelBillingLifetime({ providerRef: ref, createdAtMs: Date.now() - 20_000 })
-      );
-      await releaseGate(stub, () => provider.launchGates.shift()?.(new Error('launch failed')));
-      await waitFor(() => expect(provider.stopCalls).toEqual([ref]));
-      await waitFor(async () => expect((await readState(stub)).kind).toBe('creating'));
-      const billing = await runInDurableObject(stub, (_instance, state) =>
-        getBillingContext(state.storage)
-      );
-      expect(billing?.pendingStop).toBeUndefined();
-      expect(provider.createCalls).toBe(1);
-      if (billing === undefined) throw new Error('Expected unsettled generation');
-      await runInDurableObject(stub, instance =>
-        (
-          instance as unknown as {
-            billingSchedule: {
-              schedule(callback: string, at: number, generation: string): Promise<void>;
-            };
-          }
-        ).billingSchedule.schedule(
-          VERCEL_BILLING_SETTLEMENT_CALLBACK,
-          Date.now() - 1,
-          billing.generation
-        )
-      );
-      await runAlarm(stub);
-      await waitFor(() =>
-        expect(provider.stopCalls).toEqual(terminalEvidence === 'stop' ? [ref, ref] : [ref])
-      );
-      await waitFor(() => expect(stops).toBe(1));
-      if (provider.createCalls === 1) {
-        await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
-        await runAlarm(stub);
-      }
-      await waitFor(() => expect(provider.createCalls).toBe(2));
-    },
-    20_000
-  );
-
-  it('fails waiting routes when cleanup is unconfirmed but retains its billing alarm', async () => {
-    const sandboxId = `ses-${'c'.repeat(47)}e`;
-    let meterStops = 0;
-    const meter: ContainerUsageRpcMethods = {
-      async recordStart() {
-        return { success: true, ack: { intervalId: 'interval-1', durable: 'pg', dedup: false } };
-      },
-      async recordHeartbeat() {
-        return {
-          intervalId: 'interval-1',
-          durable: 'pg',
-          dedup: false,
-          budget: { verdict: 'continue' },
-        };
-      },
-      async recordStop() {
-        meterStops++;
-        return { intervalId: 'interval-1', durable: 'pg', dedup: false };
-      },
-    };
-    const provider = createFakeProvider({ gateLaunch: true });
-    provider.adapter.stop = async ref => {
-      provider.stopCalls.push(ref);
-      return 'retryable';
-    };
-    const stub = await startAllocation(provider, {
-      sandboxId,
-      provider: 'vercel',
-      configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
-      billing: {
-        sandboxId,
-        subject: { type: 'user', id: 'owner-1' },
-        actor: { type: 'user', id: 'owner-1' },
-        sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-        metadata: { origin: 'cloud-agent' },
-        enforcementRequested: true,
-      },
-      meter,
-      preparingRoute: 'workspace_pending_cleanup',
-    });
-    await awaitLaunch(provider);
-    const ref = provider.refs[0];
-    if (ref === undefined) throw new Error('Expected created ref');
-    await runInDurableObject(stub, instance =>
-      (
-        instance as unknown as {
-          recordVercelBillingLifetime(evidence: {
-            providerRef: string;
-            createdAtMs: number;
-          }): Promise<void>;
-        }
-      ).recordVercelBillingLifetime({ providerRef: ref, createdAtMs: Date.now() - 20_000 })
-    );
-    await releaseGate(stub, () => provider.launchGates.shift()?.(new Error('launch failed')));
-    await waitFor(() => expect(provider.stopCalls).toEqual([ref]));
-    const generation = await runInDurableObject(stub, async (_instance, state) => {
-      const context = await getBillingContext(state.storage);
-      if (context === undefined) throw new Error('Missing bound generation');
-      await updateBillingContext(state.storage, {
-        ...context,
-        startEpochMs: Date.now() - TIMERS.providerCreateMs - 1,
-      });
-      return context.generation;
-    });
-    const scheduleCleanup = () =>
-      runInDurableObject(stub, instance =>
-        (
-          instance as unknown as {
-            billingSchedule: {
-              schedule(callback: string, at: number, generation: string): Promise<void>;
-            };
-          }
-        ).billingSchedule.schedule(VERCEL_BILLING_SETTLEMENT_CALLBACK, Date.now() - 1, generation)
-      );
-    await scheduleCleanup();
-    await runAlarm(stub);
-    const route = await runInDurableObject(stub, async (_instance, state) => {
-      const db = drizzle(state.storage, { logger: false });
-      return db
-        .select()
-        .from(routesTable)
-        .where(eq(routesTable.session_id, 'workspace_pending_cleanup'));
-    });
-    expect(route[0]).toMatchObject({ state: 'failed', reason: 'sandbox_lost' });
-    expect((await readState(stub)).kind).toBe('stopped');
-    expect(
-      (await runInDurableObject(stub, (_instance, state) => getBillingContext(state.storage)))
-        ?.pendingStop
-    ).toBeUndefined();
-    expect(meterStops).toBe(0);
-    expect(provider.stopCalls).toEqual([ref, ref]);
-    const schedule = await runInDurableObject(stub, (_instance, state) =>
-      state.storage.get<BillingScheduleEntries>(VERCEL_BILLING_SCHEDULE_KEY)
-    );
-    const continuation = schedule?.[VERCEL_BILLING_SETTLEMENT_CALLBACK];
-    expect(continuation?.payload).toBe(generation);
-    expect(continuation?.dueAtMs).toBeGreaterThan(Date.now());
-    expect(meterStops).toBe(0);
+    // A transient launch failure must retain the retry: a second attempt starts.
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    const view = (await stub.status({ sessionId: 'workspace_cold_retry' })).view;
+    expect(view.state).not.toBe('failed');
   }, 20_000);
-
-  it.each(['valid', 'wrong-owner', 'invalid-size'] as const)(
-    'handles a shadow admission exception with %s billing identity',
-    async identity => {
-      const sandboxId = `ses-${(identity === 'valid' ? 'b' : identity === 'wrong-owner' ? 'c' : 'd').repeat(47)}e`;
-      const meter: ContainerUsageRpcMethods = {
-        async recordStart() {
-          return { success: true, ack: { intervalId: 'interval-1', durable: 'pg', dedup: false } };
-        },
-        async recordHeartbeat() {
-          return {
-            intervalId: 'interval-1',
-            durable: 'pg',
-            dedup: false,
-            budget: { verdict: 'continue' },
-          };
-        },
-        async recordStop() {
-          return { intervalId: 'interval-1', durable: 'pg', dedup: false };
-        },
-      };
-      const provider = createFakeProvider();
-      const stub = await startAllocation(provider, {
-        sandboxId,
-        provider: 'vercel',
-        configuration: {
-          provider: 'vercel',
-          resources: { vcpus: identity === 'invalid-size' ? 3 : 2, memory: 4096 },
-        },
-        billing: {
-          sandboxId,
-          subject: { type: 'user', id: identity === 'wrong-owner' ? 'other' : 'owner-1' },
-          actor: { type: 'user', id: 'owner-1' },
-          sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-          metadata: { origin: 'cloud-agent' },
-          enforcementRequested: false,
-        },
-        meter,
-        preparingRoute: 'workspace_shadow_exception',
-        admissionError: 'throw-after-open',
-      });
-      if (identity === 'valid') {
-        await waitFor(() => expect(provider.createCalls).toBe(1));
-        const context = await runInDurableObject(stub, (_instance, state) =>
-          getBillingContext(state.storage)
-        );
-        expect(context?.subject.id).toBe('owner-1');
-      } else {
-        await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
-        expect(provider.createCalls).toBe(0);
-        const route = await runInDurableObject(stub, async (_instance, state) => {
-          const db = drizzle(state.storage, { logger: false });
-          return db
-            .select()
-            .from(routesTable)
-            .where(eq(routesTable.session_id, 'workspace_shadow_exception'));
-        });
-        expect(route[0]).toMatchObject({ state: 'failed', reason: 'billing_unavailable' });
-      }
-    }
-  );
 });
 
 describe('SandboxControlV2 allocation egress policy', () => {
@@ -2981,6 +2507,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     'media.githubusercontent.com',
     'objects.githubusercontent.com',
     'raw.githubusercontent.com',
+    'uploads.github.com',
     'worker.example.com',
   ];
 
@@ -3005,7 +2532,6 @@ describe('SandboxControlV2 allocation egress policy', () => {
         KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com',
         KILO_OPENROUTER_BASE: 'https://gateway.example.com/api',
         KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
-        CREDENTIAL_CONTAINMENT_ENABLED: 'false',
         ...extraEnv,
       });
       Object.assign(instance, {
@@ -3028,7 +2554,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
 
   function prepareInput(
     sessionId: string,
-    policy: { egressMode?: EgressMode; egressAllowlist?: string[] } = {},
+    policy: { egressMode?: EgressMode; egressAllowlist?: string[]; egressAudit?: boolean } = {},
     repositoryUrl = 'https://git.example.com/acme/widgets.git'
   ): Parameters<DurableObjectStub<SandboxControlV2>['prepare']>[0] {
     const kiloSessionId =
@@ -3056,19 +2582,21 @@ describe('SandboxControlV2 allocation egress policy', () => {
     };
   }
 
-  it.each([
-    { egressMode: undefined, policy: undefined, expected: undefined },
-    { egressMode: 'unrestricted' as const, policy: undefined, expected: undefined },
-    { egressMode: 'allowlist' as const, policy: undefined, expected: baseline },
-    { egressMode: 'allowlist' as const, policy: [], expected: baseline },
-    {
-      egressMode: 'allowlist' as const,
-      policy: ['Packages.Example.com.', 'github.com'],
-      expected: [...baseline, 'packages.example.com'].sort(),
-    },
-  ])(
-    'persists effective ensure policy $egressMode/$policy',
-    async ({ egressMode, policy, expected }) => {
+  it.each(
+    [
+      { egressMode: undefined, policy: undefined, expected: undefined },
+      { egressMode: 'unrestricted' as const, policy: undefined, expected: undefined },
+      { egressMode: 'allowlist' as const, policy: undefined, expected: baseline },
+      { egressMode: 'allowlist' as const, policy: [], expected: baseline },
+      {
+        egressMode: 'allowlist' as const,
+        policy: ['Packages.Example.com.', 'github.com'],
+        expected: [...baseline, 'packages.example.com'].sort(),
+      },
+    ].flatMap(policy => [undefined, false, true].map(egressAudit => ({ ...policy, egressAudit })))
+  )(
+    'persists effective ensure policy %j',
+    async ({ egressMode, policy, expected, egressAudit }) => {
       const provider = createFakeProvider();
       await configureEgressSandbox(provider);
       const stub = await startAllocation(provider, {
@@ -3076,12 +2604,14 @@ describe('SandboxControlV2 allocation egress policy', () => {
         provider: 'cloudflare-containers',
         egressMode,
         egressAllowlist: policy,
+        egressAudit,
       });
       await awaitStarting(provider, stub);
       const pin = JSON.parse((await readProviderPin(stub)) ?? '{}') as StoredProviderPin;
       expect(pin.provider).toBe('cloudflare-containers');
       expect(pin.egressAllowlist).toEqual(expected);
       expect(Object.hasOwn(pin, 'egressAllowlist')).toBe(egressMode === 'allowlist');
+      expect(pin.egressAudit).toBe(egressAudit === true ? true : undefined);
     }
   );
 
@@ -3131,63 +2661,140 @@ describe('SandboxControlV2 allocation egress policy', () => {
     expect(JSON.parse((await readProviderPin(stub)) ?? '{}').egressAllowlist).toBeUndefined();
   });
 
-  it('pins the credential repository origin and forwards the persisted effective policy through the reconstructed native adapter', async () => {
-    const provider = createFakeProvider();
-    const { stub } = await configureEgressSandbox(provider);
-    expect(
-      await stub.prepare(
-        prepareInput(firstSessionId, {
-          egressMode: 'allowlist',
-          egressAllowlist: ['packages.example.com'],
-        })
-      )
-    ).toMatchObject({ state: 'preparing' });
-    await awaitStarting(provider, stub);
-    const expected = [...baseline, 'git.example.com', 'packages.example.com'].sort();
-    const rawPin = await readProviderPin(stub);
-    expect(JSON.parse(rawPin ?? '{}')).toMatchObject({ egressAllowlist: expected });
-    const before = await readState(stub);
+  it.each([undefined, 'unrestricted', 'allowlist'] as const)(
+    'forwards persisted %s audit policy through the reconstructed native adapter',
+    async egressMode => {
+      const provider = createFakeProvider();
+      const { stub } = await configureEgressSandbox(provider);
+      expect(
+        await stub.prepare(
+          prepareInput(firstSessionId, {
+            egressMode,
+            ...(egressMode === 'allowlist' ? { egressAllowlist: ['packages.example.com'] } : {}),
+            egressAudit: true,
+          })
+        )
+      ).toMatchObject({ state: 'preparing' });
+      await awaitStarting(provider, stub);
+      const expected =
+        egressMode === 'allowlist'
+          ? [...baseline, 'git.example.com', 'packages.example.com'].sort()
+          : undefined;
+      const rawPin = await readProviderPin(stub);
+      expect(JSON.parse(rawPin ?? '{}')).toMatchObject({
+        egressAudit: true,
+      });
+      expect(JSON.parse(rawPin ?? '{}').egressAllowlist).toEqual(expected);
+      const before = await readState(stub);
 
-    await evictDurableObject(stub);
+      await evictDurableObject(stub);
 
-    expect(await readState(stub)).toEqual(before);
-    expect(await readProviderPin(stub)).toBe(rawPin);
-    const launches: ContainersLaunchInput[] = [];
-    await runInDurableObject(stub, async instance => {
-      const reconstructed = instance as unknown as {
-        provider: ProviderAdapter;
-        providerPin: StoredProviderPin;
-      };
-      expect(reconstructed.providerPin.egressAllowlist).toEqual(expected);
-      Object.assign(instance, {
-        env: {
-          ...instance.env,
-          SANDBOX_CONTAINERS: {
-            getByName: (id: string) => {
-              expect(id).toBe(sandboxId);
-              return {
-                launchWrapper: async (input: ContainersLaunchInput) => {
-                  launches.push(input);
-                  return { startSource: 'image' as const };
-                },
-                ensureLeaseAtLeast: async () => undefined,
-              };
+      expect(await readState(stub)).toEqual(before);
+      expect(await readProviderPin(stub)).toBe(rawPin);
+      const launches: ContainersLaunchInput[] = [];
+      await runInDurableObject(stub, async instance => {
+        const reconstructed = instance as unknown as {
+          provider: ProviderAdapter;
+          providerPin: StoredProviderPin;
+        };
+        expect(reconstructed.providerPin.egressAllowlist).toEqual(expected);
+        expect(reconstructed.providerPin.egressAudit).toBe(true);
+        Object.assign(instance, {
+          env: {
+            ...instance.env,
+            SANDBOX_CONTAINERS: {
+              getByName: (id: string) => {
+                expect(id).toBe(sandboxId);
+                return {
+                  launchWrapper: async (input: ContainersLaunchInput) => {
+                    launches.push(input);
+                    return { startSource: 'image' as const };
+                  },
+                  ensureLeaseAtLeast: async () => undefined,
+                };
+              },
             },
           },
-        },
+        });
+        const ref = encodeCloudflareProviderRef({
+          sandboxId,
+          containment: false,
+          instanceId: 'reconstructed-allocation',
+        });
+        await reconstructed.provider.launch(ref, {
+          command: preinstalledStartup(),
+          env: {},
+        });
       });
-      const ref = encodeCloudflareProviderRef({
-        sandboxId,
-        containment: false,
-        instanceId: 'reconstructed-allocation',
+      expect(launches).toHaveLength(1);
+      expect(launches[0]?.egressAllowlist).toEqual(expected);
+      expect(launches[0]?.egressAudit).toBe(true);
+      expect(provider.createCalls).toBe(1);
+      expect(provider.stopCalls).toEqual([]);
+    }
+  );
+
+  it.each(
+    ([undefined, 'unrestricted'] as const).flatMap(egressMode =>
+      (['enabled', 'false', 'omitted', 'selection-omitted'] as const).map(change => ({
+        egressMode,
+        change,
+      }))
+    )
+  )(
+    'rejects changed unrestricted audit on an active allocation: %j',
+    async ({ egressMode, change }) => {
+      const provider = createFakeProvider();
+      const { stub } = await configureEgressSandbox(provider);
+      await stub.prepare(
+        prepareInput(firstSessionId, { egressMode, egressAudit: change !== 'enabled' })
+      );
+      await awaitStarting(provider, stub);
+      const before = await readState(stub);
+      const pin = await readProviderPin(stub);
+      const input = prepareInput(nextSessionId, {
+        egressMode,
+        ...(change === 'enabled'
+          ? { egressAudit: true }
+          : change === 'false'
+            ? { egressAudit: false }
+            : {}),
       });
-      await reconstructed.provider.launch(ref, { command: preinstalledStartup(), env: {} });
-    });
-    expect(launches).toHaveLength(1);
-    expect(launches[0]?.egressAllowlist).toEqual(expected);
-    expect(provider.createCalls).toBe(1);
-    expect(provider.stopCalls).toEqual([]);
-  });
+      if (change === 'selection-omitted') delete input.sandboxSelection;
+
+      expect(await stub.prepare(input)).toMatchObject({
+        state: 'failed',
+        reason: 'invalid_configuration',
+      });
+      expect(await readState(stub)).toEqual(before);
+      expect(await readProviderPin(stub)).toBe(pin);
+      expect(provider.createCalls).toBe(1);
+      expect(provider.stopCalls).toEqual([]);
+    }
+  );
+
+  it.each([undefined, 'unrestricted'] as const)(
+    'reuses an audited %s allocation for an equivalent unrestricted sibling',
+    async egressMode => {
+      const provider = createFakeProvider();
+      const { stub } = await configureEgressSandbox(provider);
+      await stub.prepare(prepareInput(firstSessionId, { egressMode, egressAudit: true }));
+      await awaitStarting(provider, stub);
+      const before = await readState(stub);
+      const pin = await readProviderPin(stub);
+      expect(
+        await stub.prepare(
+          prepareInput(nextSessionId, {
+            egressMode: egressMode === undefined ? 'unrestricted' : undefined,
+            egressAudit: true,
+          })
+        )
+      ).toMatchObject({ state: 'preparing' });
+      expect(await readState(stub)).toEqual(before);
+      expect(await readProviderPin(stub)).toBe(pin);
+      expect(provider.createCalls).toBe(1);
+    }
+  );
 
   it.each([
     'changed',
@@ -3198,6 +2805,8 @@ describe('SandboxControlV2 allocation egress policy', () => {
     'mode-only-introduced',
     'mode-only-removed',
     'unrestricted',
+    'audit-enabled',
+    'audit-disabled',
   ] as const)(
     'rejects a %s active prepare policy immediately without disturbing a ready sibling',
     async mismatch => {
@@ -3208,6 +2817,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
           ? {}
           : {
               egressMode: 'allowlist' as const,
+              ...(mismatch === 'audit-disabled' ? { egressAudit: true } : {}),
               ...(mismatch === 'mode-only-removed'
                 ? {}
                 : { egressAllowlist: ['packages.example.com'] }),
@@ -3249,6 +2859,13 @@ describe('SandboxControlV2 allocation egress policy', () => {
           ...initialPolicy,
         };
       if (mismatch === 'selection-omitted') delete input.sandboxSelection;
+      if (mismatch === 'audit-enabled' || mismatch === 'audit-disabled') {
+        input.sandboxSelection = {
+          provider: 'cloudflare-containers',
+          ...initialPolicy,
+          egressAudit: mismatch === 'audit-enabled',
+        };
+      }
 
       const result = await stub.prepare(input);
 
@@ -3366,14 +2983,22 @@ describe('SandboxControlV2 allocation egress policy', () => {
     expect(provider.createCalls).toBe(0);
   });
 
-  it.each([
-    { provider: 'cloudflare' as const, sandboxKind: undefined },
-    { provider: 'vercel' as const, sandboxKind: undefined },
-    { provider: 'cloudflare-containers' as const, sandboxKind: 'shared' as const },
-    { provider: 'cloudflare-containers' as const, sandboxKind: 'code-review' as const },
-  ])(
-    'rejects ensure restrictions for $provider/$sandboxKind before creating an allocation',
-    async ({ provider: kind, sandboxKind }) => {
+  it.each(
+    [
+      { provider: 'cloudflare' as const, sandboxKind: undefined },
+      { provider: 'vercel' as const, sandboxKind: undefined },
+      { provider: 'cloudflare-containers' as const, sandboxKind: 'shared' as const },
+      { provider: 'cloudflare-containers' as const, sandboxKind: 'code-review' as const },
+    ].flatMap(placement =>
+      [
+        { egressMode: 'allowlist' as const },
+        { egressAudit: true },
+        { egressMode: 'unrestricted' as const, egressAudit: true },
+      ].map(policy => ({ ...placement, policy }))
+    )
+  )(
+    'rejects unsupported ensure policy placement before creating an allocation: %j',
+    async ({ provider: kind, sandboxKind, policy }) => {
       const provider = createFakeProvider();
       const id = sandboxKind === undefined ? sandboxId : `sbx-${'b'.repeat(48)}`;
       const { stub } = await configureEgressSandbox(provider, id);
@@ -3385,7 +3010,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
           sandboxId: id,
           provider: kind,
           sandboxKind,
-          egressMode: 'allowlist',
+          ...policy,
         })
       ).rejects.toThrow('Sandbox configuration is invalid or unsupported');
 
@@ -3396,6 +3021,33 @@ describe('SandboxControlV2 allocation egress policy', () => {
       expect(provider.stopCalls).toEqual([]);
     }
   );
+
+  it.each([
+    { provider: 'cloudflare', sandboxKind: undefined },
+    { provider: 'vercel', sandboxKind: undefined },
+    { provider: 'cloudflare-containers', sandboxKind: 'shared' },
+    { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
+  ])('rejects unsupported audited unrestricted provider pins on reload: %j', async placement => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    await stub.prepare(prepareInput(firstSessionId, { egressAudit: true }));
+    await awaitStarting(provider, stub);
+    const pin = JSON.parse((await readProviderPin(stub)) ?? '{}') as StoredProviderPin;
+    await runInDurableObject(stub, async (instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      await db
+        .update(allocationTable)
+        .set({ provider_pin: JSON.stringify({ ...pin, ...placement }) })
+        .where(eq(allocationTable.id, 'current'));
+      const persisted = instance as unknown as {
+        readProviderPin(): Promise<StoredProviderPin | null>;
+      };
+      await expect(persisted.readProviderPin()).rejects.toThrow(
+        'Sandbox configuration is invalid or unsupported'
+      );
+    });
+    expect(provider.createCalls).toBe(1);
+  });
 });
 
 describe('SandboxControlV2 prepare frame secrets', () => {
@@ -3435,6 +3087,14 @@ describe('SandboxControlV2 prepare frame secrets', () => {
     };
   }
 
+  function skillsPrepareInput(
+    sessionId: string,
+    runtimeSkills: RuntimeSkillInput[]
+  ): Parameters<DurableObjectStub<SandboxControlV2>['prepare']>[0] {
+    const input = secretsPrepareInput(sessionId, {});
+    return { ...input, spec: { ...input.spec, runtimeSkills } };
+  }
+
   async function startSecrets(
     provider: FakeProvider,
     privateKey: string | undefined,
@@ -3465,7 +3125,8 @@ describe('SandboxControlV2 prepare frame secrets', () => {
 
   async function connectHello(
     provider: FakeProvider,
-    redactsNamedSecrets: boolean
+    redactsNamedSecrets: boolean,
+    installsSkillsSh = false
   ): Promise<FakeWrapper> {
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const { credential, allocationId } = launchIdentity(provider);
@@ -3474,6 +3135,7 @@ describe('SandboxControlV2 prepare frame secrets', () => {
       wrapperId: 'wr_secrets',
       allocationId,
       ...(redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+      ...(installsSkillsSh ? { installsSkillsSh: true } : {}),
     });
     expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     return wrapper;
@@ -3548,6 +3210,70 @@ describe('SandboxControlV2 prepare frame secrets', () => {
         diagnosticEvent: 'route_failed',
         reason: 'workspace_setup_failed',
         stage: 'wrapper_redaction_unsupported',
+      })
+    );
+    expect(await wrapper.next(250)).toBeNull();
+    expect(await readRouteRow(stub, sessionId)).toMatchObject({
+      state: 'failed',
+      reason: 'workspace_setup_failed',
+    });
+  });
+
+  it('sends skills.sh source references to a wrapper that advertises installation', async () => {
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_77777777-7777-4777-8777-777777777777';
+    await stub.prepare(
+      skillsPrepareInput(sessionId, [{ name: 'find-skills', source: 'vercel-labs/skills' }])
+    );
+
+    const wrapper = await connectHello(provider, true, true);
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.runtimeSkills).toEqual([
+      { name: 'find-skills', source: 'vercel-labs/skills' },
+    ]);
+  });
+
+  it('keeps bundle-only skills compatible with a wrapper that does not advertise installation', async () => {
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_88888888-8888-4888-8888-888888888888';
+    await stub.prepare(
+      skillsPrepareInput(sessionId, [{ name: 'review', rawMarkdown: '# Review' }])
+    );
+
+    const wrapper = await connectHello(provider, true, false);
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.runtimeSkills).toEqual([{ name: 'review', rawMarkdown: '# Review' }]);
+  });
+
+  it('fails without sending when a wrapper does not advertise skills.sh installation', async () => {
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_99999999-9999-4999-8999-999999999999';
+    await stub.prepare(
+      skillsPrepareInput(sessionId, [{ name: 'find-skills', source: 'vercel-labs/skills' }])
+    );
+
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      const wrapper = await connectHello(provider, true, false);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(sessionId)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+        )
+      );
+      return wrapper;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'wrapper_skills_sh_unsupported',
       })
     );
     expect(await wrapper.next(250)).toBeNull();
@@ -3637,9 +3363,96 @@ describe('SandboxControlV2 prepare frame secrets', () => {
 });
 
 describe('SandboxControlV2 previewTarget', () => {
+  const PREVIEW_OWNER = 'preview-owner';
+  const PREVIEW_ORG = 'org-preview';
+  const PREVIEW_WORKSPACE = 'worktree_11111111-1111-4111-8111-111111111111';
+  const PREVIEW_SESSION = 'workspace_22222222-2222-4222-8222-222222222222';
+  const PREVIEW_SIBLING = 'workspace_33333333-3333-4333-8333-333333333333';
+
+  type PreviewScope = Parameters<SandboxControlV2['previewTarget']>[0];
+  type PreviewRouteState = 'preparing' | 'ready' | 'failed';
+  type PreviewRouteSeed = {
+    sessionId: string;
+    state: PreviewRouteState;
+    scopeId?: string;
+    orgId?: string;
+    workspaceId?: string;
+  };
+
+  function previewScope(overrides: Partial<PreviewScope> = {}): PreviewScope {
+    return {
+      ownerId: PREVIEW_OWNER,
+      organizationId: null,
+      scopeId: PREVIEW_WORKSPACE,
+      ...overrides,
+    };
+  }
+
+  async function seedPreviewRoutes(
+    stub: DurableObjectStub<SandboxControlV2>,
+    routes: PreviewRouteSeed[]
+  ): Promise<void> {
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.put('control_plane_owner', PREVIEW_OWNER);
+      const db = drizzle(state.storage, { logger: false });
+      for (const route of routes) {
+        const spec = {
+          sessionId: route.sessionId,
+          kiloSessionId: `kilo-${route.sessionId}`,
+          directory: `/workspace/${route.sessionId}`,
+          attemptId: `${route.sessionId}-a1`,
+        };
+        const source = {
+          userId: PREVIEW_OWNER,
+          kiloSessionId: spec.kiloSessionId,
+          kiloToken: 'preview-token',
+          ...(route.orgId === undefined ? {} : { orgId: route.orgId }),
+          ...(route.scopeId === undefined ? {} : { scopeId: route.scopeId }),
+          ...(route.workspaceId === undefined ? {} : { workspaceId: route.workspaceId }),
+        };
+        const row = {
+          session_id: route.sessionId,
+          spec: JSON.stringify(spec),
+          credential_source: JSON.stringify(source),
+          state: route.state,
+          attempt_id: spec.attemptId,
+          attempt_deadline_at: route.state === 'preparing' ? Date.now() + MINUTE : null,
+          reason: route.state === 'failed' ? 'preparation_timeout' : null,
+          updated_at: Date.now(),
+        };
+        await db
+          .insert(routesTable)
+          .values(row)
+          .onConflictDoUpdate({ target: routesTable.session_id, set: row });
+      }
+    });
+  }
+
+  function readPreviewRoute(stub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
+    return runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+      return rows[0] ?? null;
+    });
+  }
+
+  async function setPreviewAllocation(
+    stub: DurableObjectStub<SandboxControlV2>,
+    allocation: { state: 'connected' | 'stopped'; providerRef: string | null }
+  ): Promise<void> {
+    await runInDurableObject(stub, async (_instance, storage) => {
+      const db = drizzle(storage.storage, { logger: false });
+      await db
+        .update(allocationTable)
+        .set({ state: allocation.state, provider_ref: allocation.providerRef })
+        .where(eq(allocationTable.id, 'current'));
+    });
+  }
+
   it('answers an unrouted session as not_running and never enqueues', async () => {
     const stub = sandboxNamespace.getByName(`${SANDBOX_ID}__preview`);
-    const observed = await runInDurableObject(stub, async instance => {
+    const observed = await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put('control_plane_owner', PREVIEW_OWNER);
       const target = instance as unknown as {
         enqueue: (task: () => Promise<unknown>) => Promise<unknown>;
       };
@@ -3649,10 +3462,110 @@ describe('SandboxControlV2 previewTarget', () => {
         enqueueCalls += 1;
         return original(task);
       };
-      const result = await instance.previewTarget('workspace_preview_unrouted');
+      const result = await instance.previewTarget(previewScope());
       return { result, enqueueCalls };
     });
     expect(observed.result).toEqual({ status: 'not_running' });
+    expect(observed.enqueueCalls).toBe(0);
+  });
+
+  it('resolves a connected container preview by workspace scope across absent, failed and preparing routes', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await connectAndHello(provider, stub);
+
+    // A sibling route proves the workspace scope; the viewed chat has no route.
+    await seedPreviewRoutes(stub, [
+      { sessionId: PREVIEW_SIBLING, state: 'failed', scopeId: PREVIEW_WORKSPACE },
+    ]);
+    expect(await readPreviewRoute(stub, PREVIEW_SESSION)).toBeNull();
+    await expect(stub.previewTarget(previewScope())).resolves.toMatchObject({
+      status: 'ok',
+      coordinates: { provider: 'cloudflare-containers', logicalSandboxId: SANDBOX_ID },
+    });
+
+    // The viewed chat's own route is failed, then preparing. Route state is
+    // never readiness: the same connected allocation stays resolvable.
+    await seedPreviewRoutes(stub, [
+      { sessionId: PREVIEW_SESSION, state: 'failed', scopeId: PREVIEW_WORKSPACE },
+    ]);
+    const failed = await readPreviewRoute(stub, PREVIEW_SESSION);
+    await expect(stub.previewTarget(previewScope())).resolves.toMatchObject({ status: 'ok' });
+
+    await seedPreviewRoutes(stub, [
+      { sessionId: PREVIEW_SESSION, state: 'preparing', scopeId: PREVIEW_WORKSPACE },
+    ]);
+    await expect(stub.previewTarget(previewScope())).resolves.toMatchObject({ status: 'ok' });
+
+    expect(provider.createCalls).toBe(1);
+    expect(await readPreviewRoute(stub, PREVIEW_SIBLING)).toMatchObject({ state: 'failed' });
+    expect(failed).toMatchObject({ state: 'failed' });
+  });
+
+  it('denies a foreign owner, organization or workspace and reports stopped or missing refs', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await connectAndHello(provider, stub);
+    await seedPreviewRoutes(stub, [
+      {
+        sessionId: PREVIEW_SESSION,
+        state: 'failed',
+        scopeId: PREVIEW_WORKSPACE,
+        orgId: PREVIEW_ORG,
+        workspaceId: PREVIEW_WORKSPACE,
+      },
+    ]);
+    const seeded = await readPreviewRoute(stub, PREVIEW_SESSION);
+
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: PREVIEW_ORG }))
+    ).resolves.toMatchObject({ status: 'ok' });
+    await expect(
+      stub.previewTarget(previewScope({ ownerId: 'other-owner', organizationId: PREVIEW_ORG }))
+    ).resolves.toEqual({ status: 'not_running' });
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: 'other-org' }))
+    ).resolves.toEqual({ status: 'not_running' });
+    await expect(
+      stub.previewTarget(
+        previewScope({
+          scopeId: 'worktree_99999999-9999-4999-8999-999999999999',
+        })
+      )
+    ).resolves.toEqual({ status: 'not_running' });
+
+    await setPreviewAllocation(stub, { state: 'connected', providerRef: null });
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: PREVIEW_ORG }))
+    ).resolves.toEqual({ status: 'not_running' });
+
+    await setPreviewAllocation(stub, { state: 'stopped', providerRef: 'stopped-ref' });
+    await expect(
+      stub.previewTarget(previewScope({ organizationId: PREVIEW_ORG }))
+    ).resolves.toEqual({ status: 'not_running' });
+
+    // The passive read never prepares a route or starts another allocation.
+    expect(provider.createCalls).toBe(1);
+    expect(await readPreviewRoute(stub, PREVIEW_SESSION)).toEqual(seeded);
+  });
+
+  it('answers an unrouted preview service inquiry as not_running and never enqueues', async () => {
+    const stub = sandboxNamespace.getByName(`${SANDBOX_ID}__preview_services`);
+    const observed = await runInDurableObject(stub, async (instance, state) => {
+      await state.storage.put('control_plane_owner', PREVIEW_OWNER);
+      const target = instance as unknown as {
+        enqueue: (task: () => Promise<unknown>) => Promise<unknown>;
+      };
+      let enqueueCalls = 0;
+      const original = target.enqueue.bind(instance);
+      target.enqueue = task => {
+        enqueueCalls += 1;
+        return original(task);
+      };
+      const result = await instance.previewServices(previewScope());
+      return { result, enqueueCalls };
+    });
+    expect(observed.result).toEqual({ services: [], status: 'not_running' });
     expect(observed.enqueueCalls).toBe(0);
   });
 });

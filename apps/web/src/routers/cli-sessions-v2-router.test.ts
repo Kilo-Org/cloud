@@ -12,7 +12,13 @@ import {
 import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { KiloSdkStoredMessage } from '@kilocode/session-ingest-contracts';
+import { MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH } from '@kilocode/session-ingest-contracts';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
+import type * as GitHubAdapterModule from '@/lib/integrations/platforms/github/adapter';
+import {
+  createEmptyPrObservations,
+  type PrObservations,
+} from '@/lib/integrations/platforms/github/pr-observations';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import {
@@ -28,16 +34,27 @@ import type {
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
 
+function enableSupportAccess(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
+
 // Mock the cloud agent client for watermark and runtime-state tests.
 const mockGetSession = jest.fn().mockRejectedValue(new Error('not mocked'));
 const mockGetPreparationAttempts = jest.fn().mockResolvedValue([]);
 const mockDeleteCloudAgentSession = jest.fn().mockResolvedValue({ success: true });
+const mockDeleteHostedWorkspaceSession = jest.fn().mockResolvedValue({
+  success: true,
+  workspaceId: 'worktree_12345678-1234-4234-9234-123456789abc',
+  sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+});
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     getSession: mockGetSession,
     getPreparationAttempts: mockGetPreparationAttempts,
     deleteSession: mockDeleteCloudAgentSession,
+    deleteHostedWorkspaceSession: mockDeleteHostedWorkspaceSession,
   })),
   rethrowCloudAgentError: jest.fn(),
   InsufficientCreditsError: class InsufficientCreditsError extends Error {
@@ -99,15 +116,24 @@ jest.mock('@sentry/nextjs', () => {
 // module members fails. Replace `fetchPullRequestByNumber` on the already-mocked
 // adapter module with a fresh `jest.fn()` so individual tests can drive it.
 jest.mock('@/lib/integrations/platforms/github/adapter', () => {
-  const actual: Record<string, unknown> = jest.requireActual(
+  const actual = jest.requireActual<typeof GitHubAdapterModule>(
     '@/lib/integrations/platforms/github/adapter'
   );
   return {
     ...actual,
     fetchPullRequestByNumber: jest.fn(),
-    fetchPullRequestReviewDecision: jest.fn(),
+    toGitHubRateLimitError: jest.fn(actual.toGitHubRateLimitError),
   };
 });
+
+jest.mock('@/lib/integrations/platforms/github/pr-refresh-budget', () => ({
+  claimPrRefresh: jest.fn(async () => ({ allowed: true })),
+  deferPrRefresh: jest.fn(async () => undefined),
+}));
+
+jest.mock('@/lib/integrations/platforms/github/pr-status', () => ({
+  fetchPullRequestObservations: jest.fn(),
+}));
 
 // Same trick for the paginated session-message client. The web router only
 // calls `fetchSessionMessagesPage`; the rest of the module keeps its real
@@ -135,10 +161,11 @@ const mockedFetchPullRequestByNumber =
   githubAdapter.fetchPullRequestByNumber as jest.MockedFunction<
     typeof githubAdapter.fetchPullRequestByNumber
   >;
-const mockedFetchPullRequestReviewDecision =
-  githubAdapter.fetchPullRequestReviewDecision as jest.MockedFunction<
-    typeof githubAdapter.fetchPullRequestReviewDecision
-  >;
+const mockedFetchPullRequestObservations = (
+  jest.requireMock('@/lib/integrations/platforms/github/pr-status') as {
+    fetchPullRequestObservations: jest.Mock;
+  }
+).fetchPullRequestObservations;
 
 let regularUser: User;
 let otherUser: User;
@@ -263,6 +290,11 @@ describe('cli-sessions-v2-router', () => {
     afterCallbacks.length = 0;
     mockedNotifyCliSessionRenamed.mockReset().mockResolvedValue({ delivered: true });
     mockDeleteCloudAgentSession.mockReset().mockResolvedValue({ success: true });
+    mockDeleteHostedWorkspaceSession.mockReset().mockResolvedValue({
+      success: true,
+      workspaceId: 'worktree_12345678-1234-4234-9234-123456789abc',
+      sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    });
     mockedCaptureException.mockClear();
   });
 
@@ -490,6 +522,25 @@ describe('cli-sessions-v2-router', () => {
 
     it.each([
       ['src/relative.ts', 'src/relative.ts'],
+      ['/workspace/app/src/app.ts', `/cloud-agent/sessions/${sessionId}/src/app.ts`],
+      [
+        '/workspace/app/sessions/ses_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [
+        '/workspace/app/worktrees/worktree_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [
+        '/workspace/user-1/worktrees/worktree_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      [
+        '/workspace/org-1/user-1/sessions/ses_abc/src/app.ts',
+        `/cloud-agent/sessions/${sessionId}/src/app.ts`,
+      ],
+      ['/workspace/application/src/app.ts', `/cloud-agent/sessions/${sessionId}`],
+      ['/workspace/app/../private/app.ts', `/cloud-agent/sessions/${sessionId}`],
       [
         `/cloud-agent/sessions/${sessionId}/src/app.ts`,
         `/cloud-agent/sessions/${sessionId}/src/app.ts`,
@@ -510,7 +561,37 @@ describe('cli-sessions-v2-router', () => {
             messages: [
               {
                 info: { id: 'msg_assistant', role: 'assistant' },
-                parts: [{ id: 'prt_patch', type: 'patch', files: [path] }],
+                parts: [
+                  { id: 'prt_patch', type: 'patch', files: [path] },
+                  {
+                    id: 'prt_read',
+                    type: 'tool',
+                    tool: 'read',
+                    state: {
+                      input: {
+                        filePath: path,
+                        file_path: path,
+                        directory: path,
+                        cwd: path,
+                        root: path,
+                        workdir: path,
+                        movePath: path,
+                      },
+                    },
+                  },
+                  {
+                    id: 'prt_grep',
+                    type: 'tool',
+                    tool: 'grep',
+                    state: { input: { path, pattern: 'needle' } },
+                  },
+                  {
+                    id: 'prt_glob',
+                    type: 'tool',
+                    tool: 'glob',
+                    state: { input: { path, pattern: '**/*.ts' } },
+                  },
+                ],
               },
             ],
           }),
@@ -523,6 +604,25 @@ describe('cli-sessions-v2-router', () => {
 
       expect(result.info).toMatchObject({ summary: { diffs: [{ file: expected }] } });
       expect(result.messages[0].parts[0]).toMatchObject({ files: [expected] });
+      expect(result.messages[0].parts[1]).toMatchObject({
+        state: {
+          input: {
+            filePath: expected,
+            file_path: expected,
+            directory: expected,
+            cwd: expected,
+            root: expected,
+            workdir: expected,
+            movePath: expected,
+          },
+        },
+      });
+      expect(result.messages[0].parts[2]).toMatchObject({
+        state: { input: { path: expected, pattern: 'needle' } },
+      });
+      expect(result.messages[0].parts[3]).toMatchObject({
+        state: { input: { path: expected, pattern: '**/*.ts' } },
+      });
     });
 
     it.each([true, false])(
@@ -622,7 +722,7 @@ describe('cli-sessions-v2-router', () => {
       '/srv/runtime/private/worktrees/worktree_12345678-1234-4234-9234-123456789abc';
     let fetchSessionMessagesPage: jest.MockedFunction<typeof FetchSessionMessagesPageType>;
 
-    function privateAssistantMessage(): KiloSdkStoredMessage {
+    function privateAssistantMessage(directory = privateDirectory): KiloSdkStoredMessage {
       return {
         info: {
           id: 'msg_assistant_01',
@@ -634,7 +734,7 @@ describe('cli-sessions-v2-router', () => {
           providerID: 'openrouter',
           mode: 'code',
           agent: 'code',
-          path: { cwd: privateDirectory, root: privateDirectory },
+          path: { cwd: directory, root: directory },
           cost: 0,
           tokens: {
             input: 1,
@@ -650,11 +750,11 @@ describe('cli-sessions-v2-router', () => {
             messageID: 'msg_assistant_01',
             type: 'file',
             mime: 'text/plain',
-            url: `file://${privateDirectory}/attachment.txt`,
+            url: `file://${directory}/attachment.txt`,
             source: {
               type: 'file',
               text: { value: 'attachment', start: 0, end: 10 },
-              path: `${privateDirectory}/attachment.txt`,
+              path: `${directory}/attachment.txt`,
             },
           },
           {
@@ -663,7 +763,7 @@ describe('cli-sessions-v2-router', () => {
             messageID: 'msg_assistant_01',
             type: 'patch',
             hash: 'patch',
-            files: [`${privateDirectory}/src/app.ts`, 'relative.ts'],
+            files: [`${directory}/src/app.ts`, 'relative.ts'],
           },
           {
             id: 'prt_tool_01',
@@ -674,15 +774,15 @@ describe('cli-sessions-v2-router', () => {
             tool: 'read',
             state: {
               status: 'completed',
-              input: { filePath: `${privateDirectory}/src/app.ts` },
-              output: `Read ${privateDirectory}/src/app.ts and src/relative.ts`,
+              input: { filePath: `${directory}/src/app.ts` },
+              output: `Read ${directory}/src/app.ts and src/relative.ts`,
               title: 'Read file',
               time: { start: 1761000000100, end: 1761000000200 },
               metadata: {
-                filediff: { file: `${privateDirectory}/src/app.ts` },
+                filediff: { file: `${directory}/src/app.ts` },
                 outputs: [
-                  `${privateDirectory}/result.txt`,
-                  { output: `Read ${privateDirectory}/nested.txt`, relative: 'src/relative.ts' },
+                  `${directory}/result.txt`,
+                  { output: `Read ${directory}/nested.txt`, relative: 'src/relative.ts' },
                 ],
               },
             },
@@ -692,7 +792,7 @@ describe('cli-sessions-v2-router', () => {
             sessionID: sessionId,
             messageID: 'msg_assistant_01',
             type: 'text',
-            text: `Updated ${privateDirectory}/src/app.ts and src/relative.ts`,
+            text: `Updated ${directory}/src/app.ts and src/relative.ts`,
           },
         ],
       };
@@ -761,11 +861,45 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
       });
       expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
         limit: 50,
       });
+    });
+
+    it('projects the parent session id so a client needs no second session read', async () => {
+      const parentSessionId = 'ses_messages_page_parent_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: parentSessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ parent_session_id: parentSessionId })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+      ).resolves.toEqual({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        watermarkEventId: null,
+        parentSessionId,
+        preparationAttempts: [],
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ parent_session_id: null })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, parentSessionId));
     });
 
     it('projects grouped paginated assistant and attachment paths into their own public directory', async () => {
@@ -823,11 +957,53 @@ describe('cli-sessions-v2-router', () => {
           omittedItemCount: 2,
         },
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
       });
       expect(JSON.stringify(result)).not.toContain(privateDirectory);
       expect(message).toEqual(privateAssistantMessage());
     });
+
+    it.each([
+      '/workspace/app',
+      '/workspace/user-1/worktrees/worktree_abc',
+      '/workspace/org-1/user-1/sessions/ses_abc',
+    ])(
+      'preserves known workspace filenames in grouped paginated history from %s',
+      async directory => {
+        await db
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+          .where(eq(cli_sessions_v2.session_id, sessionId));
+        const message = privateAssistantMessage(directory);
+        fetchSessionMessagesPage.mockResolvedValueOnce({
+          kiloSessionId: sessionId,
+          history: { messages: [message], nextCursor: null, omittedItemCount: 0 },
+        });
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId });
+        const publicDirectory = `/cloud-agent/sessions/${sessionId}`;
+
+        expect(result.history).toMatchObject({
+          messages: [
+            {
+              parts: [
+                { url: '', source: { path: `${publicDirectory}/attachment.txt` } },
+                { files: [`${publicDirectory}/src/app.ts`, 'relative.ts'] },
+                {
+                  state: {
+                    input: { filePath: `${publicDirectory}/src/app.ts` },
+                    output: `Read ${directory}/src/app.ts and src/relative.ts`,
+                  },
+                },
+                { text: `Updated ${directory}/src/app.ts and src/relative.ts` },
+              ],
+            },
+          ],
+        });
+        expect(message).toEqual(privateAssistantMessage(directory));
+      }
+    );
 
     it('preserves private-path fields unchanged for ungrouped paginated history', async () => {
       const message = privateAssistantMessage();
@@ -841,6 +1017,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
       });
     });
@@ -861,6 +1038,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: sessionId,
           history,
           watermarkEventId: null,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       }
@@ -948,6 +1126,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
         sessionGoal: goal,
       });
@@ -974,6 +1153,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history,
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
       });
     });
@@ -1001,6 +1181,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: sessionId,
           history,
           watermarkEventId: null,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       }
@@ -1022,6 +1203,7 @@ describe('cli-sessions-v2-router', () => {
         kiloSessionId: sessionId,
         history: { messages: [], nextCursor: null, omittedItemCount: 0 },
         watermarkEventId: null,
+        parentSessionId: null,
         preparationAttempts: [],
       });
     });
@@ -1163,6 +1345,19 @@ describe('cli-sessions-v2-router', () => {
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
 
+    it('rejects an over-length continuation cursor before calling the client', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          limit: 10,
+          cursor: 'A'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1),
+        })
+      ).rejects.toThrow();
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
     it('rejects an invalid session id before calling the client', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
@@ -1210,6 +1405,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: 42,
+          parentSessionId: null,
           preparationAttempts: [],
         });
         expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
@@ -1234,6 +1430,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       });
@@ -1256,6 +1453,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       });
@@ -1289,6 +1487,7 @@ describe('cli-sessions-v2-router', () => {
         mockGetPreparationAttempts.mockRejectedValueOnce(new Error('No procedure found'));
         await expect(read()).resolves.toMatchObject({
           watermarkEventId: 42,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       });
@@ -1316,6 +1515,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: null,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       });
@@ -1389,6 +1589,7 @@ describe('cli-sessions-v2-router', () => {
           kiloSessionId: watermarkSessionId,
           history: { messages: [], nextCursor: null, omittedItemCount: 0 },
           watermarkEventId: 99,
+          parentSessionId: null,
           preparationAttempts: [],
         });
       });
@@ -1498,7 +1699,6 @@ describe('cli-sessions-v2-router', () => {
         session_id: sessionId,
         kilo_user_id: regularUser.id,
         cloud_agent_session_id: cloudAgentSessionId,
-        cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc',
         created_on_platform: 'cloud-agent-web',
       });
       fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
@@ -1518,22 +1718,26 @@ describe('cli-sessions-v2-router', () => {
         'throws an operational failure',
         () => mockDeleteCloudAgentSession.mockRejectedValueOnce(new Error('Worker unavailable')),
       ],
-    ])('preserves the real ownership row when the Worker %s', async (_, failDeletion) => {
-      failDeletion();
-      const caller = await createCallerForUser(regularUser.id);
+    ])(
+      'continues ingest cleanup with pending cleanup when the Worker %s',
+      async (_, failDeletion) => {
+        failDeletion();
+        const caller = await createCallerForUser(regularUser.id);
 
-      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to clean up cloud-agent session',
-      });
+        await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
+          success: true,
+          session_id: sessionId,
+          cleanup: 'pending',
+        });
 
-      const [persisted] = await db
-        .select({ sessionId: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
-        .where(eq(cli_sessions_v2.session_id, sessionId));
-      expect(persisted?.sessionId).toBe(sessionId);
-      expect(fetchSpy).not.toHaveBeenCalled();
-    });
+        expect(mockDeleteCloudAgentSession).toHaveBeenCalledWith(cloudAgentSessionId);
+        expect(fetchSpy).toHaveBeenCalledWith(
+          `https://test-ingest.example.com/api/session/${encodeURIComponent(sessionId)}`,
+          expect.objectContaining({ method: 'DELETE' })
+        );
+        expect(jest.mocked(captureException)).toHaveBeenCalled();
+      }
+    );
 
     it('continues idempotent ownership cleanup after a typed runtime NOT_FOUND', async () => {
       const error = new TRPCClientError('Runtime session not found', {
@@ -1551,6 +1755,7 @@ describe('cli-sessions-v2-router', () => {
       await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
         success: true,
         session_id: sessionId,
+        cleanup: 'complete',
       });
 
       expect(mockDeleteCloudAgentSession).toHaveBeenCalledWith(cloudAgentSessionId);
@@ -1570,6 +1775,7 @@ describe('cli-sessions-v2-router', () => {
       await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
         success: true,
         session_id: sessionId,
+        cleanup: 'complete',
       });
 
       expect(mockDeleteCloudAgentSession).not.toHaveBeenCalled();
@@ -1680,6 +1886,26 @@ describe('cli-sessions-v2-router', () => {
 
         expect(result.cliSessions.map(session => session.session_id)).toContain(adminSessionId);
       } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
+      }
+    });
+
+    it('support access removes the platform-admin cross-organization list bypass', async () => {
+      const adminSessionId = 'ses_read_auth_admin_enforce_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: adminSessionId,
+        kilo_user_id: adminUser.id,
+        organization_id: testOrganization.id,
+        created_on_platform: 'cloud-agent',
+      });
+
+      enableSupportAccess(true);
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.cliSessionsV2.list({});
+        expect(result.cliSessions.map(session => session.session_id)).not.toContain(adminSessionId);
+      } finally {
+        enableSupportAccess(false);
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
       }
     });
@@ -1955,6 +2181,20 @@ describe('cli-sessions-v2-router', () => {
         repo: 'repo',
       });
     });
+    it('strips trailing .git after trailing slashes', () => {
+      expect(parseGitHubOwnerRepo('https://github.com/kilo/repo.git/')).toEqual({
+        owner: 'kilo',
+        repo: 'repo',
+      });
+      expect(parseGitHubOwnerRepo('https://github.com/kilo/repo/')).toEqual({
+        owner: 'kilo',
+        repo: 'repo',
+      });
+      expect(parseGitHubOwnerRepo('git@github.com:kilo/repo.git/')).toEqual({
+        owner: 'kilo',
+        repo: 'repo',
+      });
+    });
     it('parses ssh URLs', () => {
       expect(parseGitHubOwnerRepo('git@github.com:kilo/repo.git')).toEqual({
         owner: 'kilo',
@@ -1975,6 +2215,14 @@ describe('cli-sessions-v2-router', () => {
       expect(parseGitHubOwnerRepo('https://github.com/kilo')).toBeNull();
       expect(parseGitHubOwnerRepo('https://github.com/kilo/repo/tree/main')).toBeNull();
       expect(parseGitHubOwnerRepo('not-a-url')).toBeNull();
+    });
+    it('rejects owner and repo values outside GitHub name charset for every URL form', () => {
+      expect(parseGitHubOwnerRepo('https://github.com/acme.corp/repo')).toBeNull();
+      expect(parseGitHubOwnerRepo('https://github.com/kilo/repo[1]')).toBeNull();
+      expect(parseGitHubOwnerRepo('git@github.com:acme corp/repo.git')).toBeNull();
+      expect(parseGitHubOwnerRepo('git@github.com:kilo/repo;1.git')).toBeNull();
+      expect(parseGitHubOwnerRepo('ssh://git@github.com/acme.corp/repo.git')).toBeNull();
+      expect(parseGitHubOwnerRepo('ssh://git@github.com/kilo/repo[1].git')).toBeNull();
     });
   });
 
@@ -2014,6 +2262,12 @@ describe('cli-sessions-v2-router', () => {
       expect(parseGitHubPrUrl('https://gitlab.com/kilo/repo/pull/42')).toBeNull();
       expect(parseGitHubPrUrl('https://github.com/kilo/repo/pull/abc')).toBeNull();
       expect(parseGitHubPrUrl('not-a-url')).toBeNull();
+    });
+    it('rejects owner and repo values outside GitHub name charset', () => {
+      expect(parseGitHubPrUrl('https://github.com/acme.corp/repo/pull/42')).toBeNull();
+      expect(parseGitHubPrUrl('https://github.com/kilo/repo[1]/pull/42')).toBeNull();
+      expect(parseGitHubPrUrl('git@github.com:acme corp/repo/pull/42')).toBeNull();
+      expect(parseGitHubPrUrl('https://github.com/kilo/re po/pull/42')).toBeNull();
     });
   });
 
@@ -2163,6 +2417,50 @@ describe('cli-sessions-v2-router', () => {
         headSha: 'deadbeefcafe',
       });
       expect(typeof result.associatedPr?.lastSyncedAt).toBe('string');
+    });
+
+    it('returns compact webhook observations without exposing raw evidence', async () => {
+      const head = 'a'.repeat(40);
+      await db
+        .update(github_branch_pull_requests)
+        .set({
+          pr_head_sha: head,
+          pr_observations: {
+            version: 1,
+            headSha: head,
+            checks: [
+              { key: 'check:1:test', id: '1', attempt: 1, at: null, phase: 2, failed: true },
+            ],
+            threads: [{ rootId: '2', threadId: null, state: 'unresolved' }],
+            threadsObserved: true,
+            threadsUnknown: false,
+            checksTruncated: false,
+            threadsTruncated: false,
+          },
+        })
+        .where(
+          and(
+            eq(github_branch_pull_requests.git_url, CACHE_GIT_URL),
+            eq(github_branch_pull_requests.owned_by_user_id, regularUser.id)
+          )
+        );
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionWithPr });
+      expect(result.associatedPr?.observations).toEqual({
+        checks: {
+          total: 1,
+          failed: 1,
+          passed: 0,
+          pending: 0,
+          skipped: 0,
+          unknown: 0,
+          complete: false,
+        },
+        unresolvedThreads: 1,
+        threadsComplete: false,
+        truncated: false,
+      });
+      expect(result).not.toHaveProperty('pr_observations');
     });
 
     it('returns null associatedPr when the session has no stored link', async () => {
@@ -2398,6 +2696,7 @@ describe('cli-sessions-v2-router', () => {
         headSha: null,
         reviewDecision: null,
         reviewDecisionPending: true,
+        observations: null,
         platform: 'github',
       });
     });
@@ -2739,6 +3038,7 @@ describe('cli-sessions-v2-router', () => {
         headSha: null,
         reviewDecision: null,
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       });
     });
@@ -2765,6 +3065,7 @@ describe('cli-sessions-v2-router', () => {
         number: 999,
         state: 'unknown',
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
       });
     });
@@ -3028,6 +3329,10 @@ describe('cli-sessions-v2-router', () => {
         baseRepoFullName: 'kilo/repo',
         headRepoFullName: 'kilo/repo',
         headRef: SESSION_BRANCH,
+        baseRef: 'main',
+        stackNumber: 2,
+        stackPosition: 1,
+        stackSize: 3,
         ...overrides,
       };
     }
@@ -3076,7 +3381,11 @@ describe('cli-sessions-v2-router', () => {
       integrationId = integration.id;
 
       mockedFetchPullRequestByNumber.mockReset();
-      mockedFetchPullRequestReviewDecision.mockReset().mockResolvedValue('approved');
+      mockedFetchPullRequestObservations.mockReset().mockResolvedValue({
+        observations: createEmptyPrObservations(),
+        reviewDecision: 'approved',
+        reviewDecisionFetched: true,
+      });
     });
 
     afterEach(async () => {
@@ -3099,7 +3408,8 @@ describe('cli-sessions-v2-router', () => {
         .update(cli_sessions_v2)
         .set({ pr_head_sha: 'abc123' })
         .where(eq(cli_sessions_v2.session_id, sessionId));
-      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts());
+      const fetched = ownPrFacts();
+      mockedFetchPullRequestByNumber.mockResolvedValue(fetched);
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
@@ -3115,7 +3425,21 @@ describe('cli-sessions-v2-router', () => {
         appType: 'standard',
         includeCommits: true,
         expectedHeadSha: 'abc123',
+        signal: expect.any(AbortSignal),
       });
+      expect(mockedFetchPullRequestObservations).toHaveBeenCalledTimes(1);
+      expect(mockedFetchPullRequestObservations).toHaveBeenCalledWith({
+        installationId: '12345',
+        integrationId,
+        owner: 'kilo',
+        repo: 'repo',
+        number: 7,
+        appType: 'standard',
+        pullRequest: fetched,
+        existing: null,
+        signal: expect.any(AbortSignal),
+      });
+      expect(mockedFetchPullRequestObservations.mock.calls[0][0].pullRequest).toBe(fetched);
       expect(result.associatedPr).toMatchObject({
         url: SESSION_PR_URL,
         number: 7,
@@ -3124,7 +3448,12 @@ describe('cli-sessions-v2-router', () => {
         headSha: 'abc123',
         reviewDecision: 'approved',
         reviewDecisionPending: false,
+        observations: null,
         platform: 'github',
+        baseRef: 'main',
+        stackNumber: 2,
+        stackPosition: 1,
+        stackSize: 3,
       });
 
       const [persisted] = await readCacheRows();
@@ -3142,6 +3471,97 @@ describe('cli-sessions-v2-router', () => {
         .from(cli_sessions_v2)
         .where(eq(cli_sessions_v2.session_id, sessionId));
       expect(sessionRow.verifiedAt).not.toBeNull();
+    });
+
+    it('persists fetched observations and returns their derived summary', async () => {
+      const head = 'd'.repeat(40);
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_sha: head })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      const observations: PrObservations = {
+        ...createEmptyPrObservations(),
+        headSha: head,
+        checksObserved: true,
+        checksComplete: true,
+        checks: [
+          {
+            key: 'check:1:ci',
+            id: '1',
+            attempt: 1,
+            at: null,
+            phase: 2,
+            failed: false,
+            outcome: 'passed',
+          },
+        ],
+        threadsObserved: true,
+        threadsComplete: true,
+        threads: [{ rootId: '2', threadId: 'thread-1', state: 'unresolved' }],
+      };
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts({ headSha: head }));
+      mockedFetchPullRequestObservations.mockResolvedValue({
+        observations,
+        reviewDecision: 'approved',
+        reviewDecisionFetched: true,
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr?.observations).toEqual({
+        checks: {
+          total: 1,
+          failed: 0,
+          passed: 1,
+          pending: 0,
+          skipped: 0,
+          unknown: 0,
+          complete: true,
+        },
+        unresolvedThreads: 1,
+        truncated: false,
+        threadsComplete: true,
+      });
+      const [persisted] = await readCacheRows();
+      expect(persisted.pr_observations).toEqual(observations);
+      expect(persisted.pr_head_sha).toBe(head);
+    });
+
+    it('preserves an existing review decision when the observation helper cannot fetch reviews', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_link_verified_at: new Date().toISOString() })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      await db.insert(github_branch_pull_requests).values({
+        git_url: SESSION_GIT_URL,
+        git_branch: SESSION_BRANCH,
+        owned_by_user_id: regularUser.id,
+        pr_url: SESSION_PR_URL,
+        pr_number: SESSION_PR_NUMBER,
+        pr_state: 'open',
+        pr_title: 'Existing cache title',
+        pr_head_sha: 'old-sha',
+        pr_review_decision: 'approved',
+        pr_last_synced_at: new Date(Date.now() - 90_000).toISOString(),
+      });
+      const fetched = ownPrFacts();
+      mockedFetchPullRequestByNumber.mockResolvedValue(fetched);
+      mockedFetchPullRequestObservations.mockResolvedValue({
+        observations: createEmptyPrObservations(),
+        reviewDecision: null,
+        reviewDecisionFetched: false,
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr?.reviewDecision).toBe('approved');
+      const [persisted] = await readCacheRows();
+      expect(persisted).toMatchObject({
+        pr_head_sha: fetched.headSha,
+        pr_review_decision: 'approved',
+      });
     });
 
     it('rejects a PR whose head repository is a fork', async () => {

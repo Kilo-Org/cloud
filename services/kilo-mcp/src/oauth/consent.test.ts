@@ -128,6 +128,7 @@ function createFakeStore(): OAuthStoreApi &
         id: input.id,
         authRequest: input.authRequest,
         deviceAuthCode: input.deviceAuthCode,
+        userCode: input.userCode,
         status: 'pending',
         kiloUserId: null,
         organizationId: null,
@@ -246,6 +247,7 @@ async function seedPending(
     id,
     authRequest: authRequest(),
     deviceAuthCode: overrides.deviceAuthCode ?? 'PAIR-1',
+    userCode: 'SHOW-CODE',
     flowToken: overrides.flowToken ?? FLOW_TOKEN,
     createdAt: iso(-1000),
     expiresAt: overrides.expiresAt ?? iso(600_000),
@@ -338,6 +340,13 @@ async function run(handler: ExportedHandler<Env>, request: Request, env: Env): P
   return handler.fetch!(request as unknown as CfRequest, env, {} as ExecutionContext);
 }
 
+/** The requesting client the fake apps/web stores and echoes for a pairing. */
+const REQUESTING_CLIENT = {
+  clientId: CLIENT_ID,
+  clientName: 'Test Client',
+  redirectOrigin: 'https://client.test',
+};
+
 /**
  * A fetch fake routed by URL for the whole device-auth + org-list + admin
  * flow. `isAdmin` answers the paired identity's `user.getMe` read.
@@ -351,9 +360,21 @@ function flowFetch(
     for (const [suffix, response] of Object.entries(overrides)) {
       if (url.endsWith(suffix)) return response();
     }
-    if (url.endsWith('/api/device-auth/codes')) return Response.json({ code: 'PAIR-1' });
+    if (url.endsWith('/api/device-auth/codes')) {
+      return Response.json({
+        code: 'PAIR-1',
+        user_code: 'SHOW-CODE',
+        requestingClient: REQUESTING_CLIENT,
+      });
+    }
     if (url.endsWith('/api/device-auth/codes/PAIR-1')) {
-      return Response.json({ status: 'approved', token: 'kilo-tok-1', userId: 'u-1' });
+      return Response.json({
+        status: 'approved',
+        token: 'kilo-tok-1',
+        userId: 'u-1',
+        requestingClient: REQUESTING_CLIENT,
+        clientConfirmed: true,
+      });
     }
     if (url.includes('/api/trpc/user.getMe')) {
       return Response.json({ result: { data: { isAdmin: options.isAdmin ?? false } } });
@@ -415,6 +436,8 @@ describe('GET /authorize (consent)', () => {
     const html = await response.text();
     expect(html).toContain('Connect to Kilo MCP');
     expect(html).toContain('Test Client');
+    expect(html).toContain(`${WEB}/device-auth?code=SHOW-CODE`);
+    expect(html).not.toContain('PAIR-1');
     const id = [...store.pending.keys()][0]!;
     // The status URL carries the internal pending id, never the device-auth code.
     expect(html).toContain(`/authorize/status?id=${id}`);
@@ -426,7 +449,11 @@ describe('GET /authorize (consent)', () => {
         id
       )
     ).toThrow();
-    expect(store.pending.get(id)).toMatchObject({ deviceAuthCode: 'PAIR-1', status: 'pending' });
+    expect(store.pending.get(id)).toMatchObject({
+      deviceAuthCode: 'PAIR-1',
+      userCode: 'SHOW-CODE',
+      status: 'pending',
+    });
     expect(calls).toEqual([{ phase: 'started', identity: null, clientId: CLIENT_ID }]);
     expectNoCredentialLeak(calls);
   });
@@ -501,6 +528,86 @@ describe('GET /authorize (consent)', () => {
     expectNoCredentialLeak(calls);
   });
 
+  it('names the client and the redirect origin it is asking about', async () => {
+    const store = createFakeStore();
+    const { helpers } = fakeHelpers({ authRequest: authRequest(), client: clientInfo() });
+    const bodies: unknown[] = [];
+    const fetchImpl = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/api/device-auth/codes')) {
+        const body = init?.body;
+        if (typeof body !== 'string') throw new Error('expected a JSON string pairing body');
+        bodies.push(JSON.parse(body));
+        return Response.json({
+          code: 'PAIR-1',
+          user_code: 'SHOW-CODE',
+          requestingClient: REQUESTING_CLIENT,
+        });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    }) as unknown as typeof fetch;
+    const response = await run(
+      createDefaultHandler(deps(store, fetchImpl)),
+      authorizeRequestFor(),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(200);
+    expect(bodies).toEqual([
+      {
+        requesting_client: {
+          client_id: CLIENT_ID,
+          client_name: 'Test Client',
+          redirect_origin: 'https://client.test',
+        },
+      },
+    ]);
+    expect(store.pending.size).toBe(1);
+  });
+
+  it('opens no pairing for a redirect URI that cannot be presented', async () => {
+    const store = createFakeStore();
+    const { helpers } = fakeHelpers({
+      authRequest: { ...authRequest(), redirectUri: 'not-a-url' },
+      client: clientInfo(),
+    });
+    const { analytics, calls } = fakeAnalytics();
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('must not open a pairing');
+    }) as unknown as typeof fetch;
+    const response = await run(
+      createDefaultHandler(deps(store, fetchImpl, { analytics })),
+      authorizeRequestFor(),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(400);
+    expect(store.pending.size).toBe(0);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, clientId: CLIENT_ID, reason: 'invalid_request' },
+    ]);
+  });
+
+  it('returns a retryable 503 when apps/web does not store the client it was asked about', async () => {
+    const store = createFakeStore();
+    const { helpers } = fakeHelpers({ authRequest: authRequest(), client: clientInfo() });
+    const { analytics, calls } = fakeAnalytics();
+    const fetchImpl = vi.fn(async () =>
+      Response.json({ code: 'PAIR-1', user_code: 'SHOW-CODE' })
+    ) as unknown as typeof fetch;
+    const response = await run(
+      createDefaultHandler(deps(store, fetchImpl, { analytics })),
+      authorizeRequestFor(),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(503);
+    expect(await response.text()).toMatch(/Kilo sign-in could not confirm this app/);
+    expect(store.pending.size).toBe(0);
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, clientId: CLIENT_ID, reason: 'client_unconfirmed' },
+    ]);
+    expectNoCredentialLeak(calls);
+  });
+
   it('returns a retryable 503 with rate-limit copy when apps/web answers 429', async () => {
     const store = createFakeStore();
     const { helpers } = fakeHelpers({ authRequest: authRequest(), client: clientInfo() });
@@ -547,7 +654,13 @@ describe('GET /authorize/status', () => {
         polls += 1;
         // Single-use upstream: only the first poll ever sees approved.
         return polls === 1
-          ? Response.json({ status: 'approved', token: 'kilo-tok-1', userId: 'u-1' })
+          ? Response.json({
+              status: 'approved',
+              token: 'kilo-tok-1',
+              userId: 'u-1',
+              requestingClient: REQUESTING_CLIENT,
+              clientConfirmed: true,
+            })
           : new Response('', { status: 410 });
       },
     });
@@ -652,6 +765,89 @@ describe('GET /authorize/status', () => {
       { phase: 'failed', identity: null, clientId: CLIENT_ID, reason: 'expired' },
     ]);
     expectNoCredentialLeak(calls);
+  });
+
+  it.each([
+    [
+      'a different client id',
+      { ...REQUESTING_CLIENT, clientId: 'client-other' },
+      { clientConfirmed: true },
+    ],
+    [
+      'a different redirect origin',
+      { ...REQUESTING_CLIENT, redirectOrigin: 'https://elsewhere.test' },
+      { clientConfirmed: true },
+    ],
+    ['an unconfirmed client', REQUESTING_CLIENT, { clientConfirmed: false }],
+    ['no confirmation flag', REQUESTING_CLIENT, {}],
+  ])(
+    'completes only the client the authorization was started for: %s',
+    async (_label, requestingClient, extra) => {
+      const store = createFakeStore();
+      await seedPending(store);
+      const fetchImpl = flowFetch({
+        '/api/device-auth/codes/PAIR-1': () =>
+          Response.json({
+            status: 'approved',
+            token: 'kilo-tok-1',
+            userId: 'u-1',
+            requestingClient,
+            ...extra,
+          }),
+      });
+      const { analytics, calls } = fakeAnalytics();
+      const handler = createDefaultHandler(deps(store, fetchImpl, { analytics }));
+      const env = envWith(fakeHelpers({}).helpers);
+      await expect(
+        run(
+          handler,
+          new Request(`${ISSUER}/authorize/status?id=pa-1`, {
+            headers: { Cookie: flowCookie() },
+          }),
+          env
+        ).then(r => r.json())
+      ).resolves.toEqual({ status: 'denied' });
+      // No identity is stored for the record and it is closed for good.
+      expect(store.pending.get('pa-1')).toMatchObject({
+        status: 'denied',
+        kiloUserId: null,
+        kiloToken: null,
+      });
+      await expect(
+        run(
+          handler,
+          new Request(`${ISSUER}/authorize/status?id=pa-1`, {
+            headers: { Cookie: flowCookie() },
+          }),
+          env
+        ).then(r => r.json())
+      ).resolves.toEqual({ status: 'denied' });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(calls).toEqual([
+        { phase: 'failed', identity: null, clientId: CLIENT_ID, reason: 'client_not_confirmed' },
+      ]);
+      expectNoCredentialLeak(calls);
+    }
+  );
+
+  it('completes the client the authorization was started for', async () => {
+    const store = createFakeStore();
+    await seedPending(store);
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    await expect(
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/status?id=pa-1`, {
+          headers: { Cookie: flowCookie() },
+        }),
+        envWith(fakeHelpers({}).helpers)
+      ).then(r => r.json())
+    ).resolves.toEqual({ status: 'needs_org', picker_url: '/authorize/org?id=pa-1' });
+    expect(store.pending.get('pa-1')).toMatchObject({
+      status: 'pending',
+      kiloUserId: 'u-1',
+      kiloToken: 'kilo-tok-1',
+    });
   });
 
   it('answers unknown for a missing id, an unknown record, and an expired record', async () => {
@@ -815,7 +1011,23 @@ describe('GET/POST /authorize/org', () => {
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain('Connect to Kilo MCP');
-    expect(html).toContain(`${WEB}/device-auth?code=PAIR-1`);
+    expect(html).toContain(`${WEB}/device-auth?code=SHOW-CODE`);
+  });
+
+  it('returns the stale-request response for an incomplete stored request', async () => {
+    const store = createFakeStore();
+    await seedPending(store);
+    const record = await store.getPendingAuthorization('pa-1');
+    if (!record) throw new Error('expected pending fixture');
+    store.pending.set('pa-1', { ...record, userCode: null });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch())),
+      new Request(`${ISSUER}/authorize/org?id=pa-1`, { headers: { Cookie: flowCookie() } }),
+      envWith(fakeHelpers({ client: clientInfo() }).helpers)
+    );
+    expect(response.status).toBe(400);
+    expect(await response.text()).not.toContain('/device-auth?code=');
+    expect(store.pending.get('pa-1')).toEqual({ ...record, userCode: null });
   });
 
   it('binds a member organization and completes the authorization with the library', async () => {

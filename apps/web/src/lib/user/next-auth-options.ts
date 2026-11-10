@@ -5,12 +5,14 @@ import { cookies, headers } from 'next/headers';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
+import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import type { NextAuthOptions, Account, User as NextUser, Profile } from 'next-auth';
 import NextAuth from 'next-auth';
 import type { GoogleProfile } from 'next-auth/providers/google';
 import type { OAuthConfig } from 'next-auth/providers/oauth';
 import GoogleProvider from 'next-auth/providers/google';
-import GithubProvider from 'next-auth/providers/github';
+import GithubProvider, { type GithubEmail } from 'next-auth/providers/github';
+import type { DiscordProfile } from 'next-auth/providers/discord';
 import GitlabProvider from 'next-auth/providers/gitlab';
 import LinkedInProvider from 'next-auth/providers/linkedin';
 import DiscordProvider from 'next-auth/providers/discord';
@@ -31,6 +33,7 @@ import {
 import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
+import { randomBytes } from 'node:crypto';
 import type { User } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
@@ -43,7 +46,18 @@ import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizat
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
-import { linkAccountToExistingUser } from '@/lib/user';
+import {
+  findUserIdByAuthProvider,
+  getUserAuthProviders,
+  linkAccountToExistingUser,
+} from '@/lib/user';
+import {
+  createPendingLink,
+  createPendingLinkForDifferentOAuth,
+  pendingLinkCompleteUrl,
+  pendingLinkPageUrl,
+  setPendingLinkCookie,
+} from '@/lib/auth/pending-link';
 import { whenOk } from '@kilocode/web-shared/lib/maybe-result';
 import type { AuthErrorType, SignupStepUpMethod } from '@kilocode/web-shared/lib/auth/constants';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
@@ -67,6 +81,12 @@ import {
   OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
   probeOpenAiChatGptEligibility,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
+import { claudeSignInProvider } from '@/lib/auth/claude/sign-in-provider';
+import {
+  CLAUDE_OIDC_ISSUER,
+  CLAUDE_SIGN_IN_CLIENT_ID,
+} from '@kilocode/web-shared/lib/auth/claude/config';
 import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
@@ -98,10 +118,12 @@ import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { z } from 'zod';
 import {
+  getUserFromSession,
+  getUserFromSessionForCredentialIssuance,
   isBlockedTLD,
-  isEmailBlacklistedByDomainAsync,
   sessionAuthOptions,
 } from '@kilocode/web-shared/lib/user/server';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 export type TurnstileJwtPayload = {
   /**
@@ -110,6 +132,7 @@ export type TurnstileJwtPayload = {
    */
   guid: UUID;
   ip: string;
+  watchwoodIp?: string;
   iat: number;
   exp: number;
 };
@@ -139,6 +162,18 @@ function generateAppleClientSecret(): string {
     }
   );
 }
+
+/**
+ * Anthropic's ID token carries `sub`, `email` and `name`; it does not carry
+ * `email_verified`. The claim may therefore be absent, but a token that states
+ * the address is unverified is still refused. An absent claim settles without
+ * the auto-link step, and a `true` claim passes it on, so neither case needs a
+ * different identity rule.
+ */
+const claudeEmailClaimSchema = z.object({
+  email: z.email(),
+  email_verified: z.literal(true).optional(),
+});
 
 const anacondaProfileSchema = z.object({
   sub: z.string().trim().min(1),
@@ -248,6 +283,27 @@ function createOpenAiAccountInfo(
     // Issuer-qualified subject: a `sub` from any other issuer or client can
     // never collide with an OpenAI account.
     provider_account_id: `${OPENAI_ISSUER}#${sub}`,
+    display_name: null,
+  };
+}
+
+function createClaudeAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'claude') return null;
+  assert(user.email, 'User email is required for Claude auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: user.image || '',
+    hosted_domain: hosted_domain_specials.claude,
+    provider: account.provider,
+    // Issuer-qualified subject: a `sub` from any other issuer or client can
+    // never collide with a Claude account. NextAuth sets `providerAccountId`
+    // from `parseClaudeProfile`, which requires a non-empty `sub`.
+    provider_account_id: `${CLAUDE_OIDC_ISSUER}#${account.providerAccountId}`,
     display_name: null,
   };
 }
@@ -510,15 +566,71 @@ export function parseLinkedInProfileName(profile: {
   );
 }
 
+const emailVerifiedClaimSchema = z.object({
+  email_verified: z.union([z.boolean(), z.string()]).optional(),
+});
+
+const discordVerifiedSchema: z.ZodType<Partial<Pick<DiscordProfile, 'verified'>>> = z.object({
+  verified: z.boolean().optional(),
+});
+
+const githubEmailsSchema: z.ZodType<Array<Pick<GithubEmail, 'email' | 'verified'>>> = z.array(
+  z.object({
+    email: z.string(),
+    verified: z.boolean(),
+  })
+);
+
+/** Whether the GitHub `/user/emails` payload marks `email` as verified. */
+export function githubEmailsProveOwnership(payload: unknown, email: string): boolean {
+  const parsed = githubEmailsSchema.safeParse(payload);
+  if (!parsed.success) return false;
+  const target = email.trim().toLowerCase();
+  return parsed.data.some(entry => entry.verified && entry.email.trim().toLowerCase() === target);
+}
+
 /**
- * An OAuth/OIDC sign-in proves ownership of its email only when the provider
- * asserts the `email_verified` claim in the raw profile. Apple delivers the
- * claim as the string "true"; treat that as verified. Providers without the
- * claim (GitHub, GitLab, Discord) never prove the email here.
+ * Reads the GitHub verified flag for the address the sign-in uses. Any
+ * failure is a non-proof: the sign-in then falls back to the pending-link
+ * refusal instead of auto-linking.
  */
-export function profileProvesEmailOwnership(profile: unknown): boolean {
-  const emailVerified = (profile as { email_verified?: unknown } | undefined)?.email_verified;
-  return emailVerified === true || emailVerified === 'true';
+export async function fetchGitHubEmailVerified(
+  accessToken: string,
+  email: string
+): Promise<boolean> {
+  try {
+    const response = await fetch('https://api.github.com/user/emails', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github+json',
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return false;
+    const payload: unknown = await response.json();
+    return githubEmailsProveOwnership(payload, email);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether an OAuth/OIDC profile proves ownership of its email. The generic
+ * rule is the provider-asserted `email_verified` claim (Apple delivers the
+ * string "true"). Discord carries the same fact in its typed `verified`
+ * field. GitHub has no such claim in its profile; its proof comes from
+ * `/user/emails` via `fetchGitHubEmailVerified`. GitLab emits the standard
+ * `email_verified` claim from its OIDC provider, so the generic rule already
+ * covers it.
+ */
+export function profileProvesEmailOwnership(profile: unknown, provider?: string): boolean {
+  if (provider === 'discord') {
+    const parsed = discordVerifiedSchema.safeParse(profile);
+    return parsed.success && parsed.data.verified === true;
+  }
+  const parsed = emailVerifiedClaimSchema.safeParse(profile);
+  if (!parsed.success) return false;
+  return parsed.data.email_verified === true || parsed.data.email_verified === 'true';
 }
 
 function createEmailAccountInfo(
@@ -580,6 +692,7 @@ function createAccountInfo(
     createGoogleAccountInfo(account, user, profile) ??
     createAnacondaAccountInfo(account, user) ??
     createOpenAiAccountInfo(account, user, profile) ??
+    createClaudeAccountInfo(account, user) ??
     createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
@@ -635,6 +748,27 @@ export function parseSignInRedirectContext(
         : undefined,
     signup: nestedSignup || undefined,
   };
+}
+
+export function getInvitationTokenFromCallbackPath(callbackPath?: string): string | undefined {
+  const match = callbackPath?.match(/^\/users\/accept-invite\/([^/?#]+)(?:[?#].*)?$/);
+  if (!match) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return undefined;
+  }
+}
+
+export function preserveSignInRedirectContext(url: string, context: SignInRedirectContext): string {
+  const destination = new URL(url, 'http://localhost');
+  if (context.callbackPath && isValidCallbackPath(context.callbackPath)) {
+    destination.searchParams.set('callbackPath', context.callbackPath);
+  }
+  if (context.signup) {
+    destination.searchParams.set('signup', 'true');
+  }
+  return `${destination.pathname}${destination.search}`;
 }
 
 async function getSignInRedirectContext(): Promise<SignInRedirectContext> {
@@ -778,6 +912,8 @@ const openAiProvider: OAuthConfig<Profile> & { callbackUrl: string } = {
   profile: parseOpenAiProfile,
 };
 
+const serverSessionCallback = sessionAuthOptions.callbacks?.session;
+
 export const authOptions: NextAuthOptions = {
   ...sessionAuthOptions,
   cookies: {
@@ -800,6 +936,8 @@ export const authOptions: NextAuthOptions = {
       clientSecret: GOOGLE_CLIENT_SECRET,
     }),
     openAiProvider,
+    // Registered only where the Claude sign-in app is configured.
+    ...(CLAUDE_SIGN_IN_CLIENT_ID ? [claudeSignInProvider] : []),
     {
       id: 'anaconda',
       name: 'Anaconda',
@@ -833,6 +971,7 @@ export const authOptions: NextAuthOptions = {
     DiscordProvider({
       clientId: DISCORD_OAUTH_CLIENT_ID ?? '',
       clientSecret: DISCORD_OAUTH_CLIENT_SECRET ?? '',
+      issuer: 'https://discord.com',
     }),
     LinkedInProvider({
       clientId: LINKEDIN_CLIENT_ID,
@@ -961,6 +1100,29 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     ...sessionAuthOptions.callbacks,
+    // `webSessionId` and `webSessionPepper` are server-side bindings for MFA
+    // step-up proofs and session revocation. Server reads use
+    // `sessionAuthOptions` and see them; the browser-facing
+    // `/api/auth/session` response must expose neither.
+    async session({ session, token, user, trigger, newSession }) {
+      if (!serverSessionCallback) return session;
+      const result = await serverSessionCallback({
+        session,
+        token,
+        user,
+        trigger,
+        newSession,
+      });
+      if (result) {
+        const browserSession = result as {
+          webSessionId?: string;
+          webSessionPepper?: string | null;
+        };
+        delete browserSession.webSessionId;
+        delete browserSession.webSessionPepper;
+      }
+      return result;
+    },
     // NOTE(bmc): Errors thrown from this function have their messages sent to the client.
     // Realistically the entire thing should be wrapped in a try/catch and handle errors appropriately.
     // any string returned from here is a redirect URL and returning "true" is considered a successful login.
@@ -999,6 +1161,13 @@ export const authOptions: NextAuthOptions = {
         // early return for email auth (magic link)
         const isEmailAuth = account.provider === 'email';
 
+        // A provider that shares no address cannot name an account: the
+        // address is the account key, so refuse with a specific reason instead
+        // of an internal error.
+        if (!user.email) {
+          return redirectUrlForCode('EMAIL-REQUIRED');
+        }
+
         // normalize the account, user, and profile objects into a single object
         // why does next-auth have 3 separate objects for this? who knows.
         accountInfo = createAccountInfo(account, user, profile);
@@ -1006,6 +1175,90 @@ export const authOptions: NextAuthOptions = {
         linkingSession = await getAccountLinkingSession();
 
         isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
+
+        // Account linking requires the person who started it: the pending link
+        // names a user, and the request must carry that user's web session. A
+        // request whose session does not name the same user is refused with the
+        // ordinary linking failure. The read above consumed the cookie, so a
+        // refusal is final.
+        if (isAccountLinking && linkingSession) {
+          const claudeLinkingUser =
+            account.provider === 'claude'
+              ? (await getUserFromSessionForCredentialIssuance()).user
+              : undefined;
+          const linkingPrincipal =
+            account.provider === 'claude' ? claudeLinkingUser : await getUserFromSession();
+          if (linkingPrincipal?.id !== linkingSession.existingUserId) {
+            // Apple answers with a cross-site form POST that cannot carry the
+            // Lax session cookie. Park the identity as an explicit pending
+            // link and bounce to the same-site completion route, which has
+            // the session and performs the equality check there.
+            if (account.provider === 'apple') {
+              if (await isEmailBlacklisted(accountInfo.google_user_email)) {
+                return redirectUrlForCode('BLOCKED');
+              }
+              const appleOwnerId = await findUserIdByAuthProvider(
+                'apple',
+                accountInfo.provider_account_id
+              );
+              if (appleOwnerId && appleOwnerId !== linkingSession.existingUserId) {
+                return redirectUrlForCode('ACCOUNT-ALREADY-LINKED');
+              }
+              const targetProviders = await getUserAuthProviders(linkingSession.existingUserId);
+              if (targetProviders.some(p => p.provider === 'apple')) {
+                return redirectUrlForCode('PROVIDER-ALREADY-LINKED');
+              }
+              const created = await createPendingLink({
+                kiloUserId: linkingSession.existingUserId,
+                kind: 'explicit_link',
+                identity: accountInfo,
+                emailCodeAllowed: false,
+              });
+              await setPendingLinkCookie(created.secret);
+              return pendingLinkCompleteUrl;
+            }
+            warnInSentry('SECURITY: Account link refused: the session does not match the link', {
+              extra: { provider: accountInfo.provider },
+            });
+            // An organization-scoped connect starts on the organization's BYOK
+            // card, which reads `openai_error`; return the refusal there the
+            // same way the shared-services re-check below does.
+            if (account.provider === 'openai' && linkingSession.organizationId) {
+              return openAiChatGptConnectFailureUrl(
+                linkingSession.organizationId,
+                'LINKING-FAILED'
+              );
+            }
+            return redirectUrlForCode('LINKING-FAILED');
+          }
+          if (
+            account.provider === 'claude' &&
+            !(await isClaudePlatformOAuthEnabled(claudeLinkingUser?.google_user_email))
+          ) {
+            return redirectUrlForCode('LINKING-FAILED');
+          }
+        }
+        if (account.provider === 'claude' && !isAccountLinking) {
+          const claims = claudeEmailClaimSchema.safeParse(profile);
+          if (!claims.success) {
+            console.warn('[claude-auth] authorization refused', {
+              reason: 'invalid_profile_claims',
+              claimNames: Object.keys(profile ?? {}).filter(
+                key => key === 'sub' || key === 'email' || key === 'name'
+              ),
+              rejectedClaims: claims.error.issues.map(issue => issue.path.map(String).join('.')),
+            });
+            return redirectUrlForCode('UNKNOWN-ERROR');
+          }
+          if (claims.data.email !== accountInfo.google_user_email) {
+            console.warn('[claude-auth] authorization refused', { reason: 'email_mismatch' });
+            return redirectUrlForCode('UNKNOWN-ERROR');
+          }
+          if (!(await isClaudePlatformOAuthEnabled(claims.data.email))) {
+            console.warn('[claude-auth] authorization refused', { reason: 'release_denied' });
+            return redirectUrlForCode('UNKNOWN-ERROR');
+          }
+        }
 
         // The linking session is consumed here, so it carries the organization
         // through to the jwt callback on the profile, the same way `isNewUser`
@@ -1030,7 +1283,7 @@ export const authOptions: NextAuthOptions = {
           return redirectUrlForCode('USER-NOT-FOUND');
         }
 
-        if (await isEmailBlacklistedByDomainAsync(accountInfo.google_user_email)) {
+        if (await isEmailBlacklisted(accountInfo.google_user_email)) {
           sentryLogger('auth', 'warning')(
             `SECURITY: Blacklisted: ${accountInfo.google_user_email}`,
             accountInfo
@@ -1049,7 +1302,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Block new signups from blocked TLDs (existing users can still sign in)
-        if (!existingUser && isBlockedTLD(accountInfo.google_user_email)) {
+        if (!existingUser && (await isBlockedTLD(accountInfo.google_user_email))) {
           return redirectUrlForCode(`BLOCKED`);
         }
 
@@ -1079,7 +1332,10 @@ export const authOptions: NextAuthOptions = {
               return redirectUrlForCode('UNKNOWN-ERROR');
             }
             if (ssoAuthority.status === 'required') {
-              return ssoSignInRedirectUrl(domainToCheck);
+              return preserveSignInRedirectContext(
+                ssoSignInRedirectUrl(domainToCheck),
+                redirectContext
+              );
             }
           }
         }
@@ -1094,6 +1350,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const requestHeaders = await headers();
+        const watchwood = !isAccountLinking ? await readWatchwoodSignupAssessment() : undefined;
 
         if (accountInfo.provider === 'workos') {
           const { affiliateTrackingId, trackingContext } = !isAccountLinking
@@ -1110,12 +1367,18 @@ export const authOptions: NextAuthOptions = {
             }
           );
 
-          return processSSOUserLogin(
+          const result = await processSSOUserLogin(
             accountInfo,
             requestHeaders,
             affiliateTrackingId,
-            trackingContext
+            { ...trackingContext, watchwood },
+            !isAccountLinking
+              ? getInvitationTokenFromCallbackPath(redirectContext.callbackPath)
+              : undefined
           );
+          return typeof result === 'string' && !isAccountLinking
+            ? preserveSignInRedirectContext(result, redirectContext)
+            : result;
         }
 
         // Validate Turnstile JWT for real OAuth logins (not fake logins or email auth)
@@ -1159,9 +1422,18 @@ export const authOptions: NextAuthOptions = {
         // Auto-link only when the credential proves ownership of the email:
         // a magic link consumes an inbox token; fake-login is dev-only; an
         // OAuth profile proves it via the provider's email_verified claim.
-        // Methods without proof keep the DIFFERENT-OAUTH refusal.
-        const autoLinkToExistingUser =
-          isEmailAuth || isFakeLogin || profileProvesEmailOwnership(profile);
+        // Methods without proof keep the DIFFERENT-OAUTH refusal. The GitHub
+        // email list is read lazily, only when the email collides.
+        const oauthProvesEmailOwnership = profileProvesEmailOwnership(profile, account.provider);
+        const githubEmailProof =
+          account.provider === 'github' && account.access_token
+            ? fetchGitHubEmailVerified.bind(
+                null,
+                account.access_token,
+                accountInfo.google_user_email
+              )
+            : undefined;
+        const autoLinkToExistingUser = isEmailAuth || isFakeLogin || oauthProvesEmailOwnership;
         if (isAccountLinking) {
           logImpactReferralDebug('Auth flow skipped Impact tracking context extraction', {
             provider: accountInfo.provider,
@@ -1192,10 +1464,24 @@ export const authOptions: NextAuthOptions = {
                 autoLinkToExistingUser,
                 requestHeaders,
                 affiliateTrackingId,
-                trackingContext
+                { ...trackingContext, watchwood },
+                false,
+                undefined,
+                githubEmailProof ? { resolveEmailProof: githubEmailProof } : {}
               );
 
         if (result.success === false) {
+          if (result.error === 'DIFFERENT-OAUTH' && !isAccountLinking) {
+            const created = await createPendingLinkForDifferentOAuth(
+              accountInfo,
+              result,
+              redirectContext.callbackPath ?? null
+            );
+            if (created) {
+              await setPendingLinkCookie(created.secret);
+              return pendingLinkPageUrl;
+            }
+          }
           // Expected user errors that shouldn't be logged to Sentry
           const expectedErrors: AuthErrorType[] = [
             'ACCOUNT-ALREADY-LINKED',
@@ -1241,6 +1527,9 @@ export const authOptions: NextAuthOptions = {
           !(await mayConnectOpenAiChatGptSharedServices(result.user, linkingSession.organizationId))
         ) {
           return openAiChatGptConnectFailureUrl(linkingSession.organizationId, 'LINKING-FAILED');
+        }
+        if (account.provider === 'claude' && isAccountLinking) {
+          return '/connected-accounts?linked=claude';
         }
 
         // NOTE(bmc): this is sad but its here for a reason, don't change it
@@ -1305,6 +1594,10 @@ export const authOptions: NextAuthOptions = {
         token.iat = Math.floor(Date.now() / 1000);
         token.isNewUser = (profile as ExtendedProfile)?.isNewUser || false;
         token.webSessionPepper = existingUser.web_session_pepper;
+        // Minted only on sign-in. NextAuth re-encodes the JWT on every session
+        // read (`trigger` absent), and that path returns the token unchanged, so
+        // one browser session keeps one id for its whole life.
+        token.webSessionId = randomBytes(32).toString('base64url');
         token.isAdmin = existingUser.is_admin;
         token.authProvider = accountInfo.provider;
         token.authenticatedAt = token.iat;

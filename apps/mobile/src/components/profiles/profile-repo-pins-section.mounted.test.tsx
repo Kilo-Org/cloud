@@ -44,6 +44,7 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('react-native', () => ({
+  Keyboard: { dismiss: () => undefined },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -109,9 +110,9 @@ function pressButton(root: ReactTestInstance, label: string): void {
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountSection(organizationId?: string) {
+function mountSection(organizationId?: string, canManage = true) {
   return renderWithProviders(
-    createElement(ProfileRepoPinsSection, { profileId: 'profile-1', organizationId })
+    createElement(ProfileRepoPinsSection, { profileId: 'profile-1', organizationId, canManage })
   );
 }
 
@@ -192,7 +193,7 @@ describe('ProfileRepoPinsSection', () => {
     expect(texts).toContain('acme/api');
     expect(texts).not.toContain('acme/other');
 
-    pressPressable(renderer.root, 'Unbind');
+    pressPressable(renderer.root, 'Unbind acme/api');
     await waitFor(() => h.mutations.unbind.mutateAsync.mock.calls.length > 0);
     expect(h.mutations.unbind.mutateAsync.mock.calls[0]?.[0]).toEqual({
       repoFullName: 'acme/api',
@@ -218,6 +219,67 @@ describe('ProfileRepoPinsSection', () => {
       repoFullName: 'acme/infra',
       platform: 'gitlab',
     });
+
+    unmount();
+  });
+  it('names each pinned row and its own unbind control', async () => {
+    Object.assign(h.bindingsQuery, {
+      isLoading: false,
+      bindings: [
+        {
+          repoFullName: 'acme/api',
+          platform: 'github',
+          profileId: 'profile-1',
+          profileName: 'Mine',
+        },
+        {
+          repoFullName: 'acme/infra',
+          platform: 'gitlab',
+          profileId: 'profile-1',
+          profileName: 'Mine',
+        },
+      ],
+    });
+
+    const { renderer, unmount } = await mountSection();
+
+    expect(
+      findAll(renderer.root, 'View')
+        .filter(node => node.props.accessibilityRole === 'text' && node.props.accessible === true)
+        .map(node => node.props.accessibilityLabel)
+    ).toEqual(['acme/api, GitHub', 'acme/infra, GitLab']);
+    expect(
+      findAll(renderer.root, 'Pressable')
+        .filter(node => node.props.accessibilityRole === 'button')
+        .map(node => node.props.accessibilityLabel)
+    ).toEqual(['Unbind acme/api', 'Unbind acme/infra']);
+
+    unmount();
+  });
+
+  it('read-only: keeps existing repository bindings without change controls', async () => {
+    Object.assign(h.bindingsQuery, {
+      isLoading: false,
+      bindings: [
+        {
+          repoFullName: 'acme/api',
+          platform: 'github',
+          profileId: 'profile-1',
+          profileName: 'Mine',
+        },
+      ],
+    });
+
+    const { renderer, unmount } = await mountSection('org-1', false);
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain('acme/api');
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(
+      findAll(renderer.root, 'Pressable').some(node =>
+        String(node.props.accessibilityLabel).startsWith('Unbind ')
+      )
+    ).toBe(false);
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
 
     unmount();
   });

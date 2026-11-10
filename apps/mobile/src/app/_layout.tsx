@@ -1,8 +1,4 @@
 /* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry error-boundary wrap are kept together */
-// Must run before the first view mounts: allowRTL(true) makes the native
-// direction known before any layout pass (see src/i18n/rtl.ts).
-// eslint-disable-next-line import/no-duplicates -- the side effect must run here, before the named import below
-import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 // Enter the local Android Live Update module's JS in the main process on both
@@ -45,7 +41,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewInstance } from 'react-native';
+import { I18nManager, View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -53,6 +49,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
+import { DesignGateProbe } from '@/components/design-gate-probe';
 import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
@@ -68,7 +65,7 @@ import { subscribeToConsentChanges } from '@/lib/consent';
 import { shouldStartAnalytics } from '@/lib/analytics-consent';
 import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
 import { drainStartupTimings } from '@/lib/startup-drain';
-import { markStartup, markStartupComplete } from '@/lib/startup-timing';
+import { isStartupComplete, markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
@@ -80,14 +77,23 @@ import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
 import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
-import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
+import { useNavigationTheme } from '@/lib/hooks/use-navigation-theme';
 import {
   applyThemePreference,
   preloadThemePreference,
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
-import { syncRtl } from '@/i18n/rtl';
+import {
+  clearDirectionAttemptAsync,
+  readDirectionAttemptAsync,
+  writeDirectionAttemptAsync,
+} from '@/i18n/direction-attempt';
+import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
+import {
+  retryLanguageStartupDirectionAsync,
+  runLanguageStartupDirectionGuardedAsync,
+} from '@/i18n/startup-direction-run';
 import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
 import {
   getResolvedLanguage,
@@ -102,6 +108,7 @@ import {
   consumePendingDeepLink,
   getPendingDeepLinkSnapshot,
   subscribeToPendingDeepLink,
+  wasLaunchAppRouteCaptured,
   wasLaunchLinkHandled,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
@@ -118,6 +125,8 @@ import {
 } from '@/lib/notifications';
 import { restorePersistedCacheOnColdStart } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
+import { useTRPC } from '@/lib/trpc';
+import { readNotificationPreviewsIfLoaded } from '@/lib/hooks/agent-push-preference';
 import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
@@ -236,6 +245,25 @@ function RootLayoutNav({
   const globalHref = useUnstableGlobalHref();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  const trpc = useTRPC();
+  const preferencesQueryKey = useMemo(
+    () => trpc.user.getNotificationPreferences.queryOptions().queryKey,
+    [trpc]
+  );
+  // The warm answer to one of the app's own notification actions. It lives here,
+  // not at the layout root, because the notification it posts in place of the
+  // acted-on one follows the user's message-preview choice, read from the
+  // preferences query this tree holds. A response arriving before this mount is
+  // still covered by the background task and by `checkInitialNotification`.
+  useEffect(() => {
+    const subscription = setupNotificationResponseHandler({
+      readPreviews: () => readNotificationPreviewsIfLoaded(queryClient, preferencesQueryKey),
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [preferencesQueryKey]);
+
   // The root navigation container's readiness. `store.assertIsReady()` throws
   // when `navigationRef.isReady()` is false — the exact crash
   // "Attempted to navigate before mounting the Root Layout component" — and
@@ -284,9 +312,8 @@ function RootLayoutNav({
   const [optionalConsent, setOptionalConsentState] = useState(false);
   const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
   const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
-  // Flipped by every splash-hide site below, so the app_startup drain can
-  // depend on "startup finished" as an ordinary dependency.
-  const [startupFinished, setStartupFinished] = useState(false);
+  // A recreated activity has no splash once this runtime completed startup.
+  const [startupFinished, setStartupFinished] = useState(isStartupComplete);
   // Reactive snapshot so the drain effect re-triggers when the PostHog
   // client becomes ready after async init.
   const postHogReady = useSyncExternalStore(subscribeToPostHogReady, isPostHogReady);
@@ -452,19 +479,38 @@ function RootLayoutNav({
 
     const prepareLanguage = async () => {
       const resolved = getResolvedLanguage();
-      let reloadFailed = false;
-      if (syncRtl(resolved)) {
-        try {
-          await reloadAppAsync();
-          // The native reload tears down this JS context; nothing below runs.
-          return;
-        } catch {
-          // Reload failed: keep going so the language still loads, then show
-          // the Retry/Continue screen instead of first-painting in the wrong
-          // direction.
-          reloadFailed = true;
+      // Guarded: the direction step's effects are native calls, and a thrown
+      // one must not skip the ready gate below, or the app stays behind this
+      // layout's loading surface with nothing to recover from. A rejection is
+      // reported once and then takes the same terminal path as a direction the
+      // platform refused (`retry` -> the Retry/Continue screen).
+      const direction = await runLanguageStartupDirectionGuardedAsync(
+        {
+          language: resolved,
+          isRtl: I18nManager.isRTL,
+          shouldBeRtl: isRtlLanguage(resolved),
+        },
+        {
+          syncRtl,
+          readAttempt: readDirectionAttemptAsync,
+          writeAttempt: writeDirectionAttemptAsync,
+          clearAttempt: clearDirectionAttemptAsync,
+          reload: reloadAppAsync,
+        },
+        error => {
+          Sentry.captureException(error, {
+            tags: { 'error.subsystem': 'startup', 'error.operation': 'language_direction' },
+          });
         }
+      );
+      if (direction === 'reloaded') {
+        // The native reload tears down this JS context; nothing below runs.
+        return;
       }
+      // A direction that could not be applied still loads the language, then
+      // shows the Retry/Continue screen instead of first-painting in the wrong
+      // direction.
+      const reloadFailed = direction === 'retry';
       // Reopen the screen the user was on before an RTL reload. Read once,
       // after the reload path, so the helper's one-shot delete is the only read.
       // On a failed reload the key stays in SecureStore, so Retry's successful
@@ -965,6 +1011,10 @@ function RootLayoutNav({
         // same path once groups are stripped, so the resolved href of the route
         // actually on screen is the comparison, not the bare pathname.
         restoredRoute: lastRouteHrefFrom(globalHref, pathname, segments) ?? pathname,
+        // A launch that named one of the app's own routes is the screen this
+        // process was started for: the pending-deep-link consumer below opens
+        // it (with the layout anchors beneath it) instead of the record.
+        launchOpenedAppRoute: wasLaunchAppRouteCaptured(),
       })
     ) {
       return;
@@ -1222,13 +1272,14 @@ function RootLayoutNav({
     return (
       <LanguageReloadErrorScreen
         onRetry={() => {
-          void (async () => {
-            try {
-              await reloadAppAsync();
-            } catch {
-              // Reload failed: the screen stays so the user can retry or continue.
-            }
-          })();
+          // A retry is the user asking for another attempt, not the automatic
+          // relaunch the record guards against. The runner drops the record
+          // first; a reload failure leaves this screen up so the user can retry
+          // or continue.
+          void retryLanguageStartupDirectionAsync({
+            clearAttempt: clearDirectionAttemptAsync,
+            reload: reloadAppAsync,
+          });
         }}
         onContinue={() => {
           setLanguageReloadFailed(false);
@@ -1322,13 +1373,6 @@ function RootLayout() {
   // A catalog failure still resolves readiness with the existing English fallback.
   const [languageReady, setLanguageReady] = useState(false);
 
-  useEffect(() => {
-    const subscription = setupNotificationResponseHandler();
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
   // The warm half of a tap on one of the app's own search results: the native
   // wake-up re-reads the pending slot, so registering it with this tree is
   // enough. Held here rather than at module scope so unmounting releases the
@@ -1368,6 +1412,7 @@ function RootLayout() {
           <OfflineBannerSpaceGate>
             <AppRootProviders languageReady={languageReady}>
               <StatusBar style="auto" />
+              {__DEV__ ? <DesignGateProbe /> : null}
               <AppContentReveal>
                 <StateSurface className="flex-1">
                   <RootLayoutNav

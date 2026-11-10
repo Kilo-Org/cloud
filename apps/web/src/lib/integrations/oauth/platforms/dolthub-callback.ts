@@ -2,8 +2,8 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { getCallbackReportParams } from '@/lib/integrations/oauth/callback-params';
 import {
   exchangeDoltHubOAuthCode,
   upsertDoltHubInstallation,
@@ -11,10 +11,12 @@ import {
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
 import {
   appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
+  organizationAccessDenialErrorCode,
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
 
@@ -36,11 +38,14 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
+    // Callback diagnostics use the shared callback context.
+    const callbackContext = safeCallbackContext(searchParams);
+
     if (error) {
       captureMessage('DoltHub OAuth error', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-        extra: { error, state },
+        extra: { error, ...callbackContext },
       });
 
       return NextResponse.redirect(
@@ -59,7 +64,7 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       captureMessage('DoltHub callback missing code', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-        extra: { state, allParams: getCallbackReportParams(searchParams) },
+        extra: callbackContext,
       });
 
       return NextResponse.redirect(
@@ -75,7 +80,7 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       captureMessage('DoltHub callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-        extra: { code: '***', state, allParams: getCallbackReportParams(searchParams) },
+        extra: callbackContext,
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
@@ -87,6 +92,15 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
         extra: { stateUserId: verified.userId, sessionUserId: user.id },
       });
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+    }
+
+    if (verified.provider !== PLATFORM.DOLTHUB) {
+      captureMessage('DoltHub callback state minted for another flow', {
+        level: 'warning',
+        tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
+        extra: { ...callbackContext, mintedProvider: verified.provider },
+      });
+      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
     const ownerStr = verified.owner;
@@ -101,7 +115,10 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
     }
 
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
+      // The organization row stores the shared DoltHub access token, so
+      // installing or replacing it needs the role that governs integrations,
+      // not just membership.
+      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }
@@ -124,15 +141,27 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const state = searchParams.get('state');
 
+    // An organization-role denial is an expected outcome, not an incident.
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (denialCode) {
+      return NextResponse.redirect(
+        new URL(
+          buildIntegrationOAuthRedirectPathFromState(
+            PLATFORM.DOLTHUB,
+            state,
+            `error=${denialCode}`
+          ),
+          APP_URL
+        )
+      );
+    }
+
     captureException(error, {
       tags: {
         endpoint: 'dolthub/callback',
         source: 'dolthub_oauth',
       },
-      extra: {
-        state,
-        hasCode: !!searchParams.get('code'),
-      },
+      extra: safeCallbackContext(searchParams),
     });
 
     return NextResponse.redirect(

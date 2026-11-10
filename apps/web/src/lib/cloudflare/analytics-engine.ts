@@ -39,8 +39,33 @@ export async function queryAnalyticsEngine<Row>(
   return z.array(rowSchema).parse(data);
 }
 
+const LAST_CONTROL_CODE_POINT = 0x1f;
+const DELETE_CODE_POINT = 0x7f;
+
+/**
+ * Analytics Engine SQL follows ClickHouse literal syntax, where a backslash
+ * starts an escape sequence (`\\` is one backslash, `\'` a quote, `\xHH` a byte).
+ * Backslashes are doubled so one cannot escape the quote that follows it,
+ * quotes are doubled, and control characters become `\xHH` so the literal stays
+ * on one line of printable text.
+ */
+function encodeLiteralCharacter(character: string): string {
+  if (character === '\\') return '\\\\';
+  if (character === "'") return "''";
+  const codePoint = character.codePointAt(0) ?? 0;
+  if (codePoint <= LAST_CONTROL_CODE_POINT || codePoint === DELETE_CODE_POINT) {
+    return `\\x${codePoint.toString(16).padStart(2, '0')}`;
+  }
+  return character;
+}
+
+/** Renders `value` as a single-quoted SQL string literal that reads back as `value`. */
 export function sqlString(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
+  let literal = "'";
+  for (const character of value) {
+    literal += encodeLiteralCharacter(character);
+  }
+  return `${literal}'`;
 }
 
 export function sqlDateTime(ms: number): string {

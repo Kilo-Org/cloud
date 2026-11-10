@@ -18,6 +18,9 @@ export type NowTicker = {
 type TickerRegistration = {
   ticker: NowTicker;
   stop: () => void;
+  hasSubscribers: () => boolean;
+  /** When the snapshot was sampled; the registry compares it against `intervalMs`. */
+  createdAt: number;
 };
 
 const tickers = new Map<number, TickerRegistration>();
@@ -38,13 +41,18 @@ function createRegistration(intervalMs: number): TickerRegistration {
 
   const registration: TickerRegistration = {
     stop,
+    hasSubscribers: () => listeners.size > 0,
+    createdAt: now,
     // Arrow properties keep both method references stable and `this`-free,
     // which is what `useSyncExternalStore` requires.
     ticker: {
       subscribe: listener => {
         listeners.add(listener);
         if (listeners.size === 1) {
-          now = Date.now();
+          // `now` is not re-stamped here. The ticker was created inside the
+          // render that read `getSnapshot`, so moving the value between that
+          // render and this subscription is a change React never saw: it would
+          // tear the store and force a second commit on every first mount.
           timer = setInterval(() => {
             now = Date.now();
             for (const current of listeners) {
@@ -74,12 +82,23 @@ function createRegistration(intervalMs: number): TickerRegistration {
  * Return the ticker for `intervalMs`, creating it on first use. The returned
  * object and its two methods are stable for as long as the ticker lives, which
  * is what `useSyncExternalStore` requires.
+ *
+ * A registration with no subscribers that is already older than one interval is
+ * a leftover: it was created by a render that React discarded before committing
+ * (an interrupted or suspended render, or one replayed after an error) and no
+ * cleanup runs for it. Reusing it would serve the instant that discarded render
+ * read, so relative labels would sit behind by however long ago it was. It is
+ * replaced instead, which keeps the snapshot the committing render reads current.
+ * A younger unsubscribed registration is kept, because every component of one
+ * commit reads the registry during the same render pass, before any of them
+ * subscribes; replacing it there would hand two components two different tickers.
  */
 export function getNowTicker(intervalMs: number): NowTicker {
   const existing = tickers.get(intervalMs);
-  if (existing) {
+  if (existing && (existing.hasSubscribers() || Date.now() - existing.createdAt < intervalMs)) {
     return existing.ticker;
   }
+  existing?.stop();
   const registration = createRegistration(intervalMs);
   tickers.set(intervalMs, registration);
   return registration.ticker;

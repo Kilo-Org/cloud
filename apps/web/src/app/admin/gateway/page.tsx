@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,7 +13,10 @@ import { AutoFreeContent } from '@/app/admin/gateway/AutoFreeContent';
 import { GatewayModelListContent } from '@/app/admin/gateway/GatewayModelListContent';
 import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelIdOverridesContent';
 import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
+import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
+import { OrganizationFeaturesContent } from '@/app/admin/gateway/OrganizationFeaturesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
+import { ProviderMetadataContent } from '@/app/admin/gateway/ProviderMetadataContent';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
 const VALID_TABS: readonly string[] = [
@@ -23,7 +27,10 @@ const VALID_TABS: readonly string[] = [
   'preferred-models',
   'unavailable-models',
   'provider-order',
+  'custom-pricing',
+  'organization-features',
   'api-request-log',
+  'provider-metadata',
 ];
 type Tab =
   | 'sync-providers'
@@ -33,7 +40,10 @@ type Tab =
   | 'preferred-models'
   | 'unavailable-models'
   | 'provider-order'
-  | 'api-request-log';
+  | 'custom-pricing'
+  | 'organization-features'
+  | 'api-request-log'
+  | 'provider-metadata';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -70,8 +80,7 @@ export default function AdminGatewayPage() {
 
   return (
     <AdminPage breadcrumbs={breadcrumbs}>
-      <div className="flex w-full flex-col gap-y-4">
-        <h2 className="text-2xl font-bold">Gateway</h2>
+      <div className="flex w-full flex-col">
         <Tabs value={activeTab} onValueChange={onTabChange}>
           <TabsList className="h-auto w-full flex-wrap justify-start gap-x-6 rounded-none border-b bg-transparent p-0">
             <TabsTrigger value="sync-providers" className={tabTriggerClass}>
@@ -95,8 +104,17 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="provider-order" className={tabTriggerClass}>
               Provider Order
             </TabsTrigger>
+            <TabsTrigger value="custom-pricing" className={tabTriggerClass}>
+              Custom Pricing
+            </TabsTrigger>
+            <TabsTrigger value="organization-features" className={tabTriggerClass}>
+              Organization Features
+            </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
+            </TabsTrigger>
+            <TabsTrigger value="provider-metadata" className={tabTriggerClass}>
+              Provider Metadata
             </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
@@ -119,10 +137,8 @@ export default function AdminGatewayPage() {
               ordered
               description={
                 <>
-                  Ordered list of preferred model IDs, stored in the <code>preferred_models</code>{' '}
-                  column of <code>ai_gateway_config</code>. The model catalog sorts these models
-                  first in this order, and every model in the list except <code>kilo-auto/*</code>{' '}
-                  is monitored by the model stats and health checks.
+                  The model catalog lists these models first, in this order. Model stats and health
+                  checks monitor every listed model except <code>kilo-auto/*</code>.
                 </>
               }
             />
@@ -134,17 +150,21 @@ export default function AdminGatewayPage() {
               ordered={false}
               description={
                 <>
-                  Model IDs the gateway hides from the catalog and rejects for direct requests,
-                  stored in the <code>unavailable_models</code> column of{' '}
-                  <code>ai_gateway_config</code>. <code>kilo-auto</code> can still route to them.{' '}
-                  <code>google/gemma-4-26b-a4b-it:free</code> is always unavailable and is not
-                  listed here.
+                  The gateway hides these models from the catalog and rejects direct requests for
+                  them; <code>kilo-auto</code> can still route to them.{' '}
+                  <code>{AUTO_SMALL_TARGET_MODELS.free}</code> is always treated as unavailable.
                 </>
               }
             />
           </TabsContent>
           <TabsContent value="provider-order" className="mt-4">
             <PreferredProviderOrderContent />
+          </TabsContent>
+          <TabsContent value="custom-pricing" className="mt-4">
+            <CustomPricingContent />
+          </TabsContent>
+          <TabsContent value="organization-features" className="mt-4">
+            <OrganizationFeaturesContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"
@@ -154,6 +174,9 @@ export default function AdminGatewayPage() {
             <div className="mt-8">
               <RequestLoggingOptInsContent />
             </div>
+          </TabsContent>
+          <TabsContent value="provider-metadata" className="mt-4">
+            <ProviderMetadataContent />
           </TabsContent>
         </Tabs>
       </div>

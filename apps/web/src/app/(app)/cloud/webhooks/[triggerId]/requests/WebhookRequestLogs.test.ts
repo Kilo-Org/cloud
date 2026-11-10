@@ -1,4 +1,9 @@
 import React from 'react';
+import {
+  fixtureAssistant,
+  fixtureText,
+  fixtureTool,
+} from '@/components/cloud-agent-next/assistant-ui/__fixtures__/transcript';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TRPCClientError } from '@trpc/client';
 import { WebhookRequestLogs } from './WebhookRequestLogs';
@@ -17,14 +22,7 @@ jest.mock('@/lib/trpc/utils', () => ({
 jest.mock('@tanstack/react-query', () => ({
   useQuery: (options: unknown) => mockUseQuery(options),
 }));
-jest.mock('@/components/cloud-agent-next/MessageBubble', () => ({
-  MessageBubble: ({ message }: { message: { parts: Array<{ text: string }> } }) =>
-    React.createElement('div', { 'data-user-message': true }, message.parts[0]?.text),
-}));
-jest.mock('@/components/cloud-agent-next/PartRenderer', () => ({
-  PartRenderer: ({ part }: { part: { text?: string; tool?: string } }) =>
-    React.createElement('div', {}, part.text ?? part.tool),
-}));
+
 jest.mock('@/components/cloud-agent-next/LegacyMessageBubble', () => ({
   LegacyMessageBubble: ({ message }: { message: { text: string } }) =>
     React.createElement('div', { 'data-legacy-message': true }, message.text),
@@ -81,26 +79,26 @@ it('renders shared-session chat with collapsed tool work and escaped output', ()
         version: 'v2',
         messages: [
           {
-            info: { id: 'user', role: 'user' },
-            parts: [{ type: 'text', text: 'Inspect the webhook' }],
+            info: {
+              id: 'user',
+              role: 'user',
+              sessionID: 'ses-fixture',
+              time: { created: 1 },
+              agent: 'code',
+              model: { providerID: 'fixture', modelID: 'fixture' },
+            },
+            parts: [fixtureText('user-text', 'Inspect the webhook')],
           },
-          {
-            info: { id: 'assistant', role: 'assistant' },
-            parts: [
-              {
-                type: 'tool',
-                tool: 'bash',
-                state: { status: 'completed', time: { start: 1, end: 1001 } },
-              },
-              { type: 'text', text: '<script>bad</script>' },
-            ],
-          },
+          fixtureAssistant('assistant', [
+            fixtureTool('bash'),
+            fixtureText('answer', '<script>bad</script>'),
+          ]),
         ],
       },
     },
   });
   const html = render();
-  expect(html).toContain('data-user-message');
+  expect(html).toContain('data-message-role="user"');
   expect(html).toContain('Inspect the webhook');
   expect(html).toContain('1 tool call');
   expect(html).toContain('aria-expanded="false"');
@@ -129,7 +127,7 @@ it('keeps agent failures visible when the assistant has no parts', () => {
       processStatus: 'failed',
       transcript: {
         version: 'v2',
-        messages: [{ info: { id: 'failed', role: 'assistant' }, parts: [] }],
+        messages: [fixtureAssistant('failed', [])],
       },
       logs: [{ timestamp: '', eventType: 'error', message: 'Error: Provider quota exceeded' }],
     },
@@ -220,3 +218,13 @@ it('stops polling and retrying when access is denied', () => {
   expect(options.retry(0, new Error('temporary'))).toBe(true);
   expect(options.retry(3, new Error('temporary'))).toBe(false);
 });
+
+jest.mock('@/components/cloud-agent-next/worktree-review', () => ({
+  parseWorktreeReviewMessage: () => null,
+}));
+jest.mock('react-markdown', () => ({
+  __esModule: true,
+  default: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('p', null, children),
+}));
+jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));

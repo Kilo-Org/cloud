@@ -1,97 +1,115 @@
 /**
  * Fits the new-session prompt's height to the form frame it sits in.
  *
- * The prompt starts at a comfortable multi-line floor, but the form is a
- * `ScrollView` that shrinks with the keyboard and the safe areas, and the card
- * below the input is only as tall as the input plus its own chrome. When the
- * floor plus that chrome no longer fit the frame, the card's bottom row (the
- * attach/paste/voice controls) is pushed behind the bottom system bar. Yielding
- * the floor to whole lines keeps the entire card inside the frame, and whole
- * lines only, so the input never shows a clipped line.
+ * The prompt is one size whatever the draft holds: a comfortable multi-line
+ * floor, lowered only to whole lines when the form's `ScrollView` — which
+ * shrinks with the keyboard and the safe areas — can no longer hold the floor
+ * plus the card's own chrome. Yielding in whole lines keeps the entire card
+ * inside the frame, and the input never shows a clipped line; a draft taller
+ * than the field scrolls inside it instead of growing the card.
  *
- * The frame also carries the block directly under the card — the Organization
- * section when the entry renders one, then the Run on selector and its refresh
- * control — which should stay readable and tappable while the keyboard is up. A
- * long draft grows the input to its cap, and a cap taken from the window alone
- * then fills the whole frame and cuts that row at the frame's bottom edge. So
- * the cap is taken from the room the frame leaves after the card's own chrome,
- * that block, and a line of air under it, and the block is reserved only while
- * the input can still keep its floor beside it: whole lines only, a frame too
- * short for both would otherwise cost the composer most of its lines, and the
- * block then comes into view with the form's own drag instead.
- *
- * Both guards matter on the shipped form, where the block measures 167pt with
- * the keyboard up (Organization 80pt, Run on row 89pt): reserving it beside the
- * three-line floor needs a 395pt frame. The Android emulator reports 339pt with
- * its keyboard up, so there the cap falls back to the room the card alone needs
- * and the row is reached with the drag; a shorter keyboard, or a taller window,
- * leaves the frame the reserve needs and keeps the row inside it.
+ * Sizing the field to its text was the defect: the stored draft loads a moment
+ * after the screen opens, so the card grew then and every row below it moved by
+ * that growth. A height that does not depend on the draft cannot do that.
  *
  * Pure: it reads no layout and mutates nothing, so the caller can recompute it
  * on every frame change without shifting layout on load, refresh, or retry.
  */
 
-export type ResolveNewSessionPromptFrameFitInput = {
-  /** Height of the scrollable form frame the prompt sits in, in points. */
-  frameHeight: number;
-  /** The card's top offset inside that frame, in points. */
-  cardTop: number;
-  /** Everything the card renders other than the input itself, in points. */
-  cardChromeHeight: number;
-  /**
-   * The block directly under the card that the frame must still show, in
-   * points. The new-session form reports the Run on row (its `mt-5`, the label,
-   * its `mb-2`, and the selector or target line) here; `0` means the frame owes
-   * nothing below the card.
-   */
-  belowCardHeight: number;
-  /** Air kept between that block and the frame's bottom edge, in points; unset means none. */
-  clearanceHeight?: number;
-  /** One text line's height at the current Dynamic Type scale, in points. */
+export type ResolveComposerTopFadeHeightInput = {
+  /** How far the field's text has scrolled above its text box, in points. */
+  scrollOffset: number;
+  /** One text line's height, in points. */
   lineHeight: number;
-  /** The input's own vertical padding, in points. */
-  verticalPadding: number;
 };
 
 /**
- * The largest whole-line input height the frame leaves once the card's chrome,
- * the block under the card, and the requested clearance are taken out, or
- * `null` when a measurement is missing or unusable (the first layout pass, a
- * hidden frame). Every result is a whole number of lines plus the padding, and
- * never fewer than one line, so the input never shows a clipped line and a
- * cramped frame still renders a readable one.
+ * Height of the top fade over the composer input, in points.
+ *
+ * A scrolled multiline field cuts its topmost line at the text box's top edge.
+ * With line boxes `L` tall and the field scrolled by `y` into one of them, the
+ * fragment left at the top is the bottom `L - y` of that line, and the next
+ * whole line begins exactly `L - y` below the top edge. The fade has to cover
+ * the fragment and must not reach the whole line under it, so it is the
+ * smaller of the two: `min(y, L - y)`.
+ *
+ * That band is never taller than half a line, so a readable line is never
+ * dimmed — the failure of both a fixed one-line fade (it washes the first line
+ * of any overflowing draft) and a fade sized to the offset alone (past the
+ * halfway point it swallows the whole next line). It is 0 at the top of the
+ * field, where nothing is cut.
  */
-export function resolveNewSessionPromptFrameFit({
-  frameHeight,
-  cardTop,
-  cardChromeHeight,
-  belowCardHeight,
-  clearanceHeight = 0,
+export function resolveComposerTopFadeHeight({
+  scrollOffset,
   lineHeight,
-  verticalPadding,
-}: ResolveNewSessionPromptFrameFitInput): number | null {
-  if (
-    !Number.isFinite(frameHeight) ||
-    !Number.isFinite(cardTop) ||
-    !Number.isFinite(cardChromeHeight) ||
-    !Number.isFinite(belowCardHeight) ||
-    !Number.isFinite(clearanceHeight) ||
-    !Number.isFinite(lineHeight) ||
-    !Number.isFinite(verticalPadding) ||
-    frameHeight <= 0 ||
-    cardTop < 0 ||
-    cardChromeHeight <= 0 ||
-    belowCardHeight < 0 ||
-    clearanceHeight < 0 ||
-    lineHeight <= 0 ||
-    verticalPadding < 0
-  ) {
-    return null;
+}: ResolveComposerTopFadeHeightInput): number {
+  'worklet';
+  if (!Number.isFinite(scrollOffset) || !Number.isFinite(lineHeight) || lineHeight <= 0) {
+    return 0;
   }
+  const intoLine = scrollOffset % lineHeight;
+  return Math.max(0, Math.min(intoLine, lineHeight - intoLine));
+}
 
-  const available = frameHeight - cardTop - cardChromeHeight - belowCardHeight - clearanceHeight;
-  const lines = Math.max(1, Math.floor((available - verticalPadding) / lineHeight));
-  return lines * lineHeight + verticalPadding;
+/**
+ * Shortest window that still shows the form's whole first screenful at the
+ * preferred floor, in points.
+ *
+ * Measured on the design gate's compact cell — 360x640 dp at the default
+ * density, text size and font scale — where the form's viewport ended at
+ * 524.57 points and the repository picker's bottom edge at 568.38: the header
+ * and the pinned Start footer take the other 115.43 of the 640. The three-line
+ * floor therefore needs 683.81 points of window to show the whole trigger,
+ * which is 44.19 points tall and gets 48 back from one line. A shorter window
+ * does not hold it and takes the one-line floor.
+ *
+ * A height rule, not a portrait rule: a landscape phone is short too and takes
+ * the one-line floor, and only a taller window keeps the preferred floor.
+ */
+const NEW_SESSION_FIRST_SCREENFUL_MIN_WINDOW_HEIGHT = 684;
+
+/** The smallest floor the fit allows, in lines. */
+const NEW_SESSION_SHORT_WINDOW_LINES = 1;
+
+export type ResolveNewSessionPromptLineCountInput = {
+  /** The window's height in points, as `useWindowDimensions` reports it. */
+  windowHeight: number;
+  /** True while the keyboard is visible, when the frame and not the window decides. */
+  keyboardVisible: boolean;
+  /** The floor a window with room keeps, in lines. */
+  preferredLines: number;
+};
+
+/**
+ * Lines the prompt reserves on this window.
+ *
+ * The composer keeps its preferred floor wherever the form's first screenful
+ * can hold the repository picker under it. On a shorter window it takes one
+ * line, so the picker Start needs is visible without a scroll. The form still
+ * scrolls, so the yield only decides what the first screenful shows.
+ *
+ * The keyboard is the frame's problem, not the window's: the
+ * `KeyboardAvoidingView` shrinks the frame to the room above the keyboard and
+ * the fit helper lowers the floor to it. Reserving the yield there as well
+ * would pin a tall phone's composer to one line while the user types, so the
+ * window rule stands aside.
+ *
+ * The window, not the measured frame, decides: a decision that waited for the
+ * frame reflowed the form about two seconds after first paint on the emulator.
+ * An unknown height keeps the preferred floor, because the yield is the
+ * exception, never the default.
+ */
+export function resolveNewSessionPromptLineCount({
+  windowHeight,
+  keyboardVisible,
+  preferredLines,
+}: ResolveNewSessionPromptLineCountInput): number {
+  if (keyboardVisible || !Number.isFinite(windowHeight) || windowHeight <= 0) {
+    return preferredLines;
+  }
+  return windowHeight < NEW_SESSION_FIRST_SCREENFUL_MIN_WINDOW_HEIGHT
+    ? NEW_SESSION_SHORT_WINDOW_LINES
+    : preferredLines;
 }
 
 export type ResolveNewSessionPromptMinHeightInput = {
@@ -116,12 +134,6 @@ export type ResolveNewSessionPromptMinHeightInput = {
  * measurement (the first layout pass, a hidden frame) returns
  * `preferredMinHeight` unchanged, so the prompt renders at its preferred floor
  * until the frame is measurable.
- *
- * The Run on block under the card is deliberately not part of this fit: whole
- * lines only, the block costs the phone's composer its floor where the frame
- * cannot hold both, and the shorter composer is the worse trade there (see
- * `resolveNewSessionPromptMaxHeight`, which reserves the block when the floor
- * still fits beside it).
  */
 export function resolveNewSessionPromptMinHeight({
   frameHeight,
@@ -132,6 +144,14 @@ export function resolveNewSessionPromptMinHeight({
   preferredLines,
 }: ResolveNewSessionPromptMinHeightInput): number {
   if (
+    !Number.isFinite(frameHeight) ||
+    !Number.isFinite(cardTop) ||
+    !Number.isFinite(cardChromeHeight) ||
+    !Number.isFinite(lineHeight) ||
+    frameHeight <= 0 ||
+    cardTop < 0 ||
+    cardChromeHeight <= 0 ||
+    lineHeight <= 0 ||
     !Number.isFinite(preferredMinHeight) ||
     !Number.isFinite(preferredLines) ||
     preferredMinHeight <= 0 ||
@@ -143,99 +163,27 @@ export function resolveNewSessionPromptMinHeight({
   // The padding `preferredMinHeight` adds around its lines, derived from the
   // existing values instead of a second constant that could drift.
   const verticalPadding = preferredMinHeight - lineHeight * preferredLines;
-  const fitted = resolveNewSessionPromptFrameFit({
-    frameHeight,
-    cardTop,
-    cardChromeHeight,
-    belowCardHeight: 0,
-    lineHeight,
-    verticalPadding,
-  });
-  return fitted === null ? preferredMinHeight : Math.min(preferredMinHeight, fitted);
+  const available = frameHeight - cardTop - cardChromeHeight;
+  const lines = Math.max(1, Math.floor((available - verticalPadding) / lineHeight));
+  return Math.min(preferredMinHeight, lines * lineHeight + verticalPadding);
 }
 
-export type ResolveNewSessionPromptMaxHeightInput = {
-  /** Height of the scrollable form frame the prompt sits in, in points. */
-  frameHeight: number;
-  /** The card's top offset inside that frame, in points. */
-  cardTop: number;
-  /** Everything the card renders other than the input itself, in points. */
-  cardChromeHeight: number;
-  /** The block under the card the frame must still show, in points; unset means none. */
-  belowCardHeight?: number;
-  /** The cap the window math already allows, in points. */
-  preferredMaxHeight: number;
-  /** The floor the caller renders the input at; the cap never drops below it. */
-  minHeight: number;
-  /** One text line's height at the current Dynamic Type scale, in points. */
-  lineHeight: number;
-  /** The input's own vertical padding, in points. */
-  verticalPadding: number;
-};
-
-/**
- * The input's cap inside the frame: `preferredMaxHeight` while the frame has
- * room, else the largest whole-line height the frame leaves.
- *
- * The Run on block under the card is reserved — the cap keeps the card's
- * chrome, the block, and one line of air under it inside the frame — but only
- * while the input can still keep `minHeight` beside it. Where whole lines
- * cannot hold both (the Android emulator with its keyboard up: 339pt of frame,
- * 14pt card top, 101.33pt card chrome and the 167pt block leave one line),
- * reserving the block would cost the composer most of its lines for every
- * draft, so the floor wins and the cap falls back to the room the card alone
- * needs. The block then comes into view with the form's own drag, which is the
- * behaviour the Run on finding accepts alongside "stays fully visible".
- *
- * Never below `minHeight`, and an unknown or non-positive measurement returns
- * `preferredMaxHeight` unchanged, which keeps the window-only cap until the
- * frame is measurable.
- */
-export function resolveNewSessionPromptMaxHeight({
-  frameHeight,
-  cardTop,
-  cardChromeHeight,
-  belowCardHeight = 0,
-  preferredMaxHeight,
-  minHeight,
-  lineHeight,
-  verticalPadding,
-}: ResolveNewSessionPromptMaxHeightInput): number {
-  if (
-    !Number.isFinite(preferredMaxHeight) ||
-    !Number.isFinite(minHeight) ||
-    preferredMaxHeight <= 0 ||
-    minHeight < 0
-  ) {
-    return preferredMaxHeight;
-  }
-
-  const withBlock = resolveNewSessionPromptFrameFit({
-    frameHeight,
-    cardTop,
-    cardChromeHeight,
-    belowCardHeight,
-    clearanceHeight: lineHeight,
-    lineHeight,
-    verticalPadding,
-  });
-  if (withBlock === null) {
-    return preferredMaxHeight;
-  }
-  if (withBlock >= minHeight) {
-    return Math.min(preferredMaxHeight, withBlock);
-  }
-
-  const cardOnly = resolveNewSessionPromptFrameFit({
-    frameHeight,
-    cardTop,
-    cardChromeHeight,
-    belowCardHeight: 0,
-    lineHeight,
-    verticalPadding,
-  });
-  if (cardOnly === null) {
-    return preferredMaxHeight;
-  }
-  return Math.min(preferredMaxHeight, Math.max(cardOnly, minHeight));
+export function resolveNewSessionFormFrameHeight({
+  containerY,
+  containerHeight,
+  footerHeight,
+  windowHeight,
+  keyboardHeight,
+  keyboardVerticalOffset,
+}: {
+  containerY: number;
+  containerHeight: number;
+  footerHeight: number;
+  windowHeight: number;
+  keyboardHeight: number;
+  keyboardVerticalOffset: number;
+}): number {
+  const keyboardTop = windowHeight - keyboardHeight - keyboardVerticalOffset;
+  const overlap = Math.max(0, containerY + containerHeight - keyboardTop);
+  return Math.max(0, containerHeight - footerHeight - overlap);
 }

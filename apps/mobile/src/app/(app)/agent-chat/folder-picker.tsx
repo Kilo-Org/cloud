@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
@@ -71,7 +71,7 @@ export default function FolderPickerScreen() {
   }, [router]);
 
   const handleDone = useCallback(() => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     // Unsupported means the CLI cannot list this folder: Done keeps the launch
     // directory (`""`), never the listed path. Every other state confirms the
     // listed folder.
@@ -90,14 +90,19 @@ export default function FolderPickerScreen() {
     [list]
   );
 
-  const goBack = useCallback(() => {
+  // One drill step shared by the in-sheet Back control and the hardware Back
+  // listener: pops the deepest frame and restores the cached parent listing.
+  // Returns whether a frame was popped (the sheet stays open).
+  const goBack = useCallback((): boolean => {
     const parent = stack.at(-2);
     setStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
     if (parent) {
       // Restores the cached parent in-sheet and advances the generation so
       // any in-flight child listing is ignored. Never `router.back`.
       list(parent.path);
+      return true;
     }
+    return false;
   }, [list, stack]);
 
   if (!bridge) {
@@ -171,14 +176,16 @@ export default function FolderPickerScreen() {
     <PickerSheet
       title={title}
       onDone={handleDone}
-      onCancel={isNested ? goBack : undefined}
+      onCancel={isNested ? () => void goBack() : undefined}
       cancelLabel={isNested ? t('common.back') : undefined}
+      onHardwareBack={goBack}
       scrollable={false}
     >
       {currentState !== null && currentState.phase !== 'skeleton' && data.length === 0 ? (
         empty
       ) : (
         <FlashList
+          nestedScrollEnabled
           style={[listStyle, { backgroundColor: colors.background }]}
           data={data}
           keyExtractor={entry => entry.path}

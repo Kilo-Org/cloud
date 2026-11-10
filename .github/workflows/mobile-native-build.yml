@@ -1,31 +1,3 @@
-# Build the mobile debug dev-client natively and publish it as a run
-# artifact named mobile-native-<platform>-<nativeHash>. The nativeHash is
-# input-deterministic (dev/local/mobile-{ios,android}-build.ts), so any
-# machine with the same native inputs computes the same name and can install
-# the artifact instead of compiling (dev/local/mobile-remote-native.ts).
-#
-# Runs on pushes to main that can change native inputs, on pull requests that
-# change a native input, and on demand for any pushed branch via
-# workflow_dispatch. The gate job skips platforms whose artifact already
-# exists, so a PR whose nativeHash is already published costs one ubuntu gate
-# job and no macOS runner.
-#
-# A finished artifact is the only thing the gate can see, and one native build
-# takes longer than the gap between two pushes of the same native inputs.
-# Two mechanisms keep that from multiplying the work:
-# - Each heavy job takes a job-level concurrency slot keyed on the nativeHash
-#   and the event, and re-checks its artifact (`mobile-native-gate.ts
-#   --published`) before it builds. A run that arrives while the first build of
-#   that hash is running waits for the slot, then exits in seconds instead of
-#   spending a second runner. The event name is part of the key so a push build
-#   is never the pending job that a later pull_request job cancels, which would
-#   leave main without the durable artifact.
-# - A run that must publish the durable artifact (push, workflow_dispatch) but
-#   finds only the one-day pull_request artifact promotes it: the promote job
-#   copies the artifact under the same name with the durable retention, which
-#   costs a minute on ubuntu instead of a second full build. The promote jobs
-#   take no concurrency slot on purpose: a cancelled promote reads as "not
-#   success" and would answer with the full build it exists to avoid.
 name: mobile-native-build
 
 on:
@@ -43,19 +15,15 @@ on:
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'patches/**'
+      - 'dev/local/mobile-native-build.ts'
       - '.github/workflows/mobile-native-build.yml'
-  # Native inputs: any of these can break the native build, so a pull request
-  # that changes one builds it before merge (PR 6115 merged an iOS app that
-  # did not compile with only the workflow-file path here). A PR whose hash is
-  # already published skips both platforms in the gate job. Editing this
-  # workflow file itself also runs it, under a pr<N>-<workflow hash>- prefix
-  # hosts never install.
   pull_request:
     paths:
       - 'apps/mobile/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'patches/**'
+      - 'dev/local/mobile-native-build.ts'
       - '.github/workflows/mobile-native-build.yml'
 
 concurrency:
@@ -68,9 +36,6 @@ concurrency:
 permissions:
   contents: read
   actions: read
-  # The gate lists the pull request's changed files to decide whether the run
-  # validates this workflow file (out-of-namespace prefix) or a native input
-  # (plain, installable name).
   pull-requests: read
 
 jobs:
@@ -82,12 +47,6 @@ jobs:
       android_hash: ${{ steps.decide.outputs.android_hash }}
       need_ios: ${{ steps.decide.outputs.need_ios }}
       need_android: ${{ steps.decide.outputs.need_android }}
-      promote_ios: ${{ steps.decide.outputs.promote_ios }}
-      promote_android: ${{ steps.decide.outputs.promote_android }}
-      promote_ios_artifact_id: ${{ steps.decide.outputs.promote_ios_artifact_id }}
-      promote_android_artifact_id: ${{ steps.decide.outputs.promote_android_artifact_id }}
-      promote_ios_name: ${{ steps.decide.outputs.promote_ios_name }}
-      promote_android_name: ${{ steps.decide.outputs.promote_android_name }}
       prefix: ${{ steps.decide.outputs.prefix }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -103,8 +62,15 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # The hash steps run tsx over the local dev/local scripts and let
+      # @expo/fingerprint read the Expo config from apps/mobile, so they need the
+      # root project and the mobile app, not the whole workspace. Everything
+      # downstream waits behind this job, so a filtered install here releases it
+      # sooner.
+      # The hash must stay identical to the one a build job recomputes after its
+      # recursive install, or the artifact name matches no build.
+      - name: Install root and mobile dependencies
+        run: pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts
 
       - name: Compute hashes and gate the build
         id: decide
@@ -118,95 +84,127 @@ jobs:
           android_hash=$(pnpm exec tsx dev/local/mobile-native-hash.ts android)
           echo "ios_hash=$ios_hash" >> "$GITHUB_OUTPUT"
           echo "android_hash=$android_hash" >> "$GITHUB_OUTPUT"
-          # dev/local/mobile-native-gate.ts decides the prefix, which platforms
-          # still need building, and which are copied from the one-day
-          # pull_request artifact instead. A pull_request run that edits this
-          # workflow is validating that edit, so it publishes under
-          # pr<N>-<workflow hash>- and hosts never install it; a pull_request
-          # run whose native input changed publishes the plain
-          # mobile-native-<platform>-<nativeHash> name a host installs.
           pnpm exec tsx dev/local/mobile-native-gate.ts "$ios_hash" "$android_hash"
 
-  # A run that must publish the durable artifact, but finds only the one-day
-  # pull_request one, copies it instead of rebuilding. The copy carries the
-  # same name, so hosts and the gate look it up exactly as they look up a
-  # build.
+  # One harness SDK build per run. Both platform jobs need
+  # packages/harness-sdk/dist and start together after the gate, so running the
+  # action in each made a dist cache miss pay the typia compile twice and raced
+  # both jobs to save the one key, because actions/cache saves at the end of a
+  # job: the loser only logged "Unable to reserve cache". Here the action runs
+  # once and both builds download the tree it produced. The dist is a TypeScript
+  # emit, so the Linux build serves the macOS job.
   #
-  # No job-level concurrency here on purpose. A cancelled promote reports
-  # `result == 'cancelled'`, which the build jobs read as "not success" and
-  # answer with a full build — the cost this job exists to remove. A duplicate
-  # promote is a one-minute re-upload of the same bytes.
-  promote_ios:
+  # The job runs only when a platform job will. The gate already clears a
+  # platform whose artifact another run published, so a run with both cleared
+  # must not pay an install and a build for nobody.
+  prepare-harness-sdk:
     needs: gate
-    if: needs.gate.outputs.promote_ios == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    if: needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
     steps:
-      - name: Download the short-lived artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ needs.gate.outputs.promote_ios_artifact_id }}
-        run: |
-          set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
-            > "$RUNNER_TEMP/artifact.zip"
-          mkdir -p "$RUNNER_TEMP/unpacked"
-          unzip -q "$RUNNER_TEMP/artifact.zip" -d "$RUNNER_TEMP/unpacked"
+      # No lfs: the harness SDK build reads the root install and its own
+      # sources, and this matches the job in kilo-app CI and ci.yml that saves
+      # the dist cache key this job restores.
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      # The shared store keeps installs warm when a pull request changes the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
-          name: ${{ needs.gate.outputs.promote_ios_name }}
-          path: ${{ runner.temp }}/unpacked
-          compression-level: 0
-          retention-days: 90
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
+
+      # A directory path makes the directory the artifact root, so a consumer
+      # that unpacks into packages/harness-sdk/dist gets the tree the build
+      # wrote, with no extra path segment.
+      - name: Upload the harness SDK build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
+          retention-days: 1
           if-no-files-found: error
 
-  promote_android:
+  # One tRPC declaration build per run, for the same reason as the harness SDK
+  # above: both platform jobs need packages/trpc/dist and start together after
+  # the gate, so running the action in each made a cache miss compile the same
+  # declaration program twice and race both jobs to save the one key. The cache
+  # stays here, which is also the entry ci.yml's and kilo-app CI's producers
+  # write; both platform jobs download this job's artifact instead of building.
+  #
+  # The filtered install matches those two producers: the action builds
+  # `@kilocode/trpc` alone, but its declaration program also reads web-shared
+  # and apps/web sources through their path aliases.
+  #
+  # The job runs only when a platform job will: the gate clears a platform whose
+  # artifact another run already published, so a run with both cleared pays no
+  # install and no build for nobody.
+  prepare-trpc:
     needs: gate
-    if: needs.gate.outputs.promote_android == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    if: needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
     steps:
-      - name: Download the short-lived artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ needs.gate.outputs.promote_android_artifact_id }}
-        run: |
-          set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
-            > "$RUNNER_TEMP/artifact.zip"
-          mkdir -p "$RUNNER_TEMP/unpacked"
-          unzip -q "$RUNNER_TEMP/artifact.zip" -d "$RUNNER_TEMP/unpacked"
+      # No lfs, like the harness SDK producer and the two other declaration
+      # producers whose cache key this job restores.
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
-          name: ${{ needs.gate.outputs.promote_android_name }}
-          path: ${{ runner.temp }}/unpacked
-          compression-level: 0
-          retention-days: 90
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter '@kilocode/trpc...' --filter 'web...' --filter kilocode-monorepo
+
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+
+      # A directory path makes the directory the artifact root, so a consumer
+      # that unpacks into packages/trpc/dist gets the tree the build wrote. A
+      # hit that restored nothing must fail here, not in a consumer.
+      - name: Upload the tRPC declarations
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+          retention-days: 1
           if-no-files-found: error
 
   ios:
-    needs: [gate, promote_ios]
-    # Build when nothing is published, or when the promote of the short-lived
-    # artifact failed: a failed promote must not leave the hash without a
-    # durable build. `always()` keeps this job alive when the promote job was
-    # skipped, which is the normal case.
-    if: |
-      always() && !cancelled() &&
-      needs.gate.result == 'success' &&
-      (needs.gate.outputs.need_ios == 'true' ||
-       (needs.gate.outputs.promote_ios == 'true' && needs.promote_ios.result != 'success'))
+    needs: [gate, prepare-harness-sdk, prepare-trpc]
+    if: needs.gate.outputs.need_ios == 'true'
     runs-on: macos-26
     timeout-minutes: 90
-    # Serialized on the nativeHash so a sibling build of the same inputs makes
-    # this job wait and then exit at the re-check. The event name is part of the
-    # key so a push build is never the pending job that a later pull_request
-    # job cancels: main would then keep no durable artifact for that hash. The
-    # measured duplicates were all pull_request runs, and those still share one
-    # group.
+    # A pull_request run takes one slot per ref, so pull requests with the same
+    # native inputs never cancel each other's pending build; the artifact
+    # re-check below still turns a duplicate that arrives after a build
+    # published into a no-op. A push or workflow_dispatch run keeps one slot per
+    # nativeHash, keyed on the event so a push build is never the pending job a
+    # later pull_request job cancels: main would then keep no durable artifact
+    # for that hash.
     concurrency:
-      group: ${{ github.workflow }}-${{ github.event_name }}-ios-${{ needs.gate.outputs.ios_hash }}
+      group: ${{ github.workflow }}-${{ github.event_name }}-ios-${{ github.event_name == 'pull_request' && github.ref || needs.gate.outputs.ios_hash }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -222,11 +220,13 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # The probe runs tsx over the local dev/local scripts, so it needs only
+      # the root project's dependencies. A duplicate that reaches this job
+      # after another run published pays this filtered install instead of the
+      # recursive workspace one, and the guarded install below then never runs.
+      - name: Install root dependencies
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
-      # The concurrency group above serializes this hash, so the build that
-      # held the slot may have published the artifact while this job queued.
       - name: Check whether another run published this artifact
         id: published
         env:
@@ -234,13 +234,23 @@ jobs:
           ARTIFACT: ${{ needs.gate.outputs.prefix }}mobile-native-ios-${{ needs.gate.outputs.ios_hash }}
         run: pnpm exec tsx dev/local/mobile-native-gate.ts --published "$ARTIFACT"
 
-      - name: Build trpc types
+      - name: Install dependencies
         if: steps.published.outputs.published != 'true'
-        run: pnpm --filter @kilocode/trpc run build
+        run: pnpm install --frozen-lockfile
 
-      - name: Build harness SDK
+      - name: Download the tRPC declarations
         if: steps.published.outputs.published != 'true'
-        run: pnpm --filter @kilocode/harness-sdk run build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+
+      - name: Download the harness SDK build
+        if: steps.published.outputs.published != 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
 
       # A consumer computes the hash on macOS; the gate computed it on
       # Linux. A mismatch would publish an artifact nobody can ever find,
@@ -303,19 +313,14 @@ jobs:
           if-no-files-found: error
 
   android:
-    needs: [gate, promote_android]
-    if: |
-      always() && !cancelled() &&
-      needs.gate.result == 'success' &&
-      (needs.gate.outputs.need_android == 'true' ||
-       (needs.gate.outputs.promote_android == 'true' && needs.promote_android.result != 'success'))
+    needs: [gate, prepare-harness-sdk, prepare-trpc]
+    if: needs.gate.outputs.need_android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Same serialization as the ios job: pull_request runs of one nativeHash
-    # queue behind each other, and a push build keeps its own group so a later
-    # pull_request job cannot cancel it while it waits.
+    # Same slot rule as the ios job: one per ref for a pull_request run, one
+    # per nativeHash for a push or workflow_dispatch run.
     concurrency:
-      group: ${{ github.workflow }}-${{ github.event_name }}-android-${{ needs.gate.outputs.android_hash }}
+      group: ${{ github.workflow }}-${{ github.event_name }}-android-${{ github.event_name == 'pull_request' && github.ref || needs.gate.outputs.android_hash }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -337,11 +342,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # Same split as the ios job: the filtered install is enough for the
+      # probe, and a duplicate never reaches the workspace install.
+      - name: Install root dependencies
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
-      # The concurrency group above serializes this hash, so the build that
-      # held the slot may have published the artifact while this job queued.
       - name: Check whether another run published this artifact
         id: published
         env:
@@ -349,17 +354,46 @@ jobs:
           ARTIFACT: ${{ needs.gate.outputs.prefix }}mobile-native-android-${{ needs.gate.outputs.android_hash }}
         run: pnpm exec tsx dev/local/mobile-native-gate.ts --published "$ARTIFACT"
 
-      - name: Build trpc types
+      - name: Install dependencies
         if: steps.published.outputs.published != 'true'
-        run: pnpm --filter @kilocode/trpc run build
+        run: pnpm install --frozen-lockfile
 
-      - name: Build harness SDK
+      - name: Download the tRPC declarations
         if: steps.published.outputs.published != 'true'
-        run: pnpm --filter @kilocode/harness-sdk run build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+
+      - name: Download the harness SDK build
+        if: steps.published.outputs.published != 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
 
       - name: Expo prebuild
         if: steps.published.outputs.published != 'true'
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform android
+
+      # The prebuild rewrites apps/mobile/android inside this run, so the key
+      # hashes the inputs that pin the generated Gradle toolchain — the app
+      # manifest and the lockfile, which also records the patch hashes —
+      # instead of a generated wrapper file that does not exist yet. A warm
+      # user home is reused without a daemon. Any dependency change rotates the
+      # key, so a miss restores the newest earlier user home from the prefix
+      # and Gradle fetches only the modules that changed; the Build step stays
+      # the gate.
+      - name: Cache the Gradle user home
+        if: steps.published.outputs.published != 'true'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-${{ runner.arch }}-gradle-${{ hashFiles('apps/mobile/package.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-gradle-
 
       - name: Build
         if: steps.published.outputs.published != 'true'

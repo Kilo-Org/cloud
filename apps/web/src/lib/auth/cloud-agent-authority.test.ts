@@ -19,8 +19,6 @@ import {
   getResourceDelegationAuthority,
 } from './resource-delegation';
 import { GET as getIdentity } from '@/app/api/user/route';
-import { POST as mintGastownToken } from '@/app/api/gastown/token/route';
-import { POST as mintWastelandToken } from '@/app/api/wasteland/token/route';
 import {
   personalPrepareSessionNextSchema,
   organizationPrepareSessionNextSchema,
@@ -33,8 +31,6 @@ const mockMembership = jest.fn();
 const mockDirectMembership = jest.fn();
 const mockGetServerSession = jest.fn();
 const mockResolver = jest.fn();
-const mockOrgMemberships = jest.fn();
-const mockGastownEnabled = jest.fn();
 let resourceMigrationEnabled = true;
 
 jest.mock('next/headers', () => ({ headers: () => mockHeaders(), cookies: jest.fn() }));
@@ -66,17 +62,13 @@ jest.mock('@kilocode/worker-utils/account-access', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
-  getUserOrgMemberships: (...args: unknown[]) => mockOrgMemberships(...args),
-}));
-jest.mock('@/lib/gastown/feature-flags', () => ({
-  isGastownEnabled: (...args: unknown[]) => mockGastownEnabled(...args),
 }));
 jest.mock('@/lib/organizations/organization-auth', () => ({ getAuthorizedOrgContext: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
   ORGANIZATION_ID_HEADER: 'X-KiloCode-OrganizationId',
 }));
 jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
-  getBlacklistedDomains: async () => [],
+  isEmailBlacklisted: async () => false,
 }));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: jest.fn(),
@@ -87,7 +79,15 @@ jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
   authViaTokenFromHeaders: (headers: Headers) => headers.has('authorization'),
   clientIpFromHeaders: () => null,
   routeFromHeaders: () => null,
+  methodFromHeaders: (_headers: Headers, requestMethod?: string | null) => requestMethod ?? null,
+  userAgentProductFromHeaders: () => null,
   emitAdminAccessEvent: jest.fn(),
+  emitPrivilegedAccessEvent: jest.fn(),
+  recordKiloAdminElevation: jest.fn(),
+  recordKiloAdminElevationForRequest: jest.fn(),
+  elevateViaKiloAdmin: async (_ctx: unknown, params: { grant: unknown }) => params.grant,
+  serviceTarget: (service: string) => `service:${service}`,
+  organizationTarget: (id: string) => `organization:${id}`,
 }));
 jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({
   isWebSessionCurrent: () => true,
@@ -130,6 +130,7 @@ const launch = {
   mode: 'code',
   prompt: 'Launch the child',
   autoInitiate: true,
+  operationKey: '33333333-3333-4333-8333-333333333333',
 };
 function scopedClaims(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -181,8 +182,6 @@ beforeEach(() => {
   mockMembership.mockResolvedValue(true);
   mockDirectMembership.mockResolvedValue([{ id: 'fixture-membership' }]);
   mockGetServerSession.mockResolvedValue({ kiloUserId: user.id });
-  mockOrgMemberships.mockResolvedValue([]);
-  mockGastownEnabled.mockResolvedValue(true);
   mockResolver.mockResolvedValue('launched');
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -197,13 +196,27 @@ describe('verified scoped web authentication', () => {
     expect(auth.cloudAgentAuthority).toEqual(scope);
     expect(mockGetServerSession).not.toHaveBeenCalled();
   });
+  it('allows models.list discovery on scoped HTTP paths for personal and signed-org authority', async () => {
+    expect(
+      (await getUserFromAuth({ adminOnly: false, requestPathname: '/api/trpc/models.list' })).user
+        ?.id
+    ).toBe(user.id);
+    const orgScope = { ...scope, organizationId };
+    mockHeaders.mockResolvedValue(
+      bearer(scopedClaims({ organizationId, cloudAgentAuthority: orgScope }))
+    );
+    expect(
+      (await getUserFromAuth({ adminOnly: false, requestPathname: '/api/trpc/models.list' })).user
+        ?.id
+    ).toBe(user.id);
+  });
   it.each([
     undefined,
-    '/api/gastown/token',
-    '/api/wasteland/token',
     '/api/profile',
     '/api/trpc/user.getMe',
     '/api/trpc/cloudAgentNext.prepareSession,user.getMe',
+    '/api/trpc/models.preferred',
+    '/api/trpc/models.list,user.getMe',
   ])('denies direct REST and unrelated procedure paths %s', async requestPathname => {
     const headers = bearer();
     headers.set('x-pathname', '/api/user');
@@ -242,17 +255,6 @@ describe('verified scoped web authentication', () => {
     headers.set('X-KiloCode-OrganizationId', organizationId);
     mockHeaders.mockResolvedValue(headers);
     expect((await getIdentity()).status).toBe(403);
-  });
-  it('cannot reach direct REST credential mint paths even with a valid browser cookie', async () => {
-    const headers = bearer();
-    headers.set('cookie', 'next-auth.session-token=fixture');
-    headers.set('x-pathname', '/api/user');
-    mockHeaders.mockResolvedValue(headers);
-    expect((await mintGastownToken()).status).toBe(401);
-    expect((await mintWastelandToken()).status).toBe(401);
-    expect(mockOrgMemberships).not.toHaveBeenCalled();
-    expect(mockGastownEnabled).not.toHaveBeenCalled();
-    expect(mockGetServerSession).not.toHaveBeenCalled();
   });
   it('rechecks scope expiry after awaiting current-user authorization', async () => {
     mockFindUser.mockImplementation(async () => {
@@ -324,7 +326,6 @@ describe('raw tRPC scope enforcement', () => {
     { mcpServers: {} },
     { setupCommands: [] },
     { cloudAgentSpawn: {} },
-    { images: {} },
     { attachments: {} },
     { gitUrl: 'https://fixture.invalid' },
     { initialPayload: {} },
@@ -341,21 +342,17 @@ describe('raw tRPC scope enforcement', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockResolver).not.toHaveBeenCalled();
   });
-  it.each([true, false])(
-    'allows normally valid repository/model choices and opt-in %s',
-    async flag => {
-      const request = {
-        ...launch,
-        githubRepo: 'Other-Org/AnotherRepo',
-        model: 'another-provider/another-model',
-        allowSubagentSessions: flag,
-      };
-      expect(await router.createCaller(context()).cloudAgentNext.prepareSession(request)).toBe(
-        'launched'
-      );
-      expect(mockResolver).toHaveBeenCalledWith(request);
-    }
-  );
+  it('allows normally valid repository and model choices', async () => {
+    const request = {
+      ...launch,
+      githubRepo: 'Other-Org/AnotherRepo',
+      model: 'another-provider/another-model',
+    };
+    expect(await router.createCaller(context()).cloudAgentNext.prepareSession(request)).toBe(
+      'launched'
+    );
+    expect(mockResolver).toHaveBeenCalledWith(request);
+  });
   it('denies unrelated procedures, expired scope and user mismatch', async () => {
     const caller = router.createCaller(context());
     await expect(caller.user.getMe()).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -400,7 +397,6 @@ describe('scope-preserving control token exchange', () => {
     const result = await createControlTokenForRequest(user, 'cloud-agent-next', {
       headers: bearer(),
       expiresIn: 100_000,
-      extra: { isAdmin: true },
     });
     const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
     expect(claims).toMatchObject({
@@ -414,11 +410,6 @@ describe('scope-preserving control token exchange', () => {
     expect(claims.runtimeAuthorization).toBeUndefined();
     expect(claims.isAdmin).toBeUndefined();
     expect(result.expiresAt).toBe(new Date(scope.expiresAt * 1000).toISOString());
-  });
-  it.each(['gastown', 'wasteland'] as const)('cannot mint %s control', async resource => {
-    await expect(
-      createControlTokenForRequest(user, resource, { headers: bearer() })
-    ).rejects.toMatchObject({ status: 403 });
   });
   it('cannot mint other delegations, change org, re-exchange control, or use stale principal', async () => {
     await expect(getResourceDelegationAuthority(user, { headers: bearer() })).rejects.toMatchObject(
@@ -474,35 +465,29 @@ describe('scope-preserving control token exchange', () => {
   });
 });
 
-describe('ordinary opt-in schema', () => {
-  it('preserves the parent callback through personal and organization web prepare schemas', () => {
-    const input = { ...launch, callbackTarget: { url: 'session:parent' } };
-    expect(personalPrepareSessionNextSchema.parse(input).callbackTarget).toEqual(
-      input.callbackTarget
-    );
+describe('ordinary prepare schema', () => {
+  it.each(['workspace:new-chat', 'workspace:workspace_22345678-1234-4234-8234-123456789abc'])(
+    'preserves the %s callback through personal and organization web prepare schemas',
+    url => {
+      const input = { ...launch, callbackTarget: { url } };
+      expect(personalPrepareSessionNextSchema.parse(input).callbackTarget).toEqual(
+        input.callbackTarget
+      );
+      expect(
+        organizationPrepareSessionNextSchema.parse({ ...input, organizationId }).callbackTarget
+      ).toEqual(input.callbackTarget);
+    }
+  );
+  it('strips the retired spawn opt-in through prepare parsing', () => {
     expect(
-      organizationPrepareSessionNextSchema.parse({ ...input, organizationId }).callbackTarget
-    ).toEqual(input.callbackTarget);
-  });
-  it.each([true, false])('preserves boolean opt-in %s through prepare parsing', flag => {
-    expect(
-      personalPrepareSessionNextSchema.parse({ ...launch, allowSubagentSessions: flag })
-    ).toMatchObject({ allowSubagentSessions: flag });
+      personalPrepareSessionNextSchema.parse({ ...launch, allowSubagentSessions: true })
+    ).not.toHaveProperty('allowSubagentSessions');
     expect(
       organizationPrepareSessionNextSchema.parse({
         ...launch,
         organizationId,
-        allowSubagentSessions: flag,
+        allowSubagentSessions: true,
       })
-    ).toMatchObject({ allowSubagentSessions: flag });
-  });
-  it('defaults to opt-out and rejects nonboolean opt-in', () => {
-    expect(personalPrepareSessionNextSchema.parse(launch).allowSubagentSessions).toBeUndefined();
-    expect(
-      personalPrepareSessionNextSchema.safeParse({
-        ...launch,
-        allowSubagentSessions: { repositories: ['acme/repo'] },
-      }).success
-    ).toBe(false);
+    ).not.toHaveProperty('allowSubagentSessions');
   });
 });

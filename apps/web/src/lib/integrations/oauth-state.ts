@@ -1,7 +1,6 @@
 import 'server-only';
 
 import { z } from 'zod';
-import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
 import { createSignedToken, verifySignedTokenDetailed } from '@/lib/signed-token';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
@@ -15,11 +14,12 @@ import { validateReturnPath } from '@/lib/integrations/validate-return-path';
  *
  * This module produces a state value of the form:
  *
- *   base64url({ owner, uid, iat, nonce }) . HMAC-SHA256(payload, secret)
+ *   base64url({ provider, owner, uid, iat, nonce }) . HMAC-SHA256(payload, secret)
  *
- * where `owner` is the original owner string, `uid` is the ID of the
- * authenticated user who started the flow, `iat` is the issued-at timestamp
- * (seconds since epoch), and `nonce` is random bytes to ensure uniqueness.
+ * where `provider` names the integration flow that minted the state, `owner`
+ * is the original owner string, `uid` is the ID of the authenticated user who
+ * started the flow, `iat` is the issued-at timestamp (seconds since epoch),
+ * and `nonce` is random bytes to ensure uniqueness.
  *
  * On the callback we:
  *
@@ -27,14 +27,33 @@ import { validateReturnPath } from '@/lib/integrations/validate-return-path';
  *  2. Check `iat` is within the allowed TTL window (default 10 minutes).
  *  3. Extract `uid` and confirm it matches the session user (same user
  *     who initiated the flow is completing it).
- *  4. Return the `owner` string so the rest of the callback logic is
+ *  4. Check `provider` names the flow the callback serves.
+ *  5. Return the `owner` string so the rest of the callback logic is
  *     unchanged.
  */
 
 /** Maximum age of a state token in seconds (10 minutes). */
 export const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 
+/** Integration flows that mint shared signed OAuth state. */
+export const OAUTH_STATE_PROVIDERS = [
+  'github',
+  'gitlab',
+  'bitbucket',
+  'slack',
+  'discord',
+  'linear',
+  'dolthub',
+  'google',
+] as const;
+
+export type OAuthStateProvider = (typeof OAUTH_STATE_PROVIDERS)[number];
+
+const OAuthStateProviderSchema = z.enum(OAUTH_STATE_PROVIDERS);
+
 export type VerifiedOAuthState = {
+  /** The integration flow that minted this state. */
+  provider: OAuthStateProvider;
   /** The original owner string (`user_<id>` or `org_<id>`) */
   owner: string;
   /** The user ID that initiated the OAuth flow */
@@ -45,24 +64,33 @@ export type VerifiedOAuthState = {
   issuedAt: number;
 };
 
+export type CreateOAuthStateOptions = {
+  /** The integration flow minting this state. */
+  provider: OAuthStateProvider;
+  /** Marks a provider-install state that a callback must consume exactly once. */
+  purpose?: 'provider_install';
+};
+
 /**
  * Build a signed OAuth state parameter.
  *
- * @param owner  – owner string, e.g. `user_abc123` or `org_xyz789`
- * @param userId – the ID of the currently-authenticated user initiating the flow
+ * @param owner   – owner string, e.g. `user_abc123` or `org_xyz789`
+ * @param userId  – the ID of the currently-authenticated user initiating the flow
+ * @param options – the minting flow and, for reserved install flows, the purpose
  */
 export function createOAuthState(
   owner: string,
   userId: string,
-  returnTo?: string,
-  purpose?: 'provider_install'
+  returnTo: string | undefined,
+  options: CreateOAuthStateOptions
 ): string {
   const safeReturnTo = returnTo ? validateReturnPath(returnTo) : null;
   return createSignedToken({
+    provider: options.provider,
     owner,
     uid: userId,
     ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
-    ...(purpose ? { purpose } : {}),
+    ...(options.purpose ? { purpose: options.purpose } : {}),
   });
 }
 
@@ -89,6 +117,7 @@ export type OAuthStateVerificationResult =
   | { status: 'invalid'; reason: OAuthStateVerificationFailureReason };
 
 const OAuthStatePayloadSchema = z.object({
+  provider: OAuthStateProviderSchema,
   owner: z.string(),
   uid: z.string(),
   iat: z.number().finite(),
@@ -108,6 +137,7 @@ export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerifi
         typeof parsed.data.returnTo === 'string' ? validateReturnPath(parsed.data.returnTo) : null;
 
       return {
+        provider: parsed.data.provider,
         owner: parsed.data.owner,
         userId: parsed.data.uid,
         issuedAt: parsed.data.iat,
@@ -132,8 +162,4 @@ export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerifi
     case 'token_from_future':
       return { status: 'invalid', reason: 'state_from_future' };
   }
-}
-
-export function isLegacyProviderOAuthState(state: VerifiedOAuthState): boolean {
-  return !state.purpose && !isGitHubConnectionManagementEnabled();
 }

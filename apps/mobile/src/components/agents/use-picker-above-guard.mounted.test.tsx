@@ -8,6 +8,7 @@ const backMock = vi.hoisted(() => vi.fn());
 const navigationState = vi.hoisted(() => ({
   state: { index: 1, routes: [{ name: 'agent-chat/new' }, { name: 'agent-chat/new' }] },
 }));
+const stateListeners = vi.hoisted(() => new Set<() => void>());
 const preventRemove = vi.hoisted(() => ({
   prevent: false,
   handler: null as
@@ -15,17 +16,28 @@ const preventRemove = vi.hoisted(() => ({
     | ((options: { data: { action: { type: string } }; repeat: () => void }) => void),
 }));
 
-vi.mock('expo-router', () => ({
-  useNavigation: () => ({ getState: () => navigationState.state }),
-  useRouter: () => ({ back: backMock }),
-  usePreventRemove: (
-    prevent: boolean,
-    handler: (options: { data: { action: { type: string } }; repeat: () => void }) => void
-  ) => {
-    preventRemove.prevent = prevent;
-    preventRemove.handler = handler;
-  },
-}));
+vi.mock('expo-router', () => {
+  const navigation = {
+    getState: () => navigationState.state,
+    addListener: (_event: string, listener: () => void) => {
+      stateListeners.add(listener);
+      return () => {
+        stateListeners.delete(listener);
+      };
+    },
+  };
+  return {
+    useNavigation: () => navigation,
+    useRouter: () => ({ back: backMock }),
+    usePreventRemove: (
+      prevent: boolean,
+      handler: (options: { data: { action: { type: string } }; repeat: () => void }) => void
+    ) => {
+      preventRemove.prevent = prevent;
+      preventRemove.handler = handler;
+    },
+  };
+});
 
 function Harness() {
   usePickerAboveLeaveGuard();
@@ -58,10 +70,18 @@ function fireLeave(actionType: string): () => void {
 describe('usePickerAboveLeaveGuard', () => {
   beforeEach(() => {
     backMock.mockClear();
+    stateListeners.clear();
     navigationState.state = {
       index: 1,
       routes: [{ name: 'agent-chat/new' }, { name: 'agent-chat/new' }],
     };
+  });
+
+  it('leaves ordinary session Back navigation unguarded', () => {
+    const renderer = mountGuard();
+
+    expect(preventRemove.prevent).toBe(false);
+    renderer.unmount();
   });
 
   it('closes the picker instead of the screen under it', () => {
@@ -90,8 +110,16 @@ describe('usePickerAboveLeaveGuard', () => {
     expect(repeat).not.toHaveBeenCalled();
   });
 
-  it('replays a Back that has no picker above it', () => {
+  it('replays an already queued Back after the picker has closed', () => {
+    navigationState.state = {
+      index: 1,
+      routes: [{ name: 'agent-chat/new' }, { name: 'agent-chat/model-picker' }],
+    };
     mountGuard();
+    navigationState.state = {
+      index: 0,
+      routes: [{ name: 'agent-chat/new' }],
+    };
 
     const repeat = fireLeave('GO_BACK');
 
@@ -112,17 +140,21 @@ describe('usePickerAboveLeaveGuard', () => {
     expect(repeat).toHaveBeenCalledTimes(1);
   });
 
-  it('stops refusing once the removal has been replayed', () => {
+  it('disables prevention before replaying a forward removal', () => {
+    navigationState.state = {
+      index: 1,
+      routes: [{ name: 'agent-chat/new' }, { name: 'agent-chat/model-picker' }],
+    };
     const renderer = mountGuard();
     expect(preventRemove.prevent).toBe(true);
 
-    fireLeave('GO_BACK');
+    fireLeave('NAVIGATE');
 
     expect(preventRemove.prevent).toBe(false);
     renderer.unmount();
   });
 
-  it('reads the picker from the live navigation state, after a re-renderless push', () => {
+  it('arms and clears protection when the stack changes without rerendering its screen', () => {
     const renderer = mountGuard();
     navigationState.state = {
       index: 2,
@@ -132,11 +164,27 @@ describe('usePickerAboveLeaveGuard', () => {
         { name: 'agent-chat/branch-picker' },
       ],
     };
+    act(() => {
+      for (const listener of stateListeners) {
+        listener();
+      }
+    });
+    expect(preventRemove.prevent).toBe(true);
 
     const repeat = fireLeave('GO_BACK');
 
     expect(backMock).toHaveBeenCalledTimes(1);
     expect(repeat).not.toHaveBeenCalled();
+    navigationState.state = {
+      index: 1,
+      routes: [{ name: 'agent-chat/new' }, { name: 'agent-chat/new' }],
+    };
+    act(() => {
+      for (const listener of stateListeners) {
+        listener();
+      }
+    });
+    expect(preventRemove.prevent).toBe(false);
     renderer.unmount();
   });
 });

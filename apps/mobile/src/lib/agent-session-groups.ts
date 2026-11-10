@@ -34,14 +34,15 @@ function getWeekdayName(date: Date): string {
   return dateTimeFormat(i18n.language, { weekday: 'long' }).format(date);
 }
 
-function timestampMs(session: SessionTimestamps, sortBy: AgentSessionSortBy): number {
-  return parseTimestamp(getAgentSessionTimestamp(session, sortBy)).getTime();
-}
-
 /**
  * Bucket sessions into the existing Today / Yesterday / weekday / Older
  * sections, sorted newest-first by the selected timestamp. The input array
  * is never mutated — callers can hand in the tRPC query result directly.
+ *
+ * Each session's selected timestamp is parsed exactly once, before sorting:
+ * the sort, the section boundary checks and the in-section order all read
+ * that one millisecond value, so the work stays linear in the retained
+ * history instead of growing with the comparison count.
  *
  * Server-side ordering is authoritative for cross-page consistency, but
  * every section boundary check uses the same timestamp the row's relative
@@ -56,10 +57,16 @@ export function groupAgentSessionsByDate<T extends SessionTimestamps>(
   // Defensive: tolerate callers (e.g. older call sites) that pass an unknown
   // string here, the same way parseAgentSessionSortBy would have.
   const resolvedSort = parseAgentSessionSortBy(sortBy);
-  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; spread already prevents mutation of the source
-  const sorted = [...sessions].sort(
-    (a, b) => timestampMs(b, resolvedSort) - timestampMs(a, resolvedSort)
-  );
+  // Parse each selected timestamp once and pair it with its session, so the
+  // sort comparator below is a numeric subtraction and the bucketing loop
+  // reads the same value instead of parsing again. Hermes' string dates and
+  // the date-only branch of `parseTimestamp` make a parse the expensive part.
+  const decorated = sessions.map(session => ({
+    session,
+    ms: parseTimestamp(getAgentSessionTimestamp(session, resolvedSort)).getTime(),
+  }));
+  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; `decorated` is a local copy, so the caller's array is untouched
+  decorated.sort((a, b) => b.ms - a.ms);
 
   const yesterday = addDays(now, -1);
   const todayLabel = i18n.t('chat.conversationList.today');
@@ -79,16 +86,15 @@ export function groupAgentSessionsByDate<T extends SessionTimestamps>(
     }
   }
 
-  for (const session of sorted) {
-    const date = parseTimestamp(getAgentSessionTimestamp(session, resolvedSort));
+  for (const { session, ms } of decorated) {
+    const date = new Date(ms);
 
     if (isSameDay(date, now)) {
       addToBucket(todayLabel, session);
     } else if (isSameDay(date, yesterday)) {
       addToBucket(yesterdayLabel, session);
     } else {
-      const diffMs = now.getTime() - date.getTime();
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      const diffDays = (now.getTime() - ms) / (1000 * 60 * 60 * 24);
       if (diffDays <= 7) {
         addToBucket(getWeekdayName(date), session);
       } else {
@@ -97,13 +103,8 @@ export function groupAgentSessionsByDate<T extends SessionTimestamps>(
     }
   }
 
-  // The weekday bucket holds sessions in their sorted (newest-first) order
-  // already; Older needs a second pass because it's keyed by label, not by
-  // insertion order of distinct days.
-  const olderBucket = buckets.get(olderLabel);
-  if (olderBucket) {
-    olderBucket.sort((a, b) => timestampMs(b, resolvedSort) - timestampMs(a, resolvedSort));
-  }
+  // Every bucket is filled in `decorated` order, which is already newest-first
+  // by the selected timestamp, so no bucket needs a second sort.
 
   return bucketOrder.map(label => ({
     label,

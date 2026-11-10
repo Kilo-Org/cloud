@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
   GLANCEABLE_COALESCE_MS,
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   GLANCEABLE_STALE_MS,
@@ -723,6 +724,32 @@ describe('GlanceablePublisher', () => {
     publisher.dispose();
   });
 
+  it('drops a held frame of another scope at a failed read', () => {
+    const { sink, calls } = makeSink();
+    const foreign = buildGlanceableSnapshot({
+      sessions: [{ status: 'question' }, { status: 'busy' }],
+      userId: 'u2',
+      organizationId: null,
+      now: NOW - 60_000,
+      previousRevision: 7,
+    });
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, initial: foreign });
+
+    // The first read of this context fails before it derived a frame.
+    publisher.handleFetchError(PUB_CTX);
+    expect(calls).toEqual([]);
+
+    // The next derive is this publisher's first write, on its own scope.
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(lastSnapshot(calls, 'startOrUpdate')).toMatchObject({
+      scopeKey: buildOpaqueScopeKey(PUB_CTX),
+      running: 1,
+      needsInput: 0,
+      revision: foreign.revision + 1,
+    });
+    publisher.dispose();
+  });
+
   it('does not resurrect a card the terminal end already retired', () => {
     vi.useFakeTimers();
     const { sink, calls } = makeSink();
@@ -996,6 +1023,63 @@ describe('GlanceablePublisher waiting ask', () => {
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
     publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
     expect(count(calls, 'startOrUpdate')).toBe(1);
+    publisher.dispose();
+  });
+});
+
+describe('GlanceablePublisher ask redraw', () => {
+  it('writes the frame it already emitted when a fact read at draw time settles', () => {
+    const { sink, calls } = makeSink();
+    const listeners: (() => void)[] = [];
+    let unsubscribed = false;
+    const publisher = new GlanceablePublisher({
+      sinks: [sink],
+      now: () => NOW,
+      subscribeAskBound: listener => {
+        listeners.push(listener);
+        return () => {
+          unsubscribed = true;
+        };
+      },
+    });
+    publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+    const frame = lastSnapshot(calls, 'startOrUpdate');
+
+    for (const listener of listeners) {
+      listener();
+    }
+
+    // The sinks read the recorded ask when they draw, so the same content is
+    // enough for Approve to appear without waiting for the next heartbeat; the
+    // revision moves so the surfaces accept the frame.
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    expect(lastSnapshot(calls, 'startOrUpdate')).toEqual({
+      ...frame,
+      revision: frame.revision + 1,
+    });
+
+    publisher.dispose();
+    expect(unsubscribed).toBe(true);
+  });
+
+  it('writes nothing before a frame was emitted', () => {
+    const { sink, calls } = makeSink();
+    const listeners: (() => void)[] = [];
+    const publisher = new GlanceablePublisher({
+      sinks: [sink],
+      now: () => NOW,
+      subscribeAskBound: listener => {
+        listeners.push(listener);
+        return () => undefined;
+      },
+    });
+
+    for (const listener of listeners) {
+      listener();
+    }
+
+    expect(calls).toHaveLength(0);
     publisher.dispose();
   });
 });

@@ -126,6 +126,45 @@ describe('worktree review IndexedDB persistence', () => {
       };
       await persistence.save('configuration-only', configurationOnly);
       assert.equal(store.get(valuesAtom)['configuration-only'], configurationOnly);
+
+      const scopeKey = JSON.stringify(['user-one', null, 'worktree-one']);
+      for (const scope of [undefined, 'uncommitted', 'against-base-branch'] as const) {
+        const saved: PersistedWorktreeReviewDraft = {
+          ...emptyDraft,
+          comments: [
+            {
+              id: 'comment-one',
+              text: 'Please simplify this.',
+              anchor: {
+                capture: {
+                  userId: 'user-one',
+                  organizationId: undefined,
+                  workspaceScope: 'worktree-one',
+                  sourceCloudAgentSessionId: 'source-one',
+                  revision: 3,
+                  capturedAt: '2026-09-01T10:00:00Z',
+                  comparison: {
+                    baseRef: 'origin/main',
+                    mergeBase: 'a'.repeat(40),
+                    head: 'b'.repeat(40),
+                  },
+                  ...(scope === undefined ? {} : { scope }),
+                },
+                path: 'src/example.ts',
+                range: { side: 'additions', startLine: 1, endLine: 1 },
+                quote: {
+                  source: 'saved-patch',
+                  lines: [{ lineNumber: 1, kind: 'addition', text: 'new\n' }],
+                },
+              },
+            },
+          ],
+        };
+        await persistence.save(scopeKey, saved);
+        const restored = await persistence.load(scopeKey);
+        assert.deepEqual(restored, saved);
+        assert.equal(restored?.comments[0].anchor.capture.scope, scope);
+      }
     });
   });
 });

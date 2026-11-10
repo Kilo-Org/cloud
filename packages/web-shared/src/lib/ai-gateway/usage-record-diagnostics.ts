@@ -2,19 +2,25 @@ import 'server-only';
 
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { pool } from '@kilocode/web-shared/lib/drizzle';
+import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import type { UsageRecordWriteOutcome } from './processUsage.types';
 
 export type UsageRecordObservationContext = {
   entrypoint: 'gateway' | 'writer_endpoint' | 'unknown';
-  writer_caller: 'queue' | 'region_handoff' | 'unknown';
+  writer_caller: 'queue' | 'queue_vercel' | 'region_handoff' | 'unknown';
 };
 
-function completionSuccessSampleRate(): 1 | 0.01 {
+function completionSuccessSampleRate(): number {
   const vercelEnv = process.env.VERCEL_ENV;
-  if (vercelEnv === 'production') return 0.01;
-  if (process.env.VERCEL_TARGET_ENV === 'staging' || vercelEnv) return 1;
-  return process.env.NODE_ENV === 'production' ? 0.01 : 1;
+  if (vercelEnv !== 'production') {
+    if (process.env.VERCEL_TARGET_ENV === 'staging' || vercelEnv) return 1;
+    if (process.env.NODE_ENV !== 'production') return 1;
+  }
+  const raw = process.env.USAGE_RECORD_COMPLETION_SAMPLE_RATE;
+  if (raw === undefined || raw.trim() === '') return 1;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : 1;
 }
 
 /** Persistence completion signals shared by direct gateway writes and the HTTP writer. */
@@ -36,7 +42,6 @@ export async function observeUsageRecordCompletion(
       const sampleRate = level === 'info' ? completionSuccessSampleRate() : 1;
       if (sampleRate === 1 || Math.random() < sampleRate) {
         const createdAt = Date.parse(usage.created_at);
-        const region = process.env.VERCEL_REGION;
         console[level](
           JSON.stringify({
             level,
@@ -50,7 +55,7 @@ export async function observeUsageRecordCompletion(
             ...(Number.isFinite(createdAt)
               ? { event_age_ms: Math.max(0, Date.now() - createdAt) }
               : {}),
-            execution_region: region === 'fra1' || region === 'sfo1' ? region : 'unknown',
+            execution_region: getVercelExecutionRegion(),
           })
         );
       }

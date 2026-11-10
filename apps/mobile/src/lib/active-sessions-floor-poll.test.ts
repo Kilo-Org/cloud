@@ -25,7 +25,12 @@ function makePr(overrides: Partial<AssociatedPr> = {}): AssociatedPr {
     lastSyncedAt: '2026-09-22T10:00:00.000Z',
     reviewDecision: null,
     reviewDecisionPending: false,
+    baseRef: null,
+    stackNumber: null,
+    stackPosition: null,
+    stackSize: null,
     platform: 'github',
+    observations: null,
     ...overrides,
   };
 }

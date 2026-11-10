@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import { ai_gateway_config } from '@kilocode/db/schema';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import type {
   NormalizedOpenRouterResponse,
@@ -71,7 +71,7 @@ function makeSnapshot(): NormalizedOpenRouterResponse {
   };
 }
 
-function storedModel(id: string, tags: (string | undefined)[]): StoredModel {
+function storedModel(id: string, tags: (string | undefined)[]): GatewayModelWithEndpoints {
   return {
     id,
     name: id,
@@ -79,7 +79,7 @@ function storedModel(id: string, tags: (string | undefined)[]): StoredModel {
   };
 }
 
-const storedModels: Record<string, StoredModel> = {
+const storedModels: Record<string, GatewayModelWithEndpoints> = {
   [MODEL]: storedModel(MODEL, ['deepinfra/bf16', 'coreweave/bf16']),
   [FREE_MODEL]: storedModel(FREE_MODEL, ['nvidia/nvfp4']),
 };
@@ -92,6 +92,25 @@ describe('getSnapshotModelVariantId', () => {
     expect(getSnapshotModelVariantId({ ...snapshotModel(MODEL, 'free'), endpoint: null })).toBe(
       MODEL
     );
+  });
+});
+
+describe('buildModelIdToProviderSlugsIndex', () => {
+  it('leaves out BYOK-only providers', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers.push({
+      name: 'Synthetic',
+      displayName: 'Synthetic',
+      slug: 'synthetic',
+      dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+      byokOnly: true,
+      models: [snapshotModel(MODEL, 'standard'), snapshotModel('only/byok', 'standard')],
+    });
+
+    const index = buildModelIdToProviderSlugsIndex(snapshot);
+
+    expect(index.get(MODEL)).toEqual(new Set(['deepinfra', 'coreweave', 'nvidia']));
+    expect(index.has('only/byok')).toBe(false);
   });
 });
 
@@ -130,6 +149,19 @@ describe('buildDataCollectionRequiredModelIds', () => {
     expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(
       new Set(['meta/muse-spark-1.3-contributor', FREE_MODEL])
     );
+  });
+
+  it('ignores BYOK-only providers, which Kilo never routes to', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers = [
+      provider('trains', true, [snapshotModel('mixed/model', 'standard')]),
+      {
+        ...provider('synthetic', false, [snapshotModel('mixed/model', 'standard')]),
+        byokOnly: true,
+      },
+    ];
+
+    expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(new Set(['mixed/model']));
   });
 
   it('keys standard and free variants separately', () => {
@@ -176,8 +208,8 @@ describe('narrowProviderSlugsToVariant', () => {
 
 describe('createModelsByProviderIndexLoader', () => {
   function loader(
-    models: Record<string, StoredModel> = storedModels,
-    vercelModels: Record<string, StoredModel> = {},
+    models: Record<string, GatewayModelWithEndpoints> = storedModels,
+    vercelModels: Record<string, GatewayModelWithEndpoints> = {},
     snapshot = makeSnapshot()
   ) {
     return createModelsByProviderIndexLoader({

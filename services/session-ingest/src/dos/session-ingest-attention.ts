@@ -88,18 +88,26 @@ export function extractTextFromPartItemData(itemDataJson: string): string | unde
 const EXCERPT_MAX_LENGTH = 100;
 const ELLIPSIS = '...';
 
+function collapseExcerptText(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
+}
+
 function truncateExcerpt(text: string): string {
-  const singleLine = text.trim().replace(/\s+/g, ' ');
+  const singleLine = collapseExcerptText(text);
   if (singleLine.length <= EXCERPT_MAX_LENGTH) return singleLine;
   return singleLine.slice(0, EXCERPT_MAX_LENGTH - ELLIPSIS.length) + ELLIPSIS;
 }
 
-/** Joins text parts (already in emission order) into a single push-ready excerpt. */
-export function buildAssistantExcerpt(partItemDataJsonRows: string[]): string {
-  const pieces: string[] = [];
-  for (const itemDataJson of partItemDataJsonRows) {
-    const text = extractTextFromPartItemData(itemDataJson);
-    if (text) pieces.push(text);
-  }
-  return truncateExcerpt(pieces.join(''));
+/**
+ * True once `text` already runs past the excerpt length. The excerpt is the collapsed text, or its
+ * first EXCERPT_MAX_LENGTH characters plus an ellipsis once it is longer, so from this point on
+ * later text cannot change it and a reader can stop collecting parts.
+ */
+export function assistantExcerptIsComplete(text: string): boolean {
+  return collapseExcerptText(text).length > EXCERPT_MAX_LENGTH;
+}
+
+/** Joins text pieces (already in emission order) into a single push-ready excerpt. */
+export function buildAssistantExcerpt(texts: Iterable<string>): string {
+  return truncateExcerpt(Array.from(texts).join(''));
 }

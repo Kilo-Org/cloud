@@ -2,13 +2,13 @@ import 'server-only';
 
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
   CodeReviewCouncilConfigSchema,
   MAX_RUNTIME_AGENT_MODEL_LENGTH,
   type CodeReviewType,
   type ManualCodeReviewConfig,
 } from '@kilocode/db/schema-types';
+import { MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH } from '@kilocode/app-shared/code-review';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { isUniqueViolation } from '@/lib/db-errors';
 import {
@@ -27,11 +27,18 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
-import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { fetchGitLabMergeRequest } from '@/lib/integrations/platforms/gitlab/adapter';
-import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
+import {
+  authorizeProject,
+  gitlabReviewErrorToTrpcError,
+  gitlabReviewOwnerFor,
+} from '@/lib/provider-review/gitlab-authorization';
 import type { CodeReviewPlatform, Owner } from './core';
-import { createCodeReview, findActiveProviderPublishingReview } from './db/code-reviews';
+import {
+  createCodeReview,
+  findActiveProviderPublishingReview,
+  findManualReviewByOperationKey,
+} from './db/code-reviews';
 import { tryDispatchPendingReviews } from './dispatch/dispatch-pending-reviews';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -47,7 +54,17 @@ export const ManualCodeReviewJobInputSchema = z.object({
     .regex(/^[a-zA-Z]+$/)
     .nullable()
     .optional(),
-  instructions: z.string().max(4_000).optional(),
+  // Capped by the same constant both review forms bound their field with, so a
+  // draft a form accepts is a draft this schema accepts.
+  instructions: z.string().max(MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH).optional(),
+  /**
+   * Client-generated key for one manual start intent, stable across a retry of
+   * the same draft (`useHoistedOperationKey` on mobile). A start whose first
+   * attempt this server already accepted — its response lost to the client's
+   * own deadline — resolves to the review that attempt created instead of
+   * creating a second one for the same change.
+   */
+  operationKey: z.string().min(1).max(128).optional(),
   // When present, this is a multi-specialist council run. The specialists (with their
   // per-specialist model/effort) and aggregation strategy are carried here and merged
   // into the run's agent config. Absent = a standard single-reviewer run.
@@ -210,6 +227,35 @@ export async function createManualCodeReviewJob(params: {
   // repos, posts to the PR). No council-specific publish handling.
   const outputMode: ManualCodeReviewConfig['outputMode'] = localMode ? 'kilo' : 'provider';
 
+  // A manual start is uncertain the moment the client's control-plane deadline
+  // fires: the server may have committed the review after the client gave up
+  // (`withDeadline`, packages/event-service). The client sends one operation key
+  // per draft, so a retry carrying a key this owner already produced resolves to
+  // that review instead of creating a second one for the same change. The lookup
+  // precedes every provider read and entitlement check: the work it would repeat
+  // is exactly what the first, already accepted, create did.
+  const operationKey = input.operationKey ?? null;
+  if (operationKey) {
+    const replay = await findManualReviewByOperationKey({
+      owner: params.owner,
+      manualOperationKey: operationKey,
+    });
+    if (replay) {
+      if (!replayedReviewMatchesDraft(replay, platform, input.url)) {
+        // The key already produced another change's review. Reusing it is a
+        // client bug, so refuse it instead of handing back the wrong review.
+        throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+      }
+      logExceptInTest('[manual-code-review-job] Replayed an accepted manual start', {
+        reviewId: replay.id,
+        owner: params.owner,
+        platform,
+        outputMode,
+      });
+      return { reviewId: replay.id, outputMode };
+    }
+  }
+
   // Fail fast on entitlement before doing any provider/network work. The creation
   // boundary (`createCodeReview`) re-checks this as the authoritative gate, so this repeats
   // the entitlement lookup on the (rare, interactive, enterprise-only) council path. That
@@ -273,6 +319,7 @@ export async function createManualCodeReviewJob(params: {
       platform: source.platform,
       platformProjectId: source.platformProjectId,
       manualConfig,
+      manualOperationKey: operationKey ?? undefined,
       reviewType,
       triggerSource: 'manual',
     });
@@ -286,17 +333,30 @@ export async function createManualCodeReviewJob(params: {
     await tryDispatchPendingReviews(params.owner);
     return { reviewId, outputMode };
   } catch (error) {
-    if (isUniqueViolation(error) && outputMode === 'provider' && source.integrationId) {
-      const activePublisher = await findActiveProviderPublishingReview({
-        platformIntegrationId: source.integrationId,
-        repoFullName: source.repoFullName,
-        prNumber: source.prNumber,
-      });
-      if (activePublisher) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'A provider-publishing Code Reviewer job is already active for this change.',
+    if (isUniqueViolation(error)) {
+      if (operationKey) {
+        // Two creates carrying one key raced; the insert that lost resolves to
+        // the row the winner committed.
+        const replay = await findManualReviewByOperationKey({
+          owner: params.owner,
+          manualOperationKey: operationKey,
         });
+        if (replay && replayedReviewMatchesDraft(replay, platform, input.url)) {
+          return { reviewId: replay.id, outputMode };
+        }
+      }
+      if (outputMode === 'provider' && source.integrationId) {
+        const activePublisher = await findActiveProviderPublishingReview({
+          platformIntegrationId: source.integrationId,
+          repoFullName: source.repoFullName,
+          prNumber: source.prNumber,
+        });
+        if (activePublisher) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'A provider-publishing Code Reviewer job is already active for this change.',
+          });
+        }
       }
     }
     throw error;
@@ -306,6 +366,45 @@ export async function createManualCodeReviewJob(params: {
 function normalizeManualInstructions(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? '';
   return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * The change a manual-review URL names, for comparing a replayed review with
+ * the draft that produced its operation key. Null when the URL does not parse:
+ * the create path then reports its own validation error, so this helper never
+ * competes with it.
+ */
+function manualReviewTarget(
+  platform: CodeReviewPlatform,
+  url: string
+): { repoFullName: string; prNumber: number } | null {
+  try {
+    if (platform === PLATFORM.GITHUB) {
+      const parsed = parseGitHubPullRequestUrl(url);
+      return { repoFullName: `${parsed.owner}/${parsed.repo}`, prNumber: parsed.prNumber };
+    }
+    const parsed = parseGitLabMergeRequestUrl(url);
+    return { repoFullName: parsed.projectPath, prNumber: parsed.mrIid };
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a review found by operation key is the review this draft starts. */
+function replayedReviewMatchesDraft(
+  replay: { platform: CodeReviewPlatform; repoFullName: string; prNumber: number },
+  platform: CodeReviewPlatform,
+  url: string
+): boolean {
+  const target = manualReviewTarget(platform, url);
+  return (
+    target !== null &&
+    replay.platform === platform &&
+    replay.prNumber === target.prNumber &&
+    // The provider's canonical casing is authoritative, so compare
+    // case-insensitively against what the person typed.
+    replay.repoFullName.toLowerCase() === target.repoFullName.toLowerCase()
+  );
 }
 
 async function buildManualAgentConfig(params: {
@@ -524,38 +623,34 @@ async function resolveConnectedGitLabSource(
     });
   }
 
-  for (const integration of integrations) {
-    const instanceUrl = getGitLabIntegrationInstanceUrl(integration);
-    if (parsed.origin !== instanceUrl) continue;
+  const reviewOwner = gitlabReviewOwnerFor(owner, owner.userId);
 
-    const accessToken = await getValidGitLabToken(integration, {
-      userId: owner.userId,
-      ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
-    });
+  try {
+    // The same boundary GitLab branch listing and the provider-review reads
+    // enforce: the pasted project has to be one of the connection's cached
+    // repositories, and the pasted instance has to be the connected one. A
+    // refusal here happens before the connection's credential is minted, so a
+    // path outside that scope never reaches the token broker, the provider, a
+    // review row, or session preparation.
+    const access = await authorizeProject(reviewOwner, parsed.projectPath, parsed.origin);
     const rawMergeRequest = await fetchGitLabMergeRequest({
-      accessToken,
-      projectId: parsed.projectPath,
+      accessToken: access.accessToken,
+      projectId: access.projectPath,
       mrIid: parsed.mrIid,
-      instanceUrl,
+      instanceUrl: access.instanceUrl,
     });
     const mergeRequest = GitLabMergeRequestApiSchema.parse(rawMergeRequest);
     validateOpenGitLabMergeRequest(mergeRequest);
 
     return buildGitLabSource({
       mergeRequest,
-      projectPath: parsed.projectPath,
-      integrationId: integration.id,
-      platformProjectId:
-        mergeRequest.target_project_id ??
-        mergeRequest.project_id ??
-        getGitLabRepositoryIdFromIntegration(integration, parsed.projectPath),
+      projectPath: access.projectPath,
+      integrationId: access.integrationId,
+      platformProjectId: access.repositoryId,
     });
+  } catch (error) {
+    throw gitlabReviewErrorToTrpcError(error, reviewOwner);
   }
-
-  throw new TRPCError({
-    code: 'BAD_REQUEST',
-    message: 'The merge request URL does not match a connected GitLab instance.',
-  });
 }
 
 function buildGitHubSource(
@@ -752,27 +847,6 @@ function validateOpenGitLabMergeRequest(mergeRequest: GitLabMergeRequestApi): vo
       message: 'Code Reviewer does not run on draft merge requests.',
     });
   }
-}
-
-function getGitLabIntegrationInstanceUrl(integration: PlatformIntegration): string {
-  const metadata = integration.metadata;
-  const instanceUrl =
-    typeof metadata === 'object' &&
-    metadata !== null &&
-    !Array.isArray(metadata) &&
-    'gitlab_instance_url' in metadata
-      ? metadata.gitlab_instance_url
-      : undefined;
-  return normalizeGitLabInstanceUrl(typeof instanceUrl === 'string' ? instanceUrl : undefined);
-}
-
-function getGitLabRepositoryIdFromIntegration(
-  integration: PlatformIntegration,
-  projectPath: string
-): number | undefined {
-  const repositories = integration.repositories;
-  const repository = repositories?.find(candidate => candidate.full_name === projectPath);
-  return typeof repository?.id === 'number' ? repository.id : undefined;
 }
 
 class ProviderFetchError extends Error {

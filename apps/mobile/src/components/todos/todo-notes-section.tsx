@@ -5,10 +5,12 @@ import { Pressable, TextInput, View } from 'react-native';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { SectionHeader } from '@/components/home/section-header';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useTodoItemMutations } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { TODO_NOTES_MAX_LENGTH } from '@/lib/todos/todo-model';
 import { type TodoItemDetail } from '@/lib/todos/todo-types';
+import { cn } from '@/lib/utils';
 
 /** The editor: the purpose prompt as placeholder, Markdown support as optional help beside it. */
 function TodoNotesEditor({
@@ -59,7 +61,7 @@ function TodoNotesBody({
     <Pressable
       onPress={onEdit}
       accessibilityRole="button"
-      className="min-h-11 justify-center py-1 active:opacity-70"
+      className={cn(ROW_TARGET_CLASS, 'justify-center py-1 active:opacity-70')}
     >
       <Text className="text-sm text-ink2">{t('todos.item.notesPrompt')}</Text>
     </Pressable>

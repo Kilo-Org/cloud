@@ -7,6 +7,7 @@ import {
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
 const ATTACHMENT_ID = '87654321-4321-4321-8321-cba987654321';
+const MESSAGE_ID = 'msg_123456789abc123456789ABCDE';
 
 const promptPayload = (prompt: string) => ({
   type: 'prompt' as const,
@@ -29,26 +30,13 @@ const attachments = (filename: string) => ({
   files: [filename],
 });
 
-const images = (filename: string) => ({
-  path: MESSAGE_UUID,
-  files: [filename],
-});
-
 describe('baseSendMessageNextSchema', () => {
   it('accepts an empty prompt with an attachment', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: promptPayload(''),
       attachments: attachments(`${ATTACHMENT_ID}.png`),
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('accepts an empty prompt with an image', () => {
-    const result = baseSendMessageNextSchema.safeParse({
-      cloudAgentSessionId: 'cloud-session-1',
-      payload: promptPayload(''),
-      images: images(`${ATTACHMENT_ID}.png`),
     });
     expect(result.success).toBe(true);
   });
@@ -56,6 +44,7 @@ describe('baseSendMessageNextSchema', () => {
   it('rejects an empty prompt with no files', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: promptPayload(''),
     });
     expect(result.success).toBe(false);
@@ -64,6 +53,7 @@ describe('baseSendMessageNextSchema', () => {
   it('rejects a whitespace-only prompt with no files', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: promptPayload('   '),
     });
     expect(result.success).toBe(false);
@@ -72,14 +62,46 @@ describe('baseSendMessageNextSchema', () => {
   it('accepts a command payload with no prompt and no files', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: commandPayload(),
     });
     expect(result.success).toBe(true);
   });
 
+  it('preserves the selected agent, model, and variant on commands', () => {
+    const payload = {
+      ...commandPayload('changes'),
+      mode: 'reviewer',
+      model: 'kilo/selected-model',
+      variant: 'high',
+    };
+    const result = baseSendMessageNextSchema.parse({
+      cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
+      payload,
+    });
+    expect(result.payload).toEqual(payload);
+  });
+
+  it.each([
+    { mode: 'custom' },
+    { mode: 'not a slug' },
+    { model: '' },
+    { variant: 'high-123' },
+    { variant: 'x'.repeat(51) },
+  ])('rejects invalid command selection %p', selection => {
+    const result = baseSendMessageNextSchema.safeParse({
+      cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
+      payload: { ...commandPayload(), ...selection },
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('accepts a text-only prompt', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: promptPayload(atCap),
     });
     expect(result.success).toBe(true);
@@ -88,6 +110,7 @@ describe('baseSendMessageNextSchema', () => {
   it('still accepts a text prompt with an attachment', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: promptPayload('hello'),
       attachments: attachments(`${ATTACHMENT_ID}.png`),
     });
@@ -97,6 +120,7 @@ describe('baseSendMessageNextSchema', () => {
   it('rejects a follow-up prompt one character over the shared cap', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: promptPayload(overCap),
     });
     expect(result.success).toBe(false);
@@ -105,6 +129,7 @@ describe('baseSendMessageNextSchema', () => {
   it('accepts follow-up command arguments at the shared cap', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: commandPayload(atCap),
     });
     expect(result.success).toBe(true);
@@ -113,6 +138,7 @@ describe('baseSendMessageNextSchema', () => {
   it('rejects follow-up command arguments one character over the shared cap', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
       payload: commandPayload(overCap),
     });
     expect(result.success).toBe(false);

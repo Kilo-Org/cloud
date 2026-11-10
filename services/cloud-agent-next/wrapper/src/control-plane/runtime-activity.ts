@@ -1,8 +1,8 @@
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
+import type { Harness } from './harness.js';
 import { withTimeoutAndAbort } from '../utils.js';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
-import { readSessionSnapshot } from './session-snapshot.js';
+import type { HarnessActivityEvent } from './harness-activity.js';
 import {
   createSessionSupervisor,
   type ExecutionFailure,
@@ -18,18 +18,19 @@ export type ActivityFault = 'activity_observation' | 'abort_unconfirmed' | 'acti
 export type RuntimeActivityOptions = {
   nativeRuntimeId: string;
   directory: string;
-  client: WrapperKiloClient;
+  client: Harness;
   timers: ControlPlaneTimers['wrapper'];
   now(): number;
   onDeadline(
     identity: ExecutionIdentity,
     reason: ExecutionFailure,
-    retry: ExecutionRetry | undefined
+    retry: ExecutionRetry | undefined,
+    stopped: Promise<boolean>
   ): void;
   /** False when the runtime holds the fault (memory pressure); it is raised again next check. */
   onFault(reason: ActivityFault): boolean;
   onChange(): void;
-  readSnapshot?: typeof readSessionSnapshot;
+  readSnapshot?: Harness['observe'];
 };
 
 /** Process-scoped I/O and observation recovery. The runtime owns process restart. */
@@ -69,7 +70,7 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
     interrupt: async (identity, _reason, signal) => {
       const stopped = await request(
         requestSignal =>
-          options.client.abortSession({
+          options.client.interrupt({
             sessionId: identity.sessionId,
             directory: identity.directory,
             signal: requestSignal,
@@ -98,8 +99,7 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
     const token = supervisor.beginSnapshot();
     nextSnapshotAt = options.now() + SESSION_SNAPSHOT_INTERVAL_MS;
     inFlight = request(signal =>
-      (options.readSnapshot ?? readSessionSnapshot)({
-        client: options.client,
+      (options.readSnapshot ?? (input => options.client.observe(input)))({
         directory: options.directory,
         observedDirectories: [...directories],
         knownSessions: supervisor.observedSessions(),
@@ -130,6 +130,24 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
     return inFlight;
   }
 
+  function observeWith(
+    event: { nativeRuntimeId: string; directory?: string },
+    observe: () => void
+  ): void {
+    if (lifetime.signal.aborted || event.nativeRuntimeId !== options.nativeRuntimeId) return;
+    if (event.directory) directories.add(event.directory);
+    if (directories.size > 64) {
+      fault('activity_capacity');
+      return;
+    }
+    try {
+      observe();
+      options.onChange();
+    } catch {
+      fault('activity_capacity');
+    }
+  }
+
   return {
     state: (id: string) => supervisor.state(id),
     executions: () =>
@@ -155,18 +173,10 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
       void refresh();
     },
     observe(event: KiloFeedEvent) {
-      if (lifetime.signal.aborted || event.nativeRuntimeId !== options.nativeRuntimeId) return;
-      if (event.directory) directories.add(event.directory);
-      if (directories.size > 64) {
-        fault('activity_capacity');
-        return;
-      }
-      try {
-        supervisor.observe(event);
-        options.onChange();
-      } catch {
-        fault('activity_capacity');
-      }
+      observeWith(event, () => supervisor.observe(event));
+    },
+    observeActivity(event: HarnessActivityEvent) {
+      observeWith(event, () => supervisor.observeActivity(event));
     },
     tick() {
       if (lifetime.signal.aborted || faulted) return;

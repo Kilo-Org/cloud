@@ -75,11 +75,24 @@ export type NewSessionConfigureFormProps = {
   runOnInlineNote?: string | null;
   /** True for the Continue clone entry: hides Changes and Environment. */
   isCloneEntry?: boolean;
+  /**
+   * Whether the composer takes focus when the screen opens. The screen body
+   * resolves it from the run target and the current repository selection
+   * (`shouldAutoFocusNewSessionPrompt`), so an entry that still needs a
+   * repository keeps the keyboard down.
+   */
+  autoFocusPrompt?: boolean;
   // Repository (Cloud Agent only).
   groups: RepositoryGroup[];
   isRetrying: boolean;
   onChangeRepo: (fullName: string) => void;
   onConnectProvider: (platform: RepositoryPlatform) => void;
+  /**
+   * The provider whose connect flow is running, or null. Its own open control
+   * stays busy from the tap until the flow ends: the flow's first step is a
+   * network round trip, and a control with no busy state reads as inert there.
+   */
+  connectingProvider?: RepositoryPlatform | null;
   onRefreshRepos: () => void;
   repositories: NewSessionRepository[];
   /** Recently used rows, threaded to the picker's "Recently used" section. */
@@ -103,11 +116,25 @@ export type NewSessionConfigureFormProps = {
    * it (translated), or null when no such reason applies.
    */
   startBlockedReason?: string | null;
+  /**
+   * The footer recovery action for `startBlockedReason` — open the provider
+   * connect flow, or force-refresh the repository lists — or null when the
+   * reason needs no footer control.
+   */
+  startBlockedAction?: { label: string; onPress: () => void; isBusy?: boolean } | null;
   onStartSession: () => void;
   /** The last cloud-create rejection, or null before one. */
   cloudCreateError?: CloudCreateFailure | null;
   /** Re-runs the cloud create with the same draft (the retryable recovery). */
   onRetryCloudCreate?: () => void;
+  /**
+   * The organization subscription gate's refusal for a remote start under the
+   * selected account (translated), or null when the account may start. The
+   * form knows the verdict before the press, so it renders under the composer
+   * instead of in the pinned footer: an explanation there never takes height
+   * from the fields below it, and Start is disabled while it is shown.
+   */
+  planRefusal?: string | null;
   /** The remote spawn's settled or timed-out failure, or null before one. */
   remoteSpawnFailure?: RemoteSpawnFailure | null;
   /** Re-runs the remote spawn with the same draft (the retryable recovery). */

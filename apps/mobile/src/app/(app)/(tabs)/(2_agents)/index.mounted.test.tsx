@@ -145,8 +145,6 @@ vi.mock('@/components/todos/todo-lists-screen', () => ({
   },
 }));
 
-vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
-
 type AlertButton = { text: string; onPress?: () => void };
 
 const noOp = () => undefined;
@@ -211,6 +209,8 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
       'install_state_user_mismatch',
       'not_installation_admin',
       'installation_already_claimed',
+      'installation_unavailable',
+      'multiple_installations_disabled',
     ] as const) {
       const alert = buildGitHubInstallOutcomeAlert({ kind: 'error', code }, () => undefined);
       expect(alert?.buttons).toEqual([{ text: 'Back' }]);
@@ -228,6 +228,24 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
         () => undefined
       )?.title
     ).toBe('Cannot complete installation');
+    expect(
+      buildGitHubInstallOutcomeAlert(
+        { kind: 'error', code: 'installation_unavailable' },
+        () => undefined
+      )?.message
+    ).toBe(
+      'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.'
+    );
+    expect(
+      buildGitHubInstallOutcomeAlert(
+        { kind: 'error', code: 'multiple_installations_disabled' },
+        () => undefined
+      )
+    ).toEqual({
+      title: 'Cannot complete installation',
+      message: 'This Kilo organization can currently connect only one GitHub organization.',
+      buttons: [{ text: 'Back' }],
+    });
   });
 });
 
@@ -414,28 +432,17 @@ describe('Agents tab header', () => {
     tabHeader.onChange = undefined;
   });
 
-  it('gives both views the account scope line and the view switch', () => {
+  it('gives both views the same lightweight view switch', () => {
     const renderer = mountRoute();
-    const scopeRow = (header: ReactNode) => {
-      const children = (header as ReactElement<{ children: ReactElement[] }>).props.children;
-      expect(children).toHaveLength(2);
-      const row = children[0] as ReactElement<{
-        className: string;
-        children: ReactElement;
-      }>;
-      expect(row.type).toBe('View');
-      expect(row.props.className).toBe('px-[22px] pb-1');
-      expect(row.props.children.type).toBe('ContextControl');
-    };
 
     expect(tabHeader.sessions).toBeDefined();
-    scopeRow(tabHeader.sessions);
+    expect((tabHeader.sessions as ReactElement<{ value: string }>).props.value).toBe('sessions');
 
     act(() => {
       tabHeader.onChange?.('todos');
     });
     expect(tabHeader.todos).toBeDefined();
-    scopeRow(tabHeader.todos);
+    expect((tabHeader.todos as ReactElement<{ value: string }>).props.value).toBe('todos');
 
     act(() => {
       renderer.unmount();

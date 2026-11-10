@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -93,7 +94,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       },
       {
         onSuccess: () => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
           router.back();
         },
       }
@@ -108,7 +109,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
           accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
           value={enabled}
           onValueChange={value => {
-            void Haptics.selectionAsync();
+            selectionHaptic();
             setEnabled(value);
             revalidate(value, thresholdRef.current, emailsRef.current);
             clearSaveError();

@@ -167,25 +167,19 @@ export function PreferredProviderOrderContent() {
         <CardHeader>
           <CardTitle>Provider Order</CardTitle>
           <CardDescription>
-            Preferred inference provider order for OpenRouter and Vercel requests, stored in the{' '}
-            <code>preferred_provider_order</code> column of <code>ai_gateway_config</code>. Rules
-            are checked top to bottom. A rule matches when the requested model ID contains at least
-            one of its <code>includes</code> substrings and none of its optional{' '}
-            <code>excludes</code> substrings. The first matching rule sets{' '}
-            <code>provider.order</code> to its <code>providers</code>; when no rule matches, there
-            is no preference. The order is only applied when the caller did not send one, and the
-            first provider also picks the price shown in the model catalog. Provider slugs are
-            OpenRouter slugs, optionally with an endpoint variant such as <code>minimax/fp8</code>.
-            Without a stored configuration, no model has a preference. Changes take up to a minute
-            to reach every gateway instance.
+            Sets <code>provider.order</code> on non-BYOK OpenRouter and Vercel requests that do not
+            send one. A rule matches when the model ID contains any <code>includes</code> substring
+            and no <code>excludes</code> substring; the first match wins. Its first provider also
+            sets the catalog price. Use OpenRouter provider slugs, optionally with an endpoint
+            variant such as <code>minimax/fp8</code>. Changes apply within about a minute.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <p className="text-muted-foreground text-sm">
-            {hasStoredConfig
-              ? 'Showing the stored configuration.'
-              : 'No configuration stored. The gateway sets no provider order.'}
-          </p>
+          {!hasStoredConfig && (
+            <p className="text-muted-foreground text-sm">
+              No configuration stored. The gateway sets no provider order.
+            </p>
+          )}
           <div className="border-input overflow-hidden rounded-md border">
             <Editor
               height="560px"

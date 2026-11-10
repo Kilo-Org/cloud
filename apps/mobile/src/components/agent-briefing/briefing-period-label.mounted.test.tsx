@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { type BriefingReport } from '@/lib/agent-briefing';
 import { act, TestRenderer } from '@/test/renderer';
@@ -8,23 +8,24 @@ import { BriefingPeriodLabel } from './briefing-period-label';
 const locale = vi.hoisted(() => ({ language: 'pt-BR' }));
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: locale }),
+  useTranslation: () => ({
+    t: (key: string, values?: Readonly<Record<string, string>>) =>
+      values ? `${key} ${Object.values(values).join(' – ')}` : key,
+    i18n: locale,
+  }),
 }));
-vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key, language: 'en' } }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('./briefing-window', () => ({
+  formatBriefingTimestamp: (value: string, language: string, timeZone: string) =>
+    `${value} ${language} ${timeZone}`,
+}));
 
-afterEach(() => vi.unstubAllEnvs());
-
-it.each([
-  ['pt-BR', '20/10/2026'],
-  ['de', '20.10.2026'],
-])('renders the scheduled calendar day in %s even west of UTC', (language, expected) => {
-  vi.stubEnv('TZ', 'America/Los_Angeles');
-  locale.language = language;
+it('shows each window endpoint in the briefing zone and no separate date line', () => {
   const report: BriefingReport = {
     id: 'report-1',
-    kind: 'scheduled',
     createdAt: '2026-10-20T08:00:00Z',
+    capturedAt: '2026-10-20T08:00:00Z',
+    truncated: false,
     localDate: '2026-10-20',
     nightStartAt: '2026-10-19T22:00:00Z',
     cutoffAt: '2026-10-20T08:00:00Z',
@@ -34,16 +35,13 @@ it.each([
     publishedAt: '2026-10-20T08:00:00Z',
     updatedAt: '2026-10-20T08:00:00Z',
     expiresAt: '2026-10-20T12:00:00Z',
-    revision: 1,
-    revised: false,
     readAt: null,
     dismissedAt: null,
-    scorecard: { sessions: 0, pullRequests: 0, blockers: 0, spendMicrodollars: 0 },
+    scorecard: { sessions: 0, pullRequests: 0, blockers: 0 },
     coverage: {
-      activity: 'complete',
-      pullRequests: 'complete',
-      blockers: 'complete',
-      spend: 'complete',
+      activity: 'partial',
+      pullRequests: 'partial',
+      blockers: 'partial',
     },
     sessions: [],
     sources: [],
@@ -57,7 +55,6 @@ it.each([
       startedAt: null,
       finishedAt: null,
       error: null,
-      canRetry: false,
     },
   };
   const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
@@ -69,11 +66,14 @@ it.each([
     throw new Error('Period label is not mounted');
   }
   try {
-    const labels = mounted.root
+    const lines = mounted.root
       .findAll(node => (node.type as string) === 'Text')
       .map(node => node.props.children);
-    expect(labels).toContain(expected);
-    expect(labels).not.toContain('2026-10-20');
+    expect(lines).toEqual([
+      'agentBriefing.window 2026-10-19T22:00:00Z pt-BR Europe/Berlin – 2026-10-20T08:00:00Z pt-BR Europe/Berlin',
+      'Europe/Berlin',
+      'agentBriefing.capturedAt 2026-10-20T08:00:00Z pt-BR Europe/Berlin',
+    ]);
   } finally {
     act(() => {
       mounted.unmount();

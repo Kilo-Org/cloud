@@ -1,11 +1,14 @@
 import { describe, it, expect } from '@jest/globals';
+import type { SessionConfig as CloudAgentSessionConfig } from '@kilocode/cloud-agent-sdk';
 import {
   dedupeCustomModeOptions,
   ensureSelectedCustomOption,
+  filterSessionCustomModeOptions,
   isValidSessionConfig,
   modeControlValue,
   needsResumeConfiguration,
   normalizeAlias,
+  resolveSendSelection,
   type CustomModeOption,
 } from './session-config';
 import type { SessionConfig, ResumeConfig } from './types';
@@ -315,5 +318,123 @@ describe('dedupeCustomModeOptions', () => {
   it('drops an empty slug', () => {
     const options: CustomModeOption[] = [{ value: '', label: '', description: '' }];
     expect(dedupeCustomModeOptions(options)).toEqual([]);
+  });
+});
+
+describe('filterSessionCustomModeOptions', () => {
+  const option = (slug: string): CustomModeOption => ({
+    value: slug,
+    label: slug,
+    description: '',
+  });
+
+  it('excludes subagent-only, hidden, and disabled runtime agents', () => {
+    const runtimeAgents: NonNullable<CloudAgentSessionConfig['runtimeAgents']> = [
+      { slug: 'primary', name: 'Primary', mode: 'primary' },
+      { slug: 'all', name: 'All', mode: 'all' },
+      { slug: 'default', name: 'Default' },
+      { slug: 'visible', name: 'Visible', hidden: false, disable: false },
+      { slug: 'subagent', name: 'Subagent', mode: 'subagent' },
+      { slug: 'hidden', name: 'Hidden', hidden: true },
+      { slug: 'disabled', name: 'Disabled', disable: true },
+    ];
+
+    expect(
+      filterSessionCustomModeOptions(
+        runtimeAgents.map(agent => option(agent.slug)),
+        runtimeAgents
+      )
+    ).toEqual(['primary', 'all', 'default', 'visible'].map(option));
+    expect(runtimeAgents).toHaveLength(7);
+  });
+
+  it.each([{ mode: 'subagent' as const }, { hidden: true }, { disable: true }])(
+    'does not reintroduce an excluded selected mode: %p',
+    visibility => {
+      const options = ensureSelectedCustomOption([option('visible')], 'excluded');
+
+      expect(
+        filterSessionCustomModeOptions(options, [
+          { slug: 'excluded', name: 'Excluded', ...visibility },
+        ])
+      ).toEqual([option('visible')]);
+    }
+  );
+
+  it('uses session visibility even when a profile contributes the same slug', () => {
+    const options = dedupeCustomModeOptions([option('reviewer'), option('runtime-only')]);
+
+    expect(
+      filterSessionCustomModeOptions(options, [
+        { slug: 'reviewer', name: 'Reviewer', mode: 'subagent' },
+        { slug: 'runtime-only', name: 'Runtime Only', mode: 'primary' },
+      ])
+    ).toEqual([option('runtime-only')]);
+  });
+
+  it('preserves inherited custom modes when runtime metadata is unavailable', () => {
+    const options = ensureSelectedCustomOption([], 'inherited');
+
+    expect(filterSessionCustomModeOptions(options, undefined)).toEqual([option('inherited')]);
+  });
+});
+
+describe('resolveSendSelection', () => {
+  it('returns the selected mode, model, and variant', () => {
+    expect(
+      resolveSendSelection({
+        mode: 'plan',
+        model: 'anthropic/claude-sonnet',
+        variant: 'high',
+      })
+    ).toEqual({
+      mode: 'plan',
+      model: 'anthropic/claude-sonnet',
+      variant: 'high',
+    });
+  });
+
+  it('normalizes aliases and defaults an empty mode to code', () => {
+    expect(resolveSendSelection({ mode: 'build', model: 'model-a' })).toEqual({
+      mode: 'code',
+      model: 'model-a',
+      variant: undefined,
+    });
+    expect(resolveSendSelection(null)).toEqual({ mode: 'code', model: '', variant: undefined });
+  });
+
+  it("pins the selected runtime agent's model and variant over the session selection", () => {
+    expect(
+      resolveSendSelection({
+        mode: 'reviewer',
+        model: 'session/model',
+        variant: 'session-variant',
+        runtimeAgents: [
+          { slug: 'reviewer', name: 'Reviewer', model: ' pinned/model ', variant: ' pinned ' },
+        ],
+      })
+    ).toEqual({ mode: 'reviewer', model: 'pinned/model', variant: 'pinned' });
+  });
+
+  it('does not apply the session variant when the pinned agent has no variant', () => {
+    expect(
+      resolveSendSelection({
+        mode: 'reviewer',
+        model: 'session/model',
+        variant: 'session-variant',
+        runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', model: 'pinned/model' }],
+      })
+    ).toEqual({ mode: 'reviewer', model: 'pinned/model', variant: undefined });
+  });
+
+  it('ignores an agent variant when the agent does not pin a model', () => {
+    expect(
+      resolveSendSelection({
+        mode: 'reviewer',
+        model: 'session/model',
+        variant: 'session-variant',
+        runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', variant: 'agent-variant' }],
+      })
+    ).toEqual({ mode: 'reviewer', model: 'session/model', variant: 'session-variant' });
   });
 });

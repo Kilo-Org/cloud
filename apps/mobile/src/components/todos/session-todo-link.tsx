@@ -9,7 +9,8 @@ import { toast } from 'sonner-native';
 import { QueryError } from '@/components/query-error';
 import { SheetTitleRow } from '@/components/sheet-title-row';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { ChevronRight, ListTodo } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { ListTodo } from '@/components/ui/icons';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { invalidateTodoQueries, useSessionTodo, useTodoCandidates } from '@/lib/hooks/use-todos';
@@ -150,7 +151,9 @@ function SessionTodoCandidatesSheet({
     >
       <View className="flex-1 pt-4">
         <SheetTitleRow title={t('todos.linkToTodo')} onClose={onClose} />
-        <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+          {body}
+        </ScrollView>
       </View>
     </Sheet>
   );
@@ -166,6 +169,19 @@ export function SessionTodoLinkRow({ sessionId }: Readonly<{ sessionId: string }
   const colors = useThemeColors();
   const { data: todo } = useSessionTodo(sessionId);
   const [picking, setPicking] = useState(false);
+  // The primary press opens the linked to-do, so the picker is a named action
+  // (and a long press for pointer users) rather than a hidden second tap.
+  const linkedA11y = todo
+    ? {
+        accessibilityHint: t('todos.openTodoHint'),
+        accessibilityActions: [{ name: 'changeTodo', label: t('todos.item.moveToAnotherTodo') }],
+        onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => {
+          if (event.nativeEvent.actionName === 'changeTodo') {
+            setPicking(true);
+          }
+        },
+      }
+    : undefined;
 
   return (
     <>
@@ -184,15 +200,15 @@ export function SessionTodoLinkRow({ sessionId }: Readonly<{ sessionId: string }
               }
             : undefined
         }
+        {...linkedA11y}
         accessibilityRole="button"
-        accessibilityHint={todo ? t('todos.linkToTodo') : undefined}
         className="min-h-11 flex-row items-center gap-2 active:opacity-70"
       >
         <ListTodo size={16} color={colors.mutedForeground} />
         <Text className="min-w-0 flex-1 text-base font-medium text-foreground" numberOfLines={1}>
           {todo ? t('todos.sessionTodo', { title: todo.title }) : t('todos.linkToTodo')}
         </Text>
-        <ChevronRight size={16} color={colors.mutedForeground} />
+        <DirectionalChevronRight size={16} color={colors.mutedForeground} />
       </Pressable>
       <SessionTodoCandidatesSheet
         sessionId={sessionId}

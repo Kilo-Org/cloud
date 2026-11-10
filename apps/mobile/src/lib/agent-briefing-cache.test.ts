@@ -65,8 +65,9 @@ const deniedListKey = [
 function report(id: string, organizationId: string | null): BriefingReport {
   return {
     id,
-    kind: 'scheduled',
     createdAt: '2026-10-15T08:00:00Z',
+    capturedAt: '2026-10-15T08:00:00Z',
+    truncated: false,
     timezone: 'UTC',
     context: {
       id: organizationId ?? 'personal',
@@ -80,16 +81,13 @@ function report(id: string, organizationId: string | null): BriefingReport {
     publishedAt: '2026-10-15T08:00:00Z',
     updatedAt: '2026-10-15T08:00:00Z',
     expiresAt: '2026-10-15T12:00:00Z',
-    revision: 1,
-    revised: false,
     readAt: null,
     dismissedAt: null,
-    scorecard: { sessions: 1, pullRequests: 0, blockers: 0, spendMicrodollars: 100 },
+    scorecard: { sessions: 1, pullRequests: 0, blockers: 0 },
     coverage: {
       activity: 'partial',
       pullRequests: 'partial',
       blockers: 'partial',
-      spend: 'partial',
     },
     sessions: [],
     sources: [],
@@ -103,7 +101,6 @@ function report(id: string, organizationId: string | null): BriefingReport {
       startedAt: '2026-10-15T08:00:00Z',
       finishedAt: '2026-10-15T08:01:00Z',
       error: null,
-      canRetry: false,
     },
   };
 }
@@ -131,7 +128,7 @@ function clientWithReports(reports: BriefingReport[]) {
     defaultModel: 'model',
     contexts: reports.map(item => ({
       context: item.context,
-      aiEnabled: false,
+      enabled: false,
       model: 'model',
       maxDurationSeconds: 600,
       maxSpendMicrodollars: 2_000_000,

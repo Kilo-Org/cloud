@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
 import { CheckCircle2, XCircle, Loader2, Shield, LogOut } from 'lucide-react';
 import {
   closeDeviceAuthWindowIfAppMode,
@@ -14,11 +15,18 @@ import {
   getDeviceAuthShellClassName,
   getDeviceAuthSignInUrl,
 } from './device-auth-url';
+import type { RequestingClient } from '@/lib/device-auth/requesting-client';
+import type { DeviceAuthPendingLink } from '@/lib/device-auth/device-auth';
+import { getProviderById } from '@/lib/auth/provider-metadata';
 
 type DeviceAuthClientProps = {
   code: string;
   viewerToken: string;
   isAppMode: boolean;
+  /** The OAuth client this request asks to connect, when the request names one. */
+  requestingClient: RequestingClient | null;
+  /** The live pending account link this request carries, when it carries one. */
+  pendingLink: DeviceAuthPendingLink | null;
   user: {
     name: string;
     email: string;
@@ -46,10 +54,24 @@ function getUserInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceAuthClientProps) {
+export function DeviceAuthClient({
+  code,
+  viewerToken,
+  isAppMode,
+  requestingClient,
+  pendingLink,
+  user,
+}: DeviceAuthClientProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'denied' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isSigningOut, setIsSigningOut] = useState(false);
+  // The approver confirms the client the request names before it is approved;
+  // a request that names none needs no confirmation (unchanged flow).
+  const [clientConfirmed, setClientConfirmed] = useState(false);
+  const needsClientConfirmation = requestingClient !== null;
+  // No preselected attach: the approver chooses whether the pending link is
+  // added, and Authorize stays disabled until they do.
+  const [addPendingLink, setAddPendingLink] = useState<boolean | null>(null);
 
   const displayName = user.name.trim() || user.email;
   const shellClassName = getDeviceAuthShellClassName(isAppMode);
@@ -80,7 +102,11 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({
+          code,
+          ...(requestingClient ? { confirmed_client_id: requestingClient.clientId } : {}),
+          ...(pendingLink ? { add_pending_link: addPendingLink === true } : {}),
+        }),
       });
 
       if (!response.ok) {
@@ -221,6 +247,97 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             </Button>
           </div>
 
+          {/* What the requester reports about itself, shown before any
+              approval and confirmed here. The details come from the caller,
+              so the block says so rather than implying verification. A request
+              that reports no app keeps the flow to the code and the signed-in
+              account. */}
+          {requestingClient ? (
+            <div
+              className="space-y-2 rounded-lg border p-4 max-[22rem]:p-2"
+              data-testid="requesting-client"
+            >
+              <p className="text-sm font-medium">Requesting app</p>
+              <p className="text-sm break-words">{requestingClient.clientName}</p>
+              <dl className="text-muted-foreground space-y-1 text-xs">
+                <div className="flex gap-2">
+                  <dt className="shrink-0">Redirects to</dt>
+                  <dd className="font-mono break-all">{requestingClient.redirectOrigin}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="shrink-0">Client ID</dt>
+                  <dd className="font-mono break-all">{requestingClient.clientId}</dd>
+                </div>
+              </dl>
+              <p className="text-muted-foreground text-xs">
+                These details come from the app that started this request.
+              </p>
+              <div className="flex items-start gap-2 pointer-coarse:min-h-11">
+                <Checkbox
+                  id="confirm-requesting-client"
+                  className="mt-0.5"
+                  checked={clientConfirmed}
+                  onCheckedChange={setClientConfirmed}
+                  disabled={status === 'loading'}
+                />
+                <label
+                  htmlFor="confirm-requesting-client"
+                  className="text-sm leading-5 pointer-coarse:py-2"
+                >
+                  I expect this connection and recognize the destination above.
+                </label>
+              </div>
+            </div>
+          ) : null}
+
+          {pendingLink ? (
+            <div
+              className="space-y-2 rounded-lg border p-4 max-[22rem]:p-2"
+              data-testid="pending-link"
+            >
+              <p className="text-sm">
+                This app also asks to add {getProviderById(pendingLink.provider).name} (
+                {pendingLink.displayName || pendingLink.email}) to your account
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2 pointer-coarse:min-h-11">
+                  <input
+                    type="radio"
+                    id="pending-link-add"
+                    name="pending-link-choice"
+                    className="mt-1"
+                    checked={addPendingLink === true}
+                    onChange={() => setAddPendingLink(true)}
+                    disabled={status === 'loading'}
+                  />
+                  <label
+                    htmlFor="pending-link-add"
+                    className="text-sm leading-5 pointer-coarse:py-2"
+                  >
+                    Approve and add it
+                  </label>
+                </div>
+                <div className="flex items-start gap-2 pointer-coarse:min-h-11">
+                  <input
+                    type="radio"
+                    id="pending-link-skip"
+                    name="pending-link-choice"
+                    className="mt-1"
+                    checked={addPendingLink === false}
+                    onChange={() => setAddPendingLink(false)}
+                    disabled={status === 'loading'}
+                  />
+                  <label
+                    htmlFor="pending-link-skip"
+                    className="text-sm leading-5 pointer-coarse:py-2"
+                  >
+                    Approve without adding it
+                  </label>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="space-y-2 rounded-lg border p-4 max-[22rem]:p-2">
             <p className="text-sm font-medium">This will allow the device to:</p>
             <ul className="text-muted-foreground space-y-1 text-sm">
@@ -229,6 +346,17 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
               <li>• Use AI models</li>
             </ul>
           </div>
+
+          {needsClientConfirmation && !clientConfirmed ? (
+            <p className="text-muted-foreground text-xs">
+              Confirm the requesting app above to authorize it.
+            </p>
+          ) : null}
+          {pendingLink && addPendingLink === null ? (
+            <p className="text-muted-foreground text-xs">
+              Choose whether to add the sign-in method above to authorize.
+            </p>
+          ) : null}
 
           <div className="flex gap-3 max-[22rem]:flex-col">
             <Button
@@ -242,7 +370,11 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             <Button
               className="flex-1 max-[22rem]:w-full max-[22rem]:px-2 pointer-coarse:min-h-11"
               onClick={() => handleAuthorize(true)}
-              disabled={status === 'loading'}
+              disabled={
+                status === 'loading' ||
+                (needsClientConfirmation && !clientConfirmed) ||
+                (pendingLink !== null && addPendingLink === null)
+              }
             >
               {status === 'loading' ? (
                 <>

@@ -172,6 +172,37 @@ function whenAborted(signal: AbortSignal | undefined): Promise<undefined> {
 }
 
 /**
+ * Reports a launch that failed after the wait had already ended on another
+ * edge.
+ *
+ * `openAuthorizationAndWaitForReturn` settles on whichever edge comes first, so
+ * a foreground return can win while the browser is still reporting. When that
+ * report turns out to be a failure, the caller's `catch` never ran and the user
+ * saw no browser: without this report the action looks inert. Call it with the
+ * wait a caller is not awaiting further, so a platform that never delivers a
+ * report costs nothing and an aborted caller hears nothing.
+ */
+export function reportLateLaunchFailure(
+  wait: AuthorizationWait,
+  handlers: { signal?: AbortSignal; onFailure: () => void }
+): void {
+  if (wait.settledByLaunch || handlers.signal?.aborted) {
+    return;
+  }
+  void (async () => {
+    const reported = await Promise.race([wait.reported, whenAborted(handlers.signal)]);
+    if (handlers.signal?.aborted) {
+      return;
+    }
+    // A report is the browser's own outcome; `undefined` is the same launch
+    // failure that would have thrown had it arrived first.
+    if (reported === undefined) {
+      handlers.onFailure();
+    }
+  })();
+}
+
+/**
  * Launch failures are reported separately from refetch failures. Closing the
  * browser still refetches: the server-driven connection may have completed.
  * Aborting on unmount instead skips callbacks belonging to the stale caller.
@@ -204,9 +235,15 @@ export async function launchConnectGateBrowser(
   }
   void (async () => {
     const late = await Promise.race([wait.reported, whenAborted(handlers.signal)]);
-    // A failed launch is already behind us, and an aborted caller wants nothing
-    // more: only a real dismissal or sign-in after the fact is worth a read.
-    if (late === undefined || handlers.signal?.aborted) {
+    // An aborted caller wants nothing more: only a real dismissal or sign-in
+    // after the fact is worth a read, and only a live caller hears a failure.
+    if (handlers.signal?.aborted) {
+      return;
+    }
+    if (late === undefined) {
+      // The launch failed after the app's own return edge ended the wait, so
+      // the caller's catch never ran and no browser ever appeared.
+      handlers.onOpenFailure();
       return;
     }
     try {

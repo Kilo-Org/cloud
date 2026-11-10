@@ -34,6 +34,7 @@ vi.mock('@kilocode/app-shared/security-agent', () => ({
   isPersonalSecurityScope: (scope: string) => scope === 'personal',
 }));
 vi.mock('@/lib/format', () => ({
+  formatCalendarDate: String,
   formatDate: String,
   formatNumber: String,
 }));

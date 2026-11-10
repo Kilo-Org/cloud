@@ -6,6 +6,7 @@ import {
   mapResolvedModelIdToVercelWithoutOverrides,
   readVercelModelIdOverrides,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 
 const overrides = [
   { openrouter_model_id: 'meta/muse-wonder', vercel_model_id: 'meta/muse-wonder-1.0' },
@@ -111,34 +112,9 @@ describe('mapModelIdToVercel', () => {
     });
   });
 
-  describe('kilo-exclusive models', () => {
-    it('maps an exclusive flagged with vercel-routing to its internal id', async () => {
-      // google/gemma-4-26b-a4b-it:free is registered in kiloExclusiveModels
-      // with the 'vercel-routing' flag and internal_id 'google/gemma-4-26b-a4b-it'.
-      await expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free')).resolves.toBe(
-        'google/gemma-4-26b-a4b-it'
-      );
-    });
-
-    it('does not use internal_id for exclusives that are not vercel-routed', async () => {
-      // claude_sonnet_4_6_stealth_model has gateway 'martian' and no
-      // 'vercel-routing' flag, so the mapping must pass the public id through
-      // the generic prefix rewrite instead of substituting internal_id.
-      await expect(mapModelIdToVercel('stealth/claude-sonnet-4.6')).resolves.toBe(
-        'stealth/claude-sonnet-4.6'
-      );
-    });
-
-    it('maps the Vercel-served Glyph Cluster stealth model to its gateway id', async () => {
-      await expect(mapModelIdToVercel('stealth/glyph-cluster')).resolves.toBe(
-        'stealth/glyph-cluster'
-      );
-    });
-
-    it('maps the Vercel-served Reflection Beam free model to its gateway id', async () => {
-      await expect(mapModelIdToVercel('reflection/beam-free')).resolves.toBe(
-        'reflection/beam-free'
-      );
-    });
+  it('maps the auto small free model to the paid model', async () => {
+    await expect(mapModelIdToVercel(AUTO_SMALL_TARGET_MODELS.free)).resolves.toBe(
+      AUTO_SMALL_TARGET_MODELS.paid
+    );
   });
 });

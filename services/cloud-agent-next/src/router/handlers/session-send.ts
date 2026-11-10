@@ -2,8 +2,10 @@
  * New primary public surface for sending a message to an existing
  * cloud-agent session.
  *
- * `send` always enqueues through the shared `queueMessage` helper. The
- * alarm-driven flusher handles cold-start runtime restoration and delivery.
+ * `send` always enqueues through the shared `preflightAndQueuePromptMessage`
+ * helper, which runs session-runtime, runtime-authorization and model preflight
+ * before admission. The alarm-driven flusher handles cold-start runtime
+ * restoration and delivery.
  *
  * Auth: user-protected (same as `sendMessageV2`).
  */
@@ -42,7 +44,7 @@ const sendMessageHandler = protectedProcedure
           type: 'prompt' as const,
           id: input.message.id ?? undefined,
           prompt: input.message.prompt,
-          attachments: input.message.attachments ?? input.message.images,
+          attachments: input.message.attachments,
         },
         agent: input.agent,
         finalization: input.finalization,

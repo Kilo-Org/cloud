@@ -1,8 +1,9 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { randomUUID } from 'node:crypto';
 import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
+  apiKeyUpstream,
   faviconIcon,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
@@ -11,10 +12,11 @@ import { removeChatCompletionsMessageNames } from '@kilocode/web-shared/lib/ai-g
 export default {
   id: 'opencode-go',
   models_dev_id: 'opencode-go',
-  base_url: 'https://opencode.ai/zen/go/v1',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions', 'messages', 'responses'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+  ...apiKeyUpstream({
+    apiUrl: 'https://opencode.ai/zen/go/v1',
+    supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
   transformRequest(context) {
     context.extraHeaders['x-opencode-session'] = generateProviderSpecificSessionHash(
       context.kilo_user_id,
@@ -31,18 +33,7 @@ export default {
       removeChatCompletionsMessageNames(context.request.body);
     }
   },
-  models: cachedEnhancedDirectByokModelList({
-    providerId: 'opencode-go',
-    recommendedModels: [
-      {
-        id: 'qwen3.7-plus',
-        name: 'Qwen3.7 Plus',
-        flags: ['vision', 'reasoning'],
-        context_length: 1_000_000,
-        max_completion_tokens: 65_536,
-      },
-    ],
-  }),
+  models: cachedDirectByokModelList('opencode-go'),
   provider_listing: {
     dataPolicy: {
       training: true,

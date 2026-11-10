@@ -1,3 +1,4 @@
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   baseProcedure,
   createTRPCRouter,
@@ -7,11 +8,12 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { code_indexing_search, code_indexing_manifest } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { eq, getTableName, sql, desc } from 'drizzle-orm';
+import { getTableName, sql } from 'drizzle-orm';
+import { ensureOrganizationAccessAndFetchOrg } from '@kilocode/web-shared/routers/organizations/utils';
 import {
-  ensureOrganizationAccessAndFetchOrg,
-  organizationMemberProcedure,
-} from '@kilocode/web-shared/routers/organizations/utils';
+  ORGANIZATION_MANAGE_ROLES,
+  type OrganizationRole,
+} from '@kilocode/app-shared/organizations';
 import {
   elevateViaKiloAdmin,
   organizationTarget,
@@ -19,11 +21,10 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { codeIndexingAdminRouter } from './code-indexing-admin-router';
-import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { getIndexStorage } from '@/lib/code-indexing/storage';
 import { getUserUUID } from '@kilocode/web-shared/lib/user/server';
 import { findUserByEmail } from '@/lib/user';
-import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
+import { chunkCountToSizeKbSql, isEnabledForUser } from '@/lib/code-indexing/util';
 import {
   CODE_INDEXING_GONE_MESSAGE,
   isCodeIndexingEnabled,
@@ -59,16 +60,6 @@ const codeIndexingProcedure = baseProcedure.use(async ({ next }) => {
 
   return next();
 });
-
-const organizationMemberCodeIndexingProcedure = organizationMemberProcedure.use(
-  async ({ next }) => {
-    if (!isCodeIndexingEnabled()) {
-      throw codeIndexingNotAvailable();
-    }
-
-    return next();
-  }
-);
 
 const CodebaseIndexingSearchRequestSchema = z.object({
   organizationId: z.uuid().nullable().optional(),
@@ -159,13 +150,17 @@ const CodebaseIndexingProjectFilesResponseSchema = z.object({
 });
 
 type Input = { organizationId?: string | null | undefined };
-export async function getCodeIndexOrganizationId(ctx: TRPCContext, input: Input) {
+export async function getCodeIndexOrganizationId(
+  ctx: TRPCContext,
+  input: Input,
+  roles?: OrganizationRole[]
+) {
   if (!isCodeIndexingEnabled()) {
     throw codeIndexingNotAvailable();
   }
 
   if (input.organizationId) {
-    const org = await ensureOrganizationAccessAndFetchOrg(ctx, input.organizationId);
+    const org = await ensureOrganizationAccessAndFetchOrg(ctx, input.organizationId, roles);
     if (org.settings.code_indexing_enabled === false) {
       throw new TRPCError({
         code: 'FORBIDDEN',
@@ -173,6 +168,13 @@ export async function getCodeIndexOrganizationId(ctx: TRPCContext, input: Input)
       });
     }
     return input.organizationId;
+  }
+
+  if (!isEnabledForUser(ctx.user)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Code indexing is not enabled for this account',
+    });
   }
 
   return getUserUUID(ctx.user);
@@ -187,6 +189,12 @@ async function resolveOrganizationIdWithOverride(
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: 'Only admins can use overrideUser parameter',
+      });
+    }
+    if (isSupportAccessEnabled()) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'overrideUser is disabled while support access is enforced',
       });
     }
 
@@ -336,51 +344,6 @@ export const codeIndexingRouter = createTRPCRouter({
       });
 
       return manifest;
-    }),
-  getRecentSearches: organizationMemberCodeIndexingProcedure
-    .output(
-      z.array(
-        z.object({
-          id: z.uuid(),
-          query: z.string(),
-          project_id: z.string(),
-          created_at: z.string(),
-          kilo_user_id: z.string(),
-          results_count: z.number(),
-          metadata: z.any(),
-        })
-      )
-    )
-    .query(async ({ input }) => {
-      const organization = await getOrganizationById(input.organizationId);
-      if (!organization) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
-        });
-      }
-
-      const searches = await db
-        .select({
-          id: code_indexing_search.id,
-          query: code_indexing_search.query,
-          project_id: code_indexing_search.project_id,
-          created_at: code_indexing_search.created_at,
-          kilo_user_id: code_indexing_search.kilo_user_id,
-          metadata: code_indexing_search.metadata,
-        })
-        .from(code_indexing_search)
-        .where(eq(code_indexing_search.organization_id, input.organizationId))
-        .orderBy(desc(code_indexing_search.created_at))
-        .limit(50);
-
-      return searches.map(search => {
-        const metadata = search.metadata as { results?: unknown[] };
-        return {
-          ...search,
-          results_count: metadata?.results?.length || 0,
-        };
-      });
     }),
   // Non-admin procedures for organization members to view their own org's stats
   getOrganizationStats: codeIndexingProcedure
@@ -606,7 +569,11 @@ export const codeIndexingRouter = createTRPCRouter({
   deleteBeforeDate: codeIndexingProcedure
     .input(CodebaseIndexingDeleteBeforeDateRequestSchema)
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await getCodeIndexOrganizationId(ctx, input);
+      const organizationId = await getCodeIndexOrganizationId(
+        ctx,
+        input,
+        ORGANIZATION_MANAGE_ROLES
+      );
 
       await getStorage().deleteByOrganizationBeforeDate({
         organizationId,

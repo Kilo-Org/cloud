@@ -16,6 +16,7 @@ import {
 import { ProfileMetadataForm } from '@/components/profiles/profile-metadata-form';
 import { ProfileOverviewSkeleton } from '@/components/profiles/profile-overview-skeleton';
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -34,11 +35,13 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
+import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
-import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
+import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useTRPC } from '@/lib/trpc';
 import {
   getProfileAgentsPath,
@@ -93,7 +96,7 @@ export function ProfileOverviewScreen({
   stack: ProfileManagementStack;
 }>) {
   const router = useRouter();
-  const popWhenFocused = usePopWhenFocused();
+  const popOnce = usePopOnce();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const colors = useThemeColors();
@@ -101,9 +104,14 @@ export function ProfileOverviewScreen({
   const queryClient = useQueryClient();
   // Reactive: a connectivity commit re-renders the error variant selection.
   const committedConnectivity = useCommittedConnectivityStatus();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const profileQuery = useAgentProfileOverview(profileId, organizationId);
   const { update, deleteProfile, setAsDefault, clearDefault } =
     useAgentProfileMutations(organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
+  // Unsaved name or description edits ask before the route goes, the way the
+  // profile form sheets do. A read-only viewer cannot edit the form, so the
+  // guard stays off for them.
+  const metadataGuard = useMetadataLeaveGuard({ enabled: canManage });
 
   const profile = profileQuery.data;
   const isOrgOwned = organizationId !== undefined;
@@ -146,9 +154,13 @@ export function ProfileOverviewScreen({
     try {
       await deleteProfile.mutateAsync({ profileId });
       toast.success(t('profiles.deletedToast', { name: profileName }));
-      // Back during the delete already left this profile; a second pop would
-      // remove the profiles list beneath it.
-      popWhenFocused();
+      // The profile is gone, so there is nothing left to keep: the pop must not
+      // ask about edits to it.
+      metadataGuard.markClean();
+      // Back during the delete already left this profile, and a Back handled
+      // while this dismissal runs is the same leave; a second pop would remove
+      // the profiles list beneath it.
+      popOnce();
     } catch (error) {
       if (deleteErrorMessage(error) === 'blocked') {
         toast.error(t('profiles.deleteBlocked'));
@@ -177,9 +189,21 @@ export function ProfileOverviewScreen({
           session whose profile chip opened it); `backFallback` still lands on
           Profiles when the app has no history, as a cold deep link does. The
           profile name is user prose, not a UI label, so it keeps a second line
-          for a natural break. */}
+          for a natural break.
+
+          A read that has not answered yet shows a title-shaped bar in the
+          title's own slot. The header used to read the generic Profiles title
+          until the name arrived, so the heading changed text under the reader
+          for no reason of theirs; the bar keeps the slot's shape and the name
+          replaces it in place. The bar is the header's label, so a screen
+          reader still hears which screen this is. */}
       <ScreenHeader
         title={profile?.name ?? t('profiles.title')}
+        titleContent={
+          profile === undefined && errorView === null ? (
+            <Skeleton className="h-5 w-40 rounded" />
+          ) : undefined
+        }
         titleNumberOfLines={2}
         backFallback={getProfilesPath()}
       />
@@ -219,6 +243,8 @@ export function ProfileOverviewScreen({
               profile={profile}
               isSaving={update.isPending}
               onSave={saveMetadata}
+              onDirtyChange={metadataGuard.handleDirtyChange}
+              disabled={!canManage}
             />
 
             <PreferenceRow
@@ -226,7 +252,7 @@ export function ProfileOverviewScreen({
               title={t('profiles.defaultSectionTitle')}
               subtitle={t(defaultDescriptionKey(isOrgOwned))}
               value={profile.isDefault}
-              disabled={defaultPending}
+              disabled={!canManage || defaultPending}
               busy={defaultPending}
               onValueChange={next => {
                 if (next) {
@@ -237,7 +263,11 @@ export function ProfileOverviewScreen({
               }}
             />
 
-            <ProfileRepoPinsSection profileId={profileId} organizationId={organizationId} />
+            <ProfileRepoPinsSection
+              profileId={profileId}
+              organizationId={organizationId}
+              canManage={canManage}
+            />
 
             <View className="gap-1">
               <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
@@ -259,22 +289,25 @@ export function ProfileOverviewScreen({
               </View>
             </View>
 
-            <Button
-              variant="destructive"
-              loading={deleteProfile.isPending}
-              disabled={deleteProfile.isPending}
-              onPress={() => {
-                confirmDelete(profile.name);
-              }}
-            >
-              <Trash2 size={16} color={colors.destructiveForeground} />
-              <Text>{t('common.delete')}</Text>
-            </Button>
+            {!canManage ? null : (
+              <Button
+                variant="destructive"
+                loading={deleteProfile.isPending}
+                disabled={deleteProfile.isPending}
+                onPress={() => {
+                  confirmDelete(profile.name);
+                }}
+              >
+                <Trash2 size={16} color={colors.destructiveForeground} />
+                <Text>{t('common.delete')}</Text>
+              </Button>
+            )}
           </>
         ) : null}
       </TabScreenScrollView>
 
       {dialog}
+      {metadataGuard.dialog}
     </View>
   );
 }

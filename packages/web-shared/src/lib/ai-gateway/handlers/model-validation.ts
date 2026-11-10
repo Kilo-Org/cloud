@@ -1,15 +1,16 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import * as z from 'zod';
+import { parseModelValidationRequest } from './model-validation-request';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
-
-const BodySchema = z.object({ modelId: z.string().trim().min(1) });
+import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
+import { customRouterModelId, isCustomRouterModelId } from '@kilocode/auto-routing-contracts';
+import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 
 async function tryGetUserFromAuth() {
   try {
@@ -24,19 +25,9 @@ async function tryGetUserFromAuth() {
 }
 
 export async function handleModelValidationRequest(request: NextRequest) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const bodyResult = BodySchema.safeParse(body);
+  const bodyResult = await parseModelValidationRequest(request);
   if (!bodyResult.success) {
-    return NextResponse.json(
-      { error: 'Invalid request body', details: z.treeifyError(bodyResult.error) },
-      { status: 400 }
-    );
+    return bodyResult.response;
   }
 
   if (request.headers.get(ORGANIZATION_ID_HEADER)) {
@@ -48,14 +39,24 @@ export async function handleModelValidationRequest(request: NextRequest) {
 
   const auth = await tryGetUserFromAuth();
   try {
-    const models = await getEnhancedOpenRouterModels();
+    const models = await getEnhancedOpenRouterModels({
+      countryCode: requestCountryCode(request.headers),
+    });
     if (!Array.isArray(models.data)) {
       throw new Error('Model catalog returned invalid data');
     }
     const byokModels = auth?.user ? await getDirectByokModelsForUser(auth.user.id) : [];
-    const available = appendLocalFakeDeterministicCatalogModels(
-      models.data.concat(byokModels)
-    ).some(model => model.id === bodyResult.data.modelId);
+    const customRouters =
+      auth?.user && isCustomRouterModelId(bodyResult.data.modelId)
+        ? await listUsableCustomRouters({ userId: auth.user.id, organizationId: null })
+        : [];
+    const available =
+      appendLocalFakeDeterministicCatalogModels(models.data.concat(byokModels)).some(
+        model => model.id === bodyResult.data.modelId
+      ) ||
+      customRouters.some(
+        router => customRouterModelId(router.ownerType, router.slug) === bodyResult.data.modelId
+      );
     return NextResponse.json(available ? { valid: true } : { valid: false, reason: 'unavailable' });
   } catch (error) {
     captureException(error, {

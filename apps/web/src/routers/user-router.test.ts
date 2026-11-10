@@ -1,4 +1,8 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import {
+  createBearerCallerForUser,
+  createCallerForUser,
+  createSessionCallerForUser,
+} from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
@@ -12,12 +16,14 @@ import {
   organization_memberships,
   organizations,
   passkey_credentials,
+  session_step_up_proofs,
   user_activity_tokens,
   user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
@@ -26,8 +32,11 @@ import {
   sendAccountDeletionSupportNotification,
 } from '@kilocode/web-shared/lib/email';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
+import { createAccountLinkingSession } from '@/lib/account-linking-session';
+import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/email');
@@ -41,6 +50,17 @@ jest.mock('@kilocode/web-shared/lib/email', () => {
 
 jest.mock('@/lib/user/gdpr-removal', () => ({
   performGdprRemoval: jest.fn(),
+}));
+
+// Starting a link writes the linking cookie through `next/headers`, which has no
+// request scope here; the offer list is what this suite checks against.
+jest.mock('@/lib/account-linking-session', () => ({
+  ...jest.requireActual('@/lib/account-linking-session'),
+  createAccountLinkingSession: jest.fn(),
+}));
+
+jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
+  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
 }));
 
 jest.mock('@/lib/user', () => {
@@ -119,6 +139,43 @@ describe('user router - getMe', () => {
       email: user.google_user_email,
       isAdmin: false,
     });
+  });
+});
+
+describe('user router - linkAuthProvider', () => {
+  it('starts a link for every provider the connected-accounts card offers', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+    const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
+
+    for (const { id } of AccountLinkingProviders) {
+      mockCreateLinkingSession.mockClear();
+      await expect(caller.user.linkAuthProvider({ provider: id })).resolves.toEqual({
+        success: true,
+      });
+      expect(mockCreateLinkingSession).toHaveBeenCalledWith(user.id, id, undefined, undefined);
+    }
+
+    // A method the card does not offer must not open a linking session.
+    mockCreateLinkingSession.mockClear();
+    await expect(caller.user.linkAuthProvider({ provider: 'workos' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+  });
+
+  it('refuses a Claude link while Sign in with Claude is not launched', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+    const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
+    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValueOnce(false);
+    mockCreateLinkingSession.mockClear();
+
+    await expect(caller.user.linkAuthProvider({ provider: 'claude' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(user.google_user_email);
   });
 });
 
@@ -536,14 +593,29 @@ describe('user router - credit purchase history', () => {
   const manualPurchaseId = crypto.randomUUID();
   const automaticPurchaseId = crypto.randomUUID();
 
+  const organizationPurchaseId = crypto.randomUUID();
+  let purchaseOrganizationId: string;
   beforeAll(async () => {
     purchaser = await insertTestUser({
       total_microdollars_acquired: 35_000_000,
       microdollars_used: 35_000_000,
     });
     otherUser = await insertTestUser();
+    const organization = await createTestOrganization('purchase-history-org', purchaser.id, 0);
+    purchaseOrganizationId = organization.id;
 
     await db.insert(credit_transactions).values([
+      {
+        id: organizationPurchaseId,
+        kilo_user_id: purchaser.id,
+        organization_id: purchaseOrganizationId,
+        amount_microdollars: 50_000_000,
+        is_free: false,
+        description: 'Organization top-up via stripe',
+        stripe_payment_id: `ch_${crypto.randomUUID()}`,
+        created_at: '2026-06-24T10:00:00.000Z',
+        expiry_date: '2027-06-24T10:00:00.000Z',
+      },
       {
         id: manualPurchaseId,
         kilo_user_id: purchaser.id,
@@ -552,6 +624,7 @@ describe('user router - credit purchase history', () => {
         description: 'Top-up via stripe',
         stripe_payment_id: `ch_${crypto.randomUUID()}`,
         created_at: '2026-06-20T10:00:00.000Z',
+        expiry_date: '2027-06-20T10:00:00.000Z',
       },
       {
         id: automaticPurchaseId,
@@ -586,6 +659,10 @@ describe('user router - credit purchase history', () => {
     await db
       .delete(credit_transactions)
       .where(inArray(credit_transactions.kilo_user_id, [purchaser.id, otherUser.id]));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, purchaseOrganizationId));
+    await db.delete(organizations).where(eq(organizations.id, purchaseOrganizationId));
     await db.delete(kilocode_users).where(inArray(kilocode_users.id, [purchaser.id, otherUser.id]));
   });
 
@@ -599,11 +676,13 @@ describe('user router - credit purchase history', () => {
         id: automaticPurchaseId,
         description: 'Automatic top-up',
         amount_mUsd: 15_000_000,
+        expiryDate: null,
       }),
       expect.objectContaining({
         id: manualPurchaseId,
         description: 'Credit purchase',
         amount_mUsd: 20_000_000,
+        expiryDate: '2027-06-20T10:00:00.000Z',
       }),
     ]);
     expect(result.nextCursor).toBeNull();
@@ -620,10 +699,45 @@ describe('user router - credit purchase history', () => {
       transactionId: manualPurchaseId,
       amount_mUsd: 20_000_000,
       purchasedAt: '2026-06-20T10:00:00.000Z',
+      expiryDate: '2027-06-20T10:00:00.000Z',
     });
     await expect(
       otherCaller.user.getCreditPurchaseConfirmation({ transactionId: manualPurchaseId })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('returns organization purchase deadlines only to authorized billing users', async () => {
+    const purchaserCaller = await createCallerForUser(purchaser.id);
+    const otherCaller = await createCallerForUser(otherUser.id);
+    const result = await purchaserCaller.user.getCreditPurchaseHistory({
+      cursor: 0,
+      organizationId: purchaseOrganizationId,
+    });
+    expect(result.entries).toEqual([
+      expect.objectContaining({
+        id: organizationPurchaseId,
+        amount_mUsd: 50_000_000,
+        expiryDate: '2027-06-24T10:00:00.000Z',
+      }),
+    ]);
+    await expect(
+      purchaserCaller.user.getCreditPurchaseConfirmation({
+        transactionId: organizationPurchaseId,
+        organizationId: purchaseOrganizationId,
+      })
+    ).resolves.toMatchObject({ expiryDate: '2027-06-24T10:00:00.000Z' });
+    await expect(
+      otherCaller.user.getCreditPurchaseHistory({
+        cursor: 0,
+        organizationId: purchaseOrganizationId,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(
+      otherCaller.user.getCreditPurchaseReceipt({
+        transactionId: organizationPurchaseId,
+        organizationId: purchaseOrganizationId,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
   it('authorizes receipt lookup by purchase ownership', async () => {
@@ -2649,7 +2763,7 @@ describe('user router - passkeys', () => {
 
   it('lists the caller passkeys without the public key or the credential id', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     const result = await caller.user.getPasskeys();
 
@@ -2675,7 +2789,7 @@ describe('user router - passkeys', () => {
   it('lists only the caller passkeys', async () => {
     await insertPasskey(owner.id, 'Owner passkey');
     await insertPasskey(other.id, 'Other passkey');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     const result = await caller.user.getPasskeys();
 
@@ -2684,7 +2798,7 @@ describe('user router - passkeys', () => {
 
   it('renames an owned passkey', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     const result = await caller.user.renamePasskey({ id: row.id, name: 'Home desktop' });
 
@@ -2698,7 +2812,7 @@ describe('user router - passkeys', () => {
 
   it('refuses to rename another user passkey', async () => {
     const row = await insertPasskey(other.id, 'Other passkey');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(caller.user.renamePasskey({ id: row.id, name: 'Hijacked' })).rejects.toMatchObject(
       { code: 'NOT_FOUND' }
@@ -2713,9 +2827,9 @@ describe('user router - passkeys', () => {
 
   it('deletes an owned passkey', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
-    const result = await caller.user.deletePasskey({ id: row.id });
+    const result = await caller.user.deletePasskey({ id: row!.id });
 
     expect(result).toEqual({ success: true });
     const stored = await db
@@ -2727,7 +2841,7 @@ describe('user router - passkeys', () => {
 
   it('refuses to delete another user passkey and leaves it in place', async () => {
     const row = await insertPasskey(other.id, 'Other passkey');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(caller.user.deletePasskey({ id: row.id })).rejects.toMatchObject({
       code: 'NOT_FOUND',
@@ -2741,7 +2855,7 @@ describe('user router - passkeys', () => {
   });
 
   it('refuses an unknown passkey id', async () => {
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(
       caller.user.deletePasskey({ id: '11111111-1111-4111-8111-111111111111' })
@@ -2750,7 +2864,7 @@ describe('user router - passkeys', () => {
 
   it('refuses an empty passkey name', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(caller.user.renamePasskey({ id: row.id, name: '   ' })).rejects.toThrow();
 
@@ -2759,5 +2873,54 @@ describe('user router - passkeys', () => {
       .from(passkey_credentials)
       .where(eq(passkey_credentials.id, row.id));
     expect(stored?.name).toBe('Work laptop');
+  });
+
+  it.each([
+    [
+      'rename',
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>, id: string) =>
+        caller.user.renamePasskey({ id, name: 'Bearer rename' }),
+    ],
+    [
+      'delete',
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>, id: string) =>
+        caller.user.deletePasskey({ id }),
+    ],
+  ])('refuses %s through a bearer token', async (_label, invoke) => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const bearerCaller = await createBearerCallerForUser(owner.id);
+
+    await expect(invoke(bearerCaller, row.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Browser session required',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('deleting a passkey removes its step-up proofs', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    await db.insert(session_step_up_proofs).values({
+      kilo_user_id: owner.id,
+      session_id_hash: hashWebSessionId('passkey-delete-session'),
+      method: 'webauthn_uv',
+      passkey_credential_id: row!.id,
+      purpose: 'session',
+      verified_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    });
+    const caller = await createSessionCallerForUser(owner.id);
+
+    await caller.user.deletePasskey({ id: row!.id });
+
+    const proofs = await db
+      .select()
+      .from(session_step_up_proofs)
+      .where(eq(session_step_up_proofs.passkey_credential_id, row!.id));
+    expect(proofs).toHaveLength(0);
   });
 });

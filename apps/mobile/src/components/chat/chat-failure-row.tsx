@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 /**
  * The retained failure of an idle chat, in fixed copy.
@@ -23,12 +24,12 @@ export function ChatFailureRow({
     <View className="flex-row items-center gap-3 px-4 py-2">
       <AccessibleStatus message={t(failureKey)} tone="error" className="flex-1 text-sm" />
       {onAddCredits ? (
-        <Button variant="outline" size="sm" onPress={onAddCredits}>
+        <Button variant="outline" size="sm" className={STATE_ACTION_CLASS} onPress={onAddCredits}>
           <Text>{t('addCredits.cta')}</Text>
         </Button>
       ) : null}
       {onRetry ? (
-        <Button variant="outline" size="sm" onPress={onRetry}>
+        <Button variant="outline" size="sm" className={STATE_ACTION_CLASS} onPress={onRetry}>
           <Text>{t('common.retry')}</Text>
         </Button>
       ) : null}

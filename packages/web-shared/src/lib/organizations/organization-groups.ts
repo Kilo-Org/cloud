@@ -9,7 +9,7 @@ import {
   type Organization,
   type OrganizationGroup,
 } from '@kilocode/db/schema';
-import { MAX_ORGANIZATION_GROUPS } from '@kilocode/db/schema-types';
+import { MAX_ORGANIZATION_GROUPS, OrganizationSettingsSchema } from '@kilocode/db/schema-types';
 import {
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
@@ -22,6 +22,10 @@ import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import {
+  enkryptInputGuardrailGroupId,
+  resolveEnkryptInputGuardrail,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { normalizeRegisteredOrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/registry.server';
 import {
   DEFAULT_ORGANIZATION_GROUP_POLICIES,
@@ -83,7 +87,7 @@ async function assertEnterpriseOrganization(
   return organization;
 }
 
-async function acquireOrganizationPolicyLock(tx: DrizzleTransaction, organizationId: string) {
+export async function lockOrganizationGroupPolicy(tx: DrizzleTransaction, organizationId: string) {
   await tx.execute(sql`
     SELECT pg_catalog.pg_advisory_xact_lock(
       pg_catalog.hashtextextended(${`organization-group-policy:${organizationId}`}, 0)
@@ -91,7 +95,12 @@ async function acquireOrganizationPolicyLock(tx: DrizzleTransaction, organizatio
   `);
 }
 
-async function getSettingsRow(organizationId: string, client: typeof db | DrizzleTransaction = db) {
+type OrganizationGroupPolicySettingsRow = typeof organization_group_policy_settings.$inferSelect;
+
+async function getSettingsRow(
+  organizationId: string,
+  client: typeof db | DrizzleTransaction = db
+): Promise<OrganizationGroupPolicySettingsRow | undefined> {
   const [settings] = await client
     .select()
     .from(organization_group_policy_settings)
@@ -138,17 +147,21 @@ export async function bumpOrganizationGroupPolicyRevision(
   organizationId: string,
   actorUserId: string | null
 ) {
-  await acquireOrganizationPolicyLock(tx, organizationId);
+  await lockOrganizationGroupPolicy(tx, organizationId);
   const existing = await getSettingsRow(organizationId, tx);
   return await writeOrganizationGroupPolicyRevision(tx, organizationId, actorUserId, existing);
 }
 
-export async function getOrganizationGroupPolicySettings(
-  organizationId: string,
-  client: typeof db | DrizzleTransaction = db
-): Promise<CanonicalOrganizationGroupPolicySettings> {
-  await assertEnterpriseOrganization(organizationId, client);
-  const settings = await getSettingsRow(organizationId, client);
+/**
+ * The canonical view of an organization's group-policy settings: the stored
+ * row, or the defaults at revision 0 when the organization has none yet. The
+ * read path and the mutation wrapper share it so they cannot disagree about
+ * the defaults or the parse options.
+ */
+function canonicalSettingsFrom(
+  settings: OrganizationGroupPolicySettingsRow | undefined,
+  organizationId: string
+): CanonicalOrganizationGroupPolicySettings {
   if (!settings) {
     return {
       defaultPolicies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
@@ -164,6 +177,14 @@ export async function getOrganizationGroupPolicySettings(
   };
 }
 
+export async function getOrganizationGroupPolicySettings(
+  organizationId: string,
+  client: typeof db | DrizzleTransaction = db
+): Promise<CanonicalOrganizationGroupPolicySettings> {
+  await assertEnterpriseOrganization(organizationId, client);
+  return canonicalSettingsFrom(await getSettingsRow(organizationId, client), organizationId);
+}
+
 export async function withOrganizationGroupPolicyMutation<T>(
   organizationId: string,
   actorUserId: string,
@@ -174,21 +195,10 @@ export async function withOrganizationGroupPolicyMutation<T>(
   }) => Promise<T>
 ): Promise<{ result: T; policyRevision: number }> {
   return await db.transaction(async tx => {
-    await acquireOrganizationPolicyLock(tx, organizationId);
+    await lockOrganizationGroupPolicy(tx, organizationId);
     const organization = await assertEnterpriseOrganization(organizationId, tx);
     const existingSettings = await getSettingsRow(organizationId, tx);
-    const currentSettings = existingSettings
-      ? {
-          defaultPolicies: parseOrganizationGroupPolicies(existingSettings.default_policies, {
-            organizationId,
-            source: 'default',
-          }),
-          policyRevision: existingSettings.policy_revision,
-        }
-      : {
-          defaultPolicies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
-          policyRevision: 0,
-        };
+    const currentSettings = canonicalSettingsFrom(existingSettings, organizationId);
 
     const policyRevision = await writeOrganizationGroupPolicyRevision(
       tx,
@@ -692,6 +702,50 @@ export async function setOrganizationMemberGroups(params: {
   );
 }
 
+/**
+ * A group that an active Enkrypt input guardrail is limited to cannot be deleted, because the
+ * guardrail would then scan nobody. An inactive guardrail forgets the group, so it applies to every
+ * member if it is turned on again.
+ */
+async function releaseEnkryptInputGuardrailGroup(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  group: Pick<OrganizationGroup, 'id' | 'name'>,
+  actor: OrganizationGroupActor
+) {
+  const [organization] = await tx
+    .select({ settings: organizations.settings })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .for('update');
+  const settings = organization?.settings;
+  const inputGuardrail = settings?.enkrypt?.input_guardrail;
+  if (!inputGuardrail || enkryptInputGuardrailGroupId(settings) !== group.id) return;
+  if (resolveEnkryptInputGuardrail(organizationId, settings) !== null) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message:
+        'Input guardrails are limited to this group. Choose another group on the AI Guardrails page first.',
+    });
+  }
+  await tx
+    .update(organizations)
+    .set({
+      settings: OrganizationSettingsSchema.parse({
+        ...settings,
+        enkrypt: { ...settings.enkrypt, input_guardrail: { ...inputGuardrail, group_id: null } },
+      }),
+    })
+    .where(eq(organizations.id, organizationId));
+  await createAuditLog({
+    action: 'organization.settings.change',
+    ...actorAudit(actor),
+    message: `Updated AI guardrails: input guardrails now apply to all members because group "${group.name}" (${group.id}) was deleted`,
+    organization_id: organizationId,
+    tx,
+  });
+}
+
 export async function deleteOrganizationGroup(params: {
   organizationId: string;
   groupId: string;
@@ -702,6 +756,7 @@ export async function deleteOrganizationGroup(params: {
     params.actor.id,
     async ({ tx }) => {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
+      await releaseEnkryptInputGuardrailGroup(tx, params.organizationId, group, params.actor);
       await tx
         .delete(organization_groups)
         .where(

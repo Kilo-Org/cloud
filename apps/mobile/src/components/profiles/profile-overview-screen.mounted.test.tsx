@@ -11,6 +11,7 @@ import {
   pressDelete,
   pressSave,
   rerenderScreen,
+  resetOverviewState,
   testProfile,
   type TestProfileDetail,
 } from '@/components/profiles/profile-overview-screen.test-helpers';
@@ -40,8 +41,12 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => true,
+}));
+
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => h.query,
+  useAgentProfileOverview: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
@@ -50,9 +55,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('expo-router', () => ({
+  usePreventRemove: () => undefined,
   useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
 }));
-vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => h.back }));
+vi.mock('@/lib/navigation/pop-once', () => ({ usePopOnce: () => h.back }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {
@@ -118,14 +124,7 @@ describe('ProfileOverviewScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.connectivity = 'online';
-    Object.assign(h.query, {
-      data: undefined,
-      isError: false,
-      isPending: true,
-      isRefetching: false,
-    });
-    Object.assign(h.mutations.update, { isPending: false });
-    Object.assign(h.mutations.deleteProfile, { isPending: false });
+    resetOverviewState(h);
   });
 
   it('loading: renders skeleton rows and no content rows', async () => {
@@ -133,6 +132,11 @@ describe('ProfileOverviewScreen', () => {
 
     expect(findAll(renderer.root, 'Skeleton').length).toBeGreaterThan(0);
     expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
+    // The header holds a title-shaped bar while the read is out, so the heading
+    // does not swap its text when the name arrives.
+    expect(findOne(renderer.root, 'ScreenHeader').props.titleContent).toMatchObject({
+      type: 'Skeleton',
+    });
   });
 
   it('renders the overview in TabScreenScrollView, including the delete action', async () => {
@@ -140,6 +144,10 @@ describe('ProfileOverviewScreen', () => {
     h.query.isPending = false;
 
     const { renderer } = await mountScreen();
+
+    // The name takes the title slot the loading bar held: one heading, no
+    // placeholder left behind it.
+    expect(findOne(renderer.root, 'ScreenHeader').props.titleContent).toBeUndefined();
 
     // The shared scroll view reserves the tab bar (and, while the keyboard is
     // up, the IME) below its viewport, so the destructive action at the end of
@@ -171,9 +179,9 @@ describe('ProfileOverviewScreen', () => {
 
   it('happy: seeds the fields, lists the sections, and saves the metadata', async () => {
     h.query.data = testProfile({
-      vars: [{ key: 'A' }],
-      commands: ['pnpm install', 'pnpm build'],
-      skills: [{ id: 's1' }],
+      varCount: 1,
+      commandCount: 2,
+      skillCount: 1,
     });
     h.query.isPending = false;
     h.mutations.update.mutateAsync.mockResolvedValue({ success: true });
@@ -244,7 +252,7 @@ describe('ProfileOverviewScreen', () => {
     expect(h.error).toHaveBeenCalledTimes(1);
 
     // An unrelated profile refetch must not replace the failed draft.
-    h.query.data = testProfile({ vars: [{ key: 'NEW' }] });
+    h.query.data = testProfile({ varCount: 1 });
     rerenderScreen(renderer, queryClient);
     expect(findField(renderer.root, 'Profile name').props.defaultValue).toBe('Renamed');
     expect(findField(renderer.root, 'Profile description').props.defaultValue).toBe(

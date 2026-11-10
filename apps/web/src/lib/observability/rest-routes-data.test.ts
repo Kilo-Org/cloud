@@ -19,8 +19,15 @@ jest.mock('@/lib/device-auth/device-auth', () => {
     denyDeviceAuthRequest: jest.fn(),
     consumeDeviceAuthByDeviceCode: jest.fn(),
     approveDeviceAuthRequest: jest.fn(),
+    DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE:
+      'Device authorization client confirmation does not match',
+    DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE: 'Device authorization pending link choice is required',
   };
 });
+
+jest.mock('@/lib/auth/pending-link', () => ({
+  getPendingLinkBySecret: jest.fn(),
+}));
 
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
@@ -115,6 +122,7 @@ describe('REST data routes emit one api_timing line', () => {
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
       expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
     });
 
     const response = await codesRoute.POST(

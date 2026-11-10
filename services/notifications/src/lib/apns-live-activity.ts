@@ -1,3 +1,5 @@
+import { bytesToBase64url } from '@kilocode/worker-utils/base64url';
+
 /**
  * Token-based APNs client for Live Activity start, update, and end pushes.
  * Pure: every network hop goes through the injected `fetchFn` so unit tests
@@ -38,12 +40,6 @@ export type LiveActivityAlert = { title: string; body: string };
 
 const encoder = new TextEncoder();
 
-function base64Url(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
 function pemToDer(pem: string): Uint8Array {
   const body = pem.replace(APNS_KEY_PREFIX, '').replace(APNS_KEY_SUFFIX, '').replace(/\s/g, '');
   const binary = atob(body);
@@ -57,10 +53,10 @@ export async function signApnsJwt(
   credentials: ApnsCredentials,
   nowSeconds: number
 ): Promise<string> {
-  const header = base64Url(
+  const header = bytesToBase64url(
     encoder.encode(JSON.stringify({ alg: 'ES256', kid: credentials.keyId }))
   );
-  const claims = base64Url(
+  const claims = bytesToBase64url(
     encoder.encode(JSON.stringify({ iss: credentials.teamId, iat: nowSeconds }))
   );
   const signingInput = `${header}.${claims}`;
@@ -77,7 +73,7 @@ export async function signApnsJwt(
     key,
     encoder.encode(signingInput)
   );
-  return `${signingInput}.${base64Url(new Uint8Array(signature))}`;
+  return `${signingInput}.${bytesToBase64url(new Uint8Array(signature))}`;
 }
 
 /**

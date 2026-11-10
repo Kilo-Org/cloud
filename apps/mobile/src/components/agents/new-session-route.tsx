@@ -7,12 +7,15 @@ import { useNewSessionOrganization } from '@/components/agents/use-new-session-o
 import { ScreenHeader } from '@/components/screen-header';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOrganization } from '@/lib/organization-context';
+import { cn } from '@/lib/utils';
 
 /**
  * The New-session composer with the caller's organization context. Rendered by
- * the `agent-chat/new` route and by the session-detail route when its
- * `session-id` param cannot be a session id.
+ * the `agent-chat/new` route, which is the only screen that opens the composer:
+ * a session id the store does not own shows the session route's permanent
+ * not-found state instead of swapping the person's screen for this form.
  */
 export function NewSessionRoute() {
   const { t } = useTranslation();
@@ -41,7 +44,10 @@ export function NewSessionRoute() {
                 accessibilityRole="button"
                 accessibilityLabel={t('common.retry')}
                 onPress={retry}
-                className="min-h-11 flex-row items-center justify-center active:opacity-70"
+                className={cn(
+                  STATE_ACTION_CLASS,
+                  'flex-row items-center justify-center active:opacity-70'
+                )}
               >
                 <Text className="text-sm text-primary">{t('common.retry')}</Text>
               </Pressable>

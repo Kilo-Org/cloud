@@ -9,9 +9,9 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+import { HEADER_BACK_GUARD_MS } from '@/lib/hooks/header-back';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
-import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
 import { OfflineBannerSpaceProvider } from './offline-banner-space';
 
@@ -25,6 +25,27 @@ const routerState = vi.hoisted(() => ({
   canGoBack: vi.fn(() => true),
 }));
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+// The container ref the header subscribes to for navigation commits. The suite
+// fires its `state` listeners by hand to reproduce a commit that lands after
+// the header's first render (a restored stack completing).
+const navigationContainer = vi.hoisted(() => {
+  const stateListeners = new Set<() => void>();
+  return {
+    addListener: (event: string, listener: () => void) => {
+      if (event === 'state') {
+        stateListeners.add(listener);
+      }
+      return () => {
+        stateListeners.delete(listener);
+      };
+    },
+    emitState() {
+      for (const listener of stateListeners) {
+        listener();
+      }
+    },
+  };
+});
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
 /** A normal phone window: wide enough for the title and its actions to share a row. */
@@ -32,6 +53,8 @@ const layout = vi.hoisted(() => ({ width: 390, fontScale: 1 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => routerState,
+  // The header re-reads `canGoBack` on this container's `state` events.
+  useNavigationContainerRef: () => navigationContainer,
 }));
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
@@ -67,6 +90,20 @@ function isBackPressable(node: TestInstance): boolean {
 
 function findBackPressable(root: TestInstance): TestInstance {
   return root.find(node => isBackPressable(node));
+}
+
+/**
+ * The circle that clips the back target's press and focus surface. Android
+ * paints that surface across the whole target, so the clipping frame — not the
+ * `Pressable` — is what keeps it from reading as a bare square at the screen
+ * edge.
+ */
+function findBackFrame(root: TestInstance): TestInstance {
+  const frame = findBackPressable(root).parent;
+  if (!frame || String(frame.type) !== 'View') {
+    throw new Error('back control frame not found');
+  }
+  return frame;
 }
 
 function backPressableCount(root: TestInstance): number {
@@ -187,7 +224,7 @@ function findHeaderRight(root: TestInstance): TestInstance {
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
       typeof node.props.className === 'string' &&
-      /(^|\s)-?m[slre]-[0-9]/.test(node.props.className)
+      /(^|\s)ms-3(\s|$)/.test(node.props.className)
   )[0];
   if (!headerRight) {
     throw new Error('headerRight view not found');
@@ -253,11 +290,57 @@ describe('ScreenHeader mounted', () => {
 
     const back = findBackPressable(renderer.root);
     expect(back.props.className).toContain(ICON_TARGET_BOX_CLASS);
-    expect(back.props.className).toContain('-ms-4');
-    expect(back.props.className).toContain('shrink-0');
     expect(back.props.className).toContain('active:opacity-70');
     expect(back.props.className).not.toContain('mr-1');
     expect(back.props.hitSlop).toBeUndefined();
+    expect(findBackFrame(renderer.root).props.className).toContain('shrink-0');
+    expect(findBackFrame(renderer.root).props.className).toContain('-ms-4');
+  });
+
+  it('clips the back control to a circle instead of letting the platform surface fill its box', () => {
+    // Android draws the press and focus surface across the target's whole rect,
+    // so a bare 48dp target pulled flush against the screen edge read as a hard
+    // gray square taller than the title row. The frame rounds that surface; the
+    // target keeps its rect, focusability and label.
+    const renderer = renderHeader({ title: 'Sessions' });
+
+    const frame = findBackFrame(renderer.root);
+    expect(frame.props.className).toContain('rounded-full');
+    expect(frame.props.className).toContain('overflow-hidden');
+    const back = findBackPressable(renderer.root);
+    expect(String(back.props.className)).not.toContain('overflow-hidden');
+    expect(back.props.accessibilityRole).toBe('button');
+  });
+
+  it('dispatches one back for a burst of presses on the same header', () => {
+    // One gesture owns the header's Back: four presses delivered inside the
+    // window have to pop one screen, not four. The window is per header, so the
+    // screen a dispatched back lands on starts a fresh one.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      routerState.routes = ['tabs', 'security-agent', 'security-agent-settings'];
+      const renderer = renderHeader({ title: 'Settings' });
+
+      const back = findBackPressable(renderer.root);
+      for (let press = 0; press < 4; press += 1) {
+        act(() => {
+          (back.props.onPress as () => void)();
+        });
+      }
+      expect(routerState.back).toHaveBeenCalledTimes(1);
+      expect(routerState.routes).toEqual(['tabs', 'security-agent']);
+
+      // A deliberate press after the window still walks the stack.
+      vi.setSystemTime(new Date(Date.now() + HEADER_BACK_GUARD_MS));
+      act(() => {
+        (back.props.onPress as () => void)();
+      });
+      expect(routerState.back).toHaveBeenCalledTimes(2);
+      expect(routerState.routes).toEqual(['tabs']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('pulls the leading controls with a logical start margin the RTL swap cannot mirror', async () => {
@@ -270,10 +353,10 @@ describe('ScreenHeader mounted', () => {
     // points under the 44-point back target and the title's box covered 0.27 of
     // it — the "two controls cover each other" finding (the scan reports above
     // 0.25). `-ms-4` keeps a real 4-point `gap-1` between the two controls in
-    // both writing directions.
-    const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('-ms-4');
-    expect(await compiledMarginProperties(back.props.className as string)).toEqual([
+    // both writing directions. It rides on the frame, which is the row's child.
+    const frame = findBackFrame(renderer.root);
+    expect(frame.props.className).toContain('-ms-4');
+    expect(await compiledMarginProperties(frame.props.className as string)).toEqual([
       'marginInlineStart',
     ]);
 
@@ -437,22 +520,25 @@ describe('ScreenHeader mounted', () => {
     expect(findInlineActionsWrapper(uncapped.root).props.className).not.toContain('max-w-[50%]');
   });
 
-  it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
+  it('keeps the title touch area out of the row gap beside it', () => {
+    // The heading's free side is the gap to the trailing slot, and a trailing
+    // control can carry a slop that reaches into that gap. A title slop there
+    // made the same strip two tap targets: measured on the session screen at
+    // 10.33 dp across, in every state and every gate cell.
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
     const title = findTitlePressable(renderer.root);
-    expect(title.props.hitSlop).toEqual({ top: 13, right: 13, bottom: 13, left: 0 });
+    expect(title.props.hitSlop).toEqual({ top: 13, bottom: 13 });
   });
 
-  it('mirrors the title hit slop onto the free side in RTL', () => {
-    // RN does not mirror hitSlop under RTL: an unchanged physical right slop
-    // reaches across the visually mirrored back control and the title (the
-    // later sibling) wins those taps, so Back opens the title action instead.
+  it('keeps the title touch area identical in both directions', () => {
+    // RN does not mirror hitSlop under RTL. With no side slop there is nothing
+    // to mirror, so Back and the trailing cluster keep their own taps alike.
     i18nManager.isRTL = true;
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
     const title = findTitlePressable(renderer.root);
-    expect(title.props.hitSlop).toEqual({ top: 13, right: 0, bottom: 13, left: 13 });
+    expect(title.props.hitSlop).toEqual({ top: 13, bottom: 13 });
   });
 
   it('gives the interactive title at least a 44-point reachable target', () => {
@@ -608,6 +694,39 @@ describe('ScreenHeader mounted', () => {
     expect(backPressableCount(explicitlyHidden.root)).toBe(0);
   });
 
+  it('keeps the back control reachable from its fallback while the stack is unsettled', () => {
+    // A restored screen renders before its stack holds the parent, so the only
+    // thing that can answer Back is the declared fallback: the control must
+    // paint from that first render, not wait for the navigation commit.
+    routerState.canGoBack.mockReturnValue(false);
+    const renderer = renderHeader({ title: 'Code Reviewer', backFallback: AGENTS_SESSIONS_HREF });
+    expect(backPressableCount(renderer.root)).toBe(1);
+
+    act(() => {
+      (findBackPressable(renderer.root).props.onPress as () => void)();
+    });
+    expect(routerState.dismissTo).toHaveBeenLastCalledWith(AGENTS_SESSIONS_HREF);
+    expect(routerState.back).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('shows the back control when a later navigation commit supplies the history', () => {
+    // The relaunch restore renders its screen before the navigator tree above
+    // it holds the parents, so the first read is false; the header must not
+    // stay headerless once the stack completes.
+    routerState.canGoBack.mockReturnValue(false);
+    const renderer = renderHeader({ title: 'Review style' });
+    expect(backPressableCount(renderer.root)).toBe(0);
+
+    routerState.canGoBack.mockReturnValue(true);
+    act(() => {
+      navigationContainer.emitState();
+    });
+
+    expect(backPressableCount(renderer.root)).toBe(1);
+    renderer.unmount();
+  });
+
   it('keeps the back bar and target classes when title is absent', () => {
     const renderer = renderHeader({});
 
@@ -642,7 +761,6 @@ describe('ScreenHeader mounted', () => {
 
     for (const props of variants) {
       const renderer = renderHeader(props);
-      const back = findBackPressable(renderer.root);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       // The cap is clamped to the three lines the reserved box covers, so a
       // title can never paint a line the reserve does not hold. The default
@@ -651,43 +769,63 @@ describe('ScreenHeader mounted', () => {
       expect(title.props.numberOfLines).toBe(cappedLines);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
-      if (props.reserveTitleSpace) {
-        const large = props.size === 'large';
-        let reserveClass = large ? 'min-h-[72px]' : 'min-h-14';
-        if (cappedLines > 2) {
-          reserveClass = large ? 'min-h-[108px]' : 'min-h-21';
-        } else if (cappedLines === 1) {
-          reserveClass = large ? 'min-h-[36px]' : 'min-h-7';
-        }
-        expect(title.parent?.props.className).toContain(reserveClass);
-        expect(title.parent?.props.className).toContain('justify-start');
-      }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');
         // The centered title shares one row with the leading control, so the
         // control lines up with the title instead of drawing on its own row.
-        expect(title.parent?.parent?.parent).toBe(back.parent);
+        expect(title.parent?.parent?.parent).toBe(findBackFrame(renderer.root).parent);
       }
     }
   });
 
-  it('gives the session header three title lines so a real session name is not cut mid-word', () => {
-    // 15-session-working: the session header's primary heading was capped at
-    // two lines, so a name like "Tax export formatter test" truncated mid-word
-    // beside the back control and the metrics/copy cluster on a narrow window.
+  it('reserves the title cap in a band beside the heading, not around the title', () => {
     const renderer = renderHeader({
-      title: 'Tax export formatter test',
-      titleNumberOfLines: SESSION_HEADER_TITLE_LINES,
+      title: 'Harbor Analytics',
+      eyebrow: 'RECENT REVIEWS',
+      titleNumberOfLines: 2,
       reserveTitleSpace: true,
-      headerRight: 'METRICS',
     });
 
+    const band = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        String(node.props.className ?? '')
+          .split(' ')
+          .includes('w-0')
+    );
+    // The band holds one eyebrow line and the title's two-line cap, so the row
+    // keeps its height for a title that paints one line: the body below never
+    // moves when the name arrives and wraps.
+    expect(band.findAll(node => String(node.type) === 'Eyebrow')).toHaveLength(1);
+    const capBox = band.findAll(
+      node => typeof node.type === 'string' && String(node.props.className ?? '').includes('min-h')
+    );
+    expect(capBox.map(node => node.props.className)).toEqual(['min-h-14']);
+    // The band is clipped to no width, so it holds height only: it never takes
+    // space from the heading or paints beside the title.
+    expect(String(band.props.className)).toContain('w-0');
+
+    // The visible title keeps its own height, so the eyebrow sits right above
+    // it instead of above the empty line the cap reserves.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
-    // The reserved box holds the same three lines (3 x the `text-lg` 1.75rem
-    // line height), so the rendered title cannot move the body below it.
-    expect(title.parent?.props.className).toContain('min-h-21');
-    expect(title.parent?.props.className).toContain('justify-start');
+    expect(title.parent?.props.className).toBe('min-w-0 flex-1');
+    renderer.unmount();
+  });
+
+  it('reserves no band on a header whose title has a single fixed line', () => {
+    const renderer = renderHeader({
+      title: 'Personal',
+      eyebrow: 'RECENT REVIEWS',
+      titleNumberOfLines: 1,
+    });
+
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' && String(node.props.className ?? '').startsWith('w-0')
+      )
+    ).toHaveLength(0);
+    renderer.unmount();
   });
 
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {
@@ -700,9 +838,8 @@ describe('ScreenHeader mounted', () => {
       safeAreaTop: false,
       className: 'pt-3',
     });
-    const back = findBackPressable(renderer.root);
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(back.parent);
+    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
   });
@@ -710,8 +847,7 @@ describe('ScreenHeader mounted', () => {
   it('keeps the modal close control on the centered title row with a mirroring spacer', () => {
     const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
 
-    const back = findBackPressable(renderer.root);
-    const row = back.parent;
+    const row = findBackFrame(renderer.root).parent;
     if (!row || typeof row.props.className !== 'string') {
       throw new Error('back control row not found');
     }
@@ -720,7 +856,7 @@ describe('ScreenHeader mounted', () => {
 
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
     expect(title.props.className).toContain('text-center');
-    expect(title.parent?.parent?.parent).toBe(back.parent);
+    expect(title.parent?.parent?.parent).toBe(row);
 
     const spacer = row.find(
       node =>
@@ -802,6 +938,121 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
+  it('renders the subtitle under the title on one muted line', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      subtitle: 'Shared Agency Review Profile',
+    });
+
+    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    const texts = heading.findAllByType('Text');
+    expect(texts[0]?.children).toEqual(['Profile agents']);
+    const subtitle = texts[1];
+    expect(subtitle?.children).toEqual(['Shared Agency Review Profile']);
+    // Context under the title, never a second title: one line, tail ellipsis,
+    // and the muted body style with no uppercase or tracking of its own.
+    expect(subtitle?.props.variant).toBe('muted');
+    expect(subtitle?.props.numberOfLines).toBe(1);
+    expect(subtitle?.props.ellipsizeMode).toBe('tail');
+    expect(subtitle?.props.className).not.toContain('uppercase');
+    expect(subtitle?.props.className).not.toContain('tracking');
+    expect(subtitle?.props.accessible).toBe(true);
+    renderer.unmount();
+  });
+
+  it('keeps a reserved subtitle line hidden until its name arrives', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      reserveSubtitle: true,
+      centerTitle: true,
+    });
+
+    const placeholder = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    )[0];
+    expect(placeholder?.props.numberOfLines).toBe(1);
+    expect(placeholder?.children).toEqual(['\u00A0']);
+    expect(placeholder?.props.className).toContain('opacity-0');
+    expect(placeholder?.props.accessible).toBe(false);
+    expect(placeholder?.props.accessibilityElementsHidden).toBe(true);
+    expect(placeholder?.props.importantForAccessibility).toBe('no-hide-descendants');
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: 'Profile agents',
+          reserveSubtitle: true,
+          centerTitle: true,
+          subtitle: 'Shared Agency Review Profile',
+        })
+      );
+    });
+    const name = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    )[0];
+    expect(name?.children).toEqual(['Shared Agency Review Profile']);
+    expect(name?.props.className).not.toContain('opacity-0');
+    expect(name?.props.className).toContain('text-center');
+    renderer.unmount();
+  });
+
+  it('paints a placeholder on the reserved subtitle line while the name loads', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      reserveSubtitle: true,
+      subtitlePlaceholder: createElement('PlaceholderBar'),
+    });
+
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'PlaceholderBar'
+      )
+    ).toHaveLength(1);
+    // The placeholder is painted over the reserved line, which still holds the
+    // height the name will take, so the placeholder and the name lay out the same.
+    const reserved = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    );
+    expect(reserved).toHaveLength(1);
+    expect(reserved[0]?.children).toEqual(['\u00A0']);
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: 'Profile agents',
+          subtitle: 'Shared Agency Review Profile',
+        })
+      );
+    });
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'PlaceholderBar'
+      )
+    ).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('omits the subtitle line when the caller reserves no space for it', () => {
+    const renderer = renderHeader({ title: 'Profile agents' });
+    const subtitles = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    );
+    expect(subtitles).toHaveLength(0);
+    renderer.unmount();
+  });
+
   it('pads the sheet header by the landscape side insets even when it skips the safe-area top', () => {
     safeArea.left = 47;
     safeArea.right = 59;
@@ -842,7 +1093,7 @@ describe('ScreenHeader mounted', () => {
       paddingLeft: 47,
       paddingRight: 59,
     });
-    expect(findBackPressable(renderer.root).props.className).toContain('-ms-4');
+    expect(findBackFrame(renderer.root).props.className).toContain('-ms-4');
   });
 
   it('keeps the container style a portrait no-op with zero side insets', () => {
@@ -992,7 +1243,7 @@ describe('header actions row', () => {
     ).toHaveLength(0);
     // The title still shares its row with the back control; only the actions moved.
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackPressable(renderer.root).parent);
+    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
   });
 
   it('reflows a centered modal header the same way', () => {
@@ -1002,7 +1253,7 @@ describe('header actions row', () => {
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent?.parent).toBe(findBackPressable(renderer.root).parent);
+    expect(title.parent?.parent?.parent).toBe(findBackFrame(renderer.root).parent);
   });
 
   it('leaves a header without actions on its single row', () => {

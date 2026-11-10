@@ -130,11 +130,12 @@ vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
+  Plus: 'Plus',
 }));
 vi.mock('@/lib/a11y/announce', () => ({ requestA11yFocus: vi.fn() }));
 vi.mock('@/lib/hooks/use-session-mutations', () => ({ useSessionMutations: () => controls }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#999999' }),
+  useThemeColors: () => ({ mutedForeground: '#999999', primaryForeground: '#FFFFFF' }),
 }));
 vi.mock('@/lib/session-attention', () => ({ getRevisionSnapshot: () => 17 }));
 
@@ -151,9 +152,13 @@ function session(id: string): StoredSession {
     git_branch: null,
     status: null,
     status_updated_at: null,
+    latest_run_status: null,
+    latest_run_failure_kind: null,
+    latest_run_terminal_at: null,
     total_cost_microdollars: null,
     created_at: '2026-08-28T10:00:00.000Z',
     updated_at: '2026-08-28T11:55:00.000Z',
+    last_activity_at: null,
     version: 0,
     associatedPr: null,
   };
@@ -170,6 +175,8 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     isError: false,
     hasFreshHistory: true,
     isFetchingNextPage: false,
+    isFetchNextPageError: false,
+    onRetryNextPage: () => undefined,
     refetch: vi.fn<ContentProps['refetch']>().mockResolvedValue(undefined),
     onRetry: () => undefined,
     onEndReached: () => undefined,
@@ -691,27 +698,6 @@ describe('AgentSessionListContent liveness', () => {
     }
   );
 
-  it('reserves the clearance between the refresh band and the rows', () => {
-    // The band is in flow above the list, so the container's `gap-2` is the
-    // only clearance between them: without it the list's top edge sits flush
-    // on the band and a row resting across that edge is cut mid-text directly
-    // under "Couldn't refresh" (device defect p5). The clearance matches the
-    // live surface's `mx-4 gap-2` band-to-list gap.
-    const renderer = mount(
-      contentProps({
-        isError: true,
-        sections: [{ title: 'Today', data: [session('cached')] }],
-      })
-    );
-    const surface = hosts(renderer, 'AnimatedView').find(
-      node => (node.props as { className?: string }).className === 'flex-1 gap-2'
-    );
-    expect(surface).toBeDefined();
-    // The band and the list are both children of that surface.
-    expect(surface?.findAll(node => isHost(node, 'AccessibleStatus'))).toHaveLength(1);
-    expect(surface?.findAll(node => isHost(node, 'FlashList'))).toHaveLength(1);
-  });
-
   it.each([
     { hasAnySessions: false },
     { hasAnySessions: false, isError: true },
@@ -789,8 +775,9 @@ describe('AgentSessionListContent liveness', () => {
       platform: 'ios',
       fontScale: 1,
     });
-    // Only the bottom tab-bar clearance stays on the content container.
-    expect(contentStyle()).toEqual({ paddingBottom: tabClearance });
+    // The content container carries the status band's top padding and the
+    // bottom tab-bar clearance; the side insets stay off it.
+    expect(contentStyle()).toEqual({ paddingTop: 20, paddingBottom: tabClearance });
 
     // The landscape side insets live on the wrapper around the list.
     expect(wrapperStyle()).toEqual({ paddingLeft: 0, paddingRight: 0 });
@@ -801,7 +788,7 @@ describe('AgentSessionListContent liveness', () => {
     act(() => {
       renderer.update(createElement(AgentSessionListContent, contentProps({ sections })));
     });
-    expect(contentStyle()).toEqual({ paddingBottom: tabClearance });
+    expect(contentStyle()).toEqual({ paddingTop: 20, paddingBottom: tabClearance });
     expect(wrapperStyle()).toEqual({ paddingLeft: 47, paddingRight: 59 });
   });
 
@@ -853,5 +840,81 @@ describe('AgentSessionListContent liveness', () => {
     expect(start.props.loading).toBeUndefined();
     press(start);
     expect(onCreateSession).toHaveBeenCalledOnce();
+  });
+});
+
+describe('AgentSessionListContent next-page footer', () => {
+  const page = [{ title: 'Today', data: [session('a'), session('b')] }];
+
+  it('keeps the loaded rows and offers a retry when the next page failed', () => {
+    const onRetryNextPage = vi.fn<() => void>();
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isFetchNextPageError: true,
+        onRetryNextPage,
+      })
+    );
+    // The rows the list already loaded stay: a failed older page must never
+    // replace the history the reader can see.
+    expect(rows(renderer).map(row => row.id)).toEqual(['a', 'b']);
+    const retry = hosts(renderer, 'Button')[0];
+    if (!retry) {
+      throw new Error('the failed next page rendered no retry');
+    }
+    expect(retry.props.accessibilityLabel).toBe(i18n.t('common.retry'));
+    press(retry);
+    expect(onRetryNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('shows the retry line without a spinner while the failed page stands', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isFetchNextPageError: true,
+        onRetryNextPage: () => undefined,
+      })
+    );
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('common.couldnTLoadMore')
+    );
+  });
+
+  it('shows only the spinner while the next page loads', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isFetchingNextPage: true,
+      })
+    );
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('common.couldnTLoadMore')
+    );
+  });
+
+  it('renders no footer once the next page fails and the list recovers', () => {
+    const renderer = mount(
+      contentProps({
+        sections: page,
+        isFetchNextPageError: true,
+        onRetryNextPage: () => undefined,
+      })
+    );
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('common.couldnTLoadMore')
+    );
+    act(() => {
+      renderer.update(
+        createElement(AgentSessionListContent, {
+          ...contentProps({ sections: page }),
+        })
+      );
+    });
+    expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('common.couldnTLoadMore')
+    );
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
   });
 });

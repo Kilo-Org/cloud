@@ -49,8 +49,6 @@ const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE: PageSize = 25;
 const PLATFORM_COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#0891b2', '#475569'];
 
-// --- Chart Components ---
-
 type SimpleTooltipProps = {
   active?: boolean;
   payload?: Array<{ value: number }>;
@@ -356,8 +354,6 @@ function DailyUsageChart() {
   );
 }
 
-// --- Pagination ---
-
 function RequestsPagination({
   pagination,
   onPageChange,
@@ -436,8 +432,6 @@ function RequestsPagination({
     </div>
   );
 }
-
-// --- Requests Table ---
 
 function RequestsTable({
   page,
@@ -550,8 +544,6 @@ function RequestsTable({
     </Card>
   );
 }
-
-// --- Main Content ---
 
 export function BotRequestsContent() {
   const [page, setPage] = useState(DEFAULT_PAGE);

@@ -79,16 +79,13 @@ async function loadActiveRows(): Promise<Row[]> {
     .where(eq(modelStats.isActive, true));
 }
 
-function createTerminalBenchFetch(load = loadTerminalBench) {
-  return createCachedFetch(
-    () =>
-      load().catch(err => {
-        console.error('[terminal-bench] Failed to load model summaries:', err);
-        throw err;
-      }),
-    TTL,
-    new Map<string, TerminalBenchSummary>()
-  );
-}
-
-export const getTerminalBenchSummaries = createTerminalBenchFetch();
+export const getTerminalBenchSummaries = createCachedFetch(
+  () =>
+    loadTerminalBench().catch(err => {
+      console.error('[terminal-bench] Failed to load model summaries:', err);
+      throw err;
+    }),
+  TTL,
+  new Map<string, TerminalBenchSummary>(),
+  { name: 'terminalBenchSummaries' }
+);

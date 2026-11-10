@@ -17,6 +17,14 @@ import {
 // navigator's initial screen with none. So the accepted pair is also published
 // to the screens below through the provider, and they read it instead of their
 // own params.
+export const unstable_settings = {
+  // Keeps the platform overview beneath every `(edit)` route when a navigation
+  // reaches one directly (`withAnchor`, e.g. the relaunch restore or a deep
+  // link). Without it the restored edit screen is the stack's only route, so
+  // Back leaves the reviewer instead of returning to the overview.
+  anchor: 'index',
+};
+
 export default function CodeReviewerPlatformLayout() {
   const params = useValidatedReviewerRouteParams();
 

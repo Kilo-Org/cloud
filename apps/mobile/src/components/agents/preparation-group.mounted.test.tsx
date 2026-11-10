@@ -78,6 +78,44 @@ function textValues(root: TestRenderer.ReactTestInstance): unknown[] {
     .map(node => node.props.children);
 }
 
+describe('PreparationGroup command failures', () => {
+  it('names a start command by its command text, not the setup-command wording', async () => {
+    const phase = phaseStep({
+      id: 'start',
+      key: 'start_commands',
+      label: 'start commands',
+      status: 'completed',
+    });
+    const command = phaseStep({
+      id: 'start-command',
+      key: 'start_commands',
+      kind: 'setup_command',
+      label: 'Start command 1',
+      command: 'pnpm dev:start',
+      commandIndex: 0,
+      parentStepId: 'start',
+      status: 'failed',
+      exitCode: 1,
+      safeError: 'Start command 1 failed',
+    });
+    const renderer = await mountGroup({
+      ...attemptWithStep(phase),
+      status: 'completed',
+      completedAt: 13_400,
+      steps: [phase, command],
+    });
+
+    const texts = textValues(renderer.root);
+    expect(texts).toContain('pnpm dev:start');
+    expect(texts).not.toContain('Setup command 1');
+    expect(texts).toContain('Exit code: 1');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
 describe('PreparationGroup phase label', () => {
   it('renders the catalog name for the phase key, not the server label', async () => {
     const renderer = await mountGroup(attemptWithStep(phaseStep()));
@@ -182,18 +220,21 @@ async function mount(candidate: PreparationAttempt) {
 }
 
 describe('PreparationGroup incomplete restore', () => {
-  it('shows the incomplete step text and icon instead of the green completion', async () => {
+  it('shows the restore status and warning icon instead of the green completion', async () => {
     const mounted = await mount(INCOMPLETE_ATTEMPT);
-    expect(mounted.group().props.accessibilityLabel).toBe(INCOMPLETE_TEXT);
+    expect(mounted.group().props.accessibilityLabel).toBe('Session restore incomplete');
     expect(mounted.group().findAllByType('Check')).toHaveLength(0);
     expect(mounted.group().findAllByType('AlertCircle')).toHaveLength(1);
     mounted.unmount();
   });
 
-  it('expands the completed incomplete attempt so the detail is visible without a tap', async () => {
+  it('keeps the report out of the one-line header and in the expanded body', async () => {
     const mounted = await mount(INCOMPLETE_ATTEMPT);
     expect(mounted.group().props.accessibilityState).toEqual({ expanded: true });
-    expect(mounted.renderedTextValues()).toContain(INCOMPLETE_TEXT);
+    expect(mounted.renderedTextValues()).toContain(
+      '2 of 5 files were not restored (the patch did not apply). Missing: a.ts, b.ts'
+    );
+    expect(mounted.renderedTextValues()).not.toContain(INCOMPLETE_TEXT);
     expect(mounted.renderedTextValues()).not.toContain('Preparation complete');
     mounted.unmount();
   });
@@ -208,20 +249,37 @@ describe('PreparationGroup incomplete restore', () => {
     mounted.unmount();
   });
 
-  it('keeps the running and failed titles and icons', async () => {
+  it('keeps the running title while the attempt prepares', async () => {
     const running = await mount(restoreAttempt({ status: 'running' }));
     expect(running.group().props.accessibilityLabel).toBe('Preparing environment');
     expect(running.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
     running.unmount();
+  });
 
-    const failed = await mount(
-      restoreAttempt({ status: 'failed', safeError: 'preparation_timeout' })
+  it('gives a step that carries an error the warning icon rather than a status check', async () => {
+    const mounted = await mount(
+      restoreAttempt({
+        status: 'failed',
+        steps: [
+          incompleteStep({ id: 'done', key: 'workspace_setup', status: 'completed' }),
+          incompleteStep({
+            id: 'lost',
+            key: 'sandbox_boot',
+            status: 'completed',
+            safeError: 'sandbox_lost',
+          }),
+        ],
+      })
     );
-    expect(failed.group().props.accessibilityLabel).toBe('Preparation failed');
-    expect(failed.renderer.root.findAllByType('Check')).toHaveLength(0);
-    expect(failed.renderedTextValues()).toContain('Environment preparation timed out');
-    expect(failed.renderedTextValues()).not.toContain('preparation_timeout');
-    failed.unmount();
+    const row = (label: string) =>
+      mounted.renderer.root.findAll(
+        node => (node.type as string) === 'Pressable' && node.props.accessibilityLabel === label
+      )[0];
+    expect(row('Workspace setup')?.findAllByType('Check')).toHaveLength(1);
+    expect(row('Workspace setup')?.findAllByType('AlertCircle')).toHaveLength(0);
+    expect(row('Starting sandbox')?.findAllByType('AlertCircle')).toHaveLength(1);
+    expect(row('Starting sandbox')?.findAllByType('Check')).toHaveLength(0);
+    mounted.unmount();
   });
 
   it('lets a terminal failure outrank the incomplete step', async () => {
@@ -250,7 +308,7 @@ describe('PreparationGroup incomplete restore', () => {
     );
     expect(mounted.group().props.accessibilityState).toEqual({ expanded: false });
     mounted.update(INCOMPLETE_ATTEMPT);
-    expect(mounted.group().props.accessibilityLabel).toBe(INCOMPLETE_TEXT);
+    expect(mounted.group().props.accessibilityLabel).toBe('Session restore incomplete');
     expect(mounted.group().props.accessibilityState).toEqual({ expanded: true });
     mounted.unmount();
   });

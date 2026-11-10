@@ -1,10 +1,10 @@
 import { AccessibilityInfo, Alert, Linking, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { impactHaptic } from '@/lib/haptics';
 
 import {
   type VoiceInputControllerSnapshot,
@@ -21,6 +21,7 @@ import {
   voiceInputLanguageDisplayName,
 } from './voice-input-language';
 import {
+  classifyVoiceInputError,
   shouldAbortVoiceInput,
   type VoiceInputFeedback,
   type VoiceInputLifecycleInput,
@@ -34,6 +35,7 @@ import { isGatewayTranscriptionEnabled } from './gateway/gateway-transcription-p
 type VoiceInputControllerLike = {
   abort: (owner?: string) => Promise<boolean>;
   getSnapshot: () => VoiceInputControllerSnapshot;
+  refreshAvailability: () => void;
   start: (options: VoiceInputStartOptions) => Promise<boolean>;
   stop: (owner: string) => Promise<boolean>;
   subscribe: (listener: (snapshot: VoiceInputControllerSnapshot) => void) => () => void;
@@ -54,18 +56,27 @@ type VoiceInputActionsConfig = {
   getOnDraftChange: () => (draft: string) => void;
   getOwner: () => string;
   getUserId: () => string | undefined;
+  openTranscriptionModelPicker: () => void;
 };
 
-async function fireHaptic(style: Haptics.ImpactFeedbackStyle): Promise<void> {
-  try {
-    await Haptics.impactAsync(style);
-  } catch {
-    // Haptic feedback is best-effort; never surface failures to the user.
-  }
-}
+/**
+ * Navigation the feedback alert needs, supplied by the surface that owns the
+ * voice input.
+ *
+ * An alert outlives the render that raised it, so its action button must not
+ * reach for the module-level `router` from `expo-router`. That object is a
+ * shell that the navigation container rebinds when it mounts and unbinds to a
+ * throwing stub when it unmounts, so a press after an Activity recreation can
+ * throw while the bridge is between roots. A router taken from `useRouter()`
+ * instead belongs to the root that rendered this surface, so a press from a
+ * surface that is gone writes into that gone root and opens nothing.
+ */
+type VoiceInputFeedbackNavigation = {
+  openTranscriptionModelPicker: () => void;
+};
 
 function announceVoiceInputListening(): void {
-  void fireHaptic(Haptics.ImpactFeedbackStyle.Light);
+  impactHaptic(Haptics.ImpactFeedbackStyle.Light);
   AccessibilityInfo.announceForAccessibility(i18n.t('voiceInput.listening'));
 }
 
@@ -119,7 +130,10 @@ export function subscribeVoiceInputFeedback(
   };
 }
 
-export function showFeedback(feedback: VoiceInputFeedback): void {
+export function showFeedback(
+  feedback: VoiceInputFeedback,
+  navigation: VoiceInputFeedbackNavigation
+): void {
   publishVoiceInputFeedback(feedback);
   const presentation = resolveVoiceInputFeedbackPresentation(feedback);
   if (presentation.kind === 'alert') {
@@ -133,9 +147,7 @@ export function showFeedback(feedback: VoiceInputFeedback): void {
           { text: i18n.t('common.cancel'), style: 'cancel' },
           {
             text: presentation.actionLabel,
-            onPress: () => {
-              router.push('/(app)/transcription-model-picker');
-            },
+            onPress: navigation.openTranscriptionModelPicker,
           },
         ],
         // Android back dismisses, which equals Cancel: nothing opens.
@@ -178,7 +190,12 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     getOnDraftChange,
     getOwner,
     getUserId,
+    openTranscriptionModelPicker,
   } = config;
+
+  // One navigation channel for every message this owner raises, so an alert's
+  // action button and the engine's own feedback reach the same root.
+  const feedbackNavigation: VoiceInputFeedbackNavigation = { openTranscriptionModelPicker };
 
   const abort = async (): Promise<boolean> => {
     const result = await controller.abort(getOwner());
@@ -195,6 +212,13 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     if (getDisabled()) {
       return;
     }
+    // The recognizer's availability is a live OS answer, not a constant: on iOS
+    // `SFSpeechRecognizer.isAvailable` goes false while the service is busy and
+    // on Android the platform answer goes false when no recognition service is
+    // bound. Every tap re-reads it, so a stale verdict taken when this surface
+    // was built can neither hide a working microphone nor send the user into the
+    // consent disclosure for a recognizer that cannot start.
+    controller.refreshAvailability();
     const owner = getOwner();
     const snapshot = controller.getSnapshot();
     const view = resolveOwnerVoiceInputView(snapshot, owner);
@@ -206,12 +230,20 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     }
 
     if (view.isActive && snapshot.status === 'listening') {
-      void fireHaptic(Haptics.ImpactFeedbackStyle.Medium);
+      impactHaptic(Haptics.ImpactFeedbackStyle.Medium);
       await controller.stop(owner);
       return;
     }
 
     if (view.isActive) {
+      return;
+    }
+
+    if (!view.available) {
+      // The microphone stays in place while the recognizer is unavailable, so
+      // the tap is the one place the reason can be given: say what is wrong
+      // instead of raising a consent question a start could not honour.
+      showFeedback(classifyVoiceInputError('service-not-allowed'), feedbackNavigation);
       return;
     }
 
@@ -231,7 +263,9 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
         baseDraft: getDraft(),
         languageTag,
         onDraftChange: getOnDraftChange(),
-        onFeedback: showFeedback,
+        onFeedback: feedback => {
+          showFeedback(feedback, feedbackNavigation);
+        },
         owner,
         requiresOnDeviceRecognition,
       };
@@ -252,6 +286,43 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     const supportsOnDeviceByService = controller.supportsOnDevice();
     const userId = getUserId();
     const consent = userId ? await readVoiceNetworkConsent(userId) : 'unset';
+    // One disclosure serves both unanswered and previously declined consent:
+    // the microphone is where the answer can change, so a declined record
+    // must not turn the button into a dead end. Allow stores the grant and
+    // starts network recognition; Not now keeps the refusal and starts
+    // nothing.
+    const raiseOnlineConsentDisclosure = (): void => {
+      Alert.alert(
+        i18n.t('voiceInput.onlineTitle'),
+        i18n.t('voiceInput.onlineMessage', {
+          provider: Platform.OS === 'ios' ? 'Apple' : 'Google',
+        }),
+        [
+          {
+            text: i18n.t('common.notNow'),
+            style: 'cancel',
+            onPress: () => {
+              if (userId) {
+                void writeVoiceNetworkConsent(userId, 'declined');
+              }
+            },
+          },
+          {
+            text: i18n.t('voiceInput.allow'),
+            onPress: () => {
+              void (async () => {
+                if (userId) {
+                  await writeVoiceNetworkConsent(userId, 'granted');
+                }
+                await startWith(false);
+              })();
+            },
+          },
+        ],
+        // Android back dismisses without recording a consent answer.
+        { cancelable: true }
+      );
+    };
     // The service-level check alone is not enough: on-device recognition also
     // needs the offline model for the resolved language. `requiresOnDeviceRecognition`
     // without it fails on every attempt (`language-not-supported`) — that is
@@ -270,93 +341,64 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       return;
     }
     // mode === 'blocked'
-    if (consent === 'declined') {
-      if (supportsOnDeviceByService) {
-        // The device can recognize on-device, but the offline model for the
-        // resolved language is missing. Say what is wrong and offer the
-        // download instead of a bare error; the user declined network
-        // transcription, so do not re-raise that disclosure. Only a service
-        // that distinguishes supported from installed locales reaches this
-        // branch, and on iOS every supported locale reports as installed, so
-        // Android is the only platform that gets here in practice; the
-        // remediation below triggers the Android-only
-        // `androidTriggerOfflineModelDownload`, and if a service without that
-        // capability ever reports a missing model, the download tap degrades
-        // through the catch to the same actionable toast.
-        const languageName = voiceInputLanguageDisplayName(languageTag);
-        Alert.alert(
-          i18n.t('voiceInput.languageNotInstalledTitle', { language: languageName }),
-          i18n.t('voiceInput.languageNotInstalledMessage', { language: languageName }),
-          [
-            { text: i18n.t('common.notNow'), style: 'cancel' },
-            {
-              text: i18n.t('voiceInput.downloadOfflineModel'),
-              onPress: () => {
-                void (async () => {
-                  try {
-                    const result =
-                      await ExpoSpeechRecognitionModule.androidTriggerOfflineModelDownload({
-                        locale: languageTag,
-                      });
-                    // The gate memoizes the installed-locale list; drop it so
-                    // the next toggle re-queries the service instead of
-                    // re-offering a download that already ran.
-                    invalidateVoiceRecognitionLocalesCache();
-                    if (result.status === 'download_scheduled') {
-                      // A scheduled download is the accepted outcome of the
-                      // user's tap, not a failure — render it as one.
-                      toast.success(i18n.t('voiceInput.offlineModelDownloadScheduled'));
-                    }
-                  } catch {
-                    invalidateVoiceRecognitionLocalesCache();
-                    toast.error(i18n.t('voiceInput.unavailableLanguage'));
+    if (consent === 'declined' && supportsOnDeviceByService) {
+      // The device can recognize on-device, but the offline model for the
+      // resolved language is missing and network transcription was declined.
+      // Both ways out stay reachable from the microphone: the download, and the
+      // same online disclosure the declined branch raises — the answer to a
+      // consent question belongs where the user can change it. Only a service
+      // that distinguishes supported from installed locales reaches this
+      // branch, and on iOS every supported locale reports as installed, so
+      // Android is the only platform that gets here in practice; the download
+      // triggers the Android-only `androidTriggerOfflineModelDownload`, and if
+      // a service without that capability ever reports a missing model, the
+      // download tap degrades through the catch to the same actionable toast.
+      const languageName = voiceInputLanguageDisplayName(languageTag);
+      Alert.alert(
+        i18n.t('voiceInput.languageNotInstalledTitle', { language: languageName }),
+        i18n.t('voiceInput.languageNotInstalledMessage', { language: languageName }),
+        [
+          { text: i18n.t('common.notNow'), style: 'cancel' },
+          {
+            text: i18n.t('voiceInput.useOnlineTranscription'),
+            onPress: raiseOnlineConsentDisclosure,
+          },
+          {
+            text: i18n.t('voiceInput.downloadOfflineModel'),
+            onPress: () => {
+              void (async () => {
+                try {
+                  const result =
+                    await ExpoSpeechRecognitionModule.androidTriggerOfflineModelDownload({
+                      locale: languageTag,
+                    });
+                  // The gate memoizes the installed-locale list; drop it so
+                  // the next toggle re-queries the service instead of
+                  // re-offering a download that already ran.
+                  invalidateVoiceRecognitionLocalesCache();
+                  if (result.status === 'download_scheduled') {
+                    // A scheduled download is the accepted outcome of the
+                    // user's tap, not a failure — render it as one.
+                    toast.success(i18n.t('voiceInput.offlineModelDownloadScheduled'));
                   }
-                })();
-              },
+                } catch {
+                  invalidateVoiceRecognitionLocalesCache();
+                  toast.error(i18n.t('voiceInput.unavailableLanguage'));
+                }
+              })();
             },
-          ],
-          // Android back dismisses, which equals Not now: no download starts,
-          // and the gate re-offers on the next toggle.
-          { cancelable: true }
-        );
-        return;
-      }
-      toast.error(i18n.t('voiceInput.staysOff'));
+          },
+        ],
+        // Android back dismisses, which equals Not now: no download starts,
+        // and the gate re-offers on the next toggle.
+        { cancelable: true }
+      );
       return;
     }
-    // consent === 'unset' — raise the disclosure, do not start until answered.
-    Alert.alert(
-      i18n.t('voiceInput.onlineTitle'),
-      i18n.t('voiceInput.onlineMessage', {
-        provider: Platform.OS === 'ios' ? 'Apple' : 'Google',
-      }),
-      [
-        {
-          text: i18n.t('common.notNow'),
-          style: 'cancel',
-          onPress: () => {
-            if (userId) {
-              void writeVoiceNetworkConsent(userId, 'declined');
-            }
-          },
-        },
-        {
-          text: i18n.t('voiceInput.allow'),
-          onPress: () => {
-            void (async () => {
-              if (userId) {
-                await writeVoiceNetworkConsent(userId, 'granted');
-              }
-              await startWith(false);
-            })();
-          },
-        },
-      ],
-      // Android back dismisses without recording a consent answer: the state
-      // stays 'unset', so the next toggle raises the same disclosure instead
-      // of silently assuming the user declined.
-      { cancelable: true }
-    );
+    // Consent is unanswered, or declined on a device that cannot recognize
+    // on-device: in both cases the microphone offers the online path instead
+    // of staying a dead end, and nothing starts until the user answers.
+    raiseOnlineConsentDisclosure();
   };
 
   return { abort, settleBeforeSubmit, toggle };

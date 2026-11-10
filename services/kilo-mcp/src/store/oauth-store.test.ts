@@ -1,9 +1,13 @@
 /// <reference types="node" />
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { NewPendingAuthorization } from './oauth-store';
+import {
+  PENDING_PURGE_BATCHES_PER_RUN,
+  PENDING_PURGE_BATCH_SIZE,
+  type NewPendingAuthorization,
+} from './oauth-store';
 import { getOAuthApi, type OAuthProviderOptions } from '@cloudflare/workers-oauth-provider';
-import { hashRefreshToken } from '../oauth/refresh-reuse';
+import { TOKEN_REQUEST_MAX_BYTES, hashRefreshToken } from '../oauth/refresh-reuse';
 
 // `cloudflare:workers` does not exist under plain node vitest; the DO under
 // test only extends its DurableObject base, so a stub base class is enough.
@@ -53,14 +57,34 @@ function sqlExec(db: DatabaseSync, query: string, ...params: unknown[]) {
   };
 }
 
+/**
+ * What the fake storage saw, for tests that assert on the shape of the SQL the
+ * store issued and on the alarm it scheduled.
+ */
+type FakeDoStateRecorder = {
+  statements: { query: string; params: unknown[] }[];
+  alarms: number[];
+};
+
+function alarmTimeMs(time: number | Date | string): number {
+  if (time instanceof Date) return time.getTime();
+  return typeof time === 'number' ? time : Date.parse(time);
+}
+
 /** A `DurableObjectState`-shaped fake for constructing the DO under test. */
-function createFakeDoState(db: DatabaseSync) {
+function createFakeDoState(db: DatabaseSync, recorder?: FakeDoStateRecorder) {
   const kv = new Map<string, unknown>();
+  let ready: Promise<unknown> = Promise.resolve();
   return {
     waitUntil: (_promise: Promise<unknown>) => {},
+    /** Resolves once the constructor's migration finished; lets a test drop a table safely. */
+    whenReady: () => ready,
     storage: {
       sql: {
-        exec: (query: string, ...params: unknown[]) => sqlExec(db, query, ...params),
+        exec: (query: string, ...params: unknown[]) => {
+          recorder?.statements.push({ query, params });
+          return sqlExec(db, query, ...params);
+        },
       },
       transactionSync: <T>(callback: () => T): T => {
         db.exec('BEGIN');
@@ -77,10 +101,19 @@ function createFakeDoState(db: DatabaseSync) {
       put: async (key: string, value: unknown) => {
         kv.set(key, value);
       },
-      getAlarm: async () => null as number | Date | null,
-      setAlarm: async (_time: number | Date | string) => {},
+      getAlarm: async () => {
+        const scheduled = recorder?.alarms.at(-1);
+        return scheduled ?? null;
+      },
+      setAlarm: async (time: number | Date | string) => {
+        recorder?.alarms.push(alarmTimeMs(time));
+      },
     },
-    blockConcurrencyWhile: <T>(callback: () => Promise<T>): Promise<T> => callback(),
+    blockConcurrencyWhile: <T>(callback: () => Promise<T>): Promise<T> => {
+      const migration = callback();
+      ready = migration;
+      return migration;
+    },
   };
 }
 
@@ -99,48 +132,6 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
   beforeAll(async () => {
     db = new DatabaseSync(':memory:');
     store = createStore(db);
-  });
-
-  describe('migration tracking', () => {
-    it('applies the tracked schema and records it in __drizzle_migrations', () => {
-      const tables = db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-        .all() as Array<{ name: string }>;
-      // Protocol state stays in the library; local tables bridge consent,
-      // authenticate strict refresh replays using issued hashes, and hold the
-      // OTP authenticators and protected requests (o2). The dropped approval
-      // queue tables are gone (o5). The account-wide wrong-code limiter adds
-      // `failed_attempts` and `locked_until` in migration 0008, the
-      // flow-cookie binding adds `flow_token` in migration 0009.
-      expect(tables.map(t => t.name)).toEqual([
-        '__drizzle_migrations',
-        'mcp_admin_authenticators',
-        'mcp_protected_requests',
-        'oauth_pending_authorizations',
-        'oauth_refresh_token_history',
-      ]);
-      const authenticatorColumns = db
-        .prepare('PRAGMA table_info(mcp_admin_authenticators)')
-        .all() as Array<{ name: string }>;
-      expect(authenticatorColumns.map(column => column.name)).toContain('failed_attempts');
-      expect(authenticatorColumns.map(column => column.name)).toContain('locked_until');
-      const pendingColumns = db
-        .prepare('PRAGMA table_info(oauth_pending_authorizations)')
-        .all() as Array<{ name: string }>;
-      expect(pendingColumns.map(column => column.name)).toContain('flow_token');
-      const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
-        n: number;
-      };
-      expect(applied.n).toBe(10);
-    });
-
-    it('a second DO instance over the same storage does not re-apply the migration', async () => {
-      createStore(db);
-      const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
-        n: number;
-      };
-      expect(applied.n).toBe(10);
-    });
   });
 
   describe('refresh history', () => {
@@ -261,6 +252,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       id: 'pa-1',
       authRequest,
       deviceAuthCode: 'PAIR-PA-1',
+      userCode: 'SHOW-CODE',
       flowToken: 'flow-tok-1',
       createdAt: NOW,
       expiresAt: LATER,
@@ -273,6 +265,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       expect(record).toMatchObject({
         id: 'pa-1',
         deviceAuthCode: 'PAIR-PA-1',
+        userCode: 'SHOW-CODE',
         status: 'pending',
         kiloUserId: null,
         organizationId: null,
@@ -282,6 +275,12 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         expiresAt: LATER,
       });
       expect(record?.authRequest).toEqual(authRequest);
+      const appliedMigrations = db.prepare('SELECT * FROM __drizzle_migrations ORDER BY id').all();
+      const recreated = createStore(db);
+      expect(await recreated.getPendingAuthorization('pa-1')).toEqual(record);
+      expect(db.prepare('SELECT * FROM __drizzle_migrations ORDER BY id').all()).toEqual(
+        appliedMigrations
+      );
       expect(await store.getPendingAuthorization('pa-ghost')).toBeNull();
     });
 
@@ -463,6 +462,303 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       expect(await store.getPendingAuthorization('pa-purge')).toBeNull();
       expect(await store.getPendingAuthorization('pa-2')).not.toBeNull();
     });
+
+    it('reclaims one expired batch per start and keeps live rows', async () => {
+      const insertDb = new DatabaseSync(':memory:');
+      const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
+      const insertState = createFakeDoState(insertDb, recorder);
+      const insertStore = new KiloMcpOAuthStore(insertState as never, {} as never);
+      await insertState.whenReady();
+      // Seeded rows carry the same timestamp they expired at, so no seed call
+      // reclaims anything: only a later start may.
+      const expiredCount = PENDING_PURGE_BATCH_SIZE * 2 + 5;
+      for (let index = 0; index < expiredCount; index += 1) {
+        await insertStore.createPendingAuthorization(
+          pendingInput({
+            id: `pa-stale-${index}`,
+            deviceAuthCode: `PAIR-STALE-${index}`,
+            createdAt: EXPIRED,
+            expiresAt: EXPIRED,
+          })
+        );
+      }
+      const countErased = () =>
+        Number(
+          insertDb
+            .prepare('SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at < ?')
+            .get(NOW)?.n ?? -1
+        );
+      expect(countErased()).toBe(expiredCount);
+
+      recorder.statements.length = 0;
+      await insertStore.createPendingAuthorization(
+        pendingInput({ id: 'pa-fresh', deviceAuthCode: 'PAIR-FRESH' })
+      );
+
+      expect(countErased()).toBe(expiredCount - PENDING_PURGE_BATCH_SIZE);
+      expect(await insertStore.getPendingAuthorization('pa-fresh')).toMatchObject({
+        status: 'pending',
+        expiresAt: LATER,
+      });
+      for (const statement of recorder.statements) {
+        expect(statement.params.length).toBeLessThanOrEqual(100);
+      }
+    });
+
+    it('reclaims at most one expired batch per create', async () => {
+      const backlogDb = new DatabaseSync(':memory:');
+      const backlogState = createFakeDoState(backlogDb);
+      const backlogStore = new KiloMcpOAuthStore(backlogState as never, {} as never);
+      await backlogState.whenReady();
+      const expiredCount = PENDING_PURGE_BATCH_SIZE * 2 + 5;
+      for (let index = 0; index < expiredCount; index += 1) {
+        await backlogStore.createPendingAuthorization(
+          pendingInput({
+            id: `pa-backlog-${index}`,
+            deviceAuthCode: `PAIR-BACKLOG-${index}`,
+            createdAt: EXPIRED,
+            expiresAt: EXPIRED,
+          })
+        );
+      }
+      const countErased = () =>
+        Number(
+          backlogDb
+            .prepare('SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at < ?')
+            .get(NOW)?.n ?? -1
+        );
+
+      for (const step of [1, 2, 3]) {
+        await backlogStore.createPendingAuthorization(
+          pendingInput({ id: `pa-next-${step}`, deviceAuthCode: `PAIR-NEXT-${step}` })
+        );
+        expect(countErased()).toBe(Math.max(0, expiredCount - PENDING_PURGE_BATCH_SIZE * step));
+      }
+      expect(
+        backlogDb
+          .prepare('SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at >= ?')
+          .get(NOW)?.n
+      ).toBe(3);
+    });
+
+    it('keeps a start whose own timestamp is already past', async () => {
+      // Reclaim runs before the insert, so a caller-supplied timestamp in the
+      // past does not make the call delete the record it is writing.
+      await store.createPendingAuthorization(
+        pendingInput({
+          id: 'pa-stale-start',
+          deviceAuthCode: 'PAIR-STALE-START',
+          createdAt: NOW,
+          expiresAt: EXPIRED,
+        })
+      );
+      expect(await store.getPendingAuthorization('pa-stale-start')).not.toBeNull();
+    });
+
+    it('reclaims expired rows on a later create and keeps live rows', async () => {
+      const orderDb = new DatabaseSync(':memory:');
+      const orderState = createFakeDoState(orderDb);
+      const orderStore = new KiloMcpOAuthStore(orderState as never, {} as never);
+      await orderState.whenReady();
+      const baseMs = Date.parse(NOW);
+      const ttlMs = 10 * 60 * 1000;
+      const minuteIso = (minute: number) => new Date(baseMs + minute * 60 * 1000).toISOString();
+      const createMinute = async (minute: number) => {
+        for (let slot = 0; slot < 40; slot += 1) {
+          await orderStore.createPendingAuthorization(
+            pendingInput({
+              id: `pa-order-${minute}-${slot}`,
+              deviceAuthCode: `PAIR-ORDER-${minute}-${slot}`,
+              createdAt: minuteIso(minute),
+              expiresAt: new Date(baseMs + minute * 60 * 1000 + ttlMs).toISOString(),
+            })
+          );
+        }
+      };
+      const countExpiredAt = (minute: number) =>
+        Number(
+          orderDb
+            .prepare('SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at < ?')
+            .get(minuteIso(minute))?.n ?? -1
+        );
+
+      await createMinute(0);
+      await createMinute(5);
+      expect(countExpiredAt(5)).toBe(0);
+
+      await createMinute(12);
+
+      // The minute-0 records reached their expiry; the minute-5 and minute-12
+      // records are still actionable and untouched.
+      expect(countExpiredAt(12)).toBe(0);
+      const remainingIds = new Set(
+        (
+          orderDb
+            .prepare('SELECT id FROM oauth_pending_authorizations WHERE expires_at >= ?')
+            .all(minuteIso(12)) as Array<{ id: string }>
+        ).map(row => row.id)
+      );
+      expect(remainingIds.size).toBe(80);
+      expect(remainingIds.has('pa-order-0-0')).toBe(false);
+      expect(remainingIds.has('pa-order-5-0')).toBe(true);
+      expect(remainingIds.has('pa-order-12-0')).toBe(true);
+    });
+
+    it('deletes a large expired set with an exact count', async () => {
+      const bulkDb = new DatabaseSync(':memory:');
+      const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
+      const bulkState = createFakeDoState(bulkDb, recorder);
+      const bulkStore = new KiloMcpOAuthStore(bulkState as never, {} as never);
+      await bulkState.whenReady();
+      const expiredCount = PENDING_PURGE_BATCH_SIZE * 3 + 7;
+      // The live row first: a later start reclaims an expired batch in its own
+      // call, which would take rows away from the count under test.
+      await bulkStore.createPendingAuthorization(
+        pendingInput({ id: 'pa-live', deviceAuthCode: 'PAIR-LIVE' })
+      );
+      for (let index = 0; index < expiredCount; index += 1) {
+        await bulkStore.createPendingAuthorization(
+          pendingInput({
+            id: `pa-expired-${index}`,
+            deviceAuthCode: `PAIR-EXPIRED-${index}`,
+            createdAt: EXPIRED,
+            expiresAt: EXPIRED,
+          })
+        );
+      }
+
+      recorder.statements.length = 0;
+      expect(await bulkStore.purgeExpired(NOW)).toBe(expiredCount);
+
+      const pendingRows = bulkDb
+        .prepare('SELECT id FROM oauth_pending_authorizations ORDER BY id')
+        .all();
+      expect(pendingRows).toEqual([{ id: 'pa-live' }]);
+      expect(
+        recorder.statements.filter(statement =>
+          /delete from "oauth_pending_authorizations"/i.test(statement.query)
+        ).length
+      ).toBeGreaterThan(1);
+      for (const statement of recorder.statements) {
+        expect(statement.params.length).toBeLessThanOrEqual(100);
+      }
+    });
+
+    it('deletes a large expired set in one call', async () => {
+      const singleDb = new DatabaseSync(':memory:');
+      const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
+      const singleState = createFakeDoState(singleDb, recorder);
+      const singleStore = new KiloMcpOAuthStore(singleState as never, {} as never);
+      await singleState.whenReady();
+      const expiredCount = PENDING_PURGE_BATCH_SIZE * (PENDING_PURGE_BATCHES_PER_RUN + 2);
+      for (let index = 0; index < expiredCount; index += 1) {
+        await singleStore.createPendingAuthorization(
+          pendingInput({
+            id: `pa-single-${index}`,
+            deviceAuthCode: `PAIR-SINGLE-${index}`,
+            createdAt: EXPIRED,
+            expiresAt: EXPIRED,
+          })
+        );
+      }
+
+      expect(await singleStore.purgeExpired(NOW)).toBe(expiredCount);
+      expect(
+        singleDb.prepare('SELECT count(*) AS n FROM oauth_pending_authorizations').get()?.n
+      ).toBe(0);
+    });
+
+    it('finishes a set larger than one run over successive runs', async () => {
+      const cappedDb = new DatabaseSync(':memory:');
+      const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
+      const cappedState = createFakeDoState(cappedDb, recorder);
+      const cappedStore = new KiloMcpOAuthStore(cappedState as never, {} as never);
+      await cappedState.whenReady();
+      const expiredCount = PENDING_PURGE_BATCH_SIZE * (PENDING_PURGE_BATCHES_PER_RUN + 2);
+      for (let index = 0; index < expiredCount; index += 1) {
+        await cappedStore.createPendingAuthorization(
+          pendingInput({
+            id: `pa-capped-${index}`,
+            deviceAuthCode: `PAIR-CAPPED-${index}`,
+            createdAt: EXPIRED,
+            expiresAt: EXPIRED,
+          })
+        );
+      }
+      const countPending = () =>
+        Number(
+          cappedDb.prepare('SELECT count(*) AS n FROM oauth_pending_authorizations').get()?.n ?? -1
+        );
+      recorder.alarms.length = 0;
+
+      await cappedStore.alarm();
+      expect(countPending()).toBe(PENDING_PURGE_BATCH_SIZE * 2);
+      const early = recorder.alarms[0];
+      expect(early).toBeGreaterThan(Date.now() + 4 * 60 * 1000);
+      expect(early).toBeLessThan(Date.now() + 6 * 60 * 1000);
+
+      await cappedStore.alarm();
+      expect(countPending()).toBe(0);
+      expect(recorder.alarms).toHaveLength(2);
+      const periodic = recorder.alarms[1];
+      expect(periodic).toBeGreaterThan(Date.now() + 5 * 60 * 60 * 1000);
+      expect(periodic).toBeLessThan(Date.now() + 7 * 60 * 60 * 1000);
+    });
+
+    it('deletes expired history and protected-request rows on its own run', async () => {
+      const tablesDb = new DatabaseSync(':memory:');
+      const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
+      const tablesState = createFakeDoState(tablesDb, recorder);
+      const tablesStore = new KiloMcpOAuthStore(tablesState as never, {} as never);
+      await tablesState.whenReady();
+      await tablesStore.rememberRefreshToken('table-row', { userId: 'u', grantId: 'g' }, EXPIRED);
+      tablesDb
+        .prepare(
+          `INSERT INTO mcp_protected_requests
+             (id, session_id, kilo_user_id, client_id, path, kind, status, created_at, expires_at)
+           VALUES ('pr-row', 's', 'u', 'c', '/x', 'admin', 'pending', ?, ?)`
+        )
+        .run(EXPIRED, EXPIRED);
+      recorder.alarms.length = 0;
+
+      await tablesStore.alarm();
+
+      expect(
+        tablesDb.prepare('SELECT count(*) AS n FROM oauth_refresh_token_history').get()?.n
+      ).toBe(0);
+      expect(tablesDb.prepare('SELECT count(*) AS n FROM mcp_protected_requests').get()?.n).toBe(0);
+    });
+
+    it('sets an alarm on each run', async () => {
+      const alarmDb = new DatabaseSync(':memory:');
+      const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
+      const alarmState = createFakeDoState(alarmDb, recorder);
+      const alarmStore = new KiloMcpOAuthStore(alarmState as never, {} as never);
+      await alarmState.whenReady();
+      recorder.alarms.length = 0;
+
+      await alarmStore.alarm();
+      expect(recorder.alarms).toHaveLength(1);
+      const periodic = recorder.alarms[0];
+      expect(periodic).toBeGreaterThan(Date.now() + 5 * 60 * 60 * 1000);
+      expect(periodic).toBeLessThan(Date.now() + 7 * 60 * 60 * 1000);
+
+      alarmDb.exec('DROP TABLE oauth_pending_authorizations');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await expect(alarmStore.alarm()).resolves.toBeUndefined();
+        await expect(alarmStore.alarm()).resolves.toBeUndefined();
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining('[kilo-mcp] oauth store housekeeping incomplete')
+        );
+      } finally {
+        warn.mockRestore();
+      }
+      expect(recorder.alarms).toHaveLength(3);
+      const early = recorder.alarms[2];
+      expect(early).toBeGreaterThan(Date.now() + 4 * 60 * 1000);
+      expect(early).toBeLessThan(Date.now() + 6 * 60 * 1000);
+    });
   });
 });
 
@@ -570,16 +866,18 @@ describe('production token routing (real provider + DO SQLite)', () => {
         clientId: client.client_id,
       },
     });
-    const post = (body: Record<string, string>) =>
+    const postForm = (body: URLSearchParams) =>
       worker.fetch(
         new Request('https://kilo-mcp.test/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ client_id: client.client_id, ...body }),
+          body: body.toString(),
         }),
         env,
         context as unknown as ExecutionContext
       );
+    const post = (body: Record<string, string>) =>
+      postForm(new URLSearchParams({ client_id: client.client_id, ...body }));
     const exchange = (code: string) =>
       post({
         grant_type: 'authorization_code',
@@ -604,10 +902,28 @@ describe('production token routing (real provider + DO SQLite)', () => {
         vi.fn(async (input: string | URL) => {
           const url = String(input);
           if (url.endsWith('/api/device-auth/codes')) {
-            return Response.json({ code: 'PAIR-1' });
+            return Response.json({
+              code: 'PAIR-1',
+              user_code: 'SHOW-CODE',
+              requestingClient: {
+                clientId: client.client_id,
+                clientName: 'Test Client',
+                redirectOrigin: 'https://client.test',
+              },
+            });
           }
           if (url.endsWith('/api/device-auth/codes/PAIR-1')) {
-            return Response.json({ status: 'approved', token: 'kilo-token-2', userId: 'user-2' });
+            return Response.json({
+              status: 'approved',
+              token: 'kilo-token-2',
+              userId: 'user-2',
+              requestingClient: {
+                clientId: client.client_id,
+                clientName: 'Test Client',
+                redirectOrigin: 'https://client.test',
+              },
+              clientConfirmed: true,
+            });
           }
           throw new Error(`unexpected fetch during the consent flow: ${url}`);
         })
@@ -662,10 +978,14 @@ describe('production token routing (real provider + DO SQLite)', () => {
       db,
       env,
       getByName,
+      clientId: client.client_id,
       initial,
       refresh,
       exchange,
       signIn,
+      postForm,
+      fetchToken: (request: Request) =>
+        worker.fetch(request, env, context as unknown as ExecutionContext),
       recreate: () => {
         store = new KiloMcpOAuthStore(context as unknown as DurableObjectState, env);
       },
@@ -953,6 +1273,121 @@ describe('production token routing (real provider + DO SQLite)', () => {
           error: 'invalid_grant',
           error_description: 'Refresh token reuse detected; the grant has been revoked.',
         });
+      } finally {
+        h.db.close();
+      }
+    });
+  });
+
+  describe('token request handling (real provider + DO SQLite)', () => {
+    const deferred = () => {
+      let resolve = () => {};
+      const promise = new Promise<void>(settle => {
+        resolve = settle;
+      });
+      return { promise, resolve };
+    };
+
+    const endlessBody = (chunkSize: number): ReadableStream<Uint8Array> => {
+      let pulled = 0;
+      return new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled >= 1) return new Promise<void>(() => {});
+          pulled += 1;
+          controller.enqueue(new Uint8Array(chunkSize).fill(0x61));
+        },
+      });
+    };
+
+    const streamed = (body: ReadableStream<Uint8Array>, headers: Record<string, string> = {}) =>
+      new Request('https://kilo-mcp.test/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...headers },
+        body,
+        duplex: 'half',
+      } as RequestInit & { duplex: 'half' });
+
+    it('answers 413 and keeps exchange, rotation and bearer use working', async () => {
+      const h = await harness();
+      try {
+        const declared = await h.fetchToken(
+          streamed(endlessBody(4096), {
+            'Content-Length': String(TOKEN_REQUEST_MAX_BYTES + 1),
+          })
+        );
+        expect(declared.status).toBe(413);
+        expect(await declared.json()).toEqual({
+          error: 'invalid_request',
+          error_description: `Request body must be at most ${TOKEN_REQUEST_MAX_BYTES} bytes.`,
+        });
+
+        const streamedPast = await h.fetchToken(streamed(endlessBody(TOKEN_REQUEST_MAX_BYTES + 1)));
+        expect(streamedPast.status).toBe(413);
+
+        const refreshed = await h.refresh(h.initial.refresh_token);
+        expect(refreshed.status).toBe(200);
+        const rotated = (await refreshed.json()) as {
+          refresh_token: string;
+          access_token: string;
+        };
+        expect((await h.mcp(rotated.access_token)).status).toBe(200);
+        expect((await h.refresh(rotated.refresh_token)).status).toBe(200);
+      } finally {
+        h.db.close();
+      }
+    });
+
+    it('rotates a refresh carrying extension parameters and repeated resources', async () => {
+      const h = await harness();
+      try {
+        const form = (token: string) =>
+          new URLSearchParams([
+            ['client_id', h.clientId],
+            ['grant_type', 'refresh_token'],
+            ['refresh_token', token],
+            ['resource', 'https://kilo-mcp.test/mcp'],
+            ['resource', 'https://kilo-mcp.test/mcp'],
+            ['scope', 'mcp'],
+            ['unknown_extension', 'value'],
+          ]);
+        const rotated = await h.postForm(form(h.initial.refresh_token));
+        expect(rotated.status).toBe(200);
+        const next = (await rotated.json()) as { refresh_token: string; access_token: string };
+        expect((await h.mcp(next.access_token)).status).toBe(200);
+
+        const replay = await h.postForm(form(h.initial.refresh_token));
+        expect(replay.status).toBe(400);
+        expect(await replay.json()).toMatchObject({
+          error: 'invalid_grant',
+          error_description: 'Refresh token reuse detected; the grant has been revoked.',
+        });
+        expect((await h.postForm(form(next.refresh_token))).status).toBe(400);
+      } finally {
+        h.db.close();
+      }
+    });
+
+    it('completes a real refresh after other requests are served', async () => {
+      const h = await harness();
+      try {
+        const arriving = deferred();
+        const slow = h.fetchToken(
+          streamed(
+            new ReadableStream<Uint8Array>({
+              async pull(controller) {
+                await arriving.promise;
+                controller.enqueue(new TextEncoder().encode('grant_type=refresh_token'));
+                controller.close();
+              },
+            })
+          )
+        );
+        const refreshed = await h.refresh(h.initial.refresh_token);
+        expect(refreshed.status).toBe(200);
+        const rotated = (await refreshed.json()) as { access_token: string };
+        expect((await h.mcp(rotated.access_token)).status).toBe(200);
+        arriving.resolve();
+        expect((await slow).status).toBeGreaterThanOrEqual(400);
       } finally {
         h.db.close();
       }

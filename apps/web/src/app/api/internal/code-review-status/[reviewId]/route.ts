@@ -22,7 +22,7 @@ import * as z from 'zod';
 import {
   updateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal,
-  updateCodeReviewUsage,
+  backfillCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback,
@@ -38,7 +38,6 @@ import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/uti
 import {
   addReactionToPR,
   createPRComment,
-  hasPRCommentWithMarker,
   findKiloReviewComment,
   updateKiloReviewComment,
   updateCheckRun,
@@ -47,13 +46,15 @@ import type { CheckRunConclusion } from '@/lib/integrations/platforms/github/ada
 import {
   addReactionToMR,
   createMRNote,
-  hasMRNoteWithMarker,
   findKiloReviewNote,
   updateKiloReviewNote,
   setCommitStatus,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import {
+  resolveReviewProviderIntegration,
+  reviewOwnerScope,
+} from '@/lib/code-reviews/provider-integration';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
@@ -70,6 +71,7 @@ import {
 } from '@/lib/code-reviews/platform/gitlab-access';
 import { terminalReasonFromCloudAgentFailure } from '@/lib/code-reviews/terminal-reason-from-failure';
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
+import { postCodeReviewBillingNotice } from '@/lib/code-reviews/billing';
 import {
   appendReviewSummaryFooter,
   buildReviewSummaryFooter,
@@ -499,6 +501,7 @@ const SESSIONLESS_PRE_DISPATCH_FAILURE_CODES: ReadonlySet<string> = new Set([
 function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalReason): boolean {
   return (
     terminalReason === 'billing' ||
+    terminalReason === 'account_blocked' ||
     terminalReason === 'model_not_found' ||
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||
@@ -699,7 +702,6 @@ async function resolveTerminalOwner(
 }
 
 const GITHUB_COMMENT_MAX_CHARACTERS = 65_536;
-const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
 const MODEL_NOT_FOUND_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
 const MODEL_NOT_FOUND_CHECK_TITLE = 'Selected model is no longer available';
 const MODEL_NOT_FOUND_STATUS_SUMMARY = `The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
@@ -711,11 +713,6 @@ const MODEL_NOT_FOUND_SUMMARY_BODY = `<!-- kilo-review -->
 The review did not run because the selected model is no longer available.
 
 Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
-
-const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
-**Kilo Code Review could not run — your account is out of credits.**
-
-[Add credits](https://app.kilo.ai/) or [switch to a free model](https://app.kilo.ai/code-reviews) to enable reviews on this change.`;
 
 /**
  * Read a review's usage data.
@@ -746,7 +743,7 @@ async function getReviewUsageData(reviewId: string) {
     return persistedUsage;
   }
 
-  updateCodeReviewUsage(reviewId, {
+  backfillCodeReviewUsage(reviewId, {
     ...(review.model == null ? { model: billing.model } : {}),
     totalTokensIn: billing.totalTokensIn,
     totalTokensOut: billing.totalTokensOut,
@@ -778,6 +775,10 @@ function getReviewGuidanceFooterData(review: CloudAgentCodeReview) {
  * When `gateResult` is `'fail'` and the review completed successfully (no system error),
  * the conclusion is set to `'failure'` — the agent determined that the review found
  * blocking issues (based on the `gate_threshold` setting in the agent config).
+ *
+ * `errorMessage` is read only to classify the failure. Every string this returns is
+ * authored here or in the copy modules: the check run is published to the pull request,
+ * which may be public, so the callback's own text never becomes part of it.
  */
 function mapStatusToCheckRun(
   reviewStatus: string,
@@ -842,12 +843,14 @@ function mapStatusToCheckRun(
     completed: reviewFailed
       ? 'Code review completed with findings that require attention.'
       : 'Code review completed successfully.',
+    // Authored copy only: the check run renders on the pull request, which may be
+    // public. The raw callback text stays on the review and attempt rows and in the
+    // logs, where only the owning account and Kilo can read it.
     failed: actionRequiredCopy
       ? actionRequiredCopy.checkSummary
       : billingFailure
         ? 'Review could not start because the account has insufficient credits.'
-        : (terminalReasonCopy?.checkSummary ??
-          (errorMessage ? `Review failed: ${errorMessage}` : 'Review failed.')),
+        : (terminalReasonCopy?.checkSummary ?? 'Review failed.'),
     cancelled: modelNotFoundCancellation ? MODEL_NOT_FOUND_STATUS_SUMMARY : 'Review was cancelled.',
   };
 
@@ -911,10 +914,8 @@ function getGitLabStatusDescription(
     const terminalReasonCopy = getCodeReviewTerminalReasonCopy(terminalReason);
     if (terminalReasonCopy) return terminalReasonCopy.checkSummary;
   }
-  if (reviewStatus === 'failed' && errorMessage) {
-    const desc = `Review failed: ${errorMessage}`;
-    return desc.length > 255 ? desc.slice(0, 252) + '...' : desc;
-  }
+  // Fixed sentence, never the callback text: a commit status renders on the merge
+  // request, which may be public. See the failure row in the Kilo app for detail.
   if (reviewStatus === 'failed') return 'Kilo Code Review failed';
   return undefined;
 }
@@ -1162,6 +1163,21 @@ export async function POST(
     const isManualReview = manualConfig !== null;
     const shouldPublishToProvider = shouldPublishCodeReviewToProvider(review);
 
+    // Every provider side effect below runs with the review owner's own integration. A review
+    // row whose integration belongs to another owner resolves to null, so the completion still
+    // records while no foreign credential is used.
+    const reviewOwner = reviewOwnerScope(review);
+    let ownerScopedIntegrationResolved = false;
+    let ownerScopedIntegration: PlatformIntegration | null = null;
+    const getOwnerScopedIntegration = async (): Promise<PlatformIntegration | null> => {
+      if (!shouldPublishToProvider || !reviewOwner) return null;
+      if (!ownerScopedIntegrationResolved) {
+        ownerScopedIntegrationResolved = true;
+        ownerScopedIntegration = await resolveReviewProviderIntegration(review, reviewOwner);
+      }
+      return ownerScopedIntegration;
+    };
+
     const callbackCompletedAt = new Date();
     let attempt: CloudAgentCodeReviewAttempt;
     let latestAttempt = await getLatestCodeReviewAttempt(reviewId);
@@ -1240,7 +1256,7 @@ export async function POST(
             attemptId: preUpdateAttemptId,
             reviewId,
             platform: review.platform,
-            platformIntegrationId: review.platform_integration_id,
+            platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
             repoFullName: review.repo_full_name,
             prNumber: review.pr_number,
             previousSummaryBody: review.previous_summary_body,
@@ -1354,7 +1370,7 @@ export async function POST(
           attemptId: preUpdateAttemptId,
           reviewId,
           platform: review.platform,
-          platformIntegrationId: review.platform_integration_id,
+          platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
           repoFullName: review.repo_full_name,
           prNumber: review.pr_number,
           previousSummaryBody: review.previous_summary_body,
@@ -1699,10 +1715,7 @@ export async function POST(
     }
 
     // Fetch integration once — used for gate check updates and post-completion actions
-    const integration =
-      shouldPublishToProvider && review.platform_integration_id
-        ? await getIntegrationById(review.platform_integration_id)
-        : null;
+    const integration = await getOwnerScopedIntegration();
 
     if (status === 'completed') {
       if (review.platform === PLATFORM.GITHUB) {
@@ -1710,7 +1723,7 @@ export async function POST(
           attemptId: attempt.id,
           reviewId,
           platform: review.platform,
-          platformIntegrationId: review.platform_integration_id,
+          platformIntegrationId: (await getOwnerScopedIntegration())?.id ?? null,
           repoFullName: review.repo_full_name,
           prNumber: review.pr_number,
           previousSummaryBody: review.previous_summary_body,
@@ -1879,27 +1892,7 @@ export async function POST(
                 status === 'failed' &&
                 isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
               ) {
-                const alreadyPosted = await hasPRCommentWithMarker(
-                  integration.platform_installation_id,
-                  repoOwner,
-                  repoName,
-                  review.pr_number,
-                  BILLING_NOTICE_MARKER,
-                  appType
-                );
-                if (!alreadyPosted) {
-                  await createPRComment(
-                    integration.platform_installation_id,
-                    repoOwner,
-                    repoName,
-                    review.pr_number,
-                    BILLING_NOTICE_BODY,
-                    appType
-                  );
-                  logExceptInTest(
-                    `[code-review-status] Posted billing notice on ${review.repo_full_name}#${review.pr_number}`
-                  );
-                }
+                await postCodeReviewBillingNotice(review, integration);
               }
 
               // Summary history and footer (completed only)
@@ -1977,25 +1970,7 @@ export async function POST(
                 status === 'failed' &&
                 isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
               ) {
-                const alreadyPosted = await hasMRNoteWithMarker(
-                  accessToken,
-                  review.repo_full_name,
-                  review.pr_number,
-                  BILLING_NOTICE_MARKER,
-                  instanceUrl
-                );
-                if (!alreadyPosted) {
-                  await createMRNote(
-                    accessToken,
-                    review.repo_full_name,
-                    review.pr_number,
-                    BILLING_NOTICE_BODY,
-                    instanceUrl
-                  );
-                  logExceptInTest(
-                    `[code-review-status] Posted billing notice on GitLab MR ${review.repo_full_name}!${review.pr_number}`
-                  );
-                }
+                await postCodeReviewBillingNotice(review, integration, { gitlabAccessToken });
               }
 
               // Summary history and footer (completed only)

@@ -149,13 +149,15 @@ check(
 check(config.android?.package === ANDROID_PACKAGE, `android.package must be "${ANDROID_PACKAGE}"`);
 check(config.scheme === SCHEME, `scheme must be "${SCHEME}"`);
 
-// Rotation contract: all device orientations enabled (portrait + both
-// landscapes on iOS, all orientations on Android), while iPad multitasking
-// stays off — requireFullScreen keeps Split View/Slide Over out of scope.
+// Rotation and resizing contract: all device orientations enabled (portrait +
+// both landscapes on iOS, all orientations on Android) and continuous window
+// resizing. `UIRequiresFullScreen` is deprecated in iOS 27 and asks only for
+// discrete resizing, so the app must not require it; Expo then also emits the
+// four iPad orientations that App Store validation needs of a resizable app.
 check(config.orientation === 'default', `orientation must be "default"`);
 check(
-  config.ios?.requireFullScreen === true,
-  'ios.requireFullScreen must be true (iPad Split View/Slide Over stays out of scope)'
+  config.ios?.requireFullScreen !== true,
+  'ios.requireFullScreen must not be true (it requests discrete resizing; the iOS 27 SDK resizes windows regardless)'
 );
 
 // Platforms contract: the app is iOS and Android only (apps/mobile/AGENTS.md).
@@ -229,9 +231,21 @@ check(
 // exercises app.config.ts's real module resolution and the JSON import.
 const localizations = config.ios?.infoPlist?.CFBundleLocalizations ?? [];
 const locales = config.locales ?? {};
+const localeTags = Object.keys(locales);
+// The loop below is the assertion set. A config that stopped emitting the list
+// would run none of the per-locale checks and still print "OK", so the list has
+// to stand on its own before the loop starts.
 check(
-  Object.keys(locales).length === localizations.length,
-  `top-level locales must cover every CFBundleLocalization (${localizations.length})`
+  localizations.length > 0,
+  'ios.infoPlist.CFBundleLocalizations must list the supported language tags'
+);
+// Exact tags, not a count: swapping one tag for another keeps the length equal
+// while dropping one language's prompts and checking another's.
+const unlocalizedTags = localeTags.filter(tag => !localizations.includes(tag));
+const unlistedTags = localizations.filter(tag => !localeTags.includes(tag));
+check(
+  unlocalizedTags.length === 0 && unlistedTags.length === 0,
+  `ios.infoPlist.CFBundleLocalizations must name exactly the top-level locales tags (without a CFBundleLocalization: [${unlocalizedTags.join(', ')}]; without a locales entry: [${unlistedTags.join(', ')}])`
 );
 for (const tag of localizations) {
   check(

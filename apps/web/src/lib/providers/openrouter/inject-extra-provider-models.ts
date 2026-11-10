@@ -11,7 +11,9 @@ import type {
   OpenRouterModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { Endpoint, StoredModel } from '@kilocode/db/schema-types';
+import type { Endpoint } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 
 type ProviderModelData = Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
 
@@ -50,7 +52,7 @@ function toVercelEndpointModel(
 }
 
 export function injectExtraProviderModels(
-  vercelModels: Record<string, StoredModel>,
+  vercelModels: Record<string, GatewayModelWithEndpoints>,
   providerModelData: ProviderModelData,
   vercelModelIdOverrides: VercelModelIdOverrides
 ) {
@@ -77,16 +79,7 @@ export function injectExtraProviderModels(
   }
 }
 
-function toDisplayName(providerId: string) {
-  return providerId
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 type VercelOnlyProviderMetadata = {
-  displayName: string;
   termsOfServiceURL: string;
   privacyPolicyURL: string;
 };
@@ -95,22 +88,18 @@ type VercelOnlyProviderMetadata = {
 const vercelOnlyProviderMetadata = new Map<string, VercelOnlyProviderMetadata>(
   Object.entries({
     boundless: {
-      displayName: 'Boundless',
       termsOfServiceURL: 'https://boundless.network/terms-of-service',
       privacyPolicyURL: 'https://boundless.network/privacy-policy',
     },
     particle: {
-      displayName: 'Particle',
       termsOfServiceURL: 'https://particle.ai/legal/terms',
       privacyPolicyURL: 'https://particle.ai/legal/privacy',
     },
     runinfra: {
-      displayName: 'RunInfra',
       termsOfServiceURL: 'https://runinfra.ai/terms-of-service',
       privacyPolicyURL: 'https://runinfra.ai/privacy-policy',
     },
     runware: {
-      displayName: 'Runware',
       termsOfServiceURL: 'https://runware.ai/terms',
       privacyPolicyURL: 'https://runware.ai/privacy',
     },
@@ -119,7 +108,7 @@ const vercelOnlyProviderMetadata = new Map<string, VercelOnlyProviderMetadata>(
 
 function createVercelOnlyProvider(providerId: string): OpenRouterProvider {
   const metadata = vercelOnlyProviderMetadata.get(providerId);
-  const displayName = metadata?.displayName ?? toDisplayName(providerId);
+  const displayName = normalizePublicInferenceProvider(providerId).name;
   return {
     name: displayName,
     displayName,
@@ -147,7 +136,7 @@ function createVercelOnlyProvider(providerId: string): OpenRouterProvider {
  * treated as training on and retaining prompts.
  */
 export function injectVercelOnlyProviders(
-  vercelModels: Record<string, StoredModel>,
+  vercelModels: Record<string, GatewayModelWithEndpoints>,
   providerModelData: ProviderModelData,
   vercelModelIdOverrides: VercelModelIdOverrides
 ) {

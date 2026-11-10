@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type AgentSessionFilters } from '@/lib/agent-session-filters';
 import { renderWithProviders } from '@/test/render-with-providers';
 import * as PlatformFilterRows from './platform-filter-rows';
@@ -64,6 +65,7 @@ const mounted: RenderedView[] = [];
 
 async function renderModal(overrides: Partial<ComponentProps<typeof SessionFilterModal>> = {}) {
   const props = {
+    visible: true,
     selectedPlatforms: [],
     selectedProjects: [],
     projectOptions: projects,
@@ -138,6 +140,85 @@ describe('SessionFilterModal', () => {
     }
     mounted.length = 0;
   });
+
+  it('keeps the native sheet and draft content unmounted while closed', async () => {
+    const { renderer } = await renderModal({ visible: false });
+
+    expect(renderer.root.findAll(node => (node.type as unknown) === 'BottomSheet')).toHaveLength(0);
+    expect(renderer.root.findAllByType(ScrollView)).toHaveLength(0);
+    expect(PlatformFilterRows.mergePlatformOptions).not.toHaveBeenCalled();
+    expect(PlatformFilterRows.buildProjectRows).not.toHaveBeenCalled();
+  });
+
+  it.each(['cancel', 'apply', 'sheet'] as const)(
+    'retains the filter content during %s dismissal and resets the draft on reopening',
+    async dismissal => {
+      platform.OS = 'ios';
+      const { renderer, queryClient, props } = await renderModal({
+        selectedPlatforms: ['cli'],
+        selectedProjects: [firstProject.gitUrl],
+      });
+      act(() => {
+        (findRow(renderer, secondProject.displayName).props.onPress as () => void)();
+      });
+      const content = findSheetContent(renderer);
+
+      if (dismissal === 'sheet') {
+        act(() => {
+          const native = renderer.root.find(node => (node.type as unknown) === 'BottomSheet');
+          (native.props.onClose as () => void)();
+        });
+      } else {
+        pressButton(renderer, i18n.t(`common.${dismissal}`));
+      }
+      expect(props.onClose).toHaveBeenCalledOnce();
+      expect(props.onApply).toHaveBeenCalledTimes(dismissal === 'apply' ? 1 : 0);
+
+      act(() => {
+        renderer.update(
+          <QueryClientProvider client={queryClient}>
+            <SessionFilterModal {...props} visible={false} />
+          </QueryClientProvider>
+        );
+      });
+
+      const closing = renderer.root.find(node => (node.type as unknown) === 'BottomSheet');
+      expect(closing.props.index).toBe(-1);
+      expect(findSheetContent(renderer)).toBe(content);
+      expect(findRow(renderer, secondProject.displayName).props.accessibilityState).toEqual({
+        selected: true,
+      });
+      expect(renderer.root.findAllByType(Button)).toHaveLength(2);
+
+      act(() => {
+        (closing.props.onDismiss as () => void)();
+      });
+      expect(renderer.root.findAll(node => (node.type as unknown) === 'BottomSheet')).toHaveLength(
+        0
+      );
+      expect(renderer.root.findAllByType(ScrollView)).toHaveLength(0);
+
+      act(() => {
+        renderer.update(
+          <QueryClientProvider client={queryClient}>
+            <SessionFilterModal {...props} selectedPlatforms={['cloud-agent']} />
+          </QueryClientProvider>
+        );
+      });
+      expect(findRow(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+        selected: true,
+      });
+      expect(findRow(renderer, secondProject.displayName).props.accessibilityState).toEqual({
+        selected: false,
+      });
+      expect(
+        findRow(renderer, i18n.t('agentChat.sessionFilter.platformCli')).props.accessibilityState
+      ).toEqual({ selected: false });
+      expect(
+        findRow(renderer, i18n.t('agentChat.sessionFilter.platformCloud')).props.accessibilityState
+      ).toEqual({ selected: true });
+    }
+  );
 
   it('renders the default options with the current selections checked', async () => {
     const { renderer } = await renderModal({
@@ -533,5 +614,21 @@ describe('SessionFilterModal', () => {
     expect(findRow(renderer, secondProject.displayName).props.accessibilityState).toEqual({
       checked: true,
     });
+  });
+
+  // The size audit reads the row node's own rect, so the 48dp selection-row
+  // frame must be that node's class — a hitSlop around a smaller box never
+  // lifts the audited frame (see the tap-target rules in DESIGN.md).
+  it('carries the shared row floor on every option row node itself', async () => {
+    const { renderer } = await renderModal({
+      selectedPlatforms: ['cli'],
+      selectedProjects: [firstProject.gitUrl],
+    });
+    const rows = renderer.root.findAllByProps({ accessibilityRole: rowRole() });
+    expect(rows).toHaveLength(10);
+    for (const row of rows) {
+      expect(String(row.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+      expect(row.props.hitSlop).toBeUndefined();
+    }
   });
 });

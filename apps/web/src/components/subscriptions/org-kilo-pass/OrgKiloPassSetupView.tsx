@@ -16,6 +16,10 @@ import type {
   OrgKiloPassTier,
 } from './types';
 import { AllocationEditor, getDirectChildTotal, InfoTooltip, SummaryValue } from './view-shared';
+import {
+  CreditExpiryNotice,
+  usePaidCreditPolicyReady,
+} from '@/components/payment/CreditExpiryNotice';
 
 export function OrgKiloPassSetupView({
   organizationId,
@@ -206,6 +210,7 @@ function OrderSummaryCard({
   className?: string;
   onContinueToStripe: () => void;
 }) {
+  const policyReady = usePaidCreditPolicyReady();
   return (
     <Card className={cn('h-fit', className)}>
       <CardHeader>
@@ -230,10 +235,13 @@ function OrderSummaryCard({
         <p className="type-label text-muted-foreground">
           After payment is confirmed, we check these pass assignments and add your first Credits.
         </p>
+        <CreditExpiryNotice purchase="pass" />
         <Button
           className="w-full"
-          disabled={isSubmitting || isDisabled}
-          onClick={onContinueToStripe}
+          disabled={isSubmitting || isDisabled || !policyReady}
+          onClick={() => {
+            if (policyReady) onContinueToStripe();
+          }}
         >
           {isSubmitting ? (
             <>

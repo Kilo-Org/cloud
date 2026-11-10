@@ -13,7 +13,7 @@ import { createTestQueryClient } from '@/test/render-with-providers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import InstancePickerScreen from './instance-picker';
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 
@@ -61,10 +61,14 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
+  useNavigation: () => ({ isFocused: () => true }),
   useFocusEffect: (effect: EffectCallback) => {
     // The route focus effect runs on mount and clears the bridge on unmount.
     useEffect(effect, [effect]);
@@ -150,6 +154,22 @@ function radios(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestIns
   return findByType(root, 'Pressable').filter(
     node => (node.props as { accessibilityRole?: string }).accessibilityRole === 'radio'
   );
+}
+
+/** The one radio row whose accessible name contains `text`, or undefined. */
+function radioFor(
+  root: TestRenderer.ReactTestInstance,
+  text: string
+): TestRenderer.ReactTestInstance | undefined {
+  return radios(root).find(node => {
+    const props: unknown = node.props;
+    return (
+      props !== null &&
+      typeof props === 'object' &&
+      'accessibilityLabel' in props &&
+      String(props.accessibilityLabel).includes(text)
+    );
+  });
 }
 
 /**
@@ -295,6 +315,46 @@ describe('InstancePickerScreen list', () => {
 
     // Every radio renders unchecked: the Cloud Agent default is not the
     // current target, and no instance row is bound either.
+    for (const radio of radios(renderer.root)) {
+      expect(radio.props.accessibilityState).toMatchObject({ checked: false });
+    }
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('checks the row for the same computer after its connection id changes', async () => {
+    // The form's target is the row it held when it opened: a host that
+    // rebooted reconnects its CLI under a new connectionId with the same name
+    // and project, so an identifier-only match would mark no row at all.
+    bridge.currentValue = { ...CLI_INSTANCE, connectionId: 'cli-before-reboot' };
+    const renderer = await mount();
+
+    const laptop = radioFor(renderer.root, CLI_INSTANCE.name);
+    expect(laptop).toBeDefined();
+    expect(laptop?.props.accessibilityState).toMatchObject({ checked: true });
+    // The Cloud Agent row is not the target the form shows.
+    expect(
+      radioFor(renderer.root, i18n.t('agentChat.instancePicker.runOnCloudAgent'))
+    ).toBeDefined();
+    expect(
+      radioFor(renderer.root, i18n.t('agentChat.instancePicker.runOnCloudAgent'))?.props
+        .accessibilityState
+    ).toMatchObject({ checked: false });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('checks no row when the form target left the live list', async () => {
+    // The chosen computer is gone: its row cannot be marked, and the Cloud
+    // Agent is not what the form runs on either.
+    bridge.currentValue = CLI_INSTANCE;
+    fetchInstances.mockResolvedValue({ instances: [REMOTE_INSTANCE] });
+    const renderer = await mount();
+
     for (const radio of radios(renderer.root)) {
       expect(radio.props.accessibilityState).toMatchObject({ checked: false });
     }

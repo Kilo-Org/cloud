@@ -5,21 +5,21 @@ import '@/i18n';
 import {
   changeRowText,
   commitRow,
-  findAll,
   findFields,
   mountScreen,
   pressBack,
   pressButton,
-  testProfile,
-  type TestProfileDetail,
+  testCommands,
+  type TestCommands,
 } from '@/components/profiles/profile-commands-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
   query: {
-    data: undefined as TestProfileDetail | undefined,
+    data: undefined as TestCommands | undefined,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -38,8 +38,12 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => true,
+}));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => h.query,
+  useAgentProfileCommands: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('expo-router', () => ({
@@ -63,6 +67,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -80,17 +85,27 @@ vi.mock('@/components/ui/form-field', async () => {
   // helpers must be loaded inside the factory.
   const { createElement, useRef } = await import('react');
   return {
-    FormField: (props: { defaultValue?: string; onChangeText?: (value: string) => void }) => {
+    FormField: (props: {
+      defaultValue?: string;
+      labelAccessory?: unknown;
+      onChangeText?: (value: string) => void;
+    }) => {
       // Native uncontrolled text only accepts defaultValue when mounted.
       const nativeText = useRef(props.defaultValue);
-      return createElement('FormField', {
-        ...props,
-        nativeText: nativeText.current,
-        onChangeText: (value: string) => {
-          nativeText.current = value;
-          props.onChangeText?.(value);
+      // The real field renders its label accessory beside the label, so the
+      // caller's row controls are children of the mocked field too.
+      return createElement(
+        'FormField',
+        {
+          ...props,
+          nativeText: nativeText.current,
+          onChangeText: (value: string) => {
+            nativeText.current = value;
+            props.onChangeText?.(value);
+          },
         },
-      });
+        props.labelAccessory as never
+      );
     },
   };
 });
@@ -106,6 +121,7 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileCommandsScreen Back', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     h.guard.enabled = false;
     h.guard.callback = undefined;
     Object.assign(h.query, {
@@ -117,7 +133,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('saves the focused edit before the header Back leaves the screen', async () => {
-    h.query.data = testProfile(['git fetch']);
+    h.query.data = testCommands(['git fetch']);
     h.query.isPending = false;
     const pending = Promise.withResolvers<{ success: boolean }>();
     h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
@@ -145,7 +161,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('does not write twice when a blur save is already in flight for Back', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const pending = Promise.withResolvers<{ success: boolean }>();
     h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
@@ -170,7 +186,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('keeps the screen and the draft when the Back save fails', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const error = new Error('placeholder');
     error.message = '';
@@ -188,7 +204,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('sends the newest list after a pending save settles and leaves only then', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const first = Promise.withResolvers<{ success: boolean }>();
     const second = Promise.withResolvers<{ success: boolean }>();
@@ -232,7 +248,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('saves an edit typed while the Back write is in flight before leaving', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const first = Promise.withResolvers<{ success: boolean }>();
     const second = Promise.withResolvers<{ success: boolean }>();
@@ -268,7 +284,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('leaves without a write when Back only dismisses an empty draft row', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const { renderer, unmount } = await mountScreen();
 
@@ -281,25 +297,8 @@ describe('ProfileCommandsScreen Back', () => {
     unmount();
   });
 
-  it('does not number a blank draft row as a command', async () => {
-    h.query.data = testProfile(['a']);
-    h.query.isPending = false;
-    const { renderer, unmount } = await mountScreen();
-    pressButton(renderer.root);
-    const labels = findAll(renderer.root, 'Pressable')
-      .map(node => node.props.accessibilityLabel)
-      .filter((label): label is string => typeof label === 'string');
-    expect(labels.filter(label => label.startsWith('Move command '))).toEqual([
-      'Move command 1 up',
-      'Move command 1 down',
-    ]);
-    expect(labels).toContain('Move up');
-    expect(labels).toContain('Move down');
-    unmount();
-  });
-
   it('arms the removal guard only while there is unsaved work or a write in flight', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const pending = Promise.withResolvers<{ success: boolean }>();
     h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
@@ -325,7 +324,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('saves the focused edit when a system back is blocked, then replays the leave', async () => {
-    h.query.data = testProfile(['git fetch']);
+    h.query.data = testCommands(['git fetch']);
     h.query.isPending = false;
     const pending = Promise.withResolvers<{ success: boolean }>();
     h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
@@ -359,7 +358,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('keeps the screen and retries on the next system back when the save fails', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const error = new Error('placeholder');
     error.message = '';

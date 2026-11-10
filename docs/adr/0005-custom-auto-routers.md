@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted. Supersedes [ADR 0003: Efficient Model Pools](./0003-efficient-model-pools.md) at the
-cutover described below. Amends [ADR 0002](./0002-auto-routing-efficient.md) invariant 5 for
-custom routers only.
+Accepted and in effect. Supersedes [ADR 0003: Efficient Model Pools](./0003-efficient-model-pools.md)
+since the cutover described below. Amends [ADR 0002](./0002-auto-routing-efficient.md) invariant 5
+for custom routers only.
 
 ## Context
 
@@ -52,6 +52,9 @@ Split auto routing into platform routers and custom routers.
   The organization model catalog lists that organization's routers for both the fallback and
   custom-mode pickers, excluding personal routers. The gateway resolves the target with gateway
   candidates only.
+- Personal model validation includes the authenticated user's custom routers, matching the model
+  catalog. Missing routers and routers owned by another user return `unavailable`; a router lookup
+  failure returns a service error so Cloud Agent can retry.
 
 ## Router definition
 
@@ -63,7 +66,7 @@ Custom router definitions live in PostgreSQL, table `auto_routing_custom_routers
 | `owned_by_user_id` / `owned_by_organization_id` | Exactly one is set. |
 | `slug`, `name` | Unique slug per owner; display name. |
 | `base_router` | `efficient` or `frontier`. Selects the dataset, thresholds, and switch settings. |
-| `mode` | `cost_per_accuracy` or `best_accuracy`. The only owner knob. |
+| `mode` | `cost_per_accuracy`, `best_accuracy`, or `cheapest`. The only owner knob. `cheapest` picks the lowest estimated request cost among candidates that meet the base router's accuracy threshold; when none does, it picks the most accurate candidate. |
 | `entries` | JSON array of 1–20 pool entries. |
 | `default_entry_key` | Key of the pool entry used on a null decision. |
 | `created_by_user_id`, `created_at`, `updated_at` | Audit fields. |
@@ -80,8 +83,45 @@ The entry key is `gateway:<model>` or `client:<provider>/<model>`. The CLI regis
 entries from its own configuration (`kilo auto router add`). The web editor manages gateway
 entries and can remove client entries.
 
+Pool updates must include `defaultEntryKey`, even when the selected default does not change.
+The web editor sends both fields when it changes the pool.
+
+Write requests carry an explicit entry budget: model IDs up to 200 characters, provider IDs up to
+100, at most 20 variants of up to 100 characters, at most 10 input modalities of up to 50
+characters, context lengths up to 10,000,000, per-million-token prices that are finite and at most
+1,000,000, and default entry keys up to 320 characters. The budget applies to create, update, and
+client-entry registration; stored definitions and responses still parse rows written before it, so
+the worker keeps serving them.
+
 The serving worker reads definitions through its existing Hyperdrive binding with an isolate
 cache. The web app owns create, update, and delete.
+
+## Linked entries
+
+Gateway and client entries can explicitly set `measuredAs` to a platform model ID whose
+measurements they reuse. The entry keeps its own serving identity, capabilities, variants,
+and owner pricing. A link is a live reference, not a copied measurement or a new benchmark
+profile. The CLI may `suggestMeasuredAs`, but the owner must confirm the suggestion before
+it becomes an explicit `measuredAs`; model-name similarity never creates an implicit link.
+
+Saving a new or changed link requires an existing ready platform measurement for the selected
+base router, and the web service fetches the platform measurements list before it takes the
+owner's advisory lock, so a queued save never holds a pooled connection across that request.
+Unchanged links with the same entry key are exempt; changing the base router revalidates every
+link. An update that loses the race to a concurrent save re-validates the merged definition under
+the lock. A client-entry registration instead refuses with a retryable `invalid_request` when the
+base router changed concurrently, because its link was checked for the difficulty read before the
+lock. Linked gateway entries do not enter platform benchmark admission. Once saved, a link serves
+the newest ready measurement, including stale measurements and measurements whose model has since
+disappeared from the gateway catalog.
+
+Variants match by exact same name; the default variant matches only `null`. There is no
+cross-variant fallback. Unmatched variants remain client-measured rather than inheriting a
+different platform variant. Accuracy and latency come from the referenced measurement. Cost
+is repriced using the measurement's token means (input, cached input/cache read, output, and
+reasoning) and the entry's own pricing: client pricing supplied by the owner, or its own
+model-catalog pricing for a direct-BYOK gateway entry. Null client pricing means $0. Older
+summaries without token means use a blended-price ratio to scale measured cost.
 
 ## Measurements
 
@@ -90,20 +130,24 @@ The benchmark worker stays the only writer of measurements and routing tables.
 | Entry | Who runs the eval | Who pays inference | Stored as |
 |---|---|---|---|
 | Gateway model that the platform key can serve | Platform container | Platform | Global `benchmark_profiles`, keyed by base router |
+| Linked gateway or client entry | No new eval; live platform measurement | No new inference | Referenced global measurement, repriced for the entry |
 | Any other entry, including Kilo-stored direct-BYOK IDs | Owner's CLI | Owner | Owner-scoped client profiles |
 
 - Platform-paid admission is limited to 20 new models per base router per owner per rolling 24
   hours. Ready and pending models do not count. A save over the limit gets `quota_exceeded`
   (HTTP 429) with `retryAt`, and every other validation runs before admission.
-  Web saves fetch the catalog before locking, then serialize final validation, admission, and
-  the write with the owner's PostgreSQL advisory lock. Updates validate and admit the merged,
-  locked definition; deletes and client-entry edits use the same lock. All registration batches
-  share a ten-second HTTP deadline, including response-body reads. A batch that fails in transit
-  or gets a worker 5xx before the deadline is retried once.
+  Web saves fetch the catalog and admit benchmarks before locking, and the owner's PostgreSQL
+  advisory lock covers the final validation and the write, so queued saves do not hold a pooled
+  connection across an outbound benchmark request. Admission runs at most one in-flight request per
+  owner. Updates admit the merged definition computed from a pre-lock read; if a concurrent save
+  changes the base router or pool before the lock is taken, the locked definition is admitted again
+  while that lock is held, before the write. Deletes and client-entry edits use the same lock without
+  admission. All registration batches share a ten-second HTTP deadline, including response-body
+  reads. A batch that fails in transit or gets a worker 5xx before the deadline is retried once.
   PostgreSQL and worker D1 do not share a transaction: an ambiguous HTTP failure, a later batch
-  rejection, or a database commit failure can leave already-admitted profiles and quota charges.
-  There is no refund API. Re-registering current pending, running, or ready profiles is
-  idempotent, but cannot undo those charges.
+  rejection, a database commit failure, or a save that loses a concurrent race can leave
+  already-admitted profiles and quota charges. There is no refund API. Re-registering current
+  pending, running, or ready profiles is idempotent, but cannot undo those charges.
 - The frontier base gets an owner queue, as the efficient base has today.
 - Client profiles are keyed by (owner, base router, entry key, variant, engine identity,
   repetitions). They are never shared with another owner or promoted to the platform.
@@ -242,7 +286,14 @@ to keep selecting a platform routing mode.
 
 ### Operator commands
 
-Run the migration from the repository root with the approved production credentials available.
+#### Historical pool conversion (before tooling retirement)
+
+The conversion script and its worker endpoint are removed at this revision. The commands below
+document the pre-retirement procedure and require the #7808 cutover revision on `main`
+(`c03b06b1cae03f5f400119133469813bba27ef62`), not this checkout. Do not deploy the retired
+conversion endpoint again after cutover.
+
+From that revision, run from the repository root with approved production credentials.
 The default is read-only; `--apply` is required for conversion.
 
 ```sh
@@ -251,11 +302,20 @@ pnpm --filter auto-routing exec tsx scripts/convert-owner-pools.ts --apply
 pnpm --filter auto-routing exec tsx scripts/convert-owner-pools.ts --dry-run
 ```
 
-The scanner requires `CLOUDFLARE_API_TOKEN` and `INTERNAL_API_SECRET`.
+The historical scanner requires `CLOUDFLARE_API_TOKEN` and `INTERNAL_API_SECRET`.
 Retain every report. Resolve unreadable, invalid, unmatched, missing-owner, collision, and
 router-cap findings before declaring the cohort complete. Interrupted writes retain a recovery
-fence; retry the conversion rather than clearing the fence manually.
+fence; retry the conversion on the pre-retirement deployment rather than clearing the fence manually.
+If a scan response is lost, recover owner keys from the structured
+`auto_routing_owner_pool_conversion_scan` event's `readFailedOwners`, `invalidPoolOwners`,
+`invalidModeOwners`, `needsAttentionOwners`, and `notPostedOwners` arrays before declaring the
+run clean; a retry can skip owners already marked converted.
 `--limit` controls the page size, not the total number of owners.
+
+#### Advance notice (before graduation)
+
+These commands belong to rollout step 4, not tooling retirement. Do not resend the advance
+notice after cutover.
 
 Set `CUTOVER_AT` to a future timestamp with an explicit timezone.
 Set `STATE_DIR` to a private, durable campaign directory outside the checkout.
@@ -276,6 +336,24 @@ successful targets. Resolve unknown delivery outcomes against provider records w
 `--reconcile-target` and `--reconcile-outcome`; use `--help` for the exact recovery procedure.
 Do not discard a used plan or remove its lock until the prior sender has stopped.
 A changed cutover date requires a separately reviewed update campaign, not an ordinary retry.
+If cutover passes during sending, the script stops before the next recipient and returns the
+saved partial summary with a nonzero exit status. Pending recipients stay pending; sent and
+unknown outcomes retain their history. Do not send an expired advance notice. Preserve the
+original campaign for reconciliation, and review a future campaign containing only pending or
+provider-confirmed `not_sent` recipients. Explicitly exclude sent and unknown targets; copying
+the entire original cohort into a new directory would notify successful recipients again.
+
+### Cutover verification
+
+- Verify a mode-only owner and an owner with a converted pool.
+- Save each platform mode, restart the worker, and read the saved mode again.
+- Clear the organization override and verify personal-mode inheritance.
+- Clear the personal mode and verify the default.
+- Verify Efficient selects from the platform table despite a retained legacy pool.
+- Edit a non-default custom-router member without changing the default member.
+- Reload the settings page and verify the custom pool, mode, and benchmark difficulty.
+- During tooling retirement, reuse the persisted namespace and verify these settings again.
+- Confirm the retired conversion endpoint returns not found while mode reads and writes remain available.
 
 ## Invariants
 
@@ -285,8 +363,9 @@ A changed cutover date requires a separately reviewed update campaign, not an or
 4. Client measurements are owner-scoped and never affect another owner's routing.
 5. Platform routers require exact engine identity; custom routers serve the newest measurement
    and flag it stale.
-6. The platform pays only for inference that the platform key serves. The owner pays for client
-   inference, judged grading of client outputs, and classification.
+6. The platform pays only for inference that the platform key serves. Linking an entry never
+   starts new platform inference. The owner pays for client inference, judged grading of client
+   outputs, and classification.
 
 ## Consequences
 

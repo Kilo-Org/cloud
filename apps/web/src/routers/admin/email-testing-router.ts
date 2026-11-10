@@ -11,6 +11,7 @@ import {
   subjects,
   creditsVars,
   buildCreditsTopUpCreditsRowSection,
+  buildCreditsTopUpExpirySection,
   buildCreditsTopUpReceiptSection,
   buildCreditsTopUpServiceFeeSection,
   RawHtml,
@@ -23,6 +24,8 @@ import * as z from 'zod';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { format } from 'date-fns';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import { addCalendarYearUtc } from '@kilocode/web-shared/lib/paidCreditPolicy';
 
 const templateNames = Object.keys(subjects) as [TemplateName, ...TemplateName[]];
 
@@ -81,6 +84,22 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
       };
     case 'signInCode':
       return { code: '482913', email: 'user@example.com', expires_in: '10 minutes' };
+    case 'accountLinkCode':
+      return {
+        code: '482913',
+        email: 'user@example.com',
+        provider_name: 'GitHub',
+        expires_in: '10 minutes',
+      };
+    case 'newSignInMethod':
+      return {
+        email: 'user@example.com',
+        provider_name: 'GitHub',
+        linked_identity: 'octocat (user@example.com)',
+        connected_accounts_link: new RawHtml(
+          `<a href="${NEXTAUTH_URL}/connected-accounts">${NEXTAUTH_URL}/connected-accounts</a>`
+        ),
+      };
     case 'balanceAlert':
       return { minimum_balance: '10', organization_url };
     case 'spendAlert':
@@ -242,6 +261,11 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
           hasServiceFee: false,
         }),
         purchase_date: formatDate(new Date()),
+        credit_expiry_section: buildCreditsTopUpExpirySection(
+          getPaidCreditTerms('stripe') === 'one_year'
+            ? new Date(addCalendarYearUtc(new Date()))
+            : null
+        ),
         credits_url: `${NEXTAUTH_URL}/credits`,
         receipt_section: buildCreditsTopUpReceiptSection('https://pay.stripe.com/receipts/test'),
       };

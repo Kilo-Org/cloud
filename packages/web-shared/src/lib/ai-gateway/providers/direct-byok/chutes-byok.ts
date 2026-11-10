@@ -1,25 +1,19 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
-import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import {
+  apiKeyUpstream,
+  type DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'chutes-byok',
+  openrouter_inference_provider_id: 'chutes',
   models_dev_id: 'chutes',
-  base_url: 'https://llm.chutes.ai/v1',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
-  transformRequest() {},
-  models: cachedEnhancedDirectByokModelList({
-    providerId: 'chutes-byok',
-    recommendedModels: [
-      {
-        id: 'moonshotai/Kimi-K2.6-TEE',
-        name: 'Kimi-K2.6',
-        flags: ['vision', 'reasoning'],
-        context_length: 262144,
-        max_completion_tokens: 65535,
-      },
-    ],
+  ...apiKeyUpstream({
+    apiUrl: 'https://llm.chutes.ai/v1',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
+  transformRequest() {},
+  models: cachedDirectByokModelList('chutes-byok'),
 } satisfies DirectByokProvider;

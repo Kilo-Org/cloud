@@ -71,6 +71,7 @@ import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-owners
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { clearLastRoute } from '@/lib/last-route';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
+import { clearLoginDrafts } from '@/lib/login-draft';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
@@ -371,7 +372,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   );
 
   useEffect(() => {
-    // A root-boundary Retry remounts this provider after credentials may have changed.
+    // Android can recreate the activity without restarting JavaScript. Later provider mounts
+    // and root-boundary Retry remounts must read current credentials rather than the snapshot
+    // from before sign-in or a credential change.
     const preload = authPreloadAvailable
       ? { token: preloadedAuthToken, refresh: preloadedRefreshToken }
       : undefined;
@@ -465,6 +468,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // A direct account switch must not keep the prior account's session
         // state: trusted hosts, image confirms, media caches, temp copies.
         clearSessionScopedState();
+        // The sign-in form's drafts belong to the attempt that just succeeded,
+        // whatever provider finished it; a later signed-out screen must not
+        // prefill the previous attempt's address or SSO banner.
+        clearLoginDrafts();
       });
     },
     []

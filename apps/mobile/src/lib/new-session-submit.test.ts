@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   resolveContinueStartDisabled,
+  resolveNewSessionConnectProvider,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
   resolveNewSessionSubmitDisabled,
@@ -403,6 +404,50 @@ function continueReasonInput(overrides: {
   };
 }
 
+describe('resolveNewSessionConnectProvider', () => {
+  it('picks the first connectable group in the section order', () => {
+    expect(
+      resolveNewSessionConnectProvider([
+        { key: 'github', status: 'connect' },
+        { key: 'gitlab', status: 'connect' },
+        { key: 'bitbucket', status: 'connect' },
+      ])
+    ).toBe('github');
+  });
+
+  it('skips groups that are already connected, empty, loading, or failed', () => {
+    expect(
+      resolveNewSessionConnectProvider([
+        { key: 'github', status: 'connected-empty' },
+        { key: 'gitlab', status: 'loading' },
+        { key: 'bitbucket', status: 'connect' },
+      ])
+    ).toBe('bitbucket');
+    expect(
+      resolveNewSessionConnectProvider([
+        { key: 'github', status: 'error' },
+        { key: 'gitlab', status: 'connect' },
+      ])
+    ).toBe('gitlab');
+    expect(
+      resolveNewSessionConnectProvider([
+        { key: 'github', status: 'repos' },
+        { key: 'gitlab', status: 'connect' },
+      ])
+    ).toBe('gitlab');
+  });
+
+  it('returns null when no provider is left to connect', () => {
+    expect(
+      resolveNewSessionConnectProvider([
+        { key: 'github', status: 'repos' },
+        { key: 'gitlab', status: 'connected-empty' },
+      ])
+    ).toBeNull();
+    expect(resolveNewSessionConnectProvider([])).toBeNull();
+  });
+});
+
 describe('resolveNewSessionStartBlockedReason', () => {
   it('returns select-repository when rows exist and none is selected', () => {
     expect(
@@ -568,12 +613,40 @@ describe('resolveNewSessionStartBlockedReason', () => {
     ).toBe('select-repository');
   });
 
-  it('returns null when another precondition blocks Start', () => {
+  it('names the repository/provider step on the initial empty form, before any prompt', () => {
+    // The form opens with an empty composer, so the empty composer must not
+    // hide the step the user can act on: without it Start is disabled with no
+    // reason on screen.
     expect(
       resolveNewSessionStartBlockedReason(
-        newSessionReasonInput({ gate: newSessionGate({ hasPrompt: false }) })
+        newSessionReasonInput({
+          hasRepositories: false,
+          hasConnectableProvider: true,
+          gate: newSessionGate({ hasPrompt: false }),
+        })
       )
-    ).toBeNull();
+    ).toBe('connect-provider');
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          hasRepositories: false,
+          hasConnectableProvider: false,
+          gate: newSessionGate({ hasPrompt: false }),
+        })
+      )
+    ).toBe('refresh-repositories');
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          hasRepositories: true,
+          hasConnectableProvider: true,
+          gate: newSessionGate({ hasPrompt: false }),
+        })
+      )
+    ).toBe('select-repository');
+  });
+
+  it('returns null when another precondition blocks Start', () => {
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({ gate: newSessionGate({ model: '' }) })
@@ -587,6 +660,20 @@ describe('resolveNewSessionStartBlockedReason', () => {
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({ gate: newSessionGate({ isSubmitting: true }) })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          gate: newSessionGate({ hasPrompt: false, attachmentsIsUploading: true }),
+        })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          gate: newSessionGate({ hasPrompt: false, attachmentsHasFailed: true }),
+        })
       )
     ).toBeNull();
   });

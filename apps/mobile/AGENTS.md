@@ -126,9 +126,34 @@ Android searchable `formSheet` routes use only the existing safe-area-capped ful
 Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
 iOS keeps native detent expansion when the search field gains focus.
 
-Scope each PR form header with a native safe-area provider outside the scroll view.
-Apply its top inset with `SafeAreaView`, not the app root inset.
-Direct full-screen entry clears the status bar; presented sheets do not add a second inset.
+A searchable picker in a window shorter than 600pt also presents at the full detent, on either platform.
+The half detent sizes the sheet to its title row and search field, so a short window leaves the list under
+one row and the first result is clipped at the sheet edge (measured in a 501pt-tall iPad window).
+`searchPickerHeaderInList` (`@/lib/form-sheet-detents`) owns that threshold, and the language picker moves
+its search field into the scrolling list there so the title row, its actions, the field and a row stay
+together.
+
+An imperative `Sheet` with `snapPoints` hands its React content the window height on Android, not the
+detent's height, so a body that takes its slack is laid out past the sheet frame and whatever sits at its
+bottom — a dismiss row, a submit row — cannot be reached. Size such a sheet to its content instead, keep
+the rows that must stay reachable at the sheet's own edge, and bound a list that could otherwise push them
+off.
+
+The picker `formSheet` routes the `(app)` layout registers carry a single half detent on Android.
+Android lays a formSheet route's content out at the largest allowed detent, not at the presented one, so a second
+detent leaves the rows below the half sheet's edge outside the frame: the list has nothing to scroll and a drag
+on a row fires that row. One detent bounds the content host to the presented height, so the list scrolls inside
+it. `pickerSheetOptions` in that layout carries it.
+
+A sheet header takes its top clearance from `useSheetHeaderTopClearance` (`@/lib/form-sheet`), never from
+its own safe-area provider: a nested provider reports zero for the header's first frame and the window inset
+once the sheet presents, so the header moves by the status-bar height after it lands. The `SheetHeaderTopInset`
+mode names which surface owns the top of the window (`always` for a full-screen surface that may apply its own
+top edge, `bottom-form-sheet`, `android-window-top`, `ios-page-sheet`, `never`). A formSheet that is its stack's
+first screen presents at the window top and its header reserves the inset; a sheet pushed over another screen
+settles an inset lower, so it reserves nothing — `useRouteIsStackRoot` (`@/lib/navigation/route-focus`) answers
+which, before the first frame.
+Keep `pt-5` for the sheet grabber on top of that clearance.
 
 ## Implementation Rules
 
@@ -146,8 +171,8 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Default exports only where Expo Router requires them, in `src/app/`.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
-- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology.
-- Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
+- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology, and paints the palette's muted pair on Android, where the platform draws no disabled appearance of its own. Mute the row's title beside it; never dim a whole row with opacity.
+- Add reusables with `pnpm reusables add <component> --styling-library nativewind`, in a terminal: it asks before overwriting a file you edited. It runs the version pinned in `package.json`; bump it there, never through a moving tag or `dlx`/`npx`, and never pass `-y`, which auto-answers setup and dependency prompts.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
 - Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.
 - Type dynamic Expo Router paths as `Href`. Never silence route types with `as never`.
@@ -173,9 +198,16 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Every pressable gives lightweight feedback unless navigation or a native control already provides it.
 - Every data screen handles loading, empty, error, and happy states. Use `Skeleton` matching final dimensions, `EmptyState`, and pagination when results can grow.
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
-- Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
+- Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
 - A scroll view takes a horizontal inset through `contentContainerClassName`, never `className`: the scroller's own style does not narrow the scroll content, so an inset there leaves the end side flush in right-to-left layouts. `CenteredState` applies that class to its content box instead, because a `contentContainerStyle` of its own drops the caller's class.
+- Respect padding at every size: content never touches or crosses its container's padding, and opposite sides match unless the design says otherwise.
+- Center single-line content on both axes in its row or control: icons beside text, carets, button labels, badges, and the text and placeholder of single-line inputs.
+- Keep related items closer together than unrelated groups, and use the same gap for the same relation everywhere.
+- Plan long text: a label that can grow truncates with an ellipsis or wraps by design. When secondary text cannot fit, drop it before you squeeze the primary text.
+- Never shift layout when state changes. Reserve the space for spinners, status lines, errors, and copy that comes and goes, or replace content in place.
+- Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
+- Change only the visual properties the task names. A color fix does not change dimensions.
 
 ## Translations
 
@@ -183,12 +215,17 @@ Copy lives in `src/i18n/locales/en.json`. The other 86 catalogs are reviewed
 against the screens their keys render on, so a key's name and its context are
 what a translator has to work from.
 
-- Add and edit copy in `en.json` only. Never hand-edit another catalog. The one
-  exception is a value-level correction of a confirmed mistranslation in an
-  existing non-English entry (a wrong word, not a style preference): fix the
-  value in place, keep the key name, placeholders, and English copy unchanged,
-  verify the corrected string on the screen that renders it, and say so in the
-  pull request. Do not rewrite surrounding entries.
+- Add and edit copy in `en.json` only. Never hand-edit another catalog. The
+  exceptions are value-level edits of an existing non-English entry. For both,
+  keep the key name, the placeholder set, and the surrounding entries as they
+  are, and say so in the pull request:
+  - a confirmed mistranslation, meaning a wrong word rather than a style
+    preference: fix the value in place, leave the English copy unchanged, and
+    verify the corrected string on the screen that renders it;
+  - a change to the meaning of the English copy, or to the surface it names: the
+    existing value in every catalog now describes the old meaning, so update it
+    in each of them, using that catalog's own established wording for the new
+    meaning or surface. `check:i18n` and `check:plurals` still have to pass.
 - Search `en.json` for the string before you add a key. If the copy already
   exists, reuse that key. `pnpm check:i18n` fails when two keys hold the same copy.
 - Put copy used by more than one section under `common.`.
@@ -207,10 +244,35 @@ what a translator has to work from.
 - If one English word truly needs two senses, add it to `TWO_SENSE_COPY` in
   `tools/i18n/check-catalogs.mjs` and record both senses there.
 - Run `pnpm check:i18n` after you touch copy.
+- A key `en.json` gains must reach all 86 catalogs before the pull request
+  merges: `check:i18n` fails on a key one of them lacks, so a change that adds
+  copy either waits for the translation slice or lands the catalog values
+  itself and says so.
 
 ## Design
 
 The app follows https://github.com/Kilo-Org/kilo-design/ in general, except where this file states otherwise.
+
+## Design gate
+
+Before you call a UI change done, run the design gate on every screen and state the change touches:
+
+```bash
+pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standard --out <dir>
+```
+
+- It needs a dev build connected to Metro. The dev-only probe (`src/lib/design-gate/probe.ts`) reports every element's frame, so the gate measures layout in numbers instead of judging a screenshot.
+- Pass one `--link` per changed screen and per state it can show: loading, empty, error, and long text. Open a hard-to-reach state through a fixture link (see Fixtures).
+- The standard matrix covers the default size, dark mode, a compact screen, and right-to-left on Android, and the default size, dark mode, and right-to-left on iOS. It keeps font scale and display density at their defaults.
+- After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
+- Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
+- The sampler retains the newest 400 distinct layouts. A truncation flag in the timeline and motion artifacts marks incomplete capture.
+- Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
+- Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
+- Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
+- A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
+- For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.
+- For an interaction, `pnpm dev:mobile:design-gate motion --link <deep link> --tap <label>` presses the control, reports any layout shift it causes, and records the motion. The press runs the real handler: tap only an action with no effect outside the app, never one that opens a browser, pays, or sends data. The Android emulator renders in software, so judge animation feel on the iOS simulator or a device.
 
 ## Debugging
 
@@ -218,6 +280,10 @@ The app follows https://github.com/Kilo-Org/kilo-design/ in general, except wher
 - Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging.
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
+
+- `pnpm dev:mobile:diagnostics status` names this worktree's dev server, whether the bundler is ready, and how many apps are connected to it.
+- `pnpm dev:mobile:diagnostics errors` prints what the connected app threw, with the project frame of each error. It reads the port of this worktree's dev session and refuses a dev server that serves another worktree.
+- Both use Expo's agent CLI on an explicit dev-server URL. They never start Metro or a build, and they prove no tap: `runtime:tap` and `runtime:tree` invoke props, so use `agent-device` for a touch and `agent-device metro reload` after an edit.
 
 ## Chat tab
 

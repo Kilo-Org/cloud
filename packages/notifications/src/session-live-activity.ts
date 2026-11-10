@@ -1,36 +1,37 @@
-import {
-  glanceableStatusKind,
-  type GlanceableStatusKind,
-} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
-import { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
+import {
+  isDefaultSessionTitle,
+  SESSION_LIVE_COMMAND_LIMIT,
+  SESSION_LIVE_PLAN_STEP_LIMIT,
+  SESSION_LIVE_TARGET_LIMIT,
+  sessionLiveCut,
+  sessionDisplayLine,
+  sessionLiveText,
+  type SessionLiveChanges,
+  type SessionLiveFailureKind,
+  type SessionLivePlan,
+  type SessionLiveStep,
+} from '@kilocode/session-ingest-contracts';
 
 import { LIVE_ACTIVITY_RELEVANCE, type SessionLiveActivityContentState } from './push-data';
 import {
   SESSION_CARD_QUIET_AFTER_MS,
-  type SessionLiveChanges,
-  type SessionLiveFailureKind,
+  type SessionCardStatusKind,
   type SessionLiveOutcomeKind,
-  type SessionLivePlan,
-  type SessionLiveStep,
 } from './session-live-content';
 
-/** The card's status kinds: the shared vocabulary plus a turn that failed. */
-export type SessionCardStatusKind = GlanceableStatusKind | 'failed';
-
 /**
- * The session card title (spec "Content" rule 2): the home widget row title
- * rules, but an untitled session or the backend `New session - <ISO>`
- * placeholder gives null, so the card draws `common.agent` instead.
+ * The session card title (spec "Content" rule 2): trimmed and capped like a
+ * home widget row title, and read through the shared display rule so the card
+ * draws the title text it stands for. An untitled session or the backend
+ * `New session - <ISO>` placeholder gives null, so the card draws
+ * `common.agent` instead.
  */
 export function sessionLiveActivityTitle(raw: string | null | undefined): string | null {
-  // eslint-disable-next-line no-control-regex
-  const title = (raw ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+  const title = sessionDisplayLine(raw ?? '').trim();
   if (title === '' || isDefaultSessionTitle(title)) return null;
-  const bounded = title.slice(0, HOME_WIDGET_TITLE_LIMIT);
-  // Do not end a truncated title in the middle of a UTF-16 surrogate pair.
-  const last = bounded.charCodeAt(bounded.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? bounded.slice(0, -1) : bounded;
+  return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
 }
 
 /** The facts of one session row that the session card shows. */
@@ -62,9 +63,15 @@ export type SessionLiveActivityBuildOptions = {
   previous?: Partial<SessionLiveActivityContentState> | undefined;
 };
 
-function isoOrNull(value: string | null | undefined): string | null {
+/** Epoch milliseconds of one backend time, or null when it is missing or does not parse. */
+function parseTimestampMs(value: string | null | undefined): number | null {
   const at = value == null ? Number.NaN : Date.parse(value);
-  return Number.isFinite(at) ? new Date(at).toISOString() : null;
+  return Number.isFinite(at) ? at : null;
+}
+
+function isoOrNull(value: string | null | undefined): string | null {
+  const at = parseTimestampMs(value);
+  return at === null ? null : new Date(at).toISOString();
 }
 
 /** The larger of the stored and the new cost, so a local update never lowers it. */
@@ -104,6 +111,8 @@ function outcomeKind(
  *   failure and clears the remembered one; a row with no `failure` key at all
  *   cannot report it either way, so the remembered failure survives, which is
  *   what keeps a push-delivered `failed` card through a tray rebuild.
+ * - Every text field is read through the shared display rule before it reaches
+ *   the card, so a value from any producer draws as the line it stands for.
  */
 export function buildSessionLiveActivityContentState(
   row: SessionLiveActivityRow,
@@ -116,6 +125,9 @@ export function buildSessionLiveActivityContentState(
   const approvalKey = row.status === 'permission' ? options.approvalKey : null;
   const changes = row.changes ?? previous?.changes ?? null;
   const finished = statusKind === 'idle' || statusKind === 'failed';
+  const step = row.currentStep ?? previous?.currentStep ?? null;
+  const plan = row.plan ?? previous?.plan ?? null;
+  const command = row.permissionCommand ?? previous?.permissionCommand ?? null;
   return {
     sessionId: row.id,
     title: sessionLiveActivityTitle(row.title),
@@ -125,10 +137,16 @@ export function buildSessionLiveActivityContentState(
     awaitingPermission: approvalKey !== null,
     approvalKey,
     updatedAt: options.updatedAt,
-    currentStep: row.currentStep ?? previous?.currentStep ?? null,
-    plan: row.plan ?? previous?.plan ?? null,
+    currentStep:
+      step === null
+        ? null
+        : { ...step, target: sessionLiveText(step.target, SESSION_LIVE_TARGET_LIMIT) },
+    plan:
+      plan === null
+        ? null
+        : { ...plan, current: sessionLiveText(plan.current, SESSION_LIVE_PLAN_STEP_LIMIT) },
     permissionCommand:
-      approvalKey === null ? null : (row.permissionCommand ?? previous?.permissionCommand ?? null),
+      approvalKey === null ? null : sessionLiveText(command, SESSION_LIVE_COMMAND_LIMIT),
     changes,
     lastActivityAt: isoOrNull(row.lastActivityAt) ?? previous?.lastActivityAt ?? null,
     costMicrodollars: maxCost(previous?.costMicrodollars, row.costMicrodollars),
@@ -149,12 +167,11 @@ export function buildSessionLiveActivityContentState(
  */
 export function sessionCardStaleAtSeconds(
   content: Pick<SessionLiveActivityContentState, 'statusKind' | 'lastActivityAt'>,
-  nowSeconds: number,
   defaultStaleAtSeconds: number
 ): number {
   if (content.statusKind !== 'running') return defaultStaleAtSeconds;
-  const at = content.lastActivityAt == null ? Number.NaN : Date.parse(content.lastActivityAt);
-  if (!Number.isFinite(at)) return defaultStaleAtSeconds;
+  const at = parseTimestampMs(content.lastActivityAt);
+  if (at === null) return defaultStaleAtSeconds;
   return Math.min(
     defaultStaleAtSeconds,
     Math.floor(at / 1000) + SESSION_CARD_QUIET_AFTER_MS / 1000
@@ -178,8 +195,8 @@ const RECENCY_HALF_MS = 365 * 24 * 60 * 60_000;
  * a newer change first, and a bounded term so no tie-break can leave its band.
  */
 function recencyTerm(changedAt: string | null): number {
-  const at = changedAt === null ? Number.NaN : Date.parse(changedAt);
-  if (!Number.isFinite(at)) return 0;
+  const at = parseTimestampMs(changedAt);
+  if (at === null) return 0;
   const elapsed = Math.max(0, at - RECENCY_ORIGIN_MS);
   return Math.min(19, (19 * elapsed) / (elapsed + RECENCY_HALF_MS));
 }

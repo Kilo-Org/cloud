@@ -230,6 +230,11 @@ const exchangeSafeClaimNames: ReadonlySet<string> = new Set([
   'deviceAuthRequestCode',
 ] satisfies (keyof KiloTokenPolicyClaims)[]);
 
+const legacyExchangeSafeClaimNames: Record<string, true> = {
+  ...Object.fromEntries([...exchangeSafeClaimNames].map(name => [name, true] as const)),
+  deviceSessionId: true,
+};
+
 function hasOnlyExchangeSafeClaims(claimNames: readonly string[]): boolean {
   return claimNames.every(name => exchangeSafeClaimNames.has(name));
 }
@@ -256,14 +261,16 @@ export function isKiloCredentialExchangeEligible(
   const { claims } = auth;
   const now = Math.floor(Date.now() / 1000);
   if (claims.iat > now || claims.exp <= now || claims.exp <= claims.iat) return false;
-  if (!hasExchangeSafeCredentialClaims(claims, auth.claimNames)) return false;
+  if (claims.apiTokenPepper === undefined) return false;
   if (claims.tokenPurpose !== undefined || claims.credentialExchange !== undefined) {
+    if (!hasOnlyExchangeSafeClaims(auth.claimNames)) return false;
     return (
       claims.tokenPurpose === 'human-api' &&
       claims.credentialExchange === true &&
       hasSoleKiloApiAudience(claims.aud)
     );
   }
+  if (!auth.claimNames.every(name => legacyExchangeSafeClaimNames[name] === true)) return false;
   return (
     policy.legacy === 'five-year-api' &&
     claims.aud === undefined &&

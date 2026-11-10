@@ -28,7 +28,7 @@
 //     the mutation hooks own the cache update + rollback, so the
 //     thread just routes the events and lets the cache flow.
 
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { CheckCheck, ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -48,6 +48,7 @@ import {
   type ReviewThread,
   selectThreadAnchorLabel,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import { commentAuthorRowTopPadding } from '@/lib/pr-review/comment-trailing-controls';
 import { selectThreadDiffSnippet } from '@/lib/pr-review/discussion/thread-diff-snippet';
 import {
   useAddReactionMutation,
@@ -57,8 +58,12 @@ import {
   useUnresolveThreadMutation,
 } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { providerPrCapabilities, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
+
+// The separator's 14dp (`pt-4`) inset, measured to the next author row's circle.
+const SEPARATED_COMMENT_PADDING = commentAuthorRowTopPadding(14);
 
 type DiscussionThreadProps = {
   readonly owner: string;
@@ -126,7 +131,7 @@ export function DiscussionThread({
   const isReacting = addReaction.isPending || removeReaction.isPending;
 
   const onToggleResolve = () => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     if (thread.isResolved) {
       unresolve.mutate({ threadId: thread.threadId });
     } else {
@@ -181,7 +186,11 @@ export function DiscussionThread({
         {diffSnippet ? <ThreadDiffSnippet snippet={diffSnippet} /> : null}
         <View className="gap-4">
           {thread.comments.map((comment, index) => (
-            <View key={comment.nodeId} className={cn(index > 0 && 'border-t border-border pt-4')}>
+            <View
+              key={comment.nodeId}
+              style={index > 0 ? SEPARATED_COMMENT_PADDING : undefined}
+              className={cn(index > 0 && 'border-t border-border')}
+            >
               <CommentRow
                 comment={comment}
                 owner={owner}
@@ -269,7 +278,8 @@ function ThreadHeader({
 }: Readonly<ThreadHeaderProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const relative = firstTimestamp ? timeAgo(parseTimestamp(firstTimestamp)) : null;
+  const now = useRelativeTimeNow();
+  const relative = firstTimestamp ? timeAgo(parseTimestamp(firstTimestamp), undefined, now) : null;
   const LabelRow = (expanded ? Pressable : View) as typeof View;
   const labelRowA11y = expanded
     ? ({

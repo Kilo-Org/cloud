@@ -20,6 +20,7 @@ export type Profile = 'local' | 'deployed' | 'local-http';
 export type CapabilityName =
   | 'sandbox'
   | 'sessionSandbox'
+  | 'database'
   | 'deployedHttpAuthBoundary'
   | 'callbacks'
   | 'gates'
@@ -436,6 +437,8 @@ export type ScenarioEnvironment = {
   reclaimSessions?: SandboxReclaim;
   sandbox?: SandboxObservation;
   sessionSandbox?: SessionSandboxObservation;
+  /** Direct Postgres access for setup that has no public API, such as profiles. */
+  database?: { url: string };
   deployedHttpAuthBoundary?: DeployedAuthBoundaryObservation;
   callbacks?: CallbackObservation;
   gates?: GatesObservation;

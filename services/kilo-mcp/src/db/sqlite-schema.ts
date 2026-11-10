@@ -27,6 +27,7 @@ export const oauthPendingAuthorizations = sqliteTable(
     auth_request: text('auth_request').notNull(),
     /** The apps/web device-auth pairing code (`code` from POST /api/device-auth/codes). */
     device_auth_code: text('device_auth_code').notNull(),
+    user_code: text('user_code'),
     status: text('status', {
       enum: ['pending', 'approved', 'denied', 'expired', 'completed'],
     }).notNull(),
@@ -49,6 +50,9 @@ export const oauthPendingAuthorizations = sqliteTable(
   },
   table => [
     uniqueIndex('uq_oauth_pending_authorizations_device_auth_code').on(table.device_auth_code),
+    // Housekeeping reads expired rows by `expires_at`; the index lets each
+    // batch stop after its own rows instead of scanning the table.
+    index('idx_oauth_pending_authorizations_expires_at').on(table.expires_at),
   ]
 );
 

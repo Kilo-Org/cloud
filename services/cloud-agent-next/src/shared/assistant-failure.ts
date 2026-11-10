@@ -1,3 +1,4 @@
+import type { KiloSdkAssistantError } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 import type {
   CloudAgentAssistantFailureReason,
@@ -130,6 +131,14 @@ export function isAssistantInterrupt(source: unknown): boolean {
   );
 }
 
+export function missingAgentSlug(source: unknown): string | undefined {
+  const message = assistantFailureText(source).replace(/^\[BYOK\] /, '');
+  return (
+    /^Agent not found: "([a-z][a-z0-9-]{0,49})"\./.exec(message)?.[1] ??
+    /^Agent "([a-z][a-z0-9-]{0,49})" was not found in the repository or profile$/.exec(message)?.[1]
+  );
+}
+
 export function classifyAssistantFailure(
   source: unknown,
   defaultProviderOwnership: CloudAgentProviderOwnership = 'unknown'
@@ -140,6 +149,14 @@ export function classifyAssistantFailure(
     /\[byok\]/i.test(message) || gatewayErrorType === 'byok_error'
       ? 'byok'
       : defaultProviderOwnership;
+  const missingAgent = missingAgentSlug(source);
+  if (missingAgent !== undefined) {
+    return {
+      reason: 'invalid_request',
+      safeMessage: `Agent "${missingAgent}" was not found in the repository or profile`,
+      providerOwnership,
+    };
+  }
   const messageReason = classifyAssistantFailureText(message);
   const specificMessageReason =
     messageReason !== 'unknown' &&
@@ -493,4 +510,53 @@ export function assistantReportsNoActionableOutput(parts: readonly unknown[]): b
   }
   const text = texts.join('\n');
   return /no actionable output/i.test(text) && /(?:output|token) limit/i.test(text);
+}
+
+export function projectSafeSdkAssistantError(source: unknown): KiloSdkAssistantError | undefined {
+  const message = projectSafeAssistantError(source);
+  if (message === undefined) return undefined;
+  if (isAssistantInterrupt(source)) return { name: 'MessageAbortedError', data: { message } };
+  if (typeof source === 'object' && source !== null && !Array.isArray(source) && 'name' in source) {
+    const data =
+      'data' in source &&
+      typeof source.data === 'object' &&
+      source.data !== null &&
+      !Array.isArray(source.data)
+        ? source.data
+        : {};
+    switch (source.name) {
+      case 'ProviderAuthError':
+        return { name: source.name, data: { providerID: 'unknown', message } };
+      case 'MessageOutputLengthError':
+      case 'ContextOverflowError':
+        return { name: source.name, data: { message } };
+      case 'APIError': {
+        if (!('isRetryable' in data) || typeof data.isRetryable !== 'boolean') break;
+        const statusCode = 'statusCode' in data ? data.statusCode : undefined;
+        return {
+          name: source.name,
+          data: {
+            message,
+            isRetryable: data.isRetryable,
+            ...(typeof statusCode === 'number' &&
+            Number.isInteger(statusCode) &&
+            statusCode >= 100 &&
+            statusCode <= 599
+              ? { statusCode }
+              : {}),
+          },
+        };
+      }
+      case 'StructuredOutputError':
+        if (
+          'retries' in data &&
+          typeof data.retries === 'number' &&
+          Number.isSafeInteger(data.retries) &&
+          data.retries >= 0
+        ) {
+          return { name: source.name, data: { message, retries: data.retries } };
+        }
+    }
+  }
+  return { name: 'UnknownError', data: { message } };
 }

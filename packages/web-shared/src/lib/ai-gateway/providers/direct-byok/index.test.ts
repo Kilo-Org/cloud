@@ -1,21 +1,27 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { generateText } from 'ai';
-import { COMPATIBLE_USER_AGENT, type DirectByokModel } from './types';
+import {
+  COMPATIBLE_USER_AGENT,
+  type DirectByokModel,
+  type DirectByokProvider,
+  type DirectByokUpstream,
+} from './types';
+import type * as DirectByokTypes from './types';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
-  getUserByokProviderIds: jest.fn(),
-  getOrganizationByokProviderIds: jest.fn(),
+  getEnabledByokProviders: jest.fn(),
   getBYOKforUser: jest.fn(),
   getBYOKforOrganization: jest.fn(),
 }));
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
-  getPreferredModels: jest.fn(async () => []),
-}));
+function enabledKeys(...providerIds: UserByokProviderId[]) {
+  return providerIds.map(providerId => ({ providerId, serveCatalogModels: false }));
+}
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => ({
   getAiSdkProvider: jest.fn(),
@@ -30,8 +36,11 @@ jest.mock('./direct-byok-definitions', () => ({
   default: [
     {
       id: 'chutes-byok',
-      base_url: 'https://chutes.example.com/v1',
-      base_url_overrides: {},
+      ...jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+        apiUrl: 'https://chutes.example.com/v1',
+        supportedChatApis: ['chat_completions'],
+        responseTransforms: 'reasoning-content',
+      }),
       models: jest.fn(async () => [
         {
           id: 'supported-model',
@@ -49,14 +58,15 @@ jest.mock('./direct-byok-definitions', () => ({
           max_completion_tokens: 1024,
         },
       ]),
-      supported_chat_apis: ['chat_completions'],
-      reasoning_details_transform: 'reasoning-content',
       transformRequest: jest.fn(),
     },
     {
       id: 'orcarouter',
-      base_url: 'https://orcarouter.example.com/v1',
-      base_url_overrides: {},
+      ...jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+        apiUrl: 'https://orcarouter.example.com/v1',
+        supportedChatApis: ['chat_completions'],
+        responseTransforms: 'reasoning-content',
+      }),
       models: jest.fn(async () => [
         {
           id: 'other-model',
@@ -65,8 +75,6 @@ jest.mock('./direct-byok-definitions', () => ({
           max_completion_tokens: 1024,
         },
       ]),
-      supported_chat_apis: ['chat_completions'],
-      reasoning_details_transform: 'reasoning-content',
       transformRequest: jest.fn(),
     },
   ],
@@ -99,11 +107,11 @@ describe('createAiSdkProvider session headers', () => {
     const fetchMock = mockCompletions().mockResolvedValueOnce(
       new Response('Temporary failure', { status: 500 })
     );
-    const firstProbe = createAiSdkProvider(provider, 'test-key');
+    const firstProbe = await createAiSdkProvider(provider, 'test-key', 'test-model');
 
     await generateText({ model: firstProbe('test-model'), prompt: 'Say hi', maxRetries: 1 });
     await generateText({
-      model: createAiSdkProvider(provider, 'test-key')('test-model'),
+      model: (await createAiSdkProvider(provider, 'test-key', 'test-model'))('test-model'),
       prompt: 'Say hi',
       maxRetries: 0,
     });
@@ -127,13 +135,113 @@ describe('createAiSdkProvider session headers', () => {
     const fetchMock = mockCompletions();
 
     await generateText({
-      model: createAiSdkProvider(directByokProviders[0], 'test-key')('test-model'),
+      model: (await createAiSdkProvider(directByokProviders[0], 'test-key', 'test-model'))(
+        'test-model'
+      ),
       prompt: 'Say hi',
       maxRetries: 0,
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).has('x-opencode-session')).toBe(false);
+  });
+});
+
+describe('createAiSdkProvider resolved upstream', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const baseUpstream: DirectByokUpstream = {
+    apiUrl: 'https://upstream.example/v1',
+    apiUrlOverrides: {},
+    disableUrlSuffix: false,
+    apiKey: 'resolved-key',
+    apiKeyHeader: null,
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: null,
+  };
+
+  function providerWith(upstream: DirectByokUpstream): DirectByokProvider {
+    return {
+      id: 'chutes-byok',
+      openrouter_inference_provider_id: 'chutes',
+      supportedChatApis: upstream.supportedChatApis,
+      resolveUpstream: async () => upstream,
+      transformRequest() {},
+      models: async () => [],
+    };
+  }
+
+  async function sendTestRequest(upstream: DirectByokUpstream) {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      Response.json({
+        id: 'test-completion',
+        object: 'chat.completion',
+        created: 0,
+        model: 'test-model',
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'Hi' }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      })
+    );
+    const { createAiSdkProvider } = await import('.');
+    const aiSdkProvider = await createAiSdkProvider(providerWith(upstream), 'stored', 'test-model');
+    await generateText({ model: aiSdkProvider('test-model'), prompt: 'Say hi', maxRetries: 0 });
+    const [url, init] = fetchMock.mock.calls[0];
+    return { url: String(url), headers: new Headers(init?.headers) };
+  }
+
+  test('uses the Chat Completions URL override and the x-api-key header', async () => {
+    const { url, headers } = await sendTestRequest({
+      ...baseUpstream,
+      apiUrlOverrides: { chat_completions: 'https://chat.upstream.example/v2' },
+      apiKeyHeader: 'x-api-key',
+    });
+
+    expect(url).toBe('https://chat.upstream.example/v2/chat/completions');
+    expect(headers.get('x-api-key')).toBe('resolved-key');
+    expect(headers.has('authorization')).toBe(false);
+  });
+
+  test('signs requests for AWS Bedrock credentials instead of sending a bearer key', async () => {
+    const { headers } = await sendTestRequest({
+      ...baseUpstream,
+      apiKey: '',
+      awsBedrock: {
+        type: 'aws_bedrock',
+        region: 'eu-west-1',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'secret',
+      },
+    });
+
+    expect(headers.get('authorization')).toMatch(
+      /^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\/\d{8}\/eu-west-1\/bedrock\/aws4_request/
+    );
+  });
+
+  test('posts to the URL itself when the upstream disables the path suffix', async () => {
+    const { url } = await sendTestRequest({
+      ...baseUpstream,
+      apiUrl: 'https://upstream.example/models/test-model:predict',
+      disableUrlSuffix: true,
+    });
+
+    expect(url).toBe('https://upstream.example/models/test-model:predict');
+  });
+
+  test('rejects models the provider does not serve over Chat Completions', async () => {
+    const { createAiSdkProvider } = await import('.');
+
+    await expect(
+      createAiSdkProvider(
+        providerWith({ ...baseUpstream, supportedChatApis: ['messages'] }),
+        'stored',
+        'test-model'
+      )
+    ).rejects.toThrow('chutes-byok does not serve test-model over Chat Completions');
   });
 });
 
@@ -180,8 +288,8 @@ describe('getDirectByokModel', () => {
 
   test('advertises only the reasoning parameter for reasoning models', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
-    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+    const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
 
     const models = await getDirectByokModelsForUser('user-id');
 
@@ -202,10 +310,10 @@ describe('getDirectByokModel', () => {
 
   test('uses the default AI SDK provider unless a model-specific provider applies', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
     const { getAiSdkProvider } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
-    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+    jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
     jest.mocked(getAiSdkProvider).mockReturnValueOnce('anthropic').mockReturnValueOnce(undefined);
 
     const models = await getDirectByokModelsForUser('user-id');
@@ -213,12 +321,32 @@ describe('getDirectByokModel', () => {
     expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['anthropic', undefined]);
   });
 
+  test('derives the AI SDK provider from the chat API a provider assigns each model', async () => {
+    const { directByokProviders, getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getAiSdkProvider } =
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
+    const provider: DirectByokProvider = directByokProviders[0];
+    provider.getModelChatApi = model =>
+      model.id === 'supported-model' ? 'responses' : 'chat_completions';
+    jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
+
+    try {
+      const models = await getDirectByokModelsForUser('user-id');
+
+      expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['openai', undefined]);
+      expect(getAiSdkProvider).not.toHaveBeenCalled();
+    } finally {
+      delete provider.getModelChatApi;
+    }
+  });
+
   test('does not fall back to model-name variants when reasoning is unsupported', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
     const { getFallbackReasoningOptions } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options');
-    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+    jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
     jest.mocked(getFallbackReasoningOptions).mockReturnValue([{ type: 'toggle' }]);
 
     const models = await getDirectByokModelsForUser('user-id');
@@ -234,24 +362,23 @@ describe('getDirectByokModel', () => {
   test('lists models from enabled provider ids without reading stored key material', async () => {
     const { getDirectByokModelsForUser, getDirectByokModelsForOrganization } =
       await loadDirectByokModule();
-    const {
-      getUserByokProviderIds,
-      getOrganizationByokProviderIds,
-      getBYOKforUser,
-      getBYOKforOrganization,
-    } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getEnabledByokProviders, getBYOKforUser, getBYOKforOrganization } =
+      await import('@kilocode/web-shared/lib/ai-gateway/byok');
 
-    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+    jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
     const userModels = await getDirectByokModelsForUser('user-id');
 
-    jest.mocked(getOrganizationByokProviderIds).mockResolvedValueOnce(['orcarouter']);
+    jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('orcarouter'));
     const organizationModels = await getDirectByokModelsForOrganization('organization-id');
 
-    expect(getUserByokProviderIds).toHaveBeenCalledWith(expect.anything(), 'user-id');
-    expect(getOrganizationByokProviderIds).toHaveBeenCalledWith(
-      expect.anything(),
-      'organization-id'
-    );
+    expect(getEnabledByokProviders).toHaveBeenCalledWith(expect.anything(), {
+      type: 'user',
+      id: 'user-id',
+    });
+    expect(getEnabledByokProviders).toHaveBeenCalledWith(expect.anything(), {
+      type: 'organization',
+      id: 'organization-id',
+    });
     expect(userModels.map(model => model.id)).toEqual([
       'chutes-byok/supported-model',
       'chutes-byok/non-reasoning-model',
@@ -263,8 +390,8 @@ describe('getDirectByokModel', () => {
 
   test('carries a provider description into the catalog entry and leaves others empty', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
-    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+    const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
 
     const models = await getDirectByokModelsForUser('user-id');
 
@@ -274,14 +401,6 @@ describe('getDirectByokModel', () => {
     ]);
   });
 });
-
-function deferred<T>() {
-  const { promise, resolve } = Promise.withResolvers<T>();
-  return { promise, resolve };
-}
-
-/** Lets every pending promise continuation run, however many links the chain has. */
-const flushPromiseChain = () => new Promise<void>(resolveFlush => setImmediate(resolveFlush));
 
 describe('direct BYOK preferred indexes', () => {
   const providerModels = [
@@ -303,45 +422,28 @@ describe('direct BYOK preferred indexes', () => {
     jest.clearAllMocks();
   });
 
-  test('numbers recommended models in declared provider order whatever the settle order', async () => {
-    const { directByokProviders, getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
-    const { getPreferredModels } =
-      await import('@kilocode/web-shared/lib/ai-gateway/preferred-models');
-
-    async function listModels(settleOrder: 'declared' | 'reversed') {
-      const pending = directByokProviders.map(() => deferred<ReadonlyArray<DirectByokModel>>());
-      directByokProviders.forEach((provider, index) => {
-        const modelsMock = provider.models as unknown as jest.Mock<
-          () => Promise<ReadonlyArray<DirectByokModel>>
-        >;
-        modelsMock.mockImplementationOnce(() => pending[index].promise);
+  test.each(['getDirectByokModelsForUser', 'getDirectByokModelsForOrganization'] as const)(
+    '%s omits preferred indexes even for stored recommended models',
+    async method => {
+      const byok = await loadDirectByokModule();
+      const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+      byok.directByokProviders.forEach((provider: DirectByokProvider, index) => {
+        jest.mocked(provider.models).mockResolvedValueOnce(providerModels[index]);
       });
-      jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['orcarouter', 'chutes-byok']);
-      jest.mocked(getPreferredModels).mockResolvedValueOnce(['gateway/one', 'gateway/two']);
+      jest
+        .mocked(getEnabledByokProviders)
+        .mockResolvedValueOnce(enabledKeys('orcarouter', 'chutes-byok'));
 
-      const listing = getDirectByokModelsForUser('user-id');
-      await flushPromiseChain();
-      const resolutionOrder = settleOrder === 'declared' ? [0, 1] : [1, 0];
-      for (const index of resolutionOrder) {
-        pending[index].resolve(providerModels[index]);
-        await flushPromiseChain();
+      const models = await byok[method]('owner-id');
+
+      expect(models.map(model => model.id)).toEqual([
+        'chutes-byok/first',
+        'chutes-byok/second',
+        'orcarouter/third',
+      ]);
+      for (const model of models) {
+        expect(model).not.toHaveProperty('preferredIndex');
       }
-
-      return (await listing).map(model => ({
-        id: model.id,
-        preferredIndex: model.preferredIndex,
-      }));
     }
-
-    const declaredSettleOrder = await listModels('declared');
-    const reversedSettleOrder = await listModels('reversed');
-
-    expect(reversedSettleOrder).toEqual(declaredSettleOrder);
-    expect(declaredSettleOrder).toEqual([
-      { id: 'chutes-byok/first', preferredIndex: 2 },
-      { id: 'chutes-byok/second', preferredIndex: 3 },
-      { id: 'orcarouter/third', preferredIndex: 4 },
-    ]);
-  });
+  );
 });

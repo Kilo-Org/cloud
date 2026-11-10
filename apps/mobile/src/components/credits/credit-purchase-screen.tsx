@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The Buy credits screen composes the store banner, loading, empty, error, and pack-row surfaces; each is a small rendered surface that mirrors the shared header/scroll pattern. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -15,16 +15,22 @@ import { Text } from '@/components/ui/text';
 import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
-import { type StoreCreditProduct } from '@/lib/credits/store-products';
+import {
+  getStoreCreditExpiryMessageKey,
+  type StoreCreditProduct,
+} from '@/lib/credits/store-products';
 import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatUsd } from '@/lib/format';
+import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { useTRPC } from '@/lib/trpc';
+import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
 import { useCreditNativeIap } from './credit-native-iap-owner';
+import { CreditExpiryNote } from './credit-expiry-note';
 
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
@@ -68,6 +74,13 @@ export function CreditPurchaseScreen() {
     placeholderData: keepPreviousData,
   });
   const refetchBalance = balanceQuery.refetch;
+  const creditBlocksQuery = useQuery(trpc.user.getCreditBlocks.queryOptions({}));
+
+  // The amount here is the same one the Profile credits card masks, so the
+  // same preference rules this screen. Until the disk read settles the choice
+  // is unknown and the amounts stay masked.
+  const { hideBalance, hasLoaded: hideBalanceLoaded } = useHideBalancePreference();
+  const hideBalanceAmount = hideBalance || !hideBalanceLoaded;
 
   const [privacyPolicyLink, termsOfUseLink] = getStoreLegalLinks(WEB_BASE_URL);
 
@@ -97,7 +110,7 @@ export function CreditPurchaseScreen() {
   const storeBannerBodyKey = productsErrorMessageKey ?? storeUnavailableCopy.bodyKey;
 
   const handlePackPress = (pack: StoreCreditProduct) => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     clearError();
     void purchase(pack);
   };
@@ -120,9 +133,19 @@ export function CreditPurchaseScreen() {
         </Pressable>
       );
     }
+    // Always pass the label: a node React Native stops handing a label keeps
+    // its previous native value on Android, so a masked amount that reveals
+    // itself would still announce "Balance hidden" (the credits card's note).
     return (
-      <Text className="text-2xl font-bold tabular-nums">
-        {formatMoney(balanceQuery.data.balance, i18n.language)}
+      <Text
+        className="text-2xl font-bold tabular-nums"
+        accessibilityLabel={
+          hideBalanceAmount
+            ? t('profile.balanceHidden')
+            : formatMoney(balanceQuery.data.balance, i18n.language)
+        }
+      >
+        {hideBalanceAmount ? HIDDEN_BALANCE : formatMoney(balanceQuery.data.balance, i18n.language)}
       </Text>
     );
   };
@@ -141,6 +164,12 @@ export function CreditPurchaseScreen() {
               {t('profile.credits')}
             </Text>
             {renderBalanceValue()}
+            {!balancePending && !balanceFailed && (
+              <CreditExpiryNote
+                creditBlocks={creditBlocksQuery.data?.creditBlocks ?? []}
+                hiddenAmount={hideBalanceAmount ? HIDDEN_BALANCE : undefined}
+              />
+            )}
           </View>
 
           {/* The purchase error is rendered inline (the store sheet has just
@@ -182,15 +211,12 @@ export function CreditPurchaseScreen() {
 
           {isLoading &&
             Array.from({ length: PACK_SKELETON_ROWS }, (_, index) => (
-              // Mirror the pack row's own shell (p-5 + one text-base line) so
-              // the placeholder and the row it swaps with are the same height.
-              // Kilo Pass's 112px placeholder is two lines tall; reusing it
-              // here would drop the legal copy ~192px when the rows arrive.
               <View key={index} className="rounded-xl border border-border bg-card p-5">
                 <View className="flex-row items-start justify-between gap-4">
                   <Skeleton className="h-6 flex-1 rounded" />
                   <Skeleton className="h-6 w-16 rounded" />
                 </View>
+                <Skeleton className="mt-2 h-8 w-full rounded" />
               </View>
             ))}
 
@@ -199,6 +225,8 @@ export function CreditPurchaseScreen() {
               const packLabel = t('credits.packLabel', {
                 amount: formatUsd(pack.backend.amountUsd, i18n.language),
               });
+              const expiryMessageKey = getStoreCreditExpiryMessageKey(pack.backend, storefront);
+              const expiryMessage = expiryMessageKey ? t(expiryMessageKey) : undefined;
               const hasStorePrice = pack.storeProductId !== null && pack.displayPrice !== null;
               const rowCompleting =
                 completingProductId !== null && completingProductId === pack.storeProductId;
@@ -212,7 +240,9 @@ export function CreditPurchaseScreen() {
               // The row is one accessible element: the explicit label replaces
               // its children, so the charge and the disabled reason must be in
               // the label itself (the canonical Kilo Pass row does the same).
-              const rowAccessibilityLabel = [packLabel, priceLabel].join(', ');
+              const rowAccessibilityLabel = [packLabel, priceLabel, expiryMessage]
+                .filter(Boolean)
+                .join(', ');
 
               return (
                 <Pressable
@@ -235,6 +265,9 @@ export function CreditPurchaseScreen() {
                       {priceLabel}
                     </Text>
                   </View>
+                  {expiryMessage && (
+                    <Text className="mt-2 text-xs text-muted-foreground">{expiryMessage}</Text>
+                  )}
                 </Pressable>
               );
             })}

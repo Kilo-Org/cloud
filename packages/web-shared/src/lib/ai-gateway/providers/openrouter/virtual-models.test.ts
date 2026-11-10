@@ -9,7 +9,7 @@ import type {
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 const SONNET = 'anthropic/claude-sonnet-5';
 const SONNET_LATEST = '~anthropic/claude-sonnet-latest';
@@ -67,7 +67,7 @@ function catalogModel(
   };
 }
 
-function storedModel(id: string, aliasTarget?: string): StoredModel {
+function storedModel(id: string, aliasTarget?: string): GatewayModelWithEndpoints {
   return {
     id,
     name: id,
@@ -118,13 +118,16 @@ describe('injectVirtualModels', () => {
     });
   });
 
-  test('lists providerless routers under the virtual provider', () => {
-    const providerModelData = [{ provider: provider('typesafe'), models: [snapshotModel(SONNET)] }];
+  test.each([
+    ['typesafe/jev-router', 'TypeSafe: Jev Router', 'typesafe'],
+    ['nvidia/switchyard', 'NVIDIA: Switchyard', 'nvidia'],
+  ])('lists providerless router %s under the virtual provider', (id, name, author) => {
+    const providerModelData = [{ provider: provider(author), models: [snapshotModel(SONNET)] }];
 
     injectVirtualModels({
       providerModelData,
       catalogModels: [
-        catalogModel('typesafe/jev-router', 'TypeSafe: Jev Router'),
+        catalogModel(id, name),
         catalogModel('openrouter/free', 'Free Models Router', { prompt: '0', completion: '0' }),
       ],
       storedModels: {},
@@ -136,10 +139,10 @@ describe('injectVirtualModels', () => {
     );
     expect(virtual?.models).toEqual([
       {
-        slug: 'typesafe/jev-router',
-        name: 'TypeSafe: Jev Router',
-        author: 'typesafe',
-        description: 'TypeSafe: Jev Router description',
+        slug: id,
+        name,
+        author,
+        description: `${name} description`,
         context_length: 2_000_000,
         input_modalities: ['text', 'image'],
         output_modalities: ['text'],

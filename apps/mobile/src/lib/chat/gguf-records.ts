@@ -39,6 +39,8 @@ export type GgufDownload = {
   readonly fileId: string;
   readonly name: string;
   readonly phase: 'downloading' | 'paused' | 'verifying';
+  /** True while a pause or a cancel was requested and the task has not settled it yet. */
+  readonly pending: boolean;
   /** The model file and its projector together, so one bar covers both. */
   readonly written: number;
   /** Zero until the server states a length. */

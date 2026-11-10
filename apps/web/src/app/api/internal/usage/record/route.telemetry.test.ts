@@ -13,6 +13,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => ({
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   pool: { totalCount: 1, idleCount: 1, waitingCount: 0, options: { max: 10 } },
 }));
+const writerPool = jest.requireMock<{
+  pool: { totalCount: number; idleCount: number; waitingCount: number };
+}>('@kilocode/web-shared/lib/drizzle').pool;
 
 const id = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
 const createdAt = '2026-08-05T10:11:12.945Z';
@@ -71,6 +74,7 @@ function request(source?: string, secret = 'synthetic-route-secret', body: unkno
 
 beforeEach(() => {
   persist.mockReset().mockResolvedValue(recorded);
+  Object.assign(writerPool, { totalCount: 1, idleCount: 1, waitingCount: 0 });
   jest.spyOn(Math, 'random').mockReturnValue(1);
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'info').mockImplementation(() => {});
@@ -108,8 +112,11 @@ describe('usage writer telemetry caller context', () => {
     const logs = [console.log, console.info, console.warn, console.error].flatMap(
       log => jest.mocked(log).mock.calls
     );
-    expect(logs).toHaveLength(1);
-    expect(JSON.parse(logs[0][0])).toMatchObject({
+    const timings = logs
+      .map(([line]) => JSON.parse(line))
+      .filter(line => line.type === 'usage_record_timing');
+    expect(timings).toHaveLength(1);
+    expect(timings[0]).toMatchObject({
       type: 'usage_record_timing',
       usage_id: id,
       outcome: 'recorded',
@@ -150,5 +157,45 @@ describe('usage writer telemetry caller context', () => {
     const error = new Error('synthetic persistence failure');
     persist.mockRejectedValue(error);
     await expect(POST(request('queue'))).rejects.toBe(error);
+  });
+
+  it('samples pool waiting during a slow write, not only at its endpoints', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.mocked(Math.random).mockReturnValue(0);
+      const pending =
+        Promise.withResolvers<Awaited<ReturnType<typeof saveUsageRelatedDataLocally>>>();
+      persist.mockImplementationOnce(() => pending.promise);
+      const work = POST(request('queue'));
+      await jest.advanceTimersByTimeAsync(300);
+      Object.assign(writerPool, { totalCount: 10, idleCount: 10, waitingCount: 4 });
+      await jest.advanceTimersByTimeAsync(300);
+      Object.assign(writerPool, { totalCount: 10, idleCount: 10, waitingCount: 0 });
+      pending.resolve(recorded);
+      expect((await work).status).toBe(200);
+      const timings = [console.log, console.info, console.warn, console.error]
+        .flatMap(log => jest.mocked(log).mock.calls)
+        .map(([line]) => (typeof line === 'string' ? JSON.parse(line) : null))
+        .filter(line => line?.type === 'usage_record_timing');
+      expect(timings).toHaveLength(1);
+      expect(timings[0].pool_waiting_peak).toBe(4);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps a committed write successful when timing diagnostics fail', async () => {
+    jest.mocked(Math.random).mockReturnValue(0);
+    jest.mocked(console.log).mockImplementation(() => {
+      throw new Error('synthetic timing failure');
+    });
+    const response = await POST(request('region_handoff'));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ status: 'recorded' });
+    expect(jest.mocked(console.warn)).toHaveBeenCalledWith('usage record timing emission failed', {
+      usageId: id,
+      outcome: 'recorded',
+      errorName: 'Error',
+    });
   });
 });

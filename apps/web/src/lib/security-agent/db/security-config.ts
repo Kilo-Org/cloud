@@ -6,17 +6,16 @@ import type { Owner } from '@/lib/code-reviews/core';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { createSecurityAgentCommand, type SecurityAgentCommandOwner } from '@kilocode/db';
 import { agent_configs } from '@kilocode/db/schema';
-import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
+import {
+  SECURITY_CONFIG_CONFLICT_CODE,
+  type SecurityCommandType,
+} from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { TRPCError } from '@trpc/server';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 import { and, eq } from 'drizzle-orm';
+import { mergeSecurityAgentConfigPatch, parseSecurityAgentConfig } from '../core/constants';
 import {
-  DEFAULT_SECURITY_AGENT_CONFIG,
-  mergeSecurityAgentConfigPatch,
-  parseSecurityAgentConfig,
-} from '../core/constants';
-import {
-  SecurityAgentConfigSchema,
   type AutoAnalysisMinSeverity,
   type SecurityAgentConfig,
   type SecurityReviewOwner,
@@ -33,17 +32,25 @@ const DEFAULT_PLATFORM = 'github';
 const SECURITY_CONFIG_CONFLICT_MESSAGE =
   'This configuration changed in another tab. Review the latest settings and save again.';
 
+/**
+ * The compare-and-set refusal. The English message stays the web surface's copy;
+ * `upstreamCode` is the stable marker a device maps onto its own catalog copy, so
+ * the client never parses server prose.
+ */
+function securityConfigConflictError(): TRPCError {
+  return new TRPCError({
+    code: 'CONFLICT',
+    message: SECURITY_CONFIG_CONFLICT_MESSAGE,
+    cause: new UpstreamApiError(SECURITY_CONFIG_CONFLICT_CODE),
+  });
+}
+
 export async function getSecurityAgentConfig(
   owner: Owner,
   platform: string = DEFAULT_PLATFORM
 ): Promise<SecurityAgentConfig> {
   const config = await getAgentConfigForOwner(owner, AGENT_TYPE, platform);
-
-  if (!config) {
-    return SecurityAgentConfigSchema.parse(DEFAULT_SECURITY_AGENT_CONFIG);
-  }
-
-  return parseSecurityAgentConfig(config.config);
+  return parseSecurityAgentConfig(config?.config);
 }
 
 export async function getSecurityAgentConfigWithStatus(
@@ -91,10 +98,6 @@ function computeMergedSecurityConfig(
   ) {
     fullConfig.auto_remediation_enabled_at = new Date().toISOString();
   }
-  if (!fullConfig.remediation_model_slug) {
-    fullConfig.remediation_model_slug =
-      fullConfig.analysis_model_slug ?? fullConfig.model_slug ?? fullConfig.triage_model_slug;
-  }
 
   return fullConfig;
 }
@@ -117,6 +120,12 @@ function toCommandOwner(owner: SecurityReviewOwner): SecurityAgentCommandOwner {
  * non-null expectedRevision updates only when the stored revision still
  * matches; zero affected rows means a concurrent writer won, so it conflicts.
  *
+ * `isEnabled` is the only way this write moves the stored enable flag, and only
+ * the guarded `setEnabled` path supplies it. Omitted, the update leaves the
+ * column out of the SET list, so the stored value survives the save and a
+ * concurrent disable is not overwritten by a stale settings write; a first
+ * insert starts disabled.
+ *
  * Returns the new revision.
  */
 async function writeSecurityAgentConfigWithRevision(
@@ -127,6 +136,7 @@ async function writeSecurityAgentConfigWithRevision(
     createdBy: string;
     expectedRevision: number | null;
     platform: string;
+    isEnabled?: boolean;
   }
 ): Promise<number> {
   if (params.platform === 'github') {
@@ -145,7 +155,7 @@ async function writeSecurityAgentConfigWithRevision(
         agent_type: AGENT_TYPE,
         platform: params.platform,
         config: params.fullConfig,
-        is_enabled: true,
+        is_enabled: params.isEnabled ?? false,
         created_by: params.createdBy,
         config_revision: 1,
       })
@@ -153,7 +163,7 @@ async function writeSecurityAgentConfigWithRevision(
       .returning({ id: agent_configs.id });
 
     if (inserted.length === 0) {
-      throw new TRPCError({ code: 'CONFLICT', message: SECURITY_CONFIG_CONFLICT_MESSAGE });
+      throw securityConfigConflictError();
     }
     return 1;
   }
@@ -167,7 +177,7 @@ async function writeSecurityAgentConfigWithRevision(
     .update(agent_configs)
     .set({
       config: params.fullConfig,
-      is_enabled: true,
+      ...(params.isEnabled === undefined ? {} : { is_enabled: params.isEnabled }),
       updated_at: new Date().toISOString(),
       config_revision: params.expectedRevision + 1,
     })
@@ -182,7 +192,7 @@ async function writeSecurityAgentConfigWithRevision(
     .returning({ id: agent_configs.id });
 
   if (updated.length === 0) {
-    throw new TRPCError({ code: 'CONFLICT', message: SECURITY_CONFIG_CONFLICT_MESSAGE });
+    throw securityConfigConflictError();
   }
   return params.expectedRevision + 1;
 }
@@ -199,6 +209,11 @@ export type SecurityConfigSaveOutcome = {
  * remediation command creation all share one transaction: if any step throws,
  * the config change rolls back, and no worker can claim a queued backlog row
  * before the boundary it is judged against exists.
+ *
+ * A settings save passes no `isEnabled`, so the stored enable flag is not part
+ * of the write: preferences change, the agent's enabled state does not.
+ * Enabling is the guarded `setEnabled` transition, which passes `isEnabled:
+ * true` so the flag commits with the selection it was validated against.
  */
 export async function saveSecurityAgentConfigWithRevision(params: {
   owner: Owner;
@@ -206,6 +221,7 @@ export async function saveSecurityAgentConfigWithRevision(params: {
   createdBy: string;
   expectedRevision: number | null;
   platform?: string;
+  isEnabled?: boolean;
   enqueueAnalysis?: { owner: SecurityReviewOwner; minSeverity: AutoAnalysisMinSeverity };
   enqueueRemediation?: { owner: SecurityReviewOwner };
 }): Promise<SecurityConfigSaveOutcome> {
@@ -226,6 +242,7 @@ export async function saveSecurityAgentConfigWithRevision(params: {
       createdBy: params.createdBy,
       expectedRevision: params.expectedRevision,
       platform,
+      isEnabled: params.isEnabled,
     });
 
     // Record the activation boundary in the same transaction as the enqueue

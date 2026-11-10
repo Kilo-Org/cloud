@@ -1,47 +1,35 @@
 import { KILO_AUTO_FREE_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
-  findKiloExclusiveModel,
-  kiloExclusiveModels,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
   isLocalFakeTranscriptionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
-import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-
-/** Whether Kilo charges nothing for the model. Custom LLMs are always free. */
-export async function isFreeModel(modelId: string): Promise<boolean> {
-  return (await isCustomLlm(modelId)) || isFreeModelExcludingCustomLlms(modelId);
-}
+import { findCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 /**
- * The built-in free model rules, without custom LLMs. Use `isFreeModel` unless
- * custom LLMs must be excluded outright, as for `kilo-auto/free` candidates.
+ * Whether Kilo charges nothing for the model, judged by its id alone. Custom
+ * LLMs follow the same rule; the admin router rejects pricing on a custom LLM
+ * whose id matches it.
  */
-export function isFreeModelExcludingCustomLlms(model: string): boolean {
+export function isFreeModel(model: string): boolean {
   const modelId = model ?? '';
-  const exclusiveModel = findKiloExclusiveModel(modelId);
-  if (exclusiveModel) {
-    return !exclusiveModel.pricing;
-  }
   return (
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||
     modelId === KILO_AUTO_FREE_MODEL.id ||
-    modelId.endsWith(':free') ||
     modelId === 'openrouter/free' ||
-    (modelId.startsWith('stealth/') && modelId.endsWith('-alpha'))
+    modelId.endsWith(':free') ||
+    modelId.endsWith('-free') ||
+    modelId.startsWith('stealth/')
   );
 }
 
-/** Free models, custom LLMs included, are assumed to train on prompts. */
+/**
+ * Free models are assumed to train on prompts, and so are custom LLMs unless
+ * their definition sets `may_train_on_prompts: false`.
+ */
 export async function hasBestEffortGuessDataCollectionRequirement(model: string): Promise<boolean> {
-  return (
-    (await isFreeModel(model)) ||
-    kiloExclusiveModels.some(
-      candidate =>
-        candidate.public_id === model && candidate.flags.includes('requires-data-collection')
-    )
-  );
+  const customLlm = await findCustomLlm(model);
+  if (customLlm) return customLlm.definition.may_train_on_prompts !== false;
+  return isFreeModel(model);
 }

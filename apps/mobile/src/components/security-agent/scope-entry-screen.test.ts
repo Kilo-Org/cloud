@@ -23,7 +23,7 @@ let permissionData = {
 };
 let configData = structuredClone(securityConfigFixture);
 let repositoriesData: { id: number }[] = [];
-let roles: { organizationId: string; role: string }[] = [];
+let roles: { organizationId: string; organizationName: string; role: string }[] = [];
 let queryClient = new QueryClient();
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 let previousOnline = true;
@@ -32,12 +32,15 @@ let configHold: Promise<boolean> | undefined = undefined;
 let deniedProcedures = new Set<string>();
 let sessionAuthRequired = false;
 let failingProcedures = new Set<string>();
+let unreachableProcedures = new Set<string>();
 let heldProcedures = new Set<string>();
+let connectivity: 'online' | 'offline' | 'unknown' = 'online';
 let releaseHeld: (() => void) | undefined = undefined;
 const DENIAL_MESSAGE = 'You do not have access to this organization';
 const SERVER_ERROR_MESSAGE = 'Internal server error';
 const RETRY_FAILED_COPY =
   'Still could not load Security Agent. Check your connection and try again.';
+const CONNECTION_COPY = 'Check your connection and try again.';
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -52,13 +55,22 @@ vi.mock('@/lib/trpc', async () => {
   };
 });
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View', Switch: 'Switch' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
+  View: 'View',
+  Switch: 'Switch',
+  Pressable: 'Pressable',
+}));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: () => ({}) },
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Clock: 'Clock',
@@ -71,13 +83,14 @@ vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => connectivity,
 }));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: 'AuditReportButton',
 }));
 vi.mock('@/components/security-agent/dashboard-screen', () => ({
   DashboardScreen: 'DashboardScreen',
+  DashboardLoadingView: 'DashboardLoadingView',
 }));
 vi.mock('@/components/security-agent/security-agent-setup', () => ({
   SecurityAgentSetup: 'SecurityAgentSetup',
@@ -142,10 +155,12 @@ beforeEach(() => {
   deniedProcedures = new Set();
   sessionAuthRequired = false;
   failingProcedures = new Set();
+  unreachableProcedures = new Set();
   heldProcedures = new Set();
+  connectivity = 'online';
   releaseHeld = undefined;
   repositoriesData = [{ id: 1 }];
-  roles = [{ organizationId: 'org_123', role: 'owner' }];
+  roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role: 'owner' }];
   transport.mockReset().mockImplementation(async input => {
     await Promise.resolve();
     if (configHold && procedureFor(input) === 'getConfig') {
@@ -158,6 +173,10 @@ beforeEach(() => {
       await new Promise<void>(resolve => {
         releaseHeld = resolve;
       });
+    }
+    if (unreachableProcedures.has(procedureFor(input))) {
+      // A request that never reaches the server: no tRPC code on the error.
+      throw new TypeError('Network request failed');
     }
     if (failingProcedures.has(procedureFor(input))) {
       return Response.json(
@@ -312,6 +331,181 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
   );
 });
 
+describe('ScopeEntryScreen GitHub install capability', () => {
+  // `githubApps.mintInstallState` is the authority on who may start an
+  // organization installation: it resolves the caller through
+  // `ensureOrganizationAccess`, which also elevates a Kilo admin and accepts a
+  // parent-organization role. The entry therefore offers the press and lets the
+  // server refuse it, so a device-side membership read cannot deny a caller the
+  // server admits.
+  it.each(['member', 'billing_manager'])(
+    'shows the read-only notice once the mint refuses a %s',
+    async role => {
+      roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
+      permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+      deniedProcedures = new Set(['mintInstallState']);
+
+      const root = await mount('org_123');
+      const setup = host(root, 'SecurityAgentSetup')[0];
+
+      expect(setup?.props.readOnlyNotice).toBe(
+        'Ask an organization owner or admin to connect GitHub.'
+      );
+      expect(setup?.props.url).toBeUndefined();
+    }
+  );
+
+  it('keeps the press when the membership read cannot name a role for the organization', async () => {
+    // An organization reached through the server's parent-organization role has
+    // no direct row here; its mint still succeeds, so the unresolved device-side
+    // role must not withhold the press.
+    roles = [{ organizationId: 'parent_123', organizationName: 'Parent', role: 'member' }];
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(new URL(setup?.props.url as string).pathname).toBe('/github-app');
+  });
+
+  it.each(['owner', 'admin'])('keeps the install press for an %s', async role => {
+    roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(new URL(setup?.props.url as string).pathname).toBe('/github-app');
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+    ).toHaveLength(1);
+  });
+
+  it('keeps the retryable press when the mint fails for any other reason', async () => {
+    // Only a refused role retires the action; a transport or server failure
+    // leaves the press, which re-mints before opening.
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+    failingProcedures = new Set(['mintInstallState']);
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+  });
+
+  it.each(['personal', 'org_123'])(
+    'keeps the retryable press when the %s mint answers a session auth failure',
+    async scope => {
+      // A session that expired answers UNAUTHORIZED with `data.authRequired`.
+      // The app signs out on it; retiring the press for the role notice would
+      // claim an organization role decided it, which a personal scope lacks.
+      permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+      deniedProcedures = new Set(['mintInstallState']);
+      sessionAuthRequired = true;
+
+      const root = await mount(scope);
+      const setup = host(root, 'SecurityAgentSetup')[0];
+
+      expect(setup?.props.readOnlyNotice).toBeUndefined();
+      expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+    }
+  );
+
+  it("keeps the install press while an enabled agent's role list is unread", async () => {
+    // An enabled agent with no connection reaches the connect view before the
+    // shared membership list lands. Withholding the press on that unresolved
+    // role would hide the only action from the owner who can take it.
+    configData.isEnabled = true;
+    roles = [];
+    heldProcedures = new Set(['list']);
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('org_123');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(setup?.props.buttonLabel).toBe('Install GitHub App');
+    releaseHeld?.();
+  });
+
+  it('never withholds the personal install press', async () => {
+    permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+
+    const root = await mount('personal');
+    const setup = host(root, 'SecurityAgentSetup')[0];
+
+    expect(setup?.props.readOnlyNotice).toBeUndefined();
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+    ).toHaveLength(1);
+  });
+});
+
+describe('ScopeEntryScreen names the scope it acts on', () => {
+  // An admin in several organizations reauthorizes one organization's GitHub
+  // app: the header has to say whose agent the button acts on, the way the Code
+  // Reviewer's scope screens already do.
+  it('names the organization on the reauthorize view', async () => {
+    permissionData = {
+      hasIntegration: true,
+      hasPermissions: false,
+      reauthorizeUrl: 'https://github.test/install',
+    };
+    const root = await mount('org_123');
+    const header = host(root, 'ScreenHeader')[0];
+    expect(header?.props.title).toBe('Drain Labs');
+    expect(header?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the personal scope on the reauthorize view', async () => {
+    permissionData = {
+      hasIntegration: true,
+      hasPermissions: false,
+      reauthorizeUrl: 'https://github.test/install',
+    };
+    const root = await mount('personal');
+    const header = host(root, 'ScreenHeader')[0];
+    expect(header?.props.title).toBe('Personal');
+    expect(header?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the organization on the load-failure view', async () => {
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('org_123');
+    const failure = host(root, 'PlatformErrorScreen')[0];
+    expect(failure?.props.title).toBe('Drain Labs');
+    expect(failure?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('names the organization on the no-access view', async () => {
+    deniedProcedures = new Set(['getPermissionStatus', 'getConfig', 'getRepositories']);
+    const root = await mount('org_123');
+    const denied = host(root, 'ScopeAccessDeniedScreen')[0];
+    expect(denied?.props.title).toBe('Drain Labs');
+    expect(denied?.props.eyebrow).toBe('Security Agent');
+  });
+
+  it('keeps the header line while the membership list is still loading', async () => {
+    // The name arrives with the shared membership list. Until then the header
+    // keeps a placeholder title rather than an empty line, so the body does not
+    // move when the real name lands.
+    heldProcedures = new Set(['list']);
+    permissionData = {
+      hasIntegration: true,
+      hasPermissions: false,
+      reauthorizeUrl: 'https://github.test/install',
+    };
+    const root = await mount('org_123');
+    const header = host(root, 'ScreenHeader')[0];
+    expect(header?.props.title).toBe('Organization');
+    expect(header?.props.eyebrow).toBe('Security Agent');
+    releaseHeld?.();
+  });
+});
+
 describe('ScopeEntryScreen dashboard first mount', () => {
   it('paints the enabled dashboard on the first mount with no entering animation above it', async () => {
     configData.isEnabled = true;
@@ -333,16 +527,16 @@ describe('ScopeEntryScreen dashboard first mount', () => {
     expect(host(root, 'Animated.View')).toHaveLength(0);
   });
 
-  it('renders the loading skeleton, then the dashboard, on the first mount', async () => {
+  it('paints the dashboard frame, then the dashboard, on the first mount', async () => {
     configData.isEnabled = true;
     const held = Promise.withResolvers<boolean>();
     configHold = held.promise;
 
     const root = await mount('personal');
-    // Pending settings keep the screen on the header + skeleton, never on an
-    // empty body.
-    expect(host(root, 'ScreenHeader')).toHaveLength(1);
-    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    // A pending config keeps the screen on the dashboard's own frame — the
+    // header, its actions, the filter row and the tile slots — never on an
+    // empty body or a placeholder the destination then moves.
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(1);
     expect(host(root, 'DashboardScreen')).toHaveLength(0);
 
     act(() => {
@@ -353,7 +547,51 @@ describe('ScopeEntryScreen dashboard first mount', () => {
     await advanceBy();
 
     expect(host(root, 'DashboardScreen')).toHaveLength(1);
-    expect(host(root, 'Skeleton')).toHaveLength(0);
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(0);
+  });
+});
+
+describe('ScopeEntryScreen cached destination', () => {
+  it('renders the enabled destination while the organization role read fails', async () => {
+    // The config already names the destination; a failed role read only affects
+    // which controls the screens behind it offer.
+    configData.isEnabled = true;
+    failingProcedures = new Set(['list']);
+    const root = await mount('org_123');
+    // The role read really failed; the cached config still names the
+    // destination, so the dashboard renders beside that failure.
+    expect(
+      queryClient
+        .getQueryCache()
+        .findAll()
+        .some(query => query.state.status === 'error')
+    ).toBe(true);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+  });
+
+  it('keeps the cached destination while connectivity pauses its reads', async () => {
+    // A save on a flaky connection can land here with every read paused. The
+    // cached config still renders the dashboard, so the screen must not report
+    // a load failure the user would read as a lost save.
+    configData.isEnabled = true;
+    onlineManager.setOnline(false);
+    const trpc = createTRPCOptionsProxy<MobileRouter>({ client: trpcClient, queryClient });
+    queryClient.setQueryData(
+      trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: 'org_123' }),
+      configData
+    );
+    const root = await mount('org_123');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+  });
+
+  it('keeps the load-error screen when the paused reads cannot name a destination', async () => {
+    // No cached config: the setup gates genuinely need the paused reads.
+    onlineManager.setOnline(false);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
   });
 });
 
@@ -451,12 +689,15 @@ describe.each([
   ['standalone', SettingsOverviewScreen],
   ['inline', ScopeEntryScreen],
 ] as const)('%s settings readiness and access', (presentation, Screen) => {
+  // An empty repository set keeps the picker reachable: the disabled switch is
+  // refused without an effective repository, and the GitHub App grant is widened
+  // from the picker, so hiding the row there stranded the page.
   it.each([
-    ['selected', [], { repos: [], disabled: true, cta: false }],
+    ['selected', [], { repos: [], disabled: true, cta: true }],
     ['selected', [], { repos: [{ id: 1 }], disabled: true, cta: true }],
     ['selected', [1], { repos: [], disabled: false, cta: false }],
     ['all', [], { repos: [{ id: 1 }], disabled: false, cta: false }],
-    ['all', [], { repos: [], disabled: true, cta: false }],
+    ['all', [], { repos: [], disabled: true, cta: true }],
   ] as const)(
     'preserves setup controls for %s, selection %j and repositories %j',
     async (mode, selected, expected) => {
@@ -485,7 +726,10 @@ describe.each([
   it.each(['member', 'absent'])(
     'keeps the %s organization role restricted after Retry',
     async role => {
-      roles = role === 'absent' ? [] : [{ organizationId: 'org_123', role }];
+      roles =
+        role === 'absent'
+          ? []
+          : [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
       onlineManager.setOnline(false);
       const root = await mount('org_123', Screen);
       await retry(root);
@@ -516,8 +760,14 @@ describe.each([
     queryClient.setQueryData(configKey, configData);
     const root = await mount('org_123', Screen);
     const error = host(root, 'PlatformErrorScreen')[0];
+    // The inline entry shows its own load-failure surface, and a paused read
+    // is an offline one: the description names the connection on the first
+    // screen. The standalone settings screen names the failed read.
+    expect(error?.props.errorTitle).toBe(
+      presentation === 'inline' ? 'Could not load Security Agent' : undefined
+    );
     expect(error?.props.message ?? error?.props.errorTitle).toBe(
-      presentation === 'inline' ? 'Could not load Security Agent' : 'Could not load permissions'
+      presentation === 'inline' ? CONNECTION_COPY : 'Could not load permissions'
     );
     await retry(root);
     expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
@@ -533,25 +783,51 @@ describe.each([
 
 describe('ScopeEntryScreen retry recovery', () => {
   it('shows progress while a retry runs and a fresh message when it fails again', async () => {
-    failingProcedures = new Set(['getConfig']);
+    unreachableProcedures = new Set(['getConfig']);
     const root = await mount('personal');
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
-    expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBeUndefined();
+    expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBe(CONNECTION_COPY);
 
     // Hold one refetch open so the in-flight attempt is observable.
     heldProcedures = new Set(['getConfig']);
     await retry(root);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
-    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    // An unanswered config cannot name its destination yet, so the retry shows
+    // the dashboard's own frame.
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(1);
 
     releaseHeld?.();
     await advanceBy();
     await advanceBy();
     await advanceBy();
 
-    expect(host(root, 'Skeleton')).toHaveLength(0);
+    expect(host(root, 'DashboardLoadingView')).toHaveLength(0);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
     expect(host(root, 'PlatformErrorScreen')[0]?.props.message).toBe(RETRY_FAILED_COPY);
+  });
+
+  it('keeps the server wording when a retry of a server failure fails again', async () => {
+    // "Check your connection" is the wrong thing to tell a reader whose 500
+    // came from the server, also one retry later.
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')[0]?.props.variant).toBe('server');
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'getConfig')
+    ).toHaveLength(1);
+
+    await retry(root);
+    await advanceBy();
+    await advanceBy();
+
+    // The retried read really ran and rejected, so the frame below is the
+    // failed-retry frame and not the one the tap started from.
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'getConfig')
+    ).toHaveLength(2);
+    const error = host(root, 'PlatformErrorScreen')[0];
+    expect(error?.props.variant).toBe('server');
+    expect(error?.props.message).toBeUndefined();
   });
 
   it('leaves the error screen for the resolved destination when the retry succeeds', async () => {
@@ -612,5 +888,41 @@ describe('ScopeEntryScreen retry recovery', () => {
     expect(host(root, 'ScopeAccessDeniedScreen')).toHaveLength(1);
     expect(host(root, 'DashboardScreen')).toHaveLength(0);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+  });
+});
+
+describe('ScopeEntryScreen load failure cause', () => {
+  it.each([
+    ['personal', 'getConfig'],
+    ['personal', 'getPermissionStatus'],
+    ['org_123', 'getConfig'],
+    ['org_123', 'list'],
+  ] as const)('names the connection on the first failure of %s / %s', async (scope, procedure) => {
+    configData.isEnabled = false;
+    unreachableProcedures = new Set([procedure]);
+    const root = await mount(scope);
+
+    const error = host(root, 'PlatformErrorScreen')[0];
+    expect(error?.props.variant).toBe('offline');
+    expect(error?.props.message).toBe(CONNECTION_COPY);
+  });
+
+  it('keeps the server wording on the first failure of a coded 500', async () => {
+    failingProcedures = new Set(['getConfig']);
+    const root = await mount('personal');
+
+    const error = host(root, 'PlatformErrorScreen')[0];
+    expect(error?.props.variant).toBe('server');
+    expect(error?.props.message).toBeUndefined();
+  });
+
+  it('names the connection for reads paused by a confirmed-offline device', async () => {
+    connectivity = 'offline';
+    onlineManager.setOnline(false);
+    const root = await mount('personal');
+
+    const error = host(root, 'PlatformErrorScreen')[0];
+    expect(error?.props.variant).toBe('offline');
+    expect(error?.props.message).toBe(CONNECTION_COPY);
   });
 });

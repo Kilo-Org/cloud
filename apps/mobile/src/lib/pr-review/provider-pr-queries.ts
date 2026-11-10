@@ -51,7 +51,16 @@ type GitHubOverviewDto = RouterOutputs['githubPrReview']['getPullRequest'];
  * omitted on those providers and the chip is not drawn.
  */
 type PrOverviewCounts = Omit<GitHubOverviewDto['counts'], 'commits'> & { commits: number | null };
-export type PrOverviewModel = Omit<GitHubOverviewDto, 'counts'> & { counts: PrOverviewCounts };
+/**
+ * GitHub's DTO plus the one field only a provider read layer reports. The
+ * `webUrl` is the provider's own canonical URL for the loaded PR/MR,
+ * resolved by the server. It is absent (undefined at runtime, null through
+ * the selector below) on the GitHub arm, whose host is fixed by the ref.
+ */
+export type PrOverviewModel = Omit<GitHubOverviewDto, 'counts'> & {
+  counts: PrOverviewCounts;
+  webUrl: string;
+};
 export type PrChecksModel = RouterOutputs['githubPrReview']['listChecks'];
 export type PrThreadsPageModel = RouterOutputs['githubPrReview']['listReviewThreads'];
 
@@ -282,6 +291,7 @@ export function normalizeProviderOverview(summary: ProviderPrSummary): PrOvervie
     assignees: [],
     reviewers: [],
     linkedIssues: [],
+    webUrl: summary.webUrl,
     createdAt: summary.createdAt,
     updatedAt: summary.updatedAt,
     closedAt: null,
@@ -332,18 +342,30 @@ export function buildPrOverviewQueryOptions(trpc: Trpc, scope: ProviderPrScope) 
   );
 }
 
-function githubChecksOptions(trpc: Trpc, input: { owner: string; repo: string; ref: string }) {
-  return trpc.githubPrReview.listChecks.queryOptions(input);
+function githubChecksOptions(
+  trpc: Trpc,
+  input: { owner: string; repo: string; ref: string },
+  enabled: boolean
+) {
+  return trpc.githubPrReview.listChecks.queryOptions(input, { enabled });
 }
 
-export function buildPrChecksQueryOptions(trpc: Trpc, scope: ProviderPrScope, headSha: string) {
+export function buildPrChecksQueryOptions(
+  trpc: Trpc,
+  scope: ProviderPrScope,
+  input: { readonly headSha: string; readonly enabled: boolean }
+) {
   const triple = providerPrTriple(scope.ref);
   if (scope.ref.platform === 'github') {
-    return githubChecksOptions(trpc, { owner: triple.owner, repo: triple.repo, ref: headSha });
+    return githubChecksOptions(
+      trpc,
+      { owner: triple.owner, repo: triple.repo, ref: input.headSha },
+      input.enabled
+    );
   }
   return asGithubOptions<ReturnType<typeof githubChecksOptions>>(
     trpc.providerReview.listChecks.queryOptions(providerIdentity(scope), {
-      enabled: isProviderScopeReady(scope),
+      enabled: input.enabled && isProviderScopeReady(scope),
       select: normalizeProviderChecks,
     })
   );
@@ -473,6 +495,22 @@ export function selectProviderCapabilitiesData(
 }
 
 /**
+ * The provider's own web URL for the loaded PR/MR, or null when the read
+ * model carries none — a GitHub answer (its host comes from the ref) or an
+ * overview that has not loaded. Read back through a selector for the same
+ * reason as the capability data above: the overview option type is the
+ * GitHub one, which has no `webUrl` field.
+ */
+export function selectOverviewWebUrl(data: unknown): string | null {
+  // SAFETY: the overview option type is GitHub's DTO, which has no `webUrl`,
+  // so the checker cannot see the field the provider arm's read model sets.
+  // The only shapes reaching here are that read model and GitHub's answer;
+  // an absent or empty one means "no URL", which every caller handles.
+  const model = data as { webUrl?: string | null } | undefined;
+  return model?.webUrl ?? null;
+}
+
+/**
  * The seam as one value for a screen: which provider, what it can do, and
  * the two reads a screen owns itself. The list surfaces below it call the
  * builders through their own hooks (files, threads, expanded context).
@@ -487,7 +525,8 @@ export function useProviderPrQueries(fallback: { owner: string; repo: string; nu
       capabilities: providerPrCapabilities(scope.ref.platform),
       isReady: isProviderScopeReady(scope),
       overviewOptions: () => buildPrOverviewQueryOptions(trpc, scope),
-      checksOptions: (headSha: string) => buildPrChecksQueryOptions(trpc, scope, headSha),
+      checksOptions: (headSha: string, enabled: boolean) =>
+        buildPrChecksQueryOptions(trpc, scope, { headSha, enabled }),
       mergeStateOptions: () => buildPrMergeStateQueryOptions(trpc, scope),
     }),
     [trpc, scope]

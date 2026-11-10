@@ -1,23 +1,35 @@
 import * as z from 'zod';
-import {
-  type DirectByokModel,
-  type DirectByokModelFlag,
-  type DirectByokProvider,
+import type {
+  DirectByokModel,
+  DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
-import { ReasoningOptionSchema, type ReasoningOption } from '@kilocode/db/schema-types';
-import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import {
+  assertMinimumCount,
+  getMetadata,
+  type MetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import {
+  ModalitySchema,
+  ModelsDevProviderSchema,
+  loadModelsDevCatalog,
+  modelsDevCatalogSource,
+  isUsableModelsDevModel,
+  shortenDisplayName,
+  toRawModel,
+  type ModelsDevCatalog,
+  type ModelsDevProvider,
+  type RawModel,
+} from './models-dev';
+import { parseAwsBedrockModelsDevModels } from './bedrock-models';
+import { parseGcpVertexModelsDevModels } from './vertex-models';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
-
-const ModalitySchema = z
-  .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
-  .catch('unknown');
 
 const OpenAICompatibleModelsResponseSchema = z.object({
   data: z.array(
@@ -33,28 +45,18 @@ const OpenAICompatibleModelsResponseSchema = z.object({
   ),
 });
 
-const ModelsDevModelSchema = z.object({
-  id: z.string(),
-  name: z.string().optional(),
-  reasoning: z.boolean().optional(),
-  reasoning_options: z.array(ReasoningOptionSchema).optional().catch(undefined),
-  status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
-  limit: z
-    .object({
-      context: z.number().optional(),
-      output: z.number().optional(),
-    })
-    .optional(),
-  modalities: z
-    .object({
-      input: z.array(ModalitySchema).optional(),
-      output: z.array(ModalitySchema).optional(),
-    })
-    .optional(),
-  tool_call: z.boolean().optional(),
-  provider: z.object({ npm: z.string().optional() }).optional().catch(undefined),
-  canonical_model_id: z.string().optional().catch(undefined),
-});
+type OpenAICompatibleModelsResponse = z.infer<typeof OpenAICompatibleModelsResponseSchema>;
+
+function openAICompatibleModelsSource(url: string): MetadataSource<OpenAICompatibleModelsResponse> {
+  return {
+    url,
+    parse: raw => {
+      const parsed = OpenAICompatibleModelsResponseSchema.parse(raw);
+      assertMinimumCount(url, parsed.data.length, 1);
+      return parsed;
+    },
+  };
+}
 
 // A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
 // names, such as `@ai-sdk/mistral`, still speak Chat Completions, so only SDKs for the native
@@ -64,25 +66,7 @@ const GEMINI_API_MODELS_DEV_SDKS: ReadonlySet<string> = new Set([
   '@ai-sdk/google-vertex',
 ]);
 
-const ModelsDevProviderSchema = z.object({
-  models: z.record(z.string(), ModelsDevModelSchema),
-});
-
-const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
-
-type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
-
 const MODELS_DEV_OPENROUTER_ID = 'openrouter';
-
-type RawModel = {
-  id: string;
-  name?: string;
-  context_length?: number;
-  max_completion_tokens?: number;
-  input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
-  flags?: ReadonlyArray<DirectByokModelFlag>;
-  reasoning_options?: ReasoningOption[];
-};
 
 type SyncContext = {
   getModelsDevCatalog(): Promise<ModelsDevCatalog>;
@@ -91,38 +75,29 @@ type SyncContext = {
 
 type ProviderFetcher = {
   providerId: DirectUserByokInferenceProviderId;
+  metadataSources: ReadonlyArray<MetadataSource<unknown>>;
   fetch(ctx: SyncContext): Promise<RawModel[]>;
 };
 
-function shortenDisplayName(id: string): string;
-function shortenDisplayName(id: string | undefined): string | undefined;
-function shortenDisplayName(id: string | undefined) {
-  if (!id) return undefined;
-  const slash = id.lastIndexOf('/');
-  return slash >= 0 ? id.slice(slash + 1).trim() : id;
-}
-
 function openAICompatibleFetcher(options: {
   providerId: DirectUserByokInferenceProviderId;
-  label: string;
   url: string;
 }): ProviderFetcher {
+  const metadataSource = openAICompatibleModelsSource(options.url);
   return {
     providerId: options.providerId,
+    metadataSources: [metadataSource],
     async fetch() {
-      const response = await fetch(options.url);
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch ${options.label} models: ${response.status} ${response.statusText}`
-        );
-      }
-      return parseOpenAICompatibleProviderModels(await response.json());
+      return toOpenAICompatibleRawModels(await getMetadata(metadataSource, readDb));
     },
   };
 }
 
 export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] {
-  const parsed = OpenAICompatibleModelsResponseSchema.parse(entry);
+  return toOpenAICompatibleRawModels(OpenAICompatibleModelsResponseSchema.parse(entry));
+}
+
+function toOpenAICompatibleRawModels(parsed: OpenAICompatibleModelsResponse): RawModel[] {
   return parsed.data
     .filter(model => !model.supported_features || model.supported_features.includes('tools'))
     .map(model => ({
@@ -135,14 +110,6 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
     }));
 }
 
-// models.dev `[]` and effort values the gateway cannot send are treated as unknown, so that
-// reasoning models fall back to the model-name defaults when served.
-function supportedReasoningOptions(
-  options: ReasoningOption[] | undefined
-): ReasoningOption[] | undefined {
-  return options?.length && toLegacyVariants(options, undefined) ? options : undefined;
-}
-
 export function parseModelsDevProviderModels(
   entry: unknown,
   providerId: DirectUserByokInferenceProviderId,
@@ -152,24 +119,11 @@ export function parseModelsDevProviderModels(
   return Object.values(provider.models)
     .filter(
       model =>
-        model.status !== 'deprecated' &&
-        (!model.modalities?.output || model.modalities.output.includes('text')) &&
+        isUsableModelsDevModel(model) &&
         (!availableModelIds || availableModelIds.has(model.id)) &&
-        model.tool_call !== false &&
-        (!model.modalities?.input || model.modalities.input.includes('text')) &&
         (!model.provider?.npm || !GEMINI_API_MODELS_DEV_SDKS.has(model.provider.npm))
     )
-    .map(model => {
-      return {
-        id: model.id,
-        name: shortenDisplayName(model.name),
-        context_length: model.limit?.context,
-        max_completion_tokens: model.limit?.output,
-        input_modalities: model.modalities?.input,
-        flags: model.reasoning ? ['reasoning'] : undefined,
-        reasoning_options: supportedReasoningOptions(model.reasoning_options),
-      };
-    });
+    .map(model => toRawModel(model));
 }
 
 function getModelsDevId(providerId: DirectUserByokInferenceProviderId): string | undefined {
@@ -222,86 +176,88 @@ async function getCatalogModelIds(
   return catalogModelIds;
 }
 
+function getModelsDevEntry(
+  providerId: DirectUserByokInferenceProviderId,
+  catalog: ModelsDevCatalog
+) {
+  const catalogKey = getModelsDevId(providerId);
+  if (!catalogKey) {
+    throw new Error(`${providerId} has no models.dev ID`);
+  }
+  const entry = catalog[catalogKey];
+  if (!entry) {
+    throw new Error(`models.dev catalog missing ${catalogKey} entry`);
+  }
+  return entry;
+}
+
+/** Parses a provider's models.dev entry with a provider-specific selection. */
+function customModelsDevFetcher(
+  providerId: DirectUserByokInferenceProviderId,
+  parse: (provider: ModelsDevProvider) => RawModel[]
+): ProviderFetcher {
+  return {
+    providerId,
+    metadataSources: [modelsDevCatalogSource],
+    async fetch(ctx) {
+      const entry = getModelsDevEntry(providerId, await ctx.getModelsDevCatalog());
+      return parse(ModelsDevProviderSchema.parse(entry));
+    },
+  };
+}
+
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
   availableModelsUrl?: string
 ): ProviderFetcher {
+  const metadataSource = availableModelsUrl
+    ? openAICompatibleModelsSource(availableModelsUrl)
+    : undefined;
   return {
     providerId,
+    metadataSources: metadataSource
+      ? [modelsDevCatalogSource, metadataSource]
+      : [modelsDevCatalogSource],
     async fetch(ctx) {
-      const catalogKey = getModelsDevId(providerId);
-      if (!catalogKey) {
-        throw new Error(`${providerId} has no models.dev ID`);
-      }
-      const catalog = await ctx.getModelsDevCatalog();
-      const entry = catalog[catalogKey];
-      if (!entry) {
-        throw new Error(`models.dev catalog missing ${catalogKey} entry`);
-      }
-      if (!availableModelsUrl) {
+      const entry = getModelsDevEntry(providerId, await ctx.getModelsDevCatalog());
+      if (!metadataSource) {
         return parseModelsDevProviderModels(entry, providerId);
       }
-      const response = await fetch(availableModelsUrl);
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch ${providerId} available models: ${response.status} ${response.statusText}`
-        );
-      }
-      const availableModelIds = new Set(
-        OpenAICompatibleModelsResponseSchema.parse(await response.json()).data.map(
-          model => model.id
-        )
-      );
+      const availableModels = await getMetadata(metadataSource, readDb);
+      const availableModelIds = new Set(availableModels.data.map(model => model.id));
       return parseModelsDevProviderModels(entry, providerId, availableModelIds);
     },
   };
 }
 
-async function fetchModelsDevCatalog(): Promise<ModelsDevCatalog> {
-  const response = await fetch('https://models.dev/api.json');
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
-    );
-  }
-  return ModelsDevCatalogSchema.parse(await response.json());
-}
-
 const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   openAICompatibleFetcher({
     providerId: 'neuralwatt',
-    label: 'Neuralwatt',
     url: 'https://api.neuralwatt.com/v1/models',
   }),
   modelsDevFetcher('nvidia-byok', 'https://integrate.api.nvidia.com/v1/models'),
   openAICompatibleFetcher({
     providerId: 'chutes-byok',
-    label: 'Chutes',
     url: 'https://llm.chutes.ai/v1/models',
   }),
   openAICompatibleFetcher({
     providerId: 'orcarouter',
-    label: 'OrcaRouter',
     url: 'https://api.orcarouter.ai/v1/models',
   }),
   openAICompatibleFetcher({
     providerId: 'inceptron-byok',
-    label: 'Inceptron BYOK',
     url: 'https://api.inceptron.io/v1/models',
   }),
   openAICompatibleFetcher({
     providerId: 'martian',
-    label: 'Martian',
     url: 'https://api.withmartian.com/v1/models',
   }),
   openAICompatibleFetcher({
     providerId: 'synthetic',
-    label: 'Synthetic',
     url: 'https://api.synthetic.new/v1/models',
   }),
   openAICompatibleFetcher({
     providerId: 'morph-byok',
-    label: 'Morph BYOK',
     url: 'https://www.morphllm.com/api/models/json',
   }),
   modelsDevFetcher('alibaba-token-plan'),
@@ -311,6 +267,14 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   modelsDevFetcher('opencode-go', 'https://opencode.ai/zen/go/v1/models'),
   modelsDevFetcher('xiaomi-token-plan-ams'),
   modelsDevFetcher('xiaomi-token-plan-sgp'),
+  customModelsDevFetcher('bedrock-byok', parseAwsBedrockModelsDevModels),
+  customModelsDevFetcher('vertex-byok', parseGcpVertexModelsDevModels),
+];
+
+export const directByokMetadataSources: ReadonlyArray<MetadataSource<unknown>> = [
+  ...new Map(
+    FETCHERS.flatMap(fetcher => fetcher.metadataSources).map(source => [source.url, source])
+  ).values(),
 ];
 
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
@@ -337,6 +301,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       max_completion_tokens,
       reasoning_options: raw.reasoning_options,
       catalog_model_id: catalogModelIds.get(raw.id),
+      ...(raw.endpoint && { endpoint: raw.endpoint }),
     });
   }
 
@@ -357,7 +322,7 @@ export async function syncDirectByokModels(): Promise<
 > {
   let catalogPromise: Promise<ModelsDevCatalog> | null = null;
   let catalogModelIdsPromise: Promise<ReadonlyMap<string, string>> | null = null;
-  const getModelsDevCatalog = () => (catalogPromise ??= fetchModelsDevCatalog());
+  const getModelsDevCatalog = () => (catalogPromise ??= loadModelsDevCatalog());
   const ctx: SyncContext = {
     getModelsDevCatalog,
     getCatalogModelIdsByCanonicalId() {

@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- the section owns every CHECKS state in one file: the card shell, the tone/rollup helpers and the rows share one surface, and splitting the visible-loading fix away from the states it must match scatters it across callers. */
-import { useQuery } from '@tanstack/react-query';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import {
   AlertTriangle,
@@ -18,8 +17,8 @@ import {
   PrReviewChecksStatusRow,
 } from '@/components/pr-review/pr-review-checks-status-row';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -27,8 +26,8 @@ import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
-import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
-import { providerPrTermKey, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
+import { type PrChecksModel, useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import { providerPrTermKey, useProviderPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/lib/external-link';
 
@@ -39,8 +38,23 @@ type PrReviewChecksSectionProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;
-  /** Head SHA to fetch check runs for. */
-  readonly headSha: string;
+  /**
+   * The checks read, owned by the screen. It is passed in already settled
+   * (`isLoading` false), because the card's height depends on the answer: the
+   * screen holds the body until this read answers, so the card's first painted
+   * frame is its final one and the review and merge actions below it never
+   * move. Only the fields the section renders from are named here.
+   */
+  readonly checks: PrReviewChecksRead;
+};
+
+/** The settled `listChecks` read as the section consumes it. */
+type PrReviewChecksRead = {
+  readonly data: PrChecksModel | undefined;
+  readonly error: unknown;
+  readonly isError: boolean;
+  readonly isFetching: boolean;
+  readonly refetch: VoidFunction;
 };
 
 type CheckTone = 'success' | 'failure' | 'pending' | 'skipped' | 'neutral' | 'warning';
@@ -177,15 +191,12 @@ function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
 const STATUS_ORDER = ['success', 'failure', 'pending', 'skipped'] as const;
 
 // React Native on Android keeps a View's contentDescription when a later
-// render drops its `accessibilityLabel` (the loaded card inherited the loading
-// card's "Loading…" and a screen reader announced it over the loaded rows,
-// e2-scene.xml: the loaded `ViewGroup` kept `content-desc="Loading…"`). A
-// state switch must therefore mount a fresh native card: the loading card and
-// every content card carry different keys, so React unmounts one and mounts
-// the other instead of updating a reused view. The key stays stable within a
-// state, because re-mounting the same card on a re-render would drop the
-// expanded rows' state.
-const LOADING_CARD_KEY = 'checks-card-loading';
+// render drops its `accessibilityLabel` (a loaded card once inherited the
+// placeholder's "Loading…" and a screen reader announced it over the loaded
+// rows, e2-scene.xml). No card here carries a label any more — the card is
+// only ever built from a settled read — so a state switch cannot leave one
+// behind. Every card keeps one stable key so a re-render of the same state
+// does not re-mount it and drop the expanded rows' state.
 const CONTENT_CARD_KEY = 'checks-card';
 
 type CheckRunGroup = {
@@ -216,68 +227,14 @@ function groupRunsByStatus(runList: readonly CheckRun[]): CheckRunGroup[] {
   });
 }
 
-export function PrReviewChecksSection({
-  owner,
-  repo,
-  number,
-  headSha,
-}: PrReviewChecksSectionProps) {
+export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewChecksSectionProps) {
   const queries = useProviderPrQueries({ owner, repo, number });
   const colors = useThemeColors();
   const { t } = useTranslation();
-  // Null on a GitLab ref with no instance hint: no host, so no link out.
-  const prUrl = providerPrWebUrl(queries.ref);
-
-  const checks = useQuery(queries.checksOptions(headSha));
-
-  // Loading (first time, no cached data): reserve the loaded card's shape so
-  // the swap cannot move the page. The loaded card is a header strip
-  // (`border-b-[0.5px] border-hair-soft px-4 py-2`) plus one `min-h-11` group
-  // row per present status, and STATUS_ORDER holds exactly four statuses with
-  // no row for an absent one, so the card tops out at four rows. Reserving
-  // four means a mixed-status PR (the case this feature targets) is shift-free
-  // and the Review button, PrMergeSection and the head line below never get
-  // pushed down while the user is on the page; an empty or single-status card
-  // settles upward instead of growing under the user.
-  // The bars must NOT be `bg-muted` here: `--muted` and `--secondary` are
-  // the same colour in both themes (apps/mobile/src/global.css), so a
-  // `bg-muted` bar inside this `bg-secondary` card paints nothing and the
-  // section reads as an empty gray block (spot check e1-nav-mr). The shared
-  // Skeleton gives the pulse + shimmer, and `bg-muted-soft` is the one gray
-  // that contrasts with the card in both themes.
-  if (checks.isLoading) {
-    return (
-      <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          {t('prReview.checks.title')}
-        </Text>
-        <View
-          key={LOADING_CARD_KEY}
-          className="overflow-hidden rounded-lg bg-secondary"
-          accessibilityRole="progressbar"
-          accessibilityLabel={t('common.loading')}
-        >
-          <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
-            <Skeleton className="h-3 w-24 rounded-md bg-muted-soft" />
-          </View>
-          {STATUS_ORDER.map((status, rowIndex) => (
-            <View key={status}>
-              <View className="min-h-11 flex-row items-center gap-3 px-4 py-3">
-                <Skeleton className="h-4 w-4 rounded-full bg-muted-soft" />
-                <View className="flex-1">
-                  <Skeleton className="h-3.5 w-24 rounded-md bg-muted-soft" />
-                </View>
-                <Skeleton className="h-4 w-4 rounded-md bg-muted-soft" />
-              </View>
-              {rowIndex < STATUS_ORDER.length - 1 ? (
-                <View className="border-b-[0.5px] border-hair-soft" />
-              ) : null}
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  }
+  // The loaded PR/MR's own URL, published by the screen. Null until the read
+  // answers (and always the fixed host on GitHub), so the section renders no
+  // link until it has one.
+  const prUrl = useProviderPrWebUrl();
 
   if (checks.isError) {
     const state = classifyPrReviewQueryState(checks.error);
@@ -287,9 +244,7 @@ export function PrReviewChecksSection({
       // installed on the head repo). No retry — just the message.
       return (
         <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('prReview.checks.title')}
-          </Text>
+          <PrReviewSectionLabel label={t('prReview.checks.title')} />
           <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
             <Text className="text-sm text-muted-foreground">
               {t('prReview.checks.notAvailable')}
@@ -301,9 +256,7 @@ export function PrReviewChecksSection({
     if (state.kind === 'permission') {
       return (
         <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('prReview.checks.title')}
-          </Text>
+          <PrReviewSectionLabel label={t('prReview.checks.title')} />
           <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
             <Text className="text-sm text-muted-foreground">{t('prReview.checks.noAccess')}</Text>
           </View>
@@ -313,9 +266,7 @@ export function PrReviewChecksSection({
     if (state.kind === 'reconnect') {
       return (
         <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('prReview.checks.title')}
-          </Text>
+          <PrReviewSectionLabel label={t('prReview.checks.title')} />
           <PrReviewReconnectNotice />
         </View>
       );
@@ -326,9 +277,7 @@ export function PrReviewChecksSection({
     // the generic could-not-load copy.
     return (
       <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          {t('prReview.checks.title')}
-        </Text>
+        <PrReviewSectionLabel label={t('prReview.checks.title')} />
         <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
           <Text className="text-sm text-muted-foreground">
             {state.kind === 'service-unavailable'
@@ -338,7 +287,7 @@ export function PrReviewChecksSection({
           <Button
             variant="outline"
             onPress={() => {
-              void checks.refetch();
+              checks.refetch();
             }}
             loading={checks.isFetching}
             accessibilityLabel={t('prReview.checks.retryChecks')}
@@ -369,9 +318,7 @@ export function PrReviewChecksSection({
   if (runList.length === 0) {
     return (
       <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          {t('prReview.checks.title')}
-        </Text>
+        <PrReviewSectionLabel label={t('prReview.checks.title')} />
         <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
           <Text className="text-sm text-muted-foreground">
             {t('prReview.checks.noChecksReported')}
@@ -395,24 +342,32 @@ export function PrReviewChecksSection({
     );
   }
 
+  // The total strip earns its place only where no other row states it. With a
+  // single status group the group's own label is the card total, so the strip
+  // printed the same number twice ("1 check" over "1 passed", design review at
+  // the PR review overview fixture). Two or more groups have no single row
+  // carrying the total, and a listing the server cut needs the `+` to say its
+  // counts are lower bounds.
+  const showTotal = groups.length > 1 || Boolean(data?.truncated);
+
   // i18n-dup-ok: 'prReview.checks.checksCount_other' repeats the bare
   // 'prReview.checks.checksCount' by i18next convention — the bare key is the
   // plural fallback that must carry the `other` copy, so the family is one key
   // with a plural stem, not two keys for one string.
   return (
     <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.checks.title')}
-      </Text>
+      <PrReviewSectionLabel label={t('prReview.checks.title')} />
       <View key={CONTENT_CARD_KEY} className="overflow-hidden rounded-lg bg-secondary">
-        <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
-          <Text variant="muted" className="text-xs">
-            {t('prReview.checks.checksCount', {
-              count: runList.length,
-              displayCount,
-            })}
-          </Text>
-        </View>
+        {showTotal ? (
+          <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
+            <Text variant="muted" className="text-xs">
+              {t('prReview.checks.checksCount', {
+                count: runList.length,
+                displayCount,
+              })}
+            </Text>
+          </View>
+        ) : null}
         {groups.map((group, groupIndex) => (
           <PrReviewChecksStatusRow
             key={group.status}

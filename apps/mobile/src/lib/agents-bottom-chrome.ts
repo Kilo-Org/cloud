@@ -54,9 +54,8 @@ export function getAgentsListBottomInset({
  * block gap, and the action's `min-h-[48px]` plus the button's `py-2`.
  *
  * Every rem-based value is 14dp, not 16dp: NativeWind v5 fixes 1rem at 14pt
- * (`button.tsx`, and the compiled `gap-4 === 14` assertion in
- * `session-list-header-actions.mounted.test.tsx`). So `h-14` (3.5rem) is 49,
- * `gap-4` (1rem) 14, the `text-lg` line-height (1.75rem) 24.5, `gap-1`
+ * (`button.tsx`). So `h-14` (3.5rem) is 49, `gap-4` (1rem) 14, the `text-lg`
+ * line-height (1.75rem) 24.5, `gap-1`
  * (0.25rem) 3.5, the `text-sm` line-height (1.25rem) 17.5 and `py-2` (0.5rem
  * per side) 14. The `48` is the shared state-action floor
  * (`STATE_ACTION_TARGET_DP` in `a11y/tap-target.ts`, a px literal that does not

@@ -472,15 +472,16 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Install root dependencies
-        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
+      # One install pass links what the remaining steps read: the root project
+      # for the wiring suites and the runtime admission, and the usage-ingest
+      # closure because the relay regression executes Wrangler's real config
+      # parser. Lifecycle scripts stay suppressed, as both installs suppressed
+      # them before.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter cloudflare-usage-ingest --filter kilocode-monorepo
 
       - name: Check runtime publication workflow admission
         run: pnpm --filter cloud-agent-next test:runtime-ci
-
-      # The relay regression executes Wrangler's real config parser.
-      - name: Install usage-ingest deployment test dependencies
-        run: pnpm --filter cloudflare-usage-ingest install --frozen-lockfile --ignore-scripts
 
       # The stacked-CI admission runs on every change to a wiring input. All
       # wiring suites run in one invocation: the test runner starts the named

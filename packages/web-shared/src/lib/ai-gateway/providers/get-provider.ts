@@ -488,14 +488,6 @@ async function selectProvider(
   const plan = await planRoutes(planInputs);
   const keySteps = plan.filter(isKeyPlanStep);
   decision.recordByokCandidates(keySteps);
-  const chatGptIndex = plan.findIndex(step => step.route === 'chatgpt');
-  if (
-    plan
-      .slice(0, Math.max(chatGptIndex, 0))
-      .some(step => step.route === 'direct-byok' && step.decision === 'serves')
-  ) {
-    decision.step({ step: 'chatgpt', outcome: 'deferred', reason: 'catalog-key-serves' });
-  }
 
   // Skipped keys explain a route the settings page alone cannot: request-time inputs such as
   // `provider.ignore` or the provider settings decide them. Logged only when the order mattered.

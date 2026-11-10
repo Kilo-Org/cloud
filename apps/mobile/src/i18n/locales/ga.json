@@ -229,6 +229,21 @@
     "signInCodeField": "Cód sínithe isteach",
     "or": "nó"
   },
+  "pendingLink": {
+    "description": "Tá {{email}} in úsáid ag cuntas cheana. Sínigh isteach le ceann dá mhodhanna chun {{provider}} a chur leis.",
+    "emailCode": "Seol cód sínithe isteach chugam i ríomhphost",
+    "continueInBrowser": "Lean ar aghaidh sa bhrabhsálaí",
+    "startAgain": "Tosaigh arís",
+    "expired": "Tá an t-iarratas seo chun {{provider}} a chur leis imithe in éag.",
+    "noMethods": "Níl aon mhodh sínithe isteach eile ag an gcuntas seo, mar sin ní féidir {{provider}} a chur leis.",
+    "linked": "Cuireadh {{provider}} le do chuntas.",
+    "failedExpired": "Níor cuireadh {{provider}} leis mar go ndeachaigh an t-iarratas in éag.",
+    "failedWrongAccount": "Níor cuireadh {{provider}} leis mar gur shínigh tú isteach i gcuntas eile.",
+    "failedAccountAlreadyLinked": "Níor cuireadh {{provider}} leis mar go bhfuil sé nasctha le cuntas eile cheana.",
+    "failedProviderAlreadyLinked": "Níor cuireadh {{provider}} leis mar go bhfuil síniú isteach {{provider}} eile ag do chuntas cheana.",
+    "failedLinking": "Níorbh fhéidir {{provider}} a chur le do chuntas.",
+    "notAdded": "Tá tú sínithe isteach. Níor cuireadh {{provider}} le do chuntas."
+  },
   "profile": {
     "codeReviewerSubtitle": "Athbhreithnithe PR uathoibríocha",
     "securityAgentSubtitle": "Aimsigh agus réitigh leochaileachtaí",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Cuntas tástála",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO fiontair",
     "passkeysTitle": "Eochracha rochtana",
     "passkeysSubtitle": "Sínigh isteach gan phasfhocal",

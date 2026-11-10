@@ -229,6 +229,21 @@
     "signInCodeField": "Cod de autentificare",
     "or": "sau"
   },
+  "pendingLink": {
+    "description": "Există deja un cont care folosește {{email}}. Autentifică-te cu una dintre metodele lui pentru a adăuga {{provider}}.",
+    "emailCode": "Trimite-mi un cod de autentificare pe e-mail",
+    "continueInBrowser": "Continuă în browser",
+    "startAgain": "Începe din nou",
+    "expired": "Această solicitare de a adăuga {{provider}} a expirat.",
+    "noMethods": "Acest cont nu are altă metodă de autentificare, așa că {{provider}} nu poate fi adăugat.",
+    "linked": "{{provider}} a fost adăugat în contul tău.",
+    "failedExpired": "{{provider}} nu a fost adăugat pentru că solicitarea a expirat.",
+    "failedWrongAccount": "{{provider}} nu a fost adăugat pentru că te-ai autentificat în alt cont.",
+    "failedAccountAlreadyLinked": "{{provider}} nu a fost adăugat pentru că este deja asociat cu alt cont.",
+    "failedProviderAlreadyLinked": "{{provider}} nu a fost adăugat pentru că contul tău are deja o altă autentificare {{provider}}.",
+    "failedLinking": "{{provider}} nu a putut fi adăugat în contul tău.",
+    "notAdded": "Te-ai autentificat. {{provider}} nu a fost adăugat în contul tău."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revizuiri automate de PR",
     "securityAgentSubtitle": "Găsește și remediază vulnerabilitățile",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Cont de test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO pentru companii",
     "passkeysTitle": "Chei de acces",
     "passkeysSubtitle": "Autentifică-te fără parolă",

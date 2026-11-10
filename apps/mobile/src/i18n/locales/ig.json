@@ -229,6 +229,21 @@
     "signInCodeField": "Koodu nbanye",
     "or": "ma ọ bụ"
   },
+  "pendingLink": {
+    "description": "Akaụntụ na-eji {{email}} ugbu a. Jiri otu n'ime ụzọ nbanye ya banye iji tinye {{provider}}.",
+    "emailCode": "Zitere m koodu nbanye site n'ozi-e",
+    "continueInBrowser": "Gaa n'ihu na ihe nchọgharị",
+    "startAgain": "Malite ọzọ",
+    "expired": "Arịrịọ a iji tinye {{provider}} agwụla.",
+    "noMethods": "Akaụntụ a enweghị ụzọ nbanye ọzọ, ya mere enweghị ike itinye {{provider}}.",
+    "linked": "Etinyela {{provider}} na akaụntụ gị.",
+    "failedExpired": "Etinyeghị {{provider}} n'ihi na arịrịọ ahụ agwụla.",
+    "failedWrongAccount": "Etinyeghị {{provider}} n'ihi na ị banyere n'akaụntụ ọzọ.",
+    "failedAccountAlreadyLinked": "Etinyeghị {{provider}} n'ihi na ejikọọla ya na akaụntụ ọzọ.",
+    "failedProviderAlreadyLinked": "Etinyeghị {{provider}} n'ihi na akaụntụ gị nwereworị nbanye {{provider}} ọzọ.",
+    "failedLinking": "Enweghị ike itinye {{provider}} na akaụntụ gị.",
+    "notAdded": "Ị banyela. Etinyeghị {{provider}} na akaụntụ gị."
+  },
   "profile": {
     "codeReviewerSubtitle": "Nyocha PR akpaghị aka",
     "securityAgentSubtitle": "Chọta ma dozie adịghị ike nchebe",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Akaụntụ nnwale",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ụlọ ọrụ",
     "passkeysTitle": "Igodo nbanye",
     "passkeysSubtitle": "Banye na-enweghị paswọọdụ",

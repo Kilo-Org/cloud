@@ -229,6 +229,21 @@
     "signInCodeField": "Waehere takiuru",
     "or": "rānei"
   },
+  "pendingLink": {
+    "description": "Kei te whakamahia kē a {{email}} e tētahi pūkete. Takiuru mā tētahi o ōna tikanga hei tāpiri i a {{provider}}.",
+    "emailCode": "Īmēratia mai he waehere takiuru",
+    "continueInBrowser": "Haere tonu i te pūtirotiro",
+    "startAgain": "Tīmata anō",
+    "expired": "Kua pau te wā o tēnei tono ki te tāpiri i a {{provider}}.",
+    "noMethods": "Kāore he tikanga takiuru kē i tēnei pūkete, nō reira kāore e taea a {{provider}} te tāpiri.",
+    "linked": "Kua tāpirihia a {{provider}} ki tō pūkete.",
+    "failedExpired": "Kāore i tāpirihia a {{provider}} nā te mea kua pau te wā o te tono.",
+    "failedWrongAccount": "Kāore i tāpirihia a {{provider}} nā te mea i takiuru koe ki tētahi pūkete kē.",
+    "failedAccountAlreadyLinked": "Kāore i tāpirihia a {{provider}} nā te mea kua honoa kētia ki tētahi atu pūkete.",
+    "failedProviderAlreadyLinked": "Kāore i tāpirihia a {{provider}} nā te mea he takiuru {{provider}} kē tō tō pūkete.",
+    "failedLinking": "Kāore i taea a {{provider}} te tāpiri ki tō pūkete.",
+    "notAdded": "Kua takiuru koe. Kāore i tāpirihia a {{provider}} ki tō pūkete."
+  },
   "profile": {
     "codeReviewerSubtitle": "Ngā arotake PR aunoa",
     "securityAgentSubtitle": "Rapua, whakatikahia hoki ngā whakaraeraetanga",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Pūkete whakamātau",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO umanga",
     "passkeysTitle": "Ngā kī whakauru",
     "passkeysSubtitle": "Takiuru me te kore kupuhipa",

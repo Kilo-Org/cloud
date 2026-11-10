@@ -229,6 +229,21 @@
     "signInCodeField": "Bejelentkezési kód",
     "or": "vagy"
   },
+  "pendingLink": {
+    "description": "A(z) {{email}} címet már használja egy fiók. Jelentkezz be annak egyik módszerével a(z) {{provider}} hozzáadásához.",
+    "emailCode": "Bejelentkezési kód küldése e-mailben",
+    "continueInBrowser": "Folytatás böngészőben",
+    "startAgain": "Újrakezdés",
+    "expired": "A(z) {{provider}} hozzáadására vonatkozó kérés lejárt.",
+    "noMethods": "Ennek a fióknak nincs más bejelentkezési módja, ezért a(z) {{provider}} nem adható hozzá.",
+    "linked": "A(z) {{provider}} hozzá lett adva a fiókodhoz.",
+    "failedExpired": "A(z) {{provider}} nem lett hozzáadva, mert a kérés lejárt.",
+    "failedWrongAccount": "A(z) {{provider}} nem lett hozzáadva, mert egy másik fiókba jelentkeztél be.",
+    "failedAccountAlreadyLinked": "A(z) {{provider}} nem lett hozzáadva, mert már egy másik fiókhoz van kapcsolva.",
+    "failedProviderAlreadyLinked": "A(z) {{provider}} nem lett hozzáadva, mert a fiókodhoz már tartozik egy másik {{provider}}-bejelentkezés.",
+    "failedLinking": "A(z) {{provider}} nem adható hozzá a fiókodhoz.",
+    "notAdded": "Bejelentkeztél. A(z) {{provider}} nem lett hozzáadva a fiókodhoz."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatikus PR-ellenőrzések",
     "securityAgentSubtitle": "Sérülékenységek keresése és javítása",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Tesztfiók",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Vállalati SSO",
     "passkeysTitle": "Jelkulcsok",
     "passkeysSubtitle": "Bejelentkezés jelszó nélkül",

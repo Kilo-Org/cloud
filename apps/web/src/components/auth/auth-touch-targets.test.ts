@@ -324,6 +324,7 @@ describe('sign-in touch targets', () => {
       'EMAIL-INVALID-FORMAT',
       'EMAIL-MUST-BE-LOWERCASE',
       'EMAIL-CANNOT-CONTAIN-PLUS',
+      'EMAIL-REQUIRED',
       'untrusted-query-error',
     ];
 
@@ -357,6 +358,7 @@ describe('sign-in touch targets', () => {
         viewerToken: 'viewer-token',
         isAppMode: true,
         requestingClient: null,
+        pendingLink: null,
         user: { name: 'Ada Lovelace', email: 'ada@kilo.ai', imageUrl: '' },
       })
     );

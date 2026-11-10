@@ -229,6 +229,21 @@
     "signInCodeField": "Ikhodi yokungena",
     "or": "noma"
   },
+  "pendingLink": {
+    "description": "I-akhawunti isivele isebenzisa i-{{email}}. Ngena ngenye yezindlela zayo ukuze wengeze i-{{provider}}.",
+    "emailCode": "Ngithumelele ikhodi yokungena nge-imeyili",
+    "continueInBrowser": "Qhubeka esipheqululini",
+    "startAgain": "Qala futhi",
+    "expired": "Lesi sicelo sokwengeza i-{{provider}} siphelelwe yisikhathi.",
+    "noMethods": "Le akhawunti ayinayo enye indlela yokungena, ngakho i-{{provider}} ayikwazi ukwengezwa.",
+    "linked": "I-{{provider}} yengezwe ku-akhawunti yakho.",
+    "failedExpired": "I-{{provider}} ayizange yengezwe ngoba isicelo siphelelwe yisikhathi.",
+    "failedWrongAccount": "I-{{provider}} ayizange yengezwe ngoba ungene kwenye i-akhawunti.",
+    "failedAccountAlreadyLinked": "I-{{provider}} ayizange yengezwe ngoba isivele ixhunywe kwenye i-akhawunti.",
+    "failedProviderAlreadyLinked": "I-{{provider}} ayizange yengezwe ngoba i-akhawunti yakho isivele inokungena okuhlukile kwe-{{provider}}.",
+    "failedLinking": "I-{{provider}} ayikwazanga ukwengezwa ku-akhawunti yakho.",
+    "notAdded": "Ungenile. I-{{provider}} ayizange yengezwe ku-akhawunti yakho."
+  },
   "profile": {
     "codeReviewerSubtitle": "Ukuhlolwa kwe-PR okuzenzakalelayo",
     "securityAgentSubtitle": "Thola futhi ulungise ubungozi",
@@ -267,6 +282,8 @@
     "providerTestAccount": "I-akhawunti yokuhlola",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO yebhizinisi",
     "passkeysTitle": "Amakhiye okungena",
     "passkeysSubtitle": "Ngena ngaphandle kwephasiwedi",

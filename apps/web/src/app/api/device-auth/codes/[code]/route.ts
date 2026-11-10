@@ -40,6 +40,7 @@ export const GET = withRestTiming(
             userEmail: result.userEmail,
             requestingClient: result.requestingClient ?? null,
             clientConfirmed: result.clientConfirmed === true,
+            ...(result.pendingLink ? { pendingLink: result.pendingLink } : {}),
           },
           { status: 200 }
         );

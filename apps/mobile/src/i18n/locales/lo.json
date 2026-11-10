@@ -229,6 +229,21 @@
     "signInCodeField": "ລະຫັດເຂົ້າສູ່ລະບົບ",
     "or": "ຫຼື"
   },
+  "pendingLink": {
+    "description": "ມີບັນຊີທີ່ໃຊ້ {{email}} ຢູ່ແລ້ວ. ເຂົ້າສູ່ລະບົບດ້ວຍວິທີໃດໜຶ່ງຂອງບັນຊີນັ້ນເພື່ອເພີ່ມ {{provider}}.",
+    "emailCode": "ສົ່ງລະຫັດເຂົ້າສູ່ລະບົບໃຫ້ຂ້ອຍທາງອີເມວ",
+    "continueInBrowser": "ສືບຕໍ່ໃນບຣາວເຊີ",
+    "startAgain": "ເລີ່ມໃໝ່",
+    "expired": "ຄຳຂໍເພີ່ມ {{provider}} ນີ້ໝົດອາຍຸແລ້ວ.",
+    "noMethods": "ບັນຊີນີ້ບໍ່ມີວິທີເຂົ້າສູ່ລະບົບອື່ນ, ສະນັ້ນຈຶ່ງບໍ່ສາມາດເພີ່ມ {{provider}} ໄດ້.",
+    "linked": "ເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານແລ້ວ.",
+    "failedExpired": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະຄຳຂໍໝົດອາຍຸແລ້ວ.",
+    "failedWrongAccount": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະທ່ານເຂົ້າສູ່ລະບົບບັນຊີອື່ນ.",
+    "failedAccountAlreadyLinked": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະມັນເຊື່ອມຕໍ່ກັບບັນຊີອື່ນຢູ່ແລ້ວ.",
+    "failedProviderAlreadyLinked": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະບັນຊີຂອງທ່ານມີການເຂົ້າສູ່ລະບົບ {{provider}} ອື່ນຢູ່ແລ້ວ.",
+    "failedLinking": "ບໍ່ສາມາດເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານໄດ້.",
+    "notAdded": "ທ່ານເຂົ້າສູ່ລະບົບແລ້ວ. ບໍ່ໄດ້ເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານ."
+  },
   "profile": {
     "codeReviewerSubtitle": "ການກວດສອບ PR ອັດຕະໂນມັດ",
     "securityAgentSubtitle": "ຊອກຫາ ແລະ ແກ້ໄຂຈຸດອ່ອນດ້ານຄວາມປອດໄພ",
@@ -267,6 +282,8 @@
     "providerTestAccount": "ບັນຊີທົດສອບ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ສຳລັບອົງກອນ",
     "passkeysTitle": "ກະແຈເຂົ້າ",
     "passkeysSubtitle": "ເຂົ້າສູ່ລະບົບໂດຍບໍ່ມີລະຫັດຜ່ານ",

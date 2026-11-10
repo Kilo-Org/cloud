@@ -229,6 +229,21 @@
     "signInCodeField": "Aanmeldkode",
     "or": "of"
   },
+  "pendingLink": {
+    "description": "'n Rekening gebruik reeds {{email}}. Meld aan met een van sy metodes om {{provider}} by te voeg.",
+    "emailCode": "E-pos vir my 'n aanmeldkode",
+    "continueInBrowser": "Gaan voort in die blaaier",
+    "startAgain": "Begin weer",
+    "expired": "Hierdie versoek om {{provider}} by te voeg het verval.",
+    "noMethods": "Hierdie rekening het geen ander aanmeldmetode nie, dus kan {{provider}} nie bygevoeg word nie.",
+    "linked": "{{provider}} is by jou rekening gevoeg.",
+    "failedExpired": "{{provider}} is nie bygevoeg nie omdat die versoek verval het.",
+    "failedWrongAccount": "{{provider}} is nie bygevoeg nie omdat jy by 'n ander rekening aangemeld het.",
+    "failedAccountAlreadyLinked": "{{provider}} is nie bygevoeg nie omdat dit reeds aan 'n ander rekening gekoppel is.",
+    "failedProviderAlreadyLinked": "{{provider}} is nie bygevoeg nie omdat jou rekening reeds 'n ander {{provider}}-aanmelding het.",
+    "failedLinking": "{{provider}} kon nie by jou rekening gevoeg word nie.",
+    "notAdded": "Jy is aangemeld. {{provider}} is nie by jou rekening gevoeg nie."
+  },
   "profile": {
     "codeReviewerSubtitle": "Outomatiese PR-hersienings",
     "securityAgentSubtitle": "Vind en verhelp kwesbaarhede",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Toetsrekening",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Onderneming-SSO",
     "passkeysTitle": "Passkeys",
     "passkeysSubtitle": "Meld aan sonder ’n wagwoord",

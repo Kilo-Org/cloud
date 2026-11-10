@@ -229,6 +229,21 @@
     "signInCodeField": "Kóòdù ìwọlé",
     "or": "tàbí"
   },
+  "pendingLink": {
+    "description": "Àkọọ́lẹ̀ kan ti ń lo {{email}} tẹ́lẹ̀. Wọlé pẹ̀lú ọ̀kan nínú àwọn ọ̀nà rẹ̀ láti ṣàfikún {{provider}}.",
+    "emailCode": "Fi kóòdù ìwọlé ránṣẹ́ sí mi ní ímeèlì",
+    "continueInBrowser": "Tẹ̀síwájú nínú aṣàwákiri",
+    "startAgain": "Bẹ̀rẹ̀ lẹ́ẹ̀kansí",
+    "expired": "Ìbéèrè yìí láti ṣàfikún {{provider}} ti parí àkókò.",
+    "noMethods": "Àkọọ́lẹ̀ yìí kò ní ọ̀nà ìwọlé mìíràn, nítorí náà a kò lè ṣàfikún {{provider}}.",
+    "linked": "A ti ṣàfikún {{provider}} sí àkọọ́lẹ̀ rẹ.",
+    "failedExpired": "A kò ṣàfikún {{provider}} nítorí ìbéèrè náà ti parí àkókò.",
+    "failedWrongAccount": "A kò ṣàfikún {{provider}} nítorí o wọlé sí àkọọ́lẹ̀ mìíràn.",
+    "failedAccountAlreadyLinked": "A kò ṣàfikún {{provider}} nítorí ó ti so mọ́ àkọọ́lẹ̀ mìíràn tẹ́lẹ̀.",
+    "failedProviderAlreadyLinked": "A kò ṣàfikún {{provider}} nítorí àkọọ́lẹ̀ rẹ ti ní ìwọlé {{provider}} mìíràn tẹ́lẹ̀.",
+    "failedLinking": "A kò lè ṣàfikún {{provider}} sí àkọọ́lẹ̀ rẹ.",
+    "notAdded": "O ti wọlé. A kò ṣàfikún {{provider}} sí àkọọ́lẹ̀ rẹ."
+  },
   "profile": {
     "codeReviewerSubtitle": "Àtúnyẹ̀wò PR láìfọwọ́yí",
     "securityAgentSubtitle": "Wá àwọn àlàfo ààbò kí o sì ṣàtúnṣe wọn",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Àkọọ́lẹ̀ àdánwò",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ilé iṣẹ́",
     "passkeysTitle": "Àwọn passkey",
     "passkeysSubtitle": "Wọlé láìsí ọ̀rọ̀ ìpamọ́",

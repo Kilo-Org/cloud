@@ -229,6 +229,21 @@
     "signInCodeField": "ಸೈನ್ ಇನ್ ಕೋಡ್",
     "or": "ಅಥವಾ"
   },
+  "pendingLink": {
+    "description": "{{email}} ಅನ್ನು ಈಗಾಗಲೇ ಒಂದು ಖಾತೆ ಬಳಸುತ್ತಿದೆ. {{provider}} ಸೇರಿಸಲು ಅದರ ಯಾವುದಾದರೂ ಒಂದು ವಿಧಾನದಿಂದ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
+    "emailCode": "ನನಗೆ ಸೈನ್ ಇನ್ ಕೋಡ್ ಅನ್ನು ಇಮೇಲ್ ಮಾಡಿ",
+    "continueInBrowser": "ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಮುಂದುವರಿಸಿ",
+    "startAgain": "ಮತ್ತೆ ಪ್ರಾರಂಭಿಸಿ",
+    "expired": "{{provider}} ಸೇರಿಸುವ ಈ ವಿನಂತಿಯ ಅವಧಿ ಮುಗಿದಿದೆ.",
+    "noMethods": "ಈ ಖಾತೆಗೆ ಬೇರೆ ಯಾವುದೇ ಸೈನ್ ಇನ್ ವಿಧಾನವಿಲ್ಲ, ಆದ್ದರಿಂದ {{provider}} ಸೇರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+    "linked": "{{provider}} ಅನ್ನು ನಿಮ್ಮ ಖಾತೆಗೆ ಸೇರಿಸಲಾಗಿದೆ.",
+    "failedExpired": "ವಿನಂತಿಯ ಅವಧಿ ಮುಗಿದಿದ್ದರಿಂದ {{provider}} ಅನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
+    "failedWrongAccount": "ನೀವು ಬೇರೆ ಖಾತೆಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿದ್ದರಿಂದ {{provider}} ಅನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
+    "failedAccountAlreadyLinked": "{{provider}} ಈಗಾಗಲೇ ಬೇರೆ ಖಾತೆಗೆ ಲಿಂಕ್ ಆಗಿರುವುದರಿಂದ ಅದನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
+    "failedProviderAlreadyLinked": "ನಿಮ್ಮ ಖಾತೆಯಲ್ಲಿ ಈಗಾಗಲೇ ಬೇರೆ {{provider}} ಸೈನ್ ಇನ್ ಇರುವುದರಿಂದ {{provider}} ಅನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
+    "failedLinking": "{{provider}} ಅನ್ನು ನಿಮ್ಮ ಖಾತೆಗೆ ಸೇರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "notAdded": "ನೀವು ಸೈನ್ ಇನ್ ಮಾಡಿದ್ದೀರಿ. {{provider}} ಅನ್ನು ನಿಮ್ಮ ಖಾತೆಗೆ ಸೇರಿಸಲಾಗಿಲ್ಲ."
+  },
   "profile": {
     "codeReviewerSubtitle": "ಸ್ವಯಂಚಾಲಿತ PR ಪರಿಶೀಲನೆಗಳು",
     "securityAgentSubtitle": "ಭದ್ರತಾ ದೋಷಗಳನ್ನು ಹುಡುಕಿ ಸರಿಪಡಿಸಿ",
@@ -267,6 +282,8 @@
     "providerTestAccount": "ಪರೀಕ್ಷಾ ಖಾತೆ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "ಸಾಂಸ್ಥಿಕ SSO",
     "passkeysTitle": "ಪಾಸ್ಕೀಗಳು",
     "passkeysSubtitle": "ಪಾಸ್‌ವರ್ಡ್ ಇಲ್ಲದೆ ಸೈನ್ ಇನ್ ಮಾಡಿ",

@@ -13,18 +13,64 @@ jest.mock('@/lib/device-auth/device-auth', () => {
   };
 });
 
+jest.mock('@/lib/auth/pending-link', () => ({
+  getPendingLinkBySecret: jest.fn(),
+}));
+
 import {
   createDeviceAuthRequest,
   DeviceAuthPendingLimitError,
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
 } from '@/lib/device-auth/device-auth';
 import { POST } from './route';
+import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
 
 const mockCreate = jest.mocked(createDeviceAuthRequest);
+const mockGetPendingLink = jest.mocked(getPendingLinkBySecret);
 
 describe('POST /api/device-auth/codes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  test('refuses a pending link token that names no live pending link', async () => {
+    mockGetPendingLink.mockResolvedValue(null);
+
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: JSON.stringify({ pendingLinkToken: 'dead-secret' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'PENDING_LINK_EXPIRED' });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test('stores a live pending link token with the device code', async () => {
+    mockGetPendingLink.mockResolvedValue({ id: 'pending-1' } as never);
+    mockCreate.mockResolvedValue({
+      code: 'poll-secret',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: JSON.stringify({ pendingLinkToken: 'live-secret' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ pendingLinkToken: 'live-secret' })
+    );
   });
 
   test('returns code as the poll secret plus user_code, device_code, verificationUrl, and expiresIn', async () => {

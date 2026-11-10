@@ -229,6 +229,21 @@
     "signInCodeField": "ସାଇନ୍ ଇନ୍ କୋଡ୍",
     "or": "କିମ୍ବା"
   },
+  "pendingLink": {
+    "description": "{{email}} ପୂର୍ବରୁ ଏକ ଆକାଉଣ୍ଟ ବ୍ୟବହାର କରୁଛି। {{provider}} ଯୋଡ଼ିବା ପାଇଁ ଏହାର ଗୋଟିଏ ପଦ୍ଧତିରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
+    "emailCode": "ମୋତେ ସାଇନ୍ ଇନ୍ କୋଡ୍ ଇମେଲ୍ କରନ୍ତୁ",
+    "continueInBrowser": "ବ୍ରାଉଜରରେ ଜାରି ରଖନ୍ତୁ",
+    "startAgain": "ପୁଣି ଆରମ୍ଭ କରନ୍ତୁ",
+    "expired": "{{provider}} ଯୋଡ଼ିବାର ଏହି ଅନୁରୋଧର ମିଆଦ ଶେଷ ହୋଇଛି।",
+    "noMethods": "ଏହି ଆକାଉଣ୍ଟର ଅନ୍ୟ କୌଣସି ସାଇନ୍ ଇନ୍ ପଦ୍ଧତି ନାହିଁ, ତେଣୁ {{provider}} ଯୋଡ଼ାଯାଇପାରିବ ନାହିଁ।",
+    "linked": "{{provider}} ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଯୋଡ଼ାଗଲା।",
+    "failedExpired": "ଅନୁରୋଧର ମିଆଦ ଶେଷ ହୋଇଥିବାରୁ {{provider}} ଯୋଡ଼ାଗଲା ନାହିଁ।",
+    "failedWrongAccount": "ଆପଣ ଏକ ଭିନ୍ନ ଆକାଉଣ୍ଟରେ ସାଇନ୍ ଇନ୍ କରିଥିବାରୁ {{provider}} ଯୋଡ଼ାଗଲା ନାହିଁ।",
+    "failedAccountAlreadyLinked": "{{provider}} ପୂର୍ବରୁ ଅନ୍ୟ ଏକ ଆକାଉଣ୍ଟ ସହ ଲିଙ୍କ୍ ହୋଇଥିବାରୁ ଯୋଡ଼ାଗଲା ନାହିଁ।",
+    "failedProviderAlreadyLinked": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ପୂର୍ବରୁ ଏକ ଭିନ୍ନ {{provider}} ସାଇନ୍ ଇନ୍ ଥିବାରୁ {{provider}} ଯୋଡ଼ାଗଲା ନାହିଁ।",
+    "failedLinking": "{{provider}} ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଯୋଡ଼ାଯାଇପାରିଲା ନାହିଁ।",
+    "notAdded": "ଆପଣ ସାଇନ୍ ଇନ୍ କରିଛନ୍ତି। {{provider}} ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଯୋଡ଼ାଗଲା ନାହିଁ।"
+  },
   "profile": {
     "codeReviewerSubtitle": "ସ୍ୱୟଂଚାଳିତ PR ସମୀକ୍ଷା",
     "securityAgentSubtitle": "ସୁରକ୍ଷା ଦୁର୍ବଳତା ଖୋଜି ସୁଧାରନ୍ତୁ",
@@ -267,6 +282,8 @@
     "providerTestAccount": "ପରୀକ୍ଷଣ ଆକାଉଣ୍ଟ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "ଏଣ୍ଟରପ୍ରାଇଜ୍ SSO",
     "passkeysTitle": "ପାସକି",
     "passkeysSubtitle": "ପାସୱାର୍ଡ ବିନା ସାଇନ୍ ଇନ୍ କରନ୍ତୁ",

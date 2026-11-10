@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Bitte gib deine E-Mail-Adresse ein.",
     "or": "oder"
   },
+  "pendingLink": {
+    "description": "Es gibt bereits ein Konto mit {{email}}. Melde dich mit einer seiner Methoden an, um {{provider}} hinzuzufügen.",
+    "emailCode": "Anmeldecode per E-Mail senden",
+    "continueInBrowser": "Im Browser fortfahren",
+    "startAgain": "Von vorn beginnen",
+    "expired": "Diese Anfrage zum Hinzufügen von {{provider}} ist abgelaufen.",
+    "noMethods": "Dieses Konto hat keine andere Anmeldemethode, daher kann {{provider}} nicht hinzugefügt werden.",
+    "linked": "{{provider}} wurde deinem Konto hinzugefügt.",
+    "failedExpired": "{{provider}} wurde nicht hinzugefügt, weil die Anfrage abgelaufen ist.",
+    "failedWrongAccount": "{{provider}} wurde nicht hinzugefügt, weil du dich bei einem anderen Konto angemeldet hast.",
+    "failedAccountAlreadyLinked": "{{provider}} wurde nicht hinzugefügt, weil es bereits mit einem anderen Konto verknüpft ist.",
+    "failedProviderAlreadyLinked": "{{provider}} wurde nicht hinzugefügt, weil dein Konto bereits eine andere {{provider}}-Anmeldung hat.",
+    "failedLinking": "{{provider}} konnte deinem Konto nicht hinzugefügt werden.",
+    "notAdded": "Du bist angemeldet. {{provider}} wurde deinem Konto nicht hinzugefügt."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatische PR-Prüfungen",
     "securityAgentSubtitle": "Schwachstellen finden und beheben",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Unternehmens-SSO",
     "passkeysTitle": "Passkeys",
     "passkeysSubtitle": "Ohne Passwort anmelden",

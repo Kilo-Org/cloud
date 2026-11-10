@@ -229,6 +229,21 @@
     "signInCodeField": "Código de inicio de sesión",
     "or": "ou"
   },
+  "pendingLink": {
+    "description": "Xa hai unha conta que usa {{email}}. Inicia sesión cun dos seus métodos para engadir {{provider}}.",
+    "emailCode": "Enviarme un código de inicio de sesión por correo",
+    "continueInBrowser": "Continuar no navegador",
+    "startAgain": "Comezar de novo",
+    "expired": "Esta solicitude para engadir {{provider}} caducou.",
+    "noMethods": "Esta conta non ten outro método de inicio de sesión, polo que non se pode engadir {{provider}}.",
+    "linked": "Engadiuse {{provider}} á túa conta.",
+    "failedExpired": "Non se engadiu {{provider}} porque a solicitude caducou.",
+    "failedWrongAccount": "Non se engadiu {{provider}} porque iniciaches sesión noutra conta.",
+    "failedAccountAlreadyLinked": "Non se engadiu {{provider}} porque xa está vinculado a outra conta.",
+    "failedProviderAlreadyLinked": "Non se engadiu {{provider}} porque a túa conta xa ten outro inicio de sesión de {{provider}}.",
+    "failedLinking": "Non se puido engadir {{provider}} á túa conta.",
+    "notAdded": "Iniciaches sesión. Non se engadiu {{provider}} á túa conta."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisións automáticas de PR",
     "securityAgentSubtitle": "Atopar e corrixir vulnerabilidades",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Conta de proba",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO empresarial",
     "passkeysTitle": "Chaves de acceso",
     "passkeysSubtitle": "Inicia sesión sen contrasinal",

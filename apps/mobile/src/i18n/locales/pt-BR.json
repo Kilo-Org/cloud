@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Digite seu endereço de e-mail.",
     "or": "ou"
   },
+  "pendingLink": {
+    "description": "Uma conta já usa {{email}}. Entre com um dos métodos dela para adicionar {{provider}}.",
+    "emailCode": "Enviar um código de login por e-mail",
+    "continueInBrowser": "Continuar no navegador",
+    "startAgain": "Começar de novo",
+    "expired": "Esta solicitação para adicionar {{provider}} expirou.",
+    "noMethods": "Esta conta não tem outro método de login, então não é possível adicionar {{provider}}.",
+    "linked": "{{provider}} foi adicionado à sua conta.",
+    "failedExpired": "{{provider}} não foi adicionado porque a solicitação expirou.",
+    "failedWrongAccount": "{{provider}} não foi adicionado porque você entrou em outra conta.",
+    "failedAccountAlreadyLinked": "{{provider}} não foi adicionado porque já está vinculado a outra conta.",
+    "failedProviderAlreadyLinked": "{{provider}} não foi adicionado porque sua conta já tem outro login do {{provider}}.",
+    "failedLinking": "Não foi possível adicionar {{provider}} à sua conta.",
+    "notAdded": "Você entrou. {{provider}} não foi adicionado à sua conta."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisões automáticas de PR",
     "securityAgentSubtitle": "Encontrar e corrigir vulnerabilidades",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Conta de teste",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO corporativo",
     "passkeysTitle": "Chaves de acesso",
     "passkeysSubtitle": "Entre sem senha",

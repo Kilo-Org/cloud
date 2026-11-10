@@ -229,6 +229,21 @@
     "signInCodeField": "Kòd koneksyon",
     "or": "oswa"
   },
+  "pendingLink": {
+    "description": "Gen yon kont ki deja itilize {{email}}. Konekte ak youn nan metòd li yo pou ajoute {{provider}}.",
+    "emailCode": "Voye yon kòd koneksyon ban mwen pa imèl",
+    "continueInBrowser": "Kontinye nan navigatè a",
+    "startAgain": "Rekòmanse",
+    "expired": "Demann sa a pou ajoute {{provider}} ekspire.",
+    "noMethods": "Kont sa a pa gen okenn lòt metòd koneksyon, kidonk yo pa ka ajoute {{provider}}.",
+    "linked": "Yo ajoute {{provider}} nan kont ou.",
+    "failedExpired": "Yo pa t ajoute {{provider}} paske demann lan ekspire.",
+    "failedWrongAccount": "Yo pa t ajoute {{provider}} paske ou te konekte nan yon lòt kont.",
+    "failedAccountAlreadyLinked": "Yo pa t ajoute {{provider}} paske li deja lye ak yon lòt kont.",
+    "failedProviderAlreadyLinked": "Yo pa t ajoute {{provider}} paske kont ou deja gen yon lòt koneksyon {{provider}}.",
+    "failedLinking": "Nou pa t ka ajoute {{provider}} nan kont ou.",
+    "notAdded": "Ou konekte. Yo pa t ajoute {{provider}} nan kont ou."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revizyon otomatik PR yo",
     "securityAgentSubtitle": "Jwenn epi korije vilnerabilite",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Kont tès",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO antrepriz",
     "passkeysTitle": "Kle aksè",
     "passkeysSubtitle": "Konekte san modpas",

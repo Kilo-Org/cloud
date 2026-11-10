@@ -229,6 +229,21 @@
     "signInCodeField": "Koodhka soo galista",
     "or": "ama"
   },
+  "pendingLink": {
+    "description": "Akoon ayaa horey u isticmaalaya {{email}}. Ku soo gal mid ka mid ah hababkiisa si aad ugu darto {{provider}}.",
+    "emailCode": "Iimayl iigu soo dir koodh soo galis",
+    "continueInBrowser": "Ku sii wad biraawsarka",
+    "startAgain": "Dib u bilow",
+    "expired": "Codsigan lagu darayo {{provider}} wuu dhacay.",
+    "noMethods": "Akoonkan ma laha hab kale oo soo galis, sidaa darteed {{provider}} laguma dari karo.",
+    "linked": "{{provider}} waxaa lagu daray akoonkaaga.",
+    "failedExpired": "{{provider}} lama darin sababtoo ah codsigu wuu dhacay.",
+    "failedWrongAccount": "{{provider}} lama darin sababtoo ah waxaad soo gashay akoon kale.",
+    "failedAccountAlreadyLinked": "{{provider}} lama darin sababtoo ah horey ayuu ugu xiran yahay akoon kale.",
+    "failedProviderAlreadyLinked": "{{provider}} lama darin sababtoo ah akoonkaagu horey ayuu u leeyahay soo galis {{provider}} oo kale.",
+    "failedLinking": "{{provider}} laguma dari karin akoonkaaga.",
+    "notAdded": "Waad soo gashay. {{provider}} laguma darin akoonkaaga."
+  },
   "profile": {
     "codeReviewerSubtitle": "Dib-u-eegisyada tooska ah ee PR",
     "securityAgentSubtitle": "Raadi oo sax nuglaanta amniga",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Akoon tijaabo ah",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO-ga shirkadda",
     "passkeysTitle": "Furahayaasha gelitaanka",
     "passkeysSubtitle": "Ku soo gal iyada oo aan lahayn furaha sirta ah",

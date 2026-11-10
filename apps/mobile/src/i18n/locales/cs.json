@@ -229,6 +229,21 @@
     "signInCodeField": "Přihlašovací kód",
     "or": "nebo"
   },
+  "pendingLink": {
+    "description": "Účet s e-mailem {{email}} už existuje. Pro přidání {{provider}} se přihlaste některou z jeho metod.",
+    "emailCode": "Poslat mi přihlašovací kód e-mailem",
+    "continueInBrowser": "Pokračovat v prohlížeči",
+    "startAgain": "Začít znovu",
+    "expired": "Platnost žádosti o přidání {{provider}} vypršela.",
+    "noMethods": "Tento účet nemá žádnou jinou metodu přihlášení, takže {{provider}} nelze přidat.",
+    "linked": "{{provider}} byl přidán k vašemu účtu.",
+    "failedExpired": "{{provider}} nebyl přidán, protože platnost žádosti vypršela.",
+    "failedWrongAccount": "{{provider}} nebyl přidán, protože jste se přihlásili k jinému účtu.",
+    "failedAccountAlreadyLinked": "{{provider}} nebyl přidán, protože už je propojen s jiným účtem.",
+    "failedProviderAlreadyLinked": "{{provider}} nebyl přidán, protože váš účet už má jiné přihlášení přes {{provider}}.",
+    "failedLinking": "{{provider}} se nepodařilo přidat k vašemu účtu.",
+    "notAdded": "Jste přihlášeni. {{provider}} nebyl přidán k vašemu účtu."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatické kontroly PR",
     "securityAgentSubtitle": "Vyhledávat a odstraňovat zranitelnosti",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testovací účet",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Podnikové SSO",
     "passkeysTitle": "Přístupové klíče",
     "passkeysSubtitle": "Přihlaste se bez hesla",

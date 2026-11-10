@@ -229,6 +229,21 @@
     "signInCodeField": "Pierakstīšanās kods",
     "or": "vai"
   },
+  "pendingLink": {
+    "description": "Konts ar {{email}} jau pastāv. Pieraksties ar kādu no tā metodēm, lai pievienotu {{provider}}.",
+    "emailCode": "Nosūtīt man pierakstīšanās kodu e-pastā",
+    "continueInBrowser": "Turpināt pārlūkā",
+    "startAgain": "Sākt no jauna",
+    "expired": "Šim pieprasījumam pievienot {{provider}} ir beidzies derīguma termiņš.",
+    "noMethods": "Šim kontam nav citas pierakstīšanās metodes, tāpēc {{provider}} nevar pievienot.",
+    "linked": "{{provider}} tika pievienots tavam kontam.",
+    "failedExpired": "{{provider}} netika pievienots, jo pieprasījumam beidzās derīguma termiņš.",
+    "failedWrongAccount": "{{provider}} netika pievienots, jo tu pierakstījies citā kontā.",
+    "failedAccountAlreadyLinked": "{{provider}} netika pievienots, jo tas jau ir saistīts ar citu kontu.",
+    "failedProviderAlreadyLinked": "{{provider}} netika pievienots, jo tavam kontam jau ir cita {{provider}} pierakstīšanās.",
+    "failedLinking": "{{provider}} nevarēja pievienot tavam kontam.",
+    "notAdded": "Tu esi pierakstījies. {{provider}} netika pievienots tavam kontam."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automātiskas PR pārbaudes",
     "securityAgentSubtitle": "Atrast un novērst ievainojamības",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testa konts",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Uzņēmuma SSO",
     "passkeysTitle": "Piekļuves atslēgas",
     "passkeysSubtitle": "Pierakstīties bez paroles",

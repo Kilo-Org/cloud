@@ -171,6 +171,8 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'common.gitlab',
   'profile.providerGoogle',
   'profile.providerLinkedin',
+  'profile.providerChatgpt',
+  'profile.providerClaude',
   'consent.kilo',
   'common.kiloclaw',
   'tabs.kiloclawWrapped',

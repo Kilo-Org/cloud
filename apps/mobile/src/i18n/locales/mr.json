@@ -229,6 +229,21 @@
     "signInCodeField": "साइन-इन कोड",
     "or": "किंवा"
   },
+  "pendingLink": {
+    "description": "{{email}} आधीच एका खात्याद्वारे वापरला जात आहे. {{provider}} जोडण्यासाठी त्या खात्याच्या एका पद्धतीने साइन इन करा.",
+    "emailCode": "मला साइन-इन कोड ईमेल करा",
+    "continueInBrowser": "ब्राउझरमध्ये सुरू ठेवा",
+    "startAgain": "पुन्हा सुरू करा",
+    "expired": "{{provider}} जोडण्याच्या या विनंतीची मुदत संपली आहे.",
+    "noMethods": "या खात्याला दुसरी कोणतीही साइन-इन पद्धत नाही, त्यामुळे {{provider}} जोडता येणार नाही.",
+    "linked": "{{provider}} तुमच्या खात्यात जोडले गेले.",
+    "failedExpired": "विनंतीची मुदत संपल्यामुळे {{provider}} जोडले गेले नाही.",
+    "failedWrongAccount": "तुम्ही वेगळ्या खात्यात साइन इन केल्यामुळे {{provider}} जोडले गेले नाही.",
+    "failedAccountAlreadyLinked": "{{provider}} आधीच दुसऱ्या खात्याशी लिंक असल्यामुळे जोडले गेले नाही.",
+    "failedProviderAlreadyLinked": "तुमच्या खात्यात आधीच वेगळे {{provider}} साइन-इन असल्यामुळे {{provider}} जोडले गेले नाही.",
+    "failedLinking": "{{provider}} तुमच्या खात्यात जोडता आले नाही.",
+    "notAdded": "तुम्ही साइन इन केले आहे. {{provider}} तुमच्या खात्यात जोडले गेले नाही."
+  },
   "profile": {
     "codeReviewerSubtitle": "स्वयंचलित PR पुनरावलोकने",
     "securityAgentSubtitle": "सुरक्षेतील त्रुटी शोधा आणि दुरुस्त करा",
@@ -267,6 +282,8 @@
     "providerTestAccount": "चाचणी खाते",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "एंटरप्राइझ SSO",
     "passkeysTitle": "पासक्या",
     "passkeysSubtitle": "पासवर्डशिवाय साइन इन करा",

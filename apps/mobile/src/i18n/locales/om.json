@@ -229,6 +229,21 @@
     "signInCodeField": "Koodii seensaa",
     "or": "ykn"
   },
+  "pendingLink": {
+    "description": "Herregni tokko duraanuu {{email}} fayyadama. {{provider}} dabaluuf mala seensaa isaa keessaa tokkoon seeni.",
+    "emailCode": "Koodii seensaa imeeliidhaan naaf ergi",
+    "continueInBrowser": "Biraawzarii keessatti itti fufi",
+    "startAgain": "Irra deebi'ii jalqabi",
+    "expired": "Gaaffiin {{provider}} dabaluu kun yeroon isaa darbeera.",
+    "noMethods": "Herregni kun mala seensaa biraa hin qabu, kanaaf {{provider}} dabaluun hin danda'amu.",
+    "linked": "{{provider}} herrega keetti dabalameera.",
+    "failedExpired": "Gaaffiin yeroon isaa waan darbeef {{provider}} hin dabalamne.",
+    "failedWrongAccount": "Herrega biraatti waan seenteef {{provider}} hin dabalamne.",
+    "failedAccountAlreadyLinked": "{{provider}} duraanuu herrega biraa waliin waan walqabateef hin dabalamne.",
+    "failedProviderAlreadyLinked": "Herregni kee duraanuu seensa {{provider}} biraa waan qabuuf {{provider}} hin dabalamne.",
+    "failedLinking": "{{provider}} herrega keetti dabaluun hin danda'amne.",
+    "notAdded": "Seentee jirta. {{provider}} herrega keetti hin dabalamne."
+  },
   "profile": {
     "codeReviewerSubtitle": "Sakatta'iinsa PR ofumaan raawwatamu",
     "securityAgentSubtitle": "Hanqinoota nageenyaa barbaadiitii sirreessi",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Herrega yaalii",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO dhaabbataa",
     "passkeysTitle": "Furtuu seenii",
     "passkeysSubtitle": "Jecha darbii malee seeni",

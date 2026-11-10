@@ -229,6 +229,21 @@
     "signInCodeField": "Innskráningarkóði",
     "or": "eða"
   },
+  "pendingLink": {
+    "description": "Reikningur notar nú þegar {{email}}. Skráðu þig inn með einni af aðferðum hans til að bæta {{provider}} við.",
+    "emailCode": "Senda mér innskráningarkóða í tölvupósti",
+    "continueInBrowser": "Halda áfram í vafra",
+    "startAgain": "Byrja aftur",
+    "expired": "Þessi beiðni um að bæta {{provider}} við er útrunnin.",
+    "noMethods": "Þessi reikningur hefur enga aðra innskráningaraðferð, svo ekki er hægt að bæta {{provider}} við.",
+    "linked": "{{provider}} var bætt við reikninginn þinn.",
+    "failedExpired": "{{provider}} var ekki bætt við því beiðnin rann út.",
+    "failedWrongAccount": "{{provider}} var ekki bætt við því þú skráðir þig inn á annan reikning.",
+    "failedAccountAlreadyLinked": "{{provider}} var ekki bætt við því það er nú þegar tengt öðrum reikningi.",
+    "failedProviderAlreadyLinked": "{{provider}} var ekki bætt við því reikningurinn þinn er nú þegar með aðra {{provider}}-innskráningu.",
+    "failedLinking": "Ekki tókst að bæta {{provider}} við reikninginn þinn.",
+    "notAdded": "Innskráning tókst. {{provider}} var ekki bætt við reikninginn þinn."
+  },
   "profile": {
     "codeReviewerSubtitle": "Sjálfvirk yfirferð PR",
     "securityAgentSubtitle": "Finna og laga veikleika",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Prófunarreikningur",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO fyrir fyrirtæki",
     "passkeysTitle": "Aðgangslyklar",
     "passkeysSubtitle": "Skrá sig inn án lykilorðs",

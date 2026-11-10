@@ -8,7 +8,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // output shape; the language globe is verified by mounting LoginScreen with
 // the native modules stubbed.
 
-import { parseDeviceAuthTokenResponse } from '@/lib/auth/native-auth-contract';
+import {
+  parseDeviceAuthTokenResponse,
+  type PendingLinkOffer,
+} from '@/lib/auth/native-auth-contract';
+import { recordPendingLinkOutcome, setPendingLinkOffer } from '@/lib/auth/pending-link-state';
 import { type DeviceAuthError } from '@/lib/auth/device-auth-state';
 import { i18n } from '@/i18n';
 import {
@@ -831,5 +835,69 @@ describe('login-screen session-ended announcement', () => {
 
     expect(announcingWarning).not.toHaveBeenCalled();
     live.unmount();
+  });
+});
+
+describe('login-screen pending link across a remount', () => {
+  const offer: PendingLinkOffer = {
+    token: 'link-token',
+    provider: 'github',
+    email: 'person@example.com',
+    methods: ['google'],
+    emailCode: true,
+    expiresAt: Date.now() + 15 * 60 * 1000,
+  };
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    announcingWarning.mockClear();
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+    authState.sessionEnded = false;
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+    setPendingLinkOffer(null);
+  });
+
+  it('returns to the same link after an activity restart', async () => {
+    setPendingLinkOffer(offer);
+
+    const restarted = await mountLoginScreen();
+
+    // The restart lost the screen's own state; the link comes back with it
+    // instead of falling through to the plain landing.
+    const idle = findByType(restarted.root, 'IdleAuth')[0];
+    expect(idle?.props.pendingLink).toEqual(offer);
+    restarted.unmount();
+  });
+
+  it('tells the person once what happened to a link the restart interrupted', async () => {
+    setPendingLinkOffer(offer);
+    recordPendingLinkOutcome({ status: 'failed', reason: 'WRONG_ACCOUNT' });
+
+    const restarted = await mountLoginScreen();
+    expect(announcingWarning).toHaveBeenCalledWith(
+      "GitHub wasn't added because you signed in to a different account."
+    );
+    restarted.unmount();
+
+    announcingWarning.mockClear();
+    const later = await mountLoginScreen();
+    expect(announcingWarning).not.toHaveBeenCalled();
+    later.unmount();
+  });
+
+  it('drops a record the link outlived', async () => {
+    setPendingLinkOffer({ ...offer, expiresAt: Date.now() - 1 });
+    recordPendingLinkOutcome({ status: 'linked', provider: 'github' });
+
+    const late = await mountLoginScreen();
+    expect(announcingWarning).not.toHaveBeenCalled();
+    late.unmount();
   });
 });

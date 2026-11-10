@@ -229,6 +229,21 @@
     "signInCodeField": "รหัสลงชื่อเข้าใช้",
     "or": "หรือ"
   },
+  "pendingLink": {
+    "description": "มีบัญชีที่ใช้ {{email}} อยู่แล้ว ลงชื่อเข้าใช้ด้วยวิธีใดวิธีหนึ่งของบัญชีนั้นเพื่อเพิ่ม {{provider}}",
+    "emailCode": "ส่งรหัสลงชื่อเข้าใช้ให้ฉันทางอีเมล",
+    "continueInBrowser": "ดำเนินการต่อในเบราว์เซอร์",
+    "startAgain": "เริ่มใหม่",
+    "expired": "คำขอเพิ่ม {{provider}} นี้หมดอายุแล้ว",
+    "noMethods": "บัญชีนี้ไม่มีวิธีลงชื่อเข้าใช้อื่น จึงเพิ่ม {{provider}} ไม่ได้",
+    "linked": "เพิ่ม {{provider}} ในบัญชีของคุณแล้ว",
+    "failedExpired": "ไม่ได้เพิ่ม {{provider}} เนื่องจากคำขอหมดอายุ",
+    "failedWrongAccount": "ไม่ได้เพิ่ม {{provider}} เนื่องจากคุณลงชื่อเข้าใช้บัญชีอื่น",
+    "failedAccountAlreadyLinked": "ไม่ได้เพิ่ม {{provider}} เนื่องจากลิงก์กับบัญชีอื่นอยู่แล้ว",
+    "failedProviderAlreadyLinked": "ไม่ได้เพิ่ม {{provider}} เนื่องจากบัญชีของคุณมีการลงชื่อเข้าใช้ {{provider}} อื่นอยู่แล้ว",
+    "failedLinking": "ไม่สามารถเพิ่ม {{provider}} ในบัญชีของคุณได้",
+    "notAdded": "คุณลงชื่อเข้าใช้แล้ว ไม่ได้เพิ่ม {{provider}} ในบัญชีของคุณ"
+  },
   "profile": {
     "codeReviewerSubtitle": "การตรวจสอบ PR อัตโนมัติ",
     "securityAgentSubtitle": "ค้นหาและแก้ไขช่องโหว่",
@@ -267,6 +282,8 @@
     "providerTestAccount": "บัญชีทดสอบ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO สำหรับองค์กร",
     "passkeysTitle": "พาสคีย์",
     "passkeysSubtitle": "ลงชื่อเข้าใช้โดยไม่ใช้รหัสผ่าน",

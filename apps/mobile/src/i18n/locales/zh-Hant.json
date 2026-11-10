@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "請輸入你的電子郵件地址。",
     "or": "或"
   },
+  "pendingLink": {
+    "description": "已有帳戶使用 {{email}}。請使用該帳戶的其中一種方式登入，以新增 {{provider}}。",
+    "emailCode": "以電子郵件傳送登入驗證碼給我",
+    "continueInBrowser": "在瀏覽器中繼續",
+    "startAgain": "重新開始",
+    "expired": "這個新增 {{provider}} 的要求已過期。",
+    "noMethods": "這個帳戶沒有其他登入方式，因此無法新增 {{provider}}。",
+    "linked": "已將 {{provider}} 新增至你的帳戶。",
+    "failedExpired": "要求已過期，因此未新增 {{provider}}。",
+    "failedWrongAccount": "你登入了其他帳戶，因此未新增 {{provider}}。",
+    "failedAccountAlreadyLinked": "{{provider}} 已連結至其他帳戶，因此未新增。",
+    "failedProviderAlreadyLinked": "你的帳戶已有其他 {{provider}} 登入方式，因此未新增 {{provider}}。",
+    "failedLinking": "無法將 {{provider}} 新增至你的帳戶。",
+    "notAdded": "你已登入。{{provider}} 未新增至你的帳戶。"
+  },
   "profile": {
     "codeReviewerSubtitle": "自動 PR 審查",
     "securityAgentSubtitle": "尋找並修復漏洞",
@@ -267,6 +282,8 @@
     "providerTestAccount": "測試帳戶",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "企業 SSO",
     "passkeysTitle": "通行密鑰",
     "passkeysSubtitle": "無需密碼即可登入",

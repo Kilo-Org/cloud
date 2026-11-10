@@ -2444,6 +2444,13 @@
       "when": 1794318065561,
       "tag": "0348_sparkling_veda",
       "breakpoints": true
+    },
+    {
+      "idx": 349,
+      "version": "7",
+      "when": 1794319425521,
+      "tag": "0349_pending_auth_links",
+      "breakpoints": true
     }
   ]
 }

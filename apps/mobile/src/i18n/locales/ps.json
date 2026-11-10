@@ -229,6 +229,21 @@
     "signInCodeField": "د ننوتلو کوډ",
     "or": "یا"
   },
+  "pendingLink": {
+    "description": "یو حساب دمخه {{email}} کاروي. د {{provider}} د زیاتولو لپاره د هغه له یوې طریقې سره ننوځئ.",
+    "emailCode": "ما ته د ننوتلو کوډ په برېښنالیک کې راولېږئ",
+    "continueInBrowser": "په براوزر کې دوام ورکړئ",
+    "startAgain": "له سره پیل کړئ",
+    "expired": "د {{provider}} د زیاتولو دا غوښتنه پای ته رسېدلې ده.",
+    "noMethods": "دا حساب د ننوتلو بله طریقه نه لري، نو {{provider}} نشي زیاتېدای.",
+    "linked": "{{provider}} ستاسو حساب ته زیات شو.",
+    "failedExpired": "{{provider}} زیات نه شو ځکه چې غوښتنه پای ته ورسېده.",
+    "failedWrongAccount": "{{provider}} زیات نه شو ځکه چې تاسو بل حساب ته ننوتلي یاست.",
+    "failedAccountAlreadyLinked": "{{provider}} زیات نه شو ځکه چې دمخه له بل حساب سره تړل شوی دی.",
+    "failedProviderAlreadyLinked": "{{provider}} زیات نه شو ځکه چې ستاسو حساب دمخه د {{provider}} بل ننوتل لري.",
+    "failedLinking": "{{provider}} ستاسو حساب ته زیات نه شو.",
+    "notAdded": "تاسو ننوتلي یاست. {{provider}} ستاسو حساب ته زیات نه شو."
+  },
   "profile": {
     "codeReviewerSubtitle": "د PR اوتومات بیاکتنې",
     "securityAgentSubtitle": "زیانمنتیاوې ومومئ او حل کړئ",
@@ -267,6 +282,8 @@
     "providerTestAccount": "د ازموینې حساب",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "سازماني SSO",
     "passkeysTitle": "د ننوتلو کیلي",
     "passkeysSubtitle": "پرته له پټنوم ننوځئ",

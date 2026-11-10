@@ -229,6 +229,21 @@
     "signInCodeField": "کۆدی چوونە ژوورەوە",
     "or": "یان"
   },
+  "pendingLink": {
+    "description": "هەژمارێک پێشتر {{email}} بەکاردەهێنێت. بە یەکێک لە ڕێگاکانی چوونە ژوورەوەی ئەو هەژمارە بچۆ ژوورەوە بۆ زیادکردنی {{provider}}.",
+    "emailCode": "کۆدی چوونە ژوورەوەم بە ئیمەیڵ بۆ بنێرە",
+    "continueInBrowser": "لە وێبگەڕدا بەردەوام بە",
+    "startAgain": "دووبارە دەست پێبکەرەوە",
+    "expired": "ئەم داواکارییەی زیادکردنی {{provider}} بەسەرچووە.",
+    "noMethods": "ئەم هەژمارە هیچ ڕێگایەکی تری چوونە ژوورەوەی نییە، بۆیە ناتوانرێت {{provider}} زیاد بکرێت.",
+    "linked": "{{provider}} زیادکرا بۆ هەژمارەکەت.",
+    "failedExpired": "{{provider}} زیاد نەکرا چونکە داواکارییەکە بەسەرچوو.",
+    "failedWrongAccount": "{{provider}} زیاد نەکرا چونکە چوویتە ژوورەوەی هەژمارێکی تر.",
+    "failedAccountAlreadyLinked": "{{provider}} زیاد نەکرا چونکە پێشتر بە هەژمارێکی ترەوە بەستراوە.",
+    "failedProviderAlreadyLinked": "{{provider}} زیاد نەکرا چونکە هەژمارەکەت پێشتر چوونە ژوورەوەیەکی تری {{provider}}ی هەیە.",
+    "failedLinking": "نەتوانرا {{provider}} بۆ هەژمارەکەت زیاد بکرێت.",
+    "notAdded": "چوویتە ژوورەوە. {{provider}} بۆ هەژمارەکەت زیاد نەکرا."
+  },
   "profile": {
     "codeReviewerSubtitle": "پێداچوونەوەی خۆکاری PR",
     "securityAgentSubtitle": "دۆزینەوە و چارەسەرکردنی لاوازییە ئەمنییەکان",
@@ -267,6 +282,8 @@
     "providerTestAccount": "هەژماری تاقیکردنەوە",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSOی کۆمپانیا",
     "passkeysTitle": "کلیلەکانی چوونەژوورەوە",
     "passkeysSubtitle": "بەبێ وشەی نهێنی بچۆ ژوورەوە",

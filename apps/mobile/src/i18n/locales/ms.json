@@ -229,6 +229,21 @@
     "signInCodeField": "Kod log masuk",
     "or": "atau"
   },
+  "pendingLink": {
+    "description": "Sebuah akaun sudah menggunakan {{email}}. Log masuk dengan salah satu kaedahnya untuk menambah {{provider}}.",
+    "emailCode": "E-melkan saya kod log masuk",
+    "continueInBrowser": "Teruskan dalam penyemak imbas",
+    "startAgain": "Mulakan semula",
+    "expired": "Permintaan untuk menambah {{provider}} ini telah tamat tempoh.",
+    "noMethods": "Akaun ini tiada kaedah log masuk lain, jadi {{provider}} tidak dapat ditambah.",
+    "linked": "{{provider}} telah ditambah pada akaun anda.",
+    "failedExpired": "{{provider}} tidak ditambah kerana permintaan telah tamat tempoh.",
+    "failedWrongAccount": "{{provider}} tidak ditambah kerana anda log masuk ke akaun lain.",
+    "failedAccountAlreadyLinked": "{{provider}} tidak ditambah kerana ia sudah dipautkan ke akaun lain.",
+    "failedProviderAlreadyLinked": "{{provider}} tidak ditambah kerana akaun anda sudah mempunyai log masuk {{provider}} yang lain.",
+    "failedLinking": "{{provider}} tidak dapat ditambah pada akaun anda.",
+    "notAdded": "Anda telah log masuk. {{provider}} tidak ditambah pada akaun anda."
+  },
   "profile": {
     "codeReviewerSubtitle": "Semakan PR automatik",
     "securityAgentSubtitle": "Cari dan baiki kelemahan",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Akaun ujian",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO perusahaan",
     "passkeysTitle": "Kunci laluan",
     "passkeysSubtitle": "Log masuk tanpa kata laluan",

@@ -229,6 +229,21 @@
     "signInCodeField": "Kirish kodi",
     "or": "yoki"
   },
+  "pendingLink": {
+    "description": "{{email}} allaqachon bir hisob tomonidan ishlatilmoqda. {{provider}} qo'shish uchun uning usullaridan biri bilan kiring.",
+    "emailCode": "Kirish kodini elektron pochtamga yuborish",
+    "continueInBrowser": "Brauzerda davom etish",
+    "startAgain": "Qaytadan boshlash",
+    "expired": "{{provider}} qo'shish bo'yicha bu so'rovning muddati tugagan.",
+    "noMethods": "Bu hisobda boshqa kirish usuli yo'q, shuning uchun {{provider}} qo'shib bo'lmaydi.",
+    "linked": "{{provider}} hisobingizga qo'shildi.",
+    "failedExpired": "So'rov muddati tugagani uchun {{provider}} qo'shilmadi.",
+    "failedWrongAccount": "Boshqa hisobga kirganingiz uchun {{provider}} qo'shilmadi.",
+    "failedAccountAlreadyLinked": "{{provider}} allaqachon boshqa hisobga bog'langani uchun qo'shilmadi.",
+    "failedProviderAlreadyLinked": "Hisobingizda allaqachon boshqa {{provider}} orqali kirish mavjudligi uchun {{provider}} qo'shilmadi.",
+    "failedLinking": "{{provider}} hisobingizga qo'shib bo'lmadi.",
+    "notAdded": "Siz tizimga kirdingiz. {{provider}} hisobingizga qo'shilmadi."
+  },
   "profile": {
     "codeReviewerSubtitle": "PR tekshiruvlarini avtomatik bajarish",
     "securityAgentSubtitle": "Zaifliklarni topish va bartaraf etish",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Sinov hisobi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Korporativ SSO",
     "passkeysTitle": "Kirish kalitlari",
     "passkeysSubtitle": "Parolsiz kiring",

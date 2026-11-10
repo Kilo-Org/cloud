@@ -229,6 +229,21 @@
     "signInCodeField": "Код за влизане",
     "or": "или"
   },
+  "pendingLink": {
+    "description": "Вече има акаунт с {{email}}. Влез с някой от неговите методи, за да добавиш {{provider}}.",
+    "emailCode": "Изпрати ми код за влизане по имейл",
+    "continueInBrowser": "Продължи в браузъра",
+    "startAgain": "Започни отначало",
+    "expired": "Тази заявка за добавяне на {{provider}} е изтекла.",
+    "noMethods": "Този акаунт няма друг метод за влизане, затова {{provider}} не може да бъде добавен.",
+    "linked": "{{provider}} беше добавен към акаунта ти.",
+    "failedExpired": "{{provider}} не беше добавен, защото заявката изтече.",
+    "failedWrongAccount": "{{provider}} не беше добавен, защото влезе в друг акаунт.",
+    "failedAccountAlreadyLinked": "{{provider}} не беше добавен, защото вече е свързан с друг акаунт.",
+    "failedProviderAlreadyLinked": "{{provider}} не беше добавен, защото акаунтът ти вече има друго влизане с {{provider}}.",
+    "failedLinking": "{{provider}} не можа да бъде добавен към акаунта ти.",
+    "notAdded": "Влязъл си. {{provider}} не беше добавен към акаунта ти."
+  },
   "profile": {
     "codeReviewerSubtitle": "Автоматични прегледи на PR",
     "securityAgentSubtitle": "Откривай и отстранявай уязвимости",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Тестов акаунт",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Корпоративно SSO",
     "passkeysTitle": "Ключове за достъп",
     "passkeysSubtitle": "Влезте без парола",

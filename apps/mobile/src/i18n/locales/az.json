@@ -229,6 +229,21 @@
     "signInCodeField": "Giriş kodu",
     "or": "və ya"
   },
+  "pendingLink": {
+    "description": "{{email}} artıq bir hesabda istifadə olunur. {{provider}} əlavə etmək üçün həmin hesabın giriş üsullarından biri ilə daxil ol.",
+    "emailCode": "Mənə e-poçtla giriş kodu göndər",
+    "continueInBrowser": "Brauzerdə davam et",
+    "startAgain": "Yenidən başla",
+    "expired": "{{provider}} əlavə etmək sorğusunun vaxtı bitib.",
+    "noMethods": "Bu hesabın başqa giriş üsulu yoxdur, ona görə {{provider}} əlavə edilə bilməz.",
+    "linked": "{{provider}} hesabına əlavə edildi.",
+    "failedExpired": "Sorğunun vaxtı bitdiyi üçün {{provider}} əlavə edilmədi.",
+    "failedWrongAccount": "Başqa hesaba daxil olduğun üçün {{provider}} əlavə edilmədi.",
+    "failedAccountAlreadyLinked": "{{provider}} artıq başqa hesaba bağlı olduğu üçün əlavə edilmədi.",
+    "failedProviderAlreadyLinked": "Hesabında artıq başqa {{provider}} girişi olduğu üçün {{provider}} əlavə edilmədi.",
+    "failedLinking": "{{provider}} hesabına əlavə edilə bilmədi.",
+    "notAdded": "Daxil olmusan. {{provider}} hesabına əlavə edilmədi."
+  },
   "profile": {
     "codeReviewerSubtitle": "Avtomatik PR yoxlamaları",
     "securityAgentSubtitle": "Təhlükəsizlik boşluqlarını tap və aradan qaldır",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Sınaq hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Korporativ SSO",
     "passkeysTitle": "Giriş açarları",
     "passkeysSubtitle": "Şifrəsiz daxil ol",

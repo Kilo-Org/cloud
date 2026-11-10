@@ -229,6 +229,21 @@
     "signInCodeField": "Код за најавување",
     "or": "или"
   },
+  "pendingLink": {
+    "description": "Сметка веќе користи {{email}}. Најави се со еден од нејзините начини за да додадеш {{provider}}.",
+    "emailCode": "Испрати ми код за најавување по е-пошта",
+    "continueInBrowser": "Продолжи во прелистувачот",
+    "startAgain": "Започни одново",
+    "expired": "Ова барање за додавање {{provider}} истече.",
+    "noMethods": "Оваа сметка нема друг начин за најавување, па {{provider}} не може да се додаде.",
+    "linked": "{{provider}} е додаден на твојата сметка.",
+    "failedExpired": "{{provider}} не е додаден бидејќи барањето истече.",
+    "failedWrongAccount": "{{provider}} не е додаден бидејќи се најави на друга сметка.",
+    "failedAccountAlreadyLinked": "{{provider}} не е додаден бидејќи веќе е поврзан со друга сметка.",
+    "failedProviderAlreadyLinked": "{{provider}} не е додаден бидејќи твојата сметка веќе има друго најавување со {{provider}}.",
+    "failedLinking": "{{provider}} не можеше да се додаде на твојата сметка.",
+    "notAdded": "Најавен си. {{provider}} не е додаден на твојата сметка."
+  },
   "profile": {
     "codeReviewerSubtitle": "Автоматски прегледи на PR",
     "securityAgentSubtitle": "Пронаоѓај и отстранувај ранливости",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Тестна сметка",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Деловно SSO",
     "passkeysTitle": "Клучеви за пристап",
     "passkeysSubtitle": "Најави се без лозинка",

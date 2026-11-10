@@ -229,6 +229,21 @@
     "signInCodeField": "Cod mewngofnodi",
     "or": "neu"
   },
+  "pendingLink": {
+    "description": "Mae cyfrif eisoes yn defnyddio {{email}}. Mewngofnodwch gydag un o'i ddulliau i ychwanegu {{provider}}.",
+    "emailCode": "Anfon cod mewngofnodi ataf drwy e-bost",
+    "continueInBrowser": "Parhau yn y porwr",
+    "startAgain": "Dechrau eto",
+    "expired": "Mae'r cais hwn i ychwanegu {{provider}} wedi dod i ben.",
+    "noMethods": "Does gan y cyfrif hwn ddim dull mewngofnodi arall, felly does dim modd ychwanegu {{provider}}.",
+    "linked": "Cafodd {{provider}} ei ychwanegu at eich cyfrif.",
+    "failedExpired": "Chafodd {{provider}} mo'i ychwanegu oherwydd bod y cais wedi dod i ben.",
+    "failedWrongAccount": "Chafodd {{provider}} mo'i ychwanegu oherwydd i chi fewngofnodi i gyfrif gwahanol.",
+    "failedAccountAlreadyLinked": "Chafodd {{provider}} mo'i ychwanegu oherwydd ei fod eisoes wedi'i gysylltu â chyfrif arall.",
+    "failedProviderAlreadyLinked": "Chafodd {{provider}} mo'i ychwanegu oherwydd bod gan eich cyfrif ddull mewngofnodi {{provider}} gwahanol yn barod.",
+    "failedLinking": "Doedd dim modd ychwanegu {{provider}} at eich cyfrif.",
+    "notAdded": "Rydych chi wedi mewngofnodi. Chafodd {{provider}} mo'i ychwanegu at eich cyfrif."
+  },
   "profile": {
     "codeReviewerSubtitle": "Adolygiadau PR awtomatig",
     "securityAgentSubtitle": "Darganfod a thrwsio gwendidau",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Cyfrif prawf",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO menter",
     "passkeysTitle": "Allweddi mynediad",
     "passkeysSubtitle": "Mewngofnodi heb gyfrinair",

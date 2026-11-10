@@ -229,6 +229,21 @@
     "signInCodeField": "အကောင့်ဝင်ရန် ကုဒ်",
     "or": "သို့မဟုတ်"
   },
+  "pendingLink": {
+    "description": "{{email}} ကို အကောင့်တစ်ခုက အသုံးပြုထားပြီးဖြစ်သည်။ {{provider}} ကို ထည့်ရန် ၎င်း၏ နည်းလမ်းတစ်ခုဖြင့် အကောင့်ဝင်ပါ။",
+    "emailCode": "အကောင့်ဝင်ရန် ကုဒ်ကို အီးမေးလ်ဖြင့် ပို့ပေးပါ",
+    "continueInBrowser": "ဘရောက်ဆာတွင် ဆက်လုပ်ပါ",
+    "startAgain": "အစမှ ပြန်စပါ",
+    "expired": "{{provider}} ကို ထည့်ရန် ဤတောင်းဆိုမှု သက်တမ်းကုန်သွားပါပြီ။",
+    "noMethods": "ဤအကောင့်တွင် အခြားအကောင့်ဝင်နည်း မရှိသဖြင့် {{provider}} ကို ထည့်၍မရပါ။",
+    "linked": "{{provider}} ကို သင့်အကောင့်တွင် ထည့်ပြီးပါပြီ။",
+    "failedExpired": "တောင်းဆိုမှု သက်တမ်းကုန်သွားသဖြင့် {{provider}} ကို မထည့်ရသေးပါ။",
+    "failedWrongAccount": "သင် အခြားအကောင့်သို့ ဝင်ခဲ့သဖြင့် {{provider}} ကို မထည့်ရသေးပါ။",
+    "failedAccountAlreadyLinked": "{{provider}} သည် အခြားအကောင့်နှင့် ချိတ်ဆက်ထားပြီးဖြစ်သဖြင့် မထည့်ရသေးပါ။",
+    "failedProviderAlreadyLinked": "သင့်အကောင့်တွင် အခြား {{provider}} အကောင့်ဝင်နည်း ရှိပြီးဖြစ်သဖြင့် {{provider}} ကို မထည့်ရသေးပါ။",
+    "failedLinking": "{{provider}} ကို သင့်အကောင့်တွင် ထည့်၍ မရပါ။",
+    "notAdded": "သင် အကောင့်ဝင်ပြီးပါပြီ။ {{provider}} ကို သင့်အကောင့်တွင် မထည့်ရသေးပါ။"
+  },
   "profile": {
     "codeReviewerSubtitle": "အလိုအလျောက် PR သုံးသပ်မှုများ",
     "securityAgentSubtitle": "အားနည်းချက်များကို ရှာဖွေပြီး ပြုပြင်ပါ",
@@ -267,6 +282,8 @@
     "providerTestAccount": "စမ်းသပ်အကောင့်",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "လုပ်ငန်းသုံး SSO",
     "passkeysTitle": "ပက်စ်ကီးများ",
     "passkeysSubtitle": "စကားဝှက်မပါဘဲ အကောင့်ဝင်ပါ",

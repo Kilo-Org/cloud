@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "أدخل عنوان بريدك الإلكتروني.",
     "or": "أو"
   },
+  "pendingLink": {
+    "description": "يوجد حساب يستخدم {{email}} بالفعل. سجّل الدخول بإحدى طرقه لإضافة {{provider}}.",
+    "emailCode": "أرسل لي رمز تسجيل الدخول",
+    "continueInBrowser": "المتابعة في المتصفح",
+    "startAgain": "البدء من جديد",
+    "expired": "انتهت صلاحية طلب إضافة {{provider}}.",
+    "noMethods": "لا يملك هذا الحساب أي طريقة أخرى لتسجيل الدخول، لذا لا يمكن إضافة {{provider}}.",
+    "linked": "تمت إضافة {{provider}} إلى حسابك.",
+    "failedExpired": "لم تتم إضافة {{provider}} لأن صلاحية الطلب انتهت.",
+    "failedWrongAccount": "لم تتم إضافة {{provider}} لأنك سجّلت الدخول إلى حساب مختلف.",
+    "failedAccountAlreadyLinked": "لم تتم إضافة {{provider}} لأنه مرتبط بالفعل بحساب آخر.",
+    "failedProviderAlreadyLinked": "لم تتم إضافة {{provider}} لأن حسابك يحتوي بالفعل على تسجيل دخول مختلف عبر {{provider}}.",
+    "failedLinking": "تعذّرت إضافة {{provider}} إلى حسابك.",
+    "notAdded": "لقد سجّلت الدخول. لم تتم إضافة {{provider}} إلى حسابك."
+  },
   "profile": {
     "codeReviewerSubtitle": "مراجعات PR تلقائية",
     "securityAgentSubtitle": "اكتشاف الثغرات ومعالجتها",
@@ -267,6 +282,8 @@
     "providerTestAccount": "حساب تجريبي",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "تسجيل الدخول الموحّد للمؤسسات",
     "passkeysTitle": "مفاتيح المرور",
     "passkeysSubtitle": "سجّل الدخول بدون كلمة مرور",

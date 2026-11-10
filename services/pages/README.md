@@ -16,8 +16,8 @@ ready for that. The dev Worker is deployed by hand from a profile.
 | Worker | `pages-dev` |
 | Address | `https://pages-dev.kiloapps.io` |
 | First deployed | 2026-11-10, from `nteract/nteract` at `3c22117f7`, version `e11cd161-d009-4619-8cdb-b8464a0a17a1` |
-| Running now | `nteract/nteract` main at `5a177c7c8`, version `b754e822-f7b8-4a04-9cd0-b727841d3e57` |
-| Build id | `bc5143b9fb5e` (reported by `/health`) |
+| Running now | `nteract/nteract` main at `dc13616ff`, version `1c61b180-4245-4a95-8e37-f7b6e04817a2` |
+| Build id | `c28f065c4e19` (reported by `/health`) |
 | D1, auth and catalog | `pages-dev-auth` (`13db1af4-e01e-447d-ae51-cc37625d5f77`) |
 | D1, usage | `pages-dev-usage` (`8691d489-5105-49f4-bbec-63ecbca319e9`) |
 | R2 | `pages-dev-assets` |
@@ -65,13 +65,17 @@ Two secrets hold the same value, and neither is in this repository:
 To rotate, set a new value in both places. Until both match, sign-in fails
 and nothing else changes.
 
-Anaconda API keys still work for tools. The Worker checks a key with Anaconda
-and names the account `kilo-pages-dev-anaconda:<id>`. They go away when the
-agent sign-in path for Kilo accounts lands.
+The deployment has no API keys. A bearer that Pages did not issue gets 401
+`api_keys_unsupported`, and the Worker makes no outbound request for it. The
+profile still carries the two `NOTEBOOK_CLOUD_ANACONDA_API_KEY_*` values; with
+`PAGES_KILO_APP_URL` set nothing reads them, and they can leave the profile.
 
-The address is public. Anyone with a Kilo account can sign in, and any
-Anaconda account holder with an API key can create Pages. Treat its data as
-disposable.
+Before `dc13616ff` the Worker sent any unknown bearer to the Anaconda account
+service to check it. A Kilo credential sent to this address before then should
+be rotated.
+
+The address is public. Anyone with a Kilo account can sign in. Treat its data
+as disposable.
 
 ## Which agents can connect
 
@@ -89,7 +93,14 @@ before turning it on.
 
 Checked signed out on 2026-11-10: the authorize page answers "Connect an
 app" for both Claude client ids and "Connect Kilo" for the Kilo CLI, and 400
-for a document on another site. No client has finished a connection yet.
+for a document on another site.
+
+Connected on 2026-11-10: Claude, as a custom connector with its default
+settings, and the Kilo CLI with `pages-kilo`. Both act as the Kilo account
+that approved them.
+
+`/llms.txt` and `/connect` describe these routes and nothing else. They are
+written by the Worker for a deployment with `PAGES_KILO_APP_URL` set.
 
 ## Deploy again
 
@@ -151,10 +162,24 @@ took 70 to 480 ms.
 - A callback with a made-up code answers 400.
 - `wrangler secret list` shows both secret names on the Worker.
 
+## Checked after the guide change
+
+On 2026-11-10, at `dc13616ff`:
+
+- A person signed in with a Kilo account in the browser.
+- `/llms.txt` opens with "This deployment signs people and agents in with Kilo
+  accounts and has no API keys", and names no other provider.
+- A request with a made-up bearer to `/whoami` answers 401
+  `api_keys_unsupported`. A request with no credential to `/api/tools` answers
+  401 `auth_required` and points to `/connect`.
+- The Claude connector approved earlier still lists Pages after the deploy.
+
 ## Not checked yet
 
-- A person signing in end to end with a Kilo account, and a second browser
-  failing to finish a link the first one started.
+- A second browser failing to finish a sign-in link the first one started.
+- A session ending at 8 hours.
+- Sharing a Page between two Kilo accounts. Invitations match a verified
+  email, and Kilo accounts carry none, so this is expected not to work yet.
 - Live sync over WebSocket between two clients.
 - Image import from a ChatGPT attachment.
 - Memory limits, hibernation and cold-start time. The limits in this build are

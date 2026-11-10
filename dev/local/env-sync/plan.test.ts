@@ -785,8 +785,6 @@ test('points the local auto routing worker at the local gateway and seeds its se
         NEXTAUTH_SECRET_PROD: 'local-nextauth-secret',
         INTERNAL_API_SECRET_PROD: 'local-internal-secret',
         AUTO_ROUTING_DECISION_SECRET_PROD: 'local-decision-secret',
-        AUTO_ROUTING_UPSTASH_REDIS_REST_URL_PROD: `http://localhost:${getService('redis-http').port}`,
-        AUTO_ROUTING_UPSTASH_REDIS_REST_READONLY_TOKEN_PROD: 'example_token',
       });
     });
   } finally {

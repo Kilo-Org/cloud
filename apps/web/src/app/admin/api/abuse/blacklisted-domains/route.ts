@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import { listBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import {
   BLACKLIST_STATS_ROW_LIMIT,
   computeBlacklistStats,
@@ -15,9 +15,11 @@ export async function GET() {
   }
 
   try {
-    const blacklistedDomains = await getBlacklistedDomains();
-    // The report is assembled from one grouped aggregate on the read replica.
-    const emailHostCounts = await countUsersByEmailHost(readDb);
+    // The report is assembled from the list and one grouped aggregate on the read replica.
+    const [blacklistedDomains, emailHostCounts] = await Promise.all([
+      listBlacklistedDomains(readDb),
+      countUsersByEmailHost(readDb),
+    ]);
 
     return NextResponse.json(
       computeBlacklistStats(blacklistedDomains, emailHostCounts, BLACKLIST_STATS_ROW_LIMIT)

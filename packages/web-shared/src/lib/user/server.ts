@@ -70,8 +70,8 @@ import {
 } from '@kilocode/worker-utils/kilo-token-policy';
 
 import {
-  getBlacklistedDomains,
   getBlockedSignupTlds,
+  isEmailBlacklisted,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
@@ -698,7 +698,7 @@ async function validateUserAuthorization({
       tokenSource,
       cloudAgentAuthority,
     });
-  } else if (await isUserBlacklistedByDomain(user)) {
+  } else if (await isUserBlacklistedByDomain(user, readDb)) {
     return authError(403, 'Access denied (R0)', kiloUserId, {
       authorizationRefused: true,
       internalApiUse,
@@ -799,16 +799,11 @@ async function readActiveDeviceSession(
   return session !== undefined;
 }
 
-export async function isUserBlacklistedByDomain(
-  existingUser: Pick<User, 'google_user_email'>
+export function isUserBlacklistedByDomain(
+  existingUser: Pick<User, 'google_user_email'>,
+  fromDb: typeof db = db
 ): Promise<boolean> {
-  const domains = await getBlacklistedDomains();
-  return isEmailBlacklistedByDomain(existingUser.google_user_email, domains);
-}
-
-export async function isEmailBlacklistedByDomainAsync(email: string): Promise<boolean> {
-  const domains = await getBlacklistedDomains();
-  return isEmailBlacklistedByDomain(email, domains);
+  return isEmailBlacklisted(existingUser.google_user_email, fromDb);
 }
 
 /**

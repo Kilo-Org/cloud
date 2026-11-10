@@ -187,10 +187,7 @@ export function groupAssistantParts(
     const standaloneTool =
       mode === 'live' &&
       isToolPart(part) &&
-      (part.tool === 'question' ||
-        part.tool === 'task' ||
-        part.tool === 'suggest' ||
-        part.state.status === 'error');
+      (part.tool === 'question' || part.tool === 'task' || part.tool === 'suggest');
     const toolId = producingToolPartId(part);
     // A tool's returned files stay beside that tool instead of ending its group.
     const type =

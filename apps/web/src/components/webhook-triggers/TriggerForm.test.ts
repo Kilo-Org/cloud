@@ -97,7 +97,7 @@ jest.mock('@/components/ui/select', () => ({
   }) => {
     const trigger = React.Children.toArray(children).find(
       (child): child is React.ReactElement<{ id?: string }> =>
-        React.isValidElement(child) && typeof child.props.id === 'string'
+        React.isValidElement<{ id?: string }>(child) && typeof child.props.id === 'string'
     );
     return createElement(
       'div',

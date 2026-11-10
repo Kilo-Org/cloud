@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { apiKindLabel } from '@/lib/api-kind-labels';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import type { RootRouter } from '@/routers/root-router';
@@ -65,7 +66,7 @@ function EnkryptUsageTableRow({ row }: { row: EnkryptUsageRow }) {
           {userLabel(row.user)}
         </div>
       </TableCell>
-      <TableCell className="font-mono text-xs">{row.api_kind}</TableCell>
+      <TableCell>{apiKindLabel(row.api_kind)}</TableCell>
       <TableCell>{row.guardrail === 'output' ? 'Output' : 'Input'}</TableCell>
       <TableCell>
         <ToneBadge tone={decision.tone}>{decision.label}</ToneBadge>

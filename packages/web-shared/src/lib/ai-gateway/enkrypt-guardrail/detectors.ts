@@ -191,7 +191,7 @@ export type EnkryptDetectRequestDetectors = {
   pii?: EnabledToggle & { entities: EnkryptPiiEntity[] };
   keyword_detector?: EnabledToggle & { banned_keywords: string[] };
   topic_detector?: EnabledToggle & { topic: string[] };
-  policy_violation?: EnabledToggle & { need_explanation: false } & (
+  policy_violation?: EnabledToggle & { need_explanation: boolean } & (
       | { policy_text: string }
       | { rules: EnkryptRequestPolicyRule[] }
     );
@@ -214,8 +214,9 @@ function toRequestPolicyRule({
 }
 
 /**
- * Explanations are always disabled: they cost extra credits, never change the verdict, and return
- * prompt-derived text Kilo neither stores nor shows. `policy_violation` explains unless told not to.
+ * Explanations start disabled: Enkrypt documents them as a second LLM generation billed at twice the
+ * detector's rate, and a blocking scan's wait counts against the request. `policy_violation`
+ * explains unless told not to. See `withPolicyViolationExplanation` for log-only scans.
  */
 export function buildEnkryptDetectRequestDetectors(
   detectors: EnkryptInputDetectors
@@ -253,4 +254,19 @@ export function buildEnkryptDetectRequestDetectors(
   if (bias.enabled) request.bias = on;
   if (sponge_attack.enabled) request.sponge_attack = on;
   return request;
+}
+
+/**
+ * Asks `policy_violation` to explain its finding. Only log-only scans ask, because the request
+ * never waits for them. The explanation is prompt-derived prose: it is kept only in the captured
+ * Enkrypt response of the API request log and never decides a verdict, which `summary` does.
+ * https://docs.enkryptai.com/resources/credits.md documents the doubled rate.
+ */
+export function withPolicyViolationExplanation(
+  detectors: EnkryptDetectRequestDetectors
+): EnkryptDetectRequestDetectors {
+  const { policy_violation } = detectors;
+  return policy_violation
+    ? { ...detectors, policy_violation: { ...policy_violation, need_explanation: true } }
+    : detectors;
 }

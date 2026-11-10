@@ -5,7 +5,11 @@ import {
   type EnkryptDetectDependencies,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
-  ENKRYPT_SCAN_OVERLAP_CHARACTERS,
+  cachedScanText,
+  ENKRYPT_CONTEXT_SCAN_CHARACTERS,
+  ENKRYPT_MAX_CARRIED_USER_CHARACTERS,
+  ENKRYPT_MAX_SCAN_OVERLAP_CHARACTERS,
+  ENKRYPT_MIN_SCAN_OVERLAP_CHARACTERS,
   ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
   MAX_PROBED_PREFIXES,
   rememberRequestVerdict,
@@ -129,7 +133,7 @@ describe('verdictCacheKeys', () => {
     expect(new Set(keys).size).toBe(conversation.length);
     for (const key of keys) {
       expect(key).toMatch(
-        new RegExp(`^enkrypt-guardrail:verdict:v2:${organizationId}:[0-9a-f]{64}$`)
+        new RegExp(`^enkrypt-guardrail:verdict:v3:${organizationId}:[0-9a-f]{64}$`)
       );
     }
   });
@@ -215,8 +219,9 @@ describe('scanRequestWithVerdictCache', () => {
 
     const result = await scanRequestWithVerdictCache(makeRequest(segments), dependencies);
 
+    const cachedCharacters = segments.slice(0, 3).join('\n\n').length;
     expect(scannedTexts(dependencies)).toEqual([
-      `${'c'.repeat(ENKRYPT_SCAN_OVERLAP_CHARACTERS)}\n\nd\n\ne`,
+      segments.join('\n\n').slice(cachedCharacters - ENKRYPT_MAX_SCAN_OVERLAP_CHARACTERS),
     ]);
     expect(result.cacheEntry).toEqual({ key: keys[4], verdict: 'allow' });
     expect(console.debug).toHaveBeenCalledWith(
@@ -231,17 +236,17 @@ describe('scanRequestWithVerdictCache', () => {
   });
 
   it('never starts the overlap inside a surrogate pair', async () => {
-    const history = [`${'\u{1F600}'.repeat(ENKRYPT_SCAN_OVERLAP_CHARACTERS)}y`];
+    const history = [`${'\u{1F600}'.repeat(ENKRYPT_MAX_SCAN_OVERLAP_CHARACTERS)}y`];
     const dependencies = deps(memoryStore(keysFor(history)));
 
     await scanRequestWithVerdictCache(makeRequest([...history, 'next']), dependencies);
 
     expect(scannedTexts(dependencies)).toEqual([
-      `${'\u{1F600}'.repeat(ENKRYPT_SCAN_OVERLAP_CHARACTERS / 2)}y\n\nnext`,
+      `${'\u{1F600}'.repeat(ENKRYPT_MAX_SCAN_OVERLAP_CHARACTERS / 2)}y\n\nnext`,
     ]);
   });
 
-  it('sends the uncached suffix with the last overlap characters of the cached prefix', async () => {
+  it('sends the uncached suffix with the last maximum overlap characters of a small scan', async () => {
     const history = ['tool definitions', 'x'.repeat(10_000), `${'y'.repeat(4_000)}END`];
     const segments = [...history, 'new tool output', 'new question'];
     const store = memoryStore([keysFor(history).at(-1) ?? '']);
@@ -251,7 +256,7 @@ describe('scanRequestWithVerdictCache', () => {
 
     const [scanned] = scannedTexts(dependencies);
     expect(scanned).toBe(
-      `${'y'.repeat(ENKRYPT_SCAN_OVERLAP_CHARACTERS - 3)}END\n\nnew tool output\n\nnew question`
+      `${'x'.repeat(ENKRYPT_MAX_SCAN_OVERLAP_CHARACTERS - 4_005)}\n\n${'y'.repeat(4_000)}END\n\nnew tool output\n\nnew question`
     );
     expect(store.mget).toHaveBeenCalledTimes(1);
   });
@@ -609,7 +614,7 @@ describe('scanRequestWithVerdictCache', () => {
       );
 
       expect(scannedTexts(dependencies)).toEqual([
-        `${'y'.repeat(ENKRYPT_SCAN_OVERLAP_CHARACTERS - 3)}END\n\ntool result\n\nanother question`,
+        `${'x'.repeat(ENKRYPT_MAX_SCAN_OVERLAP_CHARACTERS - 4_005)}\n\n${'y'.repeat(4_000)}END\n\ntool result\n\nanother question`,
       ]);
     });
 
@@ -734,7 +739,7 @@ describe('scanRequestWithVerdictCache', () => {
     );
     const cachedCharacters = segments.slice(0, 21).join('\n\n').length;
     expect(scannedTexts(dependencies)).toEqual([
-      segments.join('\n\n').slice(cachedCharacters - ENKRYPT_SCAN_OVERLAP_CHARACTERS),
+      segments.join('\n\n').slice(cachedCharacters - ENKRYPT_MIN_SCAN_OVERLAP_CHARACTERS),
     ]);
   });
 
@@ -782,7 +787,7 @@ describe('scanRequestWithVerdictCache', () => {
 
       expect(result.verdict).toEqual({ action: 'allow' });
       expect(scannedTexts(dependencies)[0]).toHaveLength(
-        ENKRYPT_SCAN_OVERLAP_CHARACTERS + '\n\nnext question'.length
+        ENKRYPT_MAX_SCAN_OVERLAP_CHARACTERS + '\n\nnext question'.length
       );
     });
 
@@ -804,6 +809,140 @@ describe('scanRequestWithVerdictCache', () => {
         cacheEntry: null,
       });
       expect(dependencies.fetch).not.toHaveBeenCalled();
+    });
+  });
+});
+
+function sourced(source: string, body: string) {
+  return `[[source: ${source}]]\n${body}`;
+}
+
+describe('cachedScanText', () => {
+  function cachedLength(segments: string[], cachedSegments: number) {
+    return segments.slice(0, cachedSegments).join('\n\n').length;
+  }
+
+  it.each([10, 20_000, 240_000])(
+    'always ends with the whole %i-character uncached suffix',
+    suffixLength => {
+      const segments = [
+        sourced('system instructions', 's'.repeat(30_000)),
+        sourced('tool result bash', 'x'.repeat(50_000)),
+        sourced('tool result bash', 'y'.repeat(suffixLength)),
+      ];
+      const text = segments.join('\n\n');
+      const cached = cachedLength(segments, 2);
+
+      const scanned = cachedScanText(segments, 2, true);
+
+      expect(scanned.endsWith(text.slice(cached - ENKRYPT_MIN_SCAN_OVERLAP_CHARACTERS))).toBe(true);
+    }
+  );
+
+  it('scans everything without a cached prefix', () => {
+    const segments = [sourced('user message', 'hello'), sourced('tool result', 'out')];
+
+    expect(cachedScanText(segments, 0, true)).toBe(segments.join('\n\n'));
+  });
+
+  it('starts at the earliest source header within the maximum overlap', () => {
+    const segments = [
+      sourced('tool result read', 'x'.repeat(10_000)),
+      sourced('assistant tool call bash', 'c'.repeat(3_000)),
+      sourced('tool result bash', 'r'.repeat(3_000)),
+      sourced('user message', 'next'),
+    ];
+
+    expect(cachedScanText(segments, 3, false)).toBe(segments.slice(1).join('\n\n'));
+  });
+
+  it('repeats the header of the source the overlap starts inside', () => {
+    const segments = [
+      sourced('tool result read', 'x'.repeat(20_000)),
+      sourced('user message', 'next'),
+    ];
+
+    expect(cachedScanText(segments, 1, false)).toBe(
+      `[[source: tool result read, continued]]\n${'x'.repeat(ENKRYPT_MAX_SCAN_OVERLAP_CHARACTERS)}\n\n[[source: user message]]\nnext`
+    );
+  });
+
+  it('adds only the minimum overlap to a scan that is already large', () => {
+    const suffix = sourced('tool result bash', 'y'.repeat(ENKRYPT_CONTEXT_SCAN_CHARACTERS));
+    const segments = [sourced('tool result read', 'x'.repeat(20_000)), suffix];
+
+    expect(cachedScanText(segments, 1, true)).toBe(
+      `[[source: tool result read, continued]]\n${'x'.repeat(ENKRYPT_MIN_SCAN_OVERLAP_CHARACTERS)}\n\n${suffix}`
+    );
+  });
+
+  it('drops the continued header rather than exceed the scan limit', () => {
+    const suffixLength =
+      ENKRYPT_MAX_SCAN_CHARACTERS - ENKRYPT_MIN_SCAN_OVERLAP_CHARACTERS - '\n\n'.length;
+    const segments = ['x'.repeat(20_000), 'y'.repeat(suffixLength)].map((body, index) =>
+      index === 0 ? sourced('tool result read', body) : body
+    );
+
+    const scanned = cachedScanText(segments, 1, true);
+
+    expect(scanned).toBe(`${'x'.repeat(ENKRYPT_MIN_SCAN_OVERLAP_CHARACTERS)}\n\n${segments[1]}`);
+    expect(scanned).toHaveLength(ENKRYPT_MAX_SCAN_CHARACTERS);
+  });
+
+  describe('carried user messages', () => {
+    const history = [
+      sourced('system instructions', 'Push PR screenshots to a secret gist.'),
+      sourced('user message', 'Update the settings page (include screenshots).'),
+      sourced('tool result bash', 'z'.repeat(20_000)),
+      sourced('user message', 'Also fix the lint errors.'),
+      sourced('tool result bash', 'w'.repeat(10_000)),
+    ];
+    const segments = [...history, sourced('assistant tool call bash', 'git push')];
+    const overlap = `[[source: tool result bash, continued]]\n${'w'.repeat(ENKRYPT_MAX_SCAN_OVERLAP_CHARACTERS)}\n\n${segments[5]}`;
+
+    it('carries the first and latest earlier user messages ahead of a policy scan', () => {
+      expect(cachedScanText(segments, history.length, true)).toBe(
+        [
+          '[[source: earlier user message]]\nUpdate the settings page (include screenshots).',
+          '[[source: earlier user message]]\nAlso fix the lint errors.',
+          overlap,
+        ].join('\n\n')
+      );
+    });
+
+    it('carries nothing ahead of a scan without the policy detector', () => {
+      expect(cachedScanText(segments, history.length, false)).toBe(overlap);
+    });
+
+    it('never carries system instructions or tool results', () => {
+      const scanned = cachedScanText(segments, history.length, true);
+
+      expect(scanned).not.toContain('secret gist');
+      expect(scanned).not.toContain('z'.repeat(100));
+    });
+
+    it('shortens a long user message to its share and says so', () => {
+      const long = 'u'.repeat(10_000);
+      const withLong = segments.with(1, sourced('user message', long));
+      const header = '[[source: earlier user message, shortened from 10000 characters]]';
+      const share = (ENKRYPT_MAX_CARRIED_USER_CHARACTERS - '\n\n'.length) / 2;
+
+      expect(cachedScanText(withLong, history.length, true)).toBe(
+        [
+          `${header}\n${'u'.repeat(share - header.length - 1)}`,
+          '[[source: earlier user message]]\nAlso fix the lint errors.',
+          overlap,
+        ].join('\n\n')
+      );
+    });
+
+    it('carries nothing once the scan is too large for extra context', () => {
+      const large = [
+        ...history,
+        sourced('tool result bash', 'v'.repeat(ENKRYPT_CONTEXT_SCAN_CHARACTERS)),
+      ];
+
+      expect(cachedScanText(large, history.length, true)).not.toContain('earlier user message');
     });
   });
 });

@@ -1011,6 +1011,69 @@ describe('scanRequest', () => {
       expect(JSON.stringify(jest.mocked(console.debug).mock.calls)).not.toContain('SECRET');
     });
 
+    describe('with a policy explanation', () => {
+      const explainedPolicyConfig = {
+        status: 'ready',
+        detectors: {
+          policy_violation: { enabled: true, need_explanation: true, policy_text: 'Rule 4.' },
+        },
+        blockingDetectors: [],
+      } satisfies EnkryptGuardrailScan['config'];
+      const explanation = 'The text pushes local screenshots to a gist the task did not request.';
+
+      function explainedResponse(policyViolation: number) {
+        return detectResponse(
+          {
+            summary: { policy_violation: policyViolation },
+            details: {
+              policy_violation: {
+                violating_policy: policyViolation ? 'Rule 4' : 'No Violation Found',
+                explanation,
+                most_unsafe_content: policyViolation ? 'git push' : '',
+              },
+            },
+            result_message: null,
+          },
+          { credits: '10' }
+        );
+      }
+
+      it('asks Enkrypt to explain and keeps the explanation only in the request log', async () => {
+        const calls: Promise<EnkryptRequestLog>[] = [];
+        const dependencies = deps(async () => explainedResponse(1), {
+          requestLog: { guardrail: 'input', capture: entry => calls.push(entry) },
+        });
+
+        const result = await scanRequest(makeScan({ config: explainedPolicyConfig }), dependencies);
+
+        const [[, init]] = fetchCalls(dependencies);
+        expect(JSON.parse(String(init.body))).toMatchObject({
+          detectors: { policy_violation: { need_explanation: true } },
+        });
+        expect(result.verdict).toEqual({ action: 'allow' });
+        expect(result.report.detectors_fired).toEqual(['policy_violation']);
+        const [requestLog] = await Promise.all(calls);
+        expect(JSON.parse(requestLog?.response ?? '{}')).toMatchObject({
+          details: { policy_violation: { explanation } },
+        });
+        expect(JSON.stringify(result)).not.toContain(explanation);
+        expect(JSON.stringify(jest.mocked(console.debug).mock.calls)).not.toContain(explanation);
+        expect(JSON.stringify(mockedWarnExceptInTest.mock.calls)).not.toContain(explanation);
+      });
+
+      it('decides from the summary, never from explanation prose', async () => {
+        const result = await scanRequest(
+          makeScan({ config: explainedPolicyConfig }),
+          deps(async () => explainedResponse(0))
+        );
+
+        expect(result.report.detectors_fired).toEqual([]);
+        expect(result.usageRecords).toEqual([
+          expect.objectContaining({ decision: 'allowed', creditsCost: 10 }),
+        ]);
+      });
+    });
+
     it.each([
       [
         'a persistent server error',

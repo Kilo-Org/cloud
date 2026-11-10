@@ -20,6 +20,7 @@ import {
   enabledEnkryptOutputDetectorIds,
   enforcedEnkryptInputDetectors,
   enkryptOutputDetectorsAsInputDetectors,
+  withPolicyViolationExplanation,
   type EnkryptDetectRequestDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -197,8 +198,8 @@ function selectDetectors(
 /**
  * Log-only detectors never gate a request, so they are scanned in their own Enkrypt call that the
  * request does not wait for. Enkrypt bills each enabled detector per call, so the extra call only
- * adds its 1-credit per-call minimum. An invalid configuration stays blocking, so it keeps failing
- * closed.
+ * adds its 1-credit per-call minimum. That call asks `policy_violation` to explain itself. An
+ * invalid configuration stays blocking, so it keeps failing closed.
  */
 export function splitEnkryptInputGuardrail(
   config: EnkryptInputGuardrailConfig
@@ -217,7 +218,9 @@ export function splitEnkryptInputGuardrail(
         ? null
         : {
             ...config,
-            detectors: selectDetectors(config.detectors, logOnlyDetectors),
+            detectors: withPolicyViolationExplanation(
+              selectDetectors(config.detectors, logOnlyDetectors)
+            ),
             blockingDetectors: [],
           },
   };

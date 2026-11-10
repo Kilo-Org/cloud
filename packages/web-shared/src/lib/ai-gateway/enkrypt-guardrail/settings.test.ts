@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import type { OrganizationSettings } from '@kilocode/db/schema-types';
+import type { EnkryptDetectorId, OrganizationSettings } from '@kilocode/db/schema-types';
 import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
@@ -108,7 +108,7 @@ describe('resolveEnkryptInputGuardrail', () => {
     });
   });
 
-  it('scans log only configurable detectors in the log only call, never the blocking one', () => {
+  it('scans log only configurable detectors in the log only call, which asks for policy explanations', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
     detectors.policy_violation = {
       enabled: true,
@@ -130,7 +130,7 @@ describe('resolveEnkryptInputGuardrail', () => {
         injection_attack: { enabled: true, need_explanation: false },
         policy_violation: {
           enabled: true,
-          need_explanation: false,
+          need_explanation: true,
           policy_text: 'Never share customer records.',
         },
       },
@@ -293,6 +293,35 @@ describe('splitEnkryptInputGuardrail', () => {
     };
 
     expect(splitEnkryptInputGuardrail(config)).toEqual({ blocking: null, logOnly: config });
+  });
+
+  it('asks only the log-only policy scan for an explanation', () => {
+    const policy = {
+      enabled: true,
+      need_explanation: false,
+      rules: [],
+    } satisfies EnkryptDetectRequestDetectors['policy_violation'];
+    const withPolicy = (blockingDetectors: EnkryptDetectorId[]) =>
+      splitEnkryptInputGuardrail({
+        status: 'ready',
+        detectors: { ...detectors, policy_violation: policy },
+        blockingDetectors,
+      });
+
+    expect(withPolicy(['policy_violation']).blocking).toEqual({
+      status: 'ready',
+      detectors: { policy_violation: policy },
+      blockingDetectors: ['policy_violation'],
+    });
+    expect(withPolicy(['injection_attack']).logOnly).toEqual({
+      status: 'ready',
+      detectors: {
+        pii: detectors.pii,
+        policy_violation: { ...policy, need_explanation: true },
+        bias: detectors.bias,
+      },
+      blockingDetectors: [],
+    });
   });
 
   it('keeps an invalid configuration blocking so it fails closed', () => {

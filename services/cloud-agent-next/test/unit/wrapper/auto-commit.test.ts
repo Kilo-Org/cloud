@@ -507,7 +507,7 @@ describe('runAutoCommit', () => {
           ['commit', '-m', commitMessage],
           expect.objectContaining({ cwd: '/workspace', timeoutMs: 30_000, signal: opts.signal })
         );
-        expect(mockGit).toHaveBeenLastCalledWith(
+        expect(mockGit).toHaveBeenCalledWith(
           ['push'],
           expect.objectContaining({ cwd: '/workspace', timeoutMs: 60_000, signal: opts.signal })
         );

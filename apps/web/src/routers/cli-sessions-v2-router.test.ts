@@ -3329,6 +3329,10 @@ describe('cli-sessions-v2-router', () => {
         baseRepoFullName: 'kilo/repo',
         headRepoFullName: 'kilo/repo',
         headRef: SESSION_BRANCH,
+        baseRef: 'main',
+        stackNumber: 2,
+        stackPosition: 1,
+        stackSize: 3,
         ...overrides,
       };
     }
@@ -3446,6 +3450,10 @@ describe('cli-sessions-v2-router', () => {
         reviewDecisionPending: false,
         observations: null,
         platform: 'github',
+        baseRef: 'main',
+        stackNumber: 2,
+        stackPosition: 1,
+        stackSize: 3,
       });
 
       const [persisted] = await readCacheRows();

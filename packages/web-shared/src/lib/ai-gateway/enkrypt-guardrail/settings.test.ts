@@ -6,6 +6,8 @@ import {
   type EnkryptDetectRequestDetectors,
 } from './detectors';
 import {
+  enkryptInputGuardrailAppliesTo,
+  enkryptInputGuardrailGroupId,
   resolveEnkryptInputGuardrail,
   resolveEnkryptOutputGuardrail,
   splitEnkryptInputGuardrail,
@@ -13,6 +15,8 @@ import {
 } from './settings';
 
 const organizationId = '00000000-0000-4000-8000-000000000002';
+const groupId = '00000000-0000-4000-8000-000000000003';
+const otherGroupId = '00000000-0000-4000-8000-000000000004';
 
 function resolve(settings: OrganizationSettings | undefined) {
   return resolveEnkryptInputGuardrail(
@@ -45,21 +49,20 @@ describe('resolveEnkryptInputGuardrail', () => {
     expect(resolve(settings)).toBeNull();
   });
 
-  it('applies Kilo Default and scans tool results when no detectors were saved', () => {
+  it('applies Kilo Default, logging prompt injection, and scans tool results when no detectors were saved', () => {
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true } } })).toEqual({
       scanToolResults: true,
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
-        pii: { enabled: true, entities: ['secrets'] },
-        nsfw: { enabled: true },
       },
-      blockingDetectors: ['injection_attack'],
+      blockingDetectors: [],
     });
   });
 
   it('uses the saved configurable detectors and scans tool results even if a save turned them off', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.injection_attack.action = 'block';
     detectors.policy_violation = {
       enabled: true,
       action: 'block',
@@ -77,13 +80,11 @@ describe('resolveEnkryptInputGuardrail', () => {
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
-        pii: { enabled: true, entities: ['secrets'] },
         policy_violation: {
           enabled: true,
           need_explanation: false,
           policy_text: 'Never share customer records.',
         },
-        nsfw: { enabled: true },
       },
       blockingDetectors: ['injection_attack', 'policy_violation'],
     });
@@ -111,7 +112,6 @@ describe('resolveEnkryptInputGuardrail', () => {
 
   it('scans log only configurable detectors in the log only call, never the blocking one', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.injection_attack.action = 'log';
     detectors.policy_violation = {
       enabled: true,
       action: 'log',
@@ -130,31 +130,38 @@ describe('resolveEnkryptInputGuardrail', () => {
       blockingDetectors: [],
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
-        pii: { enabled: true, entities: ['secrets'] },
         policy_violation: {
           enabled: true,
           need_explanation: false,
           policy_text: 'Never share customer records.',
         },
-        nsfw: { enabled: true },
       },
     });
   });
 
-  it('applies Kilo Default to saved detectors that are not configurable', () => {
+  it('ignores saved detectors that are not configurable', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.injection_attack.enabled = false;
-    detectors.pii = { enabled: true, action: 'block', entities: ['url'] };
-    detectors.nsfw.enabled = false;
+    detectors.injection_attack.action = 'block';
+    detectors.pii = { enabled: true, action: 'block', entities: ['secrets', 'url'] };
+    detectors.nsfw.enabled = true;
     detectors.keyword_detector = { enabled: true, action: 'block', banned_keywords: ['Phoenix'] };
     detectors.toxicity.enabled = true;
 
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toEqual({
       scanToolResults: true,
       status: 'ready',
-      detectors: { pii: { enabled: true, entities: ['secrets'] }, nsfw: { enabled: true } },
-      blockingDetectors: [],
+      detectors: { injection_attack: { enabled: true, need_explanation: false } },
+      blockingDetectors: ['injection_attack'],
     });
+  });
+
+  it('is off when only detectors that are not configurable were saved as enabled', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.injection_attack.enabled = false;
+    detectors.pii.enabled = true;
+    detectors.nsfw.enabled = true;
+
+    expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toBeNull();
   });
 
   it('reports invalid saved detectors instead of weakening the policy', () => {
@@ -163,6 +170,84 @@ describe('resolveEnkryptInputGuardrail', () => {
         enkrypt: { input_guardrail: { enabled: true, detectors: { injection_attack: true } } },
       })
     ).toEqual({ scanToolResults: true, status: 'invalid' });
+  });
+
+  it('logs prompt injection without blocking when Kilo Default was saved', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+
+    expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toEqual({
+      scanToolResults: true,
+      status: 'ready',
+      detectors: { injection_attack: { enabled: true, need_explanation: false } },
+      blockingDetectors: [],
+    });
+  });
+
+  it('resolves the same guardrail whether or not it is limited to a group', () => {
+    expect(resolve({ enkrypt: { input_guardrail: { enabled: true, group_id: groupId } } })).toEqual(
+      resolve({ enkrypt: { input_guardrail: { enabled: true } } })
+    );
+  });
+});
+
+describe('enkryptInputGuardrailGroupId', () => {
+  it.each([
+    ['no settings', undefined],
+    ['no guardrail setting', {}],
+    ['a guardrail without a group', { enkrypt: { input_guardrail: { enabled: true } } }],
+    [
+      'a guardrail with a null group',
+      { enkrypt: { input_guardrail: { enabled: true, group_id: null } } },
+    ],
+    [
+      'a guardrail with an empty group',
+      { enkrypt: { input_guardrail: { enabled: true, group_id: '' } } },
+    ],
+    [
+      'a guardrail with a group that is not a UUID',
+      { enkrypt: { input_guardrail: { enabled: true, group_id: 'engineering' } } },
+    ],
+    [
+      'an invalid guardrail',
+      {
+        enkrypt: { input_guardrail: { enabled: 'yes', group_id: groupId } },
+      } as unknown as OrganizationSettings,
+    ],
+  ] satisfies [string, OrganizationSettings | undefined][])('is null for %s', (_name, settings) => {
+    expect(enkryptInputGuardrailGroupId(settings)).toBeNull();
+  });
+
+  it.each([true, false])('returns the saved group when the guardrail enabled is %s', enabled => {
+    expect(
+      enkryptInputGuardrailGroupId({ enkrypt: { input_guardrail: { enabled, group_id: groupId } } })
+    ).toBe(groupId);
+  });
+});
+
+describe('enkryptInputGuardrailAppliesTo', () => {
+  const limited: OrganizationSettings = {
+    kilo_encrypt: true,
+    enkrypt: { input_guardrail: { enabled: true, group_id: groupId } },
+  };
+
+  it('applies to every member when the guardrail is not limited to a group', () => {
+    const settings: OrganizationSettings = {
+      kilo_encrypt: true,
+      enkrypt: { input_guardrail: { enabled: true } },
+    };
+
+    expect(enkryptInputGuardrailAppliesTo(settings, [])).toBe(true);
+    expect(enkryptInputGuardrailAppliesTo(settings, [otherGroupId])).toBe(true);
+    expect(enkryptInputGuardrailAppliesTo(undefined, [])).toBe(true);
+  });
+
+  it('applies to members of the group', () => {
+    expect(enkryptInputGuardrailAppliesTo(limited, [otherGroupId, groupId])).toBe(true);
+  });
+
+  it('does not apply to members outside the group', () => {
+    expect(enkryptInputGuardrailAppliesTo(limited, [])).toBe(false);
+    expect(enkryptInputGuardrailAppliesTo(limited, [otherGroupId])).toBe(false);
   });
 });
 

@@ -463,6 +463,7 @@ export function createControlPlaneConnection(
           redactsNamedSecrets: true,
           installsSkillsSh: true,
           startCommands: true,
+          worktreeGit: true,
         })
       )
         return;

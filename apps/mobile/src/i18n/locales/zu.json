@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "Ayikho imongo evulelwe imibiko ehleliwe",
     "sourceBlocker": "Iseshini idinga ukunakwa",
     "sourceMetadata": "Imethadatha yeseshini eqoqiwe"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Asikwazanga ukuvula leli phumela lokusesha"
   }
 }

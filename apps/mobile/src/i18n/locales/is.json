@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Engin samhengi eru virkjuð fyrir áætluð yfirlit",
     "sourceBlocker": "Lota þarfnast athygli",
     "sourceMetadata": "Vistuð lýsigögn lotu"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ekki tókst að opna þessa leitarniðurstöðu"
   }
 }

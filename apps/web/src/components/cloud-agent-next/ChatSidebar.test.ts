@@ -6,8 +6,16 @@ import type { StoredSession } from './types';
 Object.assign(globalThis, { React });
 
 let mockPathname = '/cloud';
+let mockStackedSource: {
+  source?: { branch: string; repository: string; basePushed: boolean };
+  isPending: boolean;
+} = { source: undefined, isPending: false };
 const mockRouterPush = jest.fn();
 const mockRouter = { push: mockRouterPush };
+
+jest.mock('./hooks/useStackedWorkspaceSource', () => ({
+  useStackedWorkspaceSource: () => mockStackedSource,
+}));
 
 jest.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -67,10 +75,27 @@ jest.mock('@/components/ui/dropdown-menu', () => {
     DropdownMenuItem: ({
       children,
       onClick,
+      onSelect,
+      disabled,
     }: {
       children?: ReactNode;
       onClick?: (event: React.MouseEvent) => void;
-    }) => react.createElement('div', { role: 'menuitem', onClick }, children),
+      onSelect?: () => void;
+      disabled?: boolean;
+    }) =>
+      react.createElement(
+        'div',
+        {
+          role: 'menuitem',
+          'aria-disabled': disabled || undefined,
+          onClick: (event: React.MouseEvent) => {
+            if (disabled) return;
+            onClick?.(event);
+            onSelect?.();
+          },
+        },
+        children
+      ),
     DropdownMenuLabel: passthrough,
     DropdownMenuSeparator: () => null,
     DropdownMenuCheckboxItem: passthrough,
@@ -96,6 +121,8 @@ jest.mock('./SessionPrIndicator', () => ({
 import { ChatSidebar } from './ChatSidebar';
 import { SessionPrIndicator } from './SessionPrIndicator';
 import { Tooltip } from '@/components/ui/tooltip';
+import { getDefaultStore } from 'jotai';
+import { stackedWorkspaceTargetAtom } from './store/stacked-workspace-atoms';
 
 type ChatSidebarProps = React.ComponentProps<typeof ChatSidebar>;
 
@@ -231,6 +258,7 @@ describe('ChatSidebar row rendering', () => {
 
   beforeEach(() => {
     mockPathname = '/cloud';
+    mockStackedSource = { source: undefined, isPending: false };
     mockRouterPush.mockClear();
     indicatorMock.mockClear();
     tooltipMock.mockClear();
@@ -351,7 +379,7 @@ describe('ChatSidebar row rendering', () => {
     const session = makeSession(0, { worktreeId: 'worktree_loading' });
     renderSidebar({ sessions: [session], loadingWorktreeIds: ['worktree_loading'] });
     const row = dom.container.querySelector('[data-worktree-id="worktree_loading"]');
-    expect(row?.querySelector('[role="tooltip"]')).toBeNull();
+    expect(row?.querySelector('[role="tooltip"][data-side="top"]')).toBeNull();
     expect(row?.textContent).not.toContain(session.repository);
     expect(
       row?.querySelector('button[aria-label="Open worktree Loading worktree…"]')
@@ -474,6 +502,7 @@ describe('ChatSidebar row rendering', () => {
 
       const latest = {
         ...hidden,
+        createdAt: new Date(new Date(visible.createdAt).getTime() + 1_000).toISOString(),
         updatedAt: new Date(new Date(visible.updatedAt).getTime() + 1_000).toISOString(),
       };
       renderSidebar({
@@ -611,7 +640,15 @@ describe('ChatSidebar row rendering', () => {
     );
     const workspaceFolders = {
       folders: [
-        { id: ids[0], name: 'Product', color: 'blue' as const, worktreeIds: [] as string[] },
+        {
+          id: ids[0],
+          name: 'Product',
+          color: 'blue' as const,
+          kind: 'manual' as const,
+          smartPreset: null,
+          sortMode: 'manual' as const,
+          worktreeIds: [] as string[],
+        },
       ],
       isLoading: false,
       isFirstLoadPending: false,
@@ -621,9 +658,15 @@ describe('ChatSidebar row rendering', () => {
       toggleFolder: jest.fn(),
       saveFolder: jest.fn(async () => true),
       setFolderColor: jest.fn(async () => true),
+      setFolderSortMode: jest.fn(async () => true),
       deleteFolder: jest.fn(async () => true),
-      moveWorktree: jest.fn(async () => false),
+      moveWorktree: jest.fn(
+        async (_worktreeId: string, _folderId: string | null, _position?: string | null) => false
+      ),
       moveSession: jest.fn(async () => false),
+      initializeWorktreePositions: jest.fn(
+        async (_orderedWorktreeIds: readonly string[], _folderId: string | null) => true
+      ),
       reorderFolders: jest.fn(async () => true),
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
@@ -1027,5 +1070,525 @@ describe('ChatSidebar row rendering', () => {
 
     click(editingRow);
     expect(onOpenSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChatSidebar stacked workspaces', () => {
+  let dom: ReturnType<typeof installDom>;
+  let root: Root;
+
+  beforeAll(() => {
+    dom = installDom();
+  });
+
+  afterAll(() => dom.cleanup());
+
+  beforeEach(() => {
+    mockPathname = '/cloud';
+    mockStackedSource = { source: undefined, isPending: false };
+    mockRouterPush.mockClear();
+    indicatorMock.mockClear();
+    tooltipMock.mockClear();
+    root = createRoot(dom.container);
+    getDefaultStore().set(stackedWorkspaceTargetAtom, null);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+  });
+
+  function renderSidebar(overrides: Partial<ChatSidebarProps> = {}): void {
+    act(() => {
+      root.render(React.createElement(ChatSidebar, baseProps(overrides)));
+    });
+  }
+
+  function stackedGroup(): NonNullable<ChatSidebarProps['workspaceGroups']>[number] {
+    const rootSession = makeSession(0, {
+      worktreeId: 'worktree_root',
+      repository: 'kilo/repo',
+      branch: 'feature/base',
+    });
+    const childSession = makeSession(1, {
+      worktreeId: 'worktree_child',
+      repository: 'kilo/repo',
+      branch: 'feature/child',
+    });
+    const prSession = {
+      ...rootSession,
+      associatedPr: {
+        url: 'https://github.com/kilo/repo/pull/12',
+        number: 12,
+        state: 'open',
+        title: 'Root PR',
+        headSha: null,
+        lastSyncedAt: '2026-01-02T00:00:00.000Z',
+        reviewDecision: null,
+        reviewDecisionPending: false,
+        platform: 'github',
+        observations: null,
+      },
+    };
+    return {
+      type: 'worktree',
+      worktreeId: 'worktree_root',
+      sessions: [rootSession],
+      latestSession: rootSession,
+      details: {
+        name: 'Root workspace',
+        defaultTitle: null,
+        branch: 'feature/base',
+        parentWorktreeId: null,
+        baseBranch: null,
+        prSession,
+        sessions: [rootSession],
+      },
+      stackLayers: [
+        {
+          type: 'worktree',
+          worktreeId: 'worktree_child',
+          sessions: [childSession],
+          latestSession: childSession,
+          details: {
+            name: 'Child workspace',
+            defaultTitle: null,
+            branch: 'feature/child',
+            parentWorktreeId: 'worktree_root',
+            baseBranch: 'feature/base',
+            prSession: null,
+            sessions: [childSession],
+          },
+        },
+      ],
+    };
+  }
+
+  it('uses the base row as the stack header and collapses its layers without a feature flag', () => {
+    renderSidebar({
+      sessions: [],
+      workspaceGroups: [stackedGroup()],
+    });
+
+    expect(dom.container.querySelectorAll('[data-worktree-id="worktree_root"]')).toHaveLength(1);
+    expect(dom.container.querySelectorAll('[data-worktree-id="worktree_child"]')).toHaveLength(1);
+    const baseRow = () => dom.container.querySelector('[data-worktree-id="worktree_root"]');
+    const collapse = baseRow()?.querySelector<HTMLButtonElement>(
+      '[aria-label="Collapse stack Root workspace"]'
+    );
+    expect(collapse).not.toBeNull();
+    expect(
+      dom.container.querySelector(
+        '[aria-label="Layers on Root workspace"] [data-worktree-id="worktree_root"]'
+      )
+    ).toBeNull();
+    expect(baseRow()?.querySelector('[title="2 workspaces in stack"]')).toBeNull();
+    act(() => collapse?.click());
+
+    expect(collapse?.getAttribute('aria-expanded')).toBe('false');
+    expect(
+      dom.container
+        .querySelector('[aria-label="Layers on Root workspace"]')
+        ?.getAttribute('data-state')
+    ).toBe('closed');
+    expect(dom.container.querySelectorAll('[data-worktree-id="worktree_root"]')).toHaveLength(1);
+    expect(baseRow()?.querySelector('[title="2 workspaces in stack"]')?.textContent).toBe('2');
+    const expand = baseRow()?.querySelector<HTMLButtonElement>(
+      '[aria-label="Expand stack Root workspace"]'
+    );
+    expect(expand).not.toBeNull();
+    act(() => expand?.click());
+    expect(dom.container.querySelectorAll('[data-worktree-id]')).toHaveLength(2);
+  });
+
+  it('sets the stacked workspace target from the worktree row menu', () => {
+    renderSidebar({
+      sessions: [],
+      organizationId: 'org_1',
+      workspaceGroups: [stackedGroup()],
+    });
+
+    const item = [...dom.container.querySelectorAll('[role="menuitem"]')].find(node =>
+      node.textContent?.includes('New stacked workspace')
+    );
+    expect(item).toBeDefined();
+    act(() => (item as HTMLElement).click());
+
+    expect(getDefaultStore().get(stackedWorkspaceTargetAtom)).toEqual({
+      worktreeId: 'worktree_root',
+      branch: 'feature/base',
+      repository: 'kilo/repo',
+      prNumber: 12,
+      organizationId: 'org_1',
+    });
+    expect(mockRouterPush).toHaveBeenCalledWith('/organizations/org_1/cloud');
+  });
+});
+
+describe('ChatSidebar phase 4 drag ordering', () => {
+  let dom: ReturnType<typeof installDom>;
+  let root: Root;
+
+  beforeAll(() => {
+    dom = installDom();
+  });
+
+  afterAll(() => dom.cleanup());
+
+  beforeEach(() => {
+    mockPathname = '/cloud';
+    mockStackedSource = { source: undefined, isPending: false };
+    mockRouterPush.mockClear();
+    indicatorMock.mockClear();
+    tooltipMock.mockClear();
+    root = createRoot(dom.container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+  });
+
+  function renderSidebar(overrides: Partial<ChatSidebarProps> = {}): void {
+    act(() => {
+      root.render(React.createElement(ChatSidebar, baseProps(overrides)));
+    });
+  }
+
+  function phase4Group(
+    index: number,
+    sidebarPosition: string | null
+  ): NonNullable<ChatSidebarProps['workspaceGroups']>[number] {
+    const session = makeSession(index, {
+      worktreeId: `worktree_drag_${index}`,
+      cloudAgentSessionId: `workspace_${index}`,
+    });
+    return {
+      type: 'worktree',
+      worktreeId: session.worktreeId!,
+      sessions: [session],
+      latestSession: session,
+      details: {
+        name: `Workspace ${index}`,
+        defaultTitle: null,
+        branch: `feature/${index}`,
+        parentWorktreeId: null,
+        baseBranch: null,
+        folderId: null,
+        sidebarPosition,
+        createdAt: session.createdAt,
+        prSession: null,
+        sessions: [session],
+      },
+    };
+  }
+
+  function workspaceFolders() {
+    return {
+      folders: [],
+      isLoading: false,
+      isFirstLoadPending: false,
+      isError: false,
+      isSaving: false,
+      collapsedFolderIds: [] as string[],
+      toggleFolder: jest.fn(),
+      saveFolder: jest.fn(async () => true),
+      setFolderColor: jest.fn(async () => true),
+      setFolderSortMode: jest.fn(async () => true),
+      deleteFolder: jest.fn(async () => true),
+      moveWorktree: jest.fn(
+        async (_worktreeId: string, _folderId: string | null, _position?: string | null) => false
+      ),
+      moveSession: jest.fn(async () => false),
+      initializeWorktreePositions: jest.fn(
+        async (_orderedWorktreeIds: readonly string[], _folderId: string | null) => true
+      ),
+      reorderFolders: jest.fn(async () => true),
+      refresh: jest.fn(async () => undefined),
+    } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
+  }
+
+  function dragRows(
+    source: Element,
+    target: Element,
+    clientY: number
+  ): { dataTransfer: { setData: jest.Mock; setDragImage: jest.Mock } } {
+    const dataTransfer = {
+      setData: jest.fn(),
+      setDragImage: jest.fn(),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+    const event = (element: Element, type: string, y?: number) => {
+      const next = new window.Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperties(next, {
+        dataTransfer: { value: dataTransfer },
+        clientX: { value: 30 },
+        clientY: { value: y ?? 0 },
+      });
+      act(() => {
+        element.dispatchEvent(next);
+      });
+    };
+    target.getBoundingClientRect = () =>
+      ({ top: 0, left: 0, width: 200, height: 40, bottom: 40, right: 200, x: 0, y: 0 }) as DOMRect;
+    event(source, 'dragstart');
+    event(target, 'dragover', clientY);
+    event(target, 'drop', clientY);
+    return { dataTransfer };
+  }
+
+  it('initializes the whole unpositioned container on the first drag, writing the desired order', () => {
+    const folders = workspaceFolders();
+    renderSidebar({
+      sessions: [],
+      workspaceFolders: folders,
+      workspaceGroups: [phase4Group(0, null), phase4Group(1, null)],
+    });
+
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    const sourceTitle = rows[0]?.querySelector('button span');
+    if (!rows[0] || !rows[1] || !sourceTitle) throw new Error('Rows missing');
+
+    dragRows(sourceTitle, rows[1], 35);
+
+    expect(folders.initializeWorktreePositions).toHaveBeenCalledTimes(1);
+    expect(folders.initializeWorktreePositions).toHaveBeenCalledWith(
+      ['worktree_drag_1', 'worktree_drag_0'],
+      null
+    );
+    expect(folders.moveWorktree).not.toHaveBeenCalled();
+  });
+
+  it('writes only the dragged row when the container is already positioned', () => {
+    const folders = workspaceFolders();
+    renderSidebar({
+      sessions: [],
+      workspaceFolders: folders,
+      workspaceGroups: [phase4Group(0, 'a1'), phase4Group(1, 'a2')],
+    });
+
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    const sourceTitle = rows[0]?.querySelector('button span');
+    if (!rows[0] || !rows[1] || !sourceTitle) throw new Error('Rows missing');
+
+    dragRows(sourceTitle, rows[1], 35);
+
+    expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+    expect(folders.moveWorktree).toHaveBeenCalledTimes(1);
+    const [worktreeId, folderId, position] = folders.moveWorktree.mock.calls[0] ?? [];
+    expect(worktreeId).toBe('worktree_drag_0');
+    expect(folderId).toBeNull();
+    expect(typeof position).toBe('string');
+    expect((position as string) > 'a2').toBe(true);
+  });
+
+  it('places before the first row when dropped on its top half', () => {
+    const folders = workspaceFolders();
+    renderSidebar({
+      sessions: [],
+      workspaceFolders: folders,
+      workspaceGroups: [phase4Group(0, 'a2'), phase4Group(1, 'a3')],
+    });
+
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    const sourceTitle = rows[1]?.querySelector('button span');
+    if (!rows[0] || !rows[1] || !sourceTitle) throw new Error('Rows missing');
+
+    dragRows(sourceTitle, rows[0], 1);
+
+    expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+    const [worktreeId, folderId, position] = folders.moveWorktree.mock.calls[0] ?? [];
+    expect(worktreeId).toBe('worktree_drag_1');
+    expect(folderId).toBeNull();
+    expect((position as string) < 'a2').toBe(true);
+  });
+});
+
+describe('ChatSidebar stacked workspace preflight', () => {
+  let dom: ReturnType<typeof installDom>;
+  let root: Root;
+
+  beforeAll(() => {
+    dom = installDom();
+  });
+
+  afterAll(() => dom.cleanup());
+
+  beforeEach(() => {
+    mockPathname = '/cloud';
+    mockStackedSource = { source: undefined, isPending: false };
+    root = createRoot(dom.container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+  });
+
+  function renderSidebar(): void {
+    const session = makeSession(0, {
+      worktreeId: 'worktree_root',
+      repository: 'kilo/repo',
+      branch: 'feature/base',
+    });
+    const group = {
+      type: 'worktree' as const,
+      worktreeId: 'worktree_root',
+      sessions: [session],
+      latestSession: session,
+      details: {
+        name: 'Root workspace',
+        defaultTitle: null,
+        branch: 'feature/base',
+        parentWorktreeId: null,
+        baseBranch: null,
+        prSession: null,
+        sessions: [session],
+      },
+    };
+    act(() => {
+      root.render(
+        React.createElement(
+          ChatSidebar,
+          baseProps({
+            sessions: [],
+            workspaceGroups: [group],
+          })
+        )
+      );
+    });
+  }
+
+  it('disables the menu item and explains the exact push requirement when the branch is unpushed', () => {
+    mockStackedSource = {
+      source: { branch: 'feature/base', repository: 'kilo/repo', basePushed: false },
+      isPending: false,
+    };
+    renderSidebar();
+
+    const item = dom.container.querySelector<HTMLElement>(
+      '[role="menuitem"]:has(svg.lucide-layers)'
+    );
+    if (!item) throw new Error('Stacked workspace menu item missing');
+    expect(
+      item.getAttribute('aria-disabled') ?? item.closest('[aria-disabled="true"]')
+    ).toBeTruthy();
+    expect(dom.container.textContent).toContain(
+      'Push `feature/base` first; it will be pushed after the next successful turn, or enable auto-commit'
+    );
+  });
+});
+
+describe('ChatSidebar phase 4 drag ordering end placement', () => {
+  let dom: ReturnType<typeof installDom>;
+  let root: Root;
+
+  beforeAll(() => {
+    dom = installDom();
+  });
+
+  afterAll(() => dom.cleanup());
+
+  beforeEach(() => {
+    mockPathname = '/cloud';
+    mockStackedSource = { source: undefined, isPending: false };
+    root = createRoot(dom.container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+  });
+
+  it('appends after the last row when dropped on its bottom half', () => {
+    const session = (index: number, position: string) => {
+      const value = makeSession(index, {
+        worktreeId: `worktree_drag_${index}`,
+        cloudAgentSessionId: `workspace_${index}`,
+      });
+      return {
+        type: 'worktree' as const,
+        worktreeId: value.worktreeId!,
+        sessions: [value],
+        latestSession: value,
+        details: {
+          name: `Workspace ${index}`,
+          defaultTitle: null,
+          branch: `feature/${index}`,
+          parentWorktreeId: null,
+          baseBranch: null,
+          folderId: null,
+          sidebarPosition: position,
+          createdAt: value.createdAt,
+          prSession: null,
+          sessions: [value],
+        },
+      };
+    };
+    const folders = {
+      folders: [],
+      isLoading: false,
+      isFirstLoadPending: false,
+      isError: false,
+      isSaving: false,
+      collapsedFolderIds: [] as string[],
+      toggleFolder: jest.fn(),
+      saveFolder: jest.fn(async () => true),
+      setFolderColor: jest.fn(async () => true),
+      setFolderSortMode: jest.fn(async () => true),
+      deleteFolder: jest.fn(async () => true),
+      moveWorktree: jest.fn(
+        async (_worktreeId: string, _folderId: string | null, _position?: string | null) => false
+      ),
+      moveSession: jest.fn(async () => false),
+      initializeWorktreePositions: jest.fn(
+        async (_orderedWorktreeIds: readonly string[], _folderId: string | null) => true
+      ),
+      reorderFolders: jest.fn(async () => true),
+      refresh: jest.fn(async () => undefined),
+    } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
+
+    act(() => {
+      root.render(
+        React.createElement(
+          ChatSidebar,
+          baseProps({
+            sessions: [],
+            workspaceFolders: folders,
+            workspaceGroups: [session(0, 'a1'), session(1, 'a2')],
+          })
+        )
+      );
+    });
+
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    const sourceTitle = rows[0]?.querySelector('button span');
+    if (!rows[0] || !rows[1] || !sourceTitle) throw new Error('Rows missing');
+
+    const dataTransfer = {
+      setData: jest.fn(),
+      setDragImage: jest.fn(),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+    const dispatch = (element: Element, type: string, y: number) => {
+      const event = new window.Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperties(event, {
+        dataTransfer: { value: dataTransfer },
+        clientX: { value: 30 },
+        clientY: { value: y },
+      });
+      act(() => {
+        element.dispatchEvent(event);
+      });
+    };
+    rows[1]!.getBoundingClientRect = () =>
+      ({ top: 0, left: 0, width: 200, height: 40, bottom: 40, right: 200, x: 0, y: 0 }) as DOMRect;
+    dispatch(sourceTitle, 'dragstart', 0);
+    dispatch(rows[1]!, 'dragover', 35);
+    dispatch(rows[1]!, 'drop', 35);
+
+    expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+    const [worktreeId, folderId, position] = folders.moveWorktree.mock.calls[0] ?? [];
+    expect(worktreeId).toBe('worktree_drag_0');
+    expect(folderId).toBeNull();
+    expect((position as string) > 'a2').toBe(true);
   });
 });

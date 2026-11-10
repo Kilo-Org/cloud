@@ -1,3 +1,4 @@
+import { assertContainerAccountAvailable } from '../container-account-admission.js';
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -8,11 +9,6 @@ import {
   type EnvironmentReference,
 } from '@kilocode/cloud-agent-profile';
 import { resolveSecret } from '../auth.js';
-import {
-  assertContainerCapacity,
-  getContainerCapacityFailureReason,
-} from '../container-concurrency.js';
-import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import { getPgDb } from '../db/pg.js';
 import { logger } from '../logger.js';
 import { mergeEnvVarsWithSecrets, type EncryptedSecrets } from '../utils/encryption.js';
@@ -125,23 +121,16 @@ export class EnvironmentBuild extends DurableObject<Env> {
       environment: {
         reference: id => readEnvironmentReference(getPgDb(env), id),
         buildInput: id => loadEnvironmentBuildInput(getPgDb(env), id),
-        actorAccess: (owner, userId) => environmentActorAccess(getPgDb(env), owner, userId),
-        gitSource: input => resolveBuilderGitSource(env, input),
-        capacity: async (owner, instanceId, actorUserId) => {
-          try {
-            await assertContainerCapacity(env, {
+        actorAccess: async (owner, userId) => {
+          const access = await environmentActorAccess(getPgDb(env), owner, userId);
+          if (access !== 'none')
+            await assertContainerAccountAvailable(env, {
               subject: billingSubject(owner),
-              instanceId,
-              actor: { type: 'user', id: actorUserId },
-              checkpoint: 'sandbox-start',
+              actor: { type: 'user', id: userId },
             });
-            return 'ok';
-          } catch (error) {
-            if (getContainerCapacityFailureReason(error) === 'container_limit_reached')
-              return 'limit_reached';
-            throw error;
-          }
+          return access;
         },
+        gitSource: input => resolveBuilderGitSource(env, input),
       },
       provider: createBuilderProvider({
         containers: env.SANDBOX_CONTAINERS,
@@ -165,10 +154,6 @@ export class EnvironmentBuild extends DurableObject<Env> {
       decryptSecrets: encrypted =>
         mergeEnvVarsWithSecrets({}, encrypted as EncryptedSecrets, env.AGENT_ENV_VARS_PRIVATE_KEY),
       billingInput: ({ owner, actorUserId, sandboxId: billingSandboxId, buildId }) => {
-        const enforcementRequested = isCloudAgentContainerBillingEnabled(env, {
-          userId: actorUserId,
-          ...(owner.type === 'organization' ? { orgId: owner.id } : {}),
-        });
         return {
           sandboxId: billingSandboxId as never,
           sandboxKind: 'isolated',
@@ -176,7 +161,6 @@ export class EnvironmentBuild extends DurableObject<Env> {
           actor: { type: 'user', id: actorUserId },
           sessionId: `environment-build:${buildId}`,
           metadata: { origin: 'environment-build' },
-          ...(enforcementRequested ? { enforcementRequested: true } : {}),
         };
       },
       builderSandboxId: sandboxId,

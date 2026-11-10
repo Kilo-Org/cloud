@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Keine Kontexte für geplante Briefings aktiviert",
     "sourceBlocker": "Sitzung erfordert Aufmerksamkeit",
     "sourceMetadata": "Erfasste Sitzungsmetadaten"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Dieses Suchergebnis konnte nicht geöffnet werden"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "id": "36dcf95b-22dc-4e72-aade-722ee880dd3a",
+  "id": "df75cb97-e858-4274-990b-b7dd4add11eb",
   "prevId": "5cbcc798-84cb-4ecc-8667-fdd13f1c7dcd",
   "version": "7",
   "dialect": "postgresql",
@@ -4309,15 +4309,9 @@
           "method": "btree",
           "with": {}
         },
-        "UQ_claude_billing_connections_org_member": {
-          "name": "UQ_claude_billing_connections_org_member",
+        "UQ_claude_billing_connections_organization": {
+          "name": "UQ_claude_billing_connections_organization",
           "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "organization_id",
               "isExpression": false,
@@ -4327,22 +4321,6 @@
           ],
           "isUnique": true,
           "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_claude_billing_connections_shared_services": {
-          "name": "UQ_claude_billing_connections_shared_services",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL AND \"claude_billing_connections\".\"kilo_user_id\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -4394,7 +4372,7 @@
         },
         "claude_billing_connections_owner_check": {
           "name": "claude_billing_connections_owner_check",
-          "value": "\"claude_billing_connections\".\"kilo_user_id\" IS NOT NULL OR \"claude_billing_connections\".\"organization_id\" IS NOT NULL"
+          "value": "(\n        (\"claude_billing_connections\".\"kilo_user_id\" IS NOT NULL AND \"claude_billing_connections\".\"organization_id\" IS NULL) OR\n        (\"claude_billing_connections\".\"kilo_user_id\" IS NULL AND \"claude_billing_connections\".\"organization_id\" IS NOT NULL)\n      )"
         }
       },
       "isRLSEnabled": false
@@ -4966,6 +4944,27 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_v2_user_activity": {
+          "name": "IDX_cli_sessions_v2_user_activity",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coalesce(\"last_activity_at\", \"created_at\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -8137,6 +8136,72 @@
       },
       "isRLSEnabled": false
     },
+    "public.cloud_agent_user_settings": {
+      "name": "cloud_agent_user_settings",
+      "schema": "",
+      "columns": {
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "workspace_order": {
+          "name": "workspace_order",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual'"
+        },
+        "builtin_agents": {
+          "name": "builtin_agents",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cloud_agent_user_settings_kilo_user_id_kilocode_users_id_fk": {
+          "name": "cloud_agent_user_settings_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "cloud_agent_user_settings",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cloud_agent_user_settings_workspace_order_check": {
+          "name": "cloud_agent_user_settings_workspace_order_check",
+          "value": "\"cloud_agent_user_settings\".\"workspace_order\" IN ('manual', 'created', 'activity')"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.cloud_agent_webhook_triggers": {
       "name": "cloud_agent_webhook_triggers",
       "schema": "",
@@ -8458,6 +8523,26 @@
           "primaryKey": false,
           "notNull": true
         },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual'"
+        },
+        "smart_preset": {
+          "name": "smart_preset",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sort_mode": {
+          "name": "sort_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -8506,6 +8591,34 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "UQ_cloud_agent_workspace_folders_smart_preset": {
+          "name": "UQ_cloud_agent_workspace_folders_smart_preset",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coalesce(\"organization_id\"::text, '')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "smart_preset",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_workspace_folders\".\"kind\" = 'smart'",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -8551,6 +8664,18 @@
         "cloud_agent_workspace_folders_position_check": {
           "name": "cloud_agent_workspace_folders_position_check",
           "value": "\"cloud_agent_workspace_folders\".\"position\" >= 0"
+        },
+        "cloud_agent_workspace_folders_kind_check": {
+          "name": "cloud_agent_workspace_folders_kind_check",
+          "value": "\"cloud_agent_workspace_folders\".\"kind\" IN ('manual', 'smart')"
+        },
+        "cloud_agent_workspace_folders_smart_preset_check": {
+          "name": "cloud_agent_workspace_folders_smart_preset_check",
+          "value": "(\"cloud_agent_workspace_folders\".\"kind\" = 'manual' AND \"cloud_agent_workspace_folders\".\"smart_preset\" IS NULL) OR (\"cloud_agent_workspace_folders\".\"kind\" = 'smart' AND \"cloud_agent_workspace_folders\".\"smart_preset\" IS NOT NULL AND \"cloud_agent_workspace_folders\".\"smart_preset\" IN ('needs_you', 'in_review', 'done'))"
+        },
+        "cloud_agent_workspace_folders_sort_mode_check": {
+          "name": "cloud_agent_workspace_folders_sort_mode_check",
+          "value": "\"cloud_agent_workspace_folders\".\"sort_mode\" IN ('manual', 'created', 'activity')"
         }
       },
       "isRLSEnabled": false
@@ -8580,6 +8705,30 @@
         "folder_id": {
           "name": "folder_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parent_worktree_id": {
+          "name": "parent_worktree_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "base_branch": {
+          "name": "base_branch",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "base_sha": {
+          "name": "base_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sidebar_position": {
+          "name": "sidebar_position",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -8673,6 +8822,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "IDX_cloud_agent_worktrees_parent_worktree_id": {
+          "name": "IDX_cloud_agent_worktrees_parent_worktree_id",
+          "columns": [
+            {
+              "expression": "parent_worktree_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cloud_agent_worktrees\".\"parent_worktree_id\" is not null",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -8711,6 +8876,19 @@
           ],
           "columnsTo": [
             "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_worktrees_parent_worktree_id_cloud_agent_worktrees_worktree_id_fk": {
+          "name": "cloud_agent_worktrees_parent_worktree_id_cloud_agent_worktrees_worktree_id_fk",
+          "tableFrom": "cloud_agent_worktrees",
+          "tableTo": "cloud_agent_worktrees",
+          "columnsFrom": [
+            "parent_worktree_id"
+          ],
+          "columnsTo": [
+            "worktree_id"
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
@@ -14122,6 +14300,30 @@
         "pr_review_decision": {
           "name": "pr_review_decision",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_base_ref": {
+          "name": "pr_base_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stack_number": {
+          "name": "stack_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stack_position": {
+          "name": "stack_position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stack_size": {
+          "name": "stack_size",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },

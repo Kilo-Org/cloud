@@ -1,4 +1,4 @@
-import type * as z from 'zod';
+import * as z from 'zod';
 import {
   ENKRYPT_DETECTOR_IDS,
   EnkryptInputDetectorsSchema,
@@ -83,9 +83,10 @@ export function readStoredEnkryptOutputDetectors(
 /**
  * The organization's input guardrail, or null when Kilo admins have not granted the feature
  * (`kilo_encrypt`), or the guardrail is absent, disabled, invalid in settings, or selects no
- * detector. Organizations that never saved detectors get Kilo Default. Only the configurable
- * detectors follow the saved settings; see `enforcedEnkryptInputDetectors`. Every input is
- * checked, including tool results, whatever `scan_tool_results` says.
+ * detector. Organizations that never saved detectors get Kilo Default.
+ * Only the configurable detectors run, as saved; see `enforcedEnkryptInputDetectors`. Every input
+ * is checked, including tool results, whatever `scan_tool_results` says. It applies only to
+ * members of `enkryptInputGuardrailGroupId`, when that is set.
  */
 export function resolveEnkryptInputGuardrail(
   organizationId: string,
@@ -115,6 +116,30 @@ export function resolveEnkryptInputGuardrail(
     detectors: buildEnkryptDetectRequestDetectors(detectors),
     blockingDetectors: blockingEnkryptDetectorIds(detectors),
   };
+}
+
+/**
+ * The organization group the input guardrail is limited to, or null when it applies to every
+ * member. Only meaningful while `resolveEnkryptInputGuardrail` returns a guardrail. A stored value
+ * that is not a group ID cannot name a group, so the guardrail applies to every member instead of
+ * to nobody.
+ */
+export function enkryptInputGuardrailGroupId(
+  settings: OrganizationSettings | undefined
+): string | null {
+  const parsed = EnkryptInputGuardrailSettingsSchema.safeParse(settings?.enkrypt?.input_guardrail);
+  if (!parsed.success) return null;
+  const groupId = z.uuid().safeParse(parsed.data.group_id);
+  return groupId.success ? groupId.data : null;
+}
+
+/** Whether the input guardrail applies to a member who belongs to `memberGroupIds`. */
+export function enkryptInputGuardrailAppliesTo(
+  settings: OrganizationSettings | undefined,
+  memberGroupIds: readonly string[]
+): boolean {
+  const groupId = enkryptInputGuardrailGroupId(settings);
+  return groupId === null || memberGroupIds.includes(groupId);
 }
 
 /**

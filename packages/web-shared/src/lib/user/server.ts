@@ -70,8 +70,8 @@ import {
 } from '@kilocode/worker-utils/kilo-token-policy';
 
 import {
-  getBlacklistedDomains,
   getBlockedSignupTlds,
+  isEmailBlacklisted,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
@@ -231,13 +231,16 @@ type GetAuthResponse =
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
   const headersList = opts.requestHeaders ?? (await headers());
   const result = await resolveUserFromAuth(opts, headersList);
+  // Every admin audit event of one request carries the surface it arrived on,
+  // so the same request lands in one inventory entry whichever way it resolves.
+  const surface = opts.stepUpSurface ?? 'rest';
 
   // Admin audit trail: emit exactly one identity-attributed event per authorized
   // admin request. Guarded strictly on adminOnly so the millions of
   // adminOnly:false calls never log.
   if (opts.adminOnly === true && result.user) {
     emitAdminAccessEvent({
-      surface: opts.stepUpSurface ?? 'rest',
+      surface,
       kind: 'admin_guard',
       user: result.user,
       authViaToken: authViaTokenFromHeaders(headersList),
@@ -263,10 +266,9 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       delegatedWorkload: result.cloudAgentAuthority !== undefined,
     });
     if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
-      const surface = opts.stepUpSurface ?? 'rest';
       const route = routeFromHeaders(headersList);
       const method = methodFromHeaders(headersList, opts.requestMethod);
-      const { actionClass } = actionClassForRoute({
+      const { actionClass, inventoryId } = actionClassForRoute({
         surface,
         route: route ?? '',
         method,
@@ -283,11 +285,34 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
           surface,
         });
       } catch (error) {
+        // One privileged-access outcome per guarded non-session request:
+        // `denied` for a policy verdict, `failed` for an unexpected throw.
+        // Session traffic stays on `admin_guard`.
+        const emitOutcome = (outcome: 'denied' | 'failed') => {
+          if (credential === 'session') return;
+          emitPrivilegedAccessEvent({
+            surface,
+            user: result.user,
+            credential,
+            outcome,
+            actionClass,
+            actionId: inventoryId,
+            target: null,
+            wouldBlock: true,
+            userAgentProduct: userAgentProductFromHeaders(headersList),
+            tokenSource: result.tokenSource ?? null,
+            route,
+            method,
+            ip: clientIpFromHeaders(headersList),
+          });
+        };
         if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
+          emitOutcome('denied');
           return authError(403, error.cause.code, result.user.id);
         }
         // Fail closed. The guard normally converts evaluation failures itself;
         // this covers anything unexpected around it.
+        emitOutcome('failed');
         reportStepUpFailure('admin_step_up_rest', error);
         return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
       }
@@ -304,12 +329,12 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     const route = routeFromHeaders(headersList);
     const method = methodFromHeaders(headersList, opts.requestMethod);
     const { actionClass, inventoryId } = actionClassForRoute({
-      surface: 'rest',
+      surface,
       route: route ?? '',
       method,
     });
     emitPrivilegedAccessEvent({
-      surface: 'rest',
+      surface,
       user: result.user ?? undefined,
       credential,
       outcome: result.user ? 'succeeded' : 'denied',
@@ -673,7 +698,7 @@ async function validateUserAuthorization({
       tokenSource,
       cloudAgentAuthority,
     });
-  } else if (await isUserBlacklistedByDomain(user)) {
+  } else if (await isUserBlacklistedByDomain(user, readDb)) {
     return authError(403, 'Access denied (R0)', kiloUserId, {
       authorizationRefused: true,
       internalApiUse,
@@ -774,16 +799,11 @@ async function readActiveDeviceSession(
   return session !== undefined;
 }
 
-export async function isUserBlacklistedByDomain(
-  existingUser: Pick<User, 'google_user_email'>
+export function isUserBlacklistedByDomain(
+  existingUser: Pick<User, 'google_user_email'>,
+  fromDb: typeof db = db
 ): Promise<boolean> {
-  const domains = await getBlacklistedDomains();
-  return isEmailBlacklistedByDomain(existingUser.google_user_email, domains);
-}
-
-export async function isEmailBlacklistedByDomainAsync(email: string): Promise<boolean> {
-  const domains = await getBlacklistedDomains();
-  return isEmailBlacklistedByDomain(email, domains);
+  return isEmailBlacklisted(existingUser.google_user_email, fromDb);
 }
 
 /**

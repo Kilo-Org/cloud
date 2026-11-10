@@ -176,6 +176,18 @@ export const createSessionForCloudAgentSchema = z.object({
   cloudAgentSessionId: z.string().min(1),
   cloudAgentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
   cloudAgentWorktreeLocation: cloudAgentWorktreeLocationSchema.optional(),
+  /**
+   * The workspace this worktree is stacked on. Recorded on the first
+   * registration only; later sibling registrations leave it untouched.
+   */
+  parentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
+  /** The branch the new working branch starts from. Null means the default branch. */
+  baseBranch: z.string().min(1).max(256).optional(),
+  /** The exact commit the working branch starts from, resolved by the web router. */
+  baseSha: z
+    .string()
+    .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+    .optional(),
   organizationId: z.string().optional(),
   createdOnPlatform: z.string().min(1),
   title: z.string().optional(),

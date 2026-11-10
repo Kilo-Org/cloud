@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "ለመርሃ ግብር ሪፖርቶች የነቁ አውዶች የሉም",
     "sourceBlocker": "ክፍለ ጊዜው ትኩረት ይፈልጋል",
     "sourceMetadata": "የተቀመጠ የክፍለ ጊዜ ሜታዳታ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ይህን የፍለጋ ውጤት መክፈት አልተቻለም"
   }
 }

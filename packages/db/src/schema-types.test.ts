@@ -5,9 +5,8 @@ import {
   OpenRouterPricing,
   OpenRouterProvider,
   OrganizationSettingsSchema,
-  StoredModelSchema,
 } from './schema-types';
-import type { StoredModel } from './schema-types';
+import type { GatewayModel } from './schema-types';
 
 describe('CodeReviewCouncilConfigSchema', () => {
   const specialist = (id: string) => ({
@@ -227,6 +226,19 @@ describe('ModelsSchema', () => {
 
     expect(result.data.map(model => model.type)).toEqual([...types, undefined]);
   });
+
+  it('includes model reasoning metadata', () => {
+    const reasoning = {
+      mandatory: false,
+      supported_efforts: ['high', 'medium', 'low', 'none'],
+    } satisfies GatewayModel['reasoning'];
+
+    const result = ModelsSchema.parse({
+      data: [{ id: 'openai/gpt-5.2', name: 'OpenAI: GPT-5.2', reasoning }],
+    });
+
+    expect(result.data[0].reasoning).toEqual(reasoning);
+  });
 });
 
 describe('OpenRouterPricing', () => {
@@ -238,21 +250,5 @@ describe('OpenRouterPricing', () => {
     });
 
     expect(pricing.discount).toBe(0.5);
-  });
-});
-
-describe('StoredModelSchema', () => {
-  it('includes model reasoning metadata', () => {
-    const storedModel: StoredModel = {
-      id: 'openai/gpt-5.2',
-      name: 'OpenAI: GPT-5.2',
-      reasoning: {
-        mandatory: false,
-        supported_efforts: ['high', 'medium', 'low', 'none'],
-      },
-      endpoints: [],
-    };
-
-    expect(StoredModelSchema.parse(storedModel).reasoning).toEqual(storedModel.reasoning);
   });
 });

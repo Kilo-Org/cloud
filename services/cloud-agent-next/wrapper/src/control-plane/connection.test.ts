@@ -200,6 +200,7 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       redactsNamedSecrets: true,
       installsSkillsSh: true,
       startCommands: true,
+      worktreeGit: true,
     });
   });
 });
@@ -1026,6 +1027,7 @@ describe('createControlPlaneConnection', () => {
         redactsNamedSecrets: true,
         installsSkillsSh: true,
         startCommands: true,
+        worktreeGit: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

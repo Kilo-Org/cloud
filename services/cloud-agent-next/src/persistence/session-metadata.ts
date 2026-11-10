@@ -100,6 +100,13 @@ const MetadataAuthSchema = z
 const RepositoryCommonSchema = {
   token: z.string().optional(),
   upstreamBranch: branchNameSchema.optional(),
+  /** Branch a stacked workspace was created from; null/absent means the default branch. */
+  baseBranch: branchNameSchema.optional(),
+  /** Parent tip the working branch was last created or restacked onto. */
+  baseSha: z
+    .string()
+    .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+    .optional(),
 };
 
 const repositoryTypes = new Set(['github', 'gitlab', 'bitbucket', 'git']);
@@ -177,6 +184,11 @@ const MetadataRepositorySchema = z.preprocess(
           bitbucketIntegrationId: z.string().uuid().optional(),
           bitbucketTokenManaged: z.boolean().optional(),
           upstreamBranch: branchNameSchema.optional(),
+          baseBranch: branchNameSchema.optional(),
+          baseSha: z
+            .string()
+            .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+            .optional(),
         })
         .strip(),
       z
@@ -318,6 +330,8 @@ const MetadataWorkspaceSchema = egressPolicySchema
     sandboxProviderBinding: SandboxProviderBindingSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
     worktreeId: cloudAgentWorktreeIdSchema.optional(),
+    /** Parent worktree for a stacked workspace. */
+    parentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
     workspacePath: z.string().optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),

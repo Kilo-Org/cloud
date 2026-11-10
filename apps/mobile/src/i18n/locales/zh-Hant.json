@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "未為任何情境啟用排定的簡報",
     "sourceBlocker": "工作階段需要留意",
     "sourceMetadata": "已擷取的工作階段中繼資料"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "無法開啟此搜尋結果"
   }
 }

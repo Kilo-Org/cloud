@@ -1209,6 +1209,27 @@ describe('prepareSession operation-ledger admission gate', () => {
     });
     expect(result).not.toHaveProperty('replayed');
   });
+  it.each([false, true])(
+    'returns the registered worktree ID on a create or replay: %s',
+    async replayed => {
+      const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+      createSessionWithLedgerMock.mockResolvedValueOnce({
+        cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+        kiloSessionId: 'cli-session-abc123',
+        worktreeId,
+        ...(replayed ? { replayed: true } : {}),
+      });
+      const result = await router.createCaller(createContext()).prepareSession({
+        prompt: 'Test prompt',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        operationKey: OPERATION_KEY,
+      });
+      expect(result.worktreeId).toBe(worktreeId);
+    }
+  );
 
   it('propagates the clone source through createSessionWithLedger and replays on a same-key retry', async () => {
     const caller = router.createCaller(createContext());

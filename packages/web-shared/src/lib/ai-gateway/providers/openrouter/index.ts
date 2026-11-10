@@ -19,10 +19,8 @@ import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { AUTO_MODELS, type AutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
-import {
-  getOpenRouterModelsMetadataFromDatabase,
-  type StoredModelMap,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import {
   getDataCollectionRequiredModelIds,
   getProviderSlugsForModels,
@@ -146,7 +144,7 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
  */
 export function pickerModelPricing(
   model: OpenRouterModel,
-  endpointsMetadata: StoredModelMap,
+  endpointsMetadata: GatewayModelMap,
   preferredProviderOrderConfig: PreferredProviderOrderConfig
 ): OpenRouterModel['pricing'] {
   const preferredProvider = resolvePreferredProviderOrder(

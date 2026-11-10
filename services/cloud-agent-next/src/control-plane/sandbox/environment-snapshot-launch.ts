@@ -120,8 +120,8 @@ export async function lookupEnvironmentSnapshot(input: {
 }
 
 /**
- * The snapshot a session starts from. During the image rollout window the
- * coordinator may publish an older snapshot as compatible; the container
+ * The snapshot a session starts from. The coordinator may publish a snapshot
+ * from an earlier base image as compatible; the container
  * restore does not use that image, and startup installs the current runtime
  * over the restored disk, so the provider receives the current image identity.
  */
@@ -251,7 +251,7 @@ function blockedEnvironment(
       return {
         reason: 'environment_snapshot_incompatible',
         detail: blockedDetail(
-          'The environment snapshot was built for an earlier image and is outside the rollout window.',
+          'The environment snapshot was built for an incompatible sandbox runtime.',
           buildId
         ),
         environmentId,
@@ -440,7 +440,7 @@ export function environmentStartDetail(
       : '; environment settings have changed; cached files may retain earlier values';
   const image =
     snapshot.stale === 'image'
-      ? '; built for an earlier image; using it during the rollout window'
+      ? '; built for an earlier image; using it while the replacement builds'
       : '';
   return `Using environment snapshot${image}${settings}${build === null ? '' : `; ${build}`}`;
 }

@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Enweghị ọnọdụ akwadoro maka akụkọ a haziri oge ha",
     "sourceBlocker": "Nnọkọ chọrọ nlebara anya",
     "sourceMetadata": "Ozi nkọwa nnọkọ e dekọrọ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"
   }
 }

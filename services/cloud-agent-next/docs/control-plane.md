@@ -314,11 +314,15 @@ so a later report changes nothing.
   `sandbox_create_failed`; the Sandbox DO creates a new allocation for the remaining cases. At the
   deadline the route fails.
 - Provider adapters preserve structured admission causes. Only actual `insufficient_credits` fails
-  as `billing_blocked`; `stopping`, meter outages, network/5xx, throttling and recoverable conflicts
-  retain the ten-second retry pause and the original attempt deadline for the attempt's one create
-  retry. Error text or an HTTP 4xx alone never proves permanence. Proven local invalid/unsupported
-  configuration fails as `invalid_configuration`; Vercel's local REST validation kinds, not remote
-  status codes, establish it.
+  as `billing_blocked`. Native meter outages retry with the ten-second pause for one minute, then
+  fail as `billing_unavailable`. The Sandbox DO persists the admission deadline, fenced by route
+  attempt, before calling the provider. A hanging admission uses the same deadline. Successful
+  admission and terminal admission failures clear it. Nonbilling create failures clear it.
+  Other retained values are fenced by route attempt. The alarm retains the deadline across restart. Later startup retries receive a fresh admission budget. `stopping` clears the admission
+  deadline and stays on the existing creation retry path. Only `meter_unavailable` results
+  (network/5xx, throttling and recoverable conflicts) and admission timeouts retain the admission deadline. Error text or an HTTP 4xx
+  alone never proves permanence. Proven local invalid/unsupported configuration fails as
+  `invalid_configuration`; Vercel's local REST validation kinds, not remote status codes, establish it.
 - A permanent error applies only while its allocation is still current and `creating`. It fails
   preparing routes through the normal fenced route notification/message settlement path, without
   waiting for physical cleanup. An owned physical ref enters the allocation owner's existing stop
@@ -437,7 +441,19 @@ Native supervision does not schedule future wakeups after compute has stopped.
 These keep their current owners and evidence; the rewrite ports them, it does not redesign them.
 
 - Compute billing follows the physical container lifecycle (`metered-billing-lifecycle.ts`), not
-  the routing state.
+  the routing state. A controlled native stop confirms the running boundary immediately before
+  successful destruction. Settlement includes idle runtime until that boundary. A failed destroy
+  leaves measurement active. An already-stopped container retains its last confirmed measurement;
+  later discovery does not charge the unobserved period. Pending stop segments remain unchanged on replay.
+- A native budget stop notifies the Sandbox DO with the exact allocation reference. The Sandbox DO
+  rejects stale references and applies `stop-requested` with `billing_blocked`. The container sends
+  this notification outside the heartbeat queue and does not wait for physical stop. The durable
+  billing block and two-minute force stop remain the safety net. An unreadable meter verdict keeps
+  the existing safety stop but reports `billing_unavailable`; it does not claim a credit shortage.
+- Native admission denial and budget stops carry customer-safe payer, balance and minimum details.
+  Failed route and message rows retain these optional details. Stream delivery and replay use the
+  same shared schema. The existing compute billing card shows the payer's recovery action. A new
+  message after credit recovery can resume the same session; earlier failed messages stay final.
 - The Sandbox DO reconciles the current wrapper's stored compute policy on a 30-second cadence.
   A confirmed `billing_blocked` result enters the allocation's existing stop ladder and closes
   the wrapper socket with code `4402`. Allocation state fences forwarding and activity renewal.
@@ -555,17 +571,17 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   build; `environmentId` and `buildId` are logged with `snapshot_start_blocked`. The web client
   offers "View environment build", which opens the session environment's build panel, when the
   latest attempt failed at the `environment_snapshot` step. The start never falls back to the image.
-- **Image rollout.** A published snapshot from the previous base image stays usable for 24 hours
-  after its capture, while compatibility with the current image and an automatic replacement build
-  are still unresolved. The runtime ABI must match. After 24 hours the snapshot is incompatible,
-  so an environment with build commands blocks until its replacement publishes. The coordinator
-  reads the current image from the builder's container DO.
-- **Start.** `launch` receives `snapshot: { snapshotId, baseImage }`. During the rollout window a
-  previous-image snapshot is restored and the provider receives the current image identity, because
-  a container snapshot restore does not use the old image and startup installs the current runtime
-  over the disk. `launch` returns `startSource` (`repository` or `image`). The progress detail names
-  the snapshot capture date and time in UTC, the changed environment settings, the rollout window
-  and the real admission outcome.
+- **Image rollout.** A published snapshot from an earlier base image stays usable until its
+  eligible lifetime ends. It is stale and admits an automatic replacement build. The runtime ABI
+  must match; a snapshot for another ABI is incompatible, so an environment with build commands
+  blocks until its replacement publishes. The coordinator reads the current image from the
+  builder's container DO.
+- **Start.** `launch` receives `snapshot: { snapshotId, baseImage }`. An earlier-image snapshot is
+  restored and the provider receives the current image identity, because a container snapshot
+  restore does not use the old image and startup installs the current runtime over the disk.
+  `launch` returns `startSource` (`repository` or `image`). The progress detail names the snapshot
+  capture date and time in UTC, the changed environment settings, an earlier base image and the
+  real admission outcome.
 - **No fallback.** A failed snapshot start stops that container and retries the same snapshot once
   within the original deadline. A permanent reason (expired, missing, image mismatch, provenance, or a
   provider that started the image instead) fails at once. The route then fails with "Rebuild
@@ -653,9 +669,10 @@ keep environment snapshots and existing history/worktree recovery.
   snapshot. Current credential grants and native request authorization exclude deleted members
   after restore.
 - **Cold startup.** When a descriptor exists, the workspace tail is the only startup source.
-  Selection validates ownership, enrollment, provider, startup mode, image class, the 30-day
-  lifetime and the exact base image; the current image lookup is retried within the deadline. A
-  descriptor that cannot start (malformed, ownership or runtime mismatch, expired, image mismatch,
+  Selection validates ownership, enrollment, provider, startup mode, image class and the 30-day
+  lifetime. A later base image does not block a tail: the restore uses the captured disk, and the
+  provider receives the current image identity, which is looked up with retries within the
+  deadline. A descriptor that cannot start (malformed, ownership or runtime mismatch, expired,
   provider unsupported, a permanent or repeated provider failure, or a wrapper failure in the
   restore step) fails the route as `workspace_snapshot_start_failed` with a specific detail that
   names the capture time; a possibly transient failure (image lookup, repeated provider error) also
@@ -1052,7 +1069,8 @@ them through one development-only override.
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
 | Sandbox DO | Provider create call | 2 min | Retry after the pause below while a route deadline remains |
-| Sandbox DO | Provider create retry pause | 10 s after a transient failed create | One create retry within the unchanged route attempt; the next create error fails the preparing routes with `sandbox_create_failed`. Classified permanent errors still fail promptly |
+| Sandbox DO | Native billing admission | 1 min across meter retries, durable per route attempt | Route `failed` (`billing_unavailable`) |
+| Sandbox DO | Provider create retry pause | 10 s after a transient failed create | Create again within the unchanged route attempt; classified permanent errors fail promptly |
 | Sandbox DO | Wrapper first connect | 5 min from launch; includes the `downloaded` install | Stop the sandbox |
 | Sandbox DO | Unbound wrapper hello | 30 s from socket admission, not scaled | Close candidate only; attachment deadline survives hibernation and participates in the existing alarm even while stopped |
 | Sandbox DO | Heartbeat | 45 s | Treat the socket as lost |
@@ -1083,8 +1101,11 @@ them through one development-only override.
 
 | Failure | Detected by | Recovery | Message effect |
 |---|---|---|---|
-| Transient provider create error | Sandbox DO | One retry after a 10 s pause, within the unchanged route deadline | A second create error fails queued promptly (`sandbox_create_failed`); otherwise queued fail at the deadline |
+| Transient provider create error | Sandbox DO | One retry after a 10 s pause, within the unchanged route deadline | A second create error fails queued promptly (`sandbox_create_failed`) |
+| Native billing meter or database unavailable | Sandbox DO | Retry within one minute; new message after service recovery | Queued fail (`billing_unavailable`) |
 | Actual compute credit denial | Provider adapter / existing Vercel billing admission | New message after adding credits | Queued fail promptly (`billing_blocked`) |
+| Native compute budget exhausted | Native container through Sandbox DO | Add credits, then send a new message in the same session | Accepted fail promptly (`billing_blocked`) with payer and available balance |
+| Native meter verdict unreadable | Heartbeat contract validation through Sandbox DO | Try a new message after billing service recovery | Accepted fail (`billing_unavailable`); retain the safety stop |
 | Proven invalid/unsupported provider configuration | Provider adapter | New message after correcting configuration | Queued fail promptly (`invalid_configuration`) |
 | Wrapper never connects | Sandbox DO, 5 min | Stop; new allocation within the route deadline | Queued fail at the deadline |
 | Startup configuration, release descriptor or payload missing | `startup-selection.ts`, `downloaded-startup.ts` | New message after the configuration is corrected | Queued fail promptly (`invalid_configuration`) |
@@ -1504,6 +1525,61 @@ Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `hear
 `session.outcome`, `events_dropped`, terminal control requests, worktree-change requests,
 worktree-deletion requests (`worktree.prepareDeletion`, `worktree.delete`; both answer with
 `worktree.result`). Terminal bytes use the existing wrapper-to-Session-DO terminal socket.
+`worktree.git` is the one new worktree frame: the Session DO forwards one Sync or Restack request
+and the wrapper answers with the same `worktree.result` envelope. Its request payload and result
+are the shared `worktreeBranchOperation*` schemas; the result discriminates
+`changed`/`unchanged`/`conflict`/`refused`. A successful request has a 450-second reply bound
+(120s fetch + 120s rebase + 120s push plus overhead), not the 30-second capture bound.
+The wrapper advertises `worktreeGit: true` in its hello. A running older wrapper remains
+usable for turns and Changes but receives no git-operation frame; Sync and Restack fail
+immediately with `wrapper_upgrade_required` until that sandbox restarts on the updated runtime.
+
+### Stacked workspaces
+
+A stacked workspace records a base branch and the exact parent tip it was created from, plus the
+parent worktree. The flat `prepareSession` input and the grouped `start` input accept `baseBranch`,
+`baseSha` and `parentWorktreeId`; they are validated at the boundary and stored as grouped
+`SessionMetadata` v2 (`repository.baseBranch`, `repository.baseSha`, `workspace.parentWorktreeId`).
+The first session-ingest ownership row for the worktree records the same three values and later
+sibling registrations leave them untouched. A sibling chat inherits them; a transcript fork does
+not (a clone create never passes them).
+
+When the wrapper creates the working branch and no local or remote branch exists, it fetches
+`origin/<baseBranch>` and checks `baseSha` is an ancestor of it before running
+`git checkout --no-track -b <branch> <baseSha>`. It never tracks the parent branch, so auto-commit
+pushes only the workspace's own branch. The appended system instruction names
+`--base <baseBranch>` and forbids pushing any other branch. A missing base branch fails
+non-retryable (`base_branch_missing`); a base that moved between resolution and fetch fails
+`base_branch_changed` (retryable); a rebuilt workspace whose recorded base is no longer an ancestor
+fails `base_branch_stale` (non-retryable, because a retry cannot re-resolve it). Restoring a
+workspace that has a pushed branch ignores `baseSha` and checks out the pushed branch.
+
+Changes compares against `repository.baseBranch` (the default branch when absent), not
+`repository.upstreamBranch`, so a session with only an upstream branch is no longer diffed against
+itself. When the requested base ref no longer exists the wrapper falls back to the default branch
+and reports `comparison.baseRefFallback`; the request itself is unchanged, so old live wrappers
+still accept the strict `worktree.summary` payload.
+
+`syncWorktreeBranch` and `restackWorktreeBranch` are session-addressed Worker mutations:
+`{ cloudAgentSessionId, baseBranch?, upstreamSha? }`. The target
+worktree, branch, directory and sandbox are derived from the session, and only a browser workspace
+session with its own sandbox is eligible. An idle sandbox is woken through the ordinary
+`session.prepare` path with no synthetic turn; preparation is bounded at 90 seconds and returns a
+bounded failure. The wrapper owns the active-turn, dirty-tree and directory locks and answers
+`refused`; the DO never forces a rewrite over a running turn. Neither the Worker nor the Session DO
+retries an ambiguous transport timeout: the operation may have force-pushed, so the caller gets
+`operation_outcome_unknown` and must inspect the branch rather than retry blind.
+
+A completed (`changed` or `unchanged`) result persists its effective `baseBranch`/`baseSha` into the
+Session DO's grouped metadata and registration route. Sync preserves the recorded fork boundary
+when a merge-base against a retargeted base would regress it; this prevents replaying an old
+parent's commits after a squash merge. A result whose fields are null retains the recorded base.
+If Restack first needs to reconcile the remote, it returns a Sync result and does not claim or
+persist the requested Restack base. The caller must restack that layer before advancing the stack.
+The web router writes effective values to Postgres only after a completed operation. It then
+propagates them to other root chats in the worktree through the idempotent `adoptWorktreeBase`
+mutation, which checks `expectedWorktreeId` and never wakes a sandbox. Sibling adoption failures
+are logged without hiding the completed operation. `conflict`/`refused`/timeout never change the base.
 
 ### Startup mode rollout
 
@@ -1812,8 +1888,14 @@ counts.
     work promptly with `billing_blocked`, not preparation timeout. Proven local invalid configuration
     fails promptly with `invalid_configuration`. The safe stream reason, durable route/message,
     report stage/code and one report/callback per terminal batch stay consistent; no raw provider
-    detail is forwarded. Stopping, meter outages, network/5xx, throttling and recoverable conflicts
-    keep the ten-second pause, immutable attempt and original deadline, then can succeed. Owned refs
+    detail is forwarded. Native admission and active budget failures retain safe payer, balance and
+    minimum details through durable message state, stream and replay. Active budget failure stops
+    through the Sandbox DO without the reconnect delay. Stale allocation stop requests are ignored.
+    An unreadable budget is reported as unavailable, without an add-credits claim.
+    Native meter/database outages retry for one minute, including a hanging RPC,
+    then fail as `billing_unavailable`. Reconstruction keeps the admission deadline. A healthy admission
+    before the deadline succeeds. Stopping and later nonbilling startup retries receive a fresh
+    admission budget. Other transient failures keep the ten-second pause, immutable attempt and original deadline. Owned refs
     use the existing stop ladder and retain unconfirmed physical evidence. Late results after hello
     cannot fail a healthy sibling or clean up its allocation. After restoration, a new message in
     the same session succeeds without changing the earlier terminal message or duplicating effects.
@@ -1885,3 +1967,14 @@ A new preparation after stop creates a contained allocation. Sessions retain the
 Earlier branch work recorded live Vercel identity and GitHub checks.
 The shared admission refactor has local tests only; those earlier checks do not verify this change.
 Maximum payload and duration compatibility still require verification before production rollout.
+## Customer billing schema maintenance
+
+The customer billing schema owner is `packages/session-ingest-contracts/src/cloud-agent-billing.ts`.
+The standalone wrapper image copies only its wrapper and shared service files.
+After changing that schema, refresh its tested local copy from the repository root:
+
+```sh
+cp packages/session-ingest-contracts/src/cloud-agent-billing.ts services/cloud-agent-next/src/shared/cloud-agent-billing.ts
+```
+
+The mirror test requires exact source equality. Verify the standalone Docker wrapper build after schema changes.

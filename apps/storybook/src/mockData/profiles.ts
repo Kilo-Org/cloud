@@ -208,6 +208,7 @@ export const mockProfileDetails: ProfileDetails = {
   isDefault: true,
   createdAt: '2025-01-01T00:00:00Z',
   updatedAt: '2025-01-02T00:00:00Z',
+  lastUsedAt: '2025-01-02T00:00:00Z',
   vars: mockProfileVars,
   commands: mockProfileCommands,
   mcpServers: mockProfileMcpServers,
@@ -224,6 +225,7 @@ export const mockEmptyProfileDetails: ProfileDetails = {
   isDefault: false,
   createdAt: '2025-01-07T00:00:00Z',
   updatedAt: '2025-01-07T00:00:00Z',
+  lastUsedAt: null,
   vars: [],
   commands: [],
   mcpServers: [],
@@ -240,6 +242,7 @@ export const mockLocalDevProfileDetails: ProfileDetails = {
   isDefault: false,
   createdAt: '2025-01-03T00:00:00Z',
   updatedAt: '2025-01-03T00:00:00Z',
+  lastUsedAt: null,
   vars: [
     {
       key: 'DATABASE_URL',
@@ -278,6 +281,7 @@ export const mockStagingProfileDetails: ProfileDetails = {
   isDefault: false,
   createdAt: '2025-01-04T00:00:00Z',
   updatedAt: '2025-01-05T00:00:00Z',
+  lastUsedAt: null,
   vars: [
     {
       key: 'NODE_ENV',

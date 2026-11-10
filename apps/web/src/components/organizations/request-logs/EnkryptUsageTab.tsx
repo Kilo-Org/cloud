@@ -14,10 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { apiKindLabel } from '@/lib/api-kind-labels';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import type { RootRouter } from '@/routers/root-router';
-import { ToneBadge } from './detail-primitives';
+import { ABSENT_CELL, ToneBadge } from './detail-primitives';
 import { formatDurationMs, formatMicrodollarsAsUsd, formatRequestTime } from './format';
 import type { StepTone } from './routing-labels';
 
@@ -41,8 +42,6 @@ const COLUMNS = [
   { label: 'Session' },
 ] as const;
 
-const EMPTY = <span className="text-muted-foreground">—</span>;
-
 function decisionOf(decision: string) {
   return Object.hasOwn(DECISIONS, decision)
     ? DECISIONS[decision]
@@ -65,7 +64,7 @@ function EnkryptUsageTableRow({ row }: { row: EnkryptUsageRow }) {
           {userLabel(row.user)}
         </div>
       </TableCell>
-      <TableCell className="font-mono text-xs">{row.api_kind}</TableCell>
+      <TableCell>{apiKindLabel(row.api_kind)}</TableCell>
       <TableCell>{row.guardrail === 'output' ? 'Output' : 'Input'}</TableCell>
       <TableCell>
         <ToneBadge tone={decision.tone}>{decision.label}</ToneBadge>
@@ -78,7 +77,7 @@ function EnkryptUsageTableRow({ row }: { row: EnkryptUsageRow }) {
       </TableCell>
       <TableCell className="max-w-56">
         <div className="truncate font-mono text-xs" title={row.session_id ?? undefined}>
-          {row.session_id ?? EMPTY}
+          {row.session_id ?? ABSENT_CELL}
         </div>
       </TableCell>
     </TableRow>

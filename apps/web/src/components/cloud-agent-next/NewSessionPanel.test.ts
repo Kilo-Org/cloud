@@ -125,13 +125,17 @@ jest.mock('@tanstack/react-query', () => ({
 
 jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => mockCreateTrpc(),
+  useRawTRPCClient: () => ({}),
 }));
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockRouterPush }),
+  useRouter: () => ({ push: mockRouterPush, replace: jest.fn() }),
+  usePathname: () => '/cloud',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 jest.mock('jotai', () => ({
+  atom: () => ({}),
   useAtom: () => [null, jest.fn()],
   useSetAtom: () => jest.fn(),
 }));

@@ -4441,5 +4441,8 @@
     "noEnabledContexts": "Níl aon chomhthéacsanna cumasaithe le haghaidh tuarascálacha sceidealaithe",
     "sourceBlocker": "Tá aird de dhíth ar an seisiún",
     "sourceMetadata": "Meiteashonraí seisiúin gafa"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Níorbh fhéidir an toradh cuardaigh seo a oscailt"
   }
 }

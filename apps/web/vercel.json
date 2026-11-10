@@ -165,6 +165,14 @@
     {
       "path": "/api/cron/backfill-byok-envelopes",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/backfill-safety-identifiers",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/recover-code-reviews",
+      "schedule": "*/15 * * * *"
     }
   ],
   "schedules": {

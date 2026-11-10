@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, beforeEach, afterAll, afterEach } from '@jest/globals';
 import { randomBytes } from 'crypto';
 // Catalog-mode code reads the catalog snapshot through a process-wide cache. Stubbing those reads
-// keeps the cache unfilled for the listSupportedModels test, which inserts its own snapshot.
+// keeps the cache unfilled for the listSupportedModels test, which stores its own metadata.
 // `jest` stays global rather than imported from @jest/globals, so this mock is hoisted.
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => {
   const actual = jest.requireActual<typeof GatewayModelsCache>(
@@ -25,17 +25,25 @@ import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import {
+  gatewayModelEndpointsUrl,
+  openRouterGatewayModelsSource,
+  vercelGatewayModelsSource,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   ai_gateway_config,
+  ai_gateway_metadata_cache,
   byok_api_keys,
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   direct_byok_model_lists,
-  modelsByProvider,
   organization_audit_logs,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
@@ -1765,27 +1773,45 @@ describe('BYOK Router', () => {
 
   describe('listSupportedModels', () => {
     test('lists models as "name (id)" per provider', async () => {
-      const [snapshot] = await db
-        .insert(modelsByProvider)
-        .values({
-          data: { providers: [], total_providers: 0, total_models: 0, generated_at: '' },
-          openrouter: {
-            'anthropic/claude-fixture': {
-              id: 'anthropic/claude-fixture',
-              name: 'Claude Fixture',
-              endpoints: [],
-            },
+      const fillerModels = Array.from({ length: 100 }, (_, index) => ({
+        id: `filler/model-${index}`,
+        name: `Filler ${index}`,
+      }));
+      const fillerEndpointsRows = (gateway: Provider) =>
+        fillerModels.map(model => ({
+          url: gatewayModelEndpointsUrl(gateway, model.id),
+          data: { data: { endpoints: [] } },
+        }));
+      const rows = [
+        {
+          url: openRouterGatewayModelsSource.url,
+          data: {
+            data: [{ id: 'anthropic/claude-fixture', name: 'Claude Fixture' }, ...fillerModels],
           },
-          vercel: {
-            'anthropic/claude-fixture': {
-              id: 'anthropic/claude-fixture',
-              name: 'Claude Fixture',
-              type: 'language',
-              endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }],
-            },
+        },
+        {
+          url: gatewayModelEndpointsUrl(OPENROUTER, 'anthropic/claude-fixture'),
+          data: { data: { endpoints: [] } },
+        },
+        ...fillerEndpointsRows(OPENROUTER),
+        {
+          url: vercelGatewayModelsSource.url,
+          data: {
+            data: [
+              { id: 'anthropic/claude-fixture', name: 'Claude Fixture', type: 'language' },
+              ...fillerModels,
+            ],
           },
-        })
-        .returning({ id: modelsByProvider.id });
+        },
+        {
+          url: gatewayModelEndpointsUrl(VERCEL_AI_GATEWAY, 'anthropic/claude-fixture'),
+          data: {
+            data: { endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }] },
+          },
+        },
+        ...fillerEndpointsRows(VERCEL_AI_GATEWAY),
+      ];
+      await db.insert(ai_gateway_metadata_cache).values(rows);
 
       try {
         const caller = await createCallerForUser(ownerUser.id);
@@ -1797,7 +1823,12 @@ describe('BYOK Router', () => {
           'ByteDance-Seed-Code (byteplus-coding/bytedance-seed-code)'
         );
       } finally {
-        await db.delete(modelsByProvider).where(eq(modelsByProvider.id, snapshot.id));
+        await db.delete(ai_gateway_metadata_cache).where(
+          inArray(
+            ai_gateway_metadata_cache.url,
+            rows.map(row => row.url)
+          )
+        );
       }
     });
   });

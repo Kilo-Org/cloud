@@ -93,7 +93,11 @@ describe('Claude customer-billed routing', () => {
       const args = input(kind);
       const result = await checkClaudeBilling(args);
       if (result?.kind !== 'provider') throw new Error('Expected customer-billed provider');
-      expect(result.provider.apiUrl).toBe('https://api.anthropic.com/v1');
+      expect(result.provider).toMatchObject({
+        type: 'claude-billing',
+        inferenceProviderId: 'anthropic',
+        apiUrl: 'https://api.anthropic.com/v1',
+      });
       const headers: Record<string, string> = {};
       await result.provider.transformRequest({
         provider: result.provider,

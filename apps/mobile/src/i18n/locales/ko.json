@@ -2039,7 +2039,21 @@
       "thought": "추론 내용",
       "showDetails": "세부 정보 표시",
       "pending": "대기 중…",
-      "running": "실행 중…"
+      "running": "실행 중…",
+      "field": {
+        "filePath": "파일 경로",
+        "path": "경로",
+        "offset": "시작 줄",
+        "limit": "최대",
+        "pattern": "패턴",
+        "include": "포함",
+        "patchText": "패치 내용",
+        "query": "검색어",
+        "prompt": "프롬프트",
+        "header": "머리글",
+        "question": "질문",
+        "options": "선택지"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "내용을 표시하지 못했습니다."

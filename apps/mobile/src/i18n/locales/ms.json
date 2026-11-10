@@ -2577,7 +2577,21 @@
       "thought": "Pemikiran",
       "showDetails": "Paparkan butiran",
       "pending": "Menunggu…",
-      "running": "Sedang berjalan…"
+      "running": "Sedang berjalan…",
+      "field": {
+        "filePath": "Laluan fail",
+        "path": "Laluan",
+        "offset": "Ofset",
+        "limit": "Had",
+        "pattern": "Corak",
+        "include": "Sertakan",
+        "patchText": "Teks tampalan",
+        "query": "Pertanyaan",
+        "prompt": "Gesaan",
+        "header": "Pengepala",
+        "question": "Soalan",
+        "options": "Pilihan"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Gagal memaparkan kandungan."

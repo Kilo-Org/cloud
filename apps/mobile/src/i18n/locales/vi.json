@@ -2039,7 +2039,21 @@
       "thought": "Suy luận",
       "showDetails": "Hiển thị chi tiết",
       "pending": "Đang chờ…",
-      "running": "Đang chạy…"
+      "running": "Đang chạy…",
+      "field": {
+        "filePath": "Đường dẫn tệp",
+        "path": "Đường dẫn",
+        "offset": "Dòng bắt đầu",
+        "limit": "Giới hạn",
+        "pattern": "Mẫu",
+        "include": "Bao gồm",
+        "patchText": "Nội dung bản vá",
+        "query": "Truy vấn",
+        "prompt": "Chỉ dẫn",
+        "header": "Tiêu đề",
+        "question": "Câu hỏi",
+        "options": "Tùy chọn"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Không thể hiển thị nội dung."

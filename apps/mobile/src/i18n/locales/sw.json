@@ -2577,7 +2577,21 @@
       "thought": "Wazo",
       "showDetails": "Onyesha maelezo",
       "pending": "Inasubiri…",
-      "running": "Inaendelea…"
+      "running": "Inaendelea…",
+      "field": {
+        "filePath": "Njia ya faili",
+        "path": "Njia",
+        "offset": "Kianzio",
+        "limit": "Kikomo",
+        "pattern": "Muundo",
+        "include": "Kujumuisha",
+        "patchText": "Kiraka",
+        "query": "Hoji",
+        "prompt": "Maelekezo",
+        "header": "Kichwa",
+        "question": "Swali",
+        "options": "Chaguo"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Imeshindikana kuonyesha maudhui."

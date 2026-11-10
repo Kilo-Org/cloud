@@ -2039,7 +2039,21 @@
       "thought": "思考过程",
       "showDetails": "显示详情",
       "pending": "待处理……",
-      "running": "正在运行……"
+      "running": "正在运行……",
+      "field": {
+        "filePath": "文件路径",
+        "path": "路径",
+        "offset": "偏移量",
+        "limit": "上限",
+        "pattern": "模式",
+        "include": "包含",
+        "patchText": "补丁文本",
+        "query": "查询",
+        "prompt": "提示词",
+        "header": "标题",
+        "question": "问题",
+        "options": "选项"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "无法显示内容。"

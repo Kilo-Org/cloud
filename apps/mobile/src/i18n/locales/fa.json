@@ -2583,7 +2583,21 @@
       "thought": "تفکر",
       "showDetails": "نمایش جزئیات",
       "pending": "در انتظار…",
-      "running": "در حال اجرا…"
+      "running": "در حال اجرا…",
+      "field": {
+        "filePath": "مسیر فایل",
+        "path": "مسیر",
+        "offset": "خط شروع",
+        "limit": "محدودیت",
+        "pattern": "الگو",
+        "include": "شامل",
+        "patchText": "متن وصله",
+        "query": "پرس‌وجو",
+        "prompt": "دستورالعمل",
+        "header": "عنوان",
+        "question": "پرسش",
+        "options": "گزینه‌ها"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "نمایش محتوا ممکن نشد."

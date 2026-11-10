@@ -1969,7 +1969,21 @@
       "thought": "Réflexion",
       "showDetails": "Afficher les détails",
       "pending": "En attente…",
-      "running": "En cours…"
+      "running": "En cours…",
+      "field": {
+        "filePath": "Chemin du fichier",
+        "path": "Chemin",
+        "offset": "Décalage",
+        "limit": "Limite",
+        "pattern": "Motif",
+        "include": "Inclusion",
+        "patchText": "Texte correctif",
+        "query": "Requête",
+        "prompt": "Consigne",
+        "header": "En-tête",
+        "question": "Question",
+        "options": "Options"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Impossible d'afficher le contenu."

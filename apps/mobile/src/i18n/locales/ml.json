@@ -2577,7 +2577,21 @@
       "thought": "ചിന്ത",
       "showDetails": "വിശദാംശങ്ങൾ കാണിക്കുക",
       "pending": "കാത്തിരിക്കുന്നു…",
-      "running": "പ്രവർത്തിക്കുന്നു…"
+      "running": "പ്രവർത്തിക്കുന്നു…",
+      "field": {
+        "filePath": "ഫയൽ പാത",
+        "path": "പാത",
+        "offset": "ഓഫ്സെറ്റ്",
+        "limit": "പരിധി",
+        "pattern": "പാറ്റേൺ",
+        "include": "ഉൾപ്പെടുത്തൽ",
+        "patchText": "പാച്ച് വാചകം",
+        "query": "അന്വേഷണം",
+        "prompt": "പ്രോംപ്റ്റ്",
+        "header": "തലക്കെട്ട്",
+        "question": "ചോദ്യം",
+        "options": "ഓപ്ഷനുകൾ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ഉള്ളടക്കം പ്രദർശിപ്പിക്കാൻ കഴിഞ്ഞില്ല."

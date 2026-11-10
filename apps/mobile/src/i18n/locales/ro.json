@@ -2623,7 +2623,21 @@
       "thought": "Raționament",
       "showDetails": "Afișează detaliile",
       "pending": "În așteptare…",
-      "running": "În curs…"
+      "running": "În curs…",
+      "field": {
+        "filePath": "Cale fișier",
+        "path": "Cale",
+        "offset": "Decalaj",
+        "limit": "Limită",
+        "pattern": "Model",
+        "include": "Includere",
+        "patchText": "Text corecție",
+        "query": "Interogare",
+        "prompt": "Instrucțiune",
+        "header": "Titlu",
+        "question": "Întrebare",
+        "options": "Opțiuni"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nu s-a putut afișa conținutul."

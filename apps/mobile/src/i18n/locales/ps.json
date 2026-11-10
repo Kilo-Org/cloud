@@ -2577,7 +2577,21 @@
       "thought": "فکر",
       "showDetails": "جزیات وښیئ",
       "pending": "په تمه…",
-      "running": "روان…"
+      "running": "روان…",
+      "field": {
+        "filePath": "د فایل لار",
+        "path": "لار",
+        "offset": "افسیټ",
+        "limit": "حد",
+        "pattern": "نمونه",
+        "include": "شمول",
+        "patchText": "د پیچ متن",
+        "query": "لټون",
+        "prompt": "لارښوونه",
+        "header": "سرلیک",
+        "question": "پوښتنه",
+        "options": "اختیارونه"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "منځپانګه ونه ښودل شوه."

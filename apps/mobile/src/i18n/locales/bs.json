@@ -2623,7 +2623,21 @@
       "thought": "Misao",
       "showDetails": "Prikaži detalje",
       "pending": "Na čekanju…",
-      "running": "Izvršavanje…"
+      "running": "Izvršavanje…",
+      "field": {
+        "filePath": "Putanja datoteke",
+        "path": "Putanja",
+        "offset": "Pomak",
+        "limit": "Ograničenje",
+        "pattern": "Uzorak",
+        "include": "Uključivanje",
+        "patchText": "Tekst zakrpe",
+        "query": "Upit",
+        "prompt": "Uputa",
+        "header": "Naslov",
+        "question": "Pitanje",
+        "options": "Opcije"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nije moguće prikazati sadržaj."

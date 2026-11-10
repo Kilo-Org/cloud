@@ -54,9 +54,13 @@ test('fails closed when the cron secret is not configured', async () => {
 });
 
 test('emits a success event with per-backfill metadata', async () => {
+  const before = Date.now();
   const response = await GET(request('Bearer cron-secret'));
 
   expect(maxDuration).toBe(300);
+  const { deadlineAt } = jest.mocked(runScheduledBackfills).mock.calls[0][0];
+  expect(deadlineAt).toBeGreaterThan(before);
+  expect(deadlineAt - before).toBeLessThanOrEqual(maxDuration * 1000 - 60_000);
   expect(response.status).toBe(200);
   await expect(response.json()).resolves.toEqual({ backfills: completedOutcomes });
   expect(loggedEvent(info)).toMatchObject({
@@ -68,9 +72,32 @@ test('emits a success event with per-backfill metadata', async () => {
     safety_identifiers_processed_count: 50_000,
     safety_identifiers_remaining: true,
     failed_count: 0,
+    skipped_count: 0,
   });
   expect(loggedEvent(info)).not.toHaveProperty('failed_backfills');
+  expect(loggedEvent(info)).not.toHaveProperty('skipped_backfills');
   expect(error).not.toHaveBeenCalled();
+});
+
+test('reports backfills skipped by the work budget without failing the run', async () => {
+  const outcomes: ScheduledBackfillOutcome[] = [
+    { name: 'normalized_email', status: 'completed', processed: 50_000, remaining: true },
+    { name: 'blocked_at', status: 'skipped' },
+    { name: 'safety_identifiers', status: 'skipped' },
+  ];
+  jest.mocked(runScheduledBackfills).mockResolvedValue(outcomes);
+
+  const response = await GET(request('Bearer cron-secret'));
+
+  expect(response.status).toBe(200);
+  const event = loggedEvent(info);
+  expect(event).toMatchObject({
+    outcome: 'succeeded',
+    failed_count: 0,
+    skipped_count: 2,
+    skipped_backfills: 'blocked_at,safety_identifiers',
+  });
+  expect(event).not.toHaveProperty('blocked_at_processed_count');
 });
 
 test('returns 500 and emits a failure event naming the failed backfills', async () => {

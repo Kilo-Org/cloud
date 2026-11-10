@@ -34,12 +34,22 @@ const scheduledBackfills: ScheduledBackfill[] = [
 export type ScheduledBackfillOutcome = { name: string } & (
   | ({ status: 'completed' } & BackfillBatchResult)
   | { status: 'failed' }
+  | { status: 'skipped' }
 );
 
-/** Runs one batch of every backfill; a failing backfill does not stop the others. */
-export async function runScheduledBackfills(): Promise<ScheduledBackfillOutcome[]> {
+/**
+ * Runs one batch of every backfill; a failing backfill does not stop the others. Backfills not
+ * started by `deadlineAt` are skipped so the run can report before the function is killed.
+ */
+export async function runScheduledBackfills(params: {
+  deadlineAt: number;
+}): Promise<ScheduledBackfillOutcome[]> {
   const outcomes: ScheduledBackfillOutcome[] = [];
   for (const { name, run } of scheduledBackfills) {
+    if (Date.now() >= params.deadlineAt) {
+      outcomes.push({ name, status: 'skipped' });
+      continue;
+    }
     try {
       outcomes.push({ name, status: 'completed', ...(await run()) });
     } catch (error) {

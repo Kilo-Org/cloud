@@ -51,7 +51,7 @@ describe('runScheduledBackfills', () => {
   it('runs one batch of every backfill in order and fills the data', async () => {
     const { regular, blacklisted, blocked } = await insertScenario();
 
-    const outcomes = await runScheduledBackfills();
+    const outcomes = await runScheduledBackfills({ deadlineAt: Number.POSITIVE_INFINITY });
 
     expect(outcomes).toEqual([
       { name: 'normalized_email', status: 'completed', processed: 3, remaining: false },
@@ -92,7 +92,7 @@ describe('runScheduledBackfills', () => {
     queryError.name = 'DrizzleQueryError';
     jest.spyOn(db, 'execute').mockRejectedValueOnce(queryError);
 
-    const outcomes = await runScheduledBackfills();
+    const outcomes = await runScheduledBackfills({ deadlineAt: Number.POSITIVE_INFINITY });
 
     expect(outcomes.map(outcome => outcome.name)).toEqual(backfillOrder);
     expect(outcomes[0]).toEqual({ name: 'normalized_email', status: 'failed' });
@@ -117,11 +117,24 @@ describe('runScheduledBackfills', () => {
     });
   });
 
+  it('skips backfills that have not started by the deadline', async () => {
+    const { regular } = await insertScenario();
+
+    const outcomes = await runScheduledBackfills({ deadlineAt: Date.now() - 1 });
+
+    expect(outcomes).toEqual(backfillOrder.map(name => ({ name, status: 'skipped' })));
+    expect(await selectUser(regular.id)).toMatchObject({
+      normalized_email: null,
+      email_domain: null,
+      vercel_downstream_safety_identifier: null,
+    });
+  });
+
   it('reports safety identifiers as failed when OPENROUTER_ORG_ID is unset', async () => {
     const { regular } = await insertScenario();
     delete process.env.OPENROUTER_ORG_ID;
 
-    const outcomes = await runScheduledBackfills();
+    const outcomes = await runScheduledBackfills({ deadlineAt: Number.POSITIVE_INFINITY });
 
     expect(outcomes.map(outcome => outcome.name)).toEqual(backfillOrder);
     expect(outcomes.at(-1)).toEqual({ name: 'safety_identifiers', status: 'failed' });

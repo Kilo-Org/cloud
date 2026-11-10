@@ -2478,6 +2478,7 @@
       "toolPatch": "прилагане на корекция",
       "toolTask": "задача",
       "toolSendFile": "Изпратен файл",
+      "toolSendFileAction": "Изпращане на файл",
       "readTodos": "Прочети плана",
       "updateTodos": "Актуализирай плана",
       "linesBadge": "{{displayCount}} реда",

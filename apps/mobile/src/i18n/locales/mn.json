@@ -2478,6 +2478,7 @@
       "toolPatch": "засвар оруулах",
       "toolTask": "даалгавар",
       "toolSendFile": "Файл илгээсэн",
+      "toolSendFileAction": "Файл илгээх",
       "readTodos": "Төлөвлөгөө унших",
       "updateTodos": "Төлөвлөгөө шинэчлэх",
       "linesBadge": "{{displayCount}} мөр",

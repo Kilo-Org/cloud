@@ -2564,6 +2564,7 @@
       "toolPatch": "úprava",
       "toolTask": "úkol",
       "toolSendFile": "Odeslaný soubor",
+      "toolSendFileAction": "odesílání souboru",
       "readTodos": "Přečíst plán",
       "updateTodos": "Aktualizovat plán",
       "linesBadge": "řádky: {{displayCount}}",

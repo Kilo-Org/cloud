@@ -2478,6 +2478,7 @@
       "toolPatch": "կիրառել փոփոխությունները",
       "toolTask": "առաջադրանք",
       "toolSendFile": "Ֆայլն ուղարկվեց",
+      "toolSendFileAction": "ֆայլ ուղարկել",
       "readTodos": "Կարդալ պլանը",
       "updateTodos": "Թարմացնել պլանը",
       "linesBadge": "{{displayCount}} տող",

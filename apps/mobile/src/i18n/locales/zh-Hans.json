@@ -1940,6 +1940,7 @@
       "toolPatch": "应用补丁",
       "toolTask": "任务",
       "toolSendFile": "已发送文件",
+      "toolSendFileAction": "发送文件",
       "readTodos": "读取计划",
       "updateTodos": "更新计划",
       "linesBadge": "{{displayCount}} 行",

@@ -2484,6 +2484,7 @@
       "toolPatch": "සංශෝධනය යොදන්න",
       "toolTask": "කාර්යය",
       "toolSendFile": "ගොනුව යවන ලදි",
+      "toolSendFileAction": "ගොනුව යවන්න",
       "readTodos": "සැලැස්ම කියවන්න",
       "updateTodos": "සැලැස්ම යාවත්කාලීන කරන්න",
       "linesBadge": "පේළි {{displayCount}}",

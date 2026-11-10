@@ -2478,6 +2478,7 @@
       "toolPatch": "zbato ndryshimet",
       "toolTask": "detyrë",
       "toolSendFile": "Dërgoi skedarin",
+      "toolSendFileAction": "Dërgo skedarin",
       "readTodos": "Lexo planin",
       "updateTodos": "Përditëso planin",
       "linesBadge": "{{displayCount}} rreshta",

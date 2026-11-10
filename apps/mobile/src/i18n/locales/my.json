@@ -2478,6 +2478,7 @@
       "toolPatch": "ပြင်ဆင်ခြင်း",
       "toolTask": "အလုပ်",
       "toolSendFile": "ဖိုင် ပို့ပြီးပါပြီ",
+      "toolSendFileAction": "ဖိုင် ပို့ခြင်း",
       "readTodos": "အစီအစဉ်ကို ဖတ်ပါ",
       "updateTodos": "အစီအစဉ်ကို ပြင်ဆင်ပါ",
       "linesBadge": "{{displayCount}} ကြောင်း",

@@ -2484,6 +2484,7 @@
       "toolPatch": "ahitsio",
       "toolTask": "asa",
       "toolSendFile": "Rakitra nalefa",
+      "toolSendFileAction": "Alefa ny rakitra",
       "readTodos": "Vakio ny drafitra",
       "updateTodos": "Havaozy ny drafitra",
       "linesBadge": "Andalana {{displayCount}}",

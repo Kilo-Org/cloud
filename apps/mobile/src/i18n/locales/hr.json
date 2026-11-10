@@ -2521,6 +2521,7 @@
       "toolPatch": "primijeni izmjene",
       "toolTask": "zadatak",
       "toolSendFile": "Poslana datoteka",
+      "toolSendFileAction": "pošalji datoteku",
       "readTodos": "Pročitaj plan",
       "updateTodos": "Ažuriraj plan",
       "linesBadge": "redaka: {{displayCount}}",

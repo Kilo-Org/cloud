@@ -1940,6 +1940,7 @@
       "toolPatch": "wijzigingen toepassen",
       "toolTask": "taak",
       "toolSendFile": "Bestand verzonden",
+      "toolSendFileAction": "Bestand verzenden",
       "readTodos": "Planning lezen",
       "updateTodos": "Planning bijwerken",
       "linesBadge": "{{displayCount}} regels",

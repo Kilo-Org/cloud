@@ -2478,6 +2478,7 @@
       "toolPatch": "rakenda paik",
       "toolTask": "ülesanne",
       "toolSendFile": "Fail saadetud",
+      "toolSendFileAction": "saada fail",
       "readTodos": "Loe plaani",
       "updateTodos": "Uuenda plaani",
       "linesBadge": "{{displayCount}} rida",

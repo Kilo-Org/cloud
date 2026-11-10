@@ -2521,6 +2521,7 @@
       "toolPatch": "aplicare de modificări",
       "toolTask": "sarcină",
       "toolSendFile": "fișier trimis",
+      "toolSendFileAction": "trimitere fișier",
       "readTodos": "Citește planul",
       "updateTodos": "Actualizează planul",
       "linesBadge": "{{displayCount}} linii",

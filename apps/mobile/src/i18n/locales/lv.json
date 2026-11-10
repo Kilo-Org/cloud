@@ -2521,6 +2521,7 @@
       "toolPatch": "labot",
       "toolTask": "uzdevums",
       "toolSendFile": "Nosūtīts fails",
+      "toolSendFileAction": "Nosūtīt failu",
       "readTodos": "Lasīt plānu",
       "updateTodos": "Atjaunināt plānu",
       "linesBadge": "{{displayCount}} rindas",

@@ -1984,6 +1984,7 @@
       "toolPatch": "применение изменений",
       "toolTask": "задача",
       "toolSendFile": "Файл отправлен",
+      "toolSendFileAction": "Отправка файла",
       "readTodos": "Чтение плана",
       "updateTodos": "Обновление плана",
       "linesBadge": "{{displayCount}} стр.",

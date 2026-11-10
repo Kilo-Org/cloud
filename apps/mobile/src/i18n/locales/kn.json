@@ -2484,6 +2484,7 @@
       "toolPatch": "ತಿದ್ದುಪಡಿ ಮಾಡಿ",
       "toolTask": "ಕಾರ್ಯ",
       "toolSendFile": "ಫೈಲ್ ಕಳುಹಿಸಲಾಗಿದೆ",
+      "toolSendFileAction": "{\"value\": \"ಫೈಲ್ ಕಳುಹಿಸಿ\"}",
       "readTodos": "ಯೋಜನೆಯನ್ನು ಓದಿ",
       "updateTodos": "ಯೋಜನೆಯನ್ನು ನವೀಕರಿಸಿ",
       "linesBadge": "{{displayCount}} ಸಾಲುಗಳು",

@@ -2478,6 +2478,7 @@
       "toolPatch": "tuzatish kiritish",
       "toolTask": "vazifa",
       "toolSendFile": "Fayl yuborildi",
+      "toolSendFileAction": "Fayl yuborish",
       "readTodos": "Rejani o‘qish",
       "updateTodos": "Rejani yangilash",
       "linesBadge": "{{displayCount}} qator",

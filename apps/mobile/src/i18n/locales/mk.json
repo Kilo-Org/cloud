@@ -2478,6 +2478,7 @@
       "toolPatch": "примена на закрпа",
       "toolTask": "задача",
       "toolSendFile": "испратена датотека",
+      "toolSendFileAction": "испраќање датотека",
       "readTodos": "Прочитај го планот",
       "updateTodos": "Ажурирај го планот",
       "linesBadge": "{{displayCount}} редови",

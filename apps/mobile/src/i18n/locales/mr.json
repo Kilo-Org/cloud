@@ -2478,6 +2478,7 @@
       "toolPatch": "पॅच लागू करणे",
       "toolTask": "काम",
       "toolSendFile": "फाइल पाठवली",
+      "toolSendFileAction": "फाइल पाठवणे",
       "readTodos": "योजना वाचा",
       "updateTodos": "योजना अद्ययावत करा",
       "linesBadge": "{{displayCount}} ओळी",

@@ -2478,6 +2478,7 @@
       "toolPatch": "മാറ്റങ്ങൾ പ്രയോഗിക്കുക",
       "toolTask": "ചുമതല",
       "toolSendFile": "ഫയൽ അയച്ചു",
+      "toolSendFileAction": "ഫയൽ അയയ്ക്കുക",
       "readTodos": "പ്ലാൻ വായിക്കുക",
       "updateTodos": "പ്ലാൻ പുതുക്കുക",
       "linesBadge": "{{displayCount}} വരികൾ",

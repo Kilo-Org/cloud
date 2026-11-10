@@ -1929,6 +1929,7 @@
       "toolPatch": "applica patch",
       "toolTask": "attività",
       "toolSendFile": "File inviato",
+      "toolSendFileAction": "invia file",
       "readTodos": "Leggi il piano",
       "updateTodos": "Aggiorna il piano",
       "linesBadge": "{{displayCount}} righe",

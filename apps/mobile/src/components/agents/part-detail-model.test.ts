@@ -142,6 +142,21 @@ describe('getPartDetailTitle', () => {
     );
   });
 
+  it('keeps the file name in the header while a send is unfinished', () => {
+    // The body renders no chip until the delivery completes, so the header is
+    // the only place that names the file.
+    getToolDisplay.mockReturnValue({
+      title: 'Send file',
+      subtitle: 'random.txt',
+      translatable: true,
+    });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'send_file' }))).toEqual({
+      prefix: 'Send file',
+      text: 'random.txt',
+      translatable: true,
+    });
+  });
+
   it('never marks reasoning or other part types translatable', () => {
     expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toEqual(
       untranslated('Thinking')

@@ -2478,6 +2478,7 @@
       "toolPatch": "korjaus",
       "toolTask": "tehtävä",
       "toolSendFile": "Lähetetty tiedosto",
+      "toolSendFileAction": "Lähetä tiedosto",
       "readTodos": "Lue suunnitelma",
       "updateTodos": "Päivitä suunnitelma",
       "linesBadge": "{{displayCount}} riviä",

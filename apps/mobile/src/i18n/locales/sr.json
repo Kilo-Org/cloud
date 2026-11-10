@@ -2521,6 +2521,7 @@
       "toolPatch": "primena zakrpe",
       "toolTask": "zadatak",
       "toolSendFile": "Poslata datoteka",
+      "toolSendFileAction": "Slanje datoteke",
       "readTodos": "Prikaži plan",
       "updateTodos": "Ažuriraj plan",
       "linesBadge": "redova: {{displayCount}}",

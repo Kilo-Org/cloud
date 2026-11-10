@@ -2545,6 +2545,7 @@
       "toolPatch": "patch",
       "toolTask": "task",
       "toolSendFile": "Sent file",
+      "toolSendFileAction": "Send file",
       "readTodos": "Read plan",
       "updateTodos": "Update plan",
       "linesBadge_one": "{{displayCount}} line",

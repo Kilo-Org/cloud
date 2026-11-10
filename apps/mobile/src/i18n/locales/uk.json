@@ -1984,6 +1984,7 @@
       "toolPatch": "застосувати зміни",
       "toolTask": "завдання",
       "toolSendFile": "Файл надіслано",
+      "toolSendFileAction": "надіслати файл",
       "readTodos": "Прочитати план",
       "updateTodos": "Оновити план",
       "linesBadge": "рядків: {{displayCount}}",

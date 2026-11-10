@@ -2478,6 +2478,7 @@
       "toolPatch": "lagfæra",
       "toolTask": "verkefni",
       "toolSendFile": "Skjal sent",
+      "toolSendFileAction": "senda skjal",
       "readTodos": "Lesa áætlun",
       "updateTodos": "Uppfæra áætlun",
       "linesBadge": "{{displayCount}} línur",

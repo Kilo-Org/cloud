@@ -2564,6 +2564,7 @@
       "toolPatch": "выпраўленне",
       "toolTask": "задача",
       "toolSendFile": "Дасланы файл",
+      "toolSendFileAction": "Дасыланне файла",
       "readTodos": "Прачытаць план",
       "updateTodos": "Абнавіць план",
       "linesBadge": "радкоў: {{displayCount}}",

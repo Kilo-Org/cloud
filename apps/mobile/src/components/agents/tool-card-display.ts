@@ -201,9 +201,20 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       const pathName = path ? getFilename(cloudAgentFileLabel(path)) : '';
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty attachment name must fall through to the input path; ?? would keep the blank
       const name = attachmentName || pathName;
+      const subtitle = name === '' ? undefined : name;
+      // Only a finished call reports the outcome. A call that is still running,
+      // or that failed, carries the tool's own action label, like the read,
+      // edit and write rows, so it never claims a delivery that did not happen.
+      if (status !== 'completed') {
+        return {
+          title: i18n.t('agentChat.toolCard.toolSendFileAction'),
+          subtitle,
+          translatable: name !== '',
+        };
+      }
       return {
         title: i18n.t('agentChat.toolCard.toolSendFile'),
-        subtitle: name === '' ? undefined : name,
+        subtitle,
         translatable: name !== '',
         // The sheet body's file chip already names the file, so the header
         // shows this label alone rather than repeating the name below it.

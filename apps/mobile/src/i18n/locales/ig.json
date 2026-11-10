@@ -2478,6 +2478,7 @@
       "toolPatch": "tinye mgbanwe",
       "toolTask": "ọrụ",
       "toolSendFile": "Ezigara faịlụ",
+      "toolSendFileAction": "Zipu faịlụ",
       "readTodos": "Gụọ atụmatụ",
       "updateTodos": "Melite atụmatụ",
       "linesBadge": "ahịrị {{displayCount}}",

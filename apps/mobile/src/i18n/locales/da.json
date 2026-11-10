@@ -2478,6 +2478,7 @@
       "toolPatch": "anvend rettelse",
       "toolTask": "opgave",
       "toolSendFile": "Sendt fil",
+      "toolSendFileAction": "Send fil",
       "readTodos": "Læs planen",
       "updateTodos": "Opdatér planen",
       "linesBadge": "{{displayCount}} linjer",

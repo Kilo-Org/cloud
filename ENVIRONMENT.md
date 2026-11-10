@@ -56,6 +56,25 @@ Keep credentials out of tracked defaults. For local monitor development, generat
 a separate value with `openssl rand -base64 32` and set it in the local environment;
 ordinary local startup does not require this credential.
 
+### Model health monitor
+
+`MODELS_HEALTH_SECRET` is a dedicated server-only credential for `GET /api/models/up`. `[SECRET]`
+The caller must send `Authorization: Bearer <configured value>`; an unset or empty value
+answers `401` with `{ "healthy": false }`, and the endpoint accepts no other credential,
+including request parameters. Every response carries `Cache-Control: no-store`.
+
+For initial deployment or rotation, the owner runs
+`pnpm web:env set MODELS_HEALTH_SECRET`, supplies a newly generated secret, and coordinates
+the application deployment with the external monitor's header update. Order the cutover so no
+poll lands on an unroutable credential: set the secret first, then add the `Authorization:
+Bearer` header to the external monitor, then deploy the application. Verify the monitor after
+the deployment and header update. Only one configured secret is accepted; deployment and
+monitor configuration must agree.
+
+Keep the credential out of tracked defaults. For local monitor development, generate a
+separate value with `openssl rand -base64 32` and set it in the local environment; ordinary
+local startup does not require this credential.
+
 ### Uptime probe
 
 `UPTIME_PROBE_SECRET` is a dedicated server-only credential for `GET /api/up`. `[SECRET]`

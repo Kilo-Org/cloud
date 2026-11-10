@@ -487,6 +487,12 @@ export function AgentSessionListContent({
           extraData={attentionFocusRevision}
           ListFooterComponent={listFooter}
           contentContainerStyle={contentInsetStyle}
+          // The search field above this list holds the keyboard while results
+          // are filtered. With the platform default the list claims that touch
+          // and only closes the keyboard, so a result needed two taps; with
+          // this value the row's own press runs and the list still follows a
+          // drag (see `keyboardDismissMode`).
+          keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}

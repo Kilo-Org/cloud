@@ -113,7 +113,10 @@ import {
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
 import { createMessageId } from './message-id.js';
-import { canonicalRequestedEnvironment } from './requested-environment-intent.js';
+import {
+  canonicalRequestedEnvironment,
+  isExplicitNoEnvironment,
+} from './requested-environment-intent.js';
 import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import { classifyStoredInitialTurn, initialTurnTerminalFailure } from './initial-turn-outcome.js';
@@ -1481,7 +1484,11 @@ function buildSessionRegistrationCommand(
     ...(input.environment
       ? {
           environment: input.environment,
-          requestedEnvironmentRepositories: input.requestedEnvironment?.repositories ?? [],
+          requestedEnvironmentRepositories:
+            input.requestedEnvironment !== undefined &&
+            !isExplicitNoEnvironment(input.requestedEnvironment)
+              ? (input.requestedEnvironment.repositories ?? [])
+              : [],
         }
       : {}),
     finalization: input.finalization,

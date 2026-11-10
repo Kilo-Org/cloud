@@ -5,6 +5,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type * as Environments from './useCloudAgentEnvironments';
 import type { useSessionEnvironment as UseSessionEnvironment } from './useSessionEnvironment';
+import type { RepositoryEnvironmentDefaultSetting } from '@kilocode/cloud-agent-profile';
 
 const requireFromHere = createRequire(__filename);
 const { parseHTML } = requireFromHere('linkedom') as {
@@ -16,6 +17,7 @@ Object.assign(dom.window, {
   localStorage: {
     getItem: (key: string) => storage.get(key) ?? null,
     setItem: (key: string, value: string) => storage.set(key, value),
+    removeItem: (key: string) => storage.delete(key),
   },
 });
 Object.assign(globalThis, {
@@ -29,7 +31,26 @@ Object.assign(globalThis, {
 
 let mockMatches: Environments.EnvironmentSummary[] | undefined;
 let mockLoading = false;
-jest.mock('@/lib/trpc/utils', () => ({}));
+let mockDefault: RepositoryEnvironmentDefaultSetting = { mode: 'automatic' };
+let mockSettingsLoading = false;
+let mockSettingsError = false;
+jest.mock('@/lib/trpc/utils', () => ({
+  useTRPC: () => ({
+    cloudAgentSettings: {
+      getRepositoryEnvironmentDefault: { queryOptions: (input: unknown) => input },
+    },
+  }),
+}));
+jest.mock('@tanstack/react-query', () => ({
+  useQuery: (input: { platform: string; repoFullName: string }) => ({
+    data:
+      input.platform === 'github' && input.repoFullName.toLowerCase() === 'kilo-org/kilocode'
+        ? mockDefault
+        : { mode: 'automatic' },
+    isLoading: mockSettingsLoading,
+    isError: mockSettingsError,
+  }),
+}));
 jest.mock('./useCloudAgentEnvironments', () => ({
   ...jest.requireActual<typeof Environments>('./useCloudAgentEnvironments'),
   useRepositoryEnvironments: () => ({ matches: mockMatches, isLoading: mockLoading }),
@@ -87,6 +108,9 @@ describe('useSessionEnvironment', () => {
     storage.clear();
     mockMatches = environments;
     mockLoading = false;
+    mockDefault = { mode: 'automatic' };
+    mockSettingsLoading = false;
+    mockSettingsError = false;
     current = undefined;
     mount();
   });
@@ -113,6 +137,57 @@ describe('useSessionEnvironment', () => {
     act(() => session().chooseEnvironment('first'));
     remount();
     expect(session().environment?.id).toBe('first');
+  });
+
+  it('remembers No environment and can return to automatic selection', () => {
+    render();
+    act(() => session().chooseEnvironment('none'));
+    remount();
+    expect(session().environment).toBeNull();
+    expect(session().requestedEnvironment).toEqual({ mode: 'none' });
+    render({ repository, organizationId: 'org-1' });
+    expect(session().selection.status).toBe('choose');
+    render();
+    expect(session().requestedEnvironment).toEqual({ mode: 'none' });
+    act(() => session().chooseEnvironment(null));
+    remount();
+    expect(session().selection.status).toBe('choose');
+    expect(session().requestedEnvironment).toBeUndefined();
+    expect(storage.size).toBe(0);
+  });
+
+  it('uses a saved No environment default and permits an explicit override', () => {
+    mockDefault = { mode: 'none' };
+    render();
+    expect(session().environment).toBeNull();
+    expect(session().requestedEnvironment).toBeUndefined();
+    act(() => session().chooseEnvironment('first'));
+    expect(session().environment?.id).toBe('first');
+    expect(session().requestedEnvironment).toEqual({ id: 'first' });
+    act(() => session().chooseEnvironment(null));
+    expect(session().environment).toBeNull();
+  });
+
+  it('uses a saved named default without requiring a choice', () => {
+    mockDefault = { mode: 'environment', environmentId: 'second' };
+    render();
+    expect(session().environment?.id).toBe('second');
+    expect(session().requestedEnvironment).toBeUndefined();
+    act(() => session().chooseEnvironment('none'));
+    expect(session().requestedEnvironment).toEqual({ mode: 'none' });
+  });
+
+  it('waits for repository defaults but keeps an explicit opt-out usable', () => {
+    mockSettingsLoading = true;
+    render();
+    expect(session().selection.status).toBe('loading');
+    act(() => session().chooseEnvironment('none'));
+    expect(session().requestedEnvironment).toEqual({ mode: 'none' });
+    mockSettingsLoading = false;
+    mockSettingsError = true;
+    act(() => session().chooseEnvironment(null));
+    expect(session().selection.status).toBe('unknown');
+    expect(session().requestedEnvironment).toBeUndefined();
   });
 
   it('remembers each repository independently when switching back and forth', () => {
@@ -173,6 +248,19 @@ describe('useSessionEnvironment', () => {
     expect(session().selection.status).toBe('choose');
   });
 
+  it('does not apply a cached GitHub default to the same path on Bitbucket', () => {
+    mockDefault = { mode: 'none' };
+    render({
+      repository: {
+        platform: 'bitbucket',
+        fullName: repository.fullName,
+        workspaceUuid: '{ABC}',
+        repositoryUuid: '{DEF}',
+      },
+    });
+    expect(session().selection.status).toBe('choose');
+  });
+
   it('requires another choice when the remembered environment no longer matches', () => {
     render();
     act(() => session().chooseEnvironment('second'));
@@ -181,6 +269,7 @@ describe('useSessionEnvironment', () => {
     );
     remount();
     expect(session().selection.status).toBe('choose');
+    expect(session().choice).toBeNull();
     expect(session().requestedEnvironment).toBeUndefined();
     expect(session().environment).toBeUndefined();
   });

@@ -676,6 +676,33 @@ describe('CloudAgentNextClient saved worktree files', () => {
 });
 
 describe('CloudAgentNextClient prepare fields', () => {
+  it.each([
+    { id: '123e4567-e89b-12d3-a456-426614174099' },
+    {
+      id: '123e4567-e89b-12d3-a456-426614174099',
+      repositories: [{ repoFullName: 'acme/api', branch: 'feature/api' }],
+    },
+    { mode: 'none' as const },
+  ])('forwards the requested environment selection unchanged: %j', async environment => {
+    const input: PrepareSessionInput = {
+      githubRepo: 'acme/repo',
+      prompt: 'Launch a task',
+      mode: 'code',
+      model: 'kilo/test-model',
+      autoInitiate: true,
+      requestedEnvironment: environment,
+    };
+    const mutate = jest
+      .fn<CloudAgentClientModule.CloudAgentNextClient['prepareSession']>()
+      .mockResolvedValue({
+        kiloSessionId: 'ses_12345678901234567890123456',
+        cloudAgentSessionId: 'workspace_child',
+      });
+    mockCreateTRPCClient.mockReturnValueOnce({ prepareSession: { mutate } });
+    await new CloudAgentNextClient('scoped-control-token').prepareSession(input);
+    expect(mutate).toHaveBeenCalledWith(input);
+  });
+
   it('forwards prepare input unchanged', async () => {
     const input: PrepareSessionInput = {
       githubRepo: 'acme/repo',

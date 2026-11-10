@@ -711,6 +711,42 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
   });
 });
 
+describe('prepare session requestedEnvironment selection', () => {
+  const baseInput = {
+    githubRepo: 'acme/repo',
+    prompt: 'Run without an environment',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+
+  it('accepts an explicit no-environment selection', () => {
+    const result = basePrepareSessionNextSchema.safeParse({
+      ...baseInput,
+      requestedEnvironment: { mode: 'none' },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.requestedEnvironment).toEqual({ mode: 'none' });
+    }
+  });
+
+  it.each([
+    {
+      name: 'additional repositories',
+      value: { mode: 'none', repositories: [{ repoFullName: 'acme/api' }] },
+    },
+    {
+      name: 'an environment id',
+      value: { mode: 'none', id: '123e4567-e89b-12d3-a456-426614174099' },
+    },
+  ])('rejects an explicit no-environment selection with $name', ({ value }) => {
+    expect(
+      basePrepareSessionNextSchema.safeParse({ ...baseInput, requestedEnvironment: value }).success
+    ).toBe(false);
+  });
+});
+
 describe('send-time attachment filenames', () => {
   const prepareInput = {
     githubRepo: 'acme/repo',

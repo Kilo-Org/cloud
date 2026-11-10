@@ -6,6 +6,8 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_environment_profile_repo_bindings,
   agent_environment_profiles,
+  cloud_agent_environments,
+  cloud_agent_repository_environment_defaults,
   cloud_agent_sandbox_allocation_settings,
   cloud_agent_user_settings,
   type Organization,
@@ -68,6 +70,20 @@ async function insertProfile(owner: ProfileOwner, name: string): Promise<string>
   return row.id;
 }
 
+async function insertEnvironment(owner: ProfileOwner, repoFullName = 'acme/web'): Promise<string> {
+  const [row] = await db
+    .insert(cloud_agent_environments)
+    .values({
+      ...(owner.type === 'user'
+        ? { owned_by_user_id: owner.id }
+        : { owned_by_organization_id: owner.id }),
+      name: 'Automation',
+      repositories: [{ platform: 'github', repoFullName }],
+    })
+    .returning({ id: cloud_agent_environments.id });
+  return row.id;
+}
+
 describe('cloud-agent-settings router', () => {
   let createCallerForUser: typeof TestUtils.createCallerForUser;
   let ownerUser: User;
@@ -89,6 +105,22 @@ describe('cloud-agent-settings router', () => {
     await db
       .delete(cloud_agent_user_settings)
       .where(inArray(cloud_agent_user_settings.kilo_user_id, userIds));
+    await db
+      .delete(cloud_agent_repository_environment_defaults)
+      .where(
+        or(
+          inArray(cloud_agent_repository_environment_defaults.owned_by_user_id, userIds),
+          eq(cloud_agent_repository_environment_defaults.owned_by_organization_id, organization.id)
+        )
+      );
+    await db
+      .delete(cloud_agent_environments)
+      .where(
+        or(
+          inArray(cloud_agent_environments.owned_by_user_id, userIds),
+          eq(cloud_agent_environments.owned_by_organization_id, organization.id)
+        )
+      );
     await db
       .delete(cloud_agent_sandbox_allocation_settings)
       .where(
@@ -140,6 +172,8 @@ describe('cloud-agent-settings router', () => {
           repositoryPlatform: 'github',
           profileId,
           profileName: 'Personal',
+          environment: { mode: 'automatic' },
+          environmentId: null,
           allocation: 'vercel-small',
         },
       ]);
@@ -221,6 +255,361 @@ describe('cloud-agent-settings router', () => {
         code: 'BAD_REQUEST',
         message: 'Vercel sandboxes support GitHub repositories only',
       });
+    });
+  });
+
+  describe('default environments', () => {
+    test('reads one repository default without loading sandbox capabilities', async () => {
+      mockGetSandboxSelectionOptions.mockClear();
+      const caller = await createCallerForUser(ownerUser.id);
+      const repository = { repoFullName: 'Acme/Web', platform: 'github' } as const;
+      expect(await caller.cloudAgentSettings.getRepositoryEnvironmentDefault(repository)).toEqual({
+        mode: 'automatic',
+      });
+      await caller.cloudAgentSettings.setRepositorySettings({
+        ...repository,
+        environment: { mode: 'none' },
+      });
+      expect(await caller.cloudAgentSettings.getRepositoryEnvironmentDefault(repository)).toEqual({
+        mode: 'none',
+      });
+      const otherCaller = await createCallerForUser(otherUser.id);
+      expect(
+        await otherCaller.cloudAgentSettings.getRepositoryEnvironmentDefault(repository)
+      ).toEqual({
+        mode: 'automatic',
+      });
+      expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+    });
+
+    test('preserves existing environmentId API selections and rejects conflicting intents', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const environmentId = await insertEnvironment({ type: 'user', id: ownerUser.id });
+      const repository = { repoFullName: 'acme/web', platform: 'github' } as const;
+      await caller.cloudAgentSettings.setRepositorySettings({ ...repository, environmentId });
+      expect((await caller.cloudAgentSettings.get({})).repositories[0]).toMatchObject({
+        environment: { mode: 'environment', environmentId },
+        environmentId,
+      });
+      await expect(
+        caller.cloudAgentSettings.setRepositorySettings({
+          ...repository,
+          environmentId,
+          environment: { mode: 'none' },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await caller.cloudAgentSettings.setRepositorySettings({ ...repository, environmentId: null });
+      expect(await caller.cloudAgentSettings.getRepositoryEnvironmentDefault(repository)).toEqual({
+        mode: 'automatic',
+      });
+    });
+
+    test('preserves No environment when an older client edits another repository setting', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const repository = { repoFullName: 'acme/web', platform: 'github' } as const;
+      const profileId = await insertProfile({ type: 'user', id: ownerUser.id }, 'Personal');
+      await caller.cloudAgentSettings.setRepositorySettings({
+        ...repository,
+        environment: { mode: 'none' },
+      });
+      await caller.cloudAgentSettings.setRepositorySettings({
+        ...repository,
+        environmentId: null,
+        profileId,
+      });
+      expect((await caller.cloudAgentSettings.get({})).repositories[0]).toMatchObject({
+        environment: { mode: 'none' },
+        profileId,
+      });
+      await caller.cloudAgentSettings.setRepositorySettings({
+        ...repository,
+        environment: { mode: 'automatic' },
+        profileId,
+      });
+      expect(await caller.cloudAgentSettings.getRepositoryEnvironmentDefault(repository)).toEqual({
+        mode: 'automatic',
+      });
+    });
+
+    test('lists an environment-only override and keeps it out of another user scope', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const environmentId = await insertEnvironment({ type: 'user', id: ownerUser.id });
+
+      await caller.cloudAgentSettings.setRepositorySettings({
+        repoFullName: 'Acme/Web',
+        platform: 'github',
+        environment: { mode: 'environment', environmentId },
+      });
+
+      expect((await caller.cloudAgentSettings.get({})).repositories).toEqual([
+        {
+          repositoryFullName: 'acme/web',
+          repositoryPlatform: 'github',
+          profileId: null,
+          profileName: null,
+          environment: { mode: 'environment', environmentId },
+          environmentId,
+          allocation: null,
+        },
+      ]);
+      const otherCaller = await createCallerForUser(otherUser.id);
+      expect((await otherCaller.cloudAgentSettings.get({})).repositories).toEqual([]);
+    });
+
+    test('saves and clears the environment independently of profile and sandbox', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const environmentId = await insertEnvironment({ type: 'user', id: ownerUser.id });
+      const profileId = await insertProfile({ type: 'user', id: ownerUser.id }, 'Personal');
+      const repository = { repoFullName: 'acme/web', platform: 'github' } as const;
+
+      await caller.cloudAgentSettings.setRepositorySettings({
+        ...repository,
+        environment: { mode: 'environment', environmentId },
+        profileId,
+        allocation: 'cloudflare-containers-standard-3',
+      });
+      expect((await caller.cloudAgentSettings.get({})).repositories[0]).toMatchObject({
+        environment: { mode: 'environment', environmentId },
+        profileId,
+        allocation: 'cloudflare-containers-standard-3',
+      });
+
+      await caller.cloudAgentSettings.setRepositorySettings({
+        ...repository,
+        profileId,
+        allocation: null,
+      });
+      expect((await caller.cloudAgentSettings.get({})).repositories[0]).toMatchObject({
+        environment: { mode: 'environment', environmentId },
+        profileId,
+        allocation: null,
+      });
+
+      await caller.cloudAgentSettings.setRepositorySettings({
+        ...repository,
+        environment: { mode: 'automatic' },
+        profileId,
+        allocation: null,
+      });
+      expect((await caller.cloudAgentSettings.get({})).repositories[0]).toMatchObject({
+        environment: { mode: 'automatic' },
+        profileId,
+      });
+
+      await caller.cloudAgentSettings.setRepositorySettings({
+        ...repository,
+        environment: { mode: 'environment', environmentId },
+      });
+      await caller.cloudAgentSettings.removeRepositorySettings(repository);
+      expect((await caller.cloudAgentSettings.get({})).repositories).toEqual([]);
+    });
+
+    test('stores a none selection without an environment and keeps it owner-scoped', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const repository = { repoFullName: 'acme/web', platform: 'github' } as const;
+
+      await caller.cloudAgentSettings.setRepositorySettings({
+        ...repository,
+        environment: { mode: 'none' },
+      });
+      expect((await caller.cloudAgentSettings.get({})).repositories).toEqual([
+        {
+          repositoryFullName: 'acme/web',
+          repositoryPlatform: 'github',
+          profileId: null,
+          profileName: null,
+          environment: { mode: 'none' },
+          environmentId: null,
+          allocation: null,
+        },
+      ]);
+
+      const otherCaller = await createCallerForUser(otherUser.id);
+      expect((await otherCaller.cloudAgentSettings.get({})).repositories).toEqual([]);
+
+      await caller.cloudAgentSettings.setRepositorySettings({
+        ...repository,
+        environment: { mode: 'automatic' },
+      });
+      expect((await caller.cloudAgentSettings.get({})).repositories).toEqual([]);
+    });
+
+    test('rejects a default outside the owner scope or repository', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const foreignEnvironmentId = await insertEnvironment({ type: 'user', id: otherUser.id });
+      const unrelatedEnvironmentId = await insertEnvironment(
+        { type: 'user', id: ownerUser.id },
+        'acme/other'
+      );
+
+      await expect(
+        caller.cloudAgentSettings.setRepositorySettings({
+          repoFullName: 'acme/web',
+          platform: 'github',
+          environment: { mode: 'environment', environmentId: foreignEnvironmentId },
+        })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      await expect(
+        caller.cloudAgentSettings.setRepositorySettings({
+          repoFullName: 'acme/web',
+          platform: 'github',
+          environment: { mode: 'environment', environmentId: unrelatedEnvironmentId },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect((await caller.cloudAgentSettings.get({})).repositories).toEqual([]);
+    });
+
+    test('validates the GitLab instance as well as the repository path', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const [foreignInstance, matchingInstance] = await db
+        .insert(cloud_agent_environments)
+        .values([
+          {
+            owned_by_user_id: ownerUser.id,
+            name: 'Self-hosted GitLab',
+            repositories: [
+              {
+                platform: 'gitlab',
+                repoFullName: 'acme/web',
+                gitlabCloneUrl: 'https://git.corp/acme/web.git',
+              },
+            ],
+          },
+          {
+            owned_by_user_id: ownerUser.id,
+            name: 'GitLab.com',
+            repositories: [
+              {
+                platform: 'gitlab',
+                repoFullName: 'acme/web',
+                gitlabCloneUrl: 'https://gitlab.com/acme/web.git',
+              },
+            ],
+          },
+        ])
+        .returning({ id: cloud_agent_environments.id });
+
+      await expect(
+        caller.cloudAgentSettings.setRepositorySettings({
+          repoFullName: 'acme/web',
+          platform: 'gitlab',
+          environment: { mode: 'environment', environmentId: foreignInstance.id },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await caller.cloudAgentSettings.setRepositorySettings({
+        repoFullName: 'acme/web',
+        platform: 'gitlab',
+        environment: { mode: 'environment', environmentId: matchingInstance.id },
+      });
+      expect((await caller.cloudAgentSettings.get({})).repositories[0].environment).toEqual({
+        mode: 'environment',
+        environmentId: matchingInstance.id,
+      });
+    });
+
+    test('lists only GitLab defaults for the currently integrated instance', async () => {
+      const [gitlabComEnvironment] = await db
+        .insert(cloud_agent_environments)
+        .values([
+          {
+            owned_by_user_id: ownerUser.id,
+            name: 'GitLab.com',
+            repositories: [
+              {
+                platform: 'gitlab',
+                repoFullName: 'acme/web',
+                gitlabCloneUrl: 'https://gitlab.com/acme/web.git',
+              },
+            ],
+          },
+          {
+            owned_by_user_id: ownerUser.id,
+            name: 'Self-hosted',
+            repositories: [
+              {
+                platform: 'gitlab',
+                repoFullName: 'acme/web',
+                gitlabCloneUrl: 'https://git.corp:8443/gitlab/acme/web.git',
+              },
+            ],
+          },
+        ])
+        .returning({ id: cloud_agent_environments.id });
+      await db.insert(cloud_agent_repository_environment_defaults).values([
+        {
+          owned_by_user_id: ownerUser.id,
+          repository_full_name: 'acme/web',
+          repository_platform: 'gitlab',
+          repository_key: 'https://gitlab.com/acme/web.git',
+          environment_id: gitlabComEnvironment.id,
+        },
+        {
+          owned_by_user_id: ownerUser.id,
+          repository_full_name: 'acme/web',
+          repository_platform: 'gitlab',
+          repository_key: 'https://git.corp:8443/gitlab/acme/web.git',
+          environment_id: null,
+        },
+      ]);
+
+      const caller = await createCallerForUser(ownerUser.id);
+      expect((await caller.cloudAgentSettings.get({})).repositories).toEqual([
+        {
+          repositoryFullName: 'acme/web',
+          repositoryPlatform: 'gitlab',
+          profileId: null,
+          profileName: null,
+          environment: { mode: 'environment', environmentId: gitlabComEnvironment.id },
+          environmentId: gitlabComEnvironment.id,
+          allocation: null,
+        },
+      ]);
+    });
+
+    test('organization members can read defaults but only managers can change them', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const environmentId = await insertEnvironment({ type: 'organization', id: organization.id });
+      const input = {
+        organizationId: organization.id,
+        repoFullName: 'acme/web',
+        platform: 'github' as const,
+        environment: { mode: 'environment' as const, environmentId },
+      };
+
+      await caller.cloudAgentSettings.setRepositorySettings(input);
+      expect(
+        await memberCaller.cloudAgentSettings.getRepositoryEnvironmentDefault({
+          organizationId: organization.id,
+          repoFullName: 'ACME/WEB',
+          platform: 'github',
+        })
+      ).toEqual({ mode: 'environment', environmentId });
+      const outsideCaller = await createCallerForUser(otherUser.id);
+      await expect(
+        outsideCaller.cloudAgentSettings.getRepositoryEnvironmentDefault({
+          organizationId: organization.id,
+          repoFullName: 'acme/web',
+          platform: 'github',
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      expect(
+        (await memberCaller.cloudAgentSettings.get({ organizationId: organization.id }))
+          .repositories[0].environment
+      ).toEqual({ mode: 'environment', environmentId });
+      await expect(
+        memberCaller.cloudAgentSettings.setRepositorySettings({
+          ...input,
+          environment: { mode: 'automatic' },
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(
+        memberCaller.cloudAgentSettings.setRepositorySettings({
+          ...input,
+          environment: { mode: 'none' },
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      expect((await caller.cloudAgentSettings.get({})).repositories).toEqual([]);
     });
   });
 
@@ -599,10 +988,15 @@ describe('cloud-agent-settings router', () => {
       const owner: ProfileOwner = { type: 'user', id: ownerUser.id };
       const profileId = await insertProfile(owner, 'Combined');
 
-      await setRepositorySettings(db, owner, 'acme/web', 'github', {
-        profileId,
-        allocation: 'cloudflare-shared',
-      });
+      await setRepositorySettings(
+        db,
+        owner,
+        { platform: 'github', repoFullName: 'acme/web' },
+        {
+          profileId,
+          allocation: 'cloudflare-shared',
+        }
+      );
       const binding = await db
         .select()
         .from(agent_environment_profile_repo_bindings)
@@ -610,10 +1004,15 @@ describe('cloud-agent-settings router', () => {
       expect(binding).toHaveLength(1);
       expect((await getSandboxAllocationSettings(db, owner)).repositories).toHaveLength(1);
 
-      await setRepositorySettings(db, owner, 'acme/web', 'github', {
-        profileId: null,
-        allocation: null,
-      });
+      await setRepositorySettings(
+        db,
+        owner,
+        { platform: 'github', repoFullName: 'acme/web' },
+        {
+          profileId: null,
+          allocation: null,
+        }
+      );
       expect(
         await db
           .select()
@@ -622,10 +1021,15 @@ describe('cloud-agent-settings router', () => {
       ).toHaveLength(0);
       expect((await getSandboxAllocationSettings(db, owner)).repositories).toHaveLength(0);
 
-      await setRepositorySettings(db, owner, 'acme/web', 'github', {
-        profileId,
-        allocation: null,
-      });
+      await setRepositorySettings(
+        db,
+        owner,
+        { platform: 'github', repoFullName: 'acme/web' },
+        {
+          profileId,
+          allocation: null,
+        }
+      );
       expect((await getSandboxAllocationSettings(db, owner)).repositories).toHaveLength(0);
       expect(
         await db
@@ -633,7 +1037,7 @@ describe('cloud-agent-settings router', () => {
           .from(agent_environment_profile_repo_bindings)
           .where(eq(agent_environment_profile_repo_bindings.owned_by_user_id, ownerUser.id))
       ).toHaveLength(1);
-      await removeRepositorySettings(db, owner, 'acme/web', 'github');
+      await removeRepositorySettings(db, owner, { platform: 'github', repoFullName: 'acme/web' });
       expect(
         await db
           .select()

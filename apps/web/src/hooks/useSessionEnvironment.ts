@@ -1,13 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   useRepositoryEnvironments,
   type EnvironmentRepository,
 } from '@/hooks/useCloudAgentEnvironments';
-import { repositoryKey } from '@/components/cloud-agent-next/environment-repositories';
+import {
+  repositoryKey,
+  repositoryName,
+} from '@/components/cloud-agent-next/environment-repositories';
+import { useTRPC } from '@/lib/trpc/utils';
 import {
   buildRequestedEnvironment,
+  NO_ENVIRONMENT,
   selectEnvironment,
   selectedEnvironment,
 } from '@/components/cloud-agent-next/environment-selection';
@@ -15,11 +21,6 @@ import { safeLocalStorage } from '@/lib/localStorage';
 
 type Choice = { key: string; id: string | null };
 
-/**
- * The environment of a new session in the selected repository: the matches, the
- * user's choice among several.
- * Remember the last choice for each repository and personal/organization scope.
- */
 export function useSessionEnvironment({
   organizationId,
   repository,
@@ -28,6 +29,18 @@ export function useSessionEnvironment({
   repository: EnvironmentRepository | undefined;
 }) {
   const { matches, isLoading } = useRepositoryEnvironments({ organizationId, repository });
+  const trpc = useTRPC();
+  const supportsRepositoryDefault = !!repository && repository.platform !== 'bitbucket';
+  const defaultEnvironment = useQuery(
+    trpc.cloudAgentSettings.getRepositoryEnvironmentDefault.queryOptions(
+      {
+        organizationId,
+        repoFullName: repository ? repositoryName(repository) : '',
+        platform: repository?.platform === 'gitlab' ? 'gitlab' : 'github',
+      },
+      { enabled: supportsRepositoryDefault, staleTime: 30_000 }
+    )
+  );
   const key = repository
     ? `cloud-agent:environment:${organizationId ?? 'personal'}:${repositoryKey(repository)}`
     : '';
@@ -37,12 +50,27 @@ export function useSessionEnvironment({
     setStored({ key, id: key ? safeLocalStorage.getItem(key) : null });
   }, [key]);
 
-  const selection = selectEnvironment(matches, stored.key === key ? stored.id : null, isLoading);
+  const storedChoice = stored.key === key ? stored.id : null;
+  const choice =
+    storedChoice === NO_ENVIRONMENT || matches?.some(environment => environment.id === storedChoice)
+      ? storedChoice
+      : null;
+  const selection = selectEnvironment(
+    supportsRepositoryDefault && defaultEnvironment.isError && choice === null
+      ? undefined
+      : matches,
+    choice,
+    isLoading || (supportsRepositoryDefault && defaultEnvironment.isLoading),
+    supportsRepositoryDefault ? defaultEnvironment.data : undefined
+  );
 
   const chooseEnvironment = useCallback(
-    (id: string) => {
+    (id: string | null) => {
       setStored({ key, id });
-      if (key) safeLocalStorage.setItem(key, id);
+      if (key) {
+        if (id === null) safeLocalStorage.removeItem(key);
+        else safeLocalStorage.setItem(key, id);
+      }
     },
     [key]
   );
@@ -51,6 +79,7 @@ export function useSessionEnvironment({
     /** Every environment that contains the repository; undefined while unknown. */
     matches,
     selection,
+    choice,
     /** The environment: null when there is none, undefined while unknown or not yet chosen. */
     environment: selectedEnvironment(selection),
     chooseEnvironment,

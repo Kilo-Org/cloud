@@ -1,3 +1,4 @@
+import type { RepositoryEnvironmentDefaultSetting } from '@kilocode/cloud-agent-profile';
 import {
   environmentMembers,
   type EnvironmentMemberResponse,
@@ -6,15 +7,12 @@ import {
 } from '@/hooks/useCloudAgentEnvironments';
 import { memberMatchesRepository } from './environment-display';
 
-/**
- * Which environment a new session in the selected repository uses. One match
- * needs no choice. Several matches need the user to choose, and the server fails
- * a start that does not name one.
- */
+export const NO_ENVIRONMENT = 'none';
+
 export type EnvironmentSelection =
   | { status: 'loading' }
   | { status: 'unknown' }
-  | { status: 'none' }
+  | { status: 'none'; chosen?: boolean }
   | { status: 'selected'; environment: EnvironmentSummary; chosen: boolean }
   | { status: 'choose'; environments: EnvironmentSummary[] };
 
@@ -25,16 +23,25 @@ export type EnvironmentSelection =
 export function selectEnvironment(
   matches: readonly EnvironmentSummary[] | undefined,
   chosenId: string | null,
-  isLoading: boolean
+  isLoading: boolean,
+  defaultEnvironment: RepositoryEnvironmentDefaultSetting = { mode: 'automatic' }
 ): EnvironmentSelection {
+  if (chosenId === NO_ENVIRONMENT) return { status: 'none', chosen: true };
   if (matches === undefined) return { status: isLoading ? 'loading' : 'unknown' };
+  const chosen = matches.find(environment => environment.id === chosenId);
+  if (chosen) return { status: 'selected', environment: chosen, chosen: true };
+  if (isLoading) return { status: 'loading' };
+  if (defaultEnvironment.mode === 'none') return { status: 'none' };
+  if (defaultEnvironment.mode === 'environment') {
+    const environment = matches.find(
+      candidate => candidate.id === defaultEnvironment.environmentId
+    );
+    return environment ? { status: 'selected', environment, chosen: false } : { status: 'unknown' };
+  }
   const [only, ...others] = matches;
   if (only === undefined) return { status: 'none' };
   if (others.length === 0) return { status: 'selected', environment: only, chosen: false };
-  const chosen = matches.find(environment => environment.id === chosenId);
-  return chosen
-    ? { status: 'selected', environment: chosen, chosen: true }
-    : { status: 'choose', environments: [...matches] };
+  return { status: 'choose', environments: [...matches] };
 }
 
 /** The environment the session uses, or undefined while unknown or not yet chosen. */
@@ -86,16 +93,15 @@ export function branchKey(member: Pick<EnvironmentMemberResponse, 'repoFullName'
   return member.repoFullName.toLowerCase();
 }
 
-/**
- * The `requestedEnvironment` of the create request. It names the environment
- * only when the user chose it or named a branch for an additional repository;
- * otherwise the server resolves the single match itself.
- */
 export function buildRequestedEnvironment(
   selection: EnvironmentSelection,
   launch: EnvironmentRepository,
   branches: AdditionalBranches
-): { id: string; repositories?: { repoFullName: string; branch: string }[] } | undefined {
+):
+  | { id: string; repositories?: { repoFullName: string; branch: string }[] }
+  | { mode: 'none' }
+  | undefined {
+  if (selection.status === 'none' && selection.chosen) return { mode: 'none' };
   if (selection.status !== 'selected') return undefined;
   const { environment, chosen } = selection;
   const repositories = additionalRepositories(environment, launch).flatMap(member => {

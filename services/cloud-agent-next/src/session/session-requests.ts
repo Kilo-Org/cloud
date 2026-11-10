@@ -97,11 +97,17 @@ export type SessionCreateRequest = {
    * owner and the launch repository, and checks that each of `repositories` is an
    * additional member of it. `repositories` carries the branch of an additional
    * repository; the launch repository's branch is `repository.branch`.
+   *
+   * `{ mode: 'none' }` is an explicit request to run without an environment: it
+   * skips repository-environment lookup and ambiguity conflicts. Profile and
+   * sandbox defaults still apply.
    */
-  requestedEnvironment?: {
-    id: string;
-    repositories?: { repoFullName: string; branch?: string }[];
-  };
+  requestedEnvironment?:
+    | {
+        id: string;
+        repositories?: { repoFullName: string; branch?: string }[];
+      }
+    | { mode: 'none' };
   /**
    * Set only by a client that can ask its user to choose an environment. When
    * several environments contain the repository and `requestedEnvironment` names

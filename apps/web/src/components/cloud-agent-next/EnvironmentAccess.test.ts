@@ -179,9 +179,10 @@ const { RepositoryEnvironmentChip } = require('./RepositoryEnvironmentChip') as 
   RepositoryEnvironmentChip: React.ComponentType<{
     repository: { platform: 'github'; fullName: string };
     repositoryLabel: string;
-    environment: EnvironmentSummary;
+    environment: EnvironmentSummary | null;
     environments: EnvironmentSummary[];
-    onChooseEnvironment: (environmentId: string) => void;
+    choice: string | null;
+    onChooseEnvironment: (environmentId: string | null) => void;
   }>;
 };
 const { EnvironmentsSection } = require('./settings/EnvironmentsSection') as {
@@ -380,11 +381,61 @@ function chipElement(): React.ReactElement {
     repositoryLabel: environment.repoFullName,
     environment,
     environments: [environment],
+    choice: null,
     onChooseEnvironment: () => {},
   });
 }
 
 describe('environment access for members and managers', () => {
+  test('offers No environment even when no environments match', () => {
+    const choose = jest.fn();
+    const mounted = mount(
+      React.createElement(RepositoryEnvironmentChip, {
+        repository: { platform: 'github', fullName: environment.repoFullName },
+        repositoryLabel: environment.repoFullName,
+        environment: null,
+        environments: [],
+        choice: null,
+        onChooseEnvironment: choose,
+      })
+    );
+    try {
+      const none = Array.from(mounted.container.querySelectorAll('button[aria-pressed]')).find(
+        button => button.textContent?.includes('No environment')
+      );
+      click(none);
+      expect(choose).toHaveBeenCalledWith('none');
+      expect(findButton(mounted.container, 'Set up environment')).toBeUndefined();
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('members can explicitly choose No environment or return to Automatic', () => {
+    const choose = jest.fn();
+    const mounted = mount(
+      React.createElement(RepositoryEnvironmentChip, {
+        repository: { platform: 'github', fullName: environment.repoFullName },
+        repositoryLabel: environment.repoFullName,
+        environment: null,
+        environments: [environment],
+        choice: 'none',
+        onChooseEnvironment: choose,
+      })
+    );
+    try {
+      const none = mounted.container.querySelector('button[aria-pressed="true"]');
+      expect(none?.textContent).toContain('No environment');
+      expect(mounted.container.querySelector('.text-status-warning')).toBeNull();
+      click(none);
+      expect(choose).toHaveBeenLastCalledWith('none');
+      clickButton(mounted.container, 'Automatic');
+      expect(choose).toHaveBeenLastCalledWith(null);
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
   test('a member opens a read-only dialog, navigates its editors, and closes it', () => {
     mockCanManage = false;
     const mounted = mount(chipElement());

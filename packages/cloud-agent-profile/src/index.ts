@@ -209,7 +209,18 @@ export {
   setRepositorySettings,
   removeRepositorySettings,
   type RepositorySettingsInput,
+  type RepositorySettingsRepository,
 } from './repository-settings-service';
+
+export {
+  getRepositoryEnvironmentDefaults,
+  getRepositoryEnvironmentDefault,
+  type RepositoryEnvironmentDefaultKey,
+  type RepositoryEnvironmentDefaultRow,
+  type RepositoryEnvironmentDefaultSetting,
+  type RepositoryEnvironmentIdentity,
+  type StoredRepositoryEnvironmentDefault,
+} from './repository-environment-defaults-db';
 
 // Sandbox allocation settings (context default + per-repository overrides)
 export {

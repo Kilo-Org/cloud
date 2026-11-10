@@ -91,6 +91,7 @@ import {
   agent_environment_profile_skills,
   cloud_agent_sandbox_allocation_settings,
   cloud_agent_environments,
+  cloud_agent_repository_environment_defaults,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -6321,6 +6322,51 @@ describe('User', () => {
         .from(cloud_agent_environments)
         .where(eq(cloud_agent_environments.owned_by_user_id, user.id));
       expect(deletedUserEnvironments).toHaveLength(0);
+    });
+
+    it('deletes personal repository environment defaults while keeping organization rows', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization(
+        `Repository defaults cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      await db.insert(cloud_agent_repository_environment_defaults).values([
+        {
+          owned_by_user_id: user.id,
+          repository_full_name: 'acme/widgets',
+          repository_platform: 'github',
+          repository_key: 'acme/widgets',
+          environment_id: randomUUID(),
+        },
+        {
+          owned_by_organization_id: organization.id,
+          repository_full_name: 'acme/widgets',
+          repository_platform: 'github',
+          repository_key: 'acme/widgets',
+          environment_id: randomUUID(),
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_repository_environment_defaults)
+          .where(eq(cloud_agent_repository_environment_defaults.owned_by_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_repository_environment_defaults)
+          .where(
+            eq(
+              cloud_agent_repository_environment_defaults.owned_by_organization_id,
+              organization.id
+            )
+          )
+      ).toHaveLength(1);
     });
 
     it('should nullify user_feedback FK', async () => {

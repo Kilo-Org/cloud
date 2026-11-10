@@ -8495,6 +8495,14 @@ describe('prepareInputToSessionCreateRequest environment selection', () => {
     expect(request.requireEnvironmentChoice).toBe(true);
   });
 
+  it('carries an explicit no-environment selection', () => {
+    const requestedEnvironment = { mode: 'none' as const };
+
+    const request = prepareInputToSessionCreateRequest(parse({ requestedEnvironment }));
+
+    expect(request.requestedEnvironment).toEqual(requestedEnvironment);
+  });
+
   it('adds neither field when the client sent neither', () => {
     const request = prepareInputToSessionCreateRequest(parse({}));
 
@@ -8509,6 +8517,18 @@ describe('prepareInputToSessionCreateRequest environment selection', () => {
       value: { id: ENVIRONMENT_ID, repositories: [{ repoFullName: 'a/b', branch: '-x' }] },
     },
     { name: 'an unknown key', value: { id: ENVIRONMENT_ID, extra: true } },
+    {
+      name: 'an explicit no-environment selection with additional repositories',
+      value: { mode: 'none', repositories: [{ repoFullName: 'a/b' }] },
+    },
+    {
+      name: 'an explicit no-environment selection with an environment id',
+      value: { mode: 'none', id: ENVIRONMENT_ID },
+    },
+    {
+      name: 'an explicit no-environment selection with an unknown key',
+      value: { mode: 'none', extra: true },
+    },
   ])('rejects $name in the selection', ({ value }) => {
     expect(() => parse({ requestedEnvironment: value })).toThrow();
   });

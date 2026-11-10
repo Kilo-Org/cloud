@@ -317,7 +317,7 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     await clearSnapshots();
   });
 
-  test('reads the stored previous snapshot, writes the new one without the obsolete gateway model columns, and emits audit logs based on the diff', async () => {
+  test('reads the stored previous snapshot, replaces it with the new one, and emits audit logs based on the diff', async () => {
     const owner = await insertTestUser();
     const enterpriseOrg = await createTestOrganization('Wiring Org', owner.id, 0, {
       provider_policy_mode: 'allow',
@@ -325,11 +325,7 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     });
 
     const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
-    await db.insert(modelsByProvider).values({
-      data: oldSnapshot,
-      openrouter: { 'z-ai/glm-5': { id: 'z-ai/glm-5' } },
-      vercel: { 'zai/glm-5': { id: 'zai/glm-5' } },
-    });
+    await db.insert(modelsByProvider).values({ data: oldSnapshot });
 
     const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
     const result = await applySnapshotChangesAndAudit({ providers: newSnapshot });
@@ -341,14 +337,9 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     ]);
 
     const remainingRows = await db
-      .select({
-        id: modelsByProvider.id,
-        openrouter: modelsByProvider.openrouter,
-        vercel: modelsByProvider.vercel,
-      })
+      .select({ id: modelsByProvider.id, data: modelsByProvider.data })
       .from(modelsByProvider);
-    expect(remainingRows).toHaveLength(1);
-    expect(remainingRows).toEqual([{ id: result.id, openrouter: null, vercel: null }]);
+    expect(remainingRows).toEqual([{ id: result.id, data: newSnapshot }]);
 
     const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
     expect(logs).toHaveLength(1);

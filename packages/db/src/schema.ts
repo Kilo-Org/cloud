@@ -5961,10 +5961,6 @@ export type ContributorChampionSyncState = typeof contributor_champion_sync_stat
 export const modelsByProvider = pgTable('models_by_provider', {
   id: serial().notNull().primaryKey(),
   data: jsonb('data').$type<NormalizedOpenRouterResponse>().notNull(),
-  // Obsolete: no longer written or read. Gateway models and their endpoints are read from
-  // ai_gateway_metadata_cache. Kept until a follow-up migration drops both columns.
-  openrouter: jsonb('openrouter'),
-  vercel: jsonb('vercel'),
 });
 
 export const ai_gateway_config = pgTable(

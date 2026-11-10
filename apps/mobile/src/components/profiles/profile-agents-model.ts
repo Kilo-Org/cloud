@@ -114,13 +114,21 @@ export function agentRows(agents: readonly AgentSource[]): AgentRow[] {
   }));
 }
 
+/** The three actions a whole-agent permission can hold. */
+type WholeAction = 'allow' | 'ask' | 'deny';
+
+/** Whether the stored permission is one action for every tool. */
+function isWholeAction(permission: AgentPermissionMap): permission is WholeAction {
+  return permission === 'allow' || permission === 'ask' || permission === 'deny';
+}
+
 /**
  * The whole-agent action a stored permission applies to every tool at once, or
  * `undefined` when the permission is a per-tool map (or absent). The switches
  * cannot express such a rule: it governs tools this editor does not list.
  */
-function wholeActionOf(permission: AgentPermissionMap): 'allow' | 'ask' | 'deny' | undefined {
-  if (permission === 'allow' || permission === 'ask' || permission === 'deny') {
+function wholeActionOf(permission: AgentPermissionMap): WholeAction | undefined {
+  if (isWholeAction(permission)) {
     return permission;
   }
   return undefined;
@@ -133,7 +141,7 @@ function wholeActionOf(permission: AgentPermissionMap): 'allow' | 'ask' | 'deny'
  * carries no per-tool rules.
  */
 function permissionMapOf(permission: AgentPermissionMap): Readonly<Record<string, unknown>> {
-  if (wholeActionOf(permission) !== undefined || permission == null) {
+  if (permission == null || isWholeAction(permission)) {
     return {};
   }
   return permission;
@@ -160,14 +168,14 @@ export function readDisabledTools(permission: AgentPermissionMap): string[] {
 /**
  * Apply the UI's disable toggles onto the existing permission map.
  *
- * A tool the user switches off gets `deny`. A tool whose stored rule is `deny`
- * and is now on loses its entry. Every other stored rule keeps its loaded
- * value, including per-tool `ask`/`allow`, per-pattern maps, and a tool the user
- * switched off and back on in the same edit. Unrelated tool keys are retained.
+ * A tool the user switches off gets `deny`. A stored `deny` on a tool the user
+ * switches on is cleared. Every other stored rule stays exactly as loaded:
+ * per-tool `ask`/`allow`, per-pattern maps, the `null` sentinel, and tool keys
+ * this editor does not list. A tool whose switch ends where it started keeps
+ * its loaded rule.
  *
- * A whole-agent permission (one action for every tool) cannot be expressed by
- * these switches, so it is returned untouched instead of being rewritten into a
- * partial per-tool map that would drop the tools this editor does not list.
+ * A whole-agent permission (one action for every tool) applies to tools this
+ * editor does not list, so it is returned as the stored value.
  */
 export function mergePermissions(
   existing: AgentPermissionMap,

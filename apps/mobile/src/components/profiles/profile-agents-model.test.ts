@@ -73,19 +73,25 @@ describe('mergePermissions', () => {
       bash: { 'git *': 'allow' },
       external_directory: null,
     };
-    const off = [...readDisabledTools(loaded), 'bash'];
 
     expect(mergePermissions(loaded, readDisabledTools(loaded))).toEqual(loaded);
-    expect(
-      mergePermissions(
-        loaded,
-        off.filter(tool => tool !== 'bash')
-      )
-    ).toEqual(loaded);
     expect(mergePermissions(undefined, [])).toBeUndefined();
   });
 
-  it('returns a whole-agent action unchanged instead of rewriting it per tool', () => {
+  it('restores a stored rule once the switch returns to where it started', () => {
+    const loaded: AgentPermissionMap = { read: 'ask' };
+    const off = [...readDisabledTools(loaded), 'read'];
+
+    expect(mergePermissions(loaded, off)).toEqual({ read: 'deny' });
+    expect(
+      mergePermissions(
+        loaded,
+        off.filter(tool => tool !== 'read')
+      )
+    ).toEqual(loaded);
+  });
+
+  it('keeps a whole-agent action as the stored value', () => {
     expect(mergePermissions('deny', ['read'])).toBe('deny');
     expect(mergePermissions('ask', [])).toBe('ask');
   });

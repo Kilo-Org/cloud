@@ -250,8 +250,9 @@ export function joinGatewayModelEndpoints(
 /**
  * The refresh job stores a model list before the endpoints of newly listed models, so a catalog can
  * briefly list models it cannot serve yet. A listed model without usable stored endpoints keeps its
- * previous entry, and an alias retargeted to a model that is not usable yet keeps its previous
- * entry or is left out, so an alias never points at a model the catalog leaves out.
+ * previous entry. An alias retargeted to a model that is not usable yet keeps its previous entry
+ * while that entry's target is still in the catalog, and is left out otherwise, so the alias never
+ * resolves to a model the catalog leaves out.
  */
 export function retainPreviousEntries(
   joined: JoinedGatewayModels,
@@ -265,8 +266,10 @@ export function retainPreviousEntries(
   for (const [modelId, model] of Object.entries(models)) {
     const target = model.alias_target?.slug;
     if (target === undefined || !unusable.has(target)) continue;
-    if (Object.hasOwn(previous, modelId)) {
-      models[modelId] = previous[modelId];
+    const previousEntry = Object.hasOwn(previous, modelId) ? previous[modelId] : undefined;
+    const previousTarget = previousEntry?.alias_target?.slug;
+    if (previousEntry && (previousTarget === undefined || Object.hasOwn(models, previousTarget))) {
+      models[modelId] = previousEntry;
     } else {
       delete models[modelId];
     }

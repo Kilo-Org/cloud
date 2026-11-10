@@ -425,6 +425,28 @@ describe('retainPreviousEntries', () => {
       'vendor/kept': previous['vendor/kept'],
     });
   });
+
+  it('leaves out a retargeted alias whose previous target left the catalog', () => {
+    const previous = {
+      '~vendor/delisted-latest': model('~vendor/delisted-latest', 'before', 'vendor/delisted'),
+      '~vendor/batch-latest': model('~vendor/batch-latest', 'before', 'vendor/batch'),
+      'vendor/delisted': model('vendor/delisted', 'before'),
+      'vendor/batch': model('vendor/batch', 'before'),
+    };
+    const joined = {
+      models: {
+        '~vendor/delisted-latest': model('~vendor/delisted-latest', 'now', 'vendor/new'),
+        '~vendor/batch-latest': model('~vendor/batch-latest', 'now', 'vendor/new'),
+        'vendor/kept': model('vendor/kept', 'now'),
+      },
+      withoutEndpointsResource: ['vendor/batch'],
+      withoutStoredEndpoints: ['vendor/new'],
+    };
+
+    expect(retainPreviousEntries(joined, previous)).toEqual({
+      'vendor/kept': joined.models['vendor/kept'],
+    });
+  });
 });
 
 describe('formatModelIds', () => {

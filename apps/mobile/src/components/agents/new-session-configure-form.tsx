@@ -481,6 +481,7 @@ export function NewSessionConfigureForm({
       className="flex-1"
       style={sideInsetStyle}
       onLayout={handleContainerLayout}
+      testID="new-session-form"
     >
       <KeyboardAvoidingView
         className="flex-1 bg-background"

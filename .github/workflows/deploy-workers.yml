@@ -195,8 +195,9 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
-      # scripts/changed-dependencies.mjs parses pnpm-lock.yaml with js-yaml,
-      # so detection needs the root dependencies.
+      # scripts/changed-dependencies.mjs parses a dependency input
+      # (pnpm-lock.yaml, pnpm-workspace.yaml or a patch file) with js-yaml, so
+      # detection needs the root dependencies.
       - name: Mount pnpm store
         uses: ./.github/actions/pnpm-store
 

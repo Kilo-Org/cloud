@@ -22,6 +22,7 @@
     "NOTEBOOK_CLOUD_ANACONDA_API_KEY_USERINFO_URL": "https://anaconda.com/api/auth/sessions/whoami",
     "NOTEBOOK_CLOUD_ANACONDA_API_KEY_PRINCIPAL_NAMESPACE": "kilo-pages-dev-anaconda",
     "PAGES_CATALOG_INDEX": "1",
-    "PAGES_DEFAULT_PAGE_QUOTA": "250"
+    "PAGES_DEFAULT_PAGE_QUOTA": "250",
+    "PAGES_KILO_APP_URL": "https://app.kilo.ai"
   }
 }

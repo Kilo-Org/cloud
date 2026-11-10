@@ -1,5 +1,6 @@
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { ByokFailoverAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
   sendUpstreamAttempt,
   type SendUpstreamAttemptInput,
@@ -8,6 +9,9 @@ import {
 import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 
 const MIN_FAILOVER_BUDGET_MS = 30_000;
+const ERROR_BODY_READ_TIMEOUT_MS = 1_000;
+const MAX_ERROR_BODY_CHARS = 16 * 1024;
+const ERROR_CODE_PATTERN = /^[\w.:-]{1,64}$/;
 
 type ByokFailoverResult = {
   attempt: SendUpstreamAttemptResult;
@@ -15,21 +19,81 @@ type ByokFailoverResult = {
   providerContext: GetProviderProviderResult;
   /** The request as sent for the returned attempt. */
   request: GatewayRequest;
+  /** Every attempt, in order, when the request failed over at least once; otherwise null. */
+  failoverAttempts: Promise<ByokFailoverAttempt[]> | null;
 };
 
-function failedStatus(attempt: SendUpstreamAttemptResult): number | null {
+function attemptStatus(attempt: SendUpstreamAttemptResult): number {
+  return attempt.type === 'invalid-openrouter-model' ? 404 : attempt.response.status;
+}
+
+function failedResponse(attempt: SendUpstreamAttemptResult): Response | null {
   if (attempt.type === 'invalid-openrouter-model' || attempt.response.ok) return null;
-  return attempt.response.status;
+  return attempt.response;
 }
 
 function byokProviderIds(route: GetProviderProviderResult) {
-  return route.userByok?.map(byok => byok.providerId) ?? null;
+  return route.userByok?.map(byok => byok.providerId) ?? [];
 }
 
-async function discardResponse(attempt: SendUpstreamAttemptResult) {
-  if (attempt.type === 'invalid-openrouter-model') return;
-  await attempt.response.body?.cancel().catch(() => {});
+/** Reads a bounded error body, giving up on a slow or oversized one. Consumes the response. */
+async function readErrorBody(response: Response): Promise<unknown> {
+  const reader = response.body?.getReader();
+  if (!reader) return null;
+  const timeout = setTimeout(
+    () => void reader.cancel().catch(() => {}),
+    ERROR_BODY_READ_TIMEOUT_MS
+  );
+  const decoder = new TextDecoder();
+  let text = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+      if (text.length > MAX_ERROR_BODY_CHARS) return null;
+    }
+    return JSON.parse(text + decoder.decode());
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+    void reader.cancel().catch(() => {});
+  }
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function codeOf(value: unknown): string | undefined {
+  return typeof value === 'string' && ERROR_CODE_PATTERN.test(value) ? value : undefined;
+}
+
+/**
+ * The gateway's own `error_type`, or the provider's error code or type, such as OpenAI's
+ * `insufficient_quota` or Anthropic's `rate_limit_error`. Messages can echo request content, so
+ * only identifier-shaped codes are kept.
+ */
+async function readErrorCode(response: Response): Promise<string | undefined> {
+  try {
+    const body = await readErrorBody(response);
+    if (!isRecord(body)) return undefined;
+    const error = isRecord(body.error) ? body.error : {};
+    return codeOf(body.error_type) ?? codeOf(error.code) ?? codeOf(error.type) ?? codeOf(body.code);
+  } catch {
+    return undefined;
+  }
+}
+
+function remainingBudgetMs(startedAt: number): number {
+  // Node's AbortSignal.timeout throws for a fractional delay.
+  return Math.floor(UPSTREAM_DURATION_BUDGET_MS - (performance.now() - startedAt));
+}
+
+type PendingAttempt = Omit<ByokFailoverAttempt, 'error_code'> & {
+  errorCode: Promise<string | undefined>;
+};
 
 /**
  * Sends the request through its route and, while a BYOK key's upstream fails with an
@@ -43,39 +107,76 @@ export async function sendUpstreamAttemptWithByokFailover(
   let providerContext = input.providerContext;
   let request = input.request;
   if (!providerContext.byokFailovers?.length) {
-    return { attempt: await sendUpstreamAttempt(input), providerContext, request };
+    return {
+      attempt: await sendUpstreamAttempt(input),
+      providerContext,
+      request,
+      failoverAttempts: null,
+    };
   }
 
   // Provider transforms mutate the request they send, so each failover sends a copy of the original.
   const original = structuredClone(request);
   const startedAt = performance.now();
+  // Error codes are read off the request path, so reading a slow error body never delays failover
+  // or the response.
+  const pending: PendingAttempt[] = [];
+  let attemptStartedAt = startedAt;
   let attempt = await sendUpstreamAttempt(input);
+  let attemptDurationMs = Math.round(performance.now() - attemptStartedAt);
   for (;;) {
-    const status = failedStatus(attempt);
-    if (status === null || input.signal?.aborted) break;
+    const failed = failedResponse(attempt);
+    if (!failed || input.signal?.aborted) break;
     // All attempts share one upstream budget, so the invocation still ends within the route's
     // maxDuration with time left for usage accounting.
-    // Node's AbortSignal.timeout throws for a fractional delay.
-    const remainingBudgetMs = Math.floor(
-      UPSTREAM_DURATION_BUDGET_MS - (performance.now() - startedAt)
-    );
-    if (remainingBudgetMs < MIN_FAILOVER_BUDGET_MS) break;
+    if (remainingBudgetMs(startedAt) < MIN_FAILOVER_BUDGET_MS) break;
     const next = await nextByokFailover();
     if (!next) break;
+    const budgetMs = remainingBudgetMs(startedAt);
+    if (budgetMs < MIN_FAILOVER_BUDGET_MS) break;
     console.warn('[byok-failover] BYOK upstream failed, trying the next BYOK key', {
-      status,
+      status: failed.status,
       failedProviderIds: byokProviderIds(providerContext),
       nextProviderIds: byokProviderIds(next),
     });
-    await discardResponse(attempt);
+    pending.push({
+      provider_type: providerContext.provider.type,
+      byok_provider_ids: byokProviderIds(providerContext),
+      status: failed.status,
+      errorCode: readErrorCode(failed),
+      duration_ms: attemptDurationMs,
+      outcome: 'failed-over',
+    });
     providerContext = next;
     request = structuredClone(original);
+    attemptStartedAt = performance.now();
     attempt = await sendUpstreamAttempt({
       ...input,
       providerContext,
       request,
-      upstreamDurationBudgetMs: remainingBudgetMs,
+      upstreamDurationBudgetMs: budgetMs,
     });
+    attemptDurationMs = Math.round(performance.now() - attemptStartedAt);
   }
-  return { attempt, providerContext, request };
+
+  if (pending.length === 0) {
+    return { attempt, providerContext, request, failoverAttempts: null };
+  }
+  const failed = failedResponse(attempt);
+  pending.push({
+    provider_type: providerContext.provider.type,
+    byok_provider_ids: byokProviderIds(providerContext),
+    status: attemptStatus(attempt),
+    // The client still reads the failure, so the code comes from a copy.
+    errorCode: failed ? readErrorCode(failed.clone()) : Promise.resolve(undefined),
+    duration_ms: attemptDurationMs,
+    outcome: failed || attempt.type === 'invalid-openrouter-model' ? 'failed' : 'served',
+  });
+  const failoverAttempts = Promise.all(
+    pending.map(async ({ errorCode, ...rest }) => {
+      const error_code = await errorCode;
+      return error_code ? { ...rest, error_code } : rest;
+    })
+  );
+  return { attempt, providerContext, request, failoverAttempts };
 }

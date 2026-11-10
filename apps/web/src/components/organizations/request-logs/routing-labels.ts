@@ -37,6 +37,7 @@ export const BYOK_OUTCOME_LABELS: Record<string, string> = {
   selected: 'Selected',
   skipped: 'Skipped',
   unreached: 'Not reached',
+  failed: 'Failed',
 };
 
 const PAYER_LABELS: Record<string, string> = {
@@ -179,11 +180,13 @@ function describeChatGpt(step: RequestLogRoutingStep): string {
   }
 }
 
-function describeByokKey(step: RequestLogRoutingStep): string {
+function describeByokKey(step: RequestLogRoutingStep, failedOver: boolean): string {
   if (step.outcome === 'selected') {
     const key = step.provider_id ? keyLabel([step.provider_id]) : 'BYOK key';
     const through = step.route === 'vercel-byok' ? ' through Vercel AI Gateway' : '';
-    return `Served with the ${key}${through}.`;
+    return failedOver
+      ? `Tried the ${key}${through} first. It failed, so the request failed over to the next BYOK key.`
+      : `Served with the ${key}${through}.`;
   }
   return step.reason === 'none-served'
     ? 'None of the BYOK keys could serve the request.'
@@ -199,7 +202,11 @@ export function inferenceProviderNames(providers: string[]): string {
   return listOf(providers.map(provider => normalizePublicInferenceProvider(provider).name));
 }
 
-export function describeStep(step: RequestLogRoutingStep): DescribedStep {
+/** `failedOver`: the selected BYOK key failed and the request moved on to the owner's next key. */
+export function describeStep(
+  step: RequestLogRoutingStep,
+  { failedOver = false }: { failedOver?: boolean } = {}
+): DescribedStep {
   const tone = toneOf(step.outcome);
   switch (step.step) {
     case 'local-fake-llm':
@@ -231,7 +238,7 @@ export function describeStep(step: RequestLogRoutingStep): DescribedStep {
         tone,
       };
     case 'byok-key':
-      return { title: 'BYOK keys', detail: describeByokKey(step), tone };
+      return { title: 'BYOK keys', detail: describeByokKey(step, failedOver), tone };
     case 'unsupported-api-kind': {
       const key = step.provider_id ? keyLabel([step.provider_id]) : 'BYOK key';
       const supported = step.supported_api_kinds?.map(apiKindLabel).join(' and ');

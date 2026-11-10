@@ -68,6 +68,17 @@ const RoutingResultSchema = z.object({
 
 export type RequestLogRoutingResult = z.infer<typeof RoutingResultSchema>;
 
+const ByokFailoverAttemptSchema = z.object({
+  provider_type: optionalString,
+  byok_provider_ids: z.array(z.string()).catch([]),
+  status: optionalNumber,
+  error_code: optionalString,
+  duration_ms: optionalNumber,
+  outcome: z.string(),
+});
+
+export type RequestLogByokFailoverAttempt = z.infer<typeof ByokFailoverAttemptSchema>;
+
 const AiProviderMetadataRecordSchema = z.object({
   requested_model: optionalString,
   api_kind: optionalString,
@@ -77,6 +88,7 @@ const AiProviderMetadataRecordSchema = z.object({
   result: RoutingResultSchema.nullable().catch(null).default(null),
   enkrypt: EnkryptGuardrailReportSchema.optional().catch(undefined),
   enkrypt_output: EnkryptOutputGuardrailReportSchema.optional().catch(undefined),
+  byok_failover_attempts: lenientArray(ByokFailoverAttemptSchema),
 });
 
 export type RequestLogRoutingDetails = {
@@ -88,6 +100,7 @@ export type RequestLogRoutingDetails = {
   result: RequestLogRoutingResult | null;
   enkrypt: z.infer<typeof EnkryptGuardrailReportSchema> | null;
   enkrypt_output: z.infer<typeof EnkryptOutputGuardrailReportSchema> | null;
+  byok_failover_attempts: RequestLogByokFailoverAttempt[];
 };
 
 /** Returns null when the object is not JSON or not an object. */
@@ -110,5 +123,6 @@ export function parseRoutingDetails(body: string): RequestLogRoutingDetails | nu
     result: record.result,
     enkrypt: record.enkrypt ?? null,
     enkrypt_output: record.enkrypt_output ?? null,
+    byok_failover_attempts: record.byok_failover_attempts,
   };
 }

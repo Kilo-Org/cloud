@@ -7498,6 +7498,156 @@ describe('BYOK failover', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  describe('provider metadata archive', () => {
+    const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+      '@kilocode/web-shared/lib/r2/create-client'
+    );
+    const decision: ProviderRoutingDecision = {
+      requested_model: 'openai/gpt-4o',
+      api_kind: 'chat_completions',
+      owner_type: 'user',
+      steps: [
+        { step: 'byok-key', outcome: 'selected', route: 'direct-byok', provider_id: 'openai' },
+      ],
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'direct-byok',
+        provider_type: 'direct-byok',
+        byok_provider_ids: ['openai'],
+        payer: 'owner-byok-key',
+        is_free: false,
+      },
+    };
+
+    async function archivedRecord(route: GetProviderProviderResult) {
+      fakeR2.objects.clear();
+      const env = jest.replaceProperty(process, 'env', {
+        ...process.env,
+        R2_ACCOUNT_ID: 'test-metadata-account',
+        R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
+        R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+        R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+      });
+      mockedGetProvider.mockImplementation(async ({ onDecision }) => {
+        onDecision?.(decision);
+        return route;
+      });
+
+      let response: Response;
+      let body: unknown;
+      try {
+        response = await handleLlmProxyRequest(makeRequest(makeBody()));
+        body = await response.json();
+        await Promise.all(
+          jest
+            .mocked(after)
+            .mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+        );
+      } finally {
+        env.restore();
+      }
+
+      const objects = [...fakeR2.objects.values()];
+      expect(objects).toHaveLength(1);
+      const raw = objects[0] ?? '';
+      return {
+        response,
+        body,
+        raw,
+        record: KiloRoutingDecisionRecordSchema.parse(JSON.parse(raw)),
+      };
+    }
+
+    it('archives every attempt of a failover with its status and error code', async () => {
+      const candidate = failover(
+        byokRoute('anthropic', byokProvider('failover-byok-key', { type: 'vercel' }))
+      );
+      mockedUpstreamRequest
+        .mockResolvedValueOnce({
+          type: 'success',
+          response: upstreamJsonResponse(
+            {
+              error: {
+                message: 'You exceeded your current quota, please check your plan.',
+                type: 'insufficient_quota',
+                code: 'insufficient_quota',
+              },
+            },
+            429
+          ),
+        })
+        .mockResolvedValueOnce(upstreamWithStatus(200));
+
+      const { response, raw, record } = await archivedRecord(
+        byokRoute('openai', byokProvider('primary-byok-key'), [candidate])
+      );
+
+      expect(response.status).toBe(200);
+      expect(record).toMatchObject(decision);
+      expect(record.byok_failover_attempts).toEqual([
+        {
+          provider_type: 'openrouter',
+          byok_provider_ids: ['openai'],
+          status: 429,
+          error_code: 'insufficient_quota',
+          duration_ms: expect.any(Number),
+          outcome: 'failed-over',
+        },
+        {
+          provider_type: 'vercel',
+          byok_provider_ids: ['anthropic'],
+          status: 200,
+          duration_ms: expect.any(Number),
+          outcome: 'served',
+        },
+      ]);
+      expect(raw).not.toMatch(/exceeded your current quota|primary-byok-key|failover-byok-key/);
+    });
+
+    it('archives a final failure while the client still receives its body', async () => {
+      const candidate = failover(byokRoute('anthropic', byokProvider('failover-byok-key')));
+      mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(500)).mockResolvedValueOnce({
+        type: 'error',
+        response: NextResponse.json(
+          { error: 'upstream unreachable', error_type: 'upstream_disconnect' },
+          { status: 503 }
+        ),
+      });
+
+      const { response, body, record } = await archivedRecord(
+        byokRoute('openai', byokProvider('primary-byok-key'), [candidate])
+      );
+
+      expect(response.status).toBe(503);
+      expect(body).toEqual({ error: 'upstream unreachable', error_type: 'upstream_disconnect' });
+      expect(record.byok_failover_attempts).toEqual([
+        expect.objectContaining({ status: 500, outcome: 'failed-over' }),
+        expect.objectContaining({
+          byok_provider_ids: ['anthropic'],
+          status: 503,
+          error_code: 'upstream_disconnect',
+          outcome: 'failed',
+        }),
+      ]);
+      expect(record.byok_failover_attempts?.[0]).not.toHaveProperty('error_code');
+    });
+
+    it('archives no attempts when the first key serves the request', async () => {
+      const candidate = failover(byokRoute('anthropic', byokProvider('failover-byok-key')));
+      mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(200));
+
+      const { response, raw, record } = await archivedRecord(
+        byokRoute('openai', byokProvider('primary-byok-key'), [candidate])
+      );
+
+      expect(response.status).toBe(200);
+      expect(candidate.resolve).not.toHaveBeenCalled();
+      expect(record).toMatchObject(decision);
+      expect(JSON.parse(raw)).not.toHaveProperty('byok_failover_attempts');
+    });
+  });
+
   it('does not fail over once the client has disconnected', async () => {
     const controller = new AbortController();
     const candidate = failover(byokRoute('anthropic', byokProvider('failover-byok-key')));

@@ -478,6 +478,7 @@ export async function handleLlmProxyRequest(
     attempt,
     providerContext,
     request: sentRequest,
+    failoverAttempts,
   } = await sendUpstreamAttemptWithByokFailover(
     {
       providerContext: providerResult,
@@ -504,6 +505,7 @@ export async function handleLlmProxyRequest(
     },
     nextByokFailover
   );
+  if (failoverAttempts) providerMetadataCapture?.captureByokFailoverAttempts(failoverAttempts);
   if (attempt.type === 'invalid-openrouter-model') {
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }

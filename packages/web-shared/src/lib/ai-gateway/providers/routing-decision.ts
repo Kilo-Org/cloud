@@ -208,6 +208,20 @@ const ProviderRoutingDecisionSchema = z.object({
 
 export type ProviderRoutingDecision = z.infer<typeof ProviderRoutingDecisionSchema>;
 
+const ByokFailoverAttemptSchema = z.object({
+  provider_type: ProviderTypeSchema,
+  byok_provider_ids: z.array(UserByokProviderIdSchema),
+  status: z.number().int(),
+  /** A machine-readable code from the error body, such as `rate_limit_error`; never its message. */
+  error_code: z.string().optional(),
+  /** Until the upstream answered with response headers, or failed without them. */
+  duration_ms: z.number().int().nonnegative(),
+  /** `failed-over`: the next BYOK key took the request. The last attempt is `served` or `failed`. */
+  outcome: z.enum(['failed-over', 'served', 'failed']),
+});
+
+export type ByokFailoverAttempt = z.infer<typeof ByokFailoverAttemptSchema>;
+
 /** A `<usage_id>.json` object in the AI provider metadata bucket. */
 export const KiloRoutingDecisionRecordSchema = ProviderRoutingDecisionSchema.extend({
   schema_version: z.literal(1),
@@ -223,6 +237,8 @@ export const KiloRoutingDecisionRecordSchema = ProviderRoutingDecisionSchema.ext
   enkrypt: EnkryptGuardrailReportSchema.optional(),
   /** The organization's Enkrypt output guardrail, when it applied to the response. */
   enkrypt_output: EnkryptOutputGuardrailReportSchema.optional(),
+  /** Every upstream attempt, in order, when a failing BYOK key failed over to the owner's next key. */
+  byok_failover_attempts: z.array(ByokFailoverAttemptSchema).optional(),
 });
 
 export type KiloRoutingDecisionRecord = z.infer<typeof KiloRoutingDecisionRecordSchema>;

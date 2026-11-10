@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { RootRouter } from '@/routers/root-router';
 import { apiKindLabel } from '@/lib/api-kind-labels';
+import { ByokFailoverSection } from './ByokFailoverSection';
 import { DetailGrid, DetailSection, yesNo, type DetailItem } from './detail-primitives';
 import { EnkryptOutputReportSection, EnkryptReportSection } from './EnkryptReportSection';
 import {
@@ -118,6 +119,9 @@ export function RoutingSections({ metadata }: { metadata: RequestLogDetails['met
       >
         <RoutingDecisionFlow routing={routing} />
       </DetailSection>
+      {routing.byok_failover_attempts.length > 0 && (
+        <ByokFailoverSection attempts={routing.byok_failover_attempts} />
+      )}
       {routing.enkrypt && <EnkryptReportSection report={routing.enkrypt} />}
       {routing.enkrypt_output && <EnkryptOutputReportSection report={routing.enkrypt_output} />}
     </>

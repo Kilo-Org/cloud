@@ -403,7 +403,9 @@ import {
   worktreeSubscriberKey,
   type SharedWorktreeChangesInput,
 } from './worktree-changes.js';
-import { serveHistoryPage, type HistoryPageSession } from './history-pages.js';
+import { serveHistoryPage, serveRecentHistory, type HistoryPageSession } from './history-pages.js';
+import { readWorkspaceHistorySessions } from './workspace-history.js';
+import { getPgDb } from '../../db/pg.js';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
@@ -6491,6 +6493,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'events_dropped':
         if (current) this.notifications.wrapperDropped(frame.dropped);
         return;
+      case 'history.recent':
+        if (current)
+          this.ctx.waitUntil(
+            serveRecentHistory({
+              frame,
+              readRoute: sessionId => readRoute(this.db, sessionId),
+              readRecent: route => readWorkspaceHistorySessions(getPgDb(this.env), route),
+              send: result => this.trySendFrame(ws, result),
+            })
+          );
+        return;
       case 'history.page':
         // Off the serial queue: a Session DO read must not hold other frames.
         if (current)
@@ -6498,6 +6511,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
             serveHistoryPage({
               frame,
               readRoute: sessionId => readRoute(this.db, sessionId),
+              authorizeWorkspaceSession: async (route, target) =>
+                (
+                  await withTimeout(
+                    readWorkspaceHistorySessions(getPgDb(this.env), route, target),
+                    10_000,
+                    'Workspace history authorization timed out'
+                  )
+                ).length === 1,
               session: async sessionId => {
                 const owner = await this.requireOwner();
                 return owner === null ? null : this.sessionPeerFor(owner, sessionId);

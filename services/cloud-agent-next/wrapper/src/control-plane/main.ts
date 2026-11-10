@@ -504,6 +504,7 @@ export async function runControlPlaneWrapper(
     // Route preparation output (progress/ready/failed) out over the connection.
     emit: frame => connection.send(frame),
     readHistoryPage: request => historyRequests.readPage(request),
+    readRecentHistory: request => historyRequests.readRecent(request),
     log: logToFile,
     inheritedEnv: env,
     spawnSetup: createSetupSpawn(workload),

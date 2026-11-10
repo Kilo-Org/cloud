@@ -1,7 +1,10 @@
 # CI and required checks
 
 The `main-tests` ruleset (id 12440145) requires these status checks on `main`,
-each pinned to the GitHub Actions app (integration id 15368):
+each pinned to the GitHub Actions app (integration id 15368). The table is the
+required set after the ruleset edit that follows this rename: until that edit
+lands, the ruleset still lists the old eight contexts, and the three mobile rows
+below are published but not yet required.
 
 | Context | Published by |
 |---|---|

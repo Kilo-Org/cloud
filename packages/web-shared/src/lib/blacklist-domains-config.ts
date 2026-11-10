@@ -68,18 +68,19 @@ function parseSettings(raw: string): BlacklistDomainsSettings {
 /**
  * The settings used to share one Redis value with the complete domain list. Copies them into
  * their own key once, without overwriting a newer admin save; once that key exists, this never
- * runs. The next admin save reads the settings through here before it deletes the legacy value.
+ * runs. The next admin save migrates through here and then deletes the legacy value. A
+ * concurrent save can do both after the caller found no settings, so the settings key is re-read
+ * even when the legacy value is gone.
  */
 async function migrateLegacySettings(): Promise<BlacklistDomainsSettings | null> {
   const legacy = await redisClient.get<string>(LEGACY_BLACKLIST_DOMAINS_REDIS_KEY);
-  if (legacy === null) return null;
-  await redisClient.set(
-    BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY,
-    JSON.stringify(parseSettings(legacy)),
-    {
-      nx: true,
-    }
-  );
+  if (legacy !== null) {
+    await redisClient.set(
+      BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY,
+      JSON.stringify(parseSettings(legacy)),
+      { nx: true }
+    );
+  }
   const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY);
   return raw === null ? null : parseSettings(raw);
 }

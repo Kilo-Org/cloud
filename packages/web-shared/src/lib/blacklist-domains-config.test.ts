@@ -200,6 +200,26 @@ describe('readBlacklistDomainsSettings', () => {
     );
   });
 
+  test('returns settings a concurrent save wrote after deleting the legacy value', async () => {
+    const saved = settings({ blocked_signup_tlds: ['asia'], updated_by: 'newer-admin' });
+    let settingsReads = 0;
+    mockedRedisGet.mockImplementation(async <T>(key: string) => {
+      if (key === BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY && settingsReads++ === 0) {
+        redisValues.set(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY, JSON.stringify(saved));
+        return null;
+      }
+      return (redisValues.get(key) ?? null) as T | null;
+    });
+
+    await expect(readBlacklistDomainsSettings()).resolves.toEqual(saved);
+    expect(mockedRedisGet.mock.calls.map(([key]) => key)).toEqual([
+      BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY,
+      LEGACY_BLACKLIST_DOMAINS_REDIS_KEY,
+      BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY,
+    ]);
+    expect(mockedRedisSet).not.toHaveBeenCalled();
+  });
+
   test('throws on an unreadable settings value', async () => {
     redisValues.set(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY, '{not json');
 

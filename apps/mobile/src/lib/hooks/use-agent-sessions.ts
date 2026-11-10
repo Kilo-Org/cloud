@@ -123,7 +123,12 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   // zone is resolved here rather than inside the grouping so the rows under a
   // heading can be handed the very zone that heading was grouped in.
   const now = useRelativeTimeNow();
-  const timeZone = deviceTimeZone();
+  // The tick is the traced input: React Compiler memoizes a call against its own
+  // arguments, and `deviceTimeZone()` takes none, so an untracked probe would
+  // freeze the zone for the life of the screen while the row clocks — which
+  // re-probe on every format — already read the new one.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the tick is the dependency, not an input the body reads
+  const timeZone = useMemo(() => deviceTimeZone(), [now]);
   const dateGroups = useMemo(
     () => groupAgentSessionsByDate(sessions, sortBy, { now: new Date(now), timeZone }),
     [now, sessions, sortBy, timeZone]
@@ -250,7 +255,10 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // resolved here rather than inside the grouping, so the rows under a heading
   // can be handed the very zone that heading was grouped in.
   const now = useRelativeTimeNow();
-  const timeZone = deviceTimeZone();
+  // Same traced tick as the search hook above, so a zone change reaches the
+  // stored list's headings on the next minute tick instead of never.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the tick is the dependency, not an input the body reads
+  const timeZone = useMemo(() => deviceTimeZone(), [now]);
   const dateGroups = useMemo(
     () => groupAgentSessionsByDate(storedSessions, sortBy, { now: new Date(now), timeZone }),
     [now, sortBy, storedSessions, timeZone]

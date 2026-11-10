@@ -10,7 +10,11 @@ import {
   readBlacklistDomainsSettings,
   type BlacklistDomainsSettings,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import { BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
+import {
+  BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY,
+  LEGACY_BLACKLIST_DOMAINS_REDIS_KEY,
+  LEGACY_BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
+} from '@kilocode/web-shared/lib/redis-keys';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { blacklisted_domains, kilocode_users } from '@kilocode/db/schema';
@@ -57,6 +61,19 @@ async function readConfig(tx: Transaction) {
     settings,
     version: createHash('sha256').update(JSON.stringify({ domains, settings })).digest('hex'),
   };
+}
+
+// Only after a committed save: its readConfig has already copied the legacy settings into the
+// settings key, so deleting the legacy value loses nothing.
+async function deleteLegacyBlacklist() {
+  try {
+    await redisClient.del(
+      LEGACY_BLACKLIST_DOMAINS_REDIS_KEY,
+      LEGACY_BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY
+    );
+  } catch (error) {
+    captureException(error, { tags: { source: 'blacklist_domains_legacy_cleanup' } });
+  }
 }
 
 export const adminBlacklistDomainsRouter = createTRPCRouter({
@@ -127,6 +144,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     }
     const { settings, addedDomains } = saved;
     clearEmailBlacklistCache();
+    await deleteLegacyBlacklist();
 
     // The list is already live for auth checks at this point, so a backfill
     // failure must not fail the save. Report it and point the admin at the

@@ -1,0 +1,17 @@
+{
+  "name": "pages-dev",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "workers_dev": true,
+  "d1": {
+    "auth": { "database_name": "pages-dev-auth", "database_id": "13db1af4-e01e-447d-ae51-cc37625d5f77" },
+    "usage": { "database_name": "pages-dev-usage", "database_id": "8691d489-5105-49f4-bbec-63ecbca319e9" }
+  },
+  "r2_bucket": "pages-dev-assets",
+  "vars": {
+    "NOTEBOOK_CLOUD_PUBLIC_ORIGIN": "https://pages-dev.engineering-e11.workers.dev",
+    "NOTEBOOK_CLOUD_ANACONDA_API_KEY_USERINFO_URL": "https://anaconda.com/api/auth/sessions/whoami",
+    "NOTEBOOK_CLOUD_ANACONDA_API_KEY_PRINCIPAL_NAMESPACE": "kilo-pages-dev-anaconda",
+    "PAGES_CATALOG_INDEX": "1",
+    "PAGES_DEFAULT_PAGE_QUOTA": "250"
+  }
+}

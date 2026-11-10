@@ -65,9 +65,10 @@ describe('session object lifecycle', () => {
     const minted = await liveTicket(api, sessionID);
     expect(minted.status).toBe(200);
     expect(await minted.json()).toMatchObject({ ticket: expect.any(String) });
-    expect(
-      sessionStateSchema.parse(await (await api.state(sessionID)).json())
-    ).toMatchObject({ deleted: false, position: 1 });
+    expect(sessionStateSchema.parse(await (await api.state(sessionID)).json())).toMatchObject({
+      deleted: false,
+      position: 1,
+    });
 
     expect((await api.remove(sessionID)).status).toBe(200);
     expect((await api.remove(sessionID)).status).toBe(200);

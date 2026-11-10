@@ -7,9 +7,11 @@ import {
   View,
   type ViewInstance,
 } from 'react-native';
+import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
 import {
   KeyboardAvoidingView,
   useKeyboardState,
+  useReanimatedKeyboardAnimation,
   useWindowDimensions,
 } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,6 +85,14 @@ type NewSessionProfileOverrideProps = {
  * flush against the frame's top edge.
  */
 const ADVANCED_CONFIG_REVEAL_GAP = 16;
+
+/**
+ * The gap the pinned footer keeps between the Start control and the software
+ * keyboard. The keyboard covers the home indicator, so the closed-state inset
+ * collapses to this breathing room instead of a second navigation-bar
+ * reservation.
+ */
+const KEYBOARD_FOOTER_GAP = 16;
 
 /**
  * THE new-session screen body — one screen for every entry point (cloud,
@@ -183,6 +193,27 @@ export function NewSessionConfigureForm({
   const { bottom } = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { height: keyboardHeight, isVisible: keyboardVisible } = useKeyboardState();
+  // The footer reserves the platform inset while the keyboard is closed. With
+  // it open the lift has already cleared the home indicator, so the whole
+  // inset would be reserved a second time directly above the keyboard — and
+  // the footer, which is where the disabled Start and its reason line sit,
+  // would float a navigation-bar height away from the keys instead of ending
+  // at them. Interpolating it on the keyboard's own progress keeps the lift
+  // and the inset in one transition, the rule the chat composer's inset
+  // follows (flipping it on the visible flag moves the footer a second time,
+  // after the keyboard has stopped).
+  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
+  const footerInset = useAnimatedStyle(
+    () => ({
+      paddingBottom: interpolate(
+        keyboardProgress.value,
+        [0, 1],
+        [bottomClearance, KEYBOARD_FOOTER_GAP],
+        Extrapolation.CLAMP
+      ),
+    }),
+    [bottomClearance]
+  );
   const [containerFrame, setContainerFrame] = useState({ y: 0, height: 0 });
   const containerRef = useRef<ViewInstance | null>(null);
   const [footerHeight, setFooterHeight] = useState(0);
@@ -430,9 +461,9 @@ export function NewSessionConfigureForm({
   // changes, and this gate keeps a stale one off a remote target no matter
   // which path selected it.
   const footer = (
-    <View
+    <Animated.View
       className="bg-background px-4 pt-3"
-      style={{ paddingBottom: bottomClearance }}
+      style={footerInset}
       onLayout={event => {
         setFooterHeight(event.nativeEvent.layout.height);
       }}
@@ -462,7 +493,7 @@ export function NewSessionConfigureForm({
         startBlockedAction={startBlockedAction}
         onStartSession={onStartSession}
       />
-    </View>
+    </Animated.View>
   );
 
   // Shrink the scroll viewport with the keyboard; a footer-only lift grows

@@ -3,7 +3,10 @@ import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { backfillBlockedUserPepperBatch, blockedUserPepperBackfillCandidates } from './route';
+import {
+  backfillBlockedUserPepperBatch,
+  blockedUserPepperBackfillCandidates,
+} from './blocked-user-pepper';
 
 beforeEach(async () => {
   await cleanupDbForTest();

@@ -4,7 +4,7 @@ import { kilocode_users } from '@kilocode/db';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { softDeleteUser } from '@/lib/user';
-import { emailDomainBackfillCandidates } from './route';
+import { emailDomainBackfillCandidates } from './email-domain';
 
 describe('emailDomainBackfillCandidates', () => {
   afterEach(async () => {

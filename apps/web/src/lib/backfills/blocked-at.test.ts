@@ -3,7 +3,7 @@ import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { backfillBlockedAtBatch, blockedAtBackfillCandidates } from './route';
+import { backfillBlockedAtBatch, blockedAtBackfillCandidates } from './blocked-at';
 
 beforeEach(async () => {
   await cleanupDbForTest();

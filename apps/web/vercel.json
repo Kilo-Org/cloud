@@ -167,8 +167,8 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/backfill-safety-identifiers",
-      "schedule": "* * * * *"
+      "path": "/api/cron/backfill-users",
+      "schedule": "20 2 * * *"
     },
     {
       "path": "/api/cron/recover-code-reviews",

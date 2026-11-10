@@ -1,4 +1,4 @@
-import type { StoredModel } from '@kilocode/db';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
@@ -133,7 +133,7 @@ describe('briefing model pricing', () => {
         name: aion.name,
         reasoning: { mandatory: false, supported_efforts: ['low'] },
         endpoints: [{ pricing: { prompt: '0.000001', completion: '0.000002' } }],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     const roomy = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
@@ -161,7 +161,7 @@ describe('briefing model pricing', () => {
           { tag: 'other-route', pricing: { prompt: '0.0000001', completion: '0.0000002' } },
           { tag: 'preferred-route', pricing: { prompt: '0.000002', completion: '0.000004' } },
         ],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     const quote = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
@@ -204,7 +204,7 @@ describe('briefing model pricing', () => {
         id: 'vendor/listed',
         name: 'Listed',
         endpoints: [{ pricing: { prompt: '0.000001', completion: '0.000002' } }],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     await expect(briefingPriceBound(aion.id, 'Overnight activity', 2_000_000)).rejects.toThrow(
@@ -243,7 +243,7 @@ describe('briefing model pricing', () => {
         id: autoSmall.id,
         name: autoSmall.name,
         endpoints: [{ tag: 'alibaba', pricing: { prompt: '0.001', completion: '0.002' } }],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     expect(withCatalogRow).toEqual(
@@ -298,7 +298,7 @@ describe('briefing model pricing', () => {
         name: alias.name,
         alias_target: { slug: target.id },
         endpoints: [],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     const quote = await briefingPriceBound(alias.id, 'Overnight activity', 2_000_000);
@@ -321,7 +321,7 @@ describe('briefing model pricing', () => {
         name: alias.name,
         alias_target: { slug: targetId },
         endpoints: [],
-      } satisfies StoredModel,
+      } satisfies GatewayModelWithEndpoints,
     });
 
     await expect(briefingPriceBound(alias.id, 'Overnight activity', 2_000_000)).rejects.toThrow(

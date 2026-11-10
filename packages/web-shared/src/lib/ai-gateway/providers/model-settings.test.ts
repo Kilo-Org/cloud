@@ -1,9 +1,13 @@
 import { describe, expect, jest, test } from '@jest/globals';
-import type { ReasoningEffort, StoredModel } from '@kilocode/db/schema-types';
+import type { ReasoningEffort } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 const supportedEfforts: ReasoningEffort[] = ['max', 'high', 'medium', 'low', 'minimal'];
 
-function storedModel(id: string, reasoning: StoredModel['reasoning']): StoredModel {
+function storedModel(
+  id: string,
+  reasoning: GatewayModelWithEndpoints['reasoning']
+): GatewayModelWithEndpoints {
   return { id, name: id, endpoints: [], reasoning };
 }
 

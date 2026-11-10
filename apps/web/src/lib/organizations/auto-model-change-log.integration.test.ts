@@ -317,7 +317,7 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     await clearSnapshots();
   });
 
-  test('reads the stored previous snapshot, writes the new one, and emits audit logs based on the diff', async () => {
+  test('reads the stored previous snapshot, writes the new one without the obsolete gateway model columns, and emits audit logs based on the diff', async () => {
     const owner = await insertTestUser();
     const enterpriseOrg = await createTestOrganization('Wiring Org', owner.id, 0, {
       provider_policy_mode: 'allow',
@@ -327,16 +327,12 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
     await db.insert(modelsByProvider).values({
       data: oldSnapshot,
-      openrouter: {},
-      vercel: {},
+      openrouter: { 'z-ai/glm-5': { id: 'z-ai/glm-5' } },
+      vercel: { 'zai/glm-5': { id: 'zai/glm-5' } },
     });
 
     const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
-    const result = await applySnapshotChangesAndAudit({
-      providers: newSnapshot,
-      openrouter_data: {},
-      vercel_data: {},
-    });
+    const result = await applySnapshotChangesAndAudit({ providers: newSnapshot });
 
     expect(result.previousSnapshot?.providers[0].models.map(m => m.slug)).toEqual(['z-ai/glm-5']);
     expect(result.data.providers[0].models.map(m => m.slug)).toEqual([
@@ -344,9 +340,15 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
       'z-ai/glm-5.1',
     ]);
 
-    const remainingRows = await db.select().from(modelsByProvider);
+    const remainingRows = await db
+      .select({
+        id: modelsByProvider.id,
+        openrouter: modelsByProvider.openrouter,
+        vercel: modelsByProvider.vercel,
+      })
+      .from(modelsByProvider);
     expect(remainingRows).toHaveLength(1);
-    expect(remainingRows[0].id).toBe(result.id);
+    expect(remainingRows).toEqual([{ id: result.id, openrouter: null, vercel: null }]);
 
     const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
     expect(logs).toHaveLength(1);
@@ -361,11 +363,7 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     });
 
     const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
-    const result = await applySnapshotChangesAndAudit({
-      providers: newSnapshot,
-      openrouter_data: {},
-      vercel_data: {},
-    });
+    const result = await applySnapshotChangesAndAudit({ providers: newSnapshot });
 
     expect(result.previousSnapshot).toBeNull();
 
@@ -381,11 +379,7 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     });
 
     const initialSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
-    await db.insert(modelsByProvider).values({
-      data: initialSnapshot,
-      openrouter: {},
-      vercel: {},
-    });
+    await db.insert(modelsByProvider).values({ data: initialSnapshot });
 
     const nextSnapshotA = buildSnapshot([
       { slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1-a'] },
@@ -395,16 +389,8 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     ]);
 
     const [resultA, resultB] = await Promise.all([
-      applySnapshotChangesAndAudit({
-        providers: nextSnapshotA,
-        openrouter_data: {},
-        vercel_data: {},
-      }),
-      applySnapshotChangesAndAudit({
-        providers: nextSnapshotB,
-        openrouter_data: {},
-        vercel_data: {},
-      }),
+      applySnapshotChangesAndAudit({ providers: nextSnapshotA }),
+      applySnapshotChangesAndAudit({ providers: nextSnapshotB }),
     ]);
 
     const sortedById = [resultA, resultB].sort((a, b) => a.id - b.id);

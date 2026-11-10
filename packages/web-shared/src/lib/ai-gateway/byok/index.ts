@@ -28,8 +28,8 @@ import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
-  type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
@@ -42,7 +42,7 @@ export type ByokSourceDb = typeof db | DrizzleTransaction;
 
 async function deriveModelInferenceUserByokProviders(
   modelId: string,
-  vercelModelMetadata: StoredModelMap
+  vercelModelMetadata: GatewayModelMap
 ): Promise<UserByokProviderId[]> {
   const providers: UserByokProviderId[] = [
     ...new Set(
@@ -86,7 +86,7 @@ export async function getModelGatewayUserByokProviders(
   );
 }
 
-async function getVercelModelMetadata(caller: string): Promise<StoredModelMap | null> {
+async function getVercelModelMetadata(caller: string): Promise<GatewayModelMap | null> {
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
   if (Object.keys(vercelModelMetadata).length === 0) {
     console.error('[%s] no Vercel model metadata', caller);

@@ -44,7 +44,11 @@ import {
   listCodeReviewAttempts,
   type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
-import { isAutomaticallyRetryableReview, retryFailedCodeReview } from './retry-review';
+import {
+  isAutomaticallyRetryableFailure,
+  isAutomaticallyRetryableReview,
+  retryFailedCodeReview,
+} from './retry-review';
 import {
   PullRequestPayloadSchema,
   type PullRequestPayload,
@@ -80,6 +84,8 @@ export type RecoverMissedReviewsSummary = {
   reviewsRetried: number;
   skippedExisting: number;
   skippedActiveReview: number;
+  /** Failed reviews the reviewer configuration does not let a restart run. */
+  skippedRetryRefused: number;
   /**
    * Installed repository entries the sweep cannot address, because the payload
    * needs a numeric platform id. Counted across the installation fleet, so it
@@ -116,6 +122,7 @@ function summaryWith(counts: Partial<RecoverMissedReviewsSummary>): RecoverMisse
     reviewsRetried: 0,
     skippedExisting: 0,
     skippedActiveReview: 0,
+    skippedRetryRefused: 0,
     unaddressableRepositories: 0,
     skippedStale: 0,
     skippedDraft: 0,
@@ -453,13 +460,19 @@ async function recoverPullRequest(params: {
     // the pull request's gate failed and its head never gets a review, because
     // nothing retries it without a person. Restart it here, under an attempt cap
     // so a persistent fault settles instead of billing a run every sweep.
-    const attempts = await listCodeReviewAttempts(existingReview.id);
-    if (!isAutomaticallyRetryableReview(existingReview, attempts.length)) {
+    if (!isAutomaticallyRetryableFailure(existingReview)) {
       summary.skippedExisting += 1;
       return;
     }
     if (summary.reviewsStarted >= RECOVER_MISSED_REVIEWS_START_LIMIT) {
       summary.skippedStartLimit += 1;
+      return;
+    }
+    // The attempt rows are read only for a review this run can restart, so a
+    // head that already has its review costs one query.
+    const attempts = await listCodeReviewAttempts(existingReview.id);
+    if (!isAutomaticallyRetryableReview(existingReview, attempts.length)) {
+      summary.skippedExisting += 1;
       return;
     }
     // Reserve the slot before the awaited retry, as the start path does: a retry
@@ -480,6 +493,12 @@ async function recoverPullRequest(params: {
       if (retry.outcome === 'already_in_flight') {
         // Another caller reset this review first, so nothing was dispatched.
         summary.skippedExisting += 1;
+        return;
+      }
+      if (retry.outcome === 'refused') {
+        // The reviewer configuration cannot run this review, so no run was
+        // spent and nothing is left to count as a provider failure.
+        summary.skippedRetryRefused += 1;
         return;
       }
       // Dispatch refused the retried attempt, so the row is failed again.

@@ -7,12 +7,17 @@
  * check, then the dispatch that owns the retry from there.
  */
 
+import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
+import { isCodeReviewActionRequiredReason } from '@/lib/code-reviews/action-required-shared';
 import type { Owner } from '@/lib/code-reviews/core';
 import { CodeReviewPlatformSchema } from '@/lib/code-reviews/core/schemas';
+import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
   createCodeReviewAttempt,
   ensureCurrentCodeReviewAttemptFromReview,
@@ -21,7 +26,10 @@ import {
   updateCheckRunId,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
-import { shouldPublishCodeReviewToProvider } from '@/lib/code-reviews/manual-config';
+import {
+  getManualCodeReviewConfig,
+  shouldPublishCodeReviewToProvider,
+} from '@/lib/code-reviews/manual-config';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCheckRun, updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { setCommitStatus } from '@/lib/integrations/platforms/gitlab/adapter';
@@ -71,6 +79,20 @@ export const AUTOMATIC_RETRY_TERMINAL_REASONS: ReadonlySet<string> = new Set(
 export const AUTOMATIC_RETRY_ATTEMPT_LIMIT = 3;
 
 /**
+ * Whether the failure itself can be retried, before the attempt count is read.
+ *
+ * A caller that has the row can answer this without another query, so the sweep
+ * pays for the attempt rows only for a review it can restart.
+ */
+export function isAutomaticallyRetryableFailure(
+  review: Pick<CloudAgentCodeReview, 'status' | 'terminal_reason'>
+): boolean {
+  if (review.status !== 'failed') return false;
+  const reason = review.terminal_reason;
+  return reason !== null && AUTOMATIC_RETRY_TERMINAL_REASONS.has(reason);
+}
+
+/**
  * Whether a sweep may restart this review without a person deciding to.
  *
  * The attempt count is what stops a persistent fault from billing a review run
@@ -80,10 +102,7 @@ export function isAutomaticallyRetryableReview(
   review: Pick<CloudAgentCodeReview, 'status' | 'terminal_reason'>,
   attemptCount: number
 ): boolean {
-  if (review.status !== 'failed') return false;
-  if (attemptCount >= AUTOMATIC_RETRY_ATTEMPT_LIMIT) return false;
-  const reason = review.terminal_reason;
-  return reason !== null && AUTOMATIC_RETRY_TERMINAL_REASONS.has(reason);
+  return isAutomaticallyRetryableFailure(review) && attemptCount < AUTOMATIC_RETRY_ATTEMPT_LIMIT;
 }
 
 export type RetryCodeReviewOutcome =
@@ -92,7 +111,45 @@ export type RetryCodeReviewOutcome =
   /** Another caller already reset this review; nothing was dispatched. */
   | { outcome: 'already_in_flight' }
   /** Reset and dispatched, but dispatch marked the new attempt failed. */
-  | { outcome: 'still_failed'; errorMessage: string | null };
+  | { outcome: 'still_failed'; errorMessage: string | null }
+  /** The reviewer configuration cannot run this review, so nothing was reset. */
+  | { outcome: 'refused'; reason: CodeReviewRetryRefusalReason };
+
+export type CodeReviewRetryRefusalReason =
+  /** The Code Reviewer configuration needs attention before it can run. */
+  | 'action_required'
+  /** The owner switched Code Reviewer off. */
+  | 'reviewer_disabled'
+  /** A manual Code Reviewer job runs only in local development. */
+  | 'local_development_only';
+
+/**
+ * Whether the Code Reviewer configuration allows this review to run at all.
+ *
+ * A restart spends an agent run and closes the pull request gate, so a review
+ * whose reviewer the owner switched off, or whose configuration needs
+ * attention, must not start. Both callers ask here, so a person and an
+ * unattended sweep get the same answer for the same review.
+ */
+async function getRetryRefusal(
+  review: CloudAgentCodeReview,
+  owner: Owner
+): Promise<CodeReviewRetryRefusalReason | null> {
+  const manualConfig = getManualCodeReviewConfig(review);
+  if (manualConfig?.outputMode === 'kilo' && !isLocalCodeReviewDevelopmentEnabled()) {
+    return 'local_development_only';
+  }
+  if (manualConfig) return null;
+
+  const agentConfig = await getAgentConfigForOwner(
+    owner,
+    'code_review',
+    CodeReviewPlatformSchema.parse(review.platform)
+  );
+  if (getCodeReviewActionRequiredState(agentConfig)) return 'action_required';
+  if (!agentConfig?.is_enabled) return 'reviewer_disabled';
+  return null;
+}
 
 /**
  * Restarts a review in a retriggable state.
@@ -108,6 +165,11 @@ export async function retryFailedCodeReview(params: {
 }): Promise<RetryCodeReviewOutcome> {
   const { review, owner, retryReason } = params;
 
+  const refusal = await getRetryRefusal(review, owner);
+  if (refusal !== null) {
+    return { outcome: 'refused', reason: refusal };
+  }
+
   const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
 
   const resetCount = await resetCodeReviewForRetry(review.id);
@@ -122,8 +184,10 @@ export async function retryFailedCodeReview(params: {
     status: 'pending',
   });
 
+  const actor = actorFromOwner(owner);
+
   try {
-    await recreatePRGateCheck(review, actorFromOwner(owner));
+    await recreatePRGateCheck(review, actor);
   } catch (gateError) {
     // Non-blocking: the review still retries even if the gate check fails, and
     // a missing gate only costs the pull request a stale check.
@@ -135,7 +199,14 @@ export async function retryFailedCodeReview(params: {
   // Dispatch owns the retry from here: a worker that refuses the job marks the
   // review failed again. Reporting success would show a retry that never ran.
   const retriedReview = await getCodeReviewById(review.id);
-  if (retriedReview?.status === 'failed') {
+  if (retriedReview?.status === 'failed' || retriedReview?.status === 'cancelled') {
+    try {
+      await finalizeRetryGateCheck(retriedReview, actor);
+    } catch (gateError) {
+      // Non-blocking: the stored failure is the answer the caller needs, and
+      // the sweep reaches this review again on its next pass.
+      logExceptInTest('[retry] Failed to close the re-created PR gate check:', gateError);
+    }
     return { outcome: 'still_failed', errorMessage: retriedReview.error_message };
   }
   return { outcome: 'retried' };
@@ -145,6 +216,77 @@ function actorFromOwner(owner: Owner): GitLabCredentialActor {
   return owner.type === 'org'
     ? { userId: owner.userId, organizationId: owner.id }
     : { userId: owner.userId };
+}
+
+/**
+ * Closes the PR gate check re-created for a retry that then did not start.
+ *
+ * Without this the pull request keeps a queued check that no worker will ever
+ * finish, so the merge gate stays blocked on a review that already stopped. A
+ * billing refusal and an action-required cause close the gate with their own
+ * conclusion on their own path, and this leaves those two alone.
+ */
+async function finalizeRetryGateCheck(
+  review: CloudAgentCodeReview,
+  actor: GitLabCredentialActor
+): Promise<void> {
+  if (review.terminal_reason === 'billing') return;
+  if (isCodeReviewActionRequiredReason(review.terminal_reason)) return;
+  if (!shouldPublishCodeReviewToProvider(review)) return;
+  if (!review.platform_integration_id) return;
+
+  const platform = CodeReviewPlatformSchema.parse(review.platform);
+  if (platform === PLATFORM.BITBUCKET) return;
+
+  const integration = await getIntegrationById(review.platform_integration_id);
+  if (!integration) return;
+
+  const detailsUrl = `${APP_URL}/code-reviews/${review.id}`;
+  const cancelled = review.status === 'cancelled';
+  const copy = getCodeReviewTerminalReasonCopy(review.terminal_reason);
+  const title = cancelled
+    ? 'Kilo Code Review cancelled'
+    : (copy?.checkTitle ?? 'Kilo Code Review failed');
+  const summary = cancelled ? 'Review was cancelled.' : (copy?.checkSummary ?? 'Review failed.');
+
+  if (platform === PLATFORM.GITHUB && integration.platform_installation_id) {
+    const appType = integration.github_app_type ?? 'standard';
+    if (appType === 'lite') return;
+    if (!review.check_run_id) return;
+
+    const [repoOwner, repoName] = review.repo_full_name.split('/');
+    await updateCheckRun(
+      integration.platform_installation_id,
+      repoOwner,
+      repoName,
+      review.check_run_id,
+      {
+        status: 'completed',
+        conclusion: cancelled ? 'cancelled' : 'failure',
+        detailsUrl,
+        output: { title, summary },
+      },
+      appType
+    );
+    return;
+  }
+
+  if (platform === PLATFORM.GITLAB) {
+    const accessToken = review.platform_project_id
+      ? await getValidGitLabProjectAccessToken(integration, review.platform_project_id, actor)
+      : await getValidGitLabToken(integration, actor);
+    const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
+    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+
+    await setCommitStatus(
+      accessToken,
+      review.platform_project_id ?? review.repo_full_name,
+      review.head_sha,
+      cancelled ? 'canceled' : 'failed',
+      { targetUrl: detailsUrl, description: summary },
+      instanceUrl
+    );
+  }
 }
 
 /**

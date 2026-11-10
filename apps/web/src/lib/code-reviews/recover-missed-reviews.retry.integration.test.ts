@@ -293,6 +293,32 @@ describe('recoverMissedReviews restart against the database', () => {
     );
   });
 
+  it('closes the recreated gate check when dispatch leaves the restart failed', async () => {
+    const { reviewId } = await insertReview({
+      status: 'failed',
+      terminalReason: 'assistant_timeout',
+      attemptCount: 1,
+    });
+    // A preparation fault fails the dispatch outright; a worker rejection is
+    // ambiguous and leaves the review queued for the stale-queued reaper.
+    mockPrepareReviewPayload.mockRejectedValue(new Error('payload preparation failed'));
+
+    const summary = await recoverMissedReviews({ now: new Date() });
+
+    expect(summary.reviewsRetried).toBe(0);
+    expect(await storedReview(reviewId)).toEqual(
+      expect.objectContaining({ status: 'failed', terminalReason: null, checkRunId: 555 })
+    );
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      expect.any(String),
+      `sweep-retry-${RUN_SLUG}`,
+      'widgets',
+      555,
+      expect.objectContaining({ status: 'completed', conclusion: 'failure' }),
+      'standard'
+    );
+  });
+
   it('leaves a restarted review alone on the next run', async () => {
     const { reviewId } = await insertReview({
       status: 'failed',

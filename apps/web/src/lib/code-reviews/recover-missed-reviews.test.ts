@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type RetryOutcome =
   | { outcome: 'retried' | 'already_in_flight' }
-  | { outcome: 'still_failed'; errorMessage: string | null };
+  | { outcome: 'still_failed'; errorMessage: string | null }
+  | {
+      outcome: 'refused';
+      reason: 'action_required' | 'reviewer_disabled' | 'local_development_only';
+    };
 // The sweep asserts branch behaviour, so the wide-signature collaborators are
 // mocked while the real webhook handler decides the review-start verdict.
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
@@ -617,5 +621,39 @@ describe('recoverMissedReviews', () => {
       skippedExisting: 1,
       providerFailures: 0,
     });
+  });
+
+  it('reports a restart the reviewer configuration refuses as skipped, not failed', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'failed',
+      terminal_reason: 'assistant_timeout',
+    });
+    mockRetryFailedCodeReview.mockResolvedValue({
+      outcome: 'refused',
+      reason: 'reviewer_disabled',
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({
+      reviewsRetried: 0,
+      reviewsStarted: 0,
+      skippedRetryRefused: 1,
+      providerFailures: 0,
+    });
+  });
+
+  it('reads no attempt rows for a head whose review already finished', async () => {
+    mockFindExistingReview.mockResolvedValue({
+      id: 'review-1',
+      status: 'completed',
+      terminal_reason: null,
+    });
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({ skippedExisting: 1, reviewsStarted: 0 });
+    expect(mockListAttempts).not.toHaveBeenCalled();
   });
 });

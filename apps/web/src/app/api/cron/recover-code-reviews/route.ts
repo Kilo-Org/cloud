@@ -46,6 +46,7 @@ export async function GET(request: Request) {
         pull_requests_considered: summary.pullRequestsConsidered,
         reviews_started: summary.reviewsStarted,
         reviews_retried: summary.reviewsRetried,
+        skipped_retry_refused: summary.skippedRetryRefused,
         skipped_existing: summary.skippedExisting,
         skipped_active_review: summary.skippedActiveReview,
         unaddressable_repositories: summary.unaddressableRepositories,

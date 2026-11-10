@@ -50,7 +50,6 @@ import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
@@ -61,14 +60,30 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/session-log';
 import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
 import {
-  getManualCodeReviewConfig,
   getManualCodeReviewConfigForDetail,
   isLocalKiloCodeReview,
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
-import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
-import { retryFailedCodeReview } from '@/lib/code-reviews/retry-review';
+import {
+  retryFailedCodeReview,
+  type CodeReviewRetryRefusalReason,
+} from '@/lib/code-reviews/retry-review';
+
+/**
+ * The answer a person gets when the reviewer configuration refuses a retry.
+ * The sequence owns the decision, so the message is chosen from its reason.
+ */
+function retryRefusalMessage(reason: CodeReviewRetryRefusalReason): string {
+  switch (reason) {
+    case 'local_development_only':
+      return 'Local Code Reviewer jobs can only be retried in local development.';
+    case 'action_required':
+      return 'Code Reviewer is disabled because configuration needs attention. Fix settings, enable Code Reviewer again, then retry this review.';
+    case 'reviewer_disabled':
+      return 'Enable Code Reviewer before retrying this review.';
+  }
+}
 
 /**
  * Finalizes the PR gate check as cancelled for a review that never left pending.
@@ -596,39 +611,15 @@ export const codeReviewRouter = createTRPCRouter({
           owner = { type: 'user', id: review.owned_by_user_id as string, userId: ctx.user.id };
         }
 
-        const platform = CodeReviewPlatformSchema.parse(review.platform);
-        const manualConfig = getManualCodeReviewConfig(review);
-        if (manualConfig?.outputMode === 'kilo' && !isLocalCodeReviewDevelopmentEnabled()) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Local Code Reviewer jobs can only be retried in local development.',
-          });
-        }
-
-        if (!manualConfig) {
-          const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
-          const actionRequiredState = getCodeReviewActionRequiredState(agentConfig);
-          if (actionRequiredState) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message:
-                'Code Reviewer is disabled because configuration needs attention. Fix settings, enable Code Reviewer again, then retry this review.',
-            });
-          }
-
-          if (!agentConfig?.is_enabled) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Enable Code Reviewer before retrying this review.',
-            });
-          }
-        }
-
         const retry = await retryFailedCodeReview({
           review,
           owner,
           retryReason: 'manual_retrigger',
         });
+
+        if (retry.outcome === 'refused') {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: retryRefusalMessage(retry.reason) });
+        }
 
         if (retry.outcome === 'already_in_flight') {
           throw new TRPCError({

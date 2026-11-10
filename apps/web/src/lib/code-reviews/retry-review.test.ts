@@ -18,12 +18,17 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationById: jest.fn(),
 }));
 
+jest.mock('@/lib/agent-config/db/agent-configs', () => ({
+  getAgentConfigForOwner: jest.fn(),
+}));
+
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   createCheckRun: jest.fn(),
   updateCheckRun: jest.fn(),
 }));
 
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
+import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import type { Owner } from '@/lib/code-reviews/core';
 import {
   createCodeReviewAttempt,
@@ -34,12 +39,15 @@ import {
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import { createCheckRun } from '@/lib/integrations/platforms/github/adapter';
+import { createCheckRun, updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import {
   AUTOMATIC_RETRY_ATTEMPT_LIMIT,
+  isAutomaticallyRetryableFailure,
   isAutomaticallyRetryableReview,
   retryFailedCodeReview,
 } from './retry-review';
+
+const mockedGetAgentConfig = jest.mocked(getAgentConfigForOwner);
 
 const mockedEnsureAttempt = jest.mocked(ensureCurrentCodeReviewAttemptFromReview);
 const mockedReset = jest.mocked(resetCodeReviewForRetry);
@@ -49,6 +57,7 @@ const mockedUpdateCheckRunId = jest.mocked(updateCheckRunId);
 const mockedDispatch = jest.mocked(tryDispatchPendingReviews);
 const mockedGetIntegration = jest.mocked(getIntegrationById);
 const mockedCreateCheckRun = jest.mocked(createCheckRun);
+const mockedUpdateCheckRun = jest.mocked(updateCheckRun);
 
 const OWNER: Owner = { type: 'user', id: 'user-1', userId: 'user-1' };
 
@@ -84,6 +93,12 @@ beforeEach(() => {
     metadata: null,
   } as never);
   mockedCreateCheckRun.mockResolvedValue(990);
+  mockedGetAgentConfig.mockResolvedValue({
+    id: 'config-1',
+    config: {},
+    is_enabled: true,
+    runtime_state: {},
+  } as never);
 });
 
 describe('isAutomaticallyRetryableReview', () => {
@@ -113,6 +128,24 @@ describe('isAutomaticallyRetryableReview', () => {
       ).toBe(expected);
     }
   );
+});
+
+describe('isAutomaticallyRetryableFailure', () => {
+  it.each([
+    ['assistant_timeout', 'failed', true],
+    ['workspace_capacity', 'failed', true],
+    ['billing', 'failed', false],
+    [null, 'failed', false],
+    ['assistant_timeout', 'cancelled', false],
+    ['assistant_timeout', 'queued', false],
+  ])('reason %s and status %s answers %s', (reason, status, expected) => {
+    expect(
+      isAutomaticallyRetryableFailure({
+        status,
+        terminal_reason: reason,
+      } as Pick<CloudAgentCodeReview, 'status' | 'terminal_reason'>)
+    ).toBe(expected);
+  });
 });
 
 describe('retryFailedCodeReview', () => {
@@ -174,6 +207,91 @@ describe('retryFailedCodeReview', () => {
 
     expect(result).toEqual({ outcome: 'still_failed', errorMessage: 'worker refused the job' });
     expect(mockedDispatch).toHaveBeenCalled();
+  });
+
+  it('closes the recreated check run when dispatch fails the new attempt', async () => {
+    mockedGetReview.mockResolvedValue(
+      makeReview({
+        status: 'failed',
+        terminal_reason: 'assistant_timeout',
+        check_run_id: 990,
+        error_message: 'worker refused the job',
+      })
+    );
+
+    const result = await retryFailedCodeReview({
+      review: makeReview(),
+      owner: OWNER,
+      retryReason: 'automatic_recovery',
+    });
+
+    expect(result).toEqual({ outcome: 'still_failed', errorMessage: 'worker refused the job' });
+    expect(mockedUpdateCheckRun).toHaveBeenCalledWith(
+      '123456',
+      'acme',
+      'widgets',
+      990,
+      expect.objectContaining({ status: 'completed', conclusion: 'failure' }),
+      'standard'
+    );
+  });
+
+  it('leaves the check run of a refused billing failure to its own path', async () => {
+    mockedGetReview.mockResolvedValue(
+      makeReview({
+        status: 'failed',
+        terminal_reason: 'billing',
+        check_run_id: 990,
+        error_message: null,
+      })
+    );
+
+    const result = await retryFailedCodeReview({
+      review: makeReview(),
+      owner: OWNER,
+      retryReason: 'automatic_recovery',
+    });
+
+    expect(result).toEqual({ outcome: 'still_failed', errorMessage: null });
+    expect(mockedUpdateCheckRun).not.toHaveBeenCalled();
+  });
+
+  it('answers refused for a reviewer the owner switched off', async () => {
+    mockedGetAgentConfig.mockResolvedValue({ is_enabled: false, config: {} } as never);
+
+    const result = await retryFailedCodeReview({
+      review: makeReview(),
+      owner: OWNER,
+      retryReason: 'automatic_recovery',
+    });
+
+    expect(result).toEqual({ outcome: 'refused', reason: 'reviewer_disabled' });
+    expect(mockedReset).not.toHaveBeenCalled();
+    expect(mockedDispatch).not.toHaveBeenCalled();
+  });
+
+  it('answers refused for a reviewer whose configuration needs attention', async () => {
+    mockedGetAgentConfig.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+      runtime_state: {
+        code_review_action_required: {
+          reason: 'byok_invalid_key',
+          detectedAt: '2026-01-01T00:00:00.000Z',
+          lastSeenAt: '2026-01-01T00:00:00.000Z',
+          lastErrorMessage: 'invalid key',
+        },
+      },
+    } as never);
+
+    const result = await retryFailedCodeReview({
+      review: makeReview(),
+      owner: OWNER,
+      retryReason: 'automatic_recovery',
+    });
+
+    expect(result).toEqual({ outcome: 'refused', reason: 'action_required' });
+    expect(mockedDispatch).not.toHaveBeenCalled();
   });
 
   it('still retries when the gate check cannot be recreated', async () => {

@@ -1939,6 +1939,7 @@
       "toolList": "listele",
       "toolPatch": "yama uygula",
       "toolTask": "görev",
+      "toolSendFile": "Dosya gönderildi",
       "readTodos": "Planı oku",
       "updateTodos": "Planı güncelle",
       "linesBadge": "{{displayCount}} satır",

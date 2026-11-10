@@ -1961,6 +1961,7 @@
       "toolList": "הצגת רשימה",
       "toolPatch": "החלת תיקון",
       "toolTask": "משימה",
+      "toolSendFile": "שליחת קובץ",
       "readTodos": "קריאת התוכנית",
       "updateTodos": "עדכון התוכנית",
       "linesBadge": "{{displayCount}} שורות",

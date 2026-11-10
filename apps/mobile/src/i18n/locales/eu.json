@@ -2477,6 +2477,7 @@
       "toolList": "zerrendatu",
       "toolPatch": "aplikatu adabakia",
       "toolTask": "zeregina",
+      "toolSendFile": "Bidali fitxategia",
       "readTodos": "Irakurri plana",
       "updateTodos": "Eguneratu plana",
       "linesBadge": "{{displayCount}} lerro",

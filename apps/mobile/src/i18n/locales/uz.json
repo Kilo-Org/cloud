@@ -2477,6 +2477,7 @@
       "toolList": "ro'yxatni ko'rsatish",
       "toolPatch": "tuzatish kiritish",
       "toolTask": "vazifa",
+      "toolSendFile": "Fayl yuborildi",
       "readTodos": "Rejani o‘qish",
       "updateTodos": "Rejani yangilash",
       "linesBadge": "{{displayCount}} qator",

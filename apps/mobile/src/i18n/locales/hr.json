@@ -2520,6 +2520,7 @@
       "toolList": "prikaži popis",
       "toolPatch": "primijeni izmjene",
       "toolTask": "zadatak",
+      "toolSendFile": "Poslana datoteka",
       "readTodos": "Pročitaj plan",
       "updateTodos": "Ažuriraj plan",
       "linesBadge": "redaka: {{displayCount}}",

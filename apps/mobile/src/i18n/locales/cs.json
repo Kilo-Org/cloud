@@ -2563,6 +2563,7 @@
       "toolList": "výpis",
       "toolPatch": "úprava",
       "toolTask": "úkol",
+      "toolSendFile": "Odeslaný soubor",
       "readTodos": "Přečíst plán",
       "updateTodos": "Aktualizovat plán",
       "linesBadge": "řádky: {{displayCount}}",

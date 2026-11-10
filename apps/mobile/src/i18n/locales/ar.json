@@ -2027,6 +2027,7 @@
       "toolList": "عرض قائمة",
       "toolPatch": "تطبيق تصحيح",
       "toolTask": "المهمة",
+      "toolSendFile": "إرسال الملف",
       "readTodos": "قراءة الخطة",
       "updateTodos": "تحديث الخطة",
       "linesBadge": "الأسطر: {{displayCount}}",

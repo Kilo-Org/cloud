@@ -2477,6 +2477,7 @@
       "toolList": "listázás",
       "toolPatch": "módosítás",
       "toolTask": "feladat",
+      "toolSendFile": "Fájl elküldve",
       "readTodos": "Terv olvasása",
       "updateTodos": "Terv frissítése",
       "linesBadge": "{{displayCount}} sor",

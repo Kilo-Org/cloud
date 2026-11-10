@@ -2563,6 +2563,7 @@
       "toolList": "zobraziť zoznam",
       "toolPatch": "použiť záplatu",
       "toolTask": "úloha",
+      "toolSendFile": "Odoslaný súbor",
       "readTodos": "Prečítať plán",
       "updateTodos": "Aktualizovať plán",
       "linesBadge": "riadky: {{displayCount}}",

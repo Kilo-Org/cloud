@@ -2477,6 +2477,7 @@
       "toolList": "тізімдеу",
       "toolPatch": "түзету енгізу",
       "toolTask": "тапсырма",
+      "toolSendFile": "Файл жіберілді",
       "readTodos": "Жоспарды оқу",
       "updateTodos": "Жоспарды жаңарту",
       "linesBadge": "{{displayCount}} жол",

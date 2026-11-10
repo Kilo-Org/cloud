@@ -1939,6 +1939,7 @@
       "toolList": "inhoud weergeven",
       "toolPatch": "wijzigingen toepassen",
       "toolTask": "taak",
+      "toolSendFile": "Bestand verzonden",
       "readTodos": "Planning lezen",
       "updateTodos": "Planning bijwerken",
       "linesBadge": "{{displayCount}} regels",

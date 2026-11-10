@@ -2477,6 +2477,7 @@
       "toolList": "lys",
       "toolPatch": "pas wysiging toe",
       "toolTask": "taak",
+      "toolSendFile": "Lêer gestuur",
       "readTodos": "Lees plan",
       "updateTodos": "Werk plan by",
       "linesBadge": "{{displayCount}} reëls",

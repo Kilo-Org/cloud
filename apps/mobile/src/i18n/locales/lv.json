@@ -2520,6 +2520,7 @@
       "toolList": "uzskaitīt",
       "toolPatch": "labot",
       "toolTask": "uzdevums",
+      "toolSendFile": "Nosūtīts fails",
       "readTodos": "Lasīt plānu",
       "updateTodos": "Atjaunināt plānu",
       "linesBadge": "{{displayCount}} rindas",

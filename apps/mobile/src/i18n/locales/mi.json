@@ -2477,6 +2477,7 @@
       "toolList": "whakarārangitia",
       "toolPatch": "papakihia",
       "toolTask": "mahi",
+      "toolSendFile": "kua tukuna",
       "readTodos": "Pānuitia te mahere",
       "updateTodos": "Whakahoutia te mahere",
       "linesBadge": "{{displayCount}} rārangi",

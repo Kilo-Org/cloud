@@ -2483,6 +2483,7 @@
       "toolList": "መዘርዘር",
       "toolPatch": "ለውጦችን መተግበር",
       "toolTask": "ተግባር",
+      "toolSendFile": "ፋይል ተልኳል",
       "readTodos": "ዕቅዱን ያንብቡ",
       "updateTodos": "ዕቅዱን ያዘምኑ",
       "linesBadge": "{{displayCount}} መስመሮች",

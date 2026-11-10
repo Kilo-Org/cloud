@@ -2477,6 +2477,7 @@
       "toolList": "senaraikan",
       "toolPatch": "tampal",
       "toolTask": "tugasan",
+      "toolSendFile": "Hantar fail",
       "readTodos": "Baca pelan",
       "updateTodos": "Kemas kini pelan",
       "linesBadge": "{{displayCount}} baris",

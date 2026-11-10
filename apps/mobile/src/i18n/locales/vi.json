@@ -1939,6 +1939,7 @@
       "toolList": "liệt kê",
       "toolPatch": "áp dụng bản vá",
       "toolTask": "tác vụ",
+      "toolSendFile": "Đã gửi tệp",
       "readTodos": "Đọc kế hoạch",
       "updateTodos": "Cập nhật kế hoạch",
       "linesBadge": "{{displayCount}} dòng",

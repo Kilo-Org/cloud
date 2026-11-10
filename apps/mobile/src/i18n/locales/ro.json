@@ -2520,6 +2520,7 @@
       "toolList": "listare",
       "toolPatch": "aplicare de modificări",
       "toolTask": "sarcină",
+      "toolSendFile": "fișier trimis",
       "readTodos": "Citește planul",
       "updateTodos": "Actualizează planul",
       "linesBadge": "{{displayCount}} linii",

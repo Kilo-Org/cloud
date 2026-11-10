@@ -1939,6 +1939,7 @@
       "toolList": "列出",
       "toolPatch": "套用修補",
       "toolTask": "任務",
+      "toolSendFile": "傳送檔案",
       "readTodos": "讀取計畫",
       "updateTodos": "更新計畫",
       "linesBadge": "{{displayCount}} 行",

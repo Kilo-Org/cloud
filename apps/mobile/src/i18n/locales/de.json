@@ -1939,6 +1939,7 @@
       "toolList": "auflisten",
       "toolPatch": "änderungen anwenden",
       "toolTask": "aufgabe",
+      "toolSendFile": "Datei gesendet",
       "readTodos": "Planung lesen",
       "updateTodos": "Planung aktualisieren",
       "linesBadge": "{{displayCount}} Zeilen",

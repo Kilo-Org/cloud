@@ -2477,6 +2477,7 @@
       "toolList": "loetle",
       "toolPatch": "rakenda paik",
       "toolTask": "ülesanne",
+      "toolSendFile": "Fail saadetud",
       "readTodos": "Loe plaani",
       "updateTodos": "Uuenda plaani",
       "linesBadge": "{{displayCount}} rida",

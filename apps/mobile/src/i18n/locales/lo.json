@@ -2477,6 +2477,7 @@
       "toolList": "ສະແດງລາຍການ",
       "toolPatch": "ແກ້ໄຂ",
       "toolTask": "ວຽກ",
+      "toolSendFile": "ສົ່ງໄຟລ໌ແລ້ວ",
       "readTodos": "ອ່ານແຜນ",
       "updateTodos": "ອັບເດດແຜນ",
       "linesBadge": "{{displayCount}} ບັນທັດ",

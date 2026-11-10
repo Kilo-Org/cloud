@@ -1866,6 +1866,7 @@
       "toolList": "lister",
       "toolPatch": "appliquer un correctif",
       "toolTask": "tâche",
+      "toolSendFile": "Fichier envoyé",
       "readTodos": "Lire le programme",
       "updateTodos": "Mettre à jour le programme",
       "linesBadge": "{{displayCount}} lignes",

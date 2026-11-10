@@ -2477,6 +2477,7 @@
       "toolList": "list opp",
       "toolPatch": "bruk endringer",
       "toolTask": "oppgave",
+      "toolSendFile": "Sendte fil",
       "readTodos": "Les planen",
       "updateTodos": "Oppdater planen",
       "linesBadge": "{{displayCount}} linjer",

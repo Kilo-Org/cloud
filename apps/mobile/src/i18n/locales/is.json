@@ -2477,6 +2477,7 @@
       "toolList": "birta lista",
       "toolPatch": "lagfæra",
       "toolTask": "verkefni",
+      "toolSendFile": "Skjal sent",
       "readTodos": "Lesa áætlun",
       "updateTodos": "Uppfæra áætlun",
       "linesBadge": "{{displayCount}} línur",

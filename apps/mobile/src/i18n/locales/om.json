@@ -2477,6 +2477,7 @@
       "toolList": "tarreessi",
       "toolPatch": "sirreessi",
       "toolTask": "hojii",
+      "toolSendFile": "Faayilii ergame",
       "readTodos": "Karoora dubbisi",
       "updateTodos": "Karoora haaromsi",
       "linesBadge": "Sarara {{displayCount}}",

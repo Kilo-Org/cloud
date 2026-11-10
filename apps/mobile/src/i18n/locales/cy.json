@@ -2649,6 +2649,7 @@
       "toolList": "rhestru",
       "toolPatch": "clytio",
       "toolTask": "tasg",
+      "toolSendFile": "Anfonwyd ffeil",
       "readTodos": "Darllen y cynllun",
       "updateTodos": "Diweddaru'r cynllun",
       "linesBadge": "{{displayCount}} llinell",

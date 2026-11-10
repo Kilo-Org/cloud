@@ -2477,6 +2477,7 @@
       "toolList": "orodhesha",
       "toolPatch": "rekebisha",
       "toolTask": "kazi",
+      "toolSendFile": "Faili imetumwa",
       "readTodos": "Soma mpango",
       "updateTodos": "Sasisha mpango",
       "linesBadge": "Mistari {{displayCount}}",

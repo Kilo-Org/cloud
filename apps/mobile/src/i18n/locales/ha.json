@@ -2477,6 +2477,7 @@
       "toolList": "jera",
       "toolPatch": "gyara",
       "toolTask": "aiki",
+      "toolSendFile": "An aika fayil",
       "readTodos": "Karanta tsari",
       "updateTodos": "Sabunta tsari",
       "linesBadge": "layuka {{displayCount}}",

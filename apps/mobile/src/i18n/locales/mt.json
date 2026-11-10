@@ -2606,6 +2606,7 @@
       "toolList": "elenka",
       "toolPatch": "applika bidliet",
       "toolTask": "kompitu",
+      "toolSendFile": "Fajl mibgħut",
       "readTodos": "Aqra l-pjan",
       "updateTodos": "Aġġorna l-pjan",
       "linesBadge": "{{displayCount}} linji",

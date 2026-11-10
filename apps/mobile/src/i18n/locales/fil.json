@@ -2483,6 +2483,7 @@
       "toolList": "ilista",
       "toolPatch": "ilapat ang pagbabago",
       "toolTask": "gawain",
+      "toolSendFile": "Naipadala ang file",
       "readTodos": "Basahin ang plano",
       "updateTodos": "I-update ang plano",
       "linesBadge": "{{displayCount}} na linya",

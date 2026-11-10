@@ -2477,6 +2477,7 @@
       "toolList": "luettele",
       "toolPatch": "korjaus",
       "toolTask": "tehtävä",
+      "toolSendFile": "Lähetetty tiedosto",
       "readTodos": "Lue suunnitelma",
       "updateTodos": "Päivitä suunnitelma",
       "linesBadge": "{{displayCount}} riviä",

@@ -298,7 +298,7 @@ export function addInstruction(
           'instructions',
           source,
           field,
-          `Instruction is not importable: ${zodIssue.message}`
+          `Instruction "${name}" from ${source} is not importable: ${zodIssue.message}`
         )
       );
     }

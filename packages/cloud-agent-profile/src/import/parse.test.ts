@@ -197,6 +197,9 @@ describe('parseLocalConfigArchive', () => {
     const preview = parseFiles({ 'instructions/cloud-agent.md': 'Body' });
     const issue = preview.issues.find(candidate => candidate.code === 'instruction-invalid');
     expect(issue?.field).toBe('name');
+    expect(issue?.path).toBe('instructions/cloud-agent.md');
+    expect(issue?.message).toContain('"cloud-agent"');
+    expect(issue?.message).toContain('instructions/cloud-agent.md');
     expect(issue?.message).toContain('Cloud-Agent');
     expect(preview.config.instructions).toEqual([]);
   });
@@ -204,6 +207,41 @@ describe('parseLocalConfigArchive', () => {
   test('slugifies nested instruction paths into a safe rules filename', () => {
     const preview = parseFiles({ 'instructions/team/style.md': 'Body' });
     expect(preview.config.instructions).toEqual([{ name: 'team-style', content: 'Body' }]);
+  });
+
+  test('imports an instruction file whose name has no ASCII characters', () => {
+    const preview = parseFiles({ 'instructions/使用说明.md': 'Body' });
+    expect(preview.issues).toEqual([]);
+    expect(preview.config.instructions).toEqual([
+      { name: expect.stringMatching(/^instruction-[0-9a-f]{8}$/), content: 'Body' },
+    ]);
+  });
+
+  test('imports accented and ASCII instruction files that used to share one name', () => {
+    const preview = parseFiles({
+      'instructions/café-notes.md': 'Accented body',
+      'instructions/caf-notes.md': 'ASCII body',
+    });
+    expect(preview.issues).toEqual([]);
+    const contents = new Map(
+      preview.config.instructions.map(instruction => [instruction.name, instruction.content])
+    );
+    expect(contents.get('caf-notes')).toBe('ASCII body');
+    const accented = [...contents.keys()].find(name => name !== 'caf-notes');
+    expect(accented).toMatch(/^cafe-notes-[0-9a-f]{8}$/);
+    expect(contents.get(accented ?? '')).toBe('Accented body');
+  });
+
+  test('derives one identity for a non-Latin instruction matched by a directory and a glob', () => {
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: ['instructions/*.md'] }),
+      'instructions/使用说明.md': 'Body',
+    });
+    expect(issueCodes(preview)).not.toContain('duplicate-definition');
+    expect(preview.hasErrors).toBe(false);
+    expect(preview.config.instructions).toEqual([
+      { name: expect.stringMatching(/^instruction-[0-9a-f]{8}$/), content: 'Body' },
+    ]);
   });
 
   test('rejects duplicate definitions with both sources named', () => {

@@ -43,8 +43,11 @@ export type EnkryptOutputGuardrailDraft = {
   detectors: EnkryptOutputDetectorsDraft;
 };
 
+export type GuardrailGroup = { id: string; name: string };
+
 export type EnkryptGuardrailsConfig = {
   enabled: boolean;
+  group_id: string | null;
   detectors: EnkryptInputDetectors;
   output: EnkryptOutputGuardrailConfig;
 };
@@ -127,6 +130,7 @@ export function fromDraftOutputDetectors(
 export function toDraft(config: EnkryptGuardrailsConfig): EnkryptGuardrailsDraft {
   return {
     enabled: config.enabled,
+    group_id: config.group_id,
     detectors: toDraftDetectors(config.detectors),
     output: {
       enabled: config.output.enabled,
@@ -138,6 +142,7 @@ export function toDraft(config: EnkryptGuardrailsConfig): EnkryptGuardrailsDraft
 export function fromDraft(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsConfig {
   return {
     enabled: draft.enabled,
+    group_id: draft.group_id,
     detectors: fromDraftDetectors(draft.detectors),
     output: {
       enabled: draft.output.enabled,
@@ -147,7 +152,7 @@ export function fromDraft(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsConfi
 }
 
 /**
- * Applies Kilo Default's detector selection and actions and sets Policy violation to block with
+ * Applies Kilo Default's detector selection and actions and sets Policy violation to log with
  * Kilo's default policy text, keeping keywords, topics, and structured rules.
  */
 export function applyKiloDefaultPreset(
@@ -161,7 +166,7 @@ export function applyKiloDefaultPreset(
     policy_violation: {
       ...detectors.policy_violation,
       enabled: true,
-      action: preset.policy_violation.action,
+      action: 'log',
       format: 'policy_text',
       policy_text: KILO_DEFAULT_POLICY_TEXT,
     },
@@ -259,7 +264,11 @@ function sortKeys(value: unknown): unknown {
 /** Identifies a configuration by content; PostgreSQL `jsonb` does not preserve key order. */
 export function configKey(config: EnkryptGuardrailsConfig, includeOutput = true): string {
   return JSON.stringify(
-    sortKeys(includeOutput ? config : { enabled: config.enabled, detectors: config.detectors })
+    sortKeys(
+      includeOutput
+        ? config
+        : { enabled: config.enabled, group_id: config.group_id, detectors: config.detectors }
+    )
   );
 }
 

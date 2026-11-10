@@ -113,6 +113,9 @@ type StoredSessionRowProps = {
    * as the share sheet, omit it.
    */
   sectionTitle?: string | null;
+  /** The zone the section heading above this row was grouped in. Omitting it
+   * reads the device zone, which is right only for a row with no heading. */
+  timeZone?: string;
 };
 
 export function StoredSessionRow({
@@ -126,6 +129,7 @@ export function StoredSessionRow({
   live = false,
   metaWhileLive = false,
   sectionTitle = null,
+  timeZone,
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -224,7 +228,7 @@ export function StoredSessionRow({
   // the Yesterday heading) shows its clock time instead, and speaks the same
   // clock time rather than repeating the heading. Otherwise it speaks the same
   // calendar-day label it draws, so the two can never name different days.
-  const timeMeta = sectionAwareTimeMeta(timestamp, sectionTitle, { nowMs: now });
+  const timeMeta = sectionAwareTimeMeta(timestamp, sectionTitle, { nowMs: now, timeZone });
   const visibleMeta = composeStoredSessionVisibleMeta(
     formatSessionTotalCost(session.total_cost_microdollars),
     timeMeta.visible

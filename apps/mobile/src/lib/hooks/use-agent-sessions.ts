@@ -32,6 +32,7 @@ import {
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useLiveSessionsHold } from '@/lib/hooks/use-live-sessions-hold';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { deviceTimeZone } from '@/lib/intl-cache';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
@@ -118,15 +119,19 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   const sessions = useMemo(() => collectSearchPages(query.data?.pages), [query.data]);
   // The sections are calendar days of the device's own zone, so they read the
   // same shared clock the row labels do (see `useRelativeTimeNow`): a heading
-  // cannot outlive a zone change or a midnight the rows already followed.
+  // cannot outlive a zone change or a midnight the rows already followed. The
+  // zone is resolved here rather than inside the grouping so the rows under a
+  // heading can be handed the very zone that heading was grouped in.
   const now = useRelativeTimeNow();
+  const timeZone = deviceTimeZone();
   const dateGroups = useMemo(
-    () => groupAgentSessionsByDate(sessions, sortBy, { now: new Date(now) }),
-    [now, sessions, sortBy]
+    () => groupAgentSessionsByDate(sessions, sortBy, { now: new Date(now), timeZone }),
+    [now, sessions, sortBy, timeZone]
   );
 
   return {
     dateGroups,
+    timeZone,
     isPending: query.isPending,
     // Header-level fetch only — footer spinner has its own flag.
     isFetching: query.isFetching && !query.isFetchingNextPage,
@@ -241,11 +246,14 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // The sections are calendar days of the device's own zone and day. Watching
   // the shared relative-time clock (the one the row labels read) rebuilds them
   // when a zone change or a midnight moves the boundary, so a stale heading
-  // cannot sit above a row that already reads a different day.
+  // cannot sit above a row that already reads a different day. The zone is
+  // resolved here rather than inside the grouping, so the rows under a heading
+  // can be handed the very zone that heading was grouped in.
   const now = useRelativeTimeNow();
+  const timeZone = deviceTimeZone();
   const dateGroups = useMemo(
-    () => groupAgentSessionsByDate(storedSessions, sortBy, { now: new Date(now) }),
-    [now, sortBy, storedSessions]
+    () => groupAgentSessionsByDate(storedSessions, sortBy, { now: new Date(now), timeZone }),
+    [now, sortBy, storedSessions, timeZone]
   );
 
   // Departure-triggered stored reset. Only the active poll has a refetch
@@ -307,6 +315,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     activeSessionIds,
     activeExclusionIds,
     dateGroups,
+    timeZone,
     isLoading: stored.isLoading || active.isLoading,
     isError: stored.isError || active.isError,
     // Stored and active sessions come from independent queries with very

@@ -6,8 +6,9 @@ const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
 describe('calendarDayRelativeLabel', () => {
-  // Local Tuesday 20:52.
-  const now = new Date(2026, 10, 10, 20, 52).getTime();
+  // Tuesday 20:52 in the zone under test, so the assertions never depend on the
+  // host's own zone.
+  const now = new Date('2026-11-10T20:52:00.000Z').getTime();
   const zone = 'UTC';
 
   it('replaces a rolling "yesterday" that the calendar places two days back', () => {

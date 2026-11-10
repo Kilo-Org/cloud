@@ -17,6 +17,9 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
 export type SessionSection = {
   title: string;
   data: StoredSession[];
+  /** The zone this section's day boundary was computed in, so a row under it
+   * names the same day the heading does. */
+  timeZone: string;
 };
 
 /** Platform buckets offered by the session filters, in display order. */

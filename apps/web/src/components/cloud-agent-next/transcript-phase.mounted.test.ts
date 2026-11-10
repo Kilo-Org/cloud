@@ -858,6 +858,25 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(alert()?.textContent).toContain('Replay disconnected');
   });
 
+  it('attaches a readable session error above the composer with a details action', () => {
+    mockAtomValues.fetchedSessionData = { kiloSessionId: 'ses_b', organizationId: null };
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.cloudStatus = { type: 'error', message: 'workspace_setup_failed' };
+    mockAtomValues.statusIndicator = { type: 'error', message: 'workspace_setup_failed' };
+    mockAtomValues.preparationAttempts = [{ id: 'attempt_1', status: 'failed', steps: [] }];
+    mockAtomValues.isLoading = false;
+
+    render();
+
+    const notice = alert();
+    expect(notice?.textContent).toContain('Workspace setup failed');
+    expect(notice?.textContent).not.toContain('workspace_setup_failed');
+    expect(notice?.parentElement?.nextElementSibling?.hasAttribute('data-composer')).toBe(true);
+    expect(
+      Array.from(notice?.querySelectorAll('button') ?? []).map(button => button.textContent)
+    ).toEqual(['View details']);
+  });
+
   it('does not resume the ?at= anchor until the requested session owns the transcript', () => {
     mockAtParam = 'msg_1';
 

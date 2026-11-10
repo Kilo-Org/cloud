@@ -463,8 +463,9 @@ route, retry delay/budget and per-message dispositions.
 
 ## Deploy
 
-The existing `.github/workflows/deploy-workers.yml` discovers this service for
-production and staging deployments. Production's scheduled workflow can deploy
+`.github/workflows/detect-worker-changes.yml` discovers this service for
+production and staging deployments, and `.github/workflows/deploy-workers.yml`
+deploys the matrix it produces. Production's scheduled workflow can deploy
 merged changes automatically; deployment authorization and all
 [production prerequisites](eu-queues.md#production-merge-gate)
 must be satisfied before merge. There is no guaranteed manual deployment window.

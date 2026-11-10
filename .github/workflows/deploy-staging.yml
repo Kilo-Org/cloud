@@ -105,15 +105,29 @@ jobs:
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
 
+  # Worker change detection reads only the SHAs check-changes publishes, so this
+  # call runs beside the Vercel staging deploys instead of after them: the matrix
+  # is ready when the Worker deploy below opens. It deploys nothing by itself.
+  detect-workers:
+    needs: check-changes
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    uses: ./.github/workflows/deploy-workers.yml
+    with:
+      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+      target_environment: staging
+
   deploy-workers:
-    needs: [check-changes, db-gate, deploy-app, deploy-ai-gateway]
+    needs: [check-changes, db-gate, deploy-app, deploy-ai-gateway, detect-workers]
     # Guard: this workflow_dispatch is reachable from a fork, and the reusable
     # workflow inherits repo secrets. Only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/deploy-workers.yml
     with:
       target_environment: staging
-      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      worker_matrix: ${{ needs.detect-workers.outputs.matrix }}
+      deploy_cloud_agent_after_session_ingest: ${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-ingest }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
 

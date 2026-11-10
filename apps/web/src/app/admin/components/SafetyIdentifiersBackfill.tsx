@@ -87,8 +87,8 @@ export function SafetyIdentifiersBackfill() {
         {status && backfill && (
           <>
             <p className="text-muted-foreground text-sm">
-              Up to {status.batchSize.toLocaleString()} accounts every {status.scheduleMinutes}{' '}
-              minutes. Status refreshes every 15 seconds.
+              Scheduled batches process up to {status.batchSize.toLocaleString()} accounts. Status
+              refreshes every 15 seconds.
             </p>
             <dl className="grid gap-4 text-sm sm:grid-cols-2">
               <div>

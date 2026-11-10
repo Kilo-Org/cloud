@@ -18,7 +18,6 @@ import {
 } from '@kilocode/web-shared/lib/redis-keys';
 
 export const SAFETY_IDENTIFIER_BATCH_SIZE = 5_000;
-export const SAFETY_IDENTIFIER_SCHEDULE_MINUTES = 3;
 export const SAFETY_IDENTIFIER_WORK_BUDGET_MS = 240_000;
 export const SAFETY_IDENTIFIER_BACKFILL_ERROR =
   'Safety identifier regeneration failed. Retry to resume.';
@@ -86,7 +85,6 @@ export async function getSafetyIdentifierStatus() {
     backfill: state ? progressSchema.parse(state) : pendingProgress,
     running: lock !== null,
     batchSize: SAFETY_IDENTIFIER_BATCH_SIZE,
-    scheduleMinutes: SAFETY_IDENTIFIER_SCHEDULE_MINUTES,
   };
 }
 

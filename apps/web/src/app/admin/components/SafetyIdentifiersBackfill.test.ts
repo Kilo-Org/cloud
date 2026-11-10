@@ -22,7 +22,6 @@ beforeEach(() => {
   status = {
     running: false,
     batchSize: 5_000,
-    scheduleMinutes: 3,
     backfill: {
       status: 'running',
       processed: 10,
@@ -57,6 +56,11 @@ it('shows persisted progress and keeps manual regeneration enabled between batch
   expect(html).toContain('10 / 20');
   expect(html).toContain('oauth/synthetic-user');
   expect(html).toContain('Run next batch');
+  expect(html).toContain(
+    `Scheduled batches process up to ${status.batchSize.toLocaleString()} accounts.`
+  );
+  expect(html).toContain('Status refreshes every 15 seconds.');
+  expect(html).not.toMatch(/every \d+ minutes/);
   expect(html).not.toContain('disabled=""');
   expect(mockUseQuery).toHaveBeenCalledWith(expect.objectContaining({ refetchInterval: 15_000 }));
 });

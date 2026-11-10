@@ -43,7 +43,6 @@ test('returns resumable progress without mutating', async () => {
   const status = {
     running: false,
     batchSize: 5000,
-    scheduleMinutes: 3,
     backfill: {
       status: 'pending' as const,
       processed: 0,

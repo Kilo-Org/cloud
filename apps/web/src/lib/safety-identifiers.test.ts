@@ -154,10 +154,10 @@ describe('safety identifier regeneration', () => {
 
   test('reports read-only pending progress without querying users or starting a run', async () => {
     const select = jest.spyOn(db, 'select');
-    await expect(getSafetyIdentifierStatus()).resolves.toEqual({
+    const status = await getSafetyIdentifierStatus();
+    expect(status).toEqual({
       running: false,
       batchSize: 5000,
-      scheduleMinutes: 3,
       backfill: {
         status: 'pending',
         processed: 0,
@@ -170,6 +170,7 @@ describe('safety identifier regeneration', () => {
         lastError: null,
       },
     });
+    expect(status).not.toHaveProperty('scheduleMinutes');
     expect(redisClient.set).not.toHaveBeenCalled();
     expect(redisClient.eval).not.toHaveBeenCalled();
     expect(select).not.toHaveBeenCalled();

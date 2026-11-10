@@ -41,6 +41,12 @@ const publicHostnameExpiresAt = new Map<string, number>();
  * keep it, with their own signal and deadline.
  */
 const inFlightHostnameResolutions = new Map<string, Promise<string[]>>();
+/**
+ * The one retry that follows a failed shared resolution. Keyed by that
+ * resolution, not by hostname, so every caller that observed the failure
+ * awaits the same lookup after the failed attempt has left the in-flight map.
+ */
+const retryAfterFailedResolution = new WeakMap<Promise<string[]>, Promise<string[]>>();
 
 const REJECTION_MESSAGES = {
   invalid_url: 'The upstream provider URL is not a valid URL.',
@@ -148,27 +154,56 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /**
+ * The shared retry for `failed`. Every caller that observed that resolution
+ * gets this promise, so a caller that resumes after the retry has settled does
+ * not start another lookup. A caller that arrives while the retry is still
+ * pending joins it through the in-flight map.
+ */
+function sharedRetry(
+  hostname: string,
+  resolveHostAddresses: ResolveHostAddresses,
+  failed: Promise<string[]>
+): Promise<string[]> {
+  const existing = retryAfterFailedResolution.get(failed);
+  if (existing) return existing;
+
+  const retry = new Promise<void>(resolve => {
+    setTimeout(resolve, DNS_RETRY_DELAY_MS);
+  }).then(() => resolveHostAddresses(hostname));
+  retryAfterFailedResolution.set(failed, retry);
+
+  const current = inFlightHostnameResolutions.get(hostname);
+  if (current === undefined || current === failed) {
+    inFlightHostnameResolutions.set(hostname, retry);
+    const forget = () => forgetInFlightResolution(hostname, retry);
+    void retry.then(forget, forget);
+    // The delay is part of this entry, so retention has to cover it too. A
+    // stalled retry must not pin the host after one lookup deadline.
+    const retention = setTimeout(forget, DNS_RETRY_DELAY_MS + DNS_LOOKUP_TIMEOUT_MS);
+    retention.unref?.();
+  }
+  return retry;
+}
+
+/**
  * One retry absorbs a transient resolver failure such as `EAI_AGAIN`. Each
  * attempt has its own deadline, and a resolver that does not answer within it
  * ends the validation in `dns_lookup_failed`. An abort of `signal` (client
  * disconnect or the request budget) rejects at once with its reason.
  *
- * Both attempts resolve through `resolveSharedHostAddresses`, so they start a
- * system lookup only when no other validation already awaits one for the host.
+ * The first attempt uses the resolution already in flight for the host. Every
+ * caller that observed that failure awaits the same retry, so one that resumes
+ * later does not start another lookup.
  */
 async function resolveWithRetry(
   hostname: string,
   resolveHostAddresses: ResolveHostAddresses,
   signal: AbortSignal | undefined
 ): Promise<string[] | null> {
+  signal?.throwIfAborted();
+  let shared = resolveSharedHostAddresses(hostname, resolveHostAddresses);
   for (let attempt = 0; attempt < DNS_LOOKUP_ATTEMPTS; attempt += 1) {
-    if (attempt > 0) {
-      const delay = new Promise(resolve => setTimeout(resolve, DNS_RETRY_DELAY_MS));
-      await (signal ? untilAborted(delay, signal) : delay);
-    }
-    signal?.throwIfAborted();
     const deadline = AbortSignal.timeout(DNS_LOOKUP_TIMEOUT_MS);
-    const shared = resolveSharedHostAddresses(hostname, resolveHostAddresses);
     try {
       const addresses = await untilAborted(
         shared,
@@ -189,6 +224,9 @@ async function resolveWithRetry(
       // A resolution that finished with a transient failure is retried; the
       // caller reports dns_lookup_failed once attempts run out.
     }
+    if (attempt + 1 >= DNS_LOOKUP_ATTEMPTS) return null;
+    signal?.throwIfAborted();
+    shared = sharedRetry(hostname, resolveHostAddresses, shared);
   }
   return null;
 }

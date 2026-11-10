@@ -2025,6 +2025,47 @@ describe('server /internal/streams/close', () => {
     expect(closeOrgStreams).toHaveBeenCalledTimes(2);
   });
 
+  it('starts every matching close before waiting for one to finish', async () => {
+    const env = createEnv();
+    const firstClose = Promise.withResolvers<number>();
+    const closeOrgStreams = vi
+      .fn()
+      .mockReturnValueOnce(firstClose.promise)
+      .mockResolvedValueOnce(1);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [
+            { cloudAgentSessionId: 'workspace_eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' },
+            { cloudAgentSessionId: 'workspace_ffffffff-ffff-ffff-ffff-ffffffffffff' },
+          ]),
+        })),
+      })),
+    });
+
+    const responsePromise = fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    // The first close never settles until it is released, so a second call can
+    // arrive only when the handler does not wait for the first one.
+    await vi.waitFor(() => expect(closeOrgStreams).toHaveBeenCalledTimes(2));
+    firstClose.resolve(1);
+
+    expect((await responsePromise).status).toBe(204);
+  });
+
   it('skips rows that do not name a control session', async () => {
     const env = createEnv();
     const closeOrgStreams = vi.fn().mockResolvedValue(0);

@@ -36,15 +36,6 @@ WHERE isleaf;
 ```
 
 The index build takes a SHARE lock and blocks settlement inserts until commit.
-Run the migration with bounded lock acquisition and execution:
-
-```sh
-PGOPTIONS='-c lock_timeout=5s -c statement_timeout=60s' pnpm drizzle migrate
-```
-
-If either deadline expires, stop the release and use the per-partition approach below.
-Do not increase the deadline without reviewing partition sizes and settlement impact.
-
 Schedule this migration during a low-traffic release window. If partitions have grown,
 prepare a separate migration that builds each partition index concurrently and attaches it to the parent.
 Do not run a parent partitioned index build concurrently.

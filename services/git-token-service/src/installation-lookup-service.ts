@@ -528,10 +528,7 @@ export class InstallationLookupService {
             ? undefined
             : eq(platform_integrations.id, expectedIntegrationId),
           or(
-            and(
-              isNotNull(platform_integrations.owned_by_user_id),
-              availableAccountCondition()
-            ),
+            and(isNotNull(platform_integrations.owned_by_user_id), availableAccountCondition()),
             and(
               isNotNull(platform_integrations.owned_by_organization_id),
               isNull(organizations.deleted_at)
@@ -660,10 +657,7 @@ export class InstallationLookupService {
             )
           ),
           or(
-            and(
-              isNotNull(platform_integrations.owned_by_user_id),
-              availableAccountCondition()
-            ),
+            and(isNotNull(platform_integrations.owned_by_user_id), availableAccountCondition()),
             and(
               isNotNull(platform_integrations.owned_by_organization_id),
               isNull(organizations.deleted_at)

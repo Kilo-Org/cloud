@@ -370,7 +370,7 @@ describe('CreditPurchaseScreen', () => {
     const amount = renderer.root.find(
       node => String(node.type) === 'Text' && node.props.accessibilityLabel === '$1,234.00'
     );
-    expect(amount.props.children).toBe('$1,234.00');
+    expect(amount.props.children).toBe('\u2066$1,234.00\u2069');
     expect(
       renderer.root.findAll(
         node => String(node.type) === 'Text' && node.props.accessibilityLabel === 'Balance hidden'

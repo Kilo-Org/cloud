@@ -34,6 +34,11 @@ export function formatUsd(
     .join('');
 }
 
+/**
+ * Two fraction digits in the locale's money pattern. A balance or a spend the
+ * reader compares across screens wants `formatPrefixedMoney` instead: this one
+ * moves the currency behind the amount in a right-to-left language.
+ */
 export function formatMoney(amount: number, locale: string): string {
   return formatUsd(amount, locale, {
     minimumFractionDigits: 2,
@@ -64,6 +69,25 @@ export function formatPrefixedUsd(
     .map(candidate => candidate.value)
     .join('');
   return `${sign}$${digits}`;
+}
+
+/**
+ * A balance or a spend in the shares a reader compares between screens: two
+ * fraction digits, the symbol leading the number whatever the locale's money
+ * pattern says. The locale formatter still writes the digits, their separators
+ * and the minus glyph (`formatPrefixedUsd`); this is the money-shaped twin of
+ * `formatMoney`, so one account never reads `$0,00` on one screen and
+ * `0,00 $` on the next.
+ *
+ * A display still pins the run's own direction: the symbol and a leading sign
+ * are neutral characters, which a right-to-left paragraph may move behind the
+ * number.
+ */
+export function formatPrefixedMoney(amount: number, locale: string): string {
+  return formatPrefixedUsd(amount, locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 /**

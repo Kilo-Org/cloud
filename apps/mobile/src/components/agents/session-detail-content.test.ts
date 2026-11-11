@@ -5243,16 +5243,16 @@ function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {
 }
 
 describe('SessionDetailContent transcript frame', () => {
-  /** The transcript's anchored content frame, or null when nothing is reserved. */
-  function anchoredContent(view: { renderer: ReactTestRenderer }) {
-    return (
-      view.renderer.root
-        .findAll(node => {
-          const style = node.props.style as ViewStyle | null;
-          return style?.position === 'absolute' && typeof style.top === 'number';
-        })
-        .find(node => (node.props.style as ViewStyle).top !== 0) ?? null
-    );
+  /** The reserved top offset of the transcript's content frame, or null when none. */
+  function anchoredTop(view: { renderer: ReactTestRenderer }): number | null {
+    const reserved = view.renderer.root
+      .findAll(() => true)
+      .find(node => {
+        const style = node.props.style as ViewStyle | null;
+        return style?.position === 'absolute' && typeof style.top === 'number' && style.top !== 0;
+      });
+    const style = reserved?.props.style as ViewStyle | undefined;
+    return typeof style?.top === 'number' ? style.top : null;
   }
 
   function clippingHolders(view: { renderer: ReactTestRenderer }) {
@@ -5265,20 +5265,20 @@ describe('SessionDetailContent transcript frame', () => {
     goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([taskMessage(ROOT_ID, CHILD_IDS)]);
     // Nothing is reserved while the input sits on its one-line floor.
-    expect(anchoredContent(view)).toBeNull();
+    expect(anchoredTop(view)).toBeNull();
 
     act(() => {
       (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(64);
     });
     // The transcript keeps its previous height and rides up by the growth, so
     // its bottom edge tracks the composer without a scroll command.
-    expect((anchoredContent(view)?.props.style as ViewStyle).top).toBe(-64);
+    expect(anchoredTop(view)).toBe(-64);
     expect(clippingHolders(view).length).toBeGreaterThan(0);
 
     act(() => {
       (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(0);
     });
-    expect(anchoredContent(view)).toBeNull();
+    expect(anchoredTop(view)).toBeNull();
     expect(clippingHolders(view)).toHaveLength(0);
   });
 
@@ -5288,10 +5288,10 @@ describe('SessionDetailContent transcript frame', () => {
     act(() => {
       (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(64);
     });
-    expect(anchoredContent(view)).not.toBeNull();
+    expect(anchoredTop(view)).not.toBeNull();
 
-    // The read-only footer is chrome of another height, so the inset measured
-    // for the composer must not outlive it.
+    // The read-only footer is chrome of another height, so its reservation is
+    // dropped while it is up.
     act(() => {
       view.store.set(view.manager.atoms.activeSessionType, 'read-only');
       view.store.set(view.manager.atoms.isReadOnly, true);
@@ -5299,7 +5299,15 @@ describe('SessionDetailContent transcript frame', () => {
     expect(
       view.renderer.root.findAll(candidate => Object.is(candidate.type, 'ChatComposer'))
     ).toHaveLength(0);
-    expect(anchoredContent(view)).toBeNull();
+    expect(anchoredTop(view)).toBeNull();
+
+    // The measurement survives the swap: once the composer is back, a
+    // multi-line draft keeps its anchor without waiting for another line.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    expect(anchoredTop(view)).toBe(-64);
   });
 });
 

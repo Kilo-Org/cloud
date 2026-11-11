@@ -318,13 +318,16 @@ export function SessionDetailContent({
   // holds its bottom edge on that growth in the same commit it lands: the
   // list's own `onLayout` reaches JS one frame after the viewport shrank, and
   // the scroll it issues lands later still, which painted the transcript
-  // clipped and then moved it. Reset when the composer goes away, so the
-  // read-only footer and a blocking card get the whole body.
+  // clipped and then moved it.
+  //
+  // The measurement survives the composer being replaced by other chrome. Only
+  // the reservation is dropped while that chrome is up — the read-only footer
+  // and a blocking card fill the body — so a multi-line draft gets its anchor
+  // back when the composer returns, without waiting for the next line to land.
   const [composerBottomInset, setComposerBottomInset] = useState(0);
   const handleComposerBottomInsetChange = useCallback((insetDp: number) => {
     setComposerBottomInset(insetDp);
   }, []);
-  const transcriptFrame = resolveTranscriptFrame(composerBottomInset);
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -2140,14 +2143,10 @@ export function SessionDetailContent({
     !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
   const isReadOnlyContinueVisible =
     isReadOnlySession && !hasBlockingInteraction && !isSessionChromePending;
-  // The transcript's bottom inset belongs to the composer it was measured for.
-  // A blocking card or the read-only footer replaces the composer with chrome
-  // of another height on purpose, so the inset must not outlive it.
-  useEffect(() => {
-    if (!isComposerVisible) {
-      setComposerBottomInset(0);
-    }
-  }, [isComposerVisible]);
+  // A blocking card or the read-only footer replaces the composer with chrome of
+  // another height on purpose, so its reservation only applies while the
+  // composer it was measured for is the chrome on screen.
+  const transcriptFrame = resolveTranscriptFrame(isComposerVisible ? composerBottomInset : 0);
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id

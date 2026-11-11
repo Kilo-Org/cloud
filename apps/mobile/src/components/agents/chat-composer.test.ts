@@ -1133,7 +1133,7 @@ describe('ChatComposer transcript inset', () => {
 function requireInputRowMeasureHeight(render: React.ReactElement): number {
   const height = findInputRowProps(render)?.measureHeight;
   if (typeof height !== 'number') {
-    throw new Error('ChatComposerInputRow element did not carry its measured height');
+    throw new TypeError('ChatComposerInputRow element did not carry its measured height');
   }
   return height;
 }

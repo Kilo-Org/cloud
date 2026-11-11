@@ -134,6 +134,14 @@ export function loadingPlaceholder(tree: LayoutTree): boolean {
   });
 }
 
+/** One sampling window, sized for the settle it spans. */
+function startSampling(ctx: { probe: Pick<ProbeClient, 'startSampling'>; observeMs: number }) {
+  return ctx.probe.startSampling(
+    SAMPLE_INTERVAL_MS,
+    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
+  );
+}
+
 export async function sampleUntilSettled(
   probe: Pick<ProbeClient, 'dump'>,
   clock: Clock,
@@ -440,25 +448,25 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     }
   };
   await waitForPlaceholder();
+  // Sampling dumps the whole screen on the JS thread every tick, which competes
+  // with the session hydration the placeholder wait is waiting for: started
+  // before that wait, a cold screen took far longer to clear its placeholder
+  // than it did with sampling started after. It starts here, once the screen has
+  // arrived, and spans the settle that follows.
+  await startSampling(ctx);
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
   let unopened: string | undefined;
   if (!opened(settled.dump)) {
     ctx.log(`design-gate: ${target.id} did not change the screen; opening the link again`);
+    // The retry opens the same cold screen, so it gets the same wait, and the
+    // timeline is restarted after it for the same reason as above.
+    await ctx.probe.stopSampling();
     await ctx.probe.openLink(target.link);
-    // The retry opens the same cold screen, so it gets the same wait.
     await waitForPlaceholder();
+    await startSampling(ctx);
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
   }
-  // Sampling dumps the whole screen on the JS thread every tick, which competes
-  // with the session hydration the placeholder wait is waiting for: held until
-  // that wait returns, a cold screen cleared in a fraction of the time it took
-  // while sampling was already running. The observation window it serves starts
-  // here anyway.
-  await ctx.probe.startSampling(
-    SAMPLE_INTERVAL_MS,
-    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
-  );
   const { samples, truncated } = await ctx.probe.stopSampling();
   if (truncated) {
     ctx.log(

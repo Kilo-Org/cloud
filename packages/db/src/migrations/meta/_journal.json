@@ -2479,6 +2479,13 @@
       "when": 1794346750792,
       "tag": "0353_claude_billing_connection_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 354,
+      "version": "7",
+      "when": 1794401099270,
+      "tag": "0354_enkrypt_usage_characters",
+      "breakpoints": true
     }
   ]
 }

@@ -90,6 +90,8 @@ async function usageRecordForNewOrganization() {
     apiKind: 'messages' as const,
     decision: 'blocked' as const,
     creditsCost: 7,
+    scannedCharacters: 2_400,
+    totalCharacters: 10_000,
     addedLatencyMs: 212,
   };
 }

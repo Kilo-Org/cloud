@@ -704,7 +704,7 @@ describe('prepareSession endpoint', () => {
     {
       origin: 'slack',
       repository: {
-        gitUrl: 'https://gitlab.example.com/acme/subgroup/slack-repo.git',
+        gitUrl: 'https://gitlab.com/acme/subgroup/slack-repo.git',
         platform: 'gitlab' as const,
       },
       expectedRepoFullName: 'acme/subgroup/slack-repo',

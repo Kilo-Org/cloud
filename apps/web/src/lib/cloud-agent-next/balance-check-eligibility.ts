@@ -23,6 +23,7 @@ import {
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { resolveClaudeBillingModel } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
+import { resolveClaudeBillingConnector } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/connector';
 import {
   getGrantedClaudeBillingConnection,
   type ClaudeBillingOwner,
@@ -184,7 +185,10 @@ async function hasOpenAiChatGptByokForModel(params: {
  * Whether a Claude billing link serves the model, so the customer's Claude
  * organization pays instead of the Kilo balance. The candidates and their
  * order match `checkClaudeBilling`: the first link that is neither absent,
- * pending, nor removed decides, and one that cannot bill fails the request.
+ * pending, nor removed decides, and one that cannot bill fails the request. A
+ * shared-services link whose recorded connector is gone cannot bill either,
+ * because routing answers it with a reconnect requirement instead of another
+ * payer.
  */
 async function hasClaudeBillingForModel(params: {
   fromDb: typeof db;
@@ -207,8 +211,13 @@ async function hasClaudeBillingForModel(params: {
 
   for (const owner of owners) {
     const row = await getGrantedClaudeBillingConnection(owner, params.fromDb);
-    if (row?.status === ClaudeBillingConnectionStatus.Connected) return true;
     if (row?.status === ClaudeBillingConnectionStatus.BillingUnavailable) return false;
+    if (row?.status !== ClaudeBillingConnectionStatus.Connected) continue;
+    if (owner.kind === 'shared_services') {
+      const connector = await resolveClaudeBillingConnector(row.created_by, params.fromDb);
+      if (connector.kind === 'gone') return false;
+    }
+    return true;
   }
   return false;
 }

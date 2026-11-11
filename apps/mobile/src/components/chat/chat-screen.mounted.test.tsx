@@ -33,6 +33,7 @@ const state = vi.hoisted(() => ({
     effort: 'low' | 'medium' | 'high' | null;
     afterTurns: number;
     outcome: 'failed' | 'stopped';
+    failureKey?: string | null;
   }[],
   failed: null as string | null,
   failureKey: null as string | null,
@@ -681,19 +682,47 @@ describe('the thinking effort of a chat', () => {
 });
 
 describe('a retained chat failure', () => {
-  it('says the balance blocked the send and opens where the credit is bought', async () => {
+  it('states the refused send on the question and opens where the credit is bought', async () => {
     state.status = 'idle';
     state.asked = 'what is a monad';
     state.failureKey = CREDITS_FAILURE_KEY;
     state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
     const tree = await mount();
 
-    /* The question is still on screen, so the failure belongs to the composer
-       row above it rather than replacing the transcript. */
-    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
+    /* The question is still on screen, so the failure belongs to its own bubble
+       rather than replacing the transcript. */
     expect(count(tree, 'EmptyState')).toBe(0);
-    /* The question kept in the transcript carries the only Retry; the row adds
-       the one action the message cannot offer. */
+    const refused = bubbleFor(tree, 's1:asked');
+    /* The bubble states the balance, not a generic agent failure, so the row
+       above the composer has no second sentence to say. */
+    expect(refused.deliveryState).toEqual({ status: 'failed', error: '', reason: 'credits' });
+    expect(messagesOf(tree)).toEqual([]);
+    expect(buttonLabels(tree)).toEqual([]);
+    /* Asking again meets the same balance, so the question offers no Retry. The
+       action that settles it is the only recovery, and Copy to composer keeps
+       the words for the send that follows it. */
+    expect(refused.onRetryMessage).toBeUndefined();
+    expect(refused.onCopyToComposer).toBeInstanceOf(Function);
+    act(() => {
+      refused.onAddCredits?.();
+    });
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    expect(state.retry).not.toHaveBeenCalled();
+  });
+
+  it('states the balance in the row when no question is on screen to carry it', async () => {
+    /* A tool-switch refusal after the answer landed: the chat has a transcript
+       and no unanswered question, so the row is the only place the cause can
+       be stated — and the only place that can offer the action. */
+    state.status = 'idle';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 't2', role: 'assistant' } },
+    ];
+    const tree = await mount();
+
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
     expect(buttonLabels(tree)).toEqual([i18n.t('addCredits.cta')]);
     /* That action is the row's only recovery, so it carries the same 48 dp
        frame the Retry button in this row uses. */
@@ -702,6 +731,8 @@ describe('a retained chat failure', () => {
     );
     press(tree, i18n.t('addCredits.cta'));
     expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    /* Nothing on screen could be asked again, and a re-send meets the same
+       refusal, so no Retry joins it. */
     expect(state.retry).not.toHaveBeenCalled();
   });
 });
@@ -778,6 +809,7 @@ type BubbleProps = {
   onLongPressDetails?: (message: unknown) => void;
   deliveryState?: { status: string; error?: string; reason?: string };
   onRetryMessage?: (message: unknown) => void;
+  onAddCredits?: () => void;
   onCopyToComposer?: (text: string) => void;
 };
 
@@ -869,7 +901,7 @@ describe('message actions', () => {
   it('keeps a failed question below the one that took its place, with its recovery', async () => {
     state.status = 'idle';
     state.asked = 'second question';
-    state.failureKey = CREDITS_FAILURE_KEY;
+    state.failureKey = 'modelChat.backends.deletedBackend';
     state.displaced = [
       {
         id: 'k1',
@@ -879,6 +911,7 @@ describe('message actions', () => {
         effort: null,
         afterTurns: 0,
         outcome: 'failed',
+        failureKey: 'modelChat.backends.deletedBackend',
       },
     ];
     // In the order the registry draws them: the failure, then the question that
@@ -906,6 +939,50 @@ describe('message actions', () => {
     expect(sheetOf(tree).deliveryState).toEqual(kept.deliveryState);
   });
 
+  it('keeps the balance cause on a question a later send pushed out of the slot', async () => {
+    state.status = 'idle';
+    state.asked = 'second question';
+    /* The slot holds a different failure, as a tool-set move that failed after
+       an answer would leave it: the kept bubble must read its own record. */
+    state.failureKey = 'modelChat.backends.deletedBackend';
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
+      },
+    ];
+    state.messages = [
+      { info: { id: 's1:displaced:k1', role: 'user' } },
+      { info: { id: 's1:asked', role: 'user' } },
+    ];
+    const tree = await mount();
+    const kept = bubbleFor(tree, 's1:displaced:k1');
+
+    // The cause it failed with travels with it, so the bubble where it was said
+    // states the balance rather than a generic agent failure.
+    expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'credits' });
+    // Asking it again meets the same balance: the action that settles it stays,
+    // and the Retry does not.
+    expect(kept.onRetryMessage).toBeUndefined();
+    act(() => {
+      kept.onAddCredits?.();
+    });
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    expect(state.retry).not.toHaveBeenCalled();
+    // The slot's own question keeps the cause its own failure has.
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'execution',
+    });
+  });
+
   it('reads a kept question the person stopped as interrupted', async () => {
     state.status = 'idle';
     state.displaced = [
@@ -917,6 +994,7 @@ describe('message actions', () => {
         effort: null,
         afterTurns: 0,
         outcome: 'stopped',
+        failureKey: null,
       },
     ];
     state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
@@ -941,27 +1019,29 @@ describe('message actions', () => {
         effort: null,
         afterTurns: 0,
         outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
       },
     ];
     state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
     const tree = await mount();
     const bubble = bubbleFor(tree, 's1:displaced:k1');
 
-    // One bubble for one question: the attempt is drawn where it was said.
-    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    // One bubble for one question: the attempt is drawn where it was said, and
+    // carries the recovery the slot hands it — the balance's action, no Retry.
+    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'credits' });
+    expect(bubble.onRetryMessage).toBeUndefined();
     act(() => {
-      bubble.onRetryMessage?.(state.messages[0]);
+      bubble.onAddCredits?.();
     });
-    // Its Retry asks the slot's question again, not a kept copy of itself.
-    expect(state.retry).toHaveBeenCalledTimes(1);
-    expect(state.retry.mock.calls[0]).toEqual([]);
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    expect(state.retry).not.toHaveBeenCalled();
   });
 
   it('falls back to its own bubble when the record the slot names is gone', async () => {
     state.status = 'idle';
     state.asked = 'a question whose kept record is no longer here';
     state.askedFrom = 'gone';
-    state.failureKey = CREDITS_FAILURE_KEY;
+    state.failureKey = 'modelChat.backends.deletedBackend';
     state.displaced = [];
     state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
     const tree = await mount();
@@ -985,6 +1065,7 @@ describe('message actions', () => {
         effort: null,
         afterTurns: 0,
         outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
       },
     ];
     state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];

@@ -616,7 +616,7 @@ describe('ConversationMessages', () => {
     expect(html).not.toContain('role="alert"');
     expect(html).not.toContain('Verification failed');
     expect(html).toContain('Model unavailable');
-    expect(buttons(html)).toEqual([expect.stringContaining('2 tool calls')]);
+    expect(buttons(html)).toEqual([expect.stringContaining('2 tool calls · 1 failed')]);
   });
 
   it('dispatches the new tool cards as independent rows without a group disclosure', () => {
@@ -1767,7 +1767,7 @@ describe('ConversationMessages memoization', () => {
   );
 
   it.each([false, true])(
-    'keeps a failed tool in its collapsed group (streaming=%s)',
+    'shows a failure count without opening the tool group (streaming=%s)',
     isStreaming => {
       const running = toolPart('bash-1', 'bash', {
         status: 'running',
@@ -1804,7 +1804,7 @@ describe('ConversationMessages memoization', () => {
 
       expect(container.contains(group)).toBe(true);
       expect(group?.getAttribute('aria-expanded')).toBe('false');
-      expect(group?.textContent).toContain('2 tool calls');
+      expect(group?.textContent).toContain('2 tool calls · 1 failed');
       expect(container.querySelectorAll('button')).toHaveLength(1);
       expect(container.querySelector('[role="alert"]')).toBeNull();
       expect(container.textContent).not.toContain('Command failed');

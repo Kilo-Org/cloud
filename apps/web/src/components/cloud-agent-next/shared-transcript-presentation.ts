@@ -142,6 +142,10 @@ export function summarizeAgentWork(parts: Part[], working = false): string {
   } else if (tools.length > 1) {
     details.push(`${tools.length} tool calls`);
   }
+  const failedTools = tools.filter(part => part.state.status === 'error');
+  if (failedTools.length > 0) {
+    details.push(`${failedTools.length} failed`);
+  }
   if (reasoning.length > 0) {
     details.push('reasoning');
   }

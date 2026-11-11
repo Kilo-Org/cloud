@@ -161,6 +161,13 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (profilePickerRoute) {
       return profilePickerRoute;
     }
+    // Dev-only Buy credits rows against fixed store answers
+    // (`dev/credits-pack-prices-fixture/<priced|partly-priced>`).
+    const creditsPackPrices =
+      /(?:^|\/)dev\/credits-pack-prices-fixture\/(priced|partly-priced)\/?$/.exec(path);
+    if (creditsPackPrices) {
+      return `/(app)/credits-pack-prices-fixture?state=${creditsPackPrices[1]}`;
+    }
   }
   if (handleAppActionPath({ path, initial })) {
     return null;

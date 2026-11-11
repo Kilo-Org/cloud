@@ -84,8 +84,23 @@ vi.mock('@/lib/iap/legal-links', () => ({
 vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   useInlinePurchaseErrorOwnership: vi.fn(),
 }));
+// The screen's catalog reads are gated on the identity read, and a failed
+// read is one of its states, so the test drives it like the IAP owner.
+const identity = vi.hoisted(() => ({
+  userId: 'user-1' as string | undefined,
+  isError: false,
+  isUnreachable: false,
+  refetchAsync: vi.fn(),
+}));
+
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false, isError: false }),
+  useCurrentUserId: () => ({
+    userId: identity.userId,
+    isLoading: false,
+    isError: identity.isError,
+    isUnreachable: identity.isUnreachable,
+    refetchAsync: identity.refetchAsync,
+  }),
 }));
 
 // The screen obeys the Profile tab's hide-balance preference, the same store
@@ -253,6 +268,9 @@ describe('CreditPurchaseScreen', () => {
     creditBlocks.entries = [];
     hideBalancePref.hideBalance = false;
     hideBalancePref.hasLoaded = true;
+    identity.userId = 'user-1';
+    identity.isError = false;
+    identity.isUnreachable = false;
   });
 
   it('happy: renders one row per pack with its amount and store price, purchase enabled', async () => {
@@ -739,6 +757,143 @@ describe('CreditPurchaseScreen', () => {
 
     expect(packRows(renderer)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the description and the legal links above the pack area in every state', async () => {
+    // The pack area's height depends on the store: placeholder rows, priced
+    // rows, an empty card or the unavailable card. The copy sits above it, so
+    // no store answer can move it down the screen.
+    const DESCRIPTION_PREFIX = 'Credits are a one-time purchase';
+    const labelOf = (node: TestRenderer.ReactTestInstance): string => {
+      const label = node.props.accessibilityLabel;
+      return typeof label === 'string' ? label : '';
+    };
+    const cases: {
+      state: string;
+      prepare: () => void;
+      isPackArea: (node: TestRenderer.ReactTestInstance) => boolean;
+    }[] = [
+      {
+        state: 'loading',
+        prepare: () => {
+          owner.connected = false;
+        },
+        isPackArea: node => String(node.props.className ?? '') === PACK_ROW_SHELL,
+      },
+      {
+        state: 'happy',
+        prepare: () => undefined,
+        isPackArea: node =>
+          String(node.type) === 'Pressable' && labelOf(node).includes('of credits'),
+      },
+      {
+        state: 'empty',
+        prepare: () => {
+          backend.response = {
+            appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+            products: [],
+          };
+        },
+        isPackArea: node =>
+          node.children.some(child => child === 'Credit packs are unavailable right now.'),
+      },
+      {
+        state: 'store unavailable',
+        prepare: () => {
+          owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
+        },
+        isPackArea: node => node.children.some(child => child === 'App Store products unavailable'),
+      },
+    ];
+
+    const measured: {
+      state: string;
+      copyRendered: boolean;
+      legalAfterCopy: boolean;
+      packAreaAfterLegal: boolean;
+    }[] = [];
+    // Sequential, not parallel: every scenario mutates the same owner mock and
+    // the same backend fixture, so two mounted screens would race.
+    /* eslint-disable no-await-in-loop -- each scenario mutates the shared mocks */
+    for (const scenario of cases) {
+      // Each scenario starts from a connected store with the backend catalog,
+      // because a scenario mutates the shared owner mock.
+      owner.connected = true;
+      owner.fetchStoreProducts.mockResolvedValue(STORE_LISTINGS);
+      backend.response = {
+        appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+        products: BACKEND_PRODUCTS,
+      };
+      scenario.prepare();
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      // Wait for the state's own pack-area surface as well as the copy: the
+      // rows arrive after the store answers, so only the pair proves ordering.
+      await waitFor(
+        () =>
+          allText(renderer).includes(DESCRIPTION_PREFIX) &&
+          renderer.root.findAll(() => true).some(node => scenario.isPackArea(node))
+      );
+      const order = renderer.root.findAll(() => true);
+      const copyAt = order.findIndex(
+        node =>
+          String(node.type) === 'Text' &&
+          node.children.some(
+            child => typeof child === 'string' && child.startsWith(DESCRIPTION_PREFIX)
+          )
+      );
+      const legalAt = order.findIndex(
+        node => String(node.props.accessibilityRole ?? '') === 'link'
+      );
+      const packAreaAt = order.findIndex(node => scenario.isPackArea(node));
+      measured.push({
+        state: scenario.state,
+        copyRendered: copyAt !== -1,
+        legalAfterCopy: copyAt !== -1 && legalAt > copyAt,
+        packAreaAfterLegal: legalAt !== -1 && packAreaAt > legalAt,
+      });
+      unmount();
+      vi.clearAllMocks();
+    }
+    /* eslint-enable no-await-in-loop */
+
+    for (const result of measured) {
+      expect(result).toEqual({
+        state: result.state,
+        copyRendered: true,
+        legalAfterCopy: true,
+        packAreaAfterLegal: true,
+      });
+    }
+  });
+
+  it('identity failure: shows its own retryable card instead of an empty pack area', async () => {
+    // Without a user id neither catalog read can run, so nothing settles. The
+    // screen must not present that as "nothing for sale" with no way back, and
+    // it must not keep a store spinner running either: an offline cold start is
+    // exactly the case where the store has not connected.
+    identity.userId = undefined;
+    identity.isUnreachable = true;
+    owner.connected = false;
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('Check your connection and try again.'));
+
+    expect(allText(renderer)).toContain('Could not load');
+    expect(packRows(renderer)).toHaveLength(0);
+    expect(placeholderShells(renderer)).toHaveLength(0);
+    expect(allText(renderer)).not.toContain('Credit packs are unavailable right now.');
+    // Never a blank pack area and never a spinner: the card offers the retry.
+    const retry = tryAgainButton(renderer);
+    expect(retry).toBeDefined();
+    if (!retry) {
+      throw new Error('expected a Try again button');
+    }
+    await act(async () => {
+      (retry.props as { onPress?: () => void }).onPress?.();
+      await Promise.resolve();
+    });
+    expect(identity.refetchAsync).toHaveBeenCalledTimes(1);
     unmount();
   });
 

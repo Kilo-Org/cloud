@@ -66,6 +66,9 @@ export function CreditPurchaseScreen() {
     catalogEmpty,
     errorMessageKey: productsErrorMessageKey,
     refetch,
+    identityUnavailable,
+    isRetryingIdentity,
+    retryIdentity,
   } = useStoreCreditProducts({ connected, fetchStoreProducts, reconnectStore });
   // The screen renders purchase errors inline, so they must not also toast.
   useInlinePurchaseErrorOwnership();
@@ -118,7 +121,7 @@ export function CreditPurchaseScreen() {
 
   const renderBalanceValue = () => {
     if (balancePending) {
-      return <Skeleton className="mt-1 h-7 w-24 rounded" />;
+      return <Skeleton className="h-7 w-24 rounded" />;
     }
     if (balanceFailed) {
       return (
@@ -160,17 +163,62 @@ export function CreditPurchaseScreen() {
           contentContainerClassName="gap-3 px-1"
           showsVerticalScrollIndicator={false}
         >
-          <View className="min-h-16 justify-center rounded-xl border border-border bg-card px-5 py-4">
+          {/* The card holds both of its data slots in every state: the amount (a
+              skeleton, the value, or the failed read's own retry target) and
+              the expiry caption, which is two lines at text-xs in this card's
+              width and keeps one line when the account has none. The copy below
+              must not move when a read settles, and the card is the one block
+              above that copy whose height comes from late data. */}
+          <View className="rounded-xl border border-border bg-card px-5 py-4">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.credits')}
             </Text>
-            {renderBalanceValue()}
-            {!balancePending && !balanceFailed && (
-              <CreditExpiryNote
-                creditBlocks={creditBlocksQuery.data?.creditBlocks ?? []}
-                hiddenAmount={hideBalanceAmount ? HIDDEN_BALANCE : undefined}
-              />
-            )}
+            <View className="mt-1 min-h-11 justify-center">{renderBalanceValue()}</View>
+            <View className="mt-1 min-h-8 justify-center">
+              {creditBlocksQuery.isPending ? (
+                <Skeleton className="h-3 w-40 max-w-full rounded" />
+              ) : (
+                <CreditExpiryNote
+                  creditBlocks={creditBlocksQuery.data?.creditBlocks ?? []}
+                  hiddenAmount={hideBalanceAmount ? HIDDEN_BALANCE : undefined}
+                  emptyMessage={t('credits.noExpiringCredits')}
+                />
+              )}
+            </View>
+          </View>
+
+          {/* The description and the store's legal links sit above the pack
+              area, not below it. The pack area's height depends on the store —
+              four placeholder rows while it connects, the priced rows after, an
+              empty card or the unavailable card instead — so anything written
+              under it is pushed by every one of those swaps. Above it, no store
+              state or catalog answer can move this copy. */}
+          <Text className="px-1 text-xs text-muted-foreground">{t('credits.description')}</Text>
+          {/* The two store legal links are controls of their own, not words in
+              the sentence above, so each carries the shared legal-link box: a
+              real 48dp target the control-size audit can read, which keeps its
+              height in the flow so the two boxes never overlap when a long
+              locale wraps them onto two lines. `px-1` stays the screen's inset,
+              not the shared row's. */}
+          <View className={cn('px-1', LEGAL_LINK_ROW_CLASS)}>
+            <Pressable
+              accessibilityRole="link"
+              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+              onPress={() => {
+                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
+              }}
+            >
+              <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="link"
+              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+              onPress={() => {
+                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
+              }}
+            >
+              <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+            </Pressable>
           </View>
 
           {/* The purchase error is rendered inline (the store sheet has just
@@ -182,6 +230,31 @@ export function CreditPurchaseScreen() {
             message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
             className="px-1 text-sm"
           />
+
+          {/* The identity read gates both catalog reads, so its failure is the
+              one state where nothing else can settle. It gets the same card
+              shape as the store's failure, with its own retry: an empty pack
+              area would read as "nothing for sale" and offer no way back. */}
+          {identityUnavailable && (
+            <View className="gap-3 rounded-xl border border-border bg-card p-5">
+              <Text className="font-semibold text-foreground">{t('queryError.serverTitle')}</Text>
+              <Text className="text-sm text-muted-foreground">
+                {t('organization.boundary.loadErrorMessage')}
+              </Text>
+              <Button
+                accessibilityLabel={t('common.tryAgain')}
+                accessibilityState={{ busy: isRetryingIdentity, disabled: isRetryingIdentity }}
+                className="self-start"
+                disabled={isRetryingIdentity}
+                onPress={() => {
+                  void retryIdentity();
+                }}
+                variant="outline"
+              >
+                <Text>{t('common.tryAgain')}</Text>
+              </Button>
+            </View>
+          )}
 
           {storeUnavailable && (
             <View className="gap-3 rounded-xl border border-border bg-card p-5">
@@ -277,36 +350,6 @@ export function CreditPurchaseScreen() {
                 </Pressable>
               );
             })}
-
-          <Text className="px-1 pt-1 text-xs text-muted-foreground">
-            {t('credits.description')}
-          </Text>
-          {/* The two store legal links are controls of their own, not words in
-              the sentence above, so each carries the shared legal-link box: a
-              real 48dp target the control-size audit can read, which keeps its
-              height in the flow so the two boxes never overlap when a long
-              locale wraps them onto two lines. `px-1` stays the screen's inset,
-              not the shared row's. */}
-          <View className={cn('px-1', LEGAL_LINK_ROW_CLASS)}>
-            <Pressable
-              accessibilityRole="link"
-              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-              onPress={() => {
-                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
-              }}
-            >
-              <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="link"
-              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-              onPress={() => {
-                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
-              }}
-            >
-              <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
-            </Pressable>
-          </View>
         </DetailScreenScrollView>
       </View>
     </View>

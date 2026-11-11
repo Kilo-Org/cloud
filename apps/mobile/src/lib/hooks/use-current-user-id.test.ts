@@ -25,6 +25,9 @@ vi.mock('@tanstack/react-query', () => ({
 // calls hooks directly, so the mock reads the current snapshot.
 vi.mock('react', () => ({
   useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown): unknown => getSnapshot(),
+  // The hook memoises its awaitable retry with a dependency list it does not
+  // need here: this suite calls the hook directly, so the body runs as-is.
+  useCallback: (body: unknown): unknown => body,
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ user: { getMe: { queryOptions: () => ({}) } } }),
@@ -151,5 +154,27 @@ describe('useCurrentUserId', () => {
       });
       expect(useCurrentUserId().isUnreachable).toBe(false);
     });
+  });
+
+  it('answers the awaitable retry only after the read has run', async () => {
+    // A caller that starts a gated read from this retry must not start it
+    // before the identity read answered, so the promise settles on the read.
+    const read = Promise.withResolvers<undefined>();
+    query.refetch.mockReturnValue(read.promise);
+
+    const retrying = useCurrentUserId().refetchAsync();
+    let settled = false;
+    const markSettled = async (): Promise<void> => {
+      await retrying;
+      settled = true;
+    };
+    const settling = markSettled();
+
+    expect(query.refetch).toHaveBeenCalledTimes(1);
+    expect(settled).toBe(false);
+
+    read.resolve(undefined);
+    await settling;
+    expect(settled).toBe(true);
   });
 });

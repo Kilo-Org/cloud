@@ -1,5 +1,5 @@
 import { onlineManager, useQuery } from '@tanstack/react-query';
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
@@ -25,6 +25,11 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     ...SETTLE_WHILE_OFFLINE,
   });
   const refused = error !== null && isTerminalTrpcCode(readTrpcErrorField(error, 'code'));
+  // `refetch` is stable across renders, so this awaitable form is too: a caller
+  // that must sequence a gated read after it can keep it in a dependency list.
+  const refetchAsync = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   return {
     userId: data?.id,
@@ -51,5 +56,8 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     refetch: () => {
       void refetch();
     },
+    // The same retry, awaitable, for a caller that must run a read this one
+    // gates (the credits catalog waits on the identity) as soon as it settles.
+    refetchAsync,
   };
 }

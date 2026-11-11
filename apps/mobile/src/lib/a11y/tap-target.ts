@@ -522,8 +522,9 @@ export function composerControlClearanceDp(): number {
  * `ms-1` is 3.5dp (0.25rem at NativeWind's 14pt rem). The gap is narrower than
  * the row's own slop, so the send control zeroes the side that faces the toggle
  * ({@link composerFacingHitSlop}); the toggle's box carries no slop at all. It
- * stays above zero because the idle toggle (`bg-secondary`) and the empty-input
- * send (`bg-muted`) share one colour: flush, the two circles read as one shape.
+ * stays above zero because a live session fills the toggle's whole box, and a
+ * filled box flush against the send control's filled circle would read as one
+ * shape.
  */
 export const COMPOSER_VOICE_SEND_GAP_CLASS = 'ms-1';
 

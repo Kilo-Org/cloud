@@ -87,31 +87,37 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('kiloPass.title')} modal />
-        <EmptyState
-          icon={Crown}
-          title={t('kiloPass.purchaseUnavailableTitle')}
-          // Only a pass the server reports as ended has something the title does
-          // not say; the plain kind would restate the title, which the state's
-          // own guide forbids.
-          description={
-            presentation.statusClass === 'terminal'
-              ? t('kiloPass.purchaseUnavailableEnded')
-              : undefined
-          }
-          action={
-            <Button
-              accessibilityLabel={t('credits.title')}
-              className={STATE_ACTION_CLASS}
-              onPress={() => {
-                // Replacing the dead-end modal keeps one sheet on screen.
-                router.replace('/(app)/credits' as Href);
-              }}
-              variant="outline"
-            >
-              <Text>{t('credits.title')}</Text>
-            </Button>
-          }
-        />
+        {/* This screen owns the body below the header, so the state centres in
+            it directly. The measured placement would start at the window's
+            centre and lift by half the header, a jump on every open. */}
+        <View className="flex-1 justify-center">
+          <EmptyState
+            placement="static"
+            icon={Crown}
+            title={t('kiloPass.purchaseUnavailableTitle')}
+            // Only a pass the server reports as ended has something the title does
+            // not say; the plain kind would restate the title, which the state's
+            // own guide forbids.
+            description={
+              presentation.statusClass === 'terminal'
+                ? t('kiloPass.purchaseUnavailableEnded')
+                : undefined
+            }
+            action={
+              <Button
+                accessibilityLabel={t('credits.title')}
+                className={STATE_ACTION_CLASS}
+                onPress={() => {
+                  // Replacing the dead-end modal keeps one sheet on screen.
+                  router.replace('/(app)/credits' as Href);
+                }}
+                variant="outline"
+              >
+                <Text>{t('credits.title')}</Text>
+              </Button>
+            }
+          />
+        </View>
       </View>
     );
   }

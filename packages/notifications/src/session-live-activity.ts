@@ -1,5 +1,6 @@
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
+import { timestampMs } from '@kilocode/app-shared/utils';
 import {
   isDefaultSessionTitle,
   SESSION_LIVE_COMMAND_LIMIT,
@@ -63,14 +64,8 @@ export type SessionLiveActivityBuildOptions = {
   previous?: Partial<SessionLiveActivityContentState> | undefined;
 };
 
-/** Epoch milliseconds of one backend time, or null when it is missing or does not parse. */
-function parseTimestampMs(value: string | null | undefined): number | null {
-  const at = value == null ? Number.NaN : Date.parse(value);
-  return Number.isFinite(at) ? at : null;
-}
-
 function isoOrNull(value: string | null | undefined): string | null {
-  const at = parseTimestampMs(value);
+  const at = timestampMs(value);
   return at === null ? null : new Date(at).toISOString();
 }
 
@@ -170,7 +165,7 @@ export function sessionCardStaleAtSeconds(
   defaultStaleAtSeconds: number
 ): number {
   if (content.statusKind !== 'running') return defaultStaleAtSeconds;
-  const at = parseTimestampMs(content.lastActivityAt);
+  const at = timestampMs(content.lastActivityAt);
   if (at === null) return defaultStaleAtSeconds;
   return Math.min(
     defaultStaleAtSeconds,
@@ -195,7 +190,7 @@ const RECENCY_HALF_MS = 365 * 24 * 60 * 60_000;
  * a newer change first, and a bounded term so no tie-break can leave its band.
  */
 function recencyTerm(changedAt: string | null): number {
-  const at = parseTimestampMs(changedAt);
+  const at = timestampMs(changedAt);
   if (at === null) return 0;
   const elapsed = Math.max(0, at - RECENCY_ORIGIN_MS);
   return Math.min(19, (19 * elapsed) / (elapsed + RECENCY_HALF_MS));

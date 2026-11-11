@@ -1505,8 +1505,62 @@ describe('TriggerForm save and invoke', () => {
         })
       )
     );
-    return { container: dom.container, onSaveAndInvoke };
+    return { container: dom.container, onSubmit, onSaveAndInvoke };
   }
+
+  it('blocks running with an unavailable saved environment but still allows saving', async () => {
+    const mounted = render({
+      initialData: { ...initialData('high', 'scheduled'), environmentId },
+    });
+    const invokeButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      button => button.textContent === 'Save and invoke now'
+    );
+    expect(invokeButton).toHaveProperty('disabled', true);
+    click(mounted.container, 'Save and invoke now');
+    await act(async () => Promise.resolve());
+    expect(mounted.onSaveAndInvoke).not.toHaveBeenCalled();
+
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expectSubmittedEnvironmentToBeUnchanged(mounted.onSubmit);
+  });
+
+  it.each(['automatic', otherEnvironmentId])(
+    'allows running after replacing an unavailable environment with %s',
+    async selection => {
+      mockUseCloudAgentEnvironments.mockReturnValue(
+        environmentsResult({ data: [githubEnvironment({ id: otherEnvironmentId })] })
+      );
+      const mounted = render({
+        initialData: { ...initialData('high', 'scheduled'), environmentId },
+      });
+
+      selectEnvironment(mounted.container, selection);
+      click(mounted.container, 'Save and invoke now');
+      await act(async () => Promise.resolve());
+
+      expect(mounted.onSaveAndInvoke).toHaveBeenCalledWith(
+        expect.objectContaining({ environmentId: selection === 'automatic' ? null : selection })
+      );
+    }
+  );
+
+  it.each([{ isLoading: true }, { isError: true }])(
+    'does not treat an unconfirmed environment as unavailable with %o',
+    async state => {
+      mockUseCloudAgentEnvironments.mockReturnValue(
+        environmentsResult({ data: undefined, ...state })
+      );
+      const mounted = render({
+        initialData: { ...initialData('high', 'scheduled'), environmentId },
+      });
+
+      click(mounted.container, 'Save and invoke now');
+      await act(async () => Promise.resolve());
+
+      expect(mounted.onSaveAndInvoke).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('uses current validated scheduled form data with the same omission mapping', async () => {
     const mounted = render({});

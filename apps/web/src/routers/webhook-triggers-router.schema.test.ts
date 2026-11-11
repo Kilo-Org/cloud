@@ -1447,23 +1447,27 @@ describe('webhook trigger environment selection', () => {
     expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
   });
 
-  it.each([environmentId, null])(
-    'rejects environment update %j for stored KiloClaw Chat triggers',
-    async value => {
-      mockSelectWhere.mockResolvedValue([
-        {
-          id: '00000000-0000-4000-8000-000000000002',
-          activation_mode: 'webhook',
-          target_type: 'kiloclaw_chat',
-        },
-      ]);
+  it('accepts a null environment update for stored KiloClaw Chat triggers', async () => {
+    mockSelectWhere.mockResolvedValue([{ ...triggerRow, target_type: 'kiloclaw_chat' }]);
 
-      await expect(
-        createCaller({ user }).update({ triggerId: 'trigger-id', environmentId: value })
-      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-      expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
-    }
-  );
+    await createCaller({ user }).update({ triggerId: 'trigger-id', environmentId: null });
+
+    expect(mockUpdateWorkerTrigger).toHaveBeenCalledWith(
+      user.id,
+      undefined,
+      'trigger-id',
+      expect.objectContaining({ environmentId: null })
+    );
+  });
+
+  it('rejects an environment selection for stored KiloClaw Chat triggers', async () => {
+    mockSelectWhere.mockResolvedValue([{ ...triggerRow, target_type: 'kiloclaw_chat' }]);
+
+    await expect(
+      createCaller({ user }).update({ triggerId: 'trigger-id', environmentId })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
+  });
 });
 
 describe('scheduled trigger invocation', () => {

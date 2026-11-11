@@ -193,7 +193,7 @@ describe('CreateWebhookTriggerContent environment mapping', () => {
     );
   });
 
-  it('preserves automatic and clearing semantics in the create payload', async () => {
+  it('forwards Automatic as a null environment in the create payload', async () => {
     mockCreateMutation.mockResolvedValue({
       triggerId: 'daily-report',
       inboundUrl: 'https://inbound',
@@ -201,15 +201,10 @@ describe('CreateWebhookTriggerContent environment mapping', () => {
     const props = await render();
 
     await act(async () => {
-      await props.onSubmit({ ...data, environmentId: undefined });
-    });
-    const [automatic] = mockCreateMutation.mock.calls.at(-1) ?? [];
-    expect((automatic as { environmentId?: string | null }).environmentId).toBeUndefined();
-
-    await act(async () => {
       await props.onSubmit({ ...data, environmentId: null });
     });
-    const [cleared] = mockCreateMutation.mock.calls.at(-1) ?? [];
-    expect((cleared as { environmentId?: string | null }).environmentId).toBeNull();
+    expect(mockCreateMutation).toHaveBeenCalledWith(
+      expect.objectContaining({ environmentId: null })
+    );
   });
 });

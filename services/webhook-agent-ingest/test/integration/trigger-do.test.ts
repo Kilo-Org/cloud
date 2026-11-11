@@ -500,6 +500,7 @@ describe('TriggerDO', () => {
       await kiloclawStub.configure(testUserNamespace, 'environment-kiloclaw', {
         ...baseConfig,
         targetType: 'kiloclaw_chat',
+        environmentId: null,
       });
       const before = await kiloclawStub.getConfig();
 
@@ -507,16 +508,14 @@ describe('TriggerDO', () => {
         await expect(instance.updateConfig({ environmentId })).rejects.toThrow(
           'Environment selection is only supported for Cloud Agent triggers'
         );
-        await expect(instance.updateConfig({ environmentId: null })).rejects.toThrow(
-          'Environment selection is only supported for Cloud Agent triggers'
-        );
       });
       expect(await kiloclawStub.getConfig()).toEqual(before);
       await expectEnvironmentId(kiloclawStub, null);
 
       await expect(
-        kiloclawStub.updateConfig({ promptTemplate: 'Updated {{body}}' })
+        kiloclawStub.updateConfig({ promptTemplate: 'Updated {{body}}', environmentId: null })
       ).resolves.toEqual({ success: true });
+      await expectEnvironmentId(kiloclawStub, null);
       expect(await kiloclawStub.getConfig()).toMatchObject({
         ...before,
         promptTemplate: 'Updated {{body}}',

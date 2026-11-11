@@ -540,17 +540,35 @@ describe('trigger environment selection routes', () => {
     expect(configure).not.toHaveBeenCalled();
   });
 
-  it.each([{ environmentId }, { environmentId: null }])(
-    'rejects %o for stored KiloClaw triggers',
-    async updates => {
-      const { env, updateConfig } = createRouteHarness(existingConfig('kiloclaw_chat'));
+  it('accepts a null environment for KiloClaw creation and updates', async () => {
+    const create = createRouteHarness(null);
+    const response = await requestTrigger(create.env, 'POST', {
+      targetType: 'kiloclaw_chat',
+      kiloclawInstanceId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+      promptTemplate: 'Process {{body}}',
+      environmentId: null,
+    });
+    expect(response.status).toBe(201);
+    expect(create.configure).toHaveBeenCalledWith(
+      NAMESPACE,
+      TRIGGER_ID,
+      expect.objectContaining({ environmentId: null })
+    );
 
-      const response = await requestTrigger(env, 'PUT', updates);
+    const update = createRouteHarness(existingConfig('kiloclaw_chat'));
+    const updated = await requestTrigger(update.env, 'PUT', { environmentId: null });
+    expect(updated.status).toBe(200);
+    expect(update.updateConfig).toHaveBeenCalledWith({ environmentId: null });
+  });
 
-      expect(response.status).toBe(400);
-      expect(updateConfig).not.toHaveBeenCalled();
-    }
-  );
+  it('rejects environment selection for stored KiloClaw triggers', async () => {
+    const { env, updateConfig } = createRouteHarness(existingConfig('kiloclaw_chat'));
+
+    const response = await requestTrigger(env, 'PUT', { environmentId });
+
+    expect(response.status).toBe(400);
+    expect(updateConfig).not.toHaveBeenCalled();
+  });
 });
 
 describe('scheduled trigger invocation routes', () => {

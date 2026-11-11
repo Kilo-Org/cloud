@@ -933,7 +933,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    if (input.environmentId !== undefined && dbTrigger.target_type === 'kiloclaw_chat') {
+    if (input.environmentId != null && dbTrigger.target_type === 'kiloclaw_chat') {
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: 'Environment selection is not applicable for KiloClaw Chat triggers',

@@ -561,7 +561,7 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
       );
     }
 
-    if (existingConfig.targetType === 'kiloclaw_chat' && updates.environmentId !== undefined) {
+    if (existingConfig.targetType === 'kiloclaw_chat' && updates.environmentId != null) {
       return c.json(resError('environmentId is not applicable for kiloclaw_chat triggers'), 400);
     }
 

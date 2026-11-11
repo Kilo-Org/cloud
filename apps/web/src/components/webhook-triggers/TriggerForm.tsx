@@ -618,9 +618,10 @@ export function TriggerForm({
   );
 
   const handleSaveAndInvoke = useCallback(() => {
-    if (!isEditMode || !isScheduled || !isActive || !onSaveAndInvoke) return;
+    if (!isEditMode || !isScheduled || !isActive || !onSaveAndInvoke || environmentUnavailable)
+      return;
     void runSubmission(onSaveAndInvoke, true);
-  }, [isActive, isEditMode, isScheduled, onSaveAndInvoke, runSubmission]);
+  }, [environmentUnavailable, isActive, isEditMode, isScheduled, onSaveAndInvoke, runSubmission]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
@@ -1272,7 +1273,12 @@ export function TriggerForm({
                     variant="outline"
                     onClick={handleSaveAndInvoke}
                     disabled={
-                      !isFormValid || isLoading || isDeleting || isSaveAndInvoking || !isActive
+                      !isFormValid ||
+                      environmentUnavailable ||
+                      isLoading ||
+                      isDeleting ||
+                      isSaveAndInvoking ||
+                      !isActive
                     }
                   >
                     {isSaveAndInvoking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

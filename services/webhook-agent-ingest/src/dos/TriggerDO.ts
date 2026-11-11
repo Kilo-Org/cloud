@@ -397,7 +397,7 @@ export class TriggerDO extends DurableObject<Env> {
       .nullable()
       .optional()
       .parse(updates.environmentId);
-    if (environmentIdUpdate !== undefined && existingConfig.targetType === 'kiloclaw_chat') {
+    if (environmentIdUpdate != null && existingConfig.targetType === 'kiloclaw_chat') {
       throw new Error('Environment selection is only supported for Cloud Agent triggers');
     }
 

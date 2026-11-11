@@ -125,6 +125,21 @@ function trackedFile(repo: string, commit: string, file: string): string {
   }
   return git(repo, ['show', `${commit}:${file}`]);
 }
+/**
+ * The app-side probe is the gate's instrument, not product source. Both revisions
+ * must therefore be measured by the same one: a branch that repairs the probe
+ * would otherwise be compared against a base still running the old instrument,
+ * and a probe defect in the base would read as a product defect of the branch.
+ * Each revision gets the tool checkout's copy of these files, which is recorded in
+ * its `prepared` list exactly like the generated route plumbing.
+ */
+const INSTRUMENT_FILES = [
+  'apps/mobile/src/lib/design-gate/collect.ts',
+  'apps/mobile/src/lib/design-gate/paint-state.ts',
+  'apps/mobile/src/lib/design-gate/probe.ts',
+  'apps/mobile/src/lib/design-gate/sampler.ts',
+] as const;
+
 function generatedFiles(
   repo: string,
   commit: string,
@@ -134,6 +149,16 @@ function generatedFiles(
   let intent = trackedFile(repo, commit, INTENT);
   const files = new Map<string, string>();
   const branches: string[] = [];
+  for (const file of INSTRUMENT_FILES) {
+    // Only a revision that would otherwise run a different probe needs the
+    // instrument copied in, and only when that revision tracks the file at all:
+    // an unchanged probe, or a product tree without one, keeps its own source.
+    if (git(repo, ['ls-tree', commit, '--', file]).trim() === '') continue;
+    const fromTool = fs.readFileSync(containedProofSource(repo, file), 'utf8');
+    if (trackedFile(repo, commit, file) !== fromTool) {
+      files.set(file, fromTool);
+    }
+  }
   for (const target of manifest.targets) {
     const diagnostic = target.diagnostic;
     if (diagnostic === undefined) continue;

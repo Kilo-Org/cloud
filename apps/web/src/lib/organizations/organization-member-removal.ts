@@ -11,6 +11,7 @@ import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { removeClaudeBillingGrant } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import { cleanupRemovedClaudeProfilesForUser } from '@/lib/claude-billing/delete';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
@@ -170,6 +171,16 @@ export async function invalidateMemberSessionAccess(
       organizationId,
       userId,
       error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    await cleanupRemovedClaudeProfilesForUser(userId);
+  } catch (error) {
+    errorExceptInTest('Failed to retire unreferenced Claude billing profiles for removed member', {
+      organizationId,
+      userId,
+      error: error instanceof Error ? error.name : 'unknown',
     });
   }
 }

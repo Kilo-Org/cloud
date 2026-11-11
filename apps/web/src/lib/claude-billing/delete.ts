@@ -129,6 +129,7 @@ export async function deleteUserClaudeProfiles(userId: string): Promise<void> {
   const rows = await db
     .select({
       id: claude_billing_connections.id,
+      status: claude_billing_connections.status,
       user_profile_id: claude_billing_connections.user_profile_id,
     })
     .from(claude_billing_connections)
@@ -179,10 +180,17 @@ export async function deleteUserClaudeProfiles(userId: string): Promise<void> {
   if (!operatorConfigured()) throw new ClaudeProfileDeletionError(false);
 
   for (const row of rows) {
-    await deleteClaudeUserProfileRemote(row.user_profile_id);
-    await db
-      .update(claude_billing_connections)
-      .set({ status: 'billing_unavailable' })
-      .where(eq(claude_billing_connections.id, row.id));
+    if (row.status === ClaudeBillingConnectionStatus.Removed) {
+      await retireUnreferencedClaudeBillingPayer({
+        id: row.id,
+        userProfileId: row.user_profile_id,
+      });
+    } else {
+      await deleteClaudeUserProfileRemote(row.user_profile_id);
+      await db
+        .update(claude_billing_connections)
+        .set({ status: 'billing_unavailable' })
+        .where(eq(claude_billing_connections.id, row.id));
+    }
   }
 }

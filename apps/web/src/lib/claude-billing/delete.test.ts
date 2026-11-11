@@ -82,6 +82,32 @@ describe('Personal Claude profile erasure', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(`uprof_${user.id}`);
+    expect(await getClaudeBillingConnection(personal)).toBeNull();
+  });
+
+  it('deletes a removed shared-services row created by the user instead of marking it billing_unavailable', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Claude removed shared erasure', user.id, 0);
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: null,
+      organization_id: organization.id,
+      user_profile_id: `uprof_removed_shared_${user.id}`,
+      status: 'removed',
+      created_by: user.id,
+    });
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    await deleteUserClaudeProfiles(user.id);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(`uprof_removed_shared_${user.id}`);
+    expect(
+      await getClaudeBillingConnection({ kind: 'shared_services', organizationId: organization.id })
+    ).toBeNull();
   });
 
   it.each([200, 404])('accepts deletion or authoritative absence (%s)', async status => {

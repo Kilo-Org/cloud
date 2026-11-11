@@ -271,7 +271,6 @@ export class TriggerDO extends DurableObject<Env> {
 
     await this.ctx.storage.put('config', config);
 
-    // Set initial alarm for scheduled triggers
     if (config.activationMode === 'scheduled' && config.cronExpression) {
       await this.scheduleNextAlarm(config);
     }
@@ -442,10 +441,8 @@ export class TriggerDO extends DurableObject<Env> {
 
     await this.ctx.storage.put('config', updatedConfig);
 
-    // Alarm lifecycle for scheduled triggers
     if (updatedConfig.activationMode === 'scheduled') {
       if (!updatedConfig.isActive) {
-        // Deactivated — clear alarm, retry flag, and stale next-run display
         await this.ctx.storage.deleteAlarm();
         await this.ctx.storage.delete('alarmRetry');
         updatedConfig.nextScheduledAt = null;
@@ -664,7 +661,6 @@ export class TriggerDO extends DurableObject<Env> {
       })
       .run();
 
-    // Delete overflow rows, preserving in-progress requests
     this.db.run(sql`
       DELETE FROM ${requestsTable}
       WHERE ${requestsTable.id} IN (
@@ -777,7 +773,7 @@ export class TriggerDO extends DurableObject<Env> {
   async alarm(): Promise<void> {
     const config = await this.getConfig();
     if (!config || !config.isActive || config.activationMode !== 'scheduled') {
-      return; // Deactivated or mode changed — don't reschedule
+      return;
     }
 
     // If this is a DST retry alarm (no cron occurrence matched), just try to reschedule
@@ -795,7 +791,7 @@ export class TriggerDO extends DurableObject<Env> {
       logger.warn('Scheduled run skipped: too many in-flight', {
         triggerId: config.triggerId,
       });
-      await this.scheduleNextAlarm(config); // Still reschedule
+      await this.scheduleNextAlarm(config);
       return;
     }
 

@@ -55,6 +55,5 @@ export async function classifyInitiateResponse(
     };
   }
 
-  // Other 4xx — non-retriable
   return { action: 'fail', errorMessage: errorBody };
 }

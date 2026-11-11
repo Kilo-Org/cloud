@@ -12,9 +12,6 @@ import {
 import { logger } from '../util/logger.js';
 import { getSecretValue } from '../util/secret.js';
 
-/**
- * Environment bindings required for token minting.
- */
 export type TokenMintingEnv = {
   HYPERDRIVE: { connectionString: string };
   NEXTAUTH_SECRET: SecretsStoreSecret | string; // Same secret used by kilocode-backend
@@ -70,12 +67,6 @@ export class TokenMintingService {
     return this.jwtSecret;
   }
 
-  /**
-   * Mint a short-lived API token for webhook processing.
-   *
-   * For personal triggers: mints token for the real user
-   * For org triggers: uses the configured creator, otherwise the webhook bot user.
-   */
   async mintToken(params: MintTokenParams): Promise<MintTokenResult> {
     const db = this.getDb();
 
@@ -118,7 +109,6 @@ export class TokenMintingService {
     }
 
     if (params.userId) {
-      // Personal trigger - mint token for the real user
       logger.info('Token minting: lookup personal user', { userId: params.userId });
       const user = await findUserForToken(db, params.userId);
 
@@ -148,7 +138,6 @@ export class TokenMintingService {
         isBot: false,
       };
     } else if (params.orgId) {
-      // Org trigger - mint token for the webhook bot user
       logger.info('Token minting: checking org exists', { orgId: params.orgId });
       const orgExists = await organizationExists(db, params.orgId);
       if (!orgExists) {

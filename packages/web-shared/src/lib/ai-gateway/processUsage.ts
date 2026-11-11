@@ -1680,7 +1680,8 @@ export async function processTokenData(
       genStats.cacheWriteTokens = usageStats.cacheWriteTokens;
     }
 
-    genStats.model = usageStats.model; // openrouter bug?
+    // Prefer the response alias over a dated generation ID, but keep a recovered model.
+    genStats.model = usageStats.model || genStats.model;
     genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
     genStats.latency = usageStats.latency;
     genStats.generation_time = usageStats.generation_time;

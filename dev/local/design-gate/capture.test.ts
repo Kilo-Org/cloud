@@ -262,6 +262,41 @@ test('waitForLoadingPlaceholder reports a placeholder that outlives its budget',
   assert.ok(waited.elapsedMs >= 1_000);
 });
 
+test('an unsettled capture from a loading placeholder names that cause', () => {
+  const dump = dumpWith();
+  const blocked = screenFindings({
+    cell: 'base',
+    target: 'loading',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [dump, dump, dump],
+      settled: false,
+      elapsedMs: 12_000,
+      blockedBy: 'loading-placeholder',
+    },
+  });
+  assert.deepEqual(
+    blocked.map(finding => finding.rule),
+    ['unsettled']
+  );
+  assert.match(blocked[0]?.message ?? '', /still paints its loading placeholder/u);
+  const changing = screenFindings({
+    cell: 'base',
+    target: 'moving',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [dumpWith({ y: 50 }), dump],
+      settled: false,
+      elapsedMs: 12_000,
+    },
+  });
+  assert.match(changing[0]?.message ?? '', /kept changing/u);
+});
+
 type ProbeState = {
   language: string;
   route: string;

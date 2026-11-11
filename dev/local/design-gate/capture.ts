@@ -97,6 +97,8 @@ export type Sampled = {
   /** Consecutive probe states agree; this does not establish native paint. */
   settled: boolean;
   elapsedMs: number;
+  /** Set when the measured screen still paints a loading placeholder. */
+  blockedBy?: 'loading-placeholder';
   alignment?: CaptureAlignment;
 };
 
@@ -110,8 +112,11 @@ export type Sampled = {
  */
 const LOADING_TEST_ID = /(?:^|-)skeleton$/u;
 const LOADING_OWNERS: Readonly<Record<string, true>> = {
-  SessionDetailSkeleton: true,
+  SessionComposerSkeleton: true,
+  SessionListSkeletonRows: true,
   SessionReadOnlyFooterPlaceholder: true,
+  SessionRowSkeleton: true,
+  SessionSectionHeaderSkeleton: true,
   SessionSkeletonMessages: true,
   Skeleton: true,
 };
@@ -265,6 +270,7 @@ export function screenFindings(args: {
           target: args.target,
           dump: args.dump,
           elapsedMs: args.sampled.elapsedMs,
+          blockedBy: args.sampled.blockedBy,
         })
       );
     }
@@ -448,6 +454,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     layoutSignature,
     screenshotObservation(dump, image)
   );
+  const stillLoading = loadingPlaceholder(normalize(dump));
   const sampled: Sampled = {
     ...settled,
     dump,
@@ -456,9 +463,8 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     // A screen that still paints its loading placeholder is never the settled
     // screen the target describes, whatever the settle loop saw before it.
     settled:
-      settled.settled &&
-      !loadingPlaceholder(normalize(dump)) &&
-      layoutSignature(settled.dump) === layoutSignature(dump),
+      settled.settled && !stillLoading && layoutSignature(settled.dump) === layoutSignature(dump),
+    ...(stillLoading ? { blockedBy: 'loading-placeholder' as const } : {}),
   };
   writeJson(files.absolute(files.capture), alignment);
   const screen: Screen = {
@@ -519,7 +525,23 @@ export function unsettledFinding(args: {
   target: string;
   dump: ProbeDump;
   elapsedMs: number;
+  blockedBy?: Sampled['blockedBy'];
 }): Finding {
+  if (args.blockedBy === 'loading-placeholder') {
+    return {
+      rule: 'unsettled',
+      severity: 'warning',
+      cell: args.cell,
+      target: args.target,
+      element: rootRef(args.dump),
+      measured: args.elapsedMs,
+      expected: 'the screen content after its loading placeholder',
+      unit: 'ms',
+      message:
+        `The screen still paints its loading placeholder after ${args.elapsedMs} ms, so it is not ` +
+        'settled; layout rules were skipped for this screen.',
+    };
+  }
   return {
     rule: 'unsettled',
     severity: 'warning',

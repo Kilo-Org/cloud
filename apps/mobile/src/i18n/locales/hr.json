@@ -4340,10 +4340,10 @@
     "snapshotSummaryFailed": "AI sažetak nije uspio. Vaša strukturirana snimka stanja i dalje je dostupna.",
     "scheduledContextEnabled": "Zakazana izvješća",
     "scheduledContextSettings": "Zakazana izvješća · {{context}}",
-    "scheduledContextHint": "Omogućite zakazano bilježenje stanja i plaćene AI sažetke samo za ovaj kontekst. Odabrani izvaci s uklonjenim osjetljivim informacijama i strukturirane činjenice šalju se vašem modelu. Sažeci koriste jezik aplikacije koji se sprema samo kada izričito promijenite postavke izvješća. Sama promjena jezika aplikacije ne ažurira spremljeni jezik sažetaka. Naplata ide sa salda ovog konteksta. Snimke bez aktivnosti ne koriste AI.",
+    "scheduledContextHint": "Omogućite zakazano bilježenje stanja i plaćene AI sažetke samo za ovaj kontekst. Odabrani izvaci s uklonjenim osjetljivim informacijama i strukturirane činjenice šalju se vašem modelu. Sažeci koriste jezik aplikacije koji se sprema kada ažurirate postavke izvješća. Naplata ide sa salda ovog konteksta. Snimke bez aktivnosti ne koriste AI.",
     "snapshotSafeguards": "Ograničenja vremena i potrošnje po sažetku primjenjuju se na svaku zakazanu snimku stanja, a ne kao dnevni proračun.",
     "snapshotEstimateInputTooLarge": "Ova snimka stanja sadrži previše dokaza za odabrani model.",
-    "quietSnapshot": "Za ovu snimku stanja nije odabrana nijedna aktivnost sesija. Odabir ovisi o dostupnim podacima i može biti nepotpun. AI model nije pozvan, a AI sažetak nije zatražen ni naplaćen.",
+    "quietSnapshot": "Za ovu snimku stanja nije odabrana nijedna aktivnost sesija. AI sažetak nije zatražen ni naplaćen.",
     "noEnabledContexts": "Nijedan kontekst nije omogućen za zakazana izvješća",
     "sourceBlocker": "Sesija zahtijeva pozornost",
     "sourceMetadata": "Zabilježeni metapodaci sesije"

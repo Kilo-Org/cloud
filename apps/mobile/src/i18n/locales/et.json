@@ -4259,7 +4259,7 @@
     "estimateModelNotAllowed": "See mudel pole siin lubatud.",
     "estimateSpendLimitTooLow": "Kulupiirangu tõstmisel saaks selle kokkuvõtte lubada.",
     "confirmPaid": "Kas lubada tasulised kokkuvõtted kontekstis {{context}}?",
-    "paidDisclosure": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, {{minutes}} minuti pikkuse ajapiiranguga. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
+    "paidDisclosure": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, {{minutes}} min pikkuse ajapiiranguga. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
     "enable": "Luba tasulised kokkuvõtted",
     "allContexts": "Isiklikud ja organisatsiooni ülevaated hoitakse eraldi.",
     "emptyHistory": "Salvestatud ülevaateid pole",

@@ -4274,10 +4274,10 @@
     "snapshotSummaryFailed": "Tsy nahomby ny famintinana AI. Mbola azo jerena ny tatitra voalamina voarakitrao.",
     "scheduledContextEnabled": "Tatitra voalahatra",
     "scheduledContextSettings": "Tatitra voalahatra · {{context}}",
-    "scheduledContextHint": "Alefaso ny fandraketana voalahatra sy ny famintinana AI andoavana ho an'ity toe-javatra ity ihany. Sombiny voafantina sy nanafenana ny angona saro-pady ary zava-misy voalamina no alefa any amin'ny modelinao. Ny famintinana dia mampiasa ny fitenin'ny rindranasa voatahiry rehefa manova ny fikirakirana tatitra ianao. Tsy havaozina ho azy io fiteny voatahiry io rehefa miova ny fitenin'ny rindranasa. Avy amin'ny vola ao amin'ity toe-javatra ity ny sarany. Tsy mampiasa AI ny tatitra tsy misy hetsika.",
+    "scheduledContextHint": "Alefaso ny fandraketana voalahatra sy ny famintinana AI andoavana ho an'ity toe-javatra ity ihany. Sombiny voafantina sy nanafenana ny angona saro-pady ary zava-misy voalamina no alefa any amin'ny modelinao. Ny famintinana dia mampiasa ny fitenin'ny rindranasa voatahiry rehefa manova ny fikirakirana tatitra ianao. Avy amin'ny vola ao amin'ity toe-javatra ity ny sarany. Tsy mampiasa AI ny tatitra tsy misy hetsika.",
     "snapshotSafeguards": "Mihatra amin'ny tatitra raikitra voalahatra tsirairay ny fetra fotoana sy fandaniana isaky ny famintinana, fa tsy teti-bola isan'andro.",
     "snapshotEstimateInputTooLarge": "Be loatra ny porofo ao amin'ity tatitra raikitra ity ho an'ny maodely voafantina.",
-    "quietSnapshot": "Tamin'ny fifantenana araka izay azo atao, tsy nisy hetsika tao amin'ny fotoam-piasana voafantina ho an'ity tatitra raikitra ity. Tsy nisy famintinana AI nangatahana, tsy nantsoina ny modely ary tsy nisy sarany nalaina.",
+    "quietSnapshot": "Tsy nisy hetsika tao amin'ny fotoam-piasana voafantina ho an'ity tatitra raikitra ity. Tsy nisy famintinana AI nangatahana ary tsy nisy sarany nalaina.",
     "noEnabledContexts": "Tsy misy toe-javatra nandefasana tatitra voalahatra",
     "sourceBlocker": "Mila fikarakarana ny fotoam-piasana",
     "sourceMetadata": "Metadata momba ny fotoam-piasana voarakitra"

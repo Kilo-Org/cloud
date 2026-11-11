@@ -4274,10 +4274,10 @@
     "snapshotSummaryFailed": "Cuunfaan AI hin milkoofne. Galmeen haalaa qindaa'aan kee ammas ni argama.",
     "scheduledContextEnabled": "Gabaasota saganteeffaman",
     "scheduledContextSettings": "Gabaasota saganteeffaman · {{context}}",
-    "scheduledContextHint": "Haala kana qofaaf galmeessuu saganteeffamee fi cuunfaa AI kaffaltii dandeessisi. Kutaaleen filatamanii fi odeeffannoon iccitii keessaa haqame akkasumas dhugaawwan qindaa'an gara moodeela keetti ergamu. Cuunfaawwan afaan app yeroo ati qindaa'ina gabaasaa ifatti jijjiirtu kuufame fayyadamu. Afaan app jijjiiruun qofti afaan kuufame kana hin jijjiiru. Kaffaltiin haftee haala kanaa fayyadama. Galmeewwan haalaa sochii hin qabne AI hin fayyadaman.",
+    "scheduledContextHint": "Haala kana qofaaf galmeessuu saganteeffamee fi cuunfaa AI kaffaltii dandeessisi. Kutaaleen filatamanii fi odeeffannoon iccitii keessaa haqame akkasumas dhugaawwan qindaa'an gara moodeela keetti ergamu. Cuunfaawwan afaan app yeroo ati qindaa'ina gabaasaa ifatti jijjiirtu kuufame fayyadamu. Kaffaltiin haftee haala kanaa fayyadama. Galmeewwan haalaa sochii hin qabne AI hin fayyadaman.",
     "snapshotSafeguards": "Daangaawwan yeroo fi baasii cuunfaa tokkoof kaa'aman galmee haalaa saganteeffame tokkoon tokkoof hojii irra oolu; baajata guyyaa miti.",
     "snapshotEstimateInputTooLarge": "Galmeen haalaa kun moodeela filatameef ragaa baay'ee qaba.",
-    "quietSnapshot": "Galmee haalaa kanaaf filannoo hanga danda'ametti taasifame keessatti sochiin taa'umsaa hin filatamne. Cuunfaan AI hin gaafatamne; moodeelli AI hin waamamne, kaffaltiinis hin jiru.",
+    "quietSnapshot": "Galmee haalaa kanaaf sochiin taa'umsaa hin filatamne. Cuunfaan AI hin gaafatamne; kaffaltiinis hin jiru.",
     "noEnabledContexts": "Gabaasota saganteeffamaniif haalawwan dandeessifaman hin jiran",
     "sourceBlocker": "Taa'umsi xiyyeeffannoo barbaada",
     "sourceMetadata": "Meetadaataa taa'umsaa galmaa'e"

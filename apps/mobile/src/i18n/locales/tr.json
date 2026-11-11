@@ -4274,10 +4274,10 @@
     "snapshotSummaryFailed": "AI özeti başarısız oldu. Yapılandırılmış anlık görüntünüz hâlâ mevcut.",
     "scheduledContextEnabled": "Planlanmış raporlar",
     "scheduledContextSettings": "Planlanmış raporlar · {{context}}",
-    "scheduledContextHint": "Yalnızca bu bağlam için planlanmış kayıtları ve ücretli AI özetlerini etkinleştirin. Seçilmiş, hassas bilgileri gizlenmiş alıntılar ve yapılandırılmış bilgiler modelinize gönderilir. Özetlerde, rapor ayarlarını açıkça değiştirdiğinizde kaydedilen uygulama dili kullanılır; uygulama dilini değiştirmek bu dili otomatik olarak güncellemez. Ücretler bu bağlamın bakiyesinden düşülür. Etkinlik olmayan anlık görüntülerde AI kullanılmaz.",
+    "scheduledContextHint": "Yalnızca bu bağlam için planlanmış kayıtları ve ücretli AI özetlerini etkinleştirin. Seçilmiş, hassas bilgileri gizlenmiş alıntılar ve yapılandırılmış bilgiler modelinize gönderilir. Özetler, rapor ayarlarını güncellediğinizde kaydedilen uygulama dilini kullanır. Ücretler bu bağlamın bakiyesinden düşülür. Etkinlik olmayan anlık görüntülerde AI kullanılmaz.",
     "snapshotSafeguards": "Özet başına süre ve harcama sınırları, planlanmış her anlık görüntü için ayrı ayrı geçerlidir; günlük bütçe değildir.",
     "snapshotEstimateInputTooLarge": "Bu anlık görüntüde seçilen modelin işleyebileceğinden fazla kanıt var.",
-    "quietSnapshot": "Mevcut veriler elverdiğince yapılan seçimde bu anlık görüntü için hiçbir oturum etkinliği seçilmedi. AI özeti istenmedi, model çağrısı yapılmadı ve ücret alınmadı.",
+    "quietSnapshot": "Bu anlık görüntü için hiçbir oturum etkinliği seçilmedi. AI özeti istenmedi ve ücret alınmadı.",
     "noEnabledContexts": "Planlanmış raporlar için etkinleştirilmiş bağlam yok",
     "sourceBlocker": "Oturumla ilgilenilmesi gerekiyor",
     "sourceMetadata": "Kaydedilen oturum meta verileri"

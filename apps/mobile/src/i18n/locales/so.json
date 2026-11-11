@@ -4274,10 +4274,10 @@
     "snapshotSummaryFailed": "Soo koobidda AI way fashilantay. Nuqulkaaga xaaladda ee habaysan weli waa la heli karaa.",
     "scheduledContextEnabled": "Warbixinnada la jadwalay",
     "scheduledContextSettings": "Warbixinnada la jadwalay · {{context}}",
-    "scheduledContextHint": "Shid kaydinta la jadwalay iyo soo koobidda AI ee lacagta leh xaaladdan oo keliya. Qaybo la doortay oo xogta xasaasiga ah laga qariyay iyo xaqiiqooyin habaysan ayaa loo diraa moodeelkaaga. Soo koobiddu waxay isticmaashaa luqadda app-ka ee la kaydiyo oo keliya marka aad si cad u beddesho dejinta warbixinta. Luqaddaas si toos ah looma cusboonaysiiyo marka luqadda app-ku is beddesho. Lacagaha waxaa laga jaraa haraaga xaaladdan. Nuqullada xaaladda ee aan dhaqdhaqaaq lahayn ma isticmaalaan AI.",
+    "scheduledContextHint": "Shid kaydinta la jadwalay iyo soo koobidda AI ee lacagta leh xaaladdan oo keliya. Qaybo la doortay oo xogta xasaasiga ah laga qariyay iyo xaqiiqooyin habaysan ayaa loo diraa moodeelkaaga. Soo koobiddu waxay isticmaashaa luqadda app-ka ee la kaydiyo marka aad cusboonaysiiso dejinta warbixinta. Lacagaha waxaa laga jaraa haraaga xaaladdan. Nuqullada xaaladda ee aan dhaqdhaqaaq lahayn ma isticmaalaan AI.",
     "snapshotSafeguards": "Xadadka waqtiga iyo kharashka ee soo koobid kasta waxay khuseeyaan nuqul kasta oo xaaladda ah oo la jadwalay, mana aha miisaaniyad maalinle ah.",
     "snapshotEstimateInputTooLarge": "Nuqulkan xaaladda waxaa ku jira caddaymo aad ugu badan moodeelka la doortay.",
-    "quietSnapshot": "Xulashadii la sameeyay intii suurtagal ahayd, wax dhaqdhaqaaq fadhi ah looma dooran nuqulkan xaaladda. Moodeel AI ah lama wicin, soo koobid AI ahna lama codsan, wax lacag ahna laguma dallacin.",
+    "quietSnapshot": "Wax dhaqdhaqaaq fadhi ah looma dooran nuqulkan xaaladda. Soo koobid AI ahna lama codsan, wax lacag ahna laguma dallacin.",
     "noEnabledContexts": "Ma jiraan xaalado loo shiday warbixinnada la jadwalay",
     "sourceBlocker": "Fadhigu wuxuu u baahan yahay fiiro gaar ah",
     "sourceMetadata": "Xogta sharaxaysa fadhiga ee la kaydiyay"

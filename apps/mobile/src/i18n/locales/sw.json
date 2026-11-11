@@ -4274,10 +4274,10 @@
     "snapshotSummaryFailed": "Muhtasari wa AI umeshindwa. Rekodi yako ya hali yenye taarifa zilizopangwa bado inapatikana.",
     "scheduledContextEnabled": "Ripoti zilizoratibiwa",
     "scheduledContextSettings": "Ripoti zilizoratibiwa · {{context}}",
-    "scheduledContextHint": "Washa uhifadhi wa hali kwa ratiba na mihtasari ya AI ya kulipia kwa muktadha huu tu. Dondoo zilizochaguliwa, ambazo taarifa nyeti zimefichwa, pamoja na taarifa zilizopangwa hutumwa kwa modeli yako. Mihtasari hutumia lugha ya programu iliyohifadhiwa unapobadilisha mipangilio ya ripoti mwenyewe. Kubadilisha lugha ya programu pekee hakusasishi lugha hiyo iliyohifadhiwa. Malipo hutumia salio la muktadha huu. Rekodi za hali zisizo na shughuli hazitumii AI.",
+    "scheduledContextHint": "Washa uhifadhi wa hali kwa ratiba na mihtasari ya AI ya kulipia kwa muktadha huu tu. Dondoo zilizochaguliwa, ambazo taarifa nyeti zimefichwa, pamoja na taarifa zilizopangwa hutumwa kwa modeli yako. Mihtasari hutumia lugha ya programu iliyohifadhiwa unapobadilisha mipangilio ya ripoti. Malipo hutumia salio la muktadha huu. Rekodi za hali zisizo na shughuli hazitumii AI.",
     "snapshotSafeguards": "Vikomo vya muda na matumizi kwa kila muhtasari hutumika kwa kila rekodi ya hali iliyoratibiwa, si bajeti ya kila siku.",
     "snapshotEstimateInputTooLarge": "Rekodi hii ya hali ina ushahidi mwingi mno kwa modeli iliyochaguliwa.",
-    "quietSnapshot": "Uteuzi hufanywa kadiri inavyowezekana. Hakuna shughuli za vipindi zilizochaguliwa kwa rekodi hii ya hali. Hakuna muhtasari wa AI ulioombwa, modeli ya AI iliyoitwa, wala malipo yaliyotozwa.",
+    "quietSnapshot": "Hakuna shughuli za vipindi zilizochaguliwa kwa rekodi hii ya hali. Hakuna muhtasari wa AI ulioombwa wala malipo yaliyotozwa.",
     "noEnabledContexts": "Hakuna miktadha iliyowezeshwa kwa ripoti zilizoratibiwa",
     "sourceBlocker": "Kipindi kinahitaji kushughulikiwa",
     "sourceMetadata": "Metadata za kipindi zilizohifadhiwa"

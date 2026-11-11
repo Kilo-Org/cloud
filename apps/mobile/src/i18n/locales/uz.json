@@ -4274,10 +4274,10 @@
     "snapshotSummaryFailed": "AI xulosasini yaratib bo‘lmadi. Tuzilgan holat nusxangiz baribir mavjud.",
     "scheduledContextEnabled": "Rejalashtirilgan brifinglar",
     "scheduledContextSettings": "Rejalashtirilgan brifinglar · {{context}}",
-    "scheduledContextHint": "Faqat shu kontekst uchun rejalashtirilgan qayd etish va pullik AI xulosalarini yoqing. Tanlangan, maxfiy ma’lumotlari olib tashlangan parchalar va tuzilgan faktlar modelingizga yuboriladi. Xulosalar brifing sozlamalarini o‘zingiz yangilaganingizda saqlangan ilova tilida tayyorlanadi. Ilova tilini o‘zgartirishning o‘zi xulosalar tilini avtomatik yangilamaydi. To‘lovlar shu kontekst balansidan olinadi. Faoliyat tanlanmagan holat nusxalarida AI ishlatilmaydi.",
+    "scheduledContextHint": "Faqat shu kontekst uchun rejalashtirilgan qayd etish va pullik AI xulosalarini yoqing. Tanlangan, maxfiy ma’lumotlari olib tashlangan parchalar va tuzilgan faktlar modelingizga yuboriladi. Xulosalar brifing sozlamalarini o‘zingiz yangilaganingizda saqlangan ilova tilida tayyorlanadi. To‘lovlar shu kontekst balansidan olinadi. Faoliyat tanlanmagan holat nusxalarida AI ishlatilmaydi.",
     "snapshotSafeguards": "Har bir xulosa uchun vaqt va xarajat cheklovlari har bir rejalashtirilgan holat nusxasiga alohida qo‘llanadi, bu kunlik byudjet emas.",
     "snapshotEstimateInputTooLarge": "Bu holat nusxasidagi dalillar hajmi tanlangan model uchun juda katta.",
-    "quietSnapshot": "Bu holat nusxasi uchun seans faoliyati tanlanmadi. Tanlash mavjud ma’lumotlar asosida imkon qadar amalga oshiriladi. AI xulosasi so‘ralmadi, model chaqirilmadi va to‘lov olinmadi.",
+    "quietSnapshot": "Bu holat nusxasi uchun seans faoliyati tanlanmadi. AI xulosasi so‘ralmadi va to‘lov olinmadi.",
     "noEnabledContexts": "Rejalashtirilgan brifinglar uchun hech bir kontekst yoqilmagan",
     "sourceBlocker": "Seans e’tibor talab qiladi",
     "sourceMetadata": "Qayd etilgan seans metama’lumotlari"

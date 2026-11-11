@@ -4274,10 +4274,10 @@
     "snapshotSummaryFailed": "Nabigo ang buod ng AI. Available pa rin ang iyong nakaayos na snapshot.",
     "scheduledContextEnabled": "Mga naka-iskedyul na briefing",
     "scheduledContextSettings": "Mga naka-iskedyul na briefing · {{context}}",
-    "scheduledContextHint": "I-enable ang naka-iskedyul na pagtatala at mga bayad na buod ng AI para sa kontekstong ito lamang. Ipinapadala sa iyong model ang mga piniling na-redact na sipi at nakaayos na datos. Ginagamit ng mga buod ang wika ng app na na-save noong huli mong tahasang binago ang mga setting ng briefing. Hindi ito awtomatikong nagbabago kapag binago ang wika ng app. Sinisingil sa balanse ng kontekstong ito. Hindi gumagamit ng AI ang mga snapshot na walang napiling aktibidad.",
+    "scheduledContextHint": "I-enable ang naka-iskedyul na pagtatala at mga bayad na buod ng AI para sa kontekstong ito lamang. Ipinapadala sa iyong model ang mga piniling na-redact na sipi at nakaayos na datos. Ginagamit ng mga buod ang wika ng app na na-save kapag ina-update mo ang mga setting ng briefing. Sinisingil sa balanse ng kontekstong ito. Hindi gumagamit ng AI ang mga snapshot na walang napiling aktibidad.",
     "snapshotSafeguards": "Ang mga limitasyon sa oras at gastos bawat buod ay para sa bawat naka-iskedyul na snapshot, hindi pang-araw-araw na budget.",
     "snapshotEstimateInputTooLarge": "Masyadong maraming ebidensya sa snapshot na ito para sa napiling modelo.",
-    "quietSnapshot": "Walang aktibidad ng session na napili para sa snapshot na ito; maaaring hindi kumpleto ang pagpili. Walang hiniling na buod ng AI, walang tawag sa model, at walang siningil.",
+    "quietSnapshot": "Walang aktibidad ng session na napili para sa snapshot na ito. Walang buod ng AI na hiniling o siningil.",
     "noEnabledContexts": "Walang naka-enable na konteksto para sa mga naka-iskedyul na briefing",
     "sourceBlocker": "Kailangang asikasuhin ang session",
     "sourceMetadata": "Naitalang metadata ng session"

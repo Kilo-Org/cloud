@@ -2315,7 +2315,7 @@
       "cloningSession": "Saioa klonatzen",
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
       "cloneFailedRetry": "Ezin izan da saio hau klonatu. Saiatu berriro.",
-      "notEnoughCredits": "Ez dago nahikoa kreditu Cloud Agent exekutatzeko. Gehitu kredituak eta saiatu berriro.",
+      "notEnoughCredits": "Ez dago nahikoa kreditu eskaera honetarako. Gehitu kredituak eta saiatu berriro.",
       "previousTaskFinishing": "Aurreko zeregina oraindik amaitzen ari da. Itxaron pixka bat.",
       "serviceUnavailable": "Zerbitzua ez dago eskuragarri oraintxe. Saiatu berriro.",
       "connectionTrouble": "Konexio-arazo bat dago. Saiatu berriro une bat barru.",
@@ -2477,6 +2477,8 @@
       "toolList": "zerrendatu",
       "toolPatch": "aplikatu adabakia",
       "toolTask": "zeregina",
+      "toolSendFile": "Fitxategia bidalita",
+      "toolSendFileAction": "Fitxategia bidali",
       "readTodos": "Irakurri plana",
       "updateTodos": "Eguneratu plana",
       "linesBadge": "{{displayCount}} lerro",
@@ -2577,7 +2579,21 @@
       "thought": "Pentsamendua",
       "showDetails": "Erakutsi xehetasunak",
       "pending": "Zain…",
-      "running": "Exekutatzen…"
+      "running": "Exekutatzen…",
+      "field": {
+        "filePath": "Fitxategiaren bidea",
+        "path": "Bidea",
+        "offset": "Desplazamendua",
+        "limit": "Muga",
+        "pattern": "Eredua",
+        "include": "Sartzea",
+        "patchText": "Adabaki-testua",
+        "query": "Kontsulta",
+        "prompt": "Argibidea",
+        "header": "Izenburua",
+        "question": "Galdera",
+        "options": "Aukerak"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Ezin izan da edukia bistaratu."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Elkarrizketa luzeegia da modeloarentzat.",
       "assistantProviderError": "Hornitzaileak errore bat itzuli du.",
       "assistantProviderRefused": "Hornitzaileak eskaera hau baztertu du eta ezin da berriro saiatu.",
-      "assistantCreditsRefusal": "Ez dago nahikoa kreditu Cloud Agent exekutatzeko.",
+      "assistantCreditsRefusal": "Ez dago nahikoa kreditu eskaera honetarako.",
       "assistantOutputLimit": "Erantzunak modeloaren irteera-mugara iritsi da.",
       "assistantStructuredOutput": "Erantzunak ez zetorren bat eskatutako formatuarekin.",
       "assistantFailed": "Erantzunak huts egin du."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Nire agentea",
       "promptPlaceholder": "bat zara...",
       "tools": "Tresnak",
+      "wholeToolRule": "Agente honek arau bakar bat aplikatzen die tresna guztiei aldi berean: {{rule}}. Etengailu hauek irakurtzeko soilik dira.",
       "visibility": "Ikusgarritasuna",
       "visibilityPrimary": "Lehen mailakoa — hautatzailean agertzen da",
       "visibilitySubagent": "Azpi-agentea — besteengandik bakarrik dei daiteke",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Repos-en profil lehenetsiak",
+      "entryLabel": "Profil lehenetsiak",
       "add": "Gehitu lehenetsia",
       "empty": "Ez dago lehenetsirik konfiguratuta",
       "emptyDescription": "Gehitu lehenetsitako profil bat automatikoki aplikatzeko repositegi baterako saioak hastean.",

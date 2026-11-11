@@ -32,6 +32,10 @@ export default async function GetStartedSlackPage({
     );
   }
 
+  if (user.blocked_reason) {
+    redirect('/account-blocked');
+  }
+
   if (user.has_validation_stytch === null) {
     redirect('/account-verification?callbackPath=/get-started/slack');
   }

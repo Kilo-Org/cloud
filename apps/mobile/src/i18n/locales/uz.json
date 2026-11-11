@@ -2315,7 +2315,7 @@
       "cloningSession": "Sessiya klonlanmoqda",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
-      "notEnoughCredits": "Cloud Agent xizmatini ishga tushirish uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
+      "notEnoughCredits": "Bu so'rov uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali yakunlanmoqda. Biroz kuting.",
       "serviceUnavailable": "Xizmat hozir ishlamayapti. Qayta urinib ko'ring.",
       "connectionTrouble": "Ulanishda muammo yuz berdi. Birozdan keyin qayta urinib ko'ring.",
@@ -2477,6 +2477,8 @@
       "toolList": "ro'yxatni ko'rsatish",
       "toolPatch": "tuzatish kiritish",
       "toolTask": "vazifa",
+      "toolSendFile": "Fayl yuborildi",
+      "toolSendFileAction": "Fayl yuborish",
       "readTodos": "Rejani o‘qish",
       "updateTodos": "Rejani yangilash",
       "linesBadge": "{{displayCount}} qator",
@@ -2577,7 +2579,21 @@
       "thought": "Fikr",
       "showDetails": "Tafsilotlarni ko'rsatish",
       "pending": "Kutilmoqda…",
-      "running": "Bajarilmoqda…"
+      "running": "Bajarilmoqda…",
+      "field": {
+        "filePath": "Fayl yo'li",
+        "path": "Yo'l",
+        "offset": "Boshlanish",
+        "limit": "Chegara",
+        "pattern": "Shablon",
+        "include": "Kiritish",
+        "patchText": "Yamaq matni",
+        "query": "So'rov",
+        "prompt": "Ko'rsatma",
+        "header": "Sarlavha",
+        "question": "Savol",
+        "options": "Variantlar"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Mazmunni ko'rsatib bo'lmadi."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Suhbat model uchun juda uzun.",
       "assistantProviderError": "Provayder xato qaytardi.",
       "assistantProviderRefused": "Provayder bu so'rovni rad etdi va uni qayta urinish mumkin emas.",
-      "assistantCreditsRefusal": "Cloud Agent xizmatini ishga tushirish uchun kreditlar yetarli emas.",
+      "assistantCreditsRefusal": "Bu so'rov uchun kreditlar yetarli emas.",
       "assistantOutputLimit": "Javob modelning chiqish chegarasiga yetdi.",
       "assistantStructuredOutput": "Javob kerakli formatga mos kelmadi.",
       "assistantFailed": "Javobni yaratib bo'lmadi."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Mening agentim",
       "promptPlaceholder": "Siz ...",
       "tools": "Asboblar",
+      "wholeToolRule": "Bu agent bir vaqtning o'zida har bir asbobga bitta qoidani qo'llaydi: {{rule}}. Bu almashtirgichlar faqat o'qish uchun.",
       "visibility": "Ko'rinish",
       "visibilityPrimary": "Asosiy — tanlovchida ko'rsatilgan",
       "visibilitySubagent": "Subagent — faqat boshqalar tomonidan chaqirilishi mumkin",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Repos uchun standart profillar",
+      "entryLabel": "Standart profillar",
       "add": "Standart qo‘shish",
       "empty": "Hech qanday standart sozlanmagan",
       "emptyDescription": "Repo uchun seanslarni boshlashda profilni avtomatik ravishda qo'llash uchun standartni qo'shing.",

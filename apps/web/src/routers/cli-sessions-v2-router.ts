@@ -108,6 +108,8 @@ import {
   type WorkspaceOrder,
 } from '@/lib/cloud-agent/workspace-folders';
 import { after } from 'next/server';
+import { sessionAssociatedPr } from '@/lib/session-associated-pr';
+
 import {
   changeWatchPr,
   enableWatchPr,
@@ -284,6 +286,12 @@ type AssociatedPrRow = {
   stack_number?: number | null;
   stack_position?: number | null;
   stack_size?: number | null;
+  /**
+   * True when the row is the PR of the session's Cloud Agent workspace (a PR
+   * on the workspace's repository and branch) rather than the session's own
+   * reported link. See `sessionAssociatedPr`.
+   */
+  pr_from_workspace?: boolean | null;
 };
 
 /**
@@ -501,14 +509,20 @@ function samePullRequest(sessionUrl: string, cacheUrl: string): boolean {
  *      it is never surfaced as a badge or an Open-on-GitHub link; a wrong link
  *      is worse than no link.
  *
- * There is no branch-name fallback: a session with no stored link shows no PR,
- * however fresh the cache row for its branch happens to be.
+ * The one exception is a Cloud Agent workspace's PR (`pr_from_workspace`): a
+ * PR on the branch the workspace has checked out belongs to every chat in it,
+ * so it is shown without a link of the chat's own. Outside workspaces there is
+ * no branch-name fallback: a session with no stored link shows no PR, however
+ * fresh the cache row for its branch happens to be.
  */
 export function formatAssociatedPr(
   session: SessionPrFields,
   cache: AssociatedPrRow,
   opts?: { partialReviewDecisionPending?: boolean }
 ): z.infer<typeof associatedPrSchema> | null {
+  if (cache.pr_from_workspace === true) {
+    return formatCacheRow(cache, 'github');
+  }
   if (session.pr_url === null || session.pr_link_verified_at === null) {
     return null;
   }
@@ -622,24 +636,25 @@ const commonSessionFields = {
 
 /**
  * Common session fields plus the per-tenant PR cache columns. Used for the
- * list/search endpoints that LEFT JOIN `github_branch_pull_requests` so each
+ * list/search endpoints that LEFT JOIN LATERAL `sessionAssociatedPr` so each
  * row can carry an `associatedPr` summary.
  */
 const commonSessionFieldsWithPr = {
   ...commonSessionFields,
-  pr_url: github_branch_pull_requests.pr_url,
-  pr_number: github_branch_pull_requests.pr_number,
-  pr_state: github_branch_pull_requests.pr_state,
-  pr_title: github_branch_pull_requests.pr_title,
-  pr_head_sha: github_branch_pull_requests.pr_head_sha,
-  pr_observations: github_branch_pull_requests.pr_observations,
-  pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
-  pr_review_decision: github_branch_pull_requests.pr_review_decision,
-  review_decision_pending: github_branch_pull_requests.review_decision_pending,
-  pr_base_ref: github_branch_pull_requests.pr_base_ref,
-  stack_number: github_branch_pull_requests.stack_number,
-  stack_position: github_branch_pull_requests.stack_position,
-  stack_size: github_branch_pull_requests.stack_size,
+  pr_url: sessionAssociatedPr.pr_url,
+  pr_number: sessionAssociatedPr.pr_number,
+  pr_state: sessionAssociatedPr.pr_state,
+  pr_title: sessionAssociatedPr.pr_title,
+  pr_head_sha: sessionAssociatedPr.pr_head_sha,
+  pr_observations: sessionAssociatedPr.pr_observations,
+  pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+  pr_review_decision: sessionAssociatedPr.pr_review_decision,
+  review_decision_pending: sessionAssociatedPr.review_decision_pending,
+  pr_base_ref: sessionAssociatedPr.pr_base_ref,
+  stack_number: sessionAssociatedPr.stack_number,
+  stack_position: sessionAssociatedPr.stack_position,
+  stack_size: sessionAssociatedPr.stack_size,
+  pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
   // Session's own stored PR link (distinct names so they never collide with
   // the cache aliases above).
   session_pr_platform: cli_sessions_v2.platform,
@@ -650,39 +665,6 @@ const commonSessionFieldsWithPr = {
   session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
   total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
 } as const;
-
-/**
- * LEFT JOIN predicate that links a session to its PR cache row by PR identity.
- *
- * The cache holds state/review-decision for a PR the session already
- * verifiably links. Branch names are reused and shared across sessions, so the
- * join is on `(git_url, pr_number, tenant)`, never `(git_url, git_branch)`.
- * The session must also carry a stored link (`pr_url`) that GitHub verified
- * (`pr_link_verified_at`); a session without its own verified link joins
- * nothing.
- *
- * The tenant `or(...)` stops the planner using either partial unique index on
- * `github_branch_pull_requests`: it cannot prove `owned_by_*_id IS NOT NULL`
- * per row. `IDX_github_branch_prs_url_pr_number` covers `(git_url, pr_number)` and
- * carries this join instead. Do not drop that index — without it every list and
- * search hash-joins against a sequential scan of the whole cache table.
- */
-export const sessionPrJoinPredicate = and(
-  eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
-  eq(github_branch_pull_requests.pr_number, cli_sessions_v2.pr_number),
-  or(
-    and(
-      isNotNull(cli_sessions_v2.organization_id),
-      eq(github_branch_pull_requests.owned_by_organization_id, cli_sessions_v2.organization_id)
-    ),
-    and(
-      isNull(cli_sessions_v2.organization_id),
-      eq(github_branch_pull_requests.owned_by_user_id, cli_sessions_v2.kilo_user_id)
-    )
-  ),
-  isNotNull(cli_sessions_v2.pr_url),
-  isNotNull(cli_sessions_v2.pr_link_verified_at)
-);
 
 /**
  * Strip the flat `pr_*` columns produced by `commonSessionFieldsWithPr` and
@@ -710,6 +692,7 @@ export function projectAssociatedPr<
     stack_number,
     stack_position,
     stack_size,
+    pr_from_workspace,
     session_pr_platform,
     session_pr_url,
     session_pr_number,
@@ -718,15 +701,18 @@ export function projectAssociatedPr<
     session_pr_verified_at,
     ...rest
   } = row;
-  const prLinkVerificationKey = getPrLinkVerificationKey({
-    platform: session_pr_platform,
-    pr_url: session_pr_url,
-    pr_number: session_pr_number,
-    pr_link_verified_at: session_pr_verified_at,
-    git_url: rest.git_url,
-    pr_head_ref: session_pr_head_ref,
-    pr_head_sha: session_pr_head_sha,
-  });
+  const prLinkVerificationKey =
+    pr_from_workspace === true
+      ? undefined
+      : getPrLinkVerificationKey({
+          platform: session_pr_platform,
+          pr_url: session_pr_url,
+          pr_number: session_pr_number,
+          pr_link_verified_at: session_pr_verified_at,
+          git_url: rest.git_url,
+          pr_head_ref: session_pr_head_ref,
+          pr_head_sha: session_pr_head_sha,
+        });
   return {
     ...rest,
     ...(prLinkVerificationKey === undefined ? {} : { prLinkVerificationKey }),
@@ -753,6 +739,7 @@ export function projectAssociatedPr<
         stack_number,
         stack_position,
         stack_size,
+        pr_from_workspace,
       },
       { partialReviewDecisionPending: false }
     ),
@@ -1239,16 +1226,19 @@ export const cliSessionsV2Router = createTRPCRouter({
         .selectDistinctOn([cli_sessions_v2.cloud_agent_worktree_id], commonSessionFieldsWithPr)
         .from(cli_sessions_v2)
         .leftJoin(cloud_agent_worktrees, metadataJoin)
-        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+        .leftJoinLateral(sessionAssociatedPr, sql`true`)
         .where(
           and(
             scopeCondition,
-            isNotNull(cli_sessions_v2.pr_url),
-            isNotNull(cli_sessions_v2.pr_link_verified_at)
+            or(
+              isNotNull(sessionAssociatedPr.pr_number),
+              and(isNotNull(cli_sessions_v2.pr_url), isNotNull(cli_sessions_v2.pr_link_verified_at))
+            )
           )
         )
         .orderBy(
           asc(cli_sessions_v2.cloud_agent_worktree_id),
+          sql`${sessionAssociatedPr.pr_from_workspace} DESC NULLS LAST`,
           desc(cli_sessions_v2.updated_at),
           asc(cli_sessions_v2.session_id)
         ),
@@ -1490,41 +1480,36 @@ export const cliSessionsV2Router = createTRPCRouter({
           sessionPrVerifiedAt: sql<string | null>`${cli_sessions_v2.pr_link_verified_at}`.as(
             'session_pr_verified_at'
           ),
-          cachePrUrl: sql<string | null>`${github_branch_pull_requests.pr_url}`.as('cache_pr_url'),
-          cachePrNumber: sql<number | null>`${github_branch_pull_requests.pr_number}`.as(
-            'cache_pr_number'
-          ),
-          cachePrState: sql<string | null>`${github_branch_pull_requests.pr_state}`.as(
-            'cache_pr_state'
-          ),
-          cachePrTitle: sql<string | null>`${github_branch_pull_requests.pr_title}`.as(
-            'cache_pr_title'
-          ),
-          cachePrHeadSha: sql<string | null>`${github_branch_pull_requests.pr_head_sha}`.as(
+          cachePrUrl: sql<string | null>`${sessionAssociatedPr.pr_url}`.as('cache_pr_url'),
+          cachePrNumber: sql<number | null>`${sessionAssociatedPr.pr_number}`.as('cache_pr_number'),
+          cachePrState: sql<string | null>`${sessionAssociatedPr.pr_state}`.as('cache_pr_state'),
+          cachePrTitle: sql<string | null>`${sessionAssociatedPr.pr_title}`.as('cache_pr_title'),
+          cachePrHeadSha: sql<string | null>`${sessionAssociatedPr.pr_head_sha}`.as(
             'cache_pr_head_sha'
           ),
-          cachePrLastSyncedAt: sql<
-            string | null
-          >`${github_branch_pull_requests.pr_last_synced_at}`.as('cache_pr_last_synced_at'),
-          cachePrReviewDecision: sql<
-            string | null
-          >`${github_branch_pull_requests.pr_review_decision}`.as('cache_pr_review_decision'),
+          cachePrLastSyncedAt: sql<string | null>`${sessionAssociatedPr.pr_last_synced_at}`.as(
+            'cache_pr_last_synced_at'
+          ),
+          cachePrReviewDecision: sql<string | null>`${sessionAssociatedPr.pr_review_decision}`.as(
+            'cache_pr_review_decision'
+          ),
           cacheReviewDecisionPending: sql<
             boolean | null
-          >`${github_branch_pull_requests.review_decision_pending}`.as(
-            'cache_review_decision_pending'
-          ),
-          cachePrBaseRef: sql<string | null>`${github_branch_pull_requests.pr_base_ref}`.as(
+          >`${sessionAssociatedPr.review_decision_pending}`.as('cache_review_decision_pending'),
+          cachePrBaseRef: sql<string | null>`${sessionAssociatedPr.pr_base_ref}`.as(
             'cache_pr_base_ref'
           ),
-          cacheStackNumber: sql<number | null>`${github_branch_pull_requests.stack_number}`.as(
+          cacheStackNumber: sql<number | null>`${sessionAssociatedPr.stack_number}`.as(
             'cache_stack_number'
           ),
-          cacheStackPosition: sql<number | null>`${github_branch_pull_requests.stack_position}`.as(
+          cacheStackPosition: sql<number | null>`${sessionAssociatedPr.stack_position}`.as(
             'cache_stack_position'
           ),
-          cacheStackSize: sql<number | null>`${github_branch_pull_requests.stack_size}`.as(
+          cacheStackSize: sql<number | null>`${sessionAssociatedPr.stack_size}`.as(
             'cache_stack_size'
+          ),
+          cachePrFromWorkspace: sql<boolean | null>`${sessionAssociatedPr.pr_from_workspace}`.as(
+            'cache_pr_from_workspace'
           ),
           worktreeName: sql<string | null>`${cloud_agent_worktrees.name}`.as('worktree_name'),
           folderId: sql<string | null>`${cloud_agent_worktrees.folder_id}`.as('folder_id'),
@@ -1559,7 +1544,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           cloud_agent_worktrees,
           eq(cloud_agent_worktrees.worktree_id, cli_sessions_v2.cloud_agent_worktree_id)
         )
-        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+        .leftJoinLateral(sessionAssociatedPr, sql`true`)
         .where(and(...scopeConditions))
     );
 
@@ -1656,10 +1641,23 @@ export const cliSessionsV2Router = createTRPCRouter({
           stack_number: sql<number | null>`${scoped.cacheStackNumber}`.as('stack_number'),
           stack_position: sql<number | null>`${scoped.cacheStackPosition}`.as('stack_position'),
           stack_size: sql<number | null>`${scoped.cacheStackSize}`.as('stack_size'),
+          pr_from_workspace: sql<boolean | null>`${scoped.cachePrFromWorkspace}`.as(
+            'pr_from_workspace'
+          ),
         })
         .from(scoped)
-        .where(and(isNotNull(scoped.sessionPrUrl), isNotNull(scoped.sessionPrVerifiedAt)))
-        .orderBy(scoped.worktreeId, desc(scoped.updatedAt), asc(scoped.sessionId))
+        .where(
+          or(
+            isNotNull(scoped.cachePrNumber),
+            and(isNotNull(scoped.sessionPrUrl), isNotNull(scoped.sessionPrVerifiedAt))
+          )
+        )
+        .orderBy(
+          scoped.worktreeId,
+          sql`${scoped.cachePrFromWorkspace} DESC NULLS LAST`,
+          desc(scoped.updatedAt),
+          asc(scoped.sessionId)
+        )
     );
 
     const base = db.$with('workspace_base').as(
@@ -1714,6 +1712,9 @@ export const cliSessionsV2Router = createTRPCRouter({
           stack_number: sql<number | null>`${prSessions.stack_number}`.as('stack_number'),
           stack_position: sql<number | null>`${prSessions.stack_position}`.as('stack_position'),
           stack_size: sql<number | null>`${prSessions.stack_size}`.as('stack_size'),
+          pr_from_workspace: sql<boolean | null>`${prSessions.pr_from_workspace}`.as(
+            'pr_from_workspace'
+          ),
         })
         .from(grouped)
         .leftJoin(
@@ -1782,6 +1783,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         stack_number: base.stack_number,
         stack_position: base.stack_position,
         stack_size: base.stack_size,
+        pr_from_workspace: base.pr_from_workspace,
       })
       .from(base)
       .where(
@@ -1821,6 +1823,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           stack_number: row.stack_number,
           stack_position: row.stack_position,
           stack_size: row.stack_size,
+          pr_from_workspace: row.pr_from_workspace,
         }
       );
       const createdAt = new Date(row.createdAt).toISOString();
@@ -2029,7 +2032,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     const rawResults = await db
       .select(commonSessionFieldsWithPr)
       .from(cli_sessions_v2)
-      .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+      .leftJoinLateral(sessionAssociatedPr, sql`true`)
       .where(and(...whereConditions))
       .orderBy(desc(orderColumn))
       .limit(effectiveLimit + 1);
@@ -2124,7 +2127,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         sql`position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0`,
         sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_url}, ''))) > 0`,
         sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_branch}, ''))) > 0`,
-        sql`position(${needle} in lower(COALESCE(${github_branch_pull_requests.pr_title}, ''))) > 0`,
+        sql`position(${needle} in lower(COALESCE(${sessionAssociatedPr.pr_title}, ''))) > 0`,
         sql`EXISTS (
           SELECT 1 FROM ${cloud_agent_worktrees}
           WHERE ${cloud_agent_worktrees.worktree_id} = ${cli_sessions_v2.cloud_agent_worktree_id}
@@ -2142,7 +2145,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       // every session the user owns.
       const prNumber = Number(needle);
       if (/^\d+$/.test(needle) && prNumber <= PG_MAX_INTEGER) {
-        matchArms.push(eq(github_branch_pull_requests.pr_number, prNumber));
+        matchArms.push(eq(sessionAssociatedPr.pr_number, prNumber));
       }
       whereConditions.push(sql`(${sql.join(matchArms, sql` OR `)})`);
     }
@@ -2157,7 +2160,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     const rawResults = await db
       .select(commonSessionFieldsWithPr)
       .from(cli_sessions_v2)
-      .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+      .leftJoinLateral(sessionAssociatedPr, sql`true`)
       .where(baseWhere)
       .orderBy(desc(orderColumn))
       .limit(limit + 1)
@@ -2510,18 +2513,19 @@ export const cliSessionsV2Router = createTRPCRouter({
         .select({
           session: cli_sessions_v2,
           ...latestRunFields,
-          pr_url: github_branch_pull_requests.pr_url,
-          pr_number: github_branch_pull_requests.pr_number,
-          pr_state: github_branch_pull_requests.pr_state,
-          pr_title: github_branch_pull_requests.pr_title,
-          pr_head_sha: github_branch_pull_requests.pr_head_sha,
-          pr_observations: github_branch_pull_requests.pr_observations,
-          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
-          pr_review_decision: github_branch_pull_requests.pr_review_decision,
-          review_decision_pending: github_branch_pull_requests.review_decision_pending,
+          pr_url: sessionAssociatedPr.pr_url,
+          pr_number: sessionAssociatedPr.pr_number,
+          pr_state: sessionAssociatedPr.pr_state,
+          pr_title: sessionAssociatedPr.pr_title,
+          pr_head_sha: sessionAssociatedPr.pr_head_sha,
+          pr_observations: sessionAssociatedPr.pr_observations,
+          pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+          pr_review_decision: sessionAssociatedPr.pr_review_decision,
+          review_decision_pending: sessionAssociatedPr.review_decision_pending,
+          pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
         })
         .from(cli_sessions_v2)
-        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+        .leftJoinLateral(sessionAssociatedPr, sql`true`)
         .where(
           and(
             eq(cli_sessions_v2.session_id, session_id),
@@ -2605,7 +2609,8 @@ export const cliSessionsV2Router = createTRPCRouter({
         latest_run_failure_kind: row.latest_run_failure_kind,
         latest_run_terminal_at: row.latest_run_terminal_at,
         runtimeState,
-        prLinkVerificationKey: getPrLinkVerificationKey(session),
+        prLinkVerificationKey:
+          row.pr_from_workspace === true ? undefined : getPrLinkVerificationKey(session),
         associatedPr: formatAssociatedPr(
           {
             platform: session.platform,
@@ -2625,6 +2630,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             pr_last_synced_at: row.pr_last_synced_at,
             pr_review_decision: row.pr_review_decision,
             review_decision_pending: row.review_decision_pending,
+            pr_from_workspace: row.pr_from_workspace,
           }
         ),
       };
@@ -2662,23 +2668,26 @@ export const cliSessionsV2Router = createTRPCRouter({
       const [row] = await db
         .select({
           session: cli_sessions_v2,
-          pr_url: github_branch_pull_requests.pr_url,
-          pr_number: github_branch_pull_requests.pr_number,
-          pr_state: github_branch_pull_requests.pr_state,
-          pr_title: github_branch_pull_requests.pr_title,
-          pr_head_sha: github_branch_pull_requests.pr_head_sha,
-          pr_observations: github_branch_pull_requests.pr_observations,
-          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
-          pr_review_decision: github_branch_pull_requests.pr_review_decision,
-          review_decision_pending: github_branch_pull_requests.review_decision_pending,
-          cache_updated_at: github_branch_pull_requests.updated_at,
-          pr_base_ref: github_branch_pull_requests.pr_base_ref,
-          stack_number: github_branch_pull_requests.stack_number,
-          stack_position: github_branch_pull_requests.stack_position,
-          stack_size: github_branch_pull_requests.stack_size,
+          pr_url: sessionAssociatedPr.pr_url,
+          pr_number: sessionAssociatedPr.pr_number,
+          pr_state: sessionAssociatedPr.pr_state,
+          pr_title: sessionAssociatedPr.pr_title,
+          pr_head_sha: sessionAssociatedPr.pr_head_sha,
+          pr_observations: sessionAssociatedPr.pr_observations,
+          pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+          pr_review_decision: sessionAssociatedPr.pr_review_decision,
+          review_decision_pending: sessionAssociatedPr.review_decision_pending,
+          pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
+          cache_updated_at: sessionAssociatedPr.updated_at,
+          cache_git_url: sessionAssociatedPr.git_url,
+          cache_git_branch: sessionAssociatedPr.git_branch,
+          pr_base_ref: sessionAssociatedPr.pr_base_ref,
+          stack_number: sessionAssociatedPr.stack_number,
+          stack_position: sessionAssociatedPr.stack_position,
+          stack_size: sessionAssociatedPr.stack_size,
         })
         .from(cli_sessions_v2)
-        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+        .leftJoinLateral(sessionAssociatedPr, sql`true`)
         .where(
           and(
             eq(cli_sessions_v2.session_id, sessionId),
@@ -2724,19 +2733,25 @@ export const cliSessionsV2Router = createTRPCRouter({
         stack_number: row.stack_number,
         stack_position: row.stack_position,
         stack_size: row.stack_size,
+        pr_from_workspace: row.pr_from_workspace,
       };
       let cacheUpdatedAt = row.cache_updated_at;
 
+      // The PR of the session's Cloud Agent workspace (a PR on the branch the
+      // workspace has checked out) is refreshed by number. It needs no link of
+      // the session's own, so the session link is neither verified nor revoked.
+      const fromWorkspace = row.pr_from_workspace === true && row.pr_url !== null;
+
       // Non-GitHub sessions never call GitHub. A verified link (if any) comes
       // from the cache; an unverified one shows nothing.
-      if (session.platform !== 'github') {
+      if (session.platform !== 'github' && !fromWorkspace) {
         return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
       }
 
-      const sessionPrUrl = session.pr_url;
+      const sessionPrUrl = fromWorkspace ? row.pr_url : session.pr_url;
       const parsed = sessionPrUrl ? parseGitHubPrUrl(sessionPrUrl) : null;
-      const gitUrl = session.git_url;
-      const branch = session.git_branch;
+      const gitUrl = fromWorkspace ? row.cache_git_url : session.git_url;
+      const branch = fromWorkspace ? row.cache_git_branch : session.git_branch;
 
       // No candidate without a stored link, a parseable PR URL, and the repo +
       // branch identity the evidence contract requires.
@@ -2747,7 +2762,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       // The stored link itself must name the session's repository. A link that
       // names another repo is rejected without a GitHub call and its stale
       // verification is revoked.
-      if (!pullRequestUrlMatchesRepo(sessionPrUrl, gitUrl)) {
+      if (!fromWorkspace && !pullRequestUrlMatchesRepo(sessionPrUrl, gitUrl)) {
         if (session.pr_link_verified_at !== null) {
           await db
             .update(cli_sessions_v2)
@@ -2791,7 +2806,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       // Throttle: skip the fetch only when the session's link is already
       // verified and the matching cache row was synced recently.
       if (
-        session.pr_link_verified_at !== null &&
+        (fromWorkspace || session.pr_link_verified_at !== null) &&
         cacheRow.pr_url !== null &&
         samePullRequest(sessionPrUrl, cacheRow.pr_url) &&
         cacheRow.pr_last_synced_at !== null
@@ -2865,8 +2880,8 @@ export const cliSessionsV2Router = createTRPCRouter({
           repo: parsed.repo,
           number: parsed.number,
           appType,
-          includeCommits: session.pr_head_sha != null,
-          expectedHeadSha: session.pr_head_sha,
+          includeCommits: !fromWorkspace && session.pr_head_sha != null,
+          expectedHeadSha: fromWorkspace ? null : session.pr_head_sha,
           signal,
         });
       } catch (error) {
@@ -2897,29 +2912,37 @@ export const cliSessionsV2Router = createTRPCRouter({
 
       // Hard evidence: the link is accepted only when GitHub agrees it is this
       // session's PR. A wrong link is worse than no link.
-      const verification = fetched
-        ? verifySessionPullRequestLink({
-            sessionRepo: { gitUrl, gitBranch: branch },
-            link: {
-              prUrl: sessionPrUrl,
-              prNumber: session.pr_number,
-              headRef: session.pr_head_ref,
-              headSha: session.pr_head_sha,
-            },
-            pullRequest: {
-              number: fetched.number,
-              baseRepoFullName: fetched.baseRepoFullName,
-              headRepoFullName: fetched.headRepoFullName,
-              headRef: fetched.headRef,
-              headSha: fetched.headSha,
-              commitShas: fetched.commitShas,
-            },
-          })
-        : ({ verified: false } as const);
+      const verification = !fetched
+        ? ({ verified: false } as const)
+        : fromWorkspace
+          ? {
+              verified:
+                fetched.headRef === branch &&
+                !!fetched.baseRepoFullName &&
+                fetched.baseRepoFullName.toLowerCase() ===
+                  (fetched.headRepoFullName ?? '').toLowerCase(),
+            }
+          : verifySessionPullRequestLink({
+              sessionRepo: { gitUrl, gitBranch: branch },
+              link: {
+                prUrl: sessionPrUrl,
+                prNumber: session.pr_number,
+                headRef: session.pr_head_ref,
+                headSha: session.pr_head_sha,
+              },
+              pullRequest: {
+                number: fetched.number,
+                baseRepoFullName: fetched.baseRepoFullName,
+                headRepoFullName: fetched.headRepoFullName,
+                headRef: fetched.headRef,
+                headSha: fetched.headSha,
+                commitShas: fetched.commitShas,
+              },
+            });
 
       if (!verification.verified || !fetched) {
         // Revoke any stale verification; show nothing rather than a guess.
-        if (session.pr_link_verified_at !== null) {
+        if (!fromWorkspace && session.pr_link_verified_at !== null) {
           await db
             .update(cli_sessions_v2)
             .set({ pr_link_verified_at: null })
@@ -3077,20 +3100,21 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
 
       // The link passed verification; record it so the read path can show it.
-      await db
-        .update(cli_sessions_v2)
-        .set({ pr_link_verified_at: sql`now()` })
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
-            eq(cli_sessions_v2.pr_url, sessionPrUrl),
-            eq(cli_sessions_v2.git_url, gitUrl),
-            sql`${cli_sessions_v2.pr_head_sha} IS NOT DISTINCT FROM ${session.pr_head_sha}`,
-            sql`${cli_sessions_v2.pr_head_ref} IS NOT DISTINCT FROM ${session.pr_head_ref}`,
-            sql`${cli_sessions_v2.git_branch} IS NOT DISTINCT FROM ${session.git_branch}`
-          )
-        );
+      if (!fromWorkspace)
+        await db
+          .update(cli_sessions_v2)
+          .set({ pr_link_verified_at: sql`now()` })
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+              eq(cli_sessions_v2.pr_url, sessionPrUrl),
+              eq(cli_sessions_v2.git_url, gitUrl),
+              sql`${cli_sessions_v2.pr_head_sha} IS NOT DISTINCT FROM ${session.pr_head_sha}`,
+              sql`${cli_sessions_v2.pr_head_ref} IS NOT DISTINCT FROM ${session.pr_head_ref}`,
+              sql`${cli_sessions_v2.git_branch} IS NOT DISTINCT FROM ${session.git_branch}`
+            )
+          );
 
       const verifiedSessionPr: SessionPrFields = {
         ...sessionPr,
@@ -3099,7 +3123,12 @@ export const cliSessionsV2Router = createTRPCRouter({
       const winningCache =
         persisted ??
         (await db.select().from(github_branch_pull_requests).where(cacheIdentity).limit(1))[0];
-      return { associatedPr: formatAssociatedPr(verifiedSessionPr, winningCache ?? cacheRow) };
+      return {
+        associatedPr: formatAssociatedPr(verifiedSessionPr, {
+          ...(winningCache ?? cacheRow),
+          pr_from_workspace: fromWorkspace,
+        }),
+      };
     }),
 
   delete: baseProcedure.input(DeleteSessionInputSchema).mutation(async ({ ctx, input }) => {

@@ -471,6 +471,8 @@ export async function scanRequest(
     apiKind: scan.apiKind,
     decision: attemptDecision(each, config),
     creditsCost: each.creditsCost,
+    scannedCharacters: text.length,
+    totalCharacters: coverage.totalCharacters,
     ...(each.kind === 'detected' && each.firedDetectors.length > 0
       ? { detectorsFired: each.firedDetectors }
       : {}),

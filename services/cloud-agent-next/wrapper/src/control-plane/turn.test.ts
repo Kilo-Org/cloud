@@ -63,7 +63,12 @@ type PromptCall = {
   model?: { providerID?: string; modelID: string };
   signal?: AbortSignal;
 };
-type SummaryCall = { sessionId: string; model: { modelID: string }; auto?: boolean };
+type SummaryCall = {
+  sessionId: string;
+  messageId?: string;
+  model: { modelID: string };
+  auto?: boolean;
+};
 type CommandCall = { sessionId: string; command: string; messageId?: string; args?: string };
 type QuestionCall = { questionId: string; answers: string[][]; directory?: string };
 type RejectCall = { questionId: string; directory?: string };
@@ -571,6 +576,7 @@ describe('turn manager submission', () => {
     h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
     await settle();
     expect(client.summaries).toHaveLength(1);
+    expect(client.summaries[0]).toMatchObject({ messageId: 'c1' });
     expect(client.summaries[0].auto).toBeUndefined();
     expect(client.prompts).toHaveLength(0);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({
@@ -679,7 +685,7 @@ describe('turn manager submission', () => {
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
     await settle();
-    expect(h.client(routeSpec()).summaries).toHaveLength(2);
+    expect(h.client(routeSpec()).summaries.map(call => call.messageId)).toEqual(['c1', 'c1']);
     expect(h.client(routeSpec()).prompts).toEqual([]);
     expect(outcomeFrames(h.frames)).toEqual([]);
     h.manager.observeKiloEvent(completedKiloTurn());
@@ -690,6 +696,34 @@ describe('turn manager submission', () => {
     await settle();
     expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
   });
+
+  it.each([false, true])(
+    'settles a replayed compact without another native close (queued follow-up: %s)',
+    async followup => {
+      const h = createHarness();
+      const route = routeSpec();
+      h.registerRoute(route);
+      h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+      await settle();
+      if (followup) h.manager.submit(SESSION_ID, promptPayload('m1'));
+      h.retireClient(route);
+      h.client(route).client.compact = async input => {
+        expect(input.messageId).toBe('c1');
+        return 'replayed';
+      };
+      h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+      await settle();
+      if (followup) {
+        expect(h.client(route).prompts.map(call => call.messageId)).toEqual(['m1']);
+        expect(outcomeFrames(h.frames)).toEqual([]);
+        h.manager.observeKiloEvent(completedKiloTurn());
+        await settle();
+      }
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'completed', lastMessageId: followup ? 'm1' : 'c1' },
+      ]);
+    }
+  );
 
   it('drains the inbox when a heartbeat arrives after Kilo recovers', async () => {
     const h = createHarness();

@@ -6,7 +6,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
+import type { ModeOption } from '@/components/shared/ModeCombobox';
+import { CloudAgentModeCombobox } from './CloudAgentModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
@@ -85,10 +86,9 @@ export function MobileToolbarPopover({
         side="top"
       >
         {onModeChange && (
-          <ModeCombobox
+          <CloudAgentModeCombobox
             value={mode}
             onValueChange={onModeChange}
-            options={NEXT_MODE_OPTIONS}
             customOptions={customModeOptions}
             label="Mode"
           />

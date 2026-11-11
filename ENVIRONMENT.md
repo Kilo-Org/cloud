@@ -56,6 +56,25 @@ Keep credentials out of tracked defaults. For local monitor development, generat
 a separate value with `openssl rand -base64 32` and set it in the local environment;
 ordinary local startup does not require this credential.
 
+### Model health monitor
+
+`MODELS_HEALTH_SECRET` is a dedicated server-only credential for `GET /api/models/up`. `[SECRET]`
+The caller must send `Authorization: Bearer <configured value>`; an unset or empty value
+answers `401` with `{ "healthy": false }`, and the endpoint accepts no other credential,
+including request parameters. Every response carries `Cache-Control: no-store`.
+
+For initial deployment or rotation, the owner runs
+`pnpm web:env set MODELS_HEALTH_SECRET`, supplies a newly generated secret, and coordinates
+the application deployment with the external monitor's header update. Order the cutover so no
+poll lands on an unroutable credential: set the secret first, then add the `Authorization:
+Bearer` header to the external monitor, then deploy the application. Verify the monitor after
+the deployment and header update. Only one configured secret is accepted; deployment and
+monitor configuration must agree.
+
+Keep the credential out of tracked defaults. For local monitor development, generate a
+separate value with `openssl rand -base64 32` and set it in the local environment; ordinary
+local startup does not require this credential.
+
 ### Uptime probe
 
 `UPTIME_PROBE_SECRET` is a dedicated server-only credential for `GET /api/up`. `[SECRET]`
@@ -590,8 +609,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
 - `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Production `wrangler.jsonc` sets the allowlist, so a deploy overwrites the Cloudflare dashboard value. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
-- `WORKSPACE_SNAPSHOT_ORG_IDS` - Comma-separated explicit organization IDs enrolled in private registered Cloud Agent workspace tail capture and restore, independent of environment snapshots. Empty or unset is off; `*` is not supported. Only native Cloudflare Containers dedicated to one registered workspace are eligible. Sibling sessions share one snapshot; standalone sessions are excluded. Capture uses aggregate workspace activity after one minute. Snapshots may contain workspace secrets. Production and dev Wrangler defaults are empty. [SERVER]
-- `WORKSPACE_SNAPSHOT_USER_IDS` - Comma-separated explicit user IDs enrolled in private Cloud Agent workspace tail snapshots, including personal workspaces. Same scope and retention rules as `WORKSPACE_SNAPSHOT_ORG_IDS`; empty or unset is off and `*` is not supported. Either matching allowlist enables the feature. Production Wrangler enrolls user `2bbc9955-5dc2-428c-a353-be59d89a8130`; the dev default is empty. [SERVER]
+- `WORKSPACE_SNAPSHOT_IDS` - Comma-separated user or organization IDs enrolled in private registered Cloud Agent workspace tail capture and restore, independent of environment snapshots. Matching either enables the feature; `*` enrolls everyone, and empty or unset is off. Only native Cloudflare Containers dedicated to one registered workspace are eligible. Sibling sessions share one snapshot; standalone sessions are excluded. Capture uses aggregate workspace activity after one minute. Snapshots may contain workspace secrets. The production Wrangler default is `*`; the dev default is empty. [SERVER]
 - `PREVIEW_HOST_SUFFIX` - Hostname suffix the Cloud Agent Next Worker dispatches preview hosts under; a preview host is `p<port>-<workspace-uuid-hex>.<suffix>`. Unset or empty disables preview dispatch and the `/preview/open` hop, and the web app hides the preview button (it reads availability from the Worker's `getPreviewOptions`). The web app needs no preview setting. Production `wrangler.jsonc` sets `cloud-agent.kiloapps.ai`. `services/cloud-agent-next/.dev.vars.example` sets `localhost`. [SERVER]
 - `BYOC_VERCEL_IDS` - Comma-separated user or organization IDs enrolled in customer-paid Vercel compute. Empty is off; `*` enrolls both personal accounts and organizations. An enrolled owner fails closed when its ready credential is absent. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]

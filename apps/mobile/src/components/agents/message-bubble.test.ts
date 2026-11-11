@@ -1,14 +1,11 @@
 /* eslint-disable max-lines -- Queued-badge, delivery, and a11y seams share the direct-invocation MessageBubble harness. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  type MessageDeliveryState,
-  type StoredMessage,
-  type ToolPart,
-} from '@kilocode/cloud-agent-sdk';
+import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import type * as React from 'react';
 
 import type * as PartTypes from './part-types';
+import { type MessageDeliveryStatement } from './message-failure-state';
 import {
   assistantMessage,
   findElementByType,
@@ -119,13 +116,13 @@ vi.mock('./chat-markdown-text', () => ({
   ChatMarkdownText: () => null,
 }));
 vi.mock('./compaction-separator', () => ({
-  CompactionSeparator: () => null,
+  CompactionSeparator: 'CompactionSeparator',
 }));
 vi.mock('./file-part-renderer', () => ({
   FilePartRenderer: () => null,
 }));
 vi.mock('./part-renderer', () => ({
-  PartRenderer: () => null,
+  PartRenderer: 'PartRenderer',
 }));
 vi.mock('./tool-run-rows', () => ({
   CondensedToolRunRow: 'CondensedToolRunRow',
@@ -147,6 +144,49 @@ vi.mock('./use-message-copy', () => ({
 }));
 
 const BADGE_CLASS = 'flex-row items-center gap-1 self-end pr-1';
+
+describe('MessageBubble compaction', () => {
+  it.each([true, false])(
+    'passes live state %s to the compaction-only separator',
+    async isStreaming => {
+      const message = assistantMessage('compaction');
+      message.parts = [
+        {
+          id: 'part',
+          sessionID: 'ses_1',
+          messageID: 'compaction',
+          type: 'compaction',
+          auto: false,
+        },
+      ];
+      const { MessageBubble } = await import('./message-bubble');
+      // eslint-disable-next-line new-cap -- Inspect the component's unrendered tree.
+      const tree = MessageBubble.type({
+        message,
+        isLastAssistantMessage: true,
+        isSessionStreaming: isStreaming,
+      });
+      expect(findElementByType(tree, 'CompactionSeparator')?.props.info).toBe(message.info);
+      expect(findElementByType(tree, 'CompactionSeparator')?.props.isStreaming).toBe(isStreaming);
+    }
+  );
+
+  it('passes assistant status to parts in a mixed message', async () => {
+    const message = assistantMessage('compaction');
+    message.parts = [
+      { id: 'part', sessionID: 'ses_1', messageID: 'compaction', type: 'compaction', auto: false },
+      {
+        id: 'text',
+        sessionID: 'ses_1',
+        messageID: 'compaction',
+        type: 'text',
+        text: 'Other content',
+      },
+    ];
+    const tree = await renderBubble(message);
+    expect(findElementByType(tree, 'PartRenderer')?.props.messageInfo).toBe(message.info);
+  });
+});
 
 describe('MessageBubble queued badge', () => {
   it('renders the Queued badge visible when deliveryState is queued', async () => {
@@ -247,7 +287,7 @@ describe('MessageBubble failed delivery state', () => {
 async function renderBubbleWithHandlers(
   message: StoredMessage,
   props: {
-    deliveryState?: MessageDeliveryState;
+    deliveryState?: MessageDeliveryStatement;
     onRetryMessage?: (m: StoredMessage) => void;
     onAddCredits?: () => void;
     retryAvailable?: boolean;
@@ -447,6 +487,40 @@ describe('MessageBubble failure footer', () => {
     expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
   });
 
+  it('states a refused send under the person’s bubble with Add credits and no Retry', async () => {
+    const onAddCredits = vi.fn<() => void>();
+    const tree = await renderBubbleWithHandlers(userMessage('m-credits'), {
+      deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onAddCredits,
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    expect(findText(tree, t => t === 'Not enough credits to send this message.')).toBe(true);
+    // The cause is the whole statement: neither the generic title line nor the
+    // agent-failure line repeats or contradicts it.
+    expect(findText(tree, t => t === 'Response failed')).toBe(false);
+    expect(findText(tree, t => t === 'The agent could not run this message.')).toBe(false);
+    // The send never left, so the statement sits in the bubble's own column.
+    expect(String(footerOf(tree)?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
+    const addCredits = findElementByType(
+      tree,
+      'Button',
+      p => p.accessibilityLabel === 'Add credits'
+    );
+    if (!addCredits) {
+      throw new Error('the footer drew no Add credits button');
+    }
+    (addCredits.props.onPress as () => void)();
+    expect(onAddCredits).toHaveBeenCalledTimes(1);
+    // A re-send meets the same balance, so the only other action keeps the
+    // words for the send that follows the purchase.
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).not.toBeNull();
+  });
+
   it('renders only the failure footer when the user text sanitizes to empty', async () => {
     const actual = await vi.importActual<typeof PartTypes>('./part-types');
     const { isTextPart } = await import('./part-types');
@@ -563,7 +637,7 @@ describe('MessageBubble failure footer', () => {
     );
 
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
-    expect(findText(tree, t => t === 'Not enough credits to run Cloud Agent.')).toBe(true);
+    expect(findText(tree, t => t === 'Not enough credits for this request.')).toBe(true);
 
     const addCredits = findElementByType(
       tree,

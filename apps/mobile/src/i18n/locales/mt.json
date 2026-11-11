@@ -2441,7 +2441,7 @@
       "cloningSession": "Qed tiġi kklonjata s-sessjoni",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
       "cloneFailedRetry": "Ma setgħetx tiġi kklonjata din is-sessjoni. Erġa' pprova.",
-      "notEnoughCredits": "M'għandekx biżżejjed krediti biex tħaddem Cloud Agent. Żid krediti u erġa' pprova.",
+      "notEnoughCredits": "M'għandekx biżżejjed krediti għal din it-talba. Żid krediti u erġa' pprova.",
       "previousTaskFinishing": "Il-kompitu ta' qabel għadu qed jitlesta. Stenna ftit.",
       "serviceUnavailable": "Is-servizz mhux disponibbli bħalissa. Erġa' pprova.",
       "connectionTrouble": "Hemm problema bil-konnessjoni. Erġa' pprova ftit ieħor.",
@@ -2606,6 +2606,8 @@
       "toolList": "elenka",
       "toolPatch": "applika bidliet",
       "toolTask": "kompitu",
+      "toolSendFile": "Fajl mibgħut",
+      "toolSendFileAction": "ibgħat il-fajl",
       "readTodos": "Aqra l-pjan",
       "updateTodos": "Aġġorna l-pjan",
       "linesBadge": "{{displayCount}} linji",
@@ -2715,7 +2717,21 @@
       "thought": "Ħsieb",
       "showDetails": "Uri d-dettalji",
       "pending": "Pendenti…",
-      "running": "Qed jaħdem…"
+      "running": "Qed jaħdem…",
+      "field": {
+        "filePath": "Mogħdija tal-fajl",
+        "path": "Mogħdija",
+        "offset": "Bidu",
+        "limit": "Limitu",
+        "pattern": "Mudell",
+        "include": "Inklużjoni",
+        "patchText": "Test tal-patċ",
+        "query": "Tfittxija",
+        "prompt": "Istruzzjoni",
+        "header": "Titolu",
+        "question": "Mistoqsija",
+        "options": "Għażliet"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Ma setax jintwera l-kontenut."
@@ -2731,7 +2747,7 @@
       "assistantContextOverflow": "Il-konversazzjoni hija twila wisq għall-mudell.",
       "assistantProviderError": "Il-fornitur rritorna żball.",
       "assistantProviderRefused": "Il-fornitur ċaħad din it-talba u ma tistax terġa' tiġi pruvata.",
-      "assistantCreditsRefusal": "M'għandekx biżżejjed krediti biex tħaddem Cloud Agent.",
+      "assistantCreditsRefusal": "M'għandekx biżżejjed krediti għal din it-talba.",
       "assistantOutputLimit": "It-tweġiba laħqet il-limitu ta' output tal-mudell.",
       "assistantStructuredOutput": "It-tweġiba ma kinitx konformi mal-format meħtieġ.",
       "assistantFailed": "It-tweġiba falliet."
@@ -4198,6 +4214,7 @@
       "namePlaceholder": "L-aġent tiegħi",
       "promptPlaceholder": "Int...",
       "tools": "Għodda",
+      "wholeToolRule": "Dan l-aġent japplika regola waħda għal kull għodda fl-istess ħin: {{rule}}. Dawn l-iswiċċijiet huma biss għall-qari.",
       "visibility": "Viżibilità",
       "visibilityPrimary": "Primarja — muri fil-picker",
       "visibilitySubagent": "Subaġent — jissejjaħ biss minn oħrajn",
@@ -4239,6 +4256,7 @@
     },
     "repoBindings": {
       "title": "Profili default għal Repos",
+      "entryLabel": "Profili default",
       "add": "Żid default",
       "empty": "Ebda defaults konfigurati",
       "emptyDescription": "Żid default biex tapplika profil awtomatikament meta tibda sessjonijiet għal repo.",

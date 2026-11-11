@@ -2315,7 +2315,7 @@
       "cloningSession": "Kloonataan istuntoa",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
-      "notEnoughCredits": "Krediitit eivät riitä Cloud Agentin käyttämiseen. Lisää krediittejä ja yritä uudelleen.",
+      "notEnoughCredits": "Krediitit eivät riitä tähän pyyntöön. Lisää krediittejä ja yritä uudelleen.",
       "previousTaskFinishing": "Edellistä tehtävää viimeistellään vielä. Odota hetki.",
       "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
       "connectionTrouble": "Yhteydessä on ongelma. Yritä uudelleen hetken kuluttua.",
@@ -2477,6 +2477,8 @@
       "toolList": "luettele",
       "toolPatch": "korjaus",
       "toolTask": "tehtävä",
+      "toolSendFile": "Lähetetty tiedosto",
+      "toolSendFileAction": "Lähetä tiedosto",
       "readTodos": "Lue suunnitelma",
       "updateTodos": "Päivitä suunnitelma",
       "linesBadge": "{{displayCount}} riviä",
@@ -2577,7 +2579,21 @@
       "thought": "Päättely",
       "showDetails": "Näytä tiedot",
       "pending": "Odotetaan…",
-      "running": "Käynnissä…"
+      "running": "Käynnissä…",
+      "field": {
+        "filePath": "Tiedostopolku",
+        "path": "Polku",
+        "offset": "Siirtymä",
+        "limit": "Yläraja",
+        "pattern": "Kuvio",
+        "include": "Sisällytettävät",
+        "patchText": "Korjausteksti",
+        "query": "Hakukysely",
+        "prompt": "Kehote",
+        "header": "Otsikko",
+        "question": "Kysymys",
+        "options": "Vaihtoehdot"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Sisällön näyttäminen epäonnistui."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Keskustelu on liian pitkä mallille.",
       "assistantProviderError": "Palveluntarjoaja palautti virheen.",
       "assistantProviderRefused": "Palveluntarjoaja hylkäsi tämän pyynnön, eikä sitä voi yrittää uudelleen.",
-      "assistantCreditsRefusal": "Krediitit eivät riitä Cloud Agentin käyttämiseen.",
+      "assistantCreditsRefusal": "Krediitit eivät riitä tähän pyyntöön.",
       "assistantOutputLimit": "Vastaus saavutti mallin tulostusrajan.",
       "assistantStructuredOutput": "Vastaus ei vastannut vaadittua muotoa.",
       "assistantFailed": "Vastauksen tuottaminen epäonnistui."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Agenttini",
       "promptPlaceholder": "Olet...",
       "tools": "Työkalut",
+      "wholeToolRule": "Tämä agentti soveltaa yhtä sääntöä kaikkiin työkaluihin kerralla: {{rule}}. Nämä kytkimet ovat vain luku -tilassa.",
       "visibility": "Näkyvyys",
       "visibilityPrimary": "Ensisijainen — näkyy valitsimessa",
       "visibilitySubagent": "Aliagentti — vain muiden kutsuttavissa",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Koodivarastojen oletusprofiilit",
+      "entryLabel": "Profiilin oletukset",
       "add": "Lisää oletusprofiili",
       "empty": "Ei määritettyjä oletusprofiileja",
       "emptyDescription": "Lisää oletusprofiili, joka ottaa profiilin käyttöön automaattisesti, kun koodivarastolle aloitetaan istuntoja.",

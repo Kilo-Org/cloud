@@ -65,6 +65,8 @@ function usageRecord(
     apiKind: 'messages',
     decision: 'blocked',
     creditsCost: 7,
+    scannedCharacters: 2_400,
+    totalCharacters: 10_000,
     addedLatencyMs: 212,
     ...overrides,
   };
@@ -100,6 +102,8 @@ describe('recordEnkryptUsage', () => {
         added_latency_ms: enkrypt_usage.added_latency_ms,
         guardrail: enkrypt_usage_guardrail.guardrail,
         fired_detector_ids: enkrypt_usage.fired_detector_ids,
+        scanned_characters: enkrypt_usage.scanned_characters,
+        total_characters: enkrypt_usage.total_characters,
       })
       .from(enkrypt_usage)
       .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
@@ -124,6 +128,8 @@ describe('recordEnkryptUsage', () => {
         added_latency_ms: 212,
         guardrail: 'input',
         fired_detector_ids: null,
+        scanned_characters: 2_400,
+        total_characters: 10_000,
       }),
     ]);
     expect(await organizationBalance(organization.id)).toEqual({
@@ -398,5 +404,31 @@ describe('recordEnkryptUsage', () => {
     });
 
     expect(await firedDetectors(organization.id)).toEqual([null]);
+  });
+
+  it('stores no sizes for a write from a gateway deployed before them', async () => {
+    const { user, organization } = await organizationWithMember();
+    const {
+      scannedCharacters: _scannedCharacters,
+      totalCharacters: _totalCharacters,
+      ...olderWrite
+    } = usageRecord(organization.id, user.id);
+
+    await recordEnkryptUsageLocally({
+      ...olderWrite,
+      guardrail: 'input',
+      id: randomUUID(),
+      occurredAt: new Date().toISOString(),
+    });
+
+    expect(
+      await db
+        .select({
+          scanned_characters: enkrypt_usage.scanned_characters,
+          total_characters: enkrypt_usage.total_characters,
+        })
+        .from(enkrypt_usage)
+        .where(eq(enkrypt_usage.organization_id, organization.id))
+    ).toEqual([{ scanned_characters: null, total_characters: null }]);
   });
 });

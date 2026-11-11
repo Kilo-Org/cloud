@@ -1777,7 +1777,7 @@
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
-      "notEnoughCredits": "Cloud Agentを実行するためのクレジットが不足しています。クレジットを追加して、もう一度お試しください。",
+      "notEnoughCredits": "このリクエストに必要なクレジットが不足しています。クレジットを追加して、もう一度お試しください。",
       "previousTaskFinishing": "前のタスクの終了処理中です。少々お待ちください。",
       "serviceUnavailable": "サービスは現在利用できません。もう一度お試しください。",
       "connectionTrouble": "接続に問題があります。しばらくしてから、もう一度お試しください。",
@@ -1939,6 +1939,8 @@
       "toolList": "一覧",
       "toolPatch": "パッチ適用",
       "toolTask": "タスク",
+      "toolSendFile": "ファイルを送信しました",
+      "toolSendFileAction": "ファイルを送信",
       "readTodos": "プランを読み取り",
       "updateTodos": "プランを更新",
       "linesBadge": "{{displayCount}}行",
@@ -2039,7 +2041,21 @@
       "thought": "思考",
       "showDetails": "詳細を表示",
       "pending": "待機中…",
-      "running": "実行中…"
+      "running": "実行中…",
+      "field": {
+        "filePath": "ファイルパス",
+        "path": "パス",
+        "offset": "オフセット",
+        "limit": "上限",
+        "pattern": "パターン",
+        "include": "対象ファイル",
+        "patchText": "パッチ本文",
+        "query": "クエリ",
+        "prompt": "プロンプト",
+        "header": "見出し",
+        "question": "質問",
+        "options": "選択肢"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "コンテンツを表示できませんでした。"
@@ -2055,7 +2071,7 @@
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
       "assistantProviderError": "プロバイダーがエラーを返しました。",
       "assistantProviderRefused": "プロバイダーがこのリクエストを拒否したため、再試行できません。",
-      "assistantCreditsRefusal": "Cloud Agentを実行するためのクレジットが不足しています。",
+      "assistantCreditsRefusal": "このリクエストに必要なクレジットが不足しています。",
       "assistantOutputLimit": "応答がモデルの出力上限に達しました。",
       "assistantStructuredOutput": "応答が必要な形式に一致しませんでした。",
       "assistantFailed": "応答に失敗しました。"
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "私のエージェント",
       "promptPlaceholder": "あなたは...",
       "tools": "ツール",
+      "wholeToolRule": "このエージェントは、すべてのツールに一度に1つのルールを適用します：{{rule}}。これらのスイッチは読み取り専用です。",
       "visibility": "可視性",
       "visibilityPrimary": "プライマリ — ピッカーに表示されます",
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "リポジトリのデフォルトプロフィール",
+      "entryLabel": "デフォルトのプロフィール",
       "add": "デフォルトを追加",
       "empty": "デフォルトは設定されていません",
       "emptyDescription": "リポジトリのセッションを開始するときにプロフィールを自動的に適用するデフォルトを追加します。",

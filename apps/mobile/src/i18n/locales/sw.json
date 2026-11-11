@@ -2315,7 +2315,7 @@
       "cloningSession": "Inanakili kikao",
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",
       "cloneFailedRetry": "Imeshindikana kunakili kikao hiki. Jaribu tena.",
-      "notEnoughCredits": "Salio halitoshi kuendesha Cloud Agent. Ongeza salio na ujaribu tena.",
+      "notEnoughCredits": "Salio halitoshi kwa ombi hili. Ongeza salio na ujaribu tena.",
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
       "serviceUnavailable": "Huduma haipatikani sasa hivi. Tafadhali jaribu tena.",
       "connectionTrouble": "Kuna tatizo la muunganisho. Tafadhali jaribu tena baada ya muda mfupi.",
@@ -2477,6 +2477,8 @@
       "toolList": "orodhesha",
       "toolPatch": "rekebisha",
       "toolTask": "kazi",
+      "toolSendFile": "Faili imetumwa",
+      "toolSendFileAction": "tuma faili",
       "readTodos": "Soma mpango",
       "updateTodos": "Sasisha mpango",
       "linesBadge": "Mistari {{displayCount}}",
@@ -2577,7 +2579,21 @@
       "thought": "Wazo",
       "showDetails": "Onyesha maelezo",
       "pending": "Inasubiri…",
-      "running": "Inaendelea…"
+      "running": "Inaendelea…",
+      "field": {
+        "filePath": "Njia ya faili",
+        "path": "Njia",
+        "offset": "Kianzio",
+        "limit": "Kikomo",
+        "pattern": "Muundo",
+        "include": "Kujumuisha",
+        "patchText": "Kiraka",
+        "query": "Hoji",
+        "prompt": "Maelekezo",
+        "header": "Kichwa",
+        "question": "Swali",
+        "options": "Chaguo"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Imeshindikana kuonyesha maudhui."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Mazungumzo ni marefu mno kwa modeli.",
       "assistantProviderError": "Mtoa huduma alirudisha kosa.",
       "assistantProviderRefused": "Mtoa huduma alikataa ombi hili na haliwezi kujaribiwa tena.",
-      "assistantCreditsRefusal": "Salio halitoshi kuendesha Cloud Agent.",
+      "assistantCreditsRefusal": "Salio halitoshi kwa ombi hili.",
       "assistantOutputLimit": "Jibu lilifikisha kikomo cha matokeo ya modeli.",
       "assistantStructuredOutput": "Jibu halikulingana na muundo unaohitajika.",
       "assistantFailed": "Imeshindikana kutoa jibu."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Wakala Wangu",
       "promptPlaceholder": "Wewe ni...",
       "tools": "Zana",
+      "wholeToolRule": "Wakala huyu hutumia kanuni moja kwa kila zana kwa wakati mmoja: {{rule}}. Swichi hizi ni za kusoma tu.",
       "visibility": "Mwonekano",
       "visibilityPrimary": "Msingi — imeonyeshwa kwenye kiteua",
       "visibilitySubagent": "Subagent — inaitwa tu kutoka kwa wengine",
@@ -4052,7 +4069,8 @@
       "duplicateName": "Jina hilo tayari limehifadhiwa na amri nyingine katika wasifu huu"
     },
     "repoBindings": {
-      "title": "Profaili Chaguomsingi za Repos",
+      "title": "Profaili chaguomsingi za Repos",
+      "entryLabel": "Profaili chaguomsingi",
       "add": "Ongeza chaguomsingi",
       "empty": "Hakuna chaguo-msingi zilizosanidiwa",
       "emptyDescription": "Ongeza chaguomsingi ili kutumia wasifu kiotomatiki unapoanzisha vipindi vya repo.",

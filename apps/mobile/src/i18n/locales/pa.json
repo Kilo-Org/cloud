@@ -2321,7 +2321,7 @@
       "cloningSession": "ਸੈਸ਼ਨ ਕਲੋਨ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
       "couldNotLoadThisSession": "ਇਹ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "cloneFailedRetry": "ਇਹ ਸੈਸ਼ਨ ਕਲੋਨ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "notEnoughCredits": "Cloud Agent ਚਲਾਉਣ ਲਈ ਕਾਫ਼ੀ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ। ਕ੍ਰੈਡਿਟ ਜੋੜੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "notEnoughCredits": "ਇਸ ਬੇਨਤੀ ਲਈ ਕਾਫ਼ੀ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ। ਕ੍ਰੈਡਿਟ ਜੋੜੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "previousTaskFinishing": "ਪਿਛਲਾ ਕੰਮ ਅਜੇ ਪੂਰਾ ਹੋ ਰਿਹਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਥੋੜ੍ਹੀ ਦੇਰ ਉਡੀਕੋ।",
       "serviceUnavailable": "ਸੇਵਾ ਇਸ ਸਮੇਂ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "connectionTrouble": "ਕਨੈਕਸ਼ਨ ਵਿੱਚ ਸਮੱਸਿਆ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -2483,6 +2483,8 @@
       "toolList": "ਸੂਚੀ ਦਿਖਾਓ",
       "toolPatch": "ਪੈਚ ਲਾਗੂ ਕਰੋ",
       "toolTask": "ਕੰਮ",
+      "toolSendFile": "ਫ਼ਾਈਲ ਭੇਜੀ",
+      "toolSendFileAction": "ਫ਼ਾਈਲ ਭੇਜੋ",
       "readTodos": "ਯੋਜਨਾ ਪੜ੍ਹੋ",
       "updateTodos": "ਯੋਜਨਾ ਅੱਪਡੇਟ ਕਰੋ",
       "linesBadge": "{{displayCount}} ਲਾਈਨਾਂ",
@@ -2583,7 +2585,21 @@
       "thought": "ਸੋਚ",
       "showDetails": "ਵੇਰਵੇ ਦਿਖਾਓ",
       "pending": "ਉਡੀਕ ਵਿੱਚ…",
-      "running": "ਚੱਲ ਰਿਹਾ ਹੈ…"
+      "running": "ਚੱਲ ਰਿਹਾ ਹੈ…",
+      "field": {
+        "filePath": "ਫਾਈਲ ਮਾਰਗ",
+        "path": "ਮਾਰਗ",
+        "offset": "ਆਫਸੈੱਟ",
+        "limit": "ਸੀਮਾ",
+        "pattern": "ਪੈਟਰਨ",
+        "include": "ਸ਼ਾਮਲ",
+        "patchText": "ਪੈਚ ਲਿਖਤ",
+        "query": "ਕਿਊਰੀ",
+        "prompt": "ਨਿਰਦੇਸ਼",
+        "header": "ਸਿਰਲੇਖ",
+        "question": "ਸਵਾਲ",
+        "options": "ਵਿਕਲਪ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ਸਮੱਗਰੀ ਨਹੀਂ ਦਿਖਾਈ ਜਾ ਸਕੀ।"
@@ -2599,7 +2615,7 @@
       "assistantContextOverflow": "ਗੱਲਬਾਤ ਮਾਡਲ ਲਈ ਬਹੁਤ ਲੰਬੀ ਹੈ।",
       "assistantProviderError": "ਪ੍ਰਦਾਤਾ ਨੇ ਗ਼ਲਤੀ ਵਾਪਸ ਕੀਤੀ।",
       "assistantProviderRefused": "ਪ੍ਰਦਾਤਾ ਨੇ ਇਹ ਬੇਨਤੀ ਰੱਦ ਕਰ ਦਿੱਤੀ ਹੈ ਅਤੇ ਇਸਨੂੰ ਦੁਬਾਰਾ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਸਕਦਾ।",
-      "assistantCreditsRefusal": "Cloud Agent ਚਲਾਉਣ ਲਈ ਕਾਫ਼ੀ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ।",
+      "assistantCreditsRefusal": "ਇਸ ਬੇਨਤੀ ਲਈ ਕਾਫ਼ੀ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ।",
       "assistantOutputLimit": "ਜਵਾਬ ਮਾਡਲ ਦੀ ਆਉਟਪੁੱਟ ਸੀਮਾ ਤੱਕ ਪਹੁੰਚ ਗਿਆ।",
       "assistantStructuredOutput": "ਜਵਾਬ ਲੋੜੀਂਦੇ ਫਾਰਮੈਟ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
       "assistantFailed": "ਜਵਾਬ ਤਿਆਰ ਨਹੀਂ ਹੋ ਸਕਿਆ।"
@@ -4018,6 +4034,7 @@
       "namePlaceholder": "ਮੇਰਾ ਏਜੰਟ",
       "promptPlaceholder": "ਤੁਸੀਂ ਇੱਕ...",
       "tools": "ਸੰਦ",
+      "wholeToolRule": "ਇਹ ਏਜੰਟ ਹਰ ਸੰਦ ਉੱਤੇ ਇੱਕੋ ਸਮੇਂ ਇੱਕ ਨਿਯਮ ਲਾਗੂ ਕਰਦਾ ਹੈ: {{rule}}। ਇਹ ਸਵਿੱਚਾਂ ਸਿਰਫ਼-ਪੜ੍ਹਨ ਲਈ ਹਨ।",
       "visibility": "ਦਿੱਖ",
       "visibilityPrimary": "ਪ੍ਰਾਇਮਰੀ — ਚੋਣਕਾਰ ਵਿੱਚ ਦਿਖਾਇਆ ਗਿਆ ਹੈ",
       "visibilitySubagent": "ਸਬਜੈਂਟ — ਸਿਰਫ਼ ਦੂਜਿਆਂ ਤੋਂ ਕਾਲ ਕਰਨ ਯੋਗ",
@@ -4059,6 +4076,7 @@
     },
     "repoBindings": {
       "title": "ਰਿਪੋਜ਼ ਲਈ ਡਿਫਾਲਟ ਪ੍ਰੋਫਾਈਲ",
+      "entryLabel": "ਮੂਲ ਪ੍ਰੋਫਾਈਲ",
       "add": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਸ਼ਾਮਲ ਕਰੋ",
       "empty": "ਕੋਈ ਡਿਫੌਲਟ ਕੌਂਫਿਗਰ ਨਹੀਂ ਕੀਤਾ ਗਿਆ",
       "emptyDescription": "ਇੱਕ ਰੇਪੋ ਲਈ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰਨ ਵੇਲੇ ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਨੂੰ ਆਪਣੇ ਆਪ ਲਾਗੂ ਕਰਨ ਲਈ ਇੱਕ ਡਿਫੌਲਟ ਜੋੜੋ।",

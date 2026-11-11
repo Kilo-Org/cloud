@@ -27,7 +27,6 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useStackedWorkspaceSource } from './hooks/useStackedWorkspaceSource';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Badge } from '@/components/ui/badge';
-import { ComputePrice } from './ComputePrice';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
@@ -49,7 +48,8 @@ import {
 } from '@/components/shared/RepositoryCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
-import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
+import type { ModeOption } from '@/components/shared/ModeCombobox';
+import { CloudAgentModeCombobox } from './CloudAgentModeCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
@@ -1116,20 +1116,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     !!selectedModelOption &&
     (selectedModelOption.isFree || selectedModelOption.hasUserByokAvailable);
 
-  const sandboxSelectionInput = {
-    repositoryType: hasPublicRepo ? ('git' as const) : selectedPlatform,
-    repositoryFullName: selectedRepo || undefined,
-  };
-  const sandboxOptions = useQuery({
-    ...(organizationId
-      ? trpc.organizations.cloudAgentNext.getSandboxSelectionOptions.queryOptions({
-          organizationId,
-          ...sandboxSelectionInput,
-        })
-      : trpc.cloudAgentNext.getSandboxSelectionOptions.queryOptions(sandboxSelectionInput)),
-    retry: false,
-  });
-
   const creationInput = useMemo(() => {
     const trimmed = prompt.trim();
     const slashMatch = /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed);
@@ -1591,10 +1577,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             />
             {/* Desktop: individual pickers */}
             <div className="hidden md:contents">
-              <ModeCombobox<AgentMode>
+              <CloudAgentModeCombobox
                 value={mode}
                 onValueChange={setMode}
-                options={NEXT_MODE_OPTIONS}
                 customOptions={customModeOptions}
                 variant="compact"
                 className="min-w-0"
@@ -1707,8 +1692,8 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         </div>
 
         {/* Session context (outside prompt box): code source left, sandbox setup right */}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="@container/context flex flex-col gap-1.5">
+          <div className="flex flex-col items-start gap-2 @xl/context:flex-row @xl/context:items-center">
             <div className={contextGroupClassName}>
               {stackedTarget ? (
                 <span
@@ -1959,7 +1944,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               )}
             </div>
 
-            <div className={cn(contextGroupClassName, 'ml-auto')}>
+            <div className={cn(contextGroupClassName, '@xl/context:ml-auto')}>
               <RepositoryEnvironmentChip
                 organizationId={organizationId}
                 repository={environmentRepository}
@@ -1972,17 +1957,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 }}
                 selectedProfileId={selectedProfileId}
               />
-              {sandboxOptions.isError ? (
-                <span className="text-muted-foreground text-xs">Compute price unavailable</span>
-              ) : (
-                <ComputePrice
-                  destination={
-                    sandboxOptions.data?.effectiveDestination ??
-                    sandboxOptions.data?.defaultDestination
-                  }
-                  label="Compute"
-                />
-              )}
               <ProfilePickerPopover
                 organizationId={organizationId}
                 selectedOverrideProfileId={selectedProfileId}

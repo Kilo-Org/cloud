@@ -3,6 +3,7 @@ import type { EnvironmentBuild } from './environment-build/environment-build-do.
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
+  GitHubBrokerRejectionProvenance,
   GitHubRepositoryAuthorizationFailureReason,
   GitHubRepositoryAuthorizationResult,
 } from '@kilocode/worker-utils/github-authorization';
@@ -258,6 +259,7 @@ type IssueGitHubSessionCapabilityResult =
     }
   | {
       success: false;
+      rejectionProvenance?: GitHubBrokerRejectionProvenance;
       reason:
         | GitHubRepositoryAuthorizationFailureReason
         | 'capability_configuration_error'
@@ -290,7 +292,7 @@ type RedeemGitHubSessionCapabilityResult =
         | 'integration_mismatch';
     };
 
-type GetGitLabTokenFailureReason =
+export type GetGitLabTokenFailureReason =
   | 'database_not_configured'
   | 'no_integration_found'
   | 'invalid_org_id'
@@ -490,11 +492,11 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
-  /** Optional until a downloaded target provisions its private artifact bucket. */
+  /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;
   NATIVE_RUNTIME_IMAGE?: string;
-  /** Comma-separated org UUIDs whose interactive web routes use the scoped startup target. */
+  /** Retired rollout setting, retained only to reject stale deployment configuration. */
   RUNTIME_INTERACTIVE_ORG_IDS?: string;
   /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
   RUNTIME_RELEASE_DESCRIPTOR?: string;
@@ -568,8 +570,8 @@ export type Env = {
   VERCEL_SANDBOX_RUNTIME?: string;
   VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
-  WORKSPACE_SNAPSHOT_ORG_IDS?: string;
-  WORKSPACE_SNAPSHOT_USER_IDS?: string;
+  /** Comma-separated user or organization IDs allowed workspace snapshots; `*` includes everyone. */
+  WORKSPACE_SNAPSHOT_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted chip suite: the share contract, the pending placeholder frame, and the failure toasts share one harness */
 import '@/i18n';
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { createElement } from 'react';
@@ -171,6 +172,12 @@ function texts(root: TestRenderer.ReactTestInstance): string[] {
     });
 }
 
+function frameClasses(node: TestRenderer.ReactTestInstance | undefined): string[] {
+  return String(node?.props.className ?? '')
+    .split(' ')
+    .filter(Boolean);
+}
+
 async function pressShare(root: TestRenderer.ReactTestInstance): Promise<void> {
   const button = shareButtons(root)[0];
   if (!button) {
@@ -211,6 +218,29 @@ describe('ToolCardFileAttachments mounted', () => {
     await unmount(renderer);
   });
 
+  it('keeps the share control at the platform touch size without widening the icon', async () => {
+    await act(async () => {
+      await Promise.resolve();
+      seedFileCache();
+    });
+    const renderer = await mount(makeToolPart('send_file', [reportPdf]));
+    const root = renderer.root;
+
+    const button = shareButtons(root)[0];
+    const frame = frameClasses(button);
+    // The control's own box is what a control-size audit measures, so it clears
+    // the 28 dp floor on its own and the slop lifts the region to 44 dp.
+    expect(frame).toContain('min-h-8');
+    expect(frame).toContain('min-w-8');
+    const slop = button?.props.hitSlop;
+    expect(typeof slop).toBe('number');
+    expect(28 + 2 * (slop as number)).toBeGreaterThanOrEqual(44);
+    const [icon] = root.findAll(node => (node.type as string) === 'Share2');
+    expect(icon?.props.size).toBe(16);
+
+    await unmount(renderer);
+  });
+
   it('reserves the share slot and reports busy while the cache write is pending', async () => {
     const write = Promise.withResolvers<undefined>();
     expoFileSystemMock.File.mockImplementationOnce(function FilePending(
@@ -246,6 +276,13 @@ describe('ToolCardFileAttachments mounted', () => {
     // The hidden control keeps its box, so the filename cannot re-truncate when
     // the write lands.
     expect(root.findAll(node => (node.type as string) === 'Share2')).toHaveLength(1);
+    const placeholder = root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        String(node.props.className).includes('opacity-0')
+    )[0];
+    const placeholderFrame = frameClasses(placeholder).filter(clazz => clazz !== 'opacity-0');
 
     write.resolve(undefined);
     await act(async () => {
@@ -255,6 +292,10 @@ describe('ToolCardFileAttachments mounted', () => {
 
     expect(shareButtons(root)).toHaveLength(1);
     expect(root.findAll(node => (node.type as string) === 'Share2')).toHaveLength(1);
+    // Same frame in both states: the reserved box is the live control's box.
+    const live = frameClasses(shareButtons(root)[0]).filter(clazz => clazz !== 'active:opacity-60');
+    expect(placeholderFrame.length).toBeGreaterThan(0);
+    expect(placeholderFrame).toEqual(live);
 
     await unmount(renderer);
   });

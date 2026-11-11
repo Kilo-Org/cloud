@@ -70,8 +70,13 @@ export function buildCreateSessionWireData(
 }
 
 /**
- * True when the wire data differs from the bare `{ protocolVersion: 1 }` form
- * that every supported CLI accepts.
+ * True when the non-clone inheritance fields (`agent`, `model`, `orgId`,
+ * `directory`) make the wire data differ from the bare
+ * `{ protocolVersion: 1 }` form that every supported CLI accepts.
+ *
+ * The callers gate the clone fields (`cloneFromKiloSessionId`,
+ * `cloneUpToMessageId`) separately, because a clone id must never take the
+ * bare retry.
  */
 export function hasExtendedCreateSessionFields(data: CreateSessionWireData): boolean {
   return (

@@ -2315,7 +2315,7 @@
       "cloningSession": "Kei te tārua i te wātū",
       "couldNotLoadThisSession": "Kāore i taea te uta i tēnei wātū.",
       "cloneFailedRetry": "Kāore i taea te tārua i tēnei wātū. Whakamātau anō.",
-      "notEnoughCredits": "Kāore e rahi ana ngā moni tōmua hei whakahaere i a Cloud Agent. Tāpirihia he moni tōmua, kātahi ka whakamātau anō.",
+      "notEnoughCredits": "Kāore e rahi ana ngā moni tōmua hei whakahaere i tēnei tono. Tāpirihia he moni tōmua, kātahi ka whakamātau anō.",
       "previousTaskFinishing": "Kei te whakaoti tonu i te mahi o mua. Tatari mō tētahi wā poto.",
       "serviceUnavailable": "Kāore te ratonga e wātea ana ināianei. Whakamātau anō.",
       "connectionTrouble": "He raruraru kei te hononga. Whakamātau anō ā muri tata nei.",
@@ -2477,6 +2477,8 @@
       "toolList": "whakarārangitia",
       "toolPatch": "papakihia",
       "toolTask": "mahi",
+      "toolSendFile": "kua tukuna",
+      "toolSendFileAction": "tukuna te kōnae",
       "readTodos": "Pānuitia te mahere",
       "updateTodos": "Whakahoutia te mahere",
       "linesBadge": "{{displayCount}} rārangi",
@@ -2577,7 +2579,21 @@
       "thought": "Te whakaaro",
       "showDetails": "Whakaaturia ngā taipitopito",
       "pending": "E tatari ana…",
-      "running": "Kei te haere…"
+      "running": "Kei te haere…",
+      "field": {
+        "filePath": "Ara kōnae",
+        "path": "Ara",
+        "offset": "Nekehanga",
+        "limit": "Tepe",
+        "pattern": "Tauira",
+        "include": "Whakauru",
+        "patchText": "Kuputuhi whakatikatanga",
+        "query": "Rapunga",
+        "prompt": "Tohutohu",
+        "header": "Upoko",
+        "question": "Pātai",
+        "options": "Kōwhiringa"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Kāore i taea te whakaatu i ngā ihirangi."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "He roa rawa te kōrerorero mō te tauira.",
       "assistantProviderError": "I whakahoki te kaiwhakarato i tētahi hapa.",
       "assistantProviderRefused": "I whakakāhoretia tēnei tono e te kaiwhakarato, ā, kāore e taea te whakamātau anō.",
-      "assistantCreditsRefusal": "Kāore e rahi ana ngā moni tōmua hei whakahaere i a Cloud Agent.",
+      "assistantCreditsRefusal": "Kāore e rahi ana ngā moni tōmua hei whakahaere i tēnei tono.",
       "assistantOutputLimit": "Tae rawa atu te whakautu ki te roa tōpū o ngā putanga a te tauira.",
       "assistantStructuredOutput": "Kāore te whakautu i te rite ki te hōputu e hiahiatia ana.",
       "assistantFailed": "I rahua te whakautu."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Taku Kaihoko",
       "promptPlaceholder": "He...",
       "tools": "Utauta",
+      "wholeToolRule": "Ka whakahāngai tēnei māngai i tētahi ture ki ngā utauta katoa i te wā kotahi: {{rule}}. He pānui anake ēnei whakakā.",
       "visibility": "Tirohanga",
       "visibilityPrimary": "Tuatahi — ka whakaatuhia ki te kaikokoti",
       "visibilitySubagent": "Subagent — ka taea anake te waea mai i etahi atu",
@@ -4052,7 +4069,8 @@
       "duplicateName": "Kua whakamahia tēnei ingoa e tētahi atu whakahau i tēnei kōtaha"
     },
     "repoBindings": {
-      "title": "Kōtaha Taunoa mō Repos",
+      "title": "Kōtaha taunoa mō Repos",
+      "entryLabel": "Kōtaha taunoa",
       "add": "Tāpiri taunoa",
       "empty": "Karekau he taunoa i whirihora",
       "emptyDescription": "Tāpirihia he taunoa ki te tono aunoa i tetahi kōtaha i te wa e tiimata ana nga huihuinga mo te repo.",

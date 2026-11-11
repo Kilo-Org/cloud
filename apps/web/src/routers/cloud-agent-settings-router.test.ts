@@ -189,6 +189,23 @@ describe('cloud-agent-settings router', () => {
       });
     });
 
+    test('reads personal picker preferences without loading sandbox capabilities', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+      const agents = {
+        plan: { disable: true },
+        debug: { disable: true },
+        orchestrator: { disable: true },
+        ask: { disable: true },
+      };
+      await caller.cloudAgentSettings.setBuiltinAgents({ agents });
+
+      expect(await caller.cloudAgentSettings.getBuiltinAgents()).toEqual(agents);
+      expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+
+      const otherCaller = await createCallerForUser(otherUser.id);
+      expect(await otherCaller.cloudAgentSettings.getBuiltinAgents()).toEqual({});
+    });
+
     test('rejects disabling an agent that Cloud Agent requires', async () => {
       const caller = await createCallerForUser(ownerUser.id);
       await expect(

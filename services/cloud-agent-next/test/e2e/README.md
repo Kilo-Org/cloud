@@ -29,6 +29,11 @@ cloud-agent-next refactor.
    pnpm dev:start cloud-agent
    ```
 
+   Startup publishes the current wrapper and pinned CLI artifacts to local Wrangler R2 and downloads
+   them into each new runtime-free sandbox. The first start needs registry access, Bun and Docker;
+   subsequent starts reuse verified CLI tarballs in `.wrangler/state`. ARM hosts need amd64 emulation.
+   Restart the Worker after wrapper changes. There is no preinstalled local-image exception.
+
    Selecting `kilo/fake-deterministic` is enough to hit fake-llm through
    Next.js. A real-model session (`kilo-auto/efficient`, etc.) uses the same
    Worker URL and does not need a restart.

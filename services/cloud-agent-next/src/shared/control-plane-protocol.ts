@@ -4,6 +4,7 @@ import {
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
   RuntimeKiloCommandsSchema,
+  RuntimeInstructionsSchema,
 } from './runtime-profile.js';
 import type {
   CloudAgentAssistantFailureReason,
@@ -236,6 +237,7 @@ export const CONTROL_PLANE_ASSISTANT_FAILURE_REASONS = [
   'output_limit',
   'content_filter',
   'structured_output',
+  'model_catalog_unavailable',
   'unknown',
 ] as const satisfies readonly CloudAgentAssistantFailureReason[];
 export type ControlPlaneAssistantFailureReason =
@@ -386,6 +388,12 @@ export const controlPlaneWorkspaceRootSchema = z
     branch: z.string().min(1).max(256),
     /** The branch is the session's generated one: create it when the remote has none. */
     branchMode: z.literal('working').optional(),
+    /** Stacked workspace base of the launch repository; other roots never carry one. */
+    baseBranch: z.string().min(1).max(256).optional(),
+    baseSha: z
+      .string()
+      .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
+      .optional(),
   })
   .strict();
 export type ControlPlaneWorkspaceRoot = z.infer<typeof controlPlaneWorkspaceRootSchema>;
@@ -470,6 +478,7 @@ const routeSpecObjectSchema = z
      */
     environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
+    runtimeInstructions: RuntimeInstructionsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
@@ -525,6 +534,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     startCommands: true,
     environmentSetupCommandCount: true,
     runtimeSkills: true,
+    runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
     kiloCommands: true,
@@ -541,6 +551,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     startCommands: true,
     environmentSetupCommandCount: true,
     runtimeSkills: true,
+    runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
     kiloCommands: true,
@@ -1561,6 +1572,23 @@ const controlPlaneHistoryPageFrameSchema = z
     sessionId: z.string().min(1),
     kiloSessionId: z.string().min(1),
     cursor: z.string().min(1).max(2048).optional(),
+    /** Hosted route authorizing a history-only read of a sibling workspace chat. */
+    workspaceSessionId: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const WORKSPACE_HISTORY_PRELOAD_LIMIT = 5;
+export const workspaceHistorySessionsSchema = z
+  .array(z.object({ sessionId: z.string().min(1), kiloSessionId: z.string().min(1) }).strict())
+  .max(WORKSPACE_HISTORY_PRELOAD_LIMIT);
+export type WorkspaceHistorySession = z.infer<typeof workspaceHistorySessionsSchema>[number];
+
+/** Wrapper -> Sandbox DO: recent root chats in the hosted route's workspace. */
+const controlPlaneHistoryRecentFrameSchema = z
+  .object({
+    type: z.literal('history.recent'),
+    requestId: z.string().min(1).max(128),
+    sessionId: z.string().min(1),
   })
   .strict();
 
@@ -1620,6 +1648,7 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlanePreviewListFrameSchema,
   controlPlanePreviewResultFrameSchema,
   controlPlaneHistoryPageFrameSchema,
+  controlPlaneHistoryRecentFrameSchema,
   controlPlaneHistoryResultFrameSchema,
 ]);
 
@@ -1717,5 +1746,6 @@ export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultF
 export type ControlPlanePreviewListFrame = z.infer<typeof controlPlanePreviewListFrameSchema>;
 export type ControlPlanePreviewResultFrame = z.infer<typeof controlPlanePreviewResultFrameSchema>;
 export type ControlPlaneHistoryPageFrame = z.infer<typeof controlPlaneHistoryPageFrameSchema>;
+export type ControlPlaneHistoryRecentFrame = z.infer<typeof controlPlaneHistoryRecentFrameSchema>;
 export type ControlPlaneHistoryResultFrame = z.infer<typeof controlPlaneHistoryResultFrameSchema>;
 export type ControlPlaneWrapperFrame = z.infer<typeof controlPlaneWrapperFrameSchema>;

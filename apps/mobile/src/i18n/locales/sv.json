@@ -2315,7 +2315,7 @@
       "cloningSession": "Klonar sessionen",
       "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
-      "notEnoughCredits": "Du har inte tillräckligt med krediter för att köra Cloud Agent. Fyll på krediter och försök igen.",
+      "notEnoughCredits": "Du har inte tillräckligt med krediter för den här förfrågan. Fyll på krediter och försök igen.",
       "previousTaskFinishing": "Den föregående uppgiften håller på att avslutas. Vänta en stund.",
       "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
       "connectionTrouble": "Det är problem med anslutningen. Försök igen om en stund.",
@@ -2477,6 +2477,8 @@
       "toolList": "upplistning",
       "toolPatch": "ändring",
       "toolTask": "uppgift",
+      "toolSendFile": "Skickad fil",
+      "toolSendFileAction": "Skicka fil",
       "readTodos": "Läs planeringen",
       "updateTodos": "Uppdatera planeringen",
       "linesBadge": "{{displayCount}} rader",
@@ -2577,7 +2579,21 @@
       "thought": "Resonemang",
       "showDetails": "Visa detaljer",
       "pending": "Väntar…",
-      "running": "Körs…"
+      "running": "Körs…",
+      "field": {
+        "filePath": "Filsökväg",
+        "path": "Sökväg",
+        "offset": "Förskjutning",
+        "limit": "Gräns",
+        "pattern": "Mönster",
+        "include": "Inkludering",
+        "patchText": "Patchtext",
+        "query": "Sökfråga",
+        "prompt": "Instruktion",
+        "header": "Rubrik",
+        "question": "Fråga",
+        "options": "Alternativ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Det gick inte att visa innehållet."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
       "assistantProviderError": "Leverantören returnerade ett fel.",
       "assistantProviderRefused": "Leverantören avvisade begäran och den kan inte göras om.",
-      "assistantCreditsRefusal": "Du har inte tillräckligt med krediter för att köra Cloud Agent.",
+      "assistantCreditsRefusal": "Du har inte tillräckligt med krediter för den här förfrågan.",
       "assistantOutputLimit": "Svaret nådde modellens utdata-gräns.",
       "assistantStructuredOutput": "Svaret matchade inte det begärda formatet.",
       "assistantFailed": "Det gick inte att generera svaret."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Min agent",
       "promptPlaceholder": "Du är en...",
       "tools": "Verktyg",
+      "wholeToolRule": "Den här agenten tillämpar en regel på alla verktyg samtidigt: {{rule}}. Dessa reglage är skrivskyddade.",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primär — visas i väljaren",
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler för kodarkiv",
+      "entryLabel": "Standardprofiler",
       "add": "Lägg till standard",
       "empty": "Inga standardinställningar konfigurerade",
       "emptyDescription": "Lägg till en standard för att automatiskt tillämpa en profil när du startar sessioner för ett kodarkiv.",

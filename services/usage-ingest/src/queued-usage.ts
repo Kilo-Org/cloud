@@ -2,11 +2,11 @@ import {
   EnkryptUsageQueueMessageSchema,
   UsageRecordRequestSchema,
   type EnkryptUsageWrite,
-  type UsageRecordRequest,
+  type LlmUsageQueueMessage,
 } from '@kilocode/usage-contracts';
 
 export type QueuedUsage =
-  | { kind: 'llm'; usage: UsageRecordRequest }
+  | { kind: 'llm'; usage: LlmUsageQueueMessage }
   | { kind: 'enkrypt_usage'; record: EnkryptUsageWrite }
   | {
       kind: 'invalid';

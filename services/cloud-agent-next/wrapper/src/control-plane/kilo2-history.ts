@@ -12,7 +12,7 @@ const messageSchema = z.object({ message: kilo2MessageSchema, parentID: z.string
 const pageSchema = z.object({
   kind: z.literal('success'),
   source: z.object({ version: z.literal('v2'), session: z.object({ id: z.string() }) }),
-  info: z.object({ id: z.string() }).passthrough(),
+  info: z.object({ id: z.string(), title: z.string().optional() }).passthrough(),
   messages: z.array(messageSchema),
   nextCursor: z.string().nullable(),
   omittedItemCount: z.number(),
@@ -37,6 +37,7 @@ export async function restoreKilo2History(
   let bytes = 0;
   let omitted = 0;
   let truncated = false;
+  let title: string | undefined;
   const encoder = new TextEncoder();
   do {
     const data = await input.readHistoryPage(cursor);
@@ -46,6 +47,7 @@ export async function restoreKilo2History(
       .parse(data);
     if (header.info.id !== input.sessionId)
       throw new Error('Cloud history belongs to another native session');
+    title ??= header.info.title?.trim().slice(0, 200) || undefined;
     // A new Cloud chat has no native source until its first runtime opens it.
     // v1 history needs a separate migration, so its session starts empty.
     if (header.source.version !== 'v2') {
@@ -104,6 +106,7 @@ export async function restoreKilo2History(
       location: { directory: input.directory },
       info: {
         id: input.sessionId,
+        ...(title === undefined ? {} : { title }),
         projectID: location.project.id,
         location: { directory: input.directory },
         cost,

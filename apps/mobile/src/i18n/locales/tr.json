@@ -1777,7 +1777,7 @@
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar dene.",
-      "notEnoughCredits": "Cloud Agent'i çalıştırmak için yeterli kredi yok. Kredi ekleyip tekrar dene.",
+      "notEnoughCredits": "Bu istek için yeterli kredi yok. Kredi ekleyip tekrar dene.",
       "previousTaskFinishing": "Önceki görev henüz tamamlanmadı. Biraz bekle.",
       "serviceUnavailable": "Hizmet şu anda kullanılamıyor. Tekrar dene.",
       "connectionTrouble": "Bağlantıda sorun var. Birazdan tekrar dene.",
@@ -1939,6 +1939,8 @@
       "toolList": "listele",
       "toolPatch": "yama uygula",
       "toolTask": "görev",
+      "toolSendFile": "Dosya gönderildi",
+      "toolSendFileAction": "Dosya gönder",
       "readTodos": "Planı oku",
       "updateTodos": "Planı güncelle",
       "linesBadge": "{{displayCount}} satır",
@@ -2039,7 +2041,21 @@
       "thought": "Düşünce",
       "showDetails": "Ayrıntıları göster",
       "pending": "Bekliyor…",
-      "running": "Çalışıyor…"
+      "running": "Çalışıyor…",
+      "field": {
+        "filePath": "Dosya yolu",
+        "path": "Yol",
+        "offset": "Başlangıç",
+        "limit": "Sınır",
+        "pattern": "Desen",
+        "include": "Dosya filtresi",
+        "patchText": "Yama metni",
+        "query": "Sorgu",
+        "prompt": "İstem",
+        "header": "Başlık",
+        "question": "Soru",
+        "options": "Seçenekler"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "İçerik görüntülenemedi."
@@ -2055,7 +2071,7 @@
       "assistantContextOverflow": "Konuşma model için çok uzun.",
       "assistantProviderError": "Sağlayıcı bir hata döndürdü.",
       "assistantProviderRefused": "Sağlayıcı bu isteği reddetti ve istek yeniden denenemez.",
-      "assistantCreditsRefusal": "Cloud Agent'i çalıştırmak için yeterli kredi yok.",
+      "assistantCreditsRefusal": "Bu istek için yeterli kredi yok.",
       "assistantOutputLimit": "Yanıt, modelin çıktı sınırına ulaştı.",
       "assistantStructuredOutput": "Yanıt, gereken biçimle eşleşmedi.",
       "assistantFailed": "Yanıt oluşturulamadı."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Temsilcim",
       "promptPlaceholder": "Sen bir...",
       "tools": "Aletler",
+      "wholeToolRule": "Bu ajan tüm aletlere aynı anda tek bir kural uygular: {{rule}}. Bu anahtarlar salt okunur.",
       "visibility": "Görünürlük",
       "visibilityPrimary": "Birincil — seçicide gösterilir",
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",
@@ -4052,7 +4069,8 @@
       "duplicateName": "Bu adı kullanan bir komut bu profilde zaten mevcut"
     },
     "repoBindings": {
-      "title": "Depolar için Varsayılan Profiller",
+      "title": "Depolar için varsayılan profiller",
+      "entryLabel": "Varsayılan profiller",
       "add": "Varsayılan ekle",
       "empty": "Varsayılan ayar yapılandırılmadı",
       "emptyDescription": "Bir depo için oturum başlatırken bir profili otomatik olarak uygulamak için bir varsayılan ekleyin.",

@@ -5659,6 +5659,7 @@ export const ModelStatsBenchmarksSchema = z
         terminalBenchHard: z.number().optional(),
         lcr: z.number().optional(),
         ifBench: z.number().optional(),
+        timeToFirstTokenSeconds: z.number().optional(),
         lastUpdated: z.string().optional(),
       })
       .optional(),
@@ -6653,6 +6654,11 @@ export const cloud_agent_worktrees = pgTable(
     }),
     base_branch: text(),
     base_sha: text(),
+    // The repository and the branch checked out in the workspace, as last
+    // reported by its chats. A pull request on this repository and branch in
+    // the workspace's tenant is the workspace's pull request.
+    git_url: text(),
+    git_branch: text(),
     sidebar_position: text(),
     name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -6680,6 +6686,11 @@ export const cloud_agent_worktrees = pgTable(
     index('IDX_cloud_agent_worktrees_parent_worktree_id')
       .on(table.parent_worktree_id)
       .where(isNotNull(table.parent_worktree_id))
+      .concurrently(),
+    // Supports the pull_request webhook, which finds workspaces by repository and branch.
+    index('IDX_cloud_agent_worktrees_git_url_branch')
+      .on(table.git_url, table.git_branch)
+      .where(isNotNull(table.git_branch))
       .concurrently(),
     check(
       'cloud_agent_worktrees_deletion_check',
@@ -7037,6 +7048,7 @@ export type CloudAgentFailureReason =
   | 'managed_provider_unavailable'
   | 'managed_provider_authentication'
   | 'managed_model_configuration'
+  | 'model_catalog_unavailable'
   | 'provider_unavailable'
   | 'provider_disconnect'
   | 'gateway_unavailable'
@@ -7348,11 +7360,12 @@ export const github_branch_pull_requests = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Identity is the PR, not the branch: the cache is only a state/review
-    // cache for a PR a session already verifiably links. Branch names are
-    // reused and shared across sessions, so (git_url, git_branch) can never
-    // identify which PR belongs to which session. These partial unique indexes
-    // serve as ON CONFLICT targets for the webhook upsert, keyed by PR number.
+    // Identity is the PR, not the branch: the cache holds state/review for a
+    // PR a session verifiably links, or a PR on the branch a Cloud Agent
+    // workspace has checked out. Outside workspaces branch names are reused
+    // and shared across sessions, so (git_url, git_branch) never identifies a
+    // session's PR. These partial unique indexes serve as ON CONFLICT targets
+    // for the webhook upsert, keyed by PR number.
     uniqueIndex('UQ_github_branch_prs_repo_pr_org')
       .on(table.git_url, table.pr_number, table.owned_by_organization_id)
       .where(isNotNull(table.pr_number))
@@ -7361,9 +7374,13 @@ export const github_branch_pull_requests = pgTable(
       .on(table.git_url, table.pr_number, table.owned_by_user_id)
       .where(isNotNull(table.pr_number))
       .concurrently(),
-    // Reads resolve a PR by identity (git_url, pr_number); branch columns are
-    // no longer part of the join key.
+    // Session reads resolve a PR by identity (git_url, pr_number).
     index('IDX_github_branch_prs_url_pr_number').on(table.git_url, table.pr_number).concurrently(),
+    // Cloud Agent workspace reads resolve their PR by the workspace's repository and branch.
+    index('IDX_github_branch_prs_url_branch')
+      .on(table.git_url, table.git_branch)
+      .where(isNotNull(table.pr_number))
+      .concurrently(),
     check(
       'github_branch_pull_requests_owner_check',
       sql`(
@@ -7621,17 +7638,14 @@ export const openai_chatgpt_connections = pgTable(
 export type OpenAiChatGptConnectionRow = typeof openai_chatgpt_connections.$inferSelect;
 
 /**
- * A Claude billing connection: one Kilo owner linked through its Anthropic
- * user profile to a customer's Claude organization, so the Claude requests the
- * owner makes bill that organization. No credential is stored: Kilo's operator
+ * A Claude payer connection linked through its Anthropic user profile to a
+ * customer's Claude organization. No credential is stored: Kilo's operator
  * service account sends the requests, and the user profile ID names who pays.
  *
- * The set columns name the owner:
- * - `kilo_user_id` only: the person's personal account.
- * - `kilo_user_id` and `organization_id`: the person's own requests in that
- *   organization.
- * - `organization_id` only: the organization's shared services, such as code
- *   review. `created_by` records the person who connected it.
+ * The owner columns record the scope that created the payer, reassigned to a
+ * remaining active scope only if that creator's account is erased while another
+ * scope still uses the payer. Active billing scopes are resolved through
+ * `claude_billing_connection_grants`.
  *
  * Anthropic allows one user profile per customer organization for each OAuth
  * app, so `user_profile_id` is unique and kept after a removal: a reconnect
@@ -7669,13 +7683,18 @@ export const claude_billing_connections = pgTable(
     unique('UQ_claude_billing_connections_user_profile_id').on(table.user_profile_id),
     uniqueIndex('UQ_claude_billing_connections_personal')
       .on(table.kilo_user_id)
-      .where(sql`${table.organization_id} IS NULL`),
+      .where(sql`${table.organization_id} IS NULL AND ${table.status} <> 'removed'`)
+      .concurrently(),
     uniqueIndex('UQ_claude_billing_connections_org_member')
       .on(table.kilo_user_id, table.organization_id)
-      .where(sql`${table.organization_id} IS NOT NULL`),
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.status} <> 'removed'`)
+      .concurrently(),
     uniqueIndex('UQ_claude_billing_connections_shared_services')
       .on(table.organization_id)
-      .where(sql`${table.organization_id} IS NOT NULL AND ${table.kilo_user_id} IS NULL`),
+      .where(
+        sql`${table.organization_id} IS NOT NULL AND ${table.kilo_user_id} IS NULL AND ${table.status} <> 'removed'`
+      )
+      .concurrently(),
     enumCheck(
       'claude_billing_connections_status_check',
       table.status,
@@ -7689,6 +7708,44 @@ export const claude_billing_connections = pgTable(
 );
 
 export type ClaudeBillingConnectionRow = typeof claude_billing_connections.$inferSelect;
+
+/**
+ * Authorizes one Kilo billing scope to use a Claude payer connection. Multiple
+ * scopes can share a payer only through these explicit grants.
+ */
+export const claude_billing_connection_grants = pgTable(
+  'claude_billing_connection_grants',
+  {
+    id: idPrimaryKeyColumn,
+    payer_connection_id: uuid()
+      .notNull()
+      .references(() => claude_billing_connections.id, { onDelete: 'cascade' }),
+    kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    created_by: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    /** Kept after removal so a reconnect reuses this payer's Anthropic profile. */
+    removed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_claude_billing_grants_payer_connection_id').on(table.payer_connection_id),
+    uniqueIndex('UQ_claude_billing_grants_personal')
+      .on(table.kilo_user_id)
+      .where(sql`${table.organization_id} IS NULL`),
+    uniqueIndex('UQ_claude_billing_grants_org_member')
+      .on(table.kilo_user_id, table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL`),
+    uniqueIndex('UQ_claude_billing_grants_shared_services')
+      .on(table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.kilo_user_id} IS NULL`),
+    check(
+      'claude_billing_grants_owner_check',
+      sql`${table.kilo_user_id} IS NOT NULL OR ${table.organization_id} IS NOT NULL`
+    ),
+  ]
+);
+
+export type ClaudeBillingConnectionGrantRow = typeof claude_billing_connection_grants.$inferSelect;
 
 // Security Reviews - Phase 1
 export const security_findings = pgTable(
@@ -11063,6 +11120,12 @@ export const enkrypt_usage = pgTable(
     // is an `allowed` row with detectors here. PostgreSQL cannot enforce foreign keys on array
     // elements, so the writer resolves every id through the lookup table.
     fired_detector_ids: integer().array(),
+    // Sizes in UTF-16 code units. `total_characters` is the text the scan covers: the whole
+    // extracted request or response. `scanned_characters` is what this call sent to Enkrypt: the
+    // part no cached verdict covers, plus an overlap of already-scanned text. Requests that the
+    // verdict cache covers entirely make no call and have no row. Null on rows that predate them.
+    scanned_characters: integer(),
+    total_characters: integer(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -11303,6 +11366,10 @@ export const container_usage_interval = pgTable(
   },
   table => [
     index('IDX_container_usage_interval_sweep').on(table.status, table.last_seen_at),
+    index('IDX_container_usage_interval_session')
+      .on(table.session_id)
+      .concurrently()
+      .where(sql`${table.session_id} IS NOT NULL`),
     index('IDX_container_usage_interval_subject_started').on(
       table.subject_type,
       table.subject_id,

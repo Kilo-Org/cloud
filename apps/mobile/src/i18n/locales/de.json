@@ -1777,7 +1777,7 @@
       "cloningSession": "Sitzung wird geklont",
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
       "cloneFailedRetry": "Diese Sitzung konnte nicht geklont werden. Versuche es erneut.",
-      "notEnoughCredits": "Dein Guthaben reicht nicht aus, um Cloud Agent auszuführen. Lade Guthaben auf und versuche es erneut.",
+      "notEnoughCredits": "Dein Guthaben reicht für diese Anfrage nicht aus. Lade Guthaben auf und versuche es erneut.",
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
       "serviceUnavailable": "Der Dienst ist gerade nicht verfügbar. Bitte versuche es erneut.",
       "connectionTrouble": "Es gibt ein Verbindungsproblem. Bitte versuche es gleich noch einmal.",
@@ -1939,6 +1939,8 @@
       "toolList": "auflisten",
       "toolPatch": "änderungen anwenden",
       "toolTask": "aufgabe",
+      "toolSendFile": "Datei gesendet",
+      "toolSendFileAction": "Datei senden",
       "readTodos": "Planung lesen",
       "updateTodos": "Planung aktualisieren",
       "linesBadge": "{{displayCount}} Zeilen",
@@ -2039,7 +2041,21 @@
       "thought": "Gedankengang",
       "showDetails": "Details anzeigen",
       "pending": "Ausstehend…",
-      "running": "Wird ausgeführt…"
+      "running": "Wird ausgeführt…",
+      "field": {
+        "filePath": "Dateipfad",
+        "path": "Pfad",
+        "offset": "Startzeile",
+        "limit": "Maximalanzahl",
+        "pattern": "Muster",
+        "include": "Dateifilter",
+        "patchText": "Änderungstext",
+        "query": "Suchanfrage",
+        "prompt": "Anweisung",
+        "header": "Überschrift",
+        "question": "Frage",
+        "options": "Optionen"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Der Inhalt konnte nicht angezeigt werden."
@@ -2055,7 +2071,7 @@
       "assistantContextOverflow": "Die Unterhaltung ist zu lang für das Modell.",
       "assistantProviderError": "Der Anbieter hat einen Fehler zurückgegeben.",
       "assistantProviderRefused": "Der Anbieter hat diese Anfrage abgelehnt; ein erneuter Versuch ist nicht möglich.",
-      "assistantCreditsRefusal": "Dein Guthaben reicht nicht aus, um Cloud Agent auszuführen.",
+      "assistantCreditsRefusal": "Dein Guthaben reicht für diese Anfrage nicht aus.",
       "assistantOutputLimit": "Die Antwort hat das Ausgabelimit des Modells erreicht.",
       "assistantStructuredOutput": "Die Antwort entsprach nicht dem erforderlichen Format.",
       "assistantFailed": "Die Antwort konnte nicht erstellt werden."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Mein Agent",
       "promptPlaceholder": "Du bist ein...",
       "tools": "Werkzeuge",
+      "wholeToolRule": "Dieser Agent wendet eine Regel gleichzeitig auf jedes Werkzeug an: {{rule}}. Diese Schalter sind schreibgeschützt.",
       "visibility": "Sichtweite",
       "visibilityPrimary": "Primär — wird im Picker angezeigt",
       "visibilitySubagent": "Subagent — nur von anderen aufrufbar",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Standardprofile für Repos",
+      "entryLabel": "Standardprofile",
       "add": "Standard hinzufügen",
       "empty": "Keine Standardeinstellungen konfiguriert",
       "emptyDescription": "Füge einen Standard hinzu, um beim Starten von Sitzungen für ein Repo automatisch ein Profil anzuwenden.",

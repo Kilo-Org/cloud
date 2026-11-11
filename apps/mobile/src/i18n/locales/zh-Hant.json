@@ -1777,7 +1777,7 @@
       "cloningSession": "複製工作階段中",
       "couldNotLoadThisSession": "無法載入此工作階段。",
       "cloneFailedRetry": "無法複製此工作階段。請再試一次。",
-      "notEnoughCredits": "點數不足，無法執行 Cloud Agent。請加值後再試一次。",
+      "notEnoughCredits": "點數不足，無法執行此請求。請加值後再試一次。",
       "previousTaskFinishing": "上一個任務仍在收尾。請稍候。",
       "serviceUnavailable": "服務目前無法使用。請再試一次。",
       "connectionTrouble": "連線發生問題。請稍後再試一次。",
@@ -1939,6 +1939,8 @@
       "toolList": "列出",
       "toolPatch": "套用修補",
       "toolTask": "任務",
+      "toolSendFile": "已傳送檔案",
+      "toolSendFileAction": "傳送檔案",
       "readTodos": "讀取計畫",
       "updateTodos": "更新計畫",
       "linesBadge": "{{displayCount}} 行",
@@ -2039,7 +2041,21 @@
       "thought": "思考內容",
       "showDetails": "顯示詳細資料",
       "pending": "待處理…",
-      "running": "執行中…"
+      "running": "執行中…",
+      "field": {
+        "filePath": "檔案路徑",
+        "path": "路徑",
+        "offset": "偏移",
+        "limit": "上限",
+        "pattern": "模式",
+        "include": "包含",
+        "patchText": "修補文字",
+        "query": "查詢",
+        "prompt": "提示詞",
+        "header": "標題",
+        "question": "問題",
+        "options": "選項"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "無法顯示內容。"
@@ -2055,7 +2071,7 @@
       "assistantContextOverflow": "對話長度超出模型可處理的範圍。",
       "assistantProviderError": "供應商傳回錯誤。",
       "assistantProviderRefused": "供應商拒絕了此請求，且無法重試。",
-      "assistantCreditsRefusal": "點數不足，無法執行 Cloud Agent。",
+      "assistantCreditsRefusal": "點數不足，無法執行此請求。",
       "assistantOutputLimit": "回覆已達到模型的輸出上限。",
       "assistantStructuredOutput": "回覆與所需格式不符。",
       "assistantFailed": "回覆失敗。"
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "我的代理",
       "promptPlaceholder": "你是一個...",
       "tools": "工具",
+      "wholeToolRule": "此代理會一次將一條規則套用到所有工具：{{rule}}。這些開關為唯讀。",
       "visibility": "可見性",
       "visibilityPrimary": "主要 — 顯示在選擇器中",
       "visibilitySubagent": "子代理程式 — 只能從其他人調用",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "倉庫的預設設定檔",
+      "entryLabel": "預設設定檔",
       "add": "新增預設值",
       "empty": "沒有配置預設值",
       "emptyDescription": "新增預設值以在啟動儲存庫會話時自動套用設定檔。",

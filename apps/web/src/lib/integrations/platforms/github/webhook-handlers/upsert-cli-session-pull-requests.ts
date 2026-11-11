@@ -1,7 +1,11 @@
 import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { cli_sessions_v2, github_branch_pull_requests } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  cloud_agent_worktrees,
+  github_branch_pull_requests,
+} from '@kilocode/db/schema';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
@@ -222,15 +226,46 @@ export async function markSessionsVerifyingPullRequest(
 }
 
 /**
+ * Whether a live Cloud Agent workspace in the tenant has this repository and
+ * branch checked out. Such a workspace's pull request is any PR on that branch:
+ * every chat in it shares one checkout, so the branch identifies the workspace's
+ * work without any chat reporting the PR.
+ */
+export async function hasCloudAgentWorkspaceOnBranch(
+  branch: { gitUrl: string; headRef: string },
+  owner: WebhookInstallationOwner
+): Promise<boolean> {
+  const [row] = await db
+    .select({ worktree_id: cloud_agent_worktrees.worktree_id })
+    .from(cloud_agent_worktrees)
+    .where(
+      and(
+        eq(cloud_agent_worktrees.git_url, branch.gitUrl),
+        eq(cloud_agent_worktrees.git_branch, branch.headRef),
+        isNull(cloud_agent_worktrees.deletion_started_at),
+        owner.kind === 'organization'
+          ? eq(cloud_agent_worktrees.organization_id, owner.organizationId)
+          : and(
+              isNull(cloud_agent_worktrees.organization_id),
+              eq(cloud_agent_worktrees.kilo_user_id, owner.userId)
+            )
+      )
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
+/**
  * Side-effect: when a pull_request webhook arrives for one of the tracked
  * actions, a session that verifiably links the PR is marked verified and the
  * `github_branch_pull_requests` state/review cache row is upserted keyed on PR
  * identity `(normalized git_url, PR number, tenant)`.
  *
- * The cache is never the source of the link: it only carries the state and
- * review decision for a PR a session already verifiably links. A branch name
- * is not identity — a reused branch name opened by someone else must never
- * populate or overwrite the row.
+ * The row is written when a session verifiably links the PR, or when a Cloud
+ * Agent workspace in the tenant has the PR's repository and branch checked out
+ * (see `hasCloudAgentWorkspaceOnBranch`). Outside Cloud Agent workspaces a
+ * branch name is not identity — a reused branch name opened by someone else
+ * must never populate or overwrite the row.
  *
  * The review decision is NOT fetched here. Instead `review_decision_pending` is
  * flipped to `true` for actions that can affect it (opened, reopened,
@@ -289,8 +324,11 @@ export async function upsertCliSessionPullRequestsFromWebhook(
       },
       owner
     );
-    if (gateResult.kind === 'no_session') {
-      logExceptInTest('pull_request upsert: no session verifiably links this PR, skipping', {
+    if (
+      gateResult.kind === 'no_session' &&
+      !(await hasCloudAgentWorkspaceOnBranch({ gitUrl, headRef: branch }, owner))
+    ) {
+      logExceptInTest('pull_request upsert: no session or workspace links this PR, skipping', {
         action,
         pr_number: pull_request.number,
         repo: repository.full_name,

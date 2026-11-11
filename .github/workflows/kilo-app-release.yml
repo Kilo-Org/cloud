@@ -274,10 +274,12 @@ jobs:
   # check-changes found a suite run for this exact commit, and it publishes
   # whether that run settled the validation: `passed`, or `fallback` for any
   # other end. Only a passed run is reused, so no store submission precedes a
-  # passing suite. A run a later push cancels through that workflow's
-  # cancel-in-progress group carries no verdict about this commit, so it falls
-  # back to the in-workflow suite instead of failing the release: a merge burst
-  # must not fail a release whose suite never ran to completion.
+  # passing suite. A cancelled run carries no verdict about this commit, so it
+  # falls back to the in-workflow suite instead of failing the release: a merge
+  # burst must not fail a release whose suite never ran to completion. The mobile
+  # workflow cancels only a superseded pull request run, so the cancellations
+  # that remain are a run a maintainer stopped and a pending run that a third
+  # push dropped before it started.
   reuse:
     name: Reuse the same-commit suite run
     needs: [check-changes]
@@ -341,9 +343,9 @@ jobs:
           echo "The suite runs in this workflow instead."
 
   # The in-workflow suite runs when the lookup found no run to reuse, and when
-  # the run the gate waited for ended without a pass — a failure, or a run a
-  # later push cancelled. A skipped need would skip this job, and a bare `!`
-  # starts a YAML tag, so the status function is explicit.
+  # the run the gate waited for ended without a pass — a failure, or a
+  # cancellation, which carries no verdict. A skipped need would skip this job,
+  # and a bare `!` starts a YAML tag, so the status function is explicit.
   validate:
     needs: [check-changes, reuse]
     if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && (needs.check-changes.outputs.reuse == 'false' || needs.reuse.outputs.suite == 'fallback') && github.repository == 'Kilo-Org/cloud' }}

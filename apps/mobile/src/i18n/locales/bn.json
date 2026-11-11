@@ -2321,7 +2321,7 @@
       "cloningSession": "সেশন ক্লোন হচ্ছে",
       "couldNotLoadThisSession": "এই সেশনটি লোড করা যায়নি।",
       "cloneFailedRetry": "এই সেশনটি ক্লোন করা যায়নি। আবার চেষ্টা করুন।",
-      "notEnoughCredits": "Cloud Agent চালানোর জন্য পর্যাপ্ত ক্রেডিট নেই। ক্রেডিট যোগ করে আবার চেষ্টা করুন।",
+      "notEnoughCredits": "এই অনুরোধের জন্য পর্যাপ্ত ক্রেডিট নেই। ক্রেডিট যোগ করে আবার চেষ্টা করুন।",
       "previousTaskFinishing": "আগের কাজটি শেষ হতে আরও কিছু সময় লাগছে। একটু অপেক্ষা করুন।",
       "serviceUnavailable": "সেবাটি এখন পাওয়া যাচ্ছে না। আবার চেষ্টা করুন।",
       "connectionTrouble": "সংযোগে সমস্যা হয়েছে। কিছুক্ষণ পরে আবার চেষ্টা করুন।",
@@ -2483,6 +2483,8 @@
       "toolList": "তালিকা দেখা",
       "toolPatch": "পরিবর্তন প্রয়োগ",
       "toolTask": "কাজ",
+      "toolSendFile": "ফাইল পাঠানো হয়েছে",
+      "toolSendFileAction": "ফাইল পাঠান",
       "readTodos": "প্ল্যান পড়ুন",
       "updateTodos": "প্ল্যান আপডেট করুন",
       "linesBadge": "{{displayCount}}টি লাইন",
@@ -2583,7 +2585,21 @@
       "thought": "চিন্তাভাবনা",
       "showDetails": "বিস্তারিত দেখান",
       "pending": "অপেক্ষমাণ…",
-      "running": "চলছে…"
+      "running": "চলছে…",
+      "field": {
+        "filePath": "ফাইল পাথ",
+        "path": "পাথ",
+        "offset": "অফসেট",
+        "limit": "সীমা",
+        "pattern": "প্যাটার্ন",
+        "include": "অন্তর্ভুক্তি",
+        "patchText": "প্যাচ পাঠ্য",
+        "query": "অনুসন্ধান",
+        "prompt": "নির্দেশনা",
+        "header": "শিরোনাম",
+        "question": "প্রশ্ন",
+        "options": "বিকল্প"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "বিষয়বস্তু দেখানো যায়নি।"
@@ -2599,7 +2615,7 @@
       "assistantContextOverflow": "কথোপকথনটি মডেলের জন্য খুব দীর্ঘ।",
       "assistantProviderError": "প্রোভাইডার একটি ত্রুটি ফেরত দিয়েছে।",
       "assistantProviderRefused": "প্রোভাইডার এই অনুরোধটি প্রত্যাখ্যান করেছে এবং এটি আবার চেষ্টা করা যাবে না।",
-      "assistantCreditsRefusal": "Cloud Agent চালানোর জন্য পর্যাপ্ত ক্রেডিট নেই।",
+      "assistantCreditsRefusal": "এই অনুরোধের জন্য পর্যাপ্ত ক্রেডিট নেই।",
       "assistantOutputLimit": "উত্তরটি মডেলের সর্বোচ্চ আউটপুট সীমায় পৌঁছেছে।",
       "assistantStructuredOutput": "উত্তরটি প্রয়োজনীয় ফরম্যাটের সঙ্গে মেলেনি।",
       "assistantFailed": "উত্তর তৈরি করা যায়নি।"
@@ -4018,6 +4034,7 @@
       "namePlaceholder": "আমার এজেন্ট",
       "promptPlaceholder": "আপনি একটি...",
       "tools": "টুলস",
+      "wholeToolRule": "এই এজেন্ট একবারে প্রতিটি টুলে একটি নিয়ম প্রয়োগ করে: {{rule}}। এই সুইচগুলো শুধুমাত্র পাঠযোগ্য।",
       "visibility": "দৃশ্যমানতা",
       "visibilityPrimary": "প্রাথমিক — পিকারে দেখানো হয়েছে",
       "visibilitySubagent": "Subagent — শুধুমাত্র অন্যদের থেকে কলযোগ্য",
@@ -4059,6 +4076,7 @@
     },
     "repoBindings": {
       "title": "Repos এর জন্য ডিফল্ট প্রোফাইল",
+      "entryLabel": "ডিফল্ট প্রোফাইল",
       "add": "ডিফল্ট যোগ করুন",
       "empty": "কোন ডিফল্ট কনফিগার করা",
       "emptyDescription": "একটি রেপোর জন্য সেশন শুরু করার সময় স্বয়ংক্রিয়ভাবে একটি প্রোফাইল প্রয়োগ করতে একটি ডিফল্ট যোগ করুন।",

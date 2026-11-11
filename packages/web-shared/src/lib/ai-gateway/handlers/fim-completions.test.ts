@@ -12,7 +12,10 @@ import type {
   MicrodollarUsageStats,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   decide,
   releaseDecideLease,
@@ -32,6 +35,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
+  emitGatewayApiMetrics: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
@@ -188,7 +192,9 @@ describe('POST /api/fim/completions', () => {
 
   it('bills the Inception model when using the system key', async () => {
     setOrganizationAuth();
-    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+    const upstreamResponse = makeUpstreamResponse();
+    const cloneSpy = jest.spyOn(upstreamResponse, 'clone');
+    mockedFetch.mockResolvedValue(upstreamResponse);
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
     const response = await handleFimCompletionsRequest(makeRequest() as never);
@@ -222,8 +228,26 @@ describe('POST /api/fim/completions', () => {
         ttfbMs: expect.any(Number),
         statusCode: 200,
       },
-      expect.any(Response),
+      expect.any(Promise),
       expect.any(Number)
+    );
+    expect(cloneSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits gateway metrics for a bodyless upstream response without cloning it', async () => {
+    setOrganizationAuth();
+    const upstreamResponse = new Response(null, { status: 200 });
+    const cloneSpy = jest.spyOn(upstreamResponse, 'clone');
+    mockedFetch.mockResolvedValue(upstreamResponse);
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+    expect(response.status).toBe(500);
+    expect(cloneSpy).not.toHaveBeenCalled();
+    expect(emitApiMetricsForResponse).not.toHaveBeenCalled();
+    expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 200, completeRequestMs: expect.any(Number) })
     );
   });
 
@@ -282,7 +306,7 @@ describe('POST /api/fim/completions', () => {
       );
       expect(emitApiMetricsForResponse).toHaveBeenCalledWith(
         expect.objectContaining({ statusCode: 402, userByok: false }),
-        expect.any(Response),
+        expect.any(Promise),
         expect.any(Number)
       );
     }

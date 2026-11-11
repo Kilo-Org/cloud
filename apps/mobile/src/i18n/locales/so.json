@@ -2315,7 +2315,7 @@
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",
       "cloneFailedRetry": "Kalfadhigan nuqul lagama samayn karin. Mar kale isku day.",
-      "notEnoughCredits": "Lacagta isticmaalka kuma filna socodsiinta Cloud Agent. Lacag ku dar oo mar kale isku day.",
+      "notEnoughCredits": "Lacagta isticmaalka kuma filna codsigan. Lacag ku dar oo mar kale isku day.",
       "previousTaskFinishing": "Hawshii hore weli waa la dhammaystirayaa. Fadlan wax yar sug.",
       "serviceUnavailable": "Adeegga hadda lama heli karo. Fadlan mar kale isku day.",
       "connectionTrouble": "Xiriirka ayaa cilad leh. Fadlan wax yar ka dib mar kale isku day.",
@@ -2477,6 +2477,8 @@
       "toolList": "tax",
       "toolPatch": "wax ka beddel",
       "toolTask": "hawsha",
+      "toolSendFile": "Fayl la diray",
+      "toolSendFileAction": "dir",
       "readTodos": "Akhri qorshaha",
       "updateTodos": "Cusboonaysii qorshaha",
       "linesBadge": "{{displayCount}} sadar",
@@ -2577,7 +2579,21 @@
       "thought": "Fikrad",
       "showDetails": "Muuji faahfaahinta",
       "pending": "Waa la sugayaa…",
-      "running": "Way socotaa…"
+      "running": "Way socotaa…",
+      "field": {
+        "filePath": "Wadada faylka",
+        "path": "Wadada",
+        "offset": "Bilowga",
+        "limit": "Xadka",
+        "pattern": "Qaabka",
+        "include": "Ku darid",
+        "patchText": "Qoraalka hagaajinta",
+        "query": "Raadin",
+        "prompt": "Tilmaam",
+        "header": "Cinwaan",
+        "question": "Su'aal",
+        "options": "Xulashooyin"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nuxurka lama soo bandhigi karin."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Wadahadalku aad buu ugu dheer yahay moodeelka.",
       "assistantProviderError": "Bixiyaha ayaa cillad ku soo celiyay.",
       "assistantProviderRefused": "Bixiyaha ayaa diiday codsigan, dibna looma dayi karo.",
-      "assistantCreditsRefusal": "Lacagta isticmaalka kuma filna socodsiinta Cloud Agent.",
+      "assistantCreditsRefusal": "Lacagta isticmaalka kuma filna codsigan.",
       "assistantOutputLimit": "Jawaabtu waxay gaartay xadka wax-soo-saarka moodeelka.",
       "assistantStructuredOutput": "Jawaabtu ma ahayn qaabka loo baahnaa.",
       "assistantFailed": "Jawaabtu way fashilantay."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Wakiilkayga",
       "promptPlaceholder": "Waxaad tahay...",
       "tools": "Qalabka",
+      "wholeToolRule": "Wakiilkan waxa uu hal xeer isku mar ku dabaqaa qalab kasta: {{rule}}. Beddelladan waa akhris-kaliya.",
       "visibility": "Muuqashada",
       "visibilityPrimary": "Aasaasiga ah — oo lagu muujiyay dooriyaha",
       "visibilitySubagent": "Subagent — kaliya kuwa kale looga yeeri karo",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Profile-ka ugu tala galay Repos",
+      "entryLabel": "Profile-ka ugu tala galay",
       "add": "Kudar default",
       "empty": "Ma jiro wax khalad ah oo la habeeyey",
       "emptyDescription": "Ku dar default si toos ah u codso profile marka la bilaabayo fadhiyada repo.",

@@ -2315,7 +2315,7 @@
       "cloningSession": "Kloner session",
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
       "cloneFailedRetry": "Kunne ikke klone denne session. Prøv igen.",
-      "notEnoughCredits": "Du har ikke nok kreditter til at køre Cloud Agent. Tilføj kreditter og prøv igen.",
+      "notEnoughCredits": "Du har ikke nok kreditter til denne anmodning. Tilføj kreditter og prøv igen.",
       "previousTaskFinishing": "Den forrige opgave er ved at blive afsluttet. Vent et øjeblik.",
       "serviceUnavailable": "Tjenesten er ikke tilgængelig lige nu. Prøv igen.",
       "connectionTrouble": "Der er problemer med forbindelsen. Prøv igen om et øjeblik.",
@@ -2477,6 +2477,8 @@
       "toolList": "vis liste",
       "toolPatch": "anvend rettelse",
       "toolTask": "opgave",
+      "toolSendFile": "Sendt fil",
+      "toolSendFileAction": "Send fil",
       "readTodos": "Læs planen",
       "updateTodos": "Opdatér planen",
       "linesBadge": "{{displayCount}} linjer",
@@ -2577,7 +2579,21 @@
       "thought": "Ræsonnement",
       "showDetails": "Vis oplysninger",
       "pending": "Afventer…",
-      "running": "Kører…"
+      "running": "Kører…",
+      "field": {
+        "filePath": "Filsti",
+        "path": "Sti",
+        "offset": "Offset",
+        "limit": "Grænse",
+        "pattern": "Mønster",
+        "include": "Medtag",
+        "patchText": "Rettelsestekst",
+        "query": "Forespørgsel",
+        "prompt": "Instruktion",
+        "header": "Overskrift",
+        "question": "Spørgsmål",
+        "options": "Valgmuligheder"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Kunne ikke vise indholdet."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Samtalen er for lang til modellen.",
       "assistantProviderError": "Udbyderen returnerede en fejl.",
       "assistantProviderRefused": "Udbyderen afviste denne anmodning, og den kan ikke forsøges igen.",
-      "assistantCreditsRefusal": "Du har ikke nok kreditter til at køre Cloud Agent.",
+      "assistantCreditsRefusal": "Du har ikke nok kreditter til denne anmodning.",
       "assistantOutputLimit": "Svaret nåede modellens outputgrænse.",
       "assistantStructuredOutput": "Svaret matchede ikke det påkrævede format.",
       "assistantFailed": "Svaret kunne ikke genereres."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Min agent",
       "promptPlaceholder": "Du er en...",
       "tools": "Værktøjer",
+      "wholeToolRule": "Denne agent anvender én regel på alle værktøjer på én gang: {{rule}}. Disse kontakter er skrivebeskyttede.",
       "visibility": "Sigtbarhed",
       "visibilityPrimary": "Primær — vist i vælgeren",
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler for Repos",
+      "entryLabel": "Standardprofiler",
       "add": "Tilføj standard",
       "empty": "Ingen standardindstillinger konfigureret",
       "emptyDescription": "Tilføj en standard for automatisk at anvende en profil, når du starter sessioner for en repo.",

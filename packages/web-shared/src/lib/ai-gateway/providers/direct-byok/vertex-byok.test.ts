@@ -237,18 +237,27 @@ describe('vertexByok definition', () => {
     });
   });
 
-  it('drops mismatched Claude thinking blocks', () => {
+  it.each([
+    {
+      model: 'vertex-byok/claude-sonnet-5-5',
+      upstreamModel: 'claude-sonnet-5-5',
+    },
+    {
+      model: 'vertex-byok/claude-sonnet-latest',
+      upstreamModel: 'claude-sonnet-latest',
+    },
+  ])('drops mismatched Claude thinking blocks for $model', ({ model, upstreamModel }) => {
     const context = createContext(
       {
         kind: 'messages',
         body: {
-          model: 'claude-sonnet-5-5',
+          model: upstreamModel,
           messages: [],
           max_tokens: 10,
           thinking: { type: 'adaptive' },
         },
       },
-      'vertex-byok/claude-sonnet-5-5'
+      model
     );
 
     vertexByok.transformRequest(context);

@@ -1,4 +1,4 @@
-import { preinstalledStartup } from '../../src/sandbox-control/preinstalled-startup.js';
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
 import {
   env,
   evictAllDurableObjects,
@@ -48,10 +48,7 @@ import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { logger } from '../../src/logger.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
-import {
-  createFakeCredentialBroker,
-  installFakeCredentialEnv,
-} from './helpers/fake-credentials.js';
+import { createFakeCredentialBroker, installFakeSandboxEnv } from './helpers/fake-credentials.js';
 import { FakeSessionPeer, createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
@@ -490,7 +487,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     );
   });
   it.each([
-    { provider: 'cloudflare' },
+    { provider: 'vercel' },
     { provider: 'cloudflare-containers' },
     { provider: 'cloudflare-containers', instance: 'standard-3' },
     { provider: 'cloudflare-containers', instance: 'standard-4' },
@@ -2471,7 +2468,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     });
     const stub = await startAllocation(provider, {
       preparingRoute: 'workspace_cold_retry',
-      timers: { providerCreateRetryMs: 1 },
+      timers: { providerCreateRetryMs: MINUTE },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const firstAttempt = launchIdentity(provider);
@@ -2482,6 +2479,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       expect(state.allocationId).not.toBe(firstAttempt.allocationId);
       expect(state.providerRef).toBeNull();
     });
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
     await runAlarm(stub);
     // A transient launch failure must retain the retry: a second attempt starts.
     await waitFor(() => expect(provider.createCalls).toBe(2));
@@ -2527,7 +2525,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     }));
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
+      installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
         WORKER_URL: 'https://worker.example.com',
         KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com',
         KILO_OPENROUTER_BASE: 'https://gateway.example.com/api',
@@ -2654,7 +2652,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     await configureEgressSandbox(provider);
     const stub = await startAllocation(provider, {
       sandboxId,
-      provider: 'cloudflare',
+      provider: 'vercel',
       egressMode: 'unrestricted',
     });
     await awaitStarting(provider, stub);
@@ -2722,7 +2720,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
           instanceId: 'reconstructed-allocation',
         });
         await reconstructed.provider.launch(ref, {
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           env: {},
         });
       });
@@ -3107,7 +3105,7 @@ describe('SandboxControlV2 prepare frame secrets', () => {
     }));
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
+      installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
         AGENT_ENV_VARS_PRIVATE_KEY: privateKey,
       });
       Object.assign(instance, {
@@ -3472,6 +3470,7 @@ describe('SandboxControlV2 previewTarget', () => {
   it('resolves a connected container preview by workspace scope across absent, failed and preparing routes', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
     await connectAndHello(provider, stub);
 
     // A sibling route proves the workspace scope; the viewed chat has no route.
@@ -3505,6 +3504,7 @@ describe('SandboxControlV2 previewTarget', () => {
   it('denies a foreign owner, organization or workspace and reports stopped or missing refs', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
     await connectAndHello(provider, stub);
     await seedPreviewRoutes(stub, [
       {

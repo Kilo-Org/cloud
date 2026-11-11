@@ -2321,7 +2321,7 @@
       "cloningSession": "Iseshini iyakopishwa",
       "couldNotLoadThisSession": "Asikwazanga ukulayisha le seshini.",
       "cloneFailedRetry": "Asikwazanga ukwenza ikhophi yale seshini. Zama futhi.",
-      "notEnoughCredits": "Awekho amakhredithi anele okusebenzisa i-Cloud Agent. Engeza amakhredithi bese uzama futhi.",
+      "notEnoughCredits": "Awekho amakhredithi anele kulesi sicelo. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaphethwa. Sicela ulinde isikhashana.",
       "serviceUnavailable": "Isevisi ayitholakali njengamanje. Sicela uzame futhi.",
       "connectionTrouble": "Kunenkinga yokuxhumana. Sicela uzame futhi ngemva kwesikhashana.",
@@ -2483,6 +2483,8 @@
       "toolList": "bhala uhlu",
       "toolPatch": "lungisa",
       "toolTask": "umsebenzi",
+      "toolSendFile": "Kuthunyelwe ifayela",
+      "toolSendFileAction": "Thumela ifayela",
       "readTodos": "Funda uhlelo",
       "updateTodos": "Buyekeza uhlelo",
       "linesBadge": "imigqa engu-{{displayCount}}",
@@ -2583,7 +2585,21 @@
       "thought": "Umcabango",
       "showDetails": "Bonisa imininingwane",
       "pending": "Iyalinda…",
-      "running": "Iyasebenza…"
+      "running": "Iyasebenza…",
+      "field": {
+        "filePath": "Indlela yefayela",
+        "path": "Indlela",
+        "offset": "Isiqalo",
+        "limit": "Umkhawulo",
+        "pattern": "Iphethini",
+        "include": "Okufakiwe",
+        "patchText": "Umbhalo wesichibiyelo",
+        "query": "Umbuzo wokusesha",
+        "prompt": "Umyalelo",
+        "header": "Isihloko",
+        "question": "Umbuzo",
+        "options": "Izinketho"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Asikwazanga ukubonisa okuqukethwe."
@@ -2599,7 +2615,7 @@
       "assistantContextOverflow": "Ingxoxo iyinde kakhulu kumodeli.",
       "assistantProviderError": "Umhlinzeki ubuyise iphutha.",
       "assistantProviderRefused": "Umhlinzeki wenqabe lesi sicelo futhi asikwazi ukuphinda sizanywe.",
-      "assistantCreditsRefusal": "Awekho amakhredithi anele okusebenzisa i-Cloud Agent.",
+      "assistantCreditsRefusal": "Awekho amakhredithi anele kulesi sicelo.",
       "assistantOutputLimit": "Impendulo ifinyelele emkhawuleni wokukhipha womodeli.",
       "assistantStructuredOutput": "Impendulo ayihambisani nomumo odingekile.",
       "assistantFailed": "Impendulo yehlulekile."
@@ -4018,6 +4034,7 @@
       "namePlaceholder": "Umenzeli wami",
       "promptPlaceholder": "Uyi...",
       "tools": "Amathuluzi",
+      "wholeToolRule": "Le ejenti isebenzisa umthetho owodwa kwithuluzi ngalinye ngasikhathi sinye: {{rule}}. Lawa maswishi afundwa kuphela.",
       "visibility": "Ukubonakala",
       "visibilityPrimary": "Okuyinhloko — kukhonjiswe kusikhi",
       "visibilitySubagent": "I-Subagent — itholakala kuphela kwabanye",
@@ -4058,7 +4075,8 @@
       "duplicateName": "Umyalo onaleli gama isivele ukhona kuleli phrofayili"
     },
     "repoBindings": {
-      "title": "Amaphrofayili Azenzakalelayo we-Repos",
+      "title": "Amaphrofayili azenzakalelayo we-Repos",
+      "entryLabel": "Amaphrofayili azenzakalelayo",
       "add": "Engeza okuzenzakalelayo",
       "empty": "Akukho okumisiwe okumisiwe",
       "emptyDescription": "Engeza okuzenzakalelayo ukuze usebenzise ngokuzenzakalelayo iphrofayela lapho uqala izikhathi ze-repo.",

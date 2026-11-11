@@ -921,15 +921,13 @@ describe('reportNetworkError', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]?.fingerprint).toEqual(['network-error', 'fetch', 'a.b', 'failed']);
-    // Every repeat still explains the next real event.
-    expect(breadcrumbs).toHaveLength(2);
-    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
-      'POST /api/trpc/a.b failed',
-      'POST /api/trpc/a.b failed',
-    ]);
+    // The first repeat explains the next real event; a later one adds nothing,
+    // so a polling loop cannot flush the breadcrumb trail.
+    expect(breadcrumbs).toHaveLength(1);
     expect(breadcrumbs[0]).toMatchObject({
       category: 'network',
       level: 'warning',
+      message: 'POST /api/trpc/a.b failed',
       data: { 'error.source': 'fetch', 'network.outcome': 'failed', durationMs: 3 },
     });
   });
@@ -980,7 +978,7 @@ describe('reportNetworkError', () => {
     expect(breadcrumbs).toHaveLength(2);
   });
 
-  it('bounds the claim set and keeps filing a new endpoint past the cap', () => {
+  it('bounds the claim set and refreshes a fingerprint that keeps failing', () => {
     const report = (index: number) => {
       reportNetworkError({
         source: 'fetch',
@@ -988,29 +986,30 @@ describe('reportNetworkError', () => {
         durationMs: 2,
       });
     };
+    const filedFor = (index: number) =>
+      events.filter(event => event.fingerprint?.[2] === `/v1/files/${String(index)}`).length;
 
-    // A dynamic path segment forces one fingerprint per object id; the set
-    // remembers the newest 200.
-    for (let index = 0; index <= 200; index += 1) {
+    // A dynamic path segment forces one fingerprint per object id; the map
+    // remembers the 200 most recently reported.
+    for (let index = 0; index < 200; index += 1) {
       report(index);
     }
+    expect(events).toHaveLength(200);
 
-    expect(events).toHaveLength(201);
-    expect(events.at(-1)?.fingerprint).toEqual([
-      'network-error',
-      'fetch',
-      '/v1/files/200',
-      'failed',
-    ]);
-
-    // A remembered fingerprint stays claimed.
+    // The still-failing fingerprint is refreshed, so the next new path releases
+    // another one instead of it.
+    report(0);
     report(200);
+    report(0);
+
     expect(events).toHaveLength(201);
+    expect(filedFor(0)).toBe(1);
     expect(breadcrumbs).toHaveLength(1);
 
-    // The oldest claim was released, so the set cannot grow without limit.
-    report(0);
+    // A released fingerprint files once more instead of the map growing.
+    report(1);
     expect(events).toHaveLength(202);
+    expect(events.at(-1)?.fingerprint).toEqual(['network-error', 'fetch', '/v1/files/1', 'failed']);
   });
 
   it('synthesizes a failure message without a status', () => {

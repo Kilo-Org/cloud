@@ -285,19 +285,30 @@ function isAccountError(error: UpstreamStreamError): boolean {
 }
 
 /**
- * The usage-context fields that an error report may carry. Pick narrows the
- * return type, so a new context field is not attached by default.
+ * The longest model name that an error report keeps. The requested model comes
+ * from the client request, so a report bounds it instead of trusting its length.
  */
-export function usageContextReportFields(
-  usageContext: MicrodollarUsageContext
-): Pick<
+export const REPORTED_MODEL_MAX_LENGTH = 200;
+
+/**
+ * The usage-context fields that an error report may carry. Pick narrows the
+ * return type, so a new context field is not attached by default. The report
+ * must not throw, so a missing requested model becomes null.
+ */
+export function usageContextReportFields(usageContext: MicrodollarUsageContext): Pick<
   MicrodollarUsageContext,
-  'provider' | 'api_kind' | 'requested_model' | 'status_code' | 'isStreaming'
-> {
+  'provider' | 'api_kind' | 'status_code' | 'isStreaming'
+> & {
+  requested_model: string | null;
+} {
+  const requestedModel: unknown = usageContext.requested_model;
   return {
     provider: usageContext.provider,
     api_kind: usageContext.api_kind,
-    requested_model: usageContext.requested_model,
+    requested_model:
+      typeof requestedModel === 'string'
+        ? requestedModel.slice(0, REPORTED_MODEL_MAX_LENGTH)
+        : null,
     status_code: usageContext.status_code,
     isStreaming: usageContext.isStreaming,
   };

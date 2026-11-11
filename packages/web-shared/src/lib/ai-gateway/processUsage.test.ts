@@ -914,6 +914,21 @@ describe('usage accounting error reports', () => {
       });
       expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain('zzq-');
     });
+
+    test('bounds the reported requested model', async () => {
+      const model = 'm'.repeat(5000);
+
+      await processTokenData(null, makeContext({ requested_model: model }));
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        'SUSPICIOUS: No usage information',
+        expect.objectContaining({
+          extra: {
+            usageContext: expect.objectContaining({ requested_model: 'm'.repeat(200) }),
+          },
+        })
+      );
+    });
   });
 
   describe('stream and response parsing reports', () => {

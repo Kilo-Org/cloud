@@ -95,6 +95,7 @@ import {
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
+  REPORTED_MODEL_MAX_LENGTH,
   reportUpstreamStreamError,
   readResponseText,
   streamEventReportFields,
@@ -119,9 +120,6 @@ import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo
 
 const posthogClient = PostHogClient();
 
-/** The longest requested-model string that a prompt-extraction report keeps. */
-const PROMPT_EXTRACTION_MODEL_MAX_LENGTH = 200;
-
 /**
  * The only request field a prompt-extraction failure reports. The body is
  * untrusted here, because a malformed one is what threw, so the model is read
@@ -132,9 +130,7 @@ function promptExtractionReportFields(body: unknown) {
     return {};
   }
   const { model } = body;
-  return typeof model === 'string'
-    ? { model: model.slice(0, PROMPT_EXTRACTION_MODEL_MAX_LENGTH) }
-    : {};
+  return typeof model === 'string' ? { model: model.slice(0, REPORTED_MODEL_MAX_LENGTH) } : {};
 }
 
 export function extractPromptInfo(body: OpenRouterChatCompletionRequest): PromptInfo {

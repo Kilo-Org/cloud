@@ -16,6 +16,7 @@ import {
   extractVercelUpstreamId,
   reportUpstreamStreamError,
   selectUsageCostFields,
+  streamEventReportFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -153,7 +154,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-        extra: { event },
+        extra: streamEventReportFields(event),
       });
       return;
     }

@@ -798,6 +798,176 @@ describe('extractPromptInfo approval tests', () => {
   });
 });
 
+describe('usage accounting error reports', () => {
+  beforeEach(() => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  describe('extractPromptInfo failure', () => {
+    test('reports the requested model', () => {
+      extractPromptInfo(JSON.parse('{"messages":"not-a-message-list","model":"openai/gpt-4o"}'));
+
+      const [error, options] = jest.mocked(captureException).mock.calls[0];
+      expect(error).toBeInstanceOf(TypeError);
+      expect(options).toEqual({
+        level: 'warning',
+        tags: { source: 'prompt_extraction' },
+        extra: { model: 'openai/gpt-4o' },
+      });
+      expect(JSON.stringify(options)).not.toContain('not-a-message-list');
+    });
+
+    test('reports no request field when the body carries no string model', () => {
+      extractPromptInfo(JSON.parse('{"messages":"not-a-message-list","model":{"nested":true}}'));
+
+      const [error, options] = jest.mocked(captureException).mock.calls[0];
+      expect(error).toBeInstanceOf(TypeError);
+      expect(options).toEqual({
+        level: 'warning',
+        tags: { source: 'prompt_extraction' },
+        extra: {},
+      });
+      expect(JSON.stringify(options)).not.toContain('not-a-message-list');
+    });
+
+    test('bounds the reported model length', () => {
+      const model = 'm'.repeat(5000);
+      extractPromptInfo(JSON.parse(`{"messages":"not-a-message-list","model":"${model}"}`));
+
+      const [, options] = jest.mocked(captureException).mock.calls[0];
+      expect(options).toMatchObject({ extra: { model: 'm'.repeat(200) } });
+    });
+  });
+
+  describe('processTokenData without usage statistics', () => {
+    const contextSentinel = {
+      system_prompt_prefix: 'zzq-system-prefix',
+      user_prompt_prefix: 'zzq-user-prefix',
+      email: 'zzq-account@example.com',
+      machine_id: 'zzq-machine',
+      session_id: 'zzq-session',
+      client_request_id: 'zzq-request',
+      organization_id: 'zzq-organization',
+    };
+
+    const makeContext = (
+      overrides: Partial<MicrodollarUsageContext> = {}
+    ): MicrodollarUsageContext => ({
+      api_kind: 'chat_completions',
+      kiloUserId: 'report-user',
+      provider: 'openrouter',
+      requested_model: 'anthropic/claude-3.7-sonnet',
+      promptInfo: {
+        system_prompt_prefix: contextSentinel.system_prompt_prefix,
+        system_prompt_length: contextSentinel.system_prompt_prefix.length,
+        user_prompt_prefix: contextSentinel.user_prompt_prefix,
+      },
+      fraudHeaders: getFraudDetectionHeaders(
+        new Headers({ 'user-agent': 'zzq-agent', 'x-forwarded-for': '203.0.113.7' })
+      ),
+      posthog_distinct_id: contextSentinel.email,
+      machine_id: contextSentinel.machine_id,
+      session_id: contextSentinel.session_id,
+      clientRequestId: contextSentinel.client_request_id,
+      project_id: null,
+      max_tokens: 200,
+      has_middle_out_transform: null,
+      isStreaming: true,
+      prior_microdollar_usage: 0,
+      status_code: 200,
+      editor_name: null,
+      user_byok: false,
+      is_free: false,
+      has_tools: true,
+      feature: null,
+      mode: null,
+      auto_model: null,
+      reasoning_setting: null,
+      inference_region: null,
+      ttfb_ms: null,
+      custom_llm_pricing: null,
+      organizationId: undefined,
+      ...overrides,
+    });
+
+    test.each([
+      { name: 'a personal request', organization_id: undefined },
+      { name: 'an organization request', organization_id: contextSentinel.organization_id },
+    ])('reports only operational context fields for $name', async ({ organization_id }) => {
+      expect(
+        await processTokenData(null, makeContext({ organizationId: organization_id }))
+      ).toBeNull();
+
+      expect(captureMessage).toHaveBeenCalledWith('SUSPICIOUS: No usage information', {
+        level: 'error',
+        tags: { source: 'usage_processing' },
+        extra: {
+          usageContext: {
+            provider: 'openrouter',
+            api_kind: 'chat_completions',
+            requested_model: 'anthropic/claude-3.7-sonnet',
+            status_code: 200,
+            isStreaming: true,
+          },
+        },
+      });
+      expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain('zzq-');
+    });
+  });
+
+  describe('stream and response parsing reports', () => {
+    test('reports a non-JSON stream event without its payload', async () => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode('event: response.output_text.delta\ndata: null\n\n')
+          );
+          controller.close();
+        },
+      });
+
+      await parseMicrodollarUsageFromStream(
+        stream,
+        'report-user',
+        undefined,
+        'openrouter',
+        200,
+        false
+      );
+
+      const [error, options] = jest.mocked(captureException).mock.calls[0];
+      expect(error).toMatchObject({ message: 'SUSPICIOUS: No JSON in SSE event' });
+      expect(options).toEqual({
+        extra: { event_type: 'response.output_text.delta', data_length: 4 },
+      });
+    });
+
+    test('reports a missing BYOK status without the upstream response', () => {
+      const upstream = JSON.stringify({
+        id: 'zzq-message',
+        model: 'anthropic/claude-3.7-sonnet',
+        choices: [{ message: { role: 'assistant', content: 'zzq-model-output' } }],
+        usage: { cost: 0.001 },
+      });
+
+      parseMicrodollarUsageFromString(upstream, 'report-user', 200, 'openrouter');
+
+      expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
+        tags: { source: 'string_processing' },
+        extra: {
+          provider: 'openrouter',
+          model: 'anthropic/claude-3.7-sonnet',
+          status_code: 200,
+        },
+      });
+      expect(JSON.stringify(jest.mocked(captureException).mock.calls)).not.toContain(
+        'zzq-model-output'
+      );
+    });
+  });
+});
+
 describe('mapToUsageStats approval tests', () => {
   const claudeSonnetGeneration = 'claude-3-7-sonnet-generation.log.generation.json';
   test(claudeSonnetGeneration, async () => {

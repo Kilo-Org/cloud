@@ -17,6 +17,7 @@ import {
   extractVercelUpstreamId,
   reportUpstreamStreamError,
   selectUsageCostFields,
+  streamEventReportFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
@@ -130,7 +131,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-        extra: { event },
+        extra: streamEventReportFields(event),
       });
       return;
     }

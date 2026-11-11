@@ -732,6 +732,42 @@ describe('countAndStoreFimUsage', () => {
     );
   });
 
+  it('reports a non-stream FIM response without usage with operational fields only', async () => {
+    jest.mocked(captureMessage).mockClear();
+    jest.mocked(captureException).mockClear();
+    countAndStoreFimUsage(
+      new Response('{"model":"mercury-edit-2","choices":[]}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+      makeUsageContext({
+        promptInfo: {
+          system_prompt_prefix: 'zzq-system-prefix',
+          system_prompt_length: 0,
+          user_prompt_prefix: 'zzq-user-prefix',
+        },
+        posthog_distinct_id: 'zzq-account@example.com',
+      }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(captureMessage).toHaveBeenCalledWith('SUSPICIOUS: No FIM usage information', {
+      level: 'error',
+      tags: { source: 'fim_usage_processing' },
+      extra: {
+        usageContext: {
+          provider: 'inception',
+          api_kind: 'fim_completions',
+          requested_model: 'inception/mercury-edit-2',
+          status_code: 200,
+          isStreaming: false,
+        },
+      },
+    });
+    expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain('zzq-');
+  });
+
   describe('response timing', () => {
     let clockSpy: ReturnType<typeof clock.install>;
 

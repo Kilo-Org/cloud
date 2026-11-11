@@ -55,6 +55,7 @@ import {
   providerReportsIsByok,
   readResponseText,
   reportUpstreamStreamError,
+  usageContextReportFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -1272,7 +1273,7 @@ export function countAndStoreFimUsage(
           captureMessage('SUSPICIOUS: No FIM usage information', {
             level: 'error',
             tags: { source: 'fim_usage_processing' },
-            extra: { usageContext },
+            extra: { usageContext: usageContextReportFields(usageContext) },
           });
         }
         return;
@@ -1415,7 +1416,7 @@ export function countAndStoreEditUsage(
           captureMessage('SUSPICIOUS: No edit usage information', {
             level: 'error',
             tags: { source: 'edit_usage_processing' },
-            extra: { usageContext },
+            extra: { usageContext: usageContextReportFields(usageContext) },
           });
         }
         return;
@@ -1636,7 +1637,7 @@ export function countAndStoreEmbeddingUsage(
           captureMessage('SUSPICIOUS: No embedding usage information', {
             level: 'error',
             tags: { source: 'embedding_usage_processing' },
-            extra: { usageContext },
+            extra: { usageContext: usageContextReportFields(usageContext) },
           });
         }
         return;
@@ -1685,7 +1686,7 @@ export function countAndStoreTranscriptionUsage(
           captureMessage('SUSPICIOUS: No transcription usage information', {
             level: 'error',
             tags: { source: 'transcription_usage_processing' },
-            extra: { usageContext },
+            extra: { usageContext: usageContextReportFields(usageContext) },
           });
         }
         return;

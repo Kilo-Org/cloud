@@ -7,6 +7,7 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gat
 import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
+  MicrodollarUsageContext,
   NotYetCostedUsageStats,
   VercelProviderAttempt,
   VercelProviderMetaData,
@@ -281,6 +282,34 @@ function isAccountError(error: UpstreamStreamError): boolean {
     ACCOUNT_ERROR_TYPES.has(error.error_type) ||
     ACCOUNT_ERROR_TYPES.has(error.metadata?.error_type)
   );
+}
+
+/**
+ * The usage-context fields that an error report may carry. Pick narrows the
+ * return type, so a new context field is not attached by default.
+ */
+export function usageContextReportFields(
+  usageContext: MicrodollarUsageContext
+): Pick<
+  MicrodollarUsageContext,
+  'provider' | 'api_kind' | 'requested_model' | 'status_code' | 'isStreaming'
+> {
+  return {
+    provider: usageContext.provider,
+    api_kind: usageContext.api_kind,
+    requested_model: usageContext.requested_model,
+    status_code: usageContext.status_code,
+    isStreaming: usageContext.isStreaming,
+  };
+}
+
+/**
+ * The stream-event fields that an error report may carry. `data` is the upstream
+ * payload, which can repeat model output, so only the event name and the payload
+ * length are reported.
+ */
+export function streamEventReportFields(event: EventSourceMessage) {
+  return { event_type: event.event ?? null, data_length: event.data.length };
 }
 
 /**

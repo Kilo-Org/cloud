@@ -97,6 +97,8 @@ import {
   isResponseInterruptedError,
   reportUpstreamStreamError,
   readResponseText,
+  streamEventReportFields,
+  usageContextReportFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
@@ -116,6 +118,24 @@ import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usa
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 const posthogClient = PostHogClient();
+
+/** The longest requested-model string that a prompt-extraction report keeps. */
+const PROMPT_EXTRACTION_MODEL_MAX_LENGTH = 200;
+
+/**
+ * The only request field a prompt-extraction failure reports. The body is
+ * untrusted here, because a malformed one is what threw, so the model is read
+ * through a runtime type check and its length is bounded.
+ */
+function promptExtractionReportFields(body: unknown) {
+  if (typeof body !== 'object' || body === null || !('model' in body)) {
+    return {};
+  }
+  const { model } = body;
+  return typeof model === 'string'
+    ? { model: model.slice(0, PROMPT_EXTRACTION_MODEL_MAX_LENGTH) }
+    : {};
+}
 
 export function extractPromptInfo(body: OpenRouterChatCompletionRequest): PromptInfo {
   try {
@@ -142,7 +162,7 @@ export function extractPromptInfo(body: OpenRouterChatCompletionRequest): Prompt
     captureException(e, {
       level: 'warning',
       tags: { source: 'prompt_extraction' },
-      extra: { body },
+      extra: promptExtractionReportFields(body),
     });
     return { system_prompt_prefix: '', system_prompt_length: -1, user_prompt_prefix: '' };
   }
@@ -1445,7 +1465,7 @@ export async function parseMicrodollarUsageFromStream(
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-        extra: { event },
+        extra: streamEventReportFields(event),
       });
       return;
     }
@@ -1551,7 +1571,7 @@ export function parseMicrodollarUsageFromString(
   ) {
     captureException(new Error('SUSPICIOUS: is_byok is null'), {
       tags: { source: 'string_processing' },
-      extra: { responseJson },
+      extra: { provider, model: responseJson?.model ?? null, status_code: statusCode },
     });
   }
   const finish_reason = choice?.finish_reason ?? null;
@@ -1597,7 +1617,7 @@ export async function processTokenData(
     captureMessage('SUSPICIOUS: No usage information', {
       level: 'error',
       tags: { source: 'usage_processing' },
-      extra: { usageContext },
+      extra: { usageContext: usageContextReportFields(usageContext) },
     });
     return null;
   }

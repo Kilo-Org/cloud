@@ -187,13 +187,22 @@ describe('French PR-review labels and the names announced for them', () => {
     expect(i18n.t('prReview.merge.mergeTitle')).not.toBe(action);
     // The merge screen and the section button both consume the helper, so the
     // split has to hold there. Only the merge-request arm words its action as a
-    // bare verb; the other two name the object inside the action.
-    for (const platform of ['github', 'gitlab'] as const) {
-      const titles = providerPrMergeTitles(i18n.getFixedT('fr'), platform);
-      if (platform === 'gitlab') {
-        expect(titles.action).toBe(action);
-        expect(titles.title).toBe(i18n.t('prReview.merge.mergeTitle'));
-      }
-    }
+    // bare verb and takes the heading from the merge noun. GitHub names the
+    // pull request inside its action, and Bitbucket fills both fields from the
+    // term template, so on those two the heading may read as the action.
+    const fixed = i18n.getFixedT('fr');
+    const gitlab = providerPrMergeTitles(fixed, 'gitlab');
+    expect(gitlab.action).toBe(action);
+    expect(gitlab.title).toBe(i18n.t('prReview.merge.mergeTitle'));
+
+    const github = providerPrMergeTitles(fixed, 'github');
+    expect(github.action).toBe(pullRequestAction);
+    expect(github.title).toBe(pullRequestAction);
+
+    const bitbucket = providerPrMergeTitles(fixed, 'bitbucket');
+    expect(bitbucket.action).toBe(
+      i18n.t('prReview.merge.mergeTermTitle', { term: i18n.t('common.pullRequest') })
+    );
+    expect(bitbucket.title).toBe(bitbucket.action);
   });
 });

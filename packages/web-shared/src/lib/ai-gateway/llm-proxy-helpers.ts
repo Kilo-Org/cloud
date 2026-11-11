@@ -579,29 +579,18 @@ export function claudeBillingUnavailableResponse(message: string, retryable = fa
   );
 }
 
-export function modelDoesNotExistOnOpenRouterResponse(model: string) {
+export function unknownModelResponse(model: string) {
   const error =
     `The requested model '${model}' does not exist. ` +
     `Please use an exact model id as listed on /api/gateway/models. ` +
     `If this is a newly released model, please try again in a few minutes.`;
-  errorExceptInTest(`[modelDoesNotExistOnOpenRouterResponse] ${error}`);
+  errorExceptInTest(`[unknownModelResponse] ${error}`);
   return NextResponse.json(
     {
       error,
       error_type: ProxyErrorType.model_not_found,
       message: error,
     },
-    { status: 404 }
-  );
-}
-
-export function vercelOnlyModelUnavailableResponse(model: string) {
-  const error =
-    `The requested model '${model}' is only available through Vercel AI Gateway, which cannot ` +
-    `serve this request: Vercel routing is off, or the request's provider settings or cost ` +
-    `limit rule it out. Please choose a different model.`;
-  return NextResponse.json(
-    { error, error_type: ProxyErrorType.unavailable_model, message: error },
     { status: 404 }
   );
 }

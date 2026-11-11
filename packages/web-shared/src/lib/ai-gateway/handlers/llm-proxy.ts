@@ -24,14 +24,12 @@ import {
   paidModelAuthRequiredResponse,
   anonymousFreeModelLimitResponse,
   accountFreeModelLimitResponse,
-  modelDoesNotExistOnOpenRouterResponse,
-  vercelOnlyModelUnavailableResponse,
+  unknownModelResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { isVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { type BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { logUnrewrittenResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
@@ -499,10 +497,8 @@ export async function handleLlmProxyRequest(
           }
         : undefined,
   });
-  if (attempt.type === 'invalid-openrouter-model') {
-    return (await isVercelModel(effectiveModelIdLowerCased))
-      ? vercelOnlyModelUnavailableResponse(effectiveModelIdLowerCased)
-      : modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  if (attempt.type === 'unknown-gateway-model') {
+    return unknownModelResponse(effectiveModelIdLowerCased);
   }
   if (attempt.type === 'error') return attempt.response;
 

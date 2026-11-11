@@ -344,6 +344,13 @@ const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedGetVercelModels = jest.mocked(getVercelModelsFromDatabase);
+
+/** Like the OpenRouter catalog stub, Vercel's list accepts every model unless a test narrows it. */
+const everyVercelModel = { has: () => true } as unknown as ReadonlySet<string>;
+
+beforeEach(() => {
+  mockedGetVercelModels.mockResolvedValue(everyVercelModel);
+});
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 function usageAccountingResult(
@@ -2260,25 +2267,6 @@ describe('POST /api/v1/chat/completions request handling', () => {
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     }
   );
-
-  it('explains that a Vercel-only model cannot take an OpenRouter route', async () => {
-    mockedIsValidOpenRouterModelId.mockResolvedValue(false);
-    mockedGetVercelModels.mockResolvedValue(new Set(['alibaba/qwen3.5-flash']));
-
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('qwen/qwen3.5-flash')) as never
-    );
-
-    expect(response.status).toBe(404);
-    expect(await response.json()).toMatchObject({
-      error_type: 'unavailable_model',
-      message: expect.stringContaining(
-        "The requested model 'qwen/qwen3.5-flash' is only available through Vercel AI Gateway"
-      ),
-    });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
 
   it.each([
     'google/gemma-4-26b-a4b-it:free',

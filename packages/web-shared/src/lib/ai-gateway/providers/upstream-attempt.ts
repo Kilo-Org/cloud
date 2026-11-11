@@ -62,7 +62,7 @@ type SendUpstreamAttemptInput = {
 };
 
 type SendUpstreamAttemptResult =
-  | { type: 'invalid-openrouter-model' }
+  | { type: 'unknown-gateway-model' }
   | { type: 'error'; response: NextResponse }
   | {
       type: 'success';
@@ -72,6 +72,18 @@ type SendUpstreamAttemptResult =
     };
 
 /** Sends one upstream attempt and mutates the request with provider-specific transforms. */
+/** Whether the request's gateway lists the model. Other providers are not checked. */
+async function gatewayServesModel(provider: Provider, requestedModel: string) {
+  switch (provider.type) {
+    case 'openrouter':
+      return isValidOpenRouterModelId(requestedModel);
+    case 'vercel':
+      return isVercelModel(requestedModel);
+    default:
+      return true;
+  }
+}
+
 export async function sendUpstreamAttempt({
   providerContext,
   requestedModel,
@@ -125,14 +137,10 @@ export async function sendUpstreamAttempt({
   }
 
   if (
-    (providerContext.provider.type === 'openrouter' ||
-      providerContext.provider.type === 'vercel') &&
     !isAutoSmallFreeModel(requestedModel) &&
-    !(await isValidOpenRouterModelId(requestedModel)) &&
-    // Models only Vercel serves are listed under ids that OpenRouter does not know.
-    !(providerContext.provider.type === 'vercel' && (await isVercelModel(requestedModel)))
+    !(await gatewayServesModel(providerContext.provider, requestedModel))
   ) {
-    return { type: 'invalid-openrouter-model' };
+    return { type: 'unknown-gateway-model' };
   }
 
   const result = await upstreamRequest({

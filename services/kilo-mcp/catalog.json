@@ -6418,6 +6418,43 @@
     ],
     "searchBlob": "cloudAgentNext.createWorktreeChat Create a new chat session backed by a git worktree for a cloud agent. cloudagentnext createworktreechat sourcekilosessionid operationkey kilosessionid sourceKiloSessionId operationKey kiloSessionId"
   },
+  "cloudAgentNext.deleteWorkspaceArtifact": {
+    "path": "cloudAgentNext.deleteWorkspaceArtifact",
+    "kind": "mutation",
+    "summary": "Delete a file saved in a Cloud Agent workspace's /artifacts directory, using its relative path and current content hash to avoid removing a changed version. Reports deleted, absent, or hash mismatch plus the new artifact revision.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "relativePath",
+        "expectedHash"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "deleteworkspaceartifact",
+      "cloudagentsessionid",
+      "relativepath",
+      "expectedhash"
+    ],
+    "searchBlob": "cloudAgentNext.deleteWorkspaceArtifact Delete a file saved in a Cloud Agent workspace's /artifacts directory, using its relative path and current content hash to avoid removing a changed version. Reports deleted, absent, or hash mismatch plus the new artifact revision. cloudagentnext deleteworkspaceartifact cloudagentsessionid relativepath expectedhash cloudAgentSessionId relativePath expectedHash"
+  },
   "cloudAgentNext.getAttachmentDownloadUrl": {
     "path": "cloudAgentNext.getAttachmentDownloadUrl",
     "kind": "mutation",
@@ -6813,6 +6850,37 @@
     ],
     "searchBlob": "cloudAgentNext.getStackedWorkspaceSource Look up an existing workspace's branch, repository, and PR details so it can be used as the parent for creating a stacked workspace. Returns read-only source info, including whether the branch has been pushed and which provider/integration it belongs to. cloudagentnext getstackedworkspacesource worktreeid worktreeId"
   },
+  "cloudAgentNext.getWorkspaceArtifactDownloadUrl": {
+    "path": "cloudAgentNext.getWorkspaceArtifactDownloadUrl",
+    "kind": "query",
+    "summary": "Get a short-lived download link for a file saved in a Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "relativePath"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "getworkspaceartifactdownloadurl",
+      "cloudagentsessionid",
+      "relativepath"
+    ],
+    "searchBlob": "cloudAgentNext.getWorkspaceArtifactDownloadUrl Get a short-lived download link for a file saved in a Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing. cloudagentnext getworkspaceartifactdownloadurl cloudagentsessionid relativepath cloudAgentSessionId relativePath"
+  },
   "cloudAgentNext.getWorkspaceSnapshotRecovery": {
     "path": "cloudAgentNext.getWorkspaceSnapshotRecovery",
     "kind": "query",
@@ -7120,6 +7188,31 @@
       "repository"
     ],
     "searchBlob": "cloudAgentNext.listRepositoryBranches Lists a repository's branches and its default branch for the new-session flow in personal context; GitHub and GitLab use the caller's own connection, and Bitbucket reports the explicit organization-only unavailable state. cloudagentnext listrepositorybranches platform repository platform repository"
+  },
+  "cloudAgentNext.listWorkspaceArtifacts": {
+    "path": "cloudAgentNext.listWorkspaceArtifacts",
+    "kind": "query",
+    "summary": "List the files saved from a Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "listworkspaceartifacts",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.listWorkspaceArtifacts List the files saved from a Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry. cloudagentnext listworkspaceartifacts cloudagentsessionid cloudAgentSessionId"
   },
   "cloudAgentNext.prepareSession": {
     "path": "cloudAgentNext.prepareSession",
@@ -18272,6 +18365,68 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.createWorktreeChat Create a worktree-based chat from an existing cloud agent session. Use to branch a session into a new worktree. organizations cloudagentnext createworktreechat organizationid sourcekilosessionid operationkey kilosessionid organizationId sourceKiloSessionId operationKey kiloSessionId"
   },
+  "organizations.cloudAgentNext.deleteWorkspaceArtifact": {
+    "path": "organizations.cloudAgentNext.deleteWorkspaceArtifact",
+    "kind": "mutation",
+    "summary": "Delete a file saved in an organization Cloud Agent workspace's /artifacts directory, using its relative path and current content hash to avoid removing a changed version. Reports deleted, absent, or hash mismatch plus the new artifact revision.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "relativePath": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "relativePath",
+            "expectedHash",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "deleteworkspaceartifact",
+      "organizationid",
+      "cloudagentsessionid",
+      "relativepath",
+      "expectedhash"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.deleteWorkspaceArtifact Delete a file saved in an organization Cloud Agent workspace's /artifacts directory, using its relative path and current content hash to avoid removing a changed version. Reports deleted, absent, or hash mismatch plus the new artifact revision. organizations cloudagentnext deleteworkspaceartifact organizationid cloudagentsessionid relativepath expectedhash organizationId cloudAgentSessionId relativePath expectedHash"
+  },
   "organizations.cloudAgentNext.getAttachmentUploadUrl": {
     "path": "organizations.cloudAgentNext.getAttachmentUploadUrl",
     "kind": "mutation",
@@ -18686,6 +18841,62 @@
       "worktreeid"
     ],
     "searchBlob": "organizations.cloudAgentNext.getStackedWorkspaceSource Look up an existing workspace to stack a new workspace on top of it, returning its repository, branch, pull request number, and whether its branch has been pushed. Use this to preview the parent source before starting a stacked Cloud Agent session. organizations cloudagentnext getstackedworkspacesource organizationid worktreeid organizationId worktreeId"
+  },
+  "organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl": {
+    "path": "organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl",
+    "kind": "query",
+    "summary": "Get a short-lived download link for a file saved in an organization Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "relativePath": {
+              "type": "string",
+              "minLength": 1
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "relativePath",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getworkspaceartifactdownloadurl",
+      "organizationid",
+      "cloudagentsessionid",
+      "relativepath"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getWorkspaceArtifactDownloadUrl Get a short-lived download link for a file saved in an organization Cloud Agent workspace's /artifacts directory. Pass the relative path from the artifact listing. organizations cloudagentnext getworkspaceartifactdownloadurl organizationid cloudagentsessionid relativepath organizationId cloudAgentSessionId relativePath"
   },
   "organizations.cloudAgentNext.getWorkspaceSnapshotRecovery": {
     "path": "organizations.cloudAgentNext.getWorkspaceSnapshotRecovery",
@@ -19236,6 +19447,56 @@
       "repository"
     ],
     "searchBlob": "organizations.cloudAgentNext.listRepositoryBranches Lists a repository's branches and its default branch for the new-session flow in organization context, using the organization's connected GitHub, GitLab, or Bitbucket integration. organizations cloudagentnext listrepositorybranches organizationid platform repository organizationId platform repository"
+  },
+  "organizations.cloudAgentNext.listWorkspaceArtifacts": {
+    "path": "organizations.cloudAgentNext.listWorkspaceArtifacts",
+    "kind": "query",
+    "summary": "List the files saved from an organization Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "listworkspaceartifacts",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.listWorkspaceArtifacts List the files saved from an organization Cloud Agent workspace's /artifacts directory, shared by sibling chats and retained after the sandbox stops. Returns the artifact revision and each file's path, size, content type, and expiry. organizations cloudagentnext listworkspaceartifacts organizationid cloudagentsessionid organizationId cloudAgentSessionId"
   },
   "organizations.cloudAgentNext.prepareSession": {
     "path": "organizations.cloudAgentNext.prepareSession",

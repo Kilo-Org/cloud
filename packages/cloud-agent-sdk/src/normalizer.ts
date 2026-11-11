@@ -15,6 +15,7 @@ import type {
 } from './types';
 import {
   cloudWorktreeChangesReadyDataSchema,
+  cloudWorkspaceArtifactsChangedDataSchema,
   isValidCloudAgentEvent,
   projectSessionGoal,
   kilocodePayloadSchema,
@@ -217,6 +218,7 @@ export type ServiceEvent =
       catalogStatus?: SlashCommandCatalogStatus | undefined;
     }
   | { type: 'worktree.changes.ready'; cloudSessionId: string; revision: number }
+  | { type: 'workspace.artifacts.changed'; cloudSessionId: string; revision: number }
   | {
       type: 'cloud.message.queued';
       messageId: string;
@@ -722,6 +724,16 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
     if (!r.success) return null;
     return {
       type: 'worktree.changes.ready',
+      cloudSessionId: raw.sessionId,
+      revision: r.data.revision,
+    };
+  }
+
+  if (raw.streamEventType === 'cloud.workspace.artifacts.changed') {
+    const r = cloudWorkspaceArtifactsChangedDataSchema.safeParse(raw.data);
+    if (!r.success) return null;
+    return {
+      type: 'workspace.artifacts.changed',
       cloudSessionId: raw.sessionId,
       revision: r.data.revision,
     };

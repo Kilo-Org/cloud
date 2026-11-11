@@ -1,7 +1,6 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
-  CONTROL_LOG_ARCHIVE_NAME,
   CONTROL_LOG_MAX_ARCHIVE_BYTES,
   controlUploadFailureStartsEpisode,
   type ControlDiagnosticProjector,
@@ -12,6 +11,11 @@ import {
 import { createTarStream, type TarArchiveEntry } from '../log-uploader.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
 import { defaultHomeRoots } from '../control-plane/workspace-home.js';
+import {
+  createSandboxTransferClient,
+  sandboxTransferArchivePath,
+  type SandboxTransferClient,
+} from './sandbox-transfer-client.js';
 
 export type ControlFileLogUploader = {
   start: (intervalMs?: number) => void;
@@ -23,6 +27,8 @@ export type ControlFileLogUploader = {
 type Options = {
   uploadUrl?: string;
   uploadGrant?: string;
+  client?: SandboxTransferClient;
+  logPathPrefix?: string;
   wrapperLogPath?: string;
   /** Roots whose `<home>/.local/share/kilo/log` directories are archived. */
   homeRoots?: readonly string[];
@@ -156,7 +162,19 @@ async function collectArchive(
 
 export function createControlFileLogUploader(options: Options): ControlFileLogUploader {
   type Upload = { promise: Promise<void>; abort: AbortController };
-  const upload = options.fetch ?? fetch;
+  const client =
+    options.client ??
+    (options.uploadUrl && options.uploadGrant
+      ? createSandboxTransferClient({
+          baseUrl: options.uploadUrl,
+          grant: options.uploadGrant,
+          fetch: options.fetch,
+          attempts: 1,
+          timeoutMs: options.uploadTimeoutMs ?? UPLOAD_TIMEOUT_MS,
+        })
+      : undefined);
+  const logPathPrefix = options.logPathPrefix ?? (options.client ? 'logs' : '');
+  const archivePath = sandboxTransferArchivePath(logPathPrefix);
   const wrapperLogPath = options.wrapperLogPath ?? DEFAULT_WRAPPER_LOG_PATH;
   const homeRoots = options.homeRoots ?? defaultControlHomeRoots();
   let intervalId: ReturnType<typeof setInterval> | undefined;
@@ -202,11 +220,7 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
     if (finalUpload) return finalUpload;
     if (stopped) return Promise.resolve();
     if (queuedUpload) return queuedUpload.promise;
-    const uploadUrl = options.uploadUrl;
-    const uploadGrant = options.uploadGrant;
-    if (!uploadUrl || !uploadGrant) return Promise.resolve();
-    const archiveUrl = `${uploadUrl.replace(/\/$/, '')}/${CONTROL_LOG_ARCHIVE_NAME}`;
-    const authorization = `Bearer ${uploadGrant}`;
+    if (!client) return Promise.resolve();
 
     const previousUpload = activeUpload;
     const abort = new AbortController();
@@ -216,6 +230,7 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
     return next.promise;
 
     async function performUpload(): Promise<void> {
+      if (!client) return;
       try {
         await withTimeoutAndAbort(
           (async () => {
@@ -241,25 +256,25 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
 
             const payload = new ArrayBuffer(body.byteLength);
             new Uint8Array(payload).set(body);
-            const response = await upload(archiveUrl, {
-              method: 'PUT',
-              headers: {
-                Authorization: authorization,
-                'Content-Type': 'application/gzip',
-                'Content-Length': String(payload.byteLength),
-              },
+            const result = await client.put(archivePath, {
               body: payload,
-              redirect: 'error',
+              contentLength: payload.byteLength,
+              contentType: 'application/gzip',
               signal: abort.signal,
             });
-            if (!abort.signal.aborted && response.status !== 204) {
-              logToFile(`Control file log upload failed: ${response.status}`);
-              reportFailure('http_rejection', response.status);
-            } else if (!abort.signal.aborted) {
+            if (abort.signal.aborted) {
+              return;
+            }
+            if (result.status === 'ok' && result.statusCode === 204) {
               // A 204 accepts the archive: the next failure starts a new episode.
               lastFailureSample = undefined;
+            } else if (result.status === 'rejected' || result.status === 'ok') {
+              logToFile(`Control file log upload failed: ${result.statusCode}`);
+              reportFailure('http_rejection', result.statusCode);
+            } else {
+              logToFile('Control file log upload did not complete');
+              reportFailure(result.reason === 'timeout' ? 'timeout' : 'network_failure');
             }
-            void response.body?.cancel().catch(() => undefined);
           })(),
           {
             timeoutMs: options.uploadTimeoutMs ?? UPLOAD_TIMEOUT_MS,
@@ -292,7 +307,7 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
     stop();
     stopped = false;
     finalUpload = undefined;
-    if (!options.uploadUrl || !options.uploadGrant) return;
+    if (!client) return;
     void uploadNow();
     intervalId = setInterval(() => {
       if (!activeUpload && !queuedUpload) void uploadNow();

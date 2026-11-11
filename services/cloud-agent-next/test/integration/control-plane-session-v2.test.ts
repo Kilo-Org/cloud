@@ -1446,6 +1446,37 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
+  it('persists and broadcasts each workspace artifact revision once', async () => {
+    const { sessionId, stub } = await setup();
+    const stream = await connectStream(sessionId);
+    await waitForStreamEvent(stream, 'connected');
+
+    await stub.onWorkspaceArtifactsChanged({ revision: 3 });
+    await stub.onWorkspaceArtifactsChanged({ revision: 3 });
+    await stub.onWorkspaceArtifactsChanged({ revision: 4 });
+    await runInDurableObject(stub, async instance => {
+      await expect(instance.onWorkspaceArtifactsChanged({ revision: 0 })).rejects.toThrow();
+    });
+
+    const messages = (await drainStream(stream)).filter(
+      message => message.streamEventType === 'cloud.workspace.artifacts.changed'
+    );
+    expect(messages.map(message => message.data)).toEqual([{ revision: 3 }, { revision: 4 }]);
+
+    const rows = await runInDurableObject(stub, (_instance, state) =>
+      drizzle(state.storage)
+        .select()
+        .from(events)
+        .where(eq(events.stream_event_type, 'cloud.workspace.artifacts.changed'))
+        .all()
+    );
+    expect(rows.map(row => ({ entityId: row.entity_id, payload: row.payload }))).toEqual([
+      { entityId: 'workspace-artifacts/3', payload: '{"revision":3}' },
+      { entityId: 'workspace-artifacts/4', payload: '{"revision":4}' },
+    ]);
+    stream.close();
+  });
+
   it('renders the wrapper setup-command lifecycle as per-command preparing steps', async () => {
     const { sessionId, stub, peer } = await setup();
     const stream = await connectStream(sessionId);

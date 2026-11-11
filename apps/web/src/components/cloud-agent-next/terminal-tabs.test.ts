@@ -123,7 +123,17 @@ jest.mock('@tanstack/react-query', () => ({
   queryOptions: (options: unknown) => options,
   useMutation: () => ({ mutateAsync: jest.fn() }),
   useQuery: (options: { queryKey: unknown[] }) => {
-    if ((options.queryKey[0] as unknown[] | undefined)?.[0] === 'getWorkspaceSnapshotRecovery') {
+    const queryScope = options.queryKey[0];
+    if (typeof queryScope === 'string' && queryScope.startsWith('workspace-artifacts')) {
+      return {
+        data: undefined,
+        refetch: jest.fn(),
+        isPending: false,
+        isError: false,
+        isFetching: false,
+      };
+    }
+    if ((queryScope as unknown[] | undefined)?.[0] === 'getWorkspaceSnapshotRecovery') {
       return { data: undefined };
     }
     mockParentQuery(options);

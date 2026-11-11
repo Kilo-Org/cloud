@@ -18,6 +18,7 @@ import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
 import { WorktreeChangesButton } from './WorktreeChanges';
+import { WorkspaceArtifactsButton } from './WorkspaceArtifacts';
 import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
 import { SandboxStatusIndicator } from './SandboxStatusIndicator';
 import { StackedWorkspaceActions } from './StackedWorkspaceActions';
@@ -77,6 +78,8 @@ type ChatHeaderProps = {
   onToggleSound?: () => void;
   changesOpen?: boolean;
   onToggleChanges?: (event: MouseEvent<HTMLButtonElement>) => void;
+  artifactsOpen?: boolean;
+  onToggleArtifacts?: (event: MouseEvent<HTMLButtonElement>) => void;
   sessionTitle?: string;
   sessionActive: boolean;
   sandboxStatusEligible?: boolean;
@@ -108,6 +111,8 @@ export function ChatHeader({
   onToggleSound,
   changesOpen = false,
   onToggleChanges,
+  artifactsOpen = false,
+  onToggleArtifacts,
   kiloSessionId,
   organizationId,
   sessionTitle,
@@ -223,6 +228,16 @@ export function ChatHeader({
             worktreeId={worktreeId}
             open={changesOpen}
             onToggle={onToggleChanges}
+          />
+        )}
+        {onToggleArtifacts && (
+          <WorkspaceArtifactsButton
+            key={`workspace-artifacts:${currentUserId}:${organizationId ?? 'personal'}:${worktreeId ?? changesCloudAgentSessionId}`}
+            userId={currentUserId}
+            cloudAgentSessionId={changesCloudAgentSessionId}
+            organizationId={organizationId}
+            open={artifactsOpen}
+            onToggle={onToggleArtifacts}
           />
         )}
         {sandboxStatusEligible && (

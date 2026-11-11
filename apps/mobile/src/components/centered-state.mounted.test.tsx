@@ -484,6 +484,9 @@ describe('CenteredState first-frame paint', () => {
       bounds: null,
     };
     const returning = await mount();
+    // The first paint is the remembered one; settling measures the same band, so
+    // an implementation that ignored the memory would still match afterwards.
+    expect(returning.scroll().contentContainerStyle).toEqual(placed);
     returning.settle();
     expect(returning.scroll().contentContainerStyle).toEqual(placed);
     returning.unmount();

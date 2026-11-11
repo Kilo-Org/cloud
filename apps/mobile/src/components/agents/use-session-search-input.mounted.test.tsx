@@ -77,10 +77,13 @@ vi.mock('@/lib/persist/use-draft-flush', () => ({ useDraftFlushOnBackground: () 
 
 type HookState = UseSessionSearchInputResult;
 const latest = { current: null as HookState | null };
+/** Every render's body-driving values, in commit order. */
+const renders: { restorePending: boolean; searchQuery: string }[] = [];
 
 function Probe(props: UseSessionSearchInputParams): ReactElement {
   const state = useSessionSearchInput(props);
   latest.current = state;
+  renders.push({ restorePending: state.restorePending, searchQuery: state.searchQuery });
   return createElement(SessionListSearchHeader, {
     inputRef: state.searchInputRef,
     hasText: state.hasText,
@@ -122,6 +125,7 @@ describe('useSessionSearchInput visible text', () => {
     input.focused = true;
     input.mounts.length = 0;
     latest.current = null;
+    renders.length = 0;
   });
   afterEach(() => {
     act(() => {
@@ -207,14 +211,17 @@ describe('useSessionSearchInput visible text', () => {
     expect(hook().restorePending).toBe(true);
     expect(hook().searchQuery).toBe('');
 
-    // The draft settles. The seed lands in the render after this one, so this
-    // render still carries an empty query: a list body that read the query here
-    // would paint the no-query state and replace it one frame later.
+    // The draft settles. The seed lands in the render after this one, so that
+    // render still carries an empty query and a pending restore: a list body
+    // that read the query there would paint the no-query state and replace it
+    // one frame later.
+    renders.length = 0;
     act(() => {
       renderer.update(
         createElement(Probe, { userId: 'u1', restoredQuery: 'Zebra', restoreSettled: true })
       );
     });
+    expect(renders).toContainEqual({ restorePending: true, searchQuery: '' });
     expect(hook().restorePending).toBe(false);
     expect(hook().searchQuery).toBe('Zebra');
     expect(hook().hasText).toBe(true);

@@ -52,7 +52,7 @@ export function BodyEmpty({
   }
   if (kind === 'query-error-empty') {
     return (
-      <CenteredState refreshControl={refreshControl}>
+      <CenteredState refreshControl={refreshControl} stateKey={stateKey}>
         <View className="items-center gap-4">
           <QueryError
             placement="top"

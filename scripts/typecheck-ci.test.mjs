@@ -870,22 +870,26 @@ test('kilo-app CI installs the closure the declaration action needs', () => {
   }
 });
 
-// Both harness SDK producers run the same action and no other step that reads
-// a workspace, so both install the same closure. The package has no workspace
-// dependency; the root project supplies the `tsgo` binary the action's key
-// script runs, so it stays in the filter.
+// Every job that produces the harness SDK runs only steps that read this
+// package or the root project, so all of them install the same closure. The
+// package has no workspace dependency; the root project supplies the `tsgo`
+// binary the action's key script runs, so it stays in the filter.
 const harnessProducerInstall =
   "pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo";
 
-test('both harness SDK producers install the harness SDK closure', () => {
-  for (const file of ['kilo-app-ci.yml', 'mobile-native-build.yml']) {
-    const install = workflows[file].jobs[harnessProducer].steps.find(
+test('every harness SDK producer installs the harness SDK closure', () => {
+  for (const [file, job] of [
+    ['kilo-app-ci.yml', harnessProducer],
+    ['mobile-native-build.yml', harnessProducer],
+    ['ci.yml', 'harness-sdk'],
+  ]) {
+    const install = workflows[file].jobs[job].steps.find(
       step => step.name === 'Install dependencies'
     );
     assert.equal(
       install.run,
       harnessProducerInstall,
-      `${file}'s ${harnessProducer} installs the harness SDK closure, not the whole workspace`
+      `${file}'s ${job} installs the harness SDK closure, not the whole workspace`
     );
   }
 });

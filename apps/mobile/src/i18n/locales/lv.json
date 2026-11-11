@@ -22,6 +22,8 @@
     "expired": "Termiņš beidzies"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Atcelt",
     "done": "Gatavs",
     "retry": "Mēģināt vēlreiz",
@@ -2499,7 +2501,8 @@
       "selectedProfile": "Izvēlētais profils",
       "manualOverrides": "Manuāla ignorēšana",
       "openSettingsToReview": "Lai pārskatītu, atveriet iestatījumus",
-      "profileSelection": "Profila izvēle"
+      "profileSelection": "Profila izvēle",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails.",

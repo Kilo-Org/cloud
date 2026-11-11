@@ -22,6 +22,8 @@
     "expired": "Muddati tugagan"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Bekor qilish",
     "done": "Tayyor",
     "retry": "Qayta urinish",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Tanlangan profil",
       "manualOverrides": "Qo'lda bekor qilish",
       "openSettingsToReview": "Ko‘rib chiqish uchun Sozlamalarni oching",
-      "profileSelection": "Profil tanlash"
+      "profileSelection": "Profil tanlash",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi.",

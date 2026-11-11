@@ -22,6 +22,8 @@
     "expired": "หมดอายุแล้ว"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "ยกเลิก",
     "done": "เสร็จสิ้น",
     "retry": "ลองอีกครั้ง",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "โปรไฟล์ที่เลือก",
       "manualOverrides": "การแทนที่ด้วยตนเอง",
       "openSettingsToReview": "เปิดการตั้งค่าเพื่อตรวจสอบ",
-      "profileSelection": "การเลือกโปรไฟล์"
+      "profileSelection": "การเลือกโปรไฟล์",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดตไฟล์แล้ว {{displayCount}} ไฟล์",

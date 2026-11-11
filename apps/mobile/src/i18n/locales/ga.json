@@ -22,6 +22,8 @@
     "expired": "Imithe in éag"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cealaigh",
     "done": "Déanta",
     "retry": "Bain triail eile as",
@@ -2583,7 +2585,8 @@
       "selectedProfile": "Próifíl roghnaithe",
       "manualOverrides": "Sáruithe láimhe",
       "openSettingsToReview": "Oscail Socruithe chun athbhreithniú a dhéanamh",
-      "profileSelection": "Roghnú próifíle"
+      "profileSelection": "Roghnú próifíle",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} chomhad.",

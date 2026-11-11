@@ -22,6 +22,8 @@
     "expired": "Yeroon isaa darbeera"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Dhiisi",
     "done": "Xumurame",
     "retry": "Irra deebi'ii yaali",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Profaayilii filatame",
       "manualOverrides": "Harkaan irra darbuu",
       "openSettingsToReview": "Irra deebi'uuf Sajoo banaa",
-      "profileSelection": "Filannoo piroofaayilii"
+      "profileSelection": "Filannoo piroofaayilii",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayiliin {{displayCount}} haaromfameera.",

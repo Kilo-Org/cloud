@@ -22,6 +22,8 @@
     "expired": "Срок истёк"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Отмена",
     "done": "Готово",
     "retry": "Повторить",
@@ -1961,7 +1963,8 @@
       "selectedProfile": "Выбранный профиль",
       "manualOverrides": "Ручное переопределение",
       "openSettingsToReview": "Откройте настройки для просмотра",
-      "profileSelection": "Выбор профиля"
+      "profileSelection": "Выбор профиля",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлён {{displayCount}} файл.",

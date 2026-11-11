@@ -22,6 +22,8 @@
     "expired": "ໝົດອາຍຸແລ້ວ"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "ຍົກເລີກ",
     "done": "ສຳເລັດ",
     "retry": "ລອງໃໝ່",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "ໂປຣໄຟລ໌ທີ່ເລືອກ",
       "manualOverrides": "ການລົບລ້າງດ້ວຍມື",
       "openSettingsToReview": "ເປີດການຕັ້ງຄ່າເພື່ອກວດສອບ",
-      "profileSelection": "ການເລືອກໂປຣໄຟລ໌"
+      "profileSelection": "ການເລືອກໂປຣໄຟລ໌",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດໄຟລ໌ແລ້ວ {{displayCount}} ໄຟລ໌.",

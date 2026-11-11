@@ -22,6 +22,8 @@
     "expired": "Caducado"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cancelar",
     "done": "Feito",
     "retry": "Tentar de novo",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Perfil seleccionado",
       "manualOverrides": "Anulacións manuais",
       "openSettingsToReview": "Abre Configuración para revisar",
-      "profileSelection": "Selección de perfil"
+      "profileSelection": "Selección de perfil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro.",

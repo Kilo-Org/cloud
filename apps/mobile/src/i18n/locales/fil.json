@@ -22,6 +22,8 @@
     "expired": "Nag-expire"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Kanselahin",
     "done": "Tapos",
     "retry": "Subukan muli",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Napiling profile",
       "manualOverrides": "Mga manu-manong override",
       "openSettingsToReview": "Buksan ang Mga Setting para suriin",
-      "profileSelection": "Pagpili ng profile"
+      "profileSelection": "Pagpili ng profile",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} na file.",

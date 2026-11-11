@@ -22,6 +22,8 @@
     "expired": "ମିଆଦ ସମାପ୍ତ"
   },
   "common": {
+    "sentenceJoiner": "। ",
+    "listJoiner": ", ",
     "cancel": "ବାତିଲ କରନ୍ତୁ",
     "done": "ହୋଇଗଲା",
     "retry": "ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "ମନୋନୀତ ପ୍ରୋଫାଇଲ୍।",
       "manualOverrides": "ମାନୁଆଲ୍ ଓଭରବ୍ରିଡ୍।",
       "openSettingsToReview": "ସମୀକ୍ଷା କରିବାକୁ ସେଟିଂସମୂହ ଖୋଲନ୍ତୁ।",
-      "profileSelection": "ପ୍ରୋଫାଇଲ୍ ଚୟନ"
+      "profileSelection": "ପ୍ରୋଫାଇଲ୍ ଚୟନ",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି।",

@@ -22,6 +22,8 @@
     "expired": "कालबाह्य"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "रद्द करा",
     "done": "झाले",
     "retry": "पुन्हा प्रयत्न करा",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "प्रोफाइल निवडले",
       "manualOverrides": "मॅन्युअल अधिलिखित",
       "openSettingsToReview": "पुनरावलोकन करण्यासाठी सेटिंग्ज उघडा",
-      "profileSelection": "प्रोफाइल निवड"
+      "profileSelection": "प्रोफाइल निवड",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली.",

@@ -22,6 +22,8 @@
     "expired": "Caducada"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cancel·la",
     "done": "Fet",
     "retry": "Torna-ho a provar",
@@ -2499,7 +2501,8 @@
       "selectedProfile": "Perfil seleccionat",
       "manualOverrides": "Anul·lació manual",
       "openSettingsToReview": "Obriu Configuració per revisar-lo",
-      "profileSelection": "Selecció de perfil"
+      "profileSelection": "Selecció de perfil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "S'ha actualitzat {{displayCount}} fitxer.",

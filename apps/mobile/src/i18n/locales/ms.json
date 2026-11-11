@@ -22,6 +22,8 @@
     "expired": "Tamat tempoh"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Batal",
     "done": "Selesai",
     "retry": "Cuba lagi",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Profil yang dipilih",
       "manualOverrides": "Penggantian manual",
       "openSettingsToReview": "Buka Tetapan untuk menyemak",
-      "profileSelection": "Pemilihan profil"
+      "profileSelection": "Pemilihan profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail telah dikemas kini.",

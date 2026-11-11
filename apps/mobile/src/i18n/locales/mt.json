@@ -22,6 +22,8 @@
     "expired": "Skada"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Ikkanċella",
     "done": "Lest",
     "retry": "Erġa' pprova",
@@ -2583,7 +2585,8 @@
       "selectedProfile": "Profil magħżul",
       "manualOverrides": "Manwal overrides",
       "openSettingsToReview": "Iftaħ Settings biex tirrevedi",
-      "profileSelection": "Għażla tal-profil"
+      "profileSelection": "Għażla tal-profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ġie aġġornat {{displayCount}} fajl.",

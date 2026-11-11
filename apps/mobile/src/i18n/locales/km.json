@@ -22,6 +22,8 @@
     "expired": "បានផុតកំណត់"
   },
   "common": {
+    "sentenceJoiner": "។ ",
+    "listJoiner": ", ",
     "cancel": "បោះបង់",
     "done": "រួចរាល់",
     "retry": "ព្យាយាមម្តងទៀត",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "កម្រងព័ត៌មានដែលបានជ្រើសរើស",
       "manualOverrides": "ការជំនួសដោយដៃ",
       "openSettingsToReview": "បើកការកំណត់ដើម្បីពិនិត្យ",
-      "profileSelection": "ការជ្រើសរើសកម្រងព័ត៌មាន"
+      "profileSelection": "ការជ្រើសរើសកម្រងព័ត៌មាន",
+      "profileLayerAccessibility": "{{label}}៖ {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារចំនួន {{displayCount}}។",

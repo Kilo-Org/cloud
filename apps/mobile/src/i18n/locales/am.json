@@ -22,6 +22,8 @@
     "expired": "ጊዜው አልፏል"
   },
   "common": {
+    "sentenceJoiner": "። ",
+    "listJoiner": "፣ ",
     "cancel": "ተው",
     "done": "ጨርስ",
     "retry": "እንደገና ሞክር",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "የተመረጠ መገለጫ",
       "manualOverrides": "በእጅ መሻር",
       "openSettingsToReview": "ለመገምገም ቅንብሮችን ይክፈቱ",
-      "profileSelection": "የመገለጫ ምርጫ"
+      "profileSelection": "የመገለጫ ምርጫ",
+      "profileLayerAccessibility": "{{label}}፦ {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል።",

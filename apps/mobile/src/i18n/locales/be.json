@@ -22,6 +22,8 @@
     "expired": "Тэрмін дзеяння скончыўся"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Адмяніць",
     "done": "Гатова",
     "retry": "Паўтарыць",
@@ -2541,7 +2543,8 @@
       "selectedProfile": "Абраны профіль",
       "manualOverrides": "Ручныя перавызначэнні",
       "openSettingsToReview": "Адкрыйце налады для прагляду",
-      "profileSelection": "Выбар профілю"
+      "profileSelection": "Выбар профілю",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл.",

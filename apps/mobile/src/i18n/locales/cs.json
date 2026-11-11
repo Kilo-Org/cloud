@@ -22,6 +22,8 @@
     "expired": "Platnost vypršela"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Zrušit",
     "done": "Hotovo",
     "retry": "Zkusit znovu",
@@ -2541,7 +2543,8 @@
       "selectedProfile": "Vybraný profil",
       "manualOverrides": "Ruční ovládání",
       "openSettingsToReview": "Pro kontrolu otevřete Nastavení",
-      "profileSelection": "Výběr profilu"
+      "profileSelection": "Výběr profilu",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Byl aktualizován {{displayCount}} soubor.",

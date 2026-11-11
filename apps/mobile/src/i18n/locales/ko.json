@@ -22,6 +22,8 @@
     "expired": "만료됨"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "취소",
     "done": "완료",
     "retry": "다시 시도",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "선택한 프로필",
       "manualOverrides": "수동 재정의",
       "openSettingsToReview": "설정을 열어 검토하세요.",
-      "profileSelection": "프로필 선택"
+      "profileSelection": "프로필 선택",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "파일 {{displayCount}}개를 업데이트했습니다.",

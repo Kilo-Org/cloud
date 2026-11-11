@@ -22,6 +22,8 @@
     "expired": "Süresi doldu"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "İptal",
     "done": "Bitti",
     "retry": "Tekrar dene",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "Seçilen profil",
       "manualOverrides": "Manuel geçersiz kılmalar",
       "openSettingsToReview": "İncelemek için Ayarları açın",
-      "profileSelection": "Profil seçimi"
+      "profileSelection": "Profil seçimi",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi.",

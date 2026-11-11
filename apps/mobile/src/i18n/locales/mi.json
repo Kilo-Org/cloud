@@ -22,6 +22,8 @@
     "expired": "Kua pau te wā"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Whakakore",
     "done": "Kua oti",
     "retry": "Whakamātau anō",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Kotaha kua tohua",
       "manualOverrides": "Whakakore a-ringa",
       "openSettingsToReview": "Whakatuwherahia nga Tautuhinga hei arotake",
-      "profileSelection": "Kōwhiringa kōtaha"
+      "profileSelection": "Kōwhiringa kōtaha",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae.",

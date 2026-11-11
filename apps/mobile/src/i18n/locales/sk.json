@@ -22,6 +22,8 @@
     "expired": "Platnosť vypršala"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Zrušiť",
     "done": "Hotovo",
     "retry": "Skúsiť znova",
@@ -2541,7 +2543,8 @@
       "selectedProfile": "Vybraný profil",
       "manualOverrides": "Manuálne prepisy",
       "openSettingsToReview": "Ak chcete skontrolovať, otvorte Nastavenia",
-      "profileSelection": "Výber profilu"
+      "profileSelection": "Výber profilu",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizoval sa {{displayCount}} súbor.",

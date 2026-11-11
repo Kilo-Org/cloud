@@ -22,6 +22,8 @@
     "expired": "Galiojimas baigėsi"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Atšaukti",
     "done": "Baigti",
     "retry": "Bandyti dar kartą",
@@ -2541,7 +2543,8 @@
       "selectedProfile": "Pasirinktas profilis",
       "manualOverrides": "Rankiniai nepaisymai",
       "openSettingsToReview": "Norėdami peržiūrėti, atidarykite nustatymus",
-      "profileSelection": "Profilio pasirinkimas"
+      "profileSelection": "Profilio pasirinkimas",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",

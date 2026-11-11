@@ -22,6 +22,8 @@
     "expired": "פג התוקף"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "ביטול",
     "done": "סיום",
     "retry": "ניסיון חוזר",
@@ -1940,7 +1942,8 @@
       "selectedProfile": "פרופיל נבחר",
       "manualOverrides": "עקיפות ידניות",
       "openSettingsToReview": "פתח את ההגדרות כדי לסקור",
-      "profileSelection": "בחירת פרופיל"
+      "profileSelection": "בחירת פרופיל",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "מספר הקבצים שעודכנו הוא {{displayCount}}.",

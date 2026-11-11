@@ -22,6 +22,8 @@
     "expired": "ვადაგასულია"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "გაუქმება",
     "done": "მზადაა",
     "retry": "ხელახლა ცდა",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "არჩეული პროფილი",
       "manualOverrides": "მექანიკური უგულებელყოფა",
       "openSettingsToReview": "გადასახედად გახსენით პარამეტრები",
-      "profileSelection": "პროფილის შერჩევა"
+      "profileSelection": "პროფილის შერჩევა",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი.",

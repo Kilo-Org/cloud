@@ -22,6 +22,8 @@
     "expired": "منقضی شد"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": "، ",
     "cancel": "لغو",
     "done": "تمام",
     "retry": "تلاش مجدد",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "نمایه انتخاب شده",
       "manualOverrides": "لغو دستی",
       "openSettingsToReview": "برای بازبینی تنظیمات را باز کنید",
-      "profileSelection": "انتخاب نمایه"
+      "profileSelection": "انتخاب نمایه",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل به‌روزرسانی شد.",

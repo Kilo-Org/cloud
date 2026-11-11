@@ -22,6 +22,8 @@
     "expired": "കാലഹരണപ്പെട്ടു"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "റദ്ദാക്കുക",
     "done": "പൂർത്തിയായി",
     "retry": "വീണ്ടും ശ്രമിക്കുക",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "തിരഞ്ഞെടുത്ത പ്രൊഫൈൽ",
       "manualOverrides": "മാനുവൽ ഓവർറൈഡുകൾ",
       "openSettingsToReview": "അവലോകനം ചെയ്യാൻ ക്രമീകരണം തുറക്കുക",
-      "profileSelection": "പ്രൊഫൈൽ തിരഞ്ഞെടുക്കൽ"
+      "profileSelection": "പ്രൊഫൈൽ തിരഞ്ഞെടുക്കൽ",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ഫയൽ അപ്ഡേറ്റ് ചെയ്തു.",

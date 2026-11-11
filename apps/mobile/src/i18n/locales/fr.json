@@ -459,10 +459,10 @@
       "classificationEmpty": "Le fichier est vide.",
       "classificationTooLarge": "La taille des fichiers ne doit pas dépasser 20 Mo.",
       "classificationUnreadable": "Impossible de lire ce fichier.",
-      "announceUploaded": "Pièce jointe envoyée",
-      "cantUpload": "Ce fichier ne peut pas être envoyé.",
+      "announceUploaded": "Pièce jointe importée",
+      "cantUpload": "Ce fichier ne peut pas être importé.",
       "networkError": "Une erreur réseau s'est produite.",
-      "uploadFailed": "L'envoi a échoué.",
+      "uploadFailed": "L'importation a échoué",
       "nothingToPaste": "Aucun contenu à coller.",
       "metadataStripFailed": "Impossible de supprimer les métadonnées de la photo.",
       "limit_one": "Vous pouvez joindre jusqu'à {{displayCount}} fichier.",
@@ -471,7 +471,7 @@
     },
     "attachmentPreview": {
       "accessibility": "{{filename}} : {{status}}",
-      "retryUploading": "Réessayer l'envoi de {{filename}}",
+      "retryUploading": "Réessayer l'importation de {{filename}}",
       "remove": "Supprimer {{filename}}"
     },
     "messageBubble": {
@@ -1718,7 +1718,7 @@
       "exitSession": "Quitter la session",
       "restartExitFailed": "Nouvelle session démarrée. La session précédente est encore ouverte.",
       "exitNotSupported": "Cette session ne permet pas de la quitter à distance",
-      "exitUnavailable": "Il est actuellement impossible de quitter cette session à distance",
+      "exitUnavailable": "La sortie de la session distante n'est pas disponible pour cette session",
       "exitNeedsNewerCli": "Les commandes commençant par / nécessitent une version plus récente de Kilo CLI pour fonctionner à distance. Mettez à jour Kilo CLI et reconnectez-vous."
     },
     "sessionConnection": {
@@ -1792,8 +1792,8 @@
       "commitAndPush": "Valider et envoyer",
       "startSession": "Démarrer la session",
       "selectRepositoryToStart": "Sélectionnez un dépôt pour commencer.",
-      "enterPromptToStart": "Ajoutez une invite pour commencer.",
-      "enterPromptOrFileToStart": "Ajoutez une invite ou un fichier pour commencer.",
+      "enterPromptToStart": "Ajoutez une consigne pour commencer.",
+      "enterPromptOrFileToStart": "Ajoutez une consigne ou un fichier pour commencer.",
       "connectProviderToStart": "Les dépôts proviennent d'un compte GitHub, GitLab ou Bitbucket connecté.",
       "promptPlaceholder": "Sur quoi souhaitez-vous travailler ?",
       "couldNotLoadModels": "Impossible de charger les modèles",
@@ -1837,7 +1837,7 @@
       "profilesActive": "Profils actifs",
       "customConfigActive": "Configuration personnalisée active",
       "configNeedsAttention": "La configuration a besoin d'attention",
-      "repoProfile": "Profil de pension",
+      "repoProfile": "Profil de dépôt",
       "selectedProfile": "Profil sélectionné",
       "manualOverrides": "Remplacements manuels",
       "openSettingsToReview": "Ouvrez les paramètres pour vérifier",
@@ -1846,8 +1846,8 @@
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour",
-      "updatedFileCount": "{{displayCount}} fichiers ont été mis à jour",
-      "updatedFileCount_other": "{{displayCount}} fichiers ont été mis à jour",
+      "updatedFileCount": "{{displayCount}} fichiers mis à jour",
+      "updatedFileCount_other": "{{displayCount}} fichiers mis à jour",
       "updatedFileCount_many": "{{displayCount}} fichiers mis à jour"
     },
     "toolCard": {
@@ -1865,20 +1865,20 @@
       "toolTask": "tâche",
       "toolSendFile": "Fichier envoyé",
       "toolSendFileAction": "envoyer le fichier",
-      "readTodos": "Lire le programme",
-      "updateTodos": "Mettre à jour le programme",
+      "readTodos": "Lire le plan",
+      "updateTodos": "Mettre à jour le plan",
       "linesBadge": "{{displayCount}} lignes",
       "filesBadge": "{{displayCount}} fichiers",
       "matchesBadge": "{{displayCount}} résultats",
       "filesBadge_one": "{{displayCount}} fichier",
       "filesBadge_other": "{{displayCount}} fichiers",
-      "filesBadge_many": "{{displayCount}} fichiers",
+      "filesBadge_many": "{{displayCount}} de fichiers",
       "linesBadge_one": "{{displayCount}} ligne",
       "linesBadge_other": "{{displayCount}} lignes",
-      "linesBadge_many": "{{displayCount}} lignes",
+      "linesBadge_many": "{{displayCount}} de lignes",
       "matchesBadge_one": "{{displayCount}} résultat",
       "matchesBadge_other": "{{displayCount}} résultats",
-      "matchesBadge_many": "{{displayCount}} résultats",
+      "matchesBadge_many": "{{displayCount}} de résultats",
       "noOutput": "Aucune sortie.",
       "translationFailed": "Échec de la traduction"
     },
@@ -1925,7 +1925,7 @@
     },
     "modeOptions": {
       "code": "Coder",
-      "plan": "Programme",
+      "plan": "Plan",
       "debug": "Déboguer",
       "orchestrator": "Orchestrateur",
       "ask": "Poser une question",
@@ -1992,7 +1992,7 @@
       "deliveryInterrupted": "Vous avez interrompu l'envoi de ce message.",
       "deliveryExhausted": "Nous n'avons pas pu envoyer ce message après plusieurs tentatives.",
       "deliveryExecution": "L'agent n'a pas pu traiter ce message.",
-      "assistantTitle": "La génération de la réponse a échoué",
+      "assistantTitle": "Échec de la réponse",
       "assistantProviderRejected": "Le fournisseur a rejeté la requête.",
       "assistantStopped": "La génération de la réponse a été interrompue.",
       "assistantContextOverflow": "La conversation est trop longue pour le modèle.",
@@ -2072,7 +2072,7 @@
       "detailProgressPercent": "{{percent}}% terminé",
       "detailRestoreIncompleteFiles": "Fichiers non restaurés : {{skipped}} sur {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Fichiers manquants : {{paths}}",
-      "detailRestoreIncompleteMore": "{{listed}} et {{omitted}} autres",
+      "detailRestoreIncompleteMore": "{{listed}} et {{omitted}} de plus",
       "detailReasonPatchFailed": "le correctif n'a pas pu être appliqué",
       "detailReasonOutsideWorkspace": "le chemin est en dehors de l'espace de travail",
       "detailReasonMissingContent": "l'instantané ne contenait aucune donnée pour le fichier",
@@ -2122,7 +2122,7 @@
       "skipQuestionsMessage": "L'agent passera cette étape.",
       "answerProgress": "Réponses : {{answered}} sur {{total}}",
       "selectAllThatApply": "Sélectionnez toutes les réponses pertinentes",
-      "option": "Option : {{label}}",
+      "option": "{{label}}",
       "optionSelected": "{{label}}, sélectionné",
       "typeYourOwnAnswer": "Rédiger une autre réponse",
       "typeYourOwnAnswerPlaceholder": "Votre réponse…",
@@ -2160,10 +2160,10 @@
       "noMessages": "Aucun message du sous-agent",
       "noMessagesDescription": "Cette session de sous-agent s'est terminée sans produire de transcription.",
       "loading": "Chargement de la session du sous-agent",
-      "loadingDescription": "Les messages du sous-agent sont attendus…"
+      "loadingDescription": "En attente des messages du sous-agent…"
     },
     "messageBubble": {
-      "failure": "Erreur : {{title}}.",
+      "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Vous pouvez réessayer.",
       "copyToComposer": "Copier dans le champ de saisie",
       "queuedAccessibility": "Message en attente",
@@ -2188,7 +2188,7 @@
     },
     "sessionFilter": {
       "title": "Filtrer les sessions",
-      "platformCloud": "En ligne",
+      "platformCloud": "Cloud",
       "platformExtension": "Extension de l'éditeur",
       "platformDesktop": "Application de bureau",
       "platformCli": "CLI",
@@ -2225,17 +2225,17 @@
     },
     "attachmentPreview": {
       "openFailedRetry": "Impossible d'ouvrir le fichier. Réessayez.",
-      "retryUploading": "Réessayer l'envoi de {{filename}}",
+      "retryUploading": "Réessayer l'importation de {{filename}}",
       "removeAttachment": "Retirer la pièce jointe {{filename}}",
-      "uploading": "Envoi…",
-      "uploaded": "Envoyé",
-      "uploadFailedRetry": "Échec de l'envoi. Touchez pour réessayer.",
+      "uploading": "Importation…",
+      "uploaded": "Importé",
+      "uploadFailedRetry": "Échec de l'importation. Touchez pour réessayer.",
       "moveLeft": "Déplacer {{filename}} vers la gauche",
       "moveRight": "Déplacer {{filename}} vers la droite"
     },
     "attachmentPasteHint": {
       "accessibility": "Coller l'image depuis le presse-papiers",
-      "label": "Coller l'image détectée"
+      "label": "Image détectée, appuyez pour coller"
     },
     "attachmentPicker": {
       "camera": "Appareil photo",
@@ -2253,10 +2253,10 @@
     },
     "composer": {
       "addAttachment": "Ajouter une pièce jointe",
-      "removeOrRetryFailed": "Retirez d'abord les pièces jointes dont l'envoi a échoué, ou réessayez de les envoyer.",
+      "removeOrRetryFailed": "Retirez d'abord les pièces jointes dont l'importation a échoué, ou réessayez de les importer.",
       "attachmentsWithSlashCommands": "Les pièces jointes ne peuvent pas être envoyées avec des commandes commençant par /.",
       "photoMetadataNotRemoved": "Les métadonnées de la photo n'ont pas pu être supprimées d'une pièce jointe.",
-      "waitForUploads": "Attendez la fin de l'envoi des pièces jointes.",
+      "waitForUploads": "Attendez la fin de l'importation des pièces jointes.",
       "pasteFromClipboard": "Coller depuis le presse-papiers",
       "stopGenerating": "Arrêter la génération",
       "selectModelBeforeSending": "Sélectionnez un modèle avant d'envoyer le message",
@@ -2309,7 +2309,7 @@
       "exitSession": "Quitter la session",
       "clearSession": "Terminer cette session et en démarrer une nouvelle",
       "compactDescription": "compacter le contexte de la session en cours",
-      "goalDescription": "Continue à travailler vers un objectif de session. /goal <objective> ou pause, resume, clear",
+      "goalDescription": "Continuez à travailler vers un objectif de session. /goal <objective> ou pause, resume, clear. Un objectif peut attendre un réveil planifié, une tâche cron ou un processus en arrière-plan : l'attente suspend l'objectif jusqu'à son déclenchement, puis l'objectif reprend de lui-même ; /goal pause et /goal clear annulent ses minuteries programmées. Si l'objectif consiste à attendre un déploiement, une compilation ou une tâche CI, planifiez cette attente immédiatement ; n'explorez pas le dépôt d'abord.",
       "initDescription": "configuration guidée d'AGENTS.md",
       "resumeClaudeDescription": "importer la transcription d'une session Claude Code",
       "resumeCodexDescription": "importer la transcription d'une session OpenAI Codex",
@@ -2329,7 +2329,7 @@
       "windowUnavailable": "Taille de la fenêtre de contexte indisponible",
       "tapToViewDetails": " Touchez pour voir les détails du contexte.",
       "costClause": ", coût {{cost}}",
-      "loadingCostSpoken": "coût de {{cost}}.",
+      "loadingCostSpoken": "Coût jusqu'à présent {{cost}}.",
       "tokensWindowUnavailable": "Contexte : {{used}} jetons, taille de la fenêtre indisponible{{costClause}}.",
       "tokensUsage": "Contexte : {{used}} jetons sur {{window}}, {{percentage}} utilisés{{costClause}}.",
       "title": "Utilisation du contexte",
@@ -2370,7 +2370,7 @@
       "unavailable": "Cette session ne peut pas recevoir de demandes d'autorisation."
     },
     "prBadge": {
-      "open": "ouverture de la PR",
+      "open": "PR ouverte",
       "closed": "PR fermée",
       "merged": "PR fusionnée",
       "draft": "PR en brouillon",
@@ -2380,9 +2380,9 @@
     "markdownImage": {
       "load": "Charger",
       "loadWithHost": "Charger {{host}}",
-      "httpsOnly": "Seules les images accessibles en HTTPS sont autorisées",
+      "httpsOnly": "Images HTTPS uniquement",
       "trustTitle": "Charger l'image depuis {{host}} ?",
-      "trustMessage": "En faisant confiance à {{host}}, ses images se chargent sans demander à chaque fois. Vous pouvez retirer cette confiance plus tard dans Sites de confiance.",
+      "trustMessage": "Si vous faites confiance à {{host}}, ses images se chargent sans demande de confirmation à chaque fois. Vous pouvez révoquer cette autorisation plus tard dans Sites de confiance.",
       "loadOnce": "Charger une fois"
     },
     "markdownLink": {
@@ -2398,10 +2398,10 @@
       "emptyTitle": "Aucun sous-dossier",
       "fieldLabel": "Dossier",
       "retryableDescription": "Vérifiez votre connexion et réessayez. Vous pouvez toujours confirmer ce dossier avec le bouton Terminé.",
-      "retryableTitle": "Impossible d'afficher les dossiers",
+      "retryableTitle": "Impossible de lister les dossiers",
       "tapToListHint": "Touchez un dossier pour afficher son contenu",
-      "unsupportedDescription": "Cette CLI ne permet pas d'afficher les dossiers. Touchez Terminé pour conserver le dossier de lancement, puis Démarrer la session pour démarrer dans ce dossier.",
-      "unsupportedTitle": "Impossible d'afficher les dossiers"
+      "unsupportedDescription": "Cette CLI ne permet pas de lister les dossiers. Touchez Terminé pour conserver le dossier de lancement, puis Démarrer la session pour démarrer dans ce dossier.",
+      "unsupportedTitle": "Impossible de lister les dossiers"
     },
     "toolRun": {
       "sheetTitle": "Appels d’outils",

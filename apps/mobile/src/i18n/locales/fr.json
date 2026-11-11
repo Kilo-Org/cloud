@@ -364,7 +364,7 @@
     "retryPreviews": "Réessayer de charger les aperçus de notifications",
     "retrySavingPreviews": "Réessayer d'enregistrer les aperçus de notifications",
     "showFullPreviews": "Afficher les aperçus complets",
-    "retryDeviceRegistration": "Réessayer de charger l'enregistrement de l'appareil pour les notifications à distance",
+    "retryDeviceRegistration": "Réessayer de charger l'enregistrement de l'appareil pour les notifications push",
     "disabledTitle": "Notifications désactivées",
     "disabledMessage": "Activez les notifications dans les réglages de votre appareil.",
     "disableTitle": "Désactiver les notifications",

@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { CircleCheck, CircleMinus, CircleX, Clock, Flag, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type {
-  RequestLogByokCandidate,
-  RequestLogRoutingDetails,
-  RequestLogRoutingStep,
+import {
+  requestNotSentReason,
+  type RequestLogByokCandidate,
+  type RequestLogRoutingDetails,
+  type RequestLogRoutingStep,
 } from '@/lib/request-logs/routing-details';
 import { TONE_CLASSNAMES, ToneBadge } from './detail-primitives';
 import { getByokProviderDisplayName } from '@/lib/byok/provider-names';
@@ -13,6 +14,7 @@ import {
   byokSkipReasonLabel,
   describeResult,
   describeStep,
+  describeUnsentResult,
   inferenceProviderNames,
   rejectedResultLabel,
   type StepTone,
@@ -136,6 +138,16 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
     return (
       <FlowNode tone="rejected" icon={Flag} isLast>
         <span className="text-sm font-medium">{rejectedResultLabel(result)}</span>
+      </FlowNode>
+    );
+  }
+  const notSentReason = requestNotSentReason(routing);
+  if (notSentReason) {
+    const { title, detail } = describeUnsentResult(result, notSentReason);
+    return (
+      <FlowNode tone="rejected" icon={Flag} isLast>
+        <span className="text-sm font-medium">{title}</span>
+        {detail && <p className="text-muted-foreground text-xs">{detail}</p>}
       </FlowNode>
     );
   }

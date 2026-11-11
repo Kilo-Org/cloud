@@ -421,6 +421,7 @@ export async function markPersonalKiloPassReferralPaymentAdverse(params: {
     logAppliedRewardsNeedingReview('kilo_pass_referral_applied_rewards_need_review', {
       conversionId: result.summary.conversionId,
       rewardIds: result.reviewRequiredRewardIds,
+      sourcePaymentId: params.sourcePaymentId,
       paymentProvider,
       reason: params.reason,
     });

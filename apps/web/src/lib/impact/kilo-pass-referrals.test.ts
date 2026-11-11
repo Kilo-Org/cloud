@@ -1176,6 +1176,7 @@ describe('Kilo Pass Impact referral conversions', () => {
             expect.objectContaining({
               conversionId,
               rewardIds: expect.arrayContaining(rewardIds),
+              sourcePaymentId: invoiceId,
               paymentProvider: ImpactReferralPaymentProvider.Stripe,
               reason: 'chargeback',
             }),

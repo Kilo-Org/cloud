@@ -4,7 +4,6 @@ import { selectionHaptic } from '@/lib/haptics';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
@@ -29,7 +28,6 @@ import { formatPrefixedMoney } from '@/lib/format';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
-import { useSideInsetStyle } from '@/lib/screen-insets';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -38,6 +36,32 @@ import { CreditExpiryNote } from './credit-expiry-note';
 
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
+
+/**
+ * The height the pack area holds in every state.
+ *
+ * The tallest state is the store's notice card beside four priced rows, because
+ * the backend catalogue still names the packs when the store cannot price them.
+ * Measured on the compact window and confirmed by the design-gate cells:
+ *
+ * - a priced row is 80 dp (its 20 dp paddings, one title line, and its expiry
+ *   line), and four of them are 320 dp;
+ * - the content gap between them is 10.5 dp, so three of them are 31.5 dp;
+ * - the notice card is 190 dp with a three-line body: its 20 dp paddings, the
+ *   title line, three body lines, the retry control, and the 10.5 dp steps
+ *   between those four blocks.
+ *
+ * The reservation is the sum, 541.5 dp. A shorter state keeps the difference as
+ * blank space after its own content, between the pack surface and the copy, so
+ * a store answer never moves the description or the legal links.
+ */
+const PACK_ROW_HEIGHT = 80;
+const PACK_CONTENT_GAP = 10.5;
+const STORE_NOTICE_HEIGHT = 190;
+const PACK_AREA_MIN_HEIGHT =
+  PACK_SKELETON_ROWS * PACK_ROW_HEIGHT +
+  (PACK_SKELETON_ROWS - 1) * PACK_CONTENT_GAP +
+  STORE_NOTICE_HEIGHT;
 
 /**
  * One-off credit packs bought with the store's own purchase sheet.
@@ -49,8 +73,6 @@ const PACK_SKELETON_ROWS = 4;
  */
 export function CreditPurchaseScreen() {
   const { t, i18n } = useTranslation();
-  const { bottom: bottomInset } = useSafeAreaInsets();
-  const sideInsetStyle = useSideInsetStyle();
   const storefront = getCreditStorefront();
   const trpc = useTRPC();
   const {
@@ -178,11 +200,14 @@ export function CreditPurchaseScreen() {
     if (creditBlocksQuery.isPending) {
       return <Skeleton className="h-3 w-40 max-w-full rounded" />;
     }
+    // Nothing to say when no part of the balance expires: a "no expiring
+    // credits" line would repeat, in every state, the sentence each pack row
+    // already carries. The slot keeps its height so the rows below it stay put
+    // when this read settles.
     return (
       <CreditExpiryNote
         creditBlocks={creditBlocksQuery.data.creditBlocks}
         hiddenAmount={hideBalanceAmount ? HIDDEN_BALANCE : undefined}
-        emptyMessage={t('credits.noExpiringCredits')}
       />
     );
   };
@@ -195,10 +220,6 @@ export function CreditPurchaseScreen() {
           className="-mx-1 flex-1"
           contentContainerClassName="gap-3 px-1"
           showsVerticalScrollIndicator={false}
-          // The footer below the scroller carries the safe-area inset, so the
-          // scroller's own clearance would only add blank space above the
-          // divider when the pack rows are scrolled to their end.
-          bottomClearance={0}
         >
           {/* The card holds both of its data slots in every state: the amount (a
               skeleton, the value, or the failed read's own retry target) and
@@ -210,189 +231,181 @@ export function CreditPurchaseScreen() {
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.credits')}
             </Text>
-            <View className="mt-1 min-h-11 justify-center">{renderBalanceValue()}</View>
+            {/* The amount starts one 3.5 dp step under its label, as it did
+                before this screen reserved the slot: the reservation sits
+                below the value, never between the label and the value. */}
+            <View className="mt-1 min-h-11 justify-start">{renderBalanceValue()}</View>
             <View className="mt-1 min-h-8 justify-center">{renderExpirySlot()}</View>
           </View>
 
-          {/* The purchase error is rendered inline (the store sheet has just
-              dismissed), so no toast accompanies it. AccessibleStatus is the
-              one announcement channel that survives that: a polite live
-              region on Android and an imperative announcement on iOS. A plain
-              Text left a screen-reader user with no failure feedback at all. */}
-          <AccessibleStatus
-            message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
-            className="px-1 text-sm"
-          />
+          {/* The pack area holds one height in every state, and the description
+              and the legal links follow it in this scroller. The store answers
+              after the first frame — placeholder rows while it connects, the
+              priced rows after, an empty card or the store's notice beside
+              them — so an area sized by its content pushed the copy down the
+              screen on every one of those swaps. The reservation covers the
+              tallest state; a shorter state keeps the remainder as blank space
+              after its own content, below the pack surface and above the copy. */}
+          <View className="gap-3" style={{ minHeight: PACK_AREA_MIN_HEIGHT }}>
+            {/* The purchase error rides inside the reserved area too: it comes
+                and goes with a purchase attempt, and above the pack area it
+                would move the copy for as long as it showed. */}
+            <AccessibleStatus
+              message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
+              className="px-1 text-sm"
+            />
 
-          {/* The identity read gates both catalog reads, so its failure is the
+            {/* The identity read gates both catalog reads, so its failure is the
               one state where nothing else can settle. It gets the same card
               shape as the store's failure, with its own retry: an empty pack
               area would read as "nothing for sale" and offer no way back. */}
-          {identityUnavailable && (
-            <View className="gap-3 rounded-xl border border-border bg-card p-5">
-              <Text className="font-semibold text-foreground">{t('queryError.serverTitle')}</Text>
-              <Text className="text-sm text-muted-foreground">
-                {t('organization.boundary.loadErrorMessage')}
-              </Text>
-              <Button
-                accessibilityLabel={t('common.tryAgain')}
-                accessibilityState={{ busy: isRetryingIdentity, disabled: isRetryingIdentity }}
-                className="self-start"
-                disabled={isRetryingIdentity}
-                onPress={() => {
-                  void retryIdentity();
-                }}
-                variant="outline"
-              >
-                <Text>{t('common.tryAgain')}</Text>
-              </Button>
-            </View>
-          )}
-
-          {storeUnavailable && (
-            <View className="gap-3 rounded-xl border border-border bg-card p-5">
-              <Text className="font-semibold text-foreground">
-                {t(storeUnavailableCopy.titleKey)}
-              </Text>
-              <Text className="text-sm text-muted-foreground">{t(storeBannerBodyKey)}</Text>
-              <Button
-                accessibilityLabel={t('common.tryAgain')}
-                accessibilityState={{ busy: isRefetching, disabled: isRefetching }}
-                className="self-start"
-                disabled={isRefetching}
-                onPress={() => {
-                  void refetch();
-                }}
-                variant="outline"
-              >
-                <Text>{t('common.tryAgain')}</Text>
-              </Button>
-            </View>
-          )}
-
-          {packsEmpty && (
-            <View className="rounded-xl border border-border bg-card p-5">
-              <Text className="text-sm text-muted-foreground">{t('credits.empty')}</Text>
-            </View>
-          )}
-
-          {isLoading &&
-            Array.from({ length: PACK_SKELETON_ROWS }, (_, index) => (
-              <View key={index} className="rounded-xl border border-border bg-card p-5">
-                <View className="flex-row items-start justify-between gap-4">
-                  <Skeleton className="h-6 flex-1 rounded" />
-                  <Skeleton className="h-6 w-16 rounded" />
-                </View>
-                <Skeleton className="mt-2 h-8 w-full rounded" />
-              </View>
-            ))}
-
-          {!isLoading &&
-            products.map(pack => {
-              // The pack names a credit amount in the same shape as the balance
-              // above it. The store's own localized price stays as the store
-              // wrote it.
-              const packLabel = t('credits.packLabel', {
-                amount: isolateLtrBidiText(
-                  formatPrefixedMoney(pack.backend.amountUsd, i18n.language)
-                ),
-              });
-              const expiryMessageKey = getStoreCreditExpiryMessageKey(pack.backend, storefront);
-              const expiryMessage = expiryMessageKey ? t(expiryMessageKey) : undefined;
-              const hasStorePrice = pack.storeProductId !== null && pack.displayPrice !== null;
-              const rowCompleting =
-                completingProductId !== null && completingProductId === pack.storeProductId;
-              // A disconnected owner has no purchase-update listeners (expo-iap
-              // drops them when initialization fails), so even a priced row
-              // cannot complete: keep every row disabled until it reconnects.
-              const disabled = purchasing || !connected || !hasStorePrice;
-              const priceLabel = rowCompleting
-                ? t('kiloPass.completingPurchase')
-                : (pack.displayPrice ?? t('credits.priceUnavailable'));
-              // The row is one accessible element: the explicit label replaces
-              // its children, so the charge and the disabled reason must be in
-              // the label itself (the canonical Kilo Pass row does the same).
-              const rowAccessibilityLabel = [packLabel, priceLabel, expiryMessage]
-                .filter(Boolean)
-                .join(', ');
-
-              return (
-                <Pressable
-                  key={pack.backend.appleProductId}
-                  accessibilityLabel={rowAccessibilityLabel}
-                  accessibilityRole="button"
-                  accessibilityState={{ busy: rowCompleting, disabled }}
-                  className={cn(
-                    'rounded-xl border border-border bg-card p-5 active:opacity-80',
-                    disabled && 'opacity-50'
-                  )}
-                  disabled={disabled}
+            {identityUnavailable && (
+              <View className="gap-3 rounded-xl border border-border bg-card p-5">
+                <Text className="font-semibold text-foreground">{t('queryError.serverTitle')}</Text>
+                <Text className="text-sm text-muted-foreground">
+                  {t('organization.boundary.loadErrorMessage')}
+                </Text>
+                <Button
+                  accessibilityLabel={t('common.tryAgain')}
+                  accessibilityState={{ busy: isRetryingIdentity, disabled: isRetryingIdentity }}
+                  className="self-start"
+                  disabled={isRetryingIdentity}
                   onPress={() => {
-                    handlePackPress(pack);
+                    void retryIdentity();
                   }}
+                  variant="outline"
                 >
+                  <Text>{t('common.tryAgain')}</Text>
+                </Button>
+              </View>
+            )}
+
+            {storeUnavailable && (
+              <View className="gap-3 rounded-xl border border-border bg-card p-5">
+                <Text className="font-semibold text-foreground">
+                  {t(storeUnavailableCopy.titleKey)}
+                </Text>
+                <Text className="text-sm text-muted-foreground">{t(storeBannerBodyKey)}</Text>
+                <Button
+                  accessibilityLabel={t('common.tryAgain')}
+                  accessibilityState={{ busy: isRefetching, disabled: isRefetching }}
+                  className="self-start"
+                  disabled={isRefetching}
+                  onPress={() => {
+                    void refetch();
+                  }}
+                  variant="outline"
+                >
+                  <Text>{t('common.tryAgain')}</Text>
+                </Button>
+              </View>
+            )}
+
+            {packsEmpty && (
+              <View className="rounded-xl border border-border bg-card p-5">
+                <Text className="text-sm text-muted-foreground">{t('credits.empty')}</Text>
+              </View>
+            )}
+
+            {isLoading &&
+              Array.from({ length: PACK_SKELETON_ROWS }, (_, index) => (
+                <View key={index} className="rounded-xl border border-border bg-card p-5">
                   <View className="flex-row items-start justify-between gap-4">
-                    <Text className="flex-1 font-semibold text-foreground">{packLabel}</Text>
-                    <Text className="text-base font-semibold text-foreground tabular-nums">
-                      {priceLabel}
-                    </Text>
+                    <Skeleton className="h-6 flex-1 rounded" />
+                    <Skeleton className="h-6 w-16 rounded" />
                   </View>
-                  {expiryMessage && (
-                    <Text className="mt-2 text-xs text-muted-foreground">{expiryMessage}</Text>
-                  )}
-                </Pressable>
-              );
-            })}
-        </DetailScreenScrollView>
-      </View>
-      {/* The description and the store's legal links are the screen's footer,
-          outside the scroll view. The pack area's height comes from the store —
-          placeholder rows while it connects, the priced rows after, an empty
-          card or the unavailable card instead — so copy written under it inside
-          the scroll is pushed by every one of those swaps. Pinned below the
-          scroll, the copy holds its place in every state and every locale.
+                  <Skeleton className="mt-2 h-8 w-full rounded" />
+                </View>
+              ))}
 
-          `pt-[17px]` is the gap the legal boxes already leave around their own
-          ink: each box reserves a 48dp target around a 14dp line, so 17dp sits
-          above and below the link text by construction. Matching that number
-          above the description gives the footer one rhythm — divider,
-          description, links — with no margin pulled through a neighbouring
-          frame, and the boxes keep their full audited height.
+            {!isLoading &&
+              products.map(pack => {
+                // The pack names a credit amount in the same shape as the balance
+                // above it. The store's own localized price stays as the store
+                // wrote it.
+                const packLabel = t('credits.packLabel', {
+                  amount: isolateLtrBidiText(
+                    formatPrefixedMoney(pack.backend.amountUsd, i18n.language)
+                  ),
+                });
+                const expiryMessageKey = getStoreCreditExpiryMessageKey(pack.backend, storefront);
+                const expiryMessage = expiryMessageKey ? t(expiryMessageKey) : undefined;
+                const hasStorePrice = pack.storeProductId !== null && pack.displayPrice !== null;
+                const rowCompleting =
+                  completingProductId !== null && completingProductId === pack.storeProductId;
+                // A disconnected owner has no purchase-update listeners (expo-iap
+                // drops them when initialization fails), so even a priced row
+                // cannot complete: keep every row disabled until it reconnects.
+                const disabled = purchasing || !connected || !hasStorePrice;
+                const priceLabel = rowCompleting
+                  ? t('kiloPass.completingPurchase')
+                  : (pack.displayPrice ?? t('credits.priceUnavailable'));
+                // The row is one accessible element: the explicit label replaces
+                // its children, so the charge and the disabled reason must be in
+                // the label itself (the canonical Kilo Pass row does the same).
+                const rowAccessibilityLabel = [packLabel, priceLabel, expiryMessage]
+                  .filter(Boolean)
+                  .join(', ');
 
-          The divider spans the whole width, so the content inside carries the
-          side insets itself: the scroller above insets its own content for the
-          landscape notch band, and copy outside it would otherwise sit nearer
-          the edge than the rows it follows. */}
-      <View className="border-t border-border" style={{ paddingBottom: Math.max(bottomInset, 16) }}>
-        {/* The side inset and the gutter sit on separate wrappers: an inline
-            padding value replaces a className's `px-5` on the same node, so one
-            node holding both would lose the gutter wherever an inset is
-            non-zero. */}
-        <View style={sideInsetStyle}>
-          <View className="px-5 pt-[17px]">
-            <Text className="text-xs text-muted-foreground">{t('credits.description')}</Text>
-            <View className={LEGAL_LINK_ROW_CLASS}>
-              <Pressable
-                accessibilityRole="link"
-                className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-                onPress={() => {
-                  void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
-                }}
-              >
-                <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="link"
-                className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-                onPress={() => {
-                  void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
-                }}
-              >
-                <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
-              </Pressable>
-            </View>
+                return (
+                  <Pressable
+                    key={pack.backend.appleProductId}
+                    accessibilityLabel={rowAccessibilityLabel}
+                    accessibilityRole="button"
+                    accessibilityState={{ busy: rowCompleting, disabled }}
+                    className={cn(
+                      'rounded-xl border border-border bg-card p-5 active:opacity-80',
+                      disabled && 'opacity-50'
+                    )}
+                    disabled={disabled}
+                    onPress={() => {
+                      handlePackPress(pack);
+                    }}
+                  >
+                    <View className="flex-row items-start justify-between gap-4">
+                      <Text className="flex-1 font-semibold text-foreground">{packLabel}</Text>
+                      <Text className="text-base font-semibold text-foreground tabular-nums">
+                        {priceLabel}
+                      </Text>
+                    </View>
+                    {expiryMessage && (
+                      <Text className="mt-2 text-xs text-muted-foreground">{expiryMessage}</Text>
+                    )}
+                  </Pressable>
+                );
+              })}
           </View>
-        </View>
+
+          {/* The description and the two store legal links close the scroll
+              content, after the last pack row. The two links are controls of
+              their own, not words in the sentence above, so each carries the
+              shared legal-link box: a real 48dp target the control-size audit
+              can read, which keeps its height in the flow so the two boxes
+              never overlap when a long locale wraps them onto two lines. */}
+          <Text className="px-1 pt-1 text-xs text-muted-foreground">
+            {t('credits.description')}
+          </Text>
+          <View className={cn('px-1', LEGAL_LINK_ROW_CLASS)}>
+            <Pressable
+              accessibilityRole="link"
+              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+              onPress={() => {
+                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
+              }}
+            >
+              <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="link"
+              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+              onPress={() => {
+                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
+              }}
+            >
+              <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+            </Pressable>
+          </View>
+        </DetailScreenScrollView>
       </View>
     </View>
   );

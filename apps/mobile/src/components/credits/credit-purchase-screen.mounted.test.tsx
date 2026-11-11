@@ -775,32 +775,54 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('keeps the description and the legal links out of the pack area’s scroll view in every state', async () => {
-    // The pack area's height depends on the store: placeholder rows, priced
-    // rows, an empty card or the unavailable card. The copy sits in the footer
-    // beside that scroller, so no store answer can move it, and the pack rows
-    // stay the screen's first content.
+  it('keeps the description and the legal links after a pack area of one reserved height in every state', async () => {
+    // The pack area's content depends on the store: placeholder rows, priced
+    // rows, an empty card, the store's notice, and its own purchase error. The
+    // area reserves the tallest state's height and the copy follows it, so no
+    // one of those arrivals changes where the copy sits.
     const DESCRIPTION_PREFIX = 'Credits are a one-time purchase';
+    // The tallest state — the store's notice beside four priced rows — needs
+    // about 522 dp on the compact window. The reservation covers it, and the
+    // same value holds in every other state.
+    const TALLEST_STATE_MIN_HEIGHT = 520;
+    const styleOf = (node: TestRenderer.ReactTestInstance): Record<string, unknown> => {
+      const style: unknown = node.props.style;
+      return typeof style === 'object' && style !== null && !Array.isArray(style)
+        ? { ...style }
+        : {};
+    };
+    const minHeightOf = (node: TestRenderer.ReactTestInstance): number => {
+      const value = styleOf(node).minHeight;
+      return typeof value === 'number' ? value : 0;
+    };
     const labelOf = (node: TestRenderer.ReactTestInstance): string => {
-      const label = node.props.accessibilityLabel;
+      const label: unknown = node.props.accessibilityLabel;
       return typeof label === 'string' ? label : '';
     };
+    const classNameOf = (node: TestRenderer.ReactTestInstance): string => {
+      const value: unknown = node.props.className;
+      return typeof value === 'string' ? value : '';
+    };
+    const descends = (
+      node: TestRenderer.ReactTestInstance,
+      predicate: (child: TestRenderer.ReactTestInstance) => boolean
+    ): boolean => node.findAll(() => true).some(predicate);
     const cases: {
       state: string;
       prepare: () => void;
-      isPackArea: (node: TestRenderer.ReactTestInstance) => boolean;
+      isPackSurface: (node: TestRenderer.ReactTestInstance) => boolean;
     }[] = [
       {
         state: 'loading',
         prepare: () => {
           owner.connected = false;
         },
-        isPackArea: node => String(node.props.className ?? '') === PACK_ROW_SHELL,
+        isPackSurface: node => classNameOf(node) === PACK_ROW_SHELL,
       },
       {
         state: 'happy',
         prepare: () => undefined,
-        isPackArea: node =>
+        isPackSurface: node =>
           String(node.type) === 'Pressable' && labelOf(node).includes('of credits'),
       },
       {
@@ -811,7 +833,7 @@ describe('CreditPurchaseScreen', () => {
             products: [],
           };
         },
-        isPackArea: node =>
+        isPackSurface: node =>
           node.children.some(child => child === 'Credit packs are unavailable right now.'),
       },
       {
@@ -819,16 +841,26 @@ describe('CreditPurchaseScreen', () => {
         prepare: () => {
           owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
         },
-        isPackArea: node => node.children.some(child => child === 'App Store products unavailable'),
+        isPackSurface: node =>
+          node.children.some(child => child === 'App Store products unavailable'),
+      },
+      {
+        state: 'purchase error',
+        prepare: () => {
+          owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
+        },
+        isPackSurface: node =>
+          String(node.type) === 'Pressable' && labelOf(node).includes('of credits'),
       },
     ];
 
     const measured: {
       state: string;
-      copyPresent: boolean;
-      copyInScroller: number;
+      copyInScroller: boolean;
       legalInScroller: number;
-      packAreaInScroller: number;
+      packSurfaceInScroller: number;
+      reservedHeight: number;
+      copyFollowsPackArea: boolean;
     }[] = [];
     // Sequential, not parallel: every scenario mutates the same owner mock and
     // the same backend fixture, so two mounted screens would race.
@@ -849,33 +881,67 @@ describe('CreditPurchaseScreen', () => {
       await waitFor(
         () =>
           allText(renderer).includes(DESCRIPTION_PREFIX) &&
-          renderer.root.findAll(() => true).some(node => scenario.isPackArea(node))
+          renderer.root.findAll(() => true).some(node => scenario.isPackSurface(node))
       );
       const scroller = renderer.root.findByType(DetailScreenScrollView);
+      const reserved = scroller
+        .findAll(node => minHeightOf(node) > 0)
+        .filter(node => descends(node, scenario.isPackSurface))[0];
+      const packAreaIndex = scroller.children.findIndex(
+        child =>
+          typeof child !== 'string' &&
+          descends(child, scenario.isPackSurface) &&
+          minHeightOf(child) > 0
+      );
+      const copyIndex = scroller.children.findIndex(
+        child =>
+          typeof child !== 'string' &&
+          descends(
+            child,
+            node =>
+              String(node.type) === 'Text' &&
+              node.children.some(
+                part => typeof part === 'string' && part.startsWith(DESCRIPTION_PREFIX)
+              )
+          )
+      );
       measured.push({
         state: scenario.state,
-        copyPresent: allText(renderer).includes(DESCRIPTION_PREFIX),
-        copyInScroller: scroller.findAll(
-          node =>
-            String(node.type) === 'Text' &&
-            node.children.some(
-              child => typeof child === 'string' && child.startsWith(DESCRIPTION_PREFIX)
-            )
-        ).length,
+        copyInScroller: copyIndex >= 0,
         legalInScroller: legalLinkNodes(scroller).length,
-        packAreaInScroller: scroller.findAll(node => scenario.isPackArea(node)).length,
+        packSurfaceInScroller: scroller.findAll(node => scenario.isPackSurface(node)).length,
+        reservedHeight: reserved === undefined ? 0 : minHeightOf(reserved),
+        copyFollowsPackArea: packAreaIndex >= 0 && copyIndex > packAreaIndex,
       });
       unmount();
       vi.clearAllMocks();
     }
     /* eslint-enable no-await-in-loop */
 
+    const reservedHeights = new Set(measured.map(result => result.reservedHeight));
+    expect(reservedHeights.size, 'one reserved height for every state').toBe(1);
     for (const result of measured) {
-      expect(result.copyPresent, result.state).toBe(true);
-      expect(result.copyInScroller, result.state).toBe(0);
-      expect(result.legalInScroller, result.state).toBe(0);
-      expect(result.packAreaInScroller, result.state).toBeGreaterThan(0);
+      expect(result.copyInScroller, result.state).toBe(true);
+      expect(result.legalInScroller, result.state).toBe(2);
+      expect(result.packSurfaceInScroller, result.state).toBeGreaterThan(0);
+      expect(result.reservedHeight, result.state).toBeGreaterThanOrEqual(TALLEST_STATE_MIN_HEIGHT);
+      expect(result.copyFollowsPackArea, result.state).toBe(true);
     }
+  });
+
+  it('names an expiring balance and says nothing when none expires', async () => {
+    // The pack rows already state that these credits never expire, so a balance
+    // with no expiring part needs no second line; the slot keeps its height.
+    const quiet = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(quiet.renderer).length === 4);
+    expect(allText(quiet.renderer)).not.toContain('No expiring credits.');
+    quiet.unmount();
+
+    creditBlocks.entries = [{ balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' }];
+    const expiring = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(expiring.renderer).includes('in credits expires'));
+    expect(allText(expiring.renderer)).not.toContain('No expiring credits.');
+    expiring.unmount();
   });
 
   it('identity failure: shows its own retryable card instead of an empty pack area', async () => {

@@ -14,6 +14,7 @@ import {
   APP_ROUTE_ROOTS,
   opensAppRoutePath,
   opensDestination,
+  SESSION_ROUTE_SIBLINGS,
   shellRouteHref,
 } from './deep-link-destination';
 
@@ -44,8 +45,31 @@ describe('opensDestination', () => {
     // Characters the store's id rule refuses, so no read could ever address it.
     '/(app)/agent-chat/ses:1',
     '/(app)/agent-chat/has space',
+    // A sibling screen's name is a single addressable segment, and expo-router
+    // matches the static route ahead of the session route: following the link
+    // would open that screen instead of a session.
+    ...SESSION_ROUTE_SIBLINGS.map(name => `/(app)/agent-chat/${name}`),
   ])('refuses the session destination %s', href => {
     expect(opensDestination(href)).toBe(false);
+  });
+
+  it('names every sibling route of the session screen', () => {
+    // A sibling added to the route directory is a link target the filter must
+    // refuse, so the list is checked against the directory rather than trusted.
+    const entries = readdirSync(
+      fileURLToPath(new URL('../app/(app)/agent-chat', import.meta.url)),
+      {
+        withFileTypes: true,
+      }
+    )
+      .filter(entry => entry.isFile())
+      .map(entry => entry.name)
+      .filter(name => !/\.test\.tsx?$/.test(name))
+      .map(name => name.replace(/\.(tsx|ts|jsx|js)$/, ''))
+      // `[session-id]` is the session route itself and `new` is its composer.
+      .filter(name => name !== '[session-id]' && name !== 'new');
+
+    expect([...SESSION_ROUTE_SIBLINGS].sort()).toEqual(entries.sort());
   });
 });
 

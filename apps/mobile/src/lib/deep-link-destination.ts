@@ -41,6 +41,27 @@ export const APP_ROUTE_ROOTS: readonly string[] = [
 /** Route param that opens the New-session composer instead of a session. */
 const NEW_SESSION_CAPTURE = 'new';
 
+/**
+ * The screens registered beside the session route in `agent-chat/`, without
+ * their extension. Their names are single segments the store's id rule accepts,
+ * so the session filter must not take one for a session: expo-router matches a
+ * static route ahead of `[session-id]`, and following such a link would open a
+ * picker sheet outside the flow that seeds it. `new` is deliberately absent; it
+ * is the composer capture the session route itself answers.
+ *
+ * `deep-link-destination.test.ts` keeps the list equal to the route
+ * directory's entries.
+ */
+export const SESSION_ROUTE_SIBLINGS: readonly string[] = [
+  'branch-picker',
+  'folder-picker',
+  'instance-picker',
+  'mode-picker',
+  'model-picker',
+  'profile-picker',
+  'repo-picker',
+];
+
 /** The session family's group-stripped prefix, as an indexed link carries it. */
 const SESSION_FAMILY_PREFIX = deeplinkPathFromHref(SESSION_HREF_PREFIX);
 
@@ -55,13 +76,17 @@ const SESSION_FAMILY_PREFIX = deeplinkPathFromHref(SESSION_HREF_PREFIX);
  * and a link must never be refused by a rule stricter than the route that would
  * open it. The app cannot prove from the id alone that the session exists, so a
  * capture the store cannot address opens nothing, and any other capture reaches
- * the route, whose denial shows the not-found state.
+ * the route, whose denial shows the not-found state. A capture that names one
+ * of the session route's sibling screens is not a session either.
  */
 export function opensDestination(href: string): boolean {
   if (!href.startsWith(SESSION_HREF_PREFIX)) {
     return true;
   }
   const capture = href.slice(SESSION_HREF_PREFIX.length);
+  if (SESSION_ROUTE_SIBLINGS.includes(capture)) {
+    return false;
+  }
   return capture === NEW_SESSION_CAPTURE || isAddressableStoredSessionId(capture);
 }
 

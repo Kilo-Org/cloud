@@ -37,14 +37,28 @@ function valueAt(catalog: unknown, path: string[]): unknown {
   return node;
 }
 
-/** The command as the reader gets it: one isolated left-to-right run. */
-const ISOLATED_COMMAND = `${LTR_ISOLATE_OPEN}kilo remote${LTR_ISOLATE_CLOSE}`;
+/** The command as the reader gets it: one isolated, unbreakable left-to-right run. */
+const ISOLATED_COMMAND = `${LTR_ISOLATE_OPEN}kilo\u00A0remote${LTR_ISOLATE_CLOSE}`;
 
 describe('stripInlineCodeMarkers', () => {
   it('renders a marked run as one isolated left-to-right run', () => {
     expect(stripInlineCodeMarkers('Run `kilo remote`, or `/remote` in a CLI session.')).toBe(
       `Run ${ISOLATED_COMMAND}, or ${LTR_ISOLATE_OPEN}/remote${LTR_ISOLATE_CLOSE} in a CLI session.`
     );
+  });
+
+  it('leaves no breakable space inside the run', () => {
+    // A breakable space let a wrapped right-to-left sentence split the command
+    // across two lines, which then read as two fragments. The isolate alone is
+    // zero-width; the no-break space is what keeps the command on one line.
+    const visible = stripInlineCodeMarkers('Run `kilo remote` on your computer.');
+    const inside = visible.slice(
+      visible.indexOf(LTR_ISOLATE_OPEN) + 1,
+      visible.indexOf(LTR_ISOLATE_CLOSE)
+    );
+
+    expect(inside).toBe('kilo\u00A0remote');
+    expect(inside).not.toContain(' ');
   });
 
   it('leaves the sentence period outside the isolate', () => {
@@ -105,13 +119,16 @@ describe('run-location help copy', () => {
       const value = valueAt(catalog, path);
       expect(typeof value, `${tag} ${path.join('.')}`).toBe('string');
       const visible = stripInlineCodeMarkers(value as string);
-      expect(visible, `${tag} ${path.join('.')}`).toContain('kilo remote');
+      // The run's own space is a no-break space, so compare with spaces.
+      expect(visible.replaceAll('\u00A0', ' '), `${tag} ${path.join('.')}`).toContain(
+        'kilo remote'
+      );
     }
   });
 
   // Every wording that embeds the command gets the same treatment: the run is
-  // one isolate and no part of it sits outside. A catalog that ships the
-  // command plain (English) keeps its copy as it is.
+  // one isolate with no breakable space inside, and no part of it sits outside.
+  // A catalog that ships the command plain (English) keeps its copy as it is.
   it.each(SUPPORTED_LANGUAGES)('%s isolates every marked command run', tag => {
     const catalog = CATALOG_LOADERS[tag]();
 
@@ -124,7 +141,8 @@ describe('run-location help copy', () => {
       const visible = stripInlineCodeMarkers(source);
       const marked = (source.match(/`[^`]*`/g) ?? []).length;
       expect(visible.split(ISOLATED_COMMAND).length - 1, label).toBe(marked);
-      // The isolation adds marks only: no command text is lost or duplicated.
+      // The treatment adds marks and unbreakable spaces only: no command text
+      // is lost or duplicated.
       expect(visible.replaceAll(ISOLATED_COMMAND, 'kilo remote'), label).toBe(
         source.replaceAll('`', '')
       );

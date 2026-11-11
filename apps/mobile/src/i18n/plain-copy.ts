@@ -13,13 +13,18 @@ const INLINE_CODE = /`([^`]*)`|`/g;
  * removes them from the other catalogs, and this keeps those readable first.
  *
  * A marked run is a command or a path, so it renders as one isolated
- * left-to-right run (`isolateLtrBidiText`): in a right-to-left paragraph the
- * run then keeps its own order instead of splitting against the sentence
- * around it, and the punctuation outside the isolate still belongs to the
- * sentence — `kilo remote`. keeps its period at the end of the sentence.
+ * left-to-right run (`isolateLtrBidiText`). In a right-to-left paragraph the
+ * run then keeps its own order instead of taking the sentence's, and the
+ * punctuation outside the isolate still belongs to the sentence: `kilo
+ * remote`. keeps its period at the sentence end.
+ *
+ * The run's own spaces become no-break spaces, the treatment the credit-expiry
+ * note gives its zone marker: a breakable space let a wrapped sentence split
+ * the command, which then read as two fragments with the period on the wrong
+ * side. The isolate leaves the rest of the sentence free to wrap.
  */
 export function stripInlineCodeMarkers(value: string): string {
   return value.replaceAll(INLINE_CODE, (_match, run?: string) =>
-    run === undefined ? '' : isolateLtrBidiText(run)
+    run === undefined ? '' : isolateLtrBidiText(run.replaceAll(' ', '\u00A0'))
   );
 }

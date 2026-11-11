@@ -411,10 +411,12 @@ async function recoverMissingInterval(
   return existing;
 }
 
-// Compute is charged only while an organization is in its free trial and has
-// not started paying. Child organizations have no trial or subscription of
-// their own; they use their live parent's. The hierarchy is one level deep.
-async function isInUnpaidOrganizationTrial(
+// Enterprise contracts can lock in prices, so enterprise organizations are not
+// charged until their contract is reviewed and the organization is enrolled by
+// ID. Enterprise trials that have not started paying are still charged. Child
+// organizations use their live parent's plan, trial and subscription. The
+// hierarchy is one level deep.
+async function isUnreviewedEnterpriseOrganization(
   tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
   organizationId: string,
   now: Date
@@ -422,9 +424,11 @@ async function isInUnpaidOrganizationTrial(
   const [row] = await tx
     .select({
       id: organizations.id,
+      plan: organizations.plan,
       freeTrialEndAt: organizations.free_trial_end_at,
       createdAt: organizations.created_at,
       parentId: parentOrganizationsTable.id,
+      parentPlan: parentOrganizationsTable.plan,
       parentFreeTrialEndAt: parentOrganizationsTable.free_trial_end_at,
       parentCreatedAt: parentOrganizationsTable.created_at,
     })
@@ -432,7 +436,8 @@ async function isInUnpaidOrganizationTrial(
     .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
     .where(eq(organizations.id, organizationId))
     .limit(1);
-  if (!row) return true;
+  if (!row) return false;
+  if (row.plan !== 'enterprise' && row.parentPlan !== 'enterprise') return false;
   const owner =
     row.parentId && row.parentCreatedAt
       ? {
@@ -441,7 +446,7 @@ async function isInUnpaidOrganizationTrial(
           createdAt: row.parentCreatedAt,
         }
       : row;
-  if (getOrganizationTrialEndDate(owner.freeTrialEndAt, owner.createdAt) <= now) return false;
+  if (getOrganizationTrialEndDate(owner.freeTrialEndAt, owner.createdAt) <= now) return true;
 
   // Read the latest event, not any historical active subscription. Trialing
   // subscriptions have not started paying.
@@ -451,7 +456,7 @@ async function isInUnpaidOrganizationTrial(
     .where(eq(organization_seats_purchases.organization_id, owner.id))
     .orderBy(desc(organization_seats_purchases.created_at))
     .limit(1);
-  return purchase?.status !== 'active' && purchase?.status !== 'past_due';
+  return purchase?.status === 'active' || purchase?.status === 'past_due';
 }
 
 export async function applyStart(
@@ -531,7 +536,8 @@ export async function applyStartWithDb(
       billingMode === 'paid' &&
       input.service.startsWith('cloud-agent-next-') &&
       input.subject.type === 'org' &&
-      !(await isInUnpaidOrganizationTrial(tx, input.subject.id, new Date(receivedAtMs)))
+      !billingConfig.cloudAgentOrgIds.has(input.subject.id) &&
+      (await isUnreviewedEnterpriseOrganization(tx, input.subject.id, new Date(receivedAtMs)))
     ) {
       billingMode = 'shadow';
     }

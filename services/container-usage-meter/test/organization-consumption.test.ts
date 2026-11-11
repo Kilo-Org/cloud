@@ -227,50 +227,159 @@ async function fixture() {
 
 describe('native organization compute accounting', () => {
   it.each([
-    { status: 'active', wildcard: false, billingMode: 'shadow' },
-    { status: 'active', wildcard: true, billingMode: 'shadow' },
-    { status: 'past_due', wildcard: true, billingMode: 'shadow' },
-    { status: 'trialing', wildcard: true, billingMode: 'paid' },
-    { status: 'ended', wildcard: true, billingMode: 'paid' },
-    { status: 'canceled', wildcard: true, billingMode: 'paid' },
-    { status: null, wildcard: true, billingMode: 'paid' },
-  ])(
-    'uses $billingMode billing for latest seat status $status (wildcard: $wildcard)',
-    async ({ status, wildcard, billingMode }) => {
+    {
+      plan: 'teams',
+      owner: 'self',
+      trialEnded: true,
+      seats: ['active'],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: true,
+      seats: [],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: true,
+      seats: [],
+      explicit: true,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: false,
+      seats: [],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: false,
+      seats: ['active'],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: false,
+      seats: ['past_due'],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: false,
+      seats: ['trialing'],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    // An old active purchase must not hide a newer cancellation.
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: false,
+      seats: ['active', 'ended'],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'parent',
+      trialEnded: true,
+      seats: [],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'parent',
+      trialEnded: false,
+      seats: [],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'parent',
+      trialEnded: false,
+      seats: ['active'],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+    {
+      plan: 'teams',
+      owner: 'parent',
+      trialEnded: true,
+      seats: [],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'deleted-parent',
+      trialEnded: true,
+      seats: [],
+      explicit: false,
+      billingMode: 'paid',
+    },
+  ] as const)(
+    'uses $billingMode billing for a $plan $owner org (trial ended: $trialEnded, seats: $seats, explicit: $explicit)',
+    async ({ plan, owner, trialEnded, seats, explicit, billingMode }) => {
       const f = await fixture();
-      if (wildcard) f.config.cloudAgentOrgIds = new Set(['*']);
+      f.config.cloudAgentOrgIds = new Set(explicit ? [f.orgId] : ['*']);
       f.config.warnRemainingMicrodollars = 5_000_000;
-      if (status !== null) {
-        const purchase = {
-          organization_id: f.orgId,
-          subscription_stripe_id: `sub_${f.orgId}`,
-          seat_count: 1,
-          amount_usd: 19,
-          starts_at: new Date(f.start).toISOString(),
-          expires_at: new Date(f.start + 30 * 86_400_000).toISOString(),
-        };
-        // An old active purchase must not hide a newer trial or cancellation.
-        await client.db.insert(organization_seats_purchases).values([
-          {
-            ...purchase,
-            subscription_status: 'active',
-            created_at: new Date(f.start - 86_400_000).toISOString(),
-          },
-          {
-            ...purchase,
+      const trial = {
+        plan,
+        free_trial_end_at: new Date(f.start + (trialEnded ? -1 : 1) * 86_400_000).toISOString(),
+      };
+      let ownerId = f.orgId;
+      if (owner === 'self') {
+        await client.db.update(organizations).set(trial).where(eq(organizations.id, f.orgId));
+      } else {
+        // A new teams child: only the parent's plan and trial apply.
+        ownerId = crypto.randomUUID();
+        parentOrgIds.push(ownerId);
+        await client.db.insert(organizations).values({
+          ...trial,
+          id: ownerId,
+          name: 'Compute parent',
+          deleted_at:
+            owner === 'deleted-parent' ? new Date(f.start - 86_400_000).toISOString() : null,
+        });
+        await client.db
+          .update(organizations)
+          .set({ parent_organization_id: ownerId })
+          .where(eq(organizations.id, f.orgId));
+      }
+      if (seats.length > 0) {
+        await client.db.insert(organization_seats_purchases).values(
+          seats.map((status, index) => ({
+            organization_id: ownerId,
+            subscription_stripe_id: `sub_${ownerId}`,
             subscription_status: status,
-            created_at: new Date(f.start).toISOString(),
-          },
-        ]);
+            seat_count: 1,
+            amount_usd: 19,
+            starts_at: new Date(f.start).toISOString(),
+            expires_at: new Date(f.start + 30 * 86_400_000).toISOString(),
+            created_at: new Date(f.start - (seats.length - index) * 86_400_000).toISOString(),
+          }))
+        );
       }
       if (billingMode === 'shadow') await f.limit(0);
 
       expect(await f.admission()).toMatchObject({ kind: 'applied', billingMode, dedup: false });
       expect(await f.admission()).toMatchObject({ kind: 'applied', billingMode, dedup: true });
-      expect(await f.heartbeat()).toMatchObject({
-        billingMode,
-        budget: { verdict: 'continue' },
-      });
+      expect(await f.heartbeat()).toMatchObject({ billingMode, budget: { verdict: 'continue' } });
       const charged = billingMode === 'paid';
       expect((await f.payer()).microdollars_used).toBe(charged ? 3_000_000 : 0);
       expect(await f.usage()).toBe(charged ? 3_000_000 : undefined);
@@ -285,101 +394,6 @@ describe('native organization compute accounting', () => {
         .where(eq(container_usage_interval.id, f.intervalId));
       expect(interval.billing_mode).toBe(billingMode);
       expect(interval.confirmed_seconds).toBe(300);
-    }
-  );
-
-  it.each([
-    { parentStatus: 'active', parentDeleted: false, billingMode: 'shadow' },
-    { parentStatus: 'past_due', parentDeleted: false, billingMode: 'shadow' },
-    { parentStatus: 'trialing', parentDeleted: false, billingMode: 'paid' },
-    { parentStatus: 'ended', parentDeleted: false, billingMode: 'paid' },
-    { parentStatus: null, parentDeleted: false, billingMode: 'paid' },
-    { parentStatus: 'active', parentDeleted: true, billingMode: 'paid' },
-    { parentStatus: 'past_due', parentDeleted: true, billingMode: 'paid' },
-  ])(
-    'uses $billingMode billing for a child org whose parent seat status is $parentStatus (deleted: $parentDeleted)',
-    async ({ parentStatus, parentDeleted, billingMode }) => {
-      const f = await fixture();
-      f.config.cloudAgentOrgIds = new Set(['*']);
-      f.config.warnRemainingMicrodollars = 5_000_000;
-      const parentOrgId = crypto.randomUUID();
-      parentOrgIds.push(parentOrgId);
-      await client.db.insert(organizations).values({
-        id: parentOrgId,
-        name: 'Compute parent',
-        deleted_at: parentDeleted ? new Date(f.start - 86_400_000).toISOString() : null,
-      });
-      await client.db
-        .update(organizations)
-        .set({ parent_organization_id: parentOrgId })
-        .where(eq(organizations.id, f.orgId));
-      if (parentStatus !== null) {
-        await client.db.insert(organization_seats_purchases).values({
-          organization_id: parentOrgId,
-          subscription_stripe_id: `sub_${parentOrgId}`,
-          subscription_status: parentStatus,
-          seat_count: 1,
-          amount_usd: 19,
-          starts_at: new Date(f.start).toISOString(),
-          expires_at: new Date(f.start + 30 * 86_400_000).toISOString(),
-        });
-      }
-      if (billingMode === 'shadow') await f.limit(0);
-
-      expect(await f.admission()).toMatchObject({ kind: 'applied', billingMode, dedup: false });
-      expect(await f.heartbeat()).toMatchObject({
-        billingMode,
-        budget: { verdict: 'continue' },
-      });
-      const charged = billingMode === 'paid';
-      expect((await f.payer()).microdollars_used).toBe(charged ? 3_000_000 : 0);
-      expect(await f.usage()).toBe(charged ? 3_000_000 : undefined);
-      const charges = await client.db
-        .select()
-        .from(compute_usage_charge)
-        .where(eq(compute_usage_charge.organization_id, f.orgId));
-      expect(charges).toHaveLength(charged ? 1 : 0);
-    }
-  );
-
-  it.each([
-    { owner: 'self', trialEndOffsetDays: -1, billingMode: 'shadow' },
-    { owner: 'self', trialEndOffsetDays: 1, billingMode: 'paid' },
-    { owner: 'parent', trialEndOffsetDays: -1, billingMode: 'shadow' },
-    { owner: 'parent', trialEndOffsetDays: 1, billingMode: 'paid' },
-  ])(
-    'uses $billingMode billing when the $owner trial ends in $trialEndOffsetDays days',
-    async ({ owner, trialEndOffsetDays, billingMode }) => {
-      const f = await fixture();
-      f.config.cloudAgentOrgIds = new Set(['*']);
-      f.config.warnRemainingMicrodollars = 5_000_000;
-      const freeTrialEndAt = new Date(f.start + trialEndOffsetDays * 86_400_000).toISOString();
-      if (owner === 'self') {
-        await client.db
-          .update(organizations)
-          .set({ free_trial_end_at: freeTrialEndAt })
-          .where(eq(organizations.id, f.orgId));
-      } else {
-        // A new child has its own recent created_at; only the parent trial counts.
-        const parentOrgId = crypto.randomUUID();
-        parentOrgIds.push(parentOrgId);
-        await client.db.insert(organizations).values({
-          id: parentOrgId,
-          name: 'Compute parent',
-          free_trial_end_at: freeTrialEndAt,
-        });
-        await client.db
-          .update(organizations)
-          .set({ parent_organization_id: parentOrgId })
-          .where(eq(organizations.id, f.orgId));
-      }
-      if (billingMode === 'shadow') await f.limit(0);
-
-      expect(await f.admission()).toMatchObject({ kind: 'applied', billingMode, dedup: false });
-      expect(await f.heartbeat()).toMatchObject({ billingMode, budget: { verdict: 'continue' } });
-      const charged = billingMode === 'paid';
-      expect((await f.payer()).microdollars_used).toBe(charged ? 3_000_000 : 0);
-      expect(await f.usage()).toBe(charged ? 3_000_000 : undefined);
     }
   );
 

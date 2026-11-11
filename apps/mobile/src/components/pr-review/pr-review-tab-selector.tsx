@@ -73,10 +73,11 @@ export function PrReviewTabSelector({
             className={cn(
               'flex-1 items-center justify-center rounded-md py-2 active:opacity-70',
               // Dark paints `bg-card` below the row's `bg-secondary`, so the
-              // selected pill takes the palette's selected-state fill instead:
-              // it stands 3.1:1 off `--secondary`, the step a selected option
-              // needs to read as raised.
-              active && 'bg-card shadow-sm shadow-[#0000000D] dark:bg-selection',
+              // selected pill takes the palette's elevated neutral fill
+              // instead: the same raised-surface step a filled neutral control
+              // uses, so the pill stays the neutral raised surface light mode
+              // shows rather than a tinted accent that pulls the eye.
+              active && 'bg-card shadow-sm shadow-[#0000000D] dark:bg-secondary-fill',
               disabled && 'opacity-60'
             )}
           >

@@ -3,11 +3,8 @@ import type { Env } from '../types.js';
 import type * as vercelBuilder from './vercel-builder.js';
 import { ByocCredentialMissingError } from '../byoc/vercel-credential-resolver.js';
 import type { BuilderLifecycleState, VercelBuilderAllocation } from './builder-provider.js';
-import {
-  BuilderRetryableError,
-  BuilderStateInvalidError,
-  BuilderTargetMismatchError,
-} from './builder-errors.js';
+import { BuilderRetryableError, BuilderTargetMismatchError } from './builder-errors.js';
+import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 
 const openVercelBuilder = vi.hoisted(() => vi.fn());
 vi.mock('./vercel-builder.js', async importOriginal => ({
@@ -120,15 +117,22 @@ describe('Vercel builder stop without a credential', () => {
     expect(await lifecycle.get()).toBeUndefined();
   });
 
-  it('rejects a missing create expiry instead of inventing a new cleanup deadline', async () => {
+  it('bounds missing expiry state without resetting its deadline on each retry', async () => {
     openVercelBuilder.mockClear();
     openVercelBuilder.mockRejectedValue(new ByocCredentialMissingError('credential-1'));
     const lifecycle = memoryState({ sessionId: 'session-1' });
+    const requestedAt = 1_000;
+    const expiresAt = requestedAt + 45 * 60_000 + DEADLINE_MS.createSettle;
 
-    await expect(provider().stop(allocation, lifecycle)).rejects.toBeInstanceOf(
-      BuilderStateInvalidError
+    await expect(provider(() => requestedAt).stop(allocation, lifecycle)).resolves.toBe(
+      'retryable'
     );
-    expect(await lifecycle.get()).toEqual({ sessionId: 'session-1' });
+    expect(await lifecycle.get()).toEqual({ sessionId: 'session-1', createExpiresAt: expiresAt });
+    await expect(provider(() => expiresAt - 1).stop(allocation, lifecycle)).resolves.toBe(
+      'retryable'
+    );
+    await expect(provider(() => expiresAt).stop(allocation, lifecycle)).resolves.toBe('terminal');
+    expect(await lifecycle.get()).toBeUndefined();
   });
 
   it('releases a created sandbox whose credential is gone once its expiry has passed', async () => {

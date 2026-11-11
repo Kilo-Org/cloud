@@ -337,16 +337,23 @@ describe('Vercel environment builder', () => {
     expect(await state.get()).toBeUndefined();
   });
 
-  it('does not clear a live session when the credential is gone and no expiry bound exists', async () => {
+  it('persists one conservative expiry bound when the credential is gone and no bound exists', async () => {
     const state = memoryState({ sessionId: 'session-1' });
     const open = async () => {
       throw new ByocCredentialMissingError('credential-1');
     };
+    const expiresAt = now() + 45 * 60_000 + DEADLINE_MS.createSettle;
 
-    await expect(stopVercelBuilder({ allocation, state, open, now })).rejects.toBeInstanceOf(
-      BuilderStateInvalidError
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('retryable');
+    expect(await state.get()).toMatchObject({ sessionId: 'session-1', createExpiresAt: expiresAt });
+    expect(await stopVercelBuilder({ allocation, state, open, now: () => expiresAt - 1 })).toBe(
+      'retryable'
     );
-    expect(await state.get()).toMatchObject({ sessionId: 'session-1' });
+    expect(await state.get()).toHaveProperty('createExpiresAt', expiresAt);
+    expect(await stopVercelBuilder({ allocation, state, open, now: () => expiresAt })).toBe(
+      'terminal'
+    );
+    expect(await state.get()).toBeUndefined();
   });
 
   it('derives the expiry bound from the create request when no explicit bound is stored', async () => {
@@ -384,6 +391,92 @@ describe('Vercel environment builder', () => {
     expect(await stopVercelBuilder({ allocation, state, open, now: () => now() + 60_001 })).toBe(
       'terminal'
     );
+    expect(await state.get()).toBeUndefined();
+  });
+
+  it.each([
+    ['inspectByName', 'inspect'],
+    ['getSession', 'get-session'],
+    ['stopSession', 'stop-session'],
+  ] as const)('bounds cleanup when %s rejects the pinned credential', async (operation, action) => {
+    for (const status of [400, 401, 403, 422]) {
+      const expiresAt = now() + 60_000;
+      const initial = {
+        ...(operation === 'inspectByName'
+          ? { createRequestedAt: now() }
+          : { sessionId: 'session-1' }),
+        createExpiresAt: expiresAt,
+      };
+      const state = memoryState(initial);
+      const rest = client({
+        [operation]: vi.fn(async () => {
+          throw new VercelSandboxRestError('request_failed', action, status);
+        }),
+      });
+      const open = vi.fn(async () => ({
+        client: rest,
+        runtime: 'node24' as const,
+        initialTimeoutMs: 300_000,
+      }));
+
+      expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('retryable');
+      expect(await state.get()).toEqual(initial);
+      expect(await stopVercelBuilder({ allocation, state, open, now: () => expiresAt })).toBe(
+        'terminal'
+      );
+      expect(await state.get()).toBeUndefined();
+      expect(open).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('bounds cleanup of corrupt state without treating it as an absent create', async () => {
+    const state = memoryState({ createRequestedAt: 'not-a-number' });
+    const open = vi.fn(async () => {
+      throw new ByocCredentialMissingError('credential-1');
+    });
+    const expiresAt = now() + 45 * 60_000 + DEADLINE_MS.createSettle;
+
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('retryable');
+    expect(await state.get()).toHaveProperty('createExpiresAt', expiresAt);
+    expect(await stopVercelBuilder({ allocation, state, open, now: () => expiresAt - 1 })).toBe(
+      'retryable'
+    );
+    expect(await state.get()).toHaveProperty('createExpiresAt', expiresAt);
+    expect(await stopVercelBuilder({ allocation, state, open, now: () => expiresAt })).toBe(
+      'terminal'
+    );
+    expect(await state.get()).toBeUndefined();
+  });
+
+  it('stops a discoverable builder immediately despite corrupt lifecycle state', async () => {
+    const state = memoryState({ createRequestedAt: 'not-a-number' });
+    const rest = client({ inspectByName: vi.fn(async () => createEnvelope()) });
+    const open = async () => ({
+      client: rest,
+      runtime: 'node24' as const,
+      initialTimeoutMs: 300_000,
+    });
+
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('terminal');
+    expect(rest.stopSession).toHaveBeenCalledWith('session-1', allocation.sandboxId);
+    expect(await state.get()).toBeUndefined();
+  });
+
+  it('retries a transient stop failure and clears state when the provider recovers', async () => {
+    const state = memoryState({ sessionId: 'session-1', createExpiresAt: now() + 60_000 });
+    const rest = client();
+    vi.mocked(rest.stopSession).mockRejectedValueOnce(
+      new VercelSandboxRestError('request_failed', 'stop-session', 503)
+    );
+    const open = async () => ({
+      client: rest,
+      runtime: 'node24' as const,
+      initialTimeoutMs: 300_000,
+    });
+
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('retryable');
+    expect(await state.get()).toMatchObject({ sessionId: 'session-1' });
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('terminal');
     expect(await state.get()).toBeUndefined();
   });
 

@@ -7,7 +7,6 @@ import {
   type VercelSandboxSnapshot,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
-  ByocCredentialMissingError,
   ByocCredentialResolverError,
   resolveByocVercelAccessConfig,
 } from '../byoc/vercel-credential-resolver.js';
@@ -497,7 +496,16 @@ export async function stopVercelBuilder(input: {
   now?: () => number;
 }): Promise<'terminal' | 'retryable'> {
   const now = input.now ?? Date.now;
-  const state = await readState(input.state);
+  let state: LifecycleState;
+  try {
+    state = await readState(input.state);
+  } catch (error) {
+    if (!(error instanceof BuilderStateInvalidError)) throw error;
+    // Corrupt state may hide a live create. Allow one full provider lifetime from discovery.
+    state = await writeState(input.state, {
+      createExpiresAt: now() + MAX_BUILDER_TIMEOUT_MS + CREATE_LANDING_MARGIN_MS,
+    });
+  }
   if (
     state.sessionId === undefined &&
     state.createRequestedAt === undefined &&
@@ -508,18 +516,22 @@ export async function stopVercelBuilder(input: {
     return 'terminal';
   }
 
+  const expiresAt =
+    state.createExpiresAt ??
+    (state.createRequestedAt ?? now()) + MAX_BUILDER_TIMEOUT_MS + CREATE_LANDING_MARGIN_MS;
+  if (state.createExpiresAt === undefined) {
+    state = await writeState(input.state, { ...state, createExpiresAt: expiresAt });
+  }
+  if (now() >= expiresAt) {
+    await input.state.clear();
+    return 'terminal';
+  }
+
   let opened;
   try {
     opened = await input.open();
-  } catch (error) {
-    if (
-      error instanceof ByocCredentialMissingError ||
-      error instanceof BuilderTargetMismatchError
-    ) {
-      return clearWhenExpired(input.state, now);
-    }
-    if (error instanceof BuilderRetryableError) return 'retryable';
-    throw error;
+  } catch {
+    return 'retryable';
   }
   const { client, runtime } = opened;
   let sessionId = state.sessionId;
@@ -527,8 +539,8 @@ export async function stopVercelBuilder(input: {
     let inspected;
     try {
       inspected = await client.inspectByName(inspectInput(input.allocation, runtime));
-    } catch (error) {
-      wrapTransient(error, 'Vercel builder stop inspect failed');
+    } catch {
+      return 'retryable';
     }
     if (inspected === null) {
       if (
@@ -545,7 +557,6 @@ export async function stopVercelBuilder(input: {
     await writeState(input.state, {
       ...state,
       sessionId,
-      ...(state.createExpiresAt === undefined ? createExpiryBound(inspected.session) : {}),
     });
   }
 
@@ -567,31 +578,6 @@ export async function stopVercelBuilder(input: {
       await input.state.clear();
       return 'terminal';
     }
-    if (error instanceof VercelSandboxRestError && error.kind === 'correlation_mismatch') {
-      return clearWhenExpired(input.state, now);
-    }
-    if (isTransient(error)) return 'retryable';
-    throw error;
+    return 'retryable';
   }
-}
-
-/**
- * A sandbox the credential or session handle can no longer address stays
- * retryable until the provider's own create timeout proves it is gone. Never
- * claim terminal while a bound still allows the resource to be live.
- */
-async function clearWhenExpired(
-  storage: BuilderLifecycleState,
-  now: () => number
-): Promise<'terminal' | 'retryable'> {
-  const state = await readState(storage);
-  const expiresAt =
-    state.createExpiresAt ??
-    (state.createRequestedAt === undefined
-      ? undefined
-      : state.createRequestedAt + MAX_BUILDER_TIMEOUT_MS + CREATE_LANDING_MARGIN_MS);
-  if (expiresAt === undefined) throw new BuilderStateInvalidError();
-  if (now() < expiresAt) return 'retryable';
-  await storage.clear();
-  return 'terminal';
 }

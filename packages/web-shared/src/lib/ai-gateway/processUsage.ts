@@ -1359,9 +1359,18 @@ export function countAndStoreUsage(
   }
 
   metadataCapture?.waitFor(usageStatsPromise);
-  return usageStatsPromise.then(usageStats =>
-    processTokenData(usageStats, usageContext, servingProvider)
-  );
+  const statsPromise = usageStatsPromise.then(usageStats => {
+    if (usageStats) {
+      usageStats.inference_provider ??= servingProvider?.inferenceProviderId ?? null;
+    }
+    return usageStats;
+  });
+  return {
+    statsPromise,
+    usagePromise: statsPromise.then(usageStats =>
+      processTokenData(usageStats, usageContext, servingProvider)
+    ),
+  };
 }
 
 export function processOpenRouterUsage(

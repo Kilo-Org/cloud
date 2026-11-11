@@ -219,10 +219,16 @@ const CODE_REVIEW_GIT_READ_SUBCOMMANDS = [
 // are outside that workflow, so each read rule keeps a matching denial pattern.
 // Git accepts any unambiguous prefix of a long option, and the matcher has no
 // character class, so a pattern covers the shortest accepted prefix at any
-// position, with `=` and with a separating space.
+// position, with `=` and with a separating space. `--upload-pack` is the only
+// fetch or pull option that starts with `--upl`, so the shorter prefix keeps
+// `--unshallow` and the update options available to a shallow review clone. The
+// `ext::` remote helper runs the command carried in its URL locally, and that
+// URL carries no option, so each read subcommand that takes a remote denies it.
 const CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS = [
-  'git fetch *--u*',
-  'git pull *--u*',
+  'git fetch *--upl*',
+  'git pull *--upl*',
+  'git fetch *ext::*',
+  'git pull *ext::*',
   'git diff *--output*',
   'git log *--output*',
   'git show *--output*',

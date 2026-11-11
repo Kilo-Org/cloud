@@ -207,8 +207,10 @@ describe('code-review command guard policy', () => {
     if (!policy) throw new Error('Expected code-review command guard policy');
     const permissions = buildCommandGuardBashPermissions(policy);
 
-    expect(permissions['git fetch *--u*']).toBe('deny');
-    expect(permissions['git pull *--u*']).toBe('deny');
+    expect(permissions['git fetch *--upl*']).toBe('deny');
+    expect(permissions['git pull *--upl*']).toBe('deny');
+    expect(permissions['git fetch *ext::*']).toBe('deny');
+    expect(permissions['git pull *ext::*']).toBe('deny');
 
     // The option is matched at any position, with `=` or a separating space, and
     // through any accepted prefix.
@@ -226,11 +228,24 @@ describe('code-review command guard policy', () => {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }
 
+    // The `ext::` remote helper runs the command carried in its URL locally.
+    for (const command of [
+      "git fetch ext::sh -c 'id > /tmp/pwned'",
+      'git fetch origin ext::sh -c id',
+      "git pull 'ext::sh -c id'",
+      'git pull origin ext::./helper',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
+
     // The read forms of the review workflow resolve to allow.
     for (const command of [
       'git fetch origin',
       'git fetch --prune origin',
       'git fetch origin main',
+      'git fetch --unshallow origin',
+      'git fetch --update-head-ok origin',
+      'git fetch --update-shallow origin',
       'git pull',
       'git pull origin main',
       'git pull --ff-only',

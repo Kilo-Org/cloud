@@ -1,4 +1,5 @@
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { ByokFailoverAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
@@ -60,10 +61,6 @@ async function readErrorBody(response: Response): Promise<unknown> {
     clearTimeout(timeout);
     void reader.cancel().catch(() => {});
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 function codeOf(value: unknown): string | undefined {

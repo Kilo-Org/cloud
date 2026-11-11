@@ -95,7 +95,10 @@ const CHAT_TOOLS = [
       parameters: {
         type: 'object',
         properties: {
-          path: { type: 'string', description: 'Path of the file to read, relative to the workspace' },
+          path: {
+            type: 'string',
+            description: 'Path of the file to read, relative to the workspace',
+          },
         },
         required: ['path'],
         additionalProperties: false,
@@ -266,7 +269,9 @@ const messagesRequest = {
             type: 'tool_use',
             id: 'toolu_1',
             name: 'read_file',
-            input: { path: 'packages/web-shared/src/lib/ai-gateway/enkrypt-guardrail/admission.ts' },
+            input: {
+              path: 'packages/web-shared/src/lib/ai-gateway/enkrypt-guardrail/admission.ts',
+            },
           },
         ],
       },
@@ -278,7 +283,10 @@ const messagesRequest = {
             tool_use_id: 'toolu_1',
             content: [
               { type: 'text', text: ADMISSION_SOURCE },
-              { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0KGgo=' } },
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0KGgo=' },
+              },
             ],
           },
         ],
@@ -298,7 +306,11 @@ const responsesRequest = {
         role: 'user',
         content: [
           { type: 'input_text', text: 'Summarize what responses.ts does.' },
-          { type: 'input_file', filename: 'design.pdf', file_data: 'data:application/pdf;base64,JVBERi0=' },
+          {
+            type: 'input_file',
+            filename: 'design.pdf',
+            file_data: 'data:application/pdf;base64,JVBERi0=',
+          },
         ],
       },
       {
@@ -339,7 +351,9 @@ const hugeTools = Array.from({ length: 60 }, (_, index) => ({
 }));
 
 /** The expected verdict cache result and verdict of each part. Context is absent when not scanned. */
-type Expected = Partial<Record<'context' | 'conversation', `${'miss' | 'hit'} ${'allow' | 'block'}`>>;
+type Expected = Partial<
+  Record<'context' | 'conversation', `${'miss' | 'hit'} ${'allow' | 'block'}`>
+>;
 
 type Step = {
   name: string;
@@ -368,7 +382,11 @@ const steps: Step[] = [
       ...CHAT_TOOLS,
       {
         type: 'function',
-        function: { name: 'search_files', description: 'Regex search across files.', parameters: {} },
+        function: {
+          name: 'search_files',
+          description: 'Regex search across files.',
+          parameters: {},
+        },
       },
     ]),
     store: chatStore,

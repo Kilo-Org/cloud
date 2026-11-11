@@ -212,7 +212,10 @@ export function startEnkryptInputGuardrail(
         results.flatMap(({ report }, index) =>
           report ? [{ ...report, verdict_cache_write: writes[index] ?? 'skipped' }] : []
         );
-      const scans = [...scanReports(blocking, blockingWrites), ...scanReports(logOnly, logOnlyWrites)];
+      const scans = [
+        ...scanReports(blocking, blockingWrites),
+        ...scanReports(logOnly, logOnlyWrites),
+      ];
       if (!request && verdict.action === 'skip') return null;
       return {
         settings: request && guardrailSettings(request.config),

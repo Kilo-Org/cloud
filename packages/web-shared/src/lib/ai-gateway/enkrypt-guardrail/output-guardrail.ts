@@ -64,7 +64,6 @@ const SHORTER_RESPONSE_ADVICE =
 
 const HELD_OUTPUT_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot hold back more than ${MAX_HELD_OUTPUT_BYTES / 1024 / 1024} MB of model response at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
 
-
 type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
   /** Null when Enkrypt was not asked. */
   report: EnkryptScanReport | null;

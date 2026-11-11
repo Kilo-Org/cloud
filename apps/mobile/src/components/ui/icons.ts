@@ -80,6 +80,7 @@ export { default as Loader } from 'lucide-react-native/icons/loader';
 export { default as Loader2 } from 'lucide-react-native/icons/loader-circle';
 export { default as Lock } from 'lucide-react-native/icons/lock';
 export { default as LogOut } from 'lucide-react-native/icons/log-out';
+export { default as Mail } from 'lucide-react-native/icons/mail';
 export { default as MessageCircle } from 'lucide-react-native/icons/message-circle';
 export { default as MessageCirclePlus } from 'lucide-react-native/icons/message-circle-plus';
 export { default as MessageSquare } from 'lucide-react-native/icons/message-square';

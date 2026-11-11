@@ -267,8 +267,9 @@ export function textActionTargetClass(): string {
  * The box therefore overflows its own flex line by
  * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2` on each side, and a row that
  * wraps needs {@link INLINE_LINK_LINE_GAP_CLASS} between its lines: wrapped
- * lines have no gutter of their own, and without it the box on a line reaches
- * into the prose of the line above it.
+ * lines have no gutter of their own, so without it the box on a line reaches
+ * into the prose of the line above it, and two link boxes on adjacent lines
+ * overlap each other by `2 * 5.25dp` less the gap.
  */
 export const INLINE_LINK_BOX_CLASS =
   'min-h-[28px] min-w-[28px] -my-[7px] items-center justify-center';
@@ -301,35 +302,63 @@ export const INLINE_LINK_FACING_HIT_SLOP_DP = 4;
 export const INLINE_LINK_OUTER_HIT_SLOP_DP = 12;
 
 /**
- * Per-side vertical `hitSlop` for {@link INLINE_LINK_BOX_CLASS}. `DESIGN.md:364`
- * asks for the touch region in both axes, so the vertical slop is 8:
- * 28 + 2 * 8 = 44pt. It is the minimum that meets the target: unlike the
- * horizontal reach, which spends the sentence's own width, every extra dp of
- * vertical region has to be reserved as free space around the row
- * ({@link INLINE_LINK_ROW_CLASS}). The box's layout-neutral `-my-[7px]` form
- * keeps the sentence on its `text-sm` line
- * ({@link INLINE_LINK_SENTENCE_LINE_DP}) while the box's 28dp rect overflows it
- * by `(28 - 17.5) / 2 = 5.25dp` on each side, so each link's vertical region
- * reaches `5.25 + 8 = 13.25dp` beyond the line — inside the free space
- * {@link INLINE_LINK_ROW_CLASS} reserves for it.
+ * Per-side vertical `hitSlop` for a {@link INLINE_LINK_BOX_CLASS} whose sentence
+ * carries no second link to reach across: the consent sentence's policy link is
+ * the only control in its row. `DESIGN.md:364` asks for the touch region in both
+ * axes, so the vertical slop is 8: 28 + 2 * 8 = 44pt, and each side reaches
+ * `(28 - 17.5) / 2 + 8 = 13.25dp` past the sentence's text line — inside the
+ * free space {@link INLINE_LINK_ROW_CLASS} reserves for it.
+ *
+ * A sentence with two links uses {@link inlineLinkHitSlop} instead: those two
+ * boxes can land on adjacent wrapped lines, where a reach toward the neighbour
+ * would put both touch regions over one point.
  */
 export const INLINE_LINK_VERTICAL_HIT_SLOP_DP = 8;
 
 /**
- * The per-side `hitSlop` of the legal link that sits at the given end of the
- * sentence. `hitSlop` is physical while the sentence's ends are logical, so the
- * start/end resolve to left/right through the interface direction: a flex-row
- * mirrors in RTL, so the link at the sentence's start faces the connector on its
- * other physical side. Both links keep the same vertical slop
- * ({@link INLINE_LINK_VERTICAL_HIT_SLOP_DP}); only the horizontal sides differ,
- * facing = {@link INLINE_LINK_FACING_HIT_SLOP_DP} and outer =
- * {@link INLINE_LINK_OUTER_HIT_SLOP_DP}.
+ * The vertical `hitSlop` of an inline link pointing at its neighbour link in the
+ * same sentence, per side. A wrapped legal sentence stacks the two link boxes on
+ * adjacent lines, and each box's rect already overflows its `text-sm` line by
+ * `(28 - 17.5) / 2 = 5.25dp` on each side, so the pair spends 10.5dp of the
+ * wrapped-line gap ({@link INLINE_LINK_LINE_GAP_CLASS}) before any slop. Any
+ * facing slop on top of that would put the two regions over one point, and the
+ * later link claims a tap meant for the earlier one, so the facing side is 0.
+ */
+export const INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP = 0;
+
+/**
+ * The vertical `hitSlop` on the side away from the neighbour. The facing side
+ * gives up its half of the reach, so the far side carries all of it:
+ * 28 + 16 = 44pt, and the two vertical sides of a link still sum to
+ * `2 * {@link INLINE_LINK_VERTICAL_HIT_SLOP_DP}`. That reach leaves the row's
+ * free space, which is why {@link INLINE_LINK_ROW_CLASS} carries the margin its
+ * neighbours need.
+ */
+export const INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP = 16;
+
+/**
+ * The `hitSlop` of the legal link that sits at the given end of the sentence.
+ * `hitSlop` is physical while the sentence's ends are logical, so the
+ * start/end resolve through the interface direction: a flex-row mirrors in RTL,
+ * so the link at the sentence's start faces the connector on its other physical
+ * side. Vertically every side resolves the same way in both directions, because
+ * wrapped lines always stack downward and the flex row keeps the sentence's
+ * order: the start link's neighbour is on the same line or the next one, never
+ * above it, so its reach goes up and the end link's goes down.
+ *
+ * Facing = {@link INLINE_LINK_FACING_HIT_SLOP_DP} (
+ * {@link INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP} vertically) and outer =
+ * {@link INLINE_LINK_OUTER_HIT_SLOP_DP}
+ * ({@link INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP}).
  */
 export function inlineLinkHitSlop(edge: 'start' | 'end') {
   const facesRight = edge === 'start' ? !I18nManager.isRTL : I18nManager.isRTL;
+  const facing = INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP;
+  const outer = INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP;
+  const neighbourBelow = edge === 'start';
   return {
-    top: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
-    bottom: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
+    top: neighbourBelow ? outer : facing,
+    bottom: neighbourBelow ? facing : outer,
     left: facesRight ? INLINE_LINK_OUTER_HIT_SLOP_DP : INLINE_LINK_FACING_HIT_SLOP_DP,
     right: facesRight ? INLINE_LINK_FACING_HIT_SLOP_DP : INLINE_LINK_OUTER_HIT_SLOP_DP,
   };
@@ -337,39 +366,43 @@ export function inlineLinkHitSlop(edge: 'start' | 'end') {
 
 /**
  * The vertical gap a wrapping sentence row keeps between its lines, and its
- * class. A sentence with an inline link row wraps in long locales, and a link
- * box's layout-neutral form makes its rect overflow its own flex line by
- * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 = 5.25dp` on each side.
- * Without a gap the wrapped lines sit one text line apart, so a box on the
- * second line reaches up into the first line's prose (and a box on the first
- * line reaches down into the second). The gap is the next whole dp above that
- * overflow plus its headroom, so a wrapped line never collides with the box on
- * the line before it while the two lines still read as one sentence; a sentence
- * that fits one line never sees it, because a flex row's `gap-y` only separates
- * wrapped lines.
+ * class.
+ *
+ * A sentence with two inline links wraps in long locales, and a wrapped line can
+ * stack the two link boxes on adjacent lines. Each box's layout-neutral form
+ * makes its rect overflow its own flex line by
+ * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 = 5.25dp` on each side, so the
+ * pair needs `2 * 5.25 = 10.5dp` between the lines before the two rects, and with
+ * them the two touch regions, stop sharing a point: a tap in the strip where
+ * they crossed opened the later link, and the later link takes a tap aimed at
+ * the earlier one. The gap is the next whole dp above that pair, 11dp, so the
+ * boxes stay 0.5dp apart and the two wrapped lines still read as one sentence. A
+ * sentence that fits one line never sees it, because a flex row's `gap-y` only
+ * separates wrapped lines.
  */
-export const INLINE_LINK_LINE_GAP_DP = 7;
-export const INLINE_LINK_LINE_GAP_CLASS = 'gap-y-[7px]';
+export const INLINE_LINK_LINE_GAP_DP = 11;
+export const INLINE_LINK_LINE_GAP_CLASS = 'gap-y-[11px]';
 
 /**
  * The extra vertical margin the legal sentence row carries, and its class.
  *
- * A legal link's 44pt vertical region reaches
- * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 + 8 = 13.25dp` past the text
+ * With the whole 44pt vertical reach on the far side of each link
+ * ({@link INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP}), a link's region reaches
+ * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 + 16 = 21.25dp` past the text
  * line it sits on. The screen's `gap-3` gutter to the Continue button above the
- * row (and to the ghost button below it) is 10.5dp — 2.75dp short — so a region
- * at the full 44pt would reach into the Continue button's frame, and a tap on
- * its bottom strip would open Terms instead of sending the code (an earlier
- * revision capped the region at 3dp to avoid that and lost the target). The row
- * therefore adds 5dp: 10.5 + 5 = 15.5dp of free space each side, which holds
- * the whole 44pt region clear of both neighbours. The row itself still lays out
+ * row (and to the ghost button below it) is 10.5dp — 10.75dp short — so without
+ * the row's own margin the region would cover most of the Continue button's
+ * bottom strip and a tap there would open Terms instead of sending the code (an
+ * earlier revision capped the region to avoid exactly that and lost the target).
+ * The row therefore adds 11dp: 10.5 + 11 = 21.5dp of free space each side, which
+ * holds the whole region clear of both neighbours. The row itself still lays out
  * on one text line; the margin is the extra gutter the target needs, and it is
  * part of the row's box, not its height. The wrapped-line gap
  * ({@link INLINE_LINK_LINE_GAP_CLASS}) is separate from it: this margin is
  * outside the row, that gap is between the row's own lines.
  */
-export const INLINE_LINK_ROW_MARGIN_DP = 5;
-export const INLINE_LINK_ROW_CLASS = 'my-[5px] gap-y-[7px]';
+export const INLINE_LINK_ROW_MARGIN_DP = 11;
+export const INLINE_LINK_ROW_CLASS = 'my-[11px] gap-y-[11px]';
 
 /**
  * The box a text action renders at the end of a line of copy — the code

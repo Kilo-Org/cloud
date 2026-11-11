@@ -56,7 +56,18 @@ describe('ClaudeBillingCardView', () => {
   it('offers the personal-link action for an unlinked organization scope', () => {
     expect(
       buttons({
-        status: { ...status('not_connected'), canSharePersonal: true },
+        status: {
+          ...status('not_connected'),
+          canSharePersonal: true,
+          shareableLinks: [
+            {
+              payerId: '00000000-0000-4000-8000-000000000009',
+              source: {},
+              label: 'Personal account',
+              connectedAt: '2026-09-16T12:00:00.000Z',
+            },
+          ],
+        },
         scope: 'member',
         onShare: () => undefined,
       })

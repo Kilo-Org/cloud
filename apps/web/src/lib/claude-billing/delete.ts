@@ -23,7 +23,10 @@ function operatorConfigured(): boolean {
   return typeof isClaudeOperatorConfigured === 'function' && isClaudeOperatorConfigured();
 }
 
-async function deleteClaudeUserProfileRemote(userProfileId: string): Promise<void> {
+async function deleteClaudeUserProfileRemote(
+  userProfileId: string,
+  timeoutMs = 15_000
+): Promise<void> {
   const response = await fetch(
     `${CLAUDE_API_BASE_URL}/v1/user_profiles/${encodeURIComponent(userProfileId)}`,
     {
@@ -34,7 +37,7 @@ async function deleteClaudeUserProfileRemote(userProfileId: string): Promise<voi
         'anthropic-version': '2023-06-01',
       },
       redirect: 'manual',
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(timeoutMs),
     }
   );
   if (response.status === 404) return;
@@ -48,10 +51,11 @@ async function deleteClaudeUserProfileRemote(userProfileId: string): Promise<voi
 }
 
 export async function retireUnreferencedClaudeBillingPayer(
-  payer: UnreferencedClaudeBillingPayer
+  payer: UnreferencedClaudeBillingPayer,
+  timeoutMs = 15_000
 ): Promise<void> {
   if (!operatorConfigured()) return;
-  await deleteClaudeUserProfileRemote(payer.userProfileId);
+  await deleteClaudeUserProfileRemote(payer.userProfileId, timeoutMs);
   await db.delete(claude_billing_connections).where(
     and(
       eq(claude_billing_connections.id, payer.id),
@@ -71,7 +75,10 @@ export async function retireUnreferencedClaudeBillingPayer(
   );
 }
 
-export async function cleanupRemovedClaudeProfilesForUser(userId: string): Promise<void> {
+export async function cleanupRemovedClaudeProfilesForUser(
+  userId: string,
+  options: { limit?: number; timeoutMs?: number } = {}
+): Promise<void> {
   if (!operatorConfigured()) return;
   const rows = await db
     .select({
@@ -115,10 +122,10 @@ export async function cleanupRemovedClaudeProfilesForUser(userId: string): Promi
             )
         )
       )
-    );
-  for (const row of rows) {
-    await retireUnreferencedClaudeBillingPayer(row);
-  }
+    )
+    .limit(options.limit ?? 10);
+  const timeoutMs = options.timeoutMs ?? 15_000;
+  await Promise.allSettled(rows.map(row => retireUnreferencedClaudeBillingPayer(row, timeoutMs)));
 }
 /**
  * Deletes the Anthropic user profiles behind connections the person created

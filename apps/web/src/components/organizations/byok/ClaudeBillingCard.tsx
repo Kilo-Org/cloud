@@ -153,21 +153,7 @@ export function ClaudeBillingCardView({
   const copy = SCOPE_COPY[scope];
   const refusal = status ? refusalMessage(status) : null;
   const connected = status?.state === 'connected' || status?.state === 'billing_unavailable';
-  const shareableLinks =
-    !connected && status
-      ? status.shareableLinks.length > 0
-        ? status.shareableLinks
-        : status.canSharePersonal
-          ? [
-              {
-                payerId: 'personal',
-                source: {},
-                label: 'Personal account',
-                connectedAt: null,
-              },
-            ]
-          : []
-      : [];
+  const shareableLinks = !connected && status ? status.shareableLinks : [];
   const [selectedPayerId, setSelectedPayerId] = useState<string | null>(null);
   const selectedShareLink =
     shareableLinks.find(link => link.payerId === selectedPayerId) ?? shareableLinks[0];

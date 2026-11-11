@@ -205,4 +205,45 @@ describe('Personal Claude profile erasure', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })).toBeNull();
   });
+
+  it('continues retiring remaining removed rows when one remote delete fails', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('Claude partial cleanup', user.id, 0);
+    await db.insert(claude_billing_connections).values([
+      {
+        kilo_user_id: user.id,
+        organization_id: null,
+        user_profile_id: `uprof_fail_${user.id}`,
+        status: 'removed',
+        created_by: user.id,
+      },
+      {
+        kilo_user_id: user.id,
+        organization_id: org.id,
+        user_profile_id: `uprof_ok_${user.id}`,
+        status: 'removed',
+        created_by: user.id,
+      },
+    ]);
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async url =>
+        String(url).includes(`uprof_fail_${user.id}`)
+          ? new Response('{}', { status: 503 })
+          : new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    await cleanupRemovedClaudeProfilesForUser(user.id);
+
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ user_profile_id: `uprof_fail_${user.id}`, status: 'removed' });
+    expect(
+      await getClaudeBillingConnection({
+        kind: 'member',
+        kiloUserId: user.id,
+        organizationId: org.id,
+      })
+    ).toBeNull();
+  });
 });

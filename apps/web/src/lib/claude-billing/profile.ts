@@ -20,7 +20,9 @@ export async function ensureClaudeBillingProfile(
   owner: ClaudeBillingOwner,
   createdBy: string
 ): Promise<{ userProfileId: string; connectionVersion: string }> {
-  await cleanupRemovedClaudeProfilesForUser(createdBy).catch(() => undefined);
+  await cleanupRemovedClaudeProfilesForUser(createdBy, { limit: 3, timeoutMs: 3_000 }).catch(
+    () => undefined
+  );
   const lockKey = claudeBillingOwnerKey(owner);
 
   return await db.transaction(async tx => {

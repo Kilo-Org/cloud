@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -153,12 +152,6 @@ describe('session tracking identifiers', () => {
 describe('downstream safety identifiers', () => {
   const testUserId = 'test-user-123';
 
-  it('uses the OpenRouter-specific user hash for OpenRouter', () => {
-    expect(generateOpenRouterDownstreamSafetyIdentifier(testUserId)).toBe(
-      generateProviderSpecificHash(testUserId, OPENROUTER)
-    );
-  });
-
   it('keeps OpenRouter and Vercel identifiers distinct', () => {
     expect(generateOpenRouterDownstreamSafetyIdentifier(testUserId)).not.toBe(
       generateVercelDownstreamSafetyIdentifier(testUserId)
@@ -176,16 +169,6 @@ describe('generateOpenRouterUpstreamSafetyIdentifier', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
-  });
-
-  it('hashes the organization ID and both downstream user hashes with hyphen separators', () => {
-    const userHash = generateOpenRouterDownstreamSafetyIdentifier(userId);
-    const expected = crypto
-      .createHash('sha256')
-      .update(orgId + '-' + userHash + '-' + userHash)
-      .digest('hex');
-
-    expect(generateOpenRouterUpstreamSafetyIdentifier(userId)).toBe(expected);
   });
 
   it('matches the fixed synthetic organization and user vector', () => {

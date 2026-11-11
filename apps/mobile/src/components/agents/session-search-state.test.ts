@@ -220,7 +220,11 @@ describe('resolveSearchRestoreDecision', () => {
 
   it('commits a padded draft as its trimmed term and keeps the padding visible', () => {
     expect(
-      resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: '  alpha ' })
+      resolveSearchRestoreDecision({
+        settled: true,
+        hasInteracted: false,
+        restoredQuery: '  alpha ',
+      })
     ).toEqual({
       shouldSeed: true,
       query: 'alpha',

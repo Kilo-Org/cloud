@@ -122,12 +122,13 @@ describe('useSessionListAutoScroll viewport resize', () => {
     expect(scrollToEnd).toHaveBeenCalledTimes(1);
   });
 
-  it('never yanks a reader who scrolled away from the bottom', () => {
+  it('never yanks a reader who scrolled away from the bottom', async () => {
     vi.useFakeTimers();
     const { scrollToEnd, api } = mountAutoScroll(1);
 
-    act(() => {
+    await act(async () => {
       api.handleListLayout(layoutEvent(600));
+      await Promise.resolve();
     });
     closeProgrammaticScrollWindow();
     // Far from the content end: the follow is off.
@@ -136,19 +137,21 @@ describe('useSessionListAutoScroll viewport resize', () => {
     });
     scrollToEnd.mockClear();
 
-    act(() => {
+    await act(async () => {
       api.handleListLayout(layoutEvent(500));
+      await Promise.resolve();
     });
 
     expect(scrollToEnd).not.toHaveBeenCalled();
   });
 
-  it('never yanks a viewport resize during a drag', () => {
+  it('never yanks a viewport resize during a drag', async () => {
     vi.useFakeTimers();
     const { scrollToEnd, api } = mountAutoScroll(1);
 
-    act(() => {
+    await act(async () => {
       api.handleListLayout(layoutEvent(600));
+      await Promise.resolve();
     });
     closeProgrammaticScrollWindow();
     act(() => {
@@ -156,8 +159,9 @@ describe('useSessionListAutoScroll viewport resize', () => {
     });
     scrollToEnd.mockClear();
 
-    act(() => {
+    await act(async () => {
       api.handleListLayout(layoutEvent(500));
+      await Promise.resolve();
     });
 
     expect(scrollToEnd).not.toHaveBeenCalled();

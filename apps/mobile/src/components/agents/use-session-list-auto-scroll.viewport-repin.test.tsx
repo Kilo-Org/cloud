@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- the coalescing cases share one probe and one task harness. */
 import { createElement } from 'react';
 import { type LayoutChangeEvent } from 'react-native';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
@@ -27,7 +27,14 @@ const layoutAt = (height: number): LayoutChangeEvent => {
 
 const mounted: ReactTestRenderer[] = [];
 
+beforeEach(() => {
+  // Mount arms an 80 ms retry on real timers; left running it adds a call to
+  // the counts these cases assert.
+  vi.useFakeTimers();
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   for (const renderer of mounted.splice(0)) {
     renderer.unmount();
   }

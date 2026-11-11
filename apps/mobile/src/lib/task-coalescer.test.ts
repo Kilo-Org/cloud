@@ -35,6 +35,21 @@ describe('createTaskCoalescer', () => {
     expect(run).toHaveBeenCalledTimes(2);
   });
 
+  it('drops the queued correction when the caller cancels it', async () => {
+    const coalescer = createTaskCoalescer();
+    const run = vi.fn();
+    const correction = () => {
+      run();
+    };
+
+    coalescer.schedule(correction);
+    coalescer.cancel();
+    await Promise.resolve();
+
+    expect(run).not.toHaveBeenCalled();
+    expect(coalescer.isPending()).toBe(false);
+  });
+
   it('reports a queued correction so a second event can skip the hard scroll', async () => {
     const coalescer = createTaskCoalescer();
 

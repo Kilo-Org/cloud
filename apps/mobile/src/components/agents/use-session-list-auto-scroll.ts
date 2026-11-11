@@ -297,8 +297,11 @@ export function useSessionListAutoScroll<ItemT>({
       clearAutoScrollResetTimeout();
       clearAutoScrollRetryTimeout();
       clearUserScrollingTimeout();
+      // A layout event in the unmounting task must not scroll a detached list
+      // or arm a timer nothing will clear.
+      tailRepin.cancel();
     },
-    [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout, clearUserScrollingTimeout]
+    [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout, clearUserScrollingTimeout, tailRepin]
   );
 
   const updateAutoScrollFromEvent = useCallback(

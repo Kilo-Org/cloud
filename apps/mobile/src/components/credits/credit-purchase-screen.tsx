@@ -364,27 +364,33 @@ export function CreditPurchaseScreen() {
           landscape notch band, and copy outside it would otherwise sit nearer
           the edge than the rows it follows. */}
       <View className="border-t border-border" style={{ paddingBottom: Math.max(bottomInset, 16) }}>
-        <View className="px-5 pt-[17px]" style={sideInsetStyle}>
-          <Text className="text-xs text-muted-foreground">{t('credits.description')}</Text>
-          <View className={LEGAL_LINK_ROW_CLASS}>
-            <Pressable
-              accessibilityRole="link"
-              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-              onPress={() => {
-                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
-              }}
-            >
-              <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="link"
-              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-              onPress={() => {
-                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
-              }}
-            >
-              <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
-            </Pressable>
+        {/* The side inset and the gutter sit on separate wrappers: an inline
+            padding value replaces a className's `px-5` on the same node, so one
+            node holding both would lose the gutter wherever an inset is
+            non-zero. */}
+        <View style={sideInsetStyle}>
+          <View className="px-5 pt-[17px]">
+            <Text className="text-xs text-muted-foreground">{t('credits.description')}</Text>
+            <View className={LEGAL_LINK_ROW_CLASS}>
+              <Pressable
+                accessibilityRole="link"
+                className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+                onPress={() => {
+                  void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
+                }}
+              >
+                <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="link"
+                className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+                onPress={() => {
+                  void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
+                }}
+              >
+                <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </View>

@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { type LayoutChangeEvent } from 'react-native';
+import { type LayoutChangeEvent, type StyleProp, type TextStyle } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -31,7 +31,10 @@ const sentinelOnLayout = () => undefined;
 
 async function renderSelectableText(
   children: string,
-  onLayout?: (event: LayoutChangeEvent) => void
+  options: {
+    onLayout?: (event: LayoutChangeEvent) => void;
+    style?: StyleProp<TextStyle>;
+  } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
@@ -40,7 +43,7 @@ async function renderSelectableText(
     await Promise.resolve();
     rendererRef.current = TestRenderer.create(
       // eslint-disable-next-line react/no-children-prop -- tsgo requires `children` in the props object, not the third argument.
-      createElement(SelectableText, onLayout ? { children, onLayout } : { children })
+      createElement(SelectableText, { children, ...options })
     );
   });
   const renderer = rendererRef.current;
@@ -87,7 +90,7 @@ describe('SelectableText mounted', () => {
   });
 
   it('forwards the caller onLayout to the TextInput host', async () => {
-    const renderer = await renderSelectableText('measured', sentinelOnLayout);
+    const renderer = await renderSelectableText('measured', { onLayout: sentinelOnLayout });
 
     // Same reference, so the mono block height pin stays wired to real layout.
     expect(findTextInput(renderer)?.props.onLayout).toBe(sentinelOnLayout);
@@ -95,18 +98,7 @@ describe('SelectableText mounted', () => {
 
   it('forwards the caller style to the TextInput host beside the class string', async () => {
     const style = { direction: 'ltr', writingDirection: 'ltr', textAlign: 'right' } as const;
-    const holder: { current?: TestRenderer.ReactTestRenderer } = { current: undefined };
-    await act(async () => {
-      await Promise.resolve();
-      // eslint-disable-next-line react/no-children-prop -- tsgo requires `children` in the props object, not the third argument.
-      holder.current = TestRenderer.create(
-        createElement(SelectableText, { children: 'الجلسة', style })
-      );
-    });
-    const renderer = holder.current;
-    if (!renderer) {
-      throw new Error('renderer was not created');
-    }
+    const renderer = await renderSelectableText('الجلسة', { style });
 
     const input = findTextInput(renderer);
     expect(input?.props.style).toEqual(style);

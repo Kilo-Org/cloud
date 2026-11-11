@@ -99,9 +99,24 @@ export function CenteredState({
   refreshControl,
 }: CenteredStateProps) {
   const surface = useStateSurface();
-  const frame = surface?.frame;
   const windowSize = useWindowDimensions();
   const shortBand = isShortViewport(windowSize.width, windowSize.height);
+  // A screen whose surface is not published yet still covers the window it
+  // fills: its band is the window minus the reservation the caller already
+  // knows. Placing against that band is exact for a full-screen state, so a
+  // first mount paints where it will be measured instead of at the pending
+  // centering and then lifting when the surface arrives.
+  const liveFrame = surface?.frame ?? null;
+  const frame = useMemo(
+    () => liveFrame ?? { top: 0, bottom: windowSize.height },
+    [liveFrame, windowSize.height]
+  );
+  const topInset = surface?.frame ? surface.topInset : 0;
+  const bottomInset = surface?.frame ? surface.bottomInset : (surface?.bottomReservation ?? 0);
+  const boundsBottom = surface?.frame ? surface.bounds?.bottom : frame.bottom;
+  const nativeViewportFillsSurface = surface?.frame
+    ? surface.nativeViewportFillsSurface
+    : false;
   const scrollRef = useRef<ScrollViewInstance | null>(null);
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
@@ -115,10 +130,6 @@ export function CenteredState({
     requestRef.current += 1;
     const request = requestRef.current;
     const node = scrollRef.current?.getNativeScrollRef();
-    if (!frame) {
-      setViewport(null);
-      return;
-    }
     if (!node) {
       // The scroller's native node is briefly absent while a screen that owned
       // this surface comes back and re-attaches its host view. The geometry it
@@ -183,7 +194,6 @@ export function CenteredState({
     // instead of dropping back to the pending one and jumping when it returns.
     const measured = viewport;
     if (
-      !frame ||
       !measured ||
       measured.surface.top !== frame.top ||
       measured.surface.bottom !== frame.bottom ||
@@ -196,13 +206,21 @@ export function CenteredState({
       surface: frame,
       viewport: measuredFrame,
       contentHeight,
-      topInset: surface.topInset,
-      bottomInset: surface.bottomInset,
-      nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
-      nativeViewportBottom: surface.bounds?.bottom,
+      topInset,
+      bottomInset,
+      nativeViewportFillsSurface,
+      nativeViewportBottom: boundsBottom,
       roundToPixel: value => PixelRatio.roundToNearestPixel(value),
     });
-  }, [surface, frame, viewport, contentHeight]);
+  }, [
+    boundsBottom,
+    bottomInset,
+    contentHeight,
+    frame,
+    nativeViewportFillsSurface,
+    topInset,
+    viewport,
+  ]);
   const placementKey = stateKey ?? testID;
   const remembered = rememberedPlacements.get(placementKey);
   const rememberedStyle =

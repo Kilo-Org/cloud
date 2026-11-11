@@ -518,7 +518,7 @@ describe('CenteredState first-frame paint', () => {
   it('remembers one placement per state, not one per surface', async () => {
     // A tab's empty body and a pushed screen's body share one surface and one
     // default testID. The second state must not be placed with the first one's
-    // size: the history body would paint about 29 dp off its own centre.
+    // memory: the history body would paint about 29 dp off its own centre.
     const tabState = await mount();
     tabState.settle();
     tabState.unmount();
@@ -528,9 +528,20 @@ describe('CenteredState first-frame paint', () => {
       frame: null,
       bounds: null,
     };
-    const otherState = await mount({ stateKey: 'other-screen' });
-    otherState.settle();
-    expect(otherState.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
+    // Its own content has not laid out and it has no memory of its own, so it
+    // falls back instead of borrowing the other state's placement.
+    const otherState = await renderWithProviders(
+      <CenteredState testID="state" stateKey="other-screen">
+        {null}
+      </CenteredState>
+    );
+    const scroll = () => otherState.renderer.root.findByType(ScrollView).props as ScrollViewProps;
+    act(() => {
+      for (const onMeasure of native.measurements.splice(0)) {
+        onMeasure(0, 80, 400, 340);
+      }
+    });
+    expect(scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     otherState.unmount();
   });
 

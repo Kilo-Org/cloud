@@ -197,5 +197,42 @@ describe('useSessionSearchInput visible text', () => {
     expect(input.mounts.at(-1)?.defaultValue).toBe('');
     expect(hook().hasText).toBe(false);
     expect(hook().searchQuery).toBe('');
+    // The user's clear wins: no restore is pending, so the body stays on the
+    // cleared (no-query) state instead of loading for a draft it will ignore.
+    expect(hook().restorePending).toBe(false);
+  });
+
+  it('reports a pending restore until the saved search reaches the query state', () => {
+    const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    expect(hook().restorePending).toBe(true);
+    expect(hook().searchQuery).toBe('');
+
+    // The draft settles. The seed lands in the render after this one, so this
+    // render still carries an empty query: a list body that read the query here
+    // would paint the no-query state and replace it one frame later.
+    act(() => {
+      renderer.update(
+        createElement(Probe, { userId: 'u1', restoredQuery: 'Zebra', restoreSettled: true })
+      );
+    });
+    expect(hook().restorePending).toBe(false);
+    expect(hook().searchQuery).toBe('Zebra');
+    expect(hook().hasText).toBe(true);
+    expect(input.mounts.at(-1)?.defaultValue).toBe('Zebra');
+  });
+
+  it('does not wait on the draft once the user types', () => {
+    const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    act(() => {
+      hook().handleSearchInputChange('Zeb');
+    });
+    expect(hook().restorePending).toBe(false);
+    act(() => {
+      renderer.update(
+        createElement(Probe, { userId: 'u1', restoredQuery: 'Zebra', restoreSettled: true })
+      );
+    });
+    expect(hook().restorePending).toBe(false);
+    expect(hook().searchQuery).toBe('');
   });
 });

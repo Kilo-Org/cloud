@@ -33,6 +33,14 @@ export type UseSessionSearchInputParams = {
 export type UseSessionSearchInputResult = {
   /** Committed (debounced) search query that drives the list body. */
   searchQuery: string;
+  /**
+   * True while the durable draft has not reached the search state yet: the
+   * settle is still pending, or it has landed and this mount has not applied
+   * it. The committed query and the visible text change in the same commit as
+   * this clears, so a list body can wait one paint instead of rendering the
+   * previous no-query state and then replacing it.
+   */
+  restorePending: boolean;
   /** Ref for the uncontrolled search TextInput. */
   searchInputRef: React.RefObject<TextInput | null>;
   /** Whether the search TextInput currently has non-empty text. */
@@ -82,6 +90,11 @@ export function useSessionSearchInput({
   // it": a late draft settle must not seed a field the user has already
   // emptied, and it must not undo a clear.
   const userInteractedRef = useRef(false);
+
+  // Whether this mount has applied the settled draft to the search state. The
+  // seed below also sets `searchQuery` and `hasText`, so a render that reads
+  // this ref as true already carries the restored query.
+  const seedAppliedRef = useRef(false);
 
   // Boolean state whose setter returns its previous value while it stays
   // true, so extra keystrokes before the debounce commits are free of
@@ -234,6 +247,7 @@ export function useSessionSearchInput({
     if (!decision.shouldSeed) {
       return;
     }
+    seedAppliedRef.current = true;
     lastTypedRef.current = decision.query;
     setHasText(decision.hasText);
     setSearchQuery(decision.query);
@@ -249,8 +263,14 @@ export function useSessionSearchInput({
     [searchController]
   );
 
+  // A pending restore outranks any query state: the body must not claim a
+  // result for a search text it is about to receive. Interaction wins, so a
+  // user who types or clears before the draft lands never waits on it.
+  const restorePending = !(userInteractedRef.current || seedAppliedRef.current);
+
   return {
     searchQuery,
+    restorePending,
     searchInputRef,
     hasText,
     awaitingCommit,

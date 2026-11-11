@@ -55,6 +55,7 @@ export function SessionHistoryScreen() {
 
   const {
     searchQuery,
+    restorePending,
     searchInputRef,
     hasText,
     awaitingCommit,
@@ -192,12 +193,18 @@ export function SessionHistoryScreen() {
     clearFilters();
   }, [clearSearchInput, searchController, clearFilters, isSearching]);
 
-  const isLoading = selectSessionListIsLoading({
-    ready,
-    isSearching,
-    searchIsPending: search.isPending,
-    storedIsPending,
-  });
+  // The durable draft is the saved search this screen reopens with. Until the
+  // hook has applied it, the body cannot know whether a search applies, so it
+  // shows the loading body: painting the unfiltered list or "No past sessions"
+  // first claims a result the saved search is about to replace.
+  const isLoading =
+    restorePending ||
+    selectSessionListIsLoading({
+      ready,
+      isSearching,
+      searchIsPending: search.isPending,
+      storedIsPending,
+    });
 
   // One permanently mounted body inside one keyboard container: the empty-state
   // subtitle, the rows, the skeletons and the reserved refresh band all lift

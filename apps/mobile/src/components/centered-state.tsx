@@ -1,7 +1,6 @@
 import {
   type ReactNode,
   useCallback,
-  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -46,12 +45,17 @@ type CenteredStateProps = {
 type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
 
 /**
- * Upper bound on how long the content stays hidden waiting for a surface
- * measurement. A missing or empty native reading must not leave a data state
- * (empty, status, error) invisible forever.
+ * Centered data state (empty, status, error) inside the band a screen surface
+ * reserves.
+ *
+ * The state paints on its first frame. A surface that has not measured yet — a
+ * screen coming back from a pushed route, the tab bar's own layout pass, a
+ * rotation — places the content with the pending style (centered, with the
+ * surface's bottom reservation) instead of hiding it: a hidden data state is a
+ * blank body, which reads as a broken screen and outlasts the measurement on a
+ * slow device. When the surface measures, the same content moves to its
+ * measured placement.
  */
-export const STATE_SURFACE_FALLBACK_MS = 400;
-
 export function CenteredState({
   children,
   className,
@@ -182,38 +186,6 @@ export function CenteredState({
           },
     [bottomReservation, layout, ready]
   );
-  const [fallbackElapsed, setFallbackElapsed] = useState(false);
-  // The hidden-until-measured gate keeps a data state from flashing at the wrong
-  // spot on its first frame. It must only ever gate that first frame: once the
-  // state has been painted, a measurement that lands, detaches and lands again
-  // — a restored route, the tab bar's own layout pass, a rotation — must not
-  // hide it again. Re-arming this window on every `ready` transition did
-  // exactly that, and a run of them kept an empty history body invisible for
-  // seconds after a relaunch. The timer starts once at mount, and the reveal is
-  // latched for the life of the mount.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setFallbackElapsed(true);
-    }, STATE_SURFACE_FALLBACK_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, []);
-  // The latch is a layout effect, and it is declared after the measuring layout
-  // effect above: layout effects flush before the frame is painted, so the
-  // reveal lands in the same commit that placed the state, and a later detach —
-  // which clears the placement in that earlier layout effect — already reads the
-  // latch. An ordinary effect would run after paint and let one hidden frame
-  // through, which is the blank body a returning screen showed; a render-phase
-  // update is not an option either, because it updates a component React has
-  // not mounted yet and surfaces as a development-time state-update warning.
-  const [revealed, setRevealed] = useState(false);
-  const visible = ready || fallbackElapsed || revealed;
-  useLayoutEffect(() => {
-    if (visible && !revealed) {
-      setRevealed(true);
-    }
-  }, [revealed, visible]);
 
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');
@@ -233,11 +205,9 @@ export function CenteredState({
         keyboardShouldPersistTaps="handled"
       >
         <View
-          className={cn('w-full', contentContainerClassName, !visible && 'opacity-0')}
+          className={cn('w-full', contentContainerClassName)}
           testID={testID ? `${testID}-content` : undefined}
           onLayout={measureContent}
-          accessibilityElementsHidden={!visible}
-          importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
         >
           {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
           {children}

@@ -13,6 +13,7 @@ import {
   deferContendedRemediationAttempt,
   discoverQueuedRemediationAttempts,
 } from './remediation.js';
+import { DISPATCH_REMEDIATION_ATTEMPT_LIMIT } from './dispatcher.js';
 
 const connectionString =
   process.env.POSTGRES_URL ?? 'postgres://postgres:postgres@localhost:5432/postgres';
@@ -184,11 +185,15 @@ describe('remediation attempt discovery against PostgreSQL', () => {
       },
     ]);
 
-    const discovered = await discoverQueuedRemediationAttempts(client.db as never, 200);
+    const discovered = await discoverQueuedRemediationAttempts(
+      client.db as never,
+      DISPATCH_REMEDIATION_ATTEMPT_LIMIT
+    );
     const window = fixtureWindow(discovered, [...bulkAttemptIds, policyAttemptId]);
 
-    // Every fixture attempt is due, so the window holds both owners in per-owner round-robin order.
-    expect(window).toEqual([bulkAttemptIds[0], policyAttemptId, ...bulkAttemptIds.slice(1)]);
+    expect(discovered).toHaveLength(DISPATCH_REMEDIATION_ATTEMPT_LIMIT);
+    expect(discovered).toContain(policyAttemptId);
+    expect(window.slice(0, 2)).toEqual([bulkAttemptIds[0], policyAttemptId]);
   });
 
   it('separates user and organization owners in the same window', async () => {

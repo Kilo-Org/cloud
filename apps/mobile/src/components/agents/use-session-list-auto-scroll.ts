@@ -16,7 +16,7 @@ import {
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { createTaskCoalescer } from '@/lib/task-coalescer';
+import { createFrameCoalescer } from '@/lib/coalesce-frame';
 
 type UseSessionListAutoScrollParams = {
   itemCount: number;
@@ -137,7 +137,16 @@ export function useSessionListAutoScroll<ItemT>({
     }, 150);
   }, [clearAutoScrollResetTimeout]);
 
-  const tailRepin = useRef(createTaskCoalescer()).current;
+  // One tail correction per frame: a keyboard slide reports several layout
+  // passes and a content change in the same frame, and correcting each of them
+  // hard-scrolls the list twice per frame.
+  const scrollToLatestRef = useRef(scrollToLatestMessage);
+  scrollToLatestRef.current = scrollToLatestMessage;
+  const tailRepin = useRef(
+    createFrameCoalescer<null>(() => {
+      scrollToLatestRef.current();
+    })
+  ).current;
 
   // Animated scroll for the user-initiated "scroll to bottom" button.
   // Intentionally does NOT set `isAutoScrollingRef`: that flag suppresses
@@ -392,14 +401,12 @@ export function useSessionListAutoScroll<ItemT>({
           isUserScrolling: isUserScrollingRef.current,
           shouldAutoScroll: shouldAutoScrollRef.current,
           didContentHeightChange,
-        }) &&
-        // The queued correction lands the tail on this geometry too.
-        !tailRepin.isPending()
+        })
       ) {
-        scrollToLatestMessage();
+        tailRepin.push(null);
       }
     },
-    [scrollToLatestMessage, tailRepin]
+    [tailRepin]
   );
 
   const handleListLayout = useCallback(
@@ -422,7 +429,7 @@ export function useSessionListAutoScroll<ItemT>({
           didViewportHeightChange,
         })
       ) {
-        tailRepin.schedule(scrollToLatestMessage);
+        tailRepin.push(null);
         return;
       }
       if (
@@ -435,7 +442,7 @@ export function useSessionListAutoScroll<ItemT>({
         scheduleScrollToLatestMessage();
       }
     },
-    [scheduleScrollToLatestMessage, scrollToLatestMessage, tailRepin]
+    [scheduleScrollToLatestMessage, tailRepin]
   );
 
   return {

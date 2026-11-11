@@ -81,7 +81,7 @@ describe('useSessionListAutoScroll viewport resize', () => {
     vi.useRealTimers();
   });
 
-  it('re-pins the tail when the fixed status row shrinks the list inside the streaming follow window', async () => {
+  it('re-pins the tail when the fixed status row shrinks the list inside the streaming follow window', () => {
     // Reproduces the session-answered defect: the working indicator / session
     // status row lives outside the list, so mounting it shrinks the viewport
     // while the offset stays put. The resize lands inside the 150ms
@@ -92,20 +92,20 @@ describe('useSessionListAutoScroll viewport resize', () => {
     const { scrollToEnd, api } = mountAutoScroll(1);
 
     // The first layout records the pre-resize viewport height.
-    await act(async () => {
+    act(() => {
       api.handleListLayout(layoutEvent(600));
-      await Promise.resolve();
+      vi.advanceTimersByTime(1);
     });
     closeProgrammaticScrollWindow();
-    await act(async () => {
-      await Promise.resolve();
+    act(() => {
+      vi.advanceTimersByTime(1);
     });
     scrollToEnd.mockClear();
 
     // A streamed row grows the content and starts a follow scroll.
-    await act(async () => {
+    act(() => {
       api.handleContentSizeChange(400, 2000);
-      await Promise.resolve();
+      vi.advanceTimersByTime(1);
     });
     expect(scrollToEnd).toHaveBeenCalledTimes(1);
 
@@ -114,21 +114,21 @@ describe('useSessionListAutoScroll viewport resize', () => {
     // Inside that window the status row mounts and the list gets shorter.
     // The correction is coalesced to the task, so the resize and any content
     // change it carries land as one scroll.
-    await act(async () => {
+    act(() => {
       api.handleListLayout(layoutEvent(500));
-      await Promise.resolve();
+      vi.advanceTimersByTime(1);
     });
 
     expect(scrollToEnd).toHaveBeenCalledTimes(1);
   });
 
-  it('never yanks a reader who scrolled away from the bottom', async () => {
+  it('never yanks a reader who scrolled away from the bottom', () => {
     vi.useFakeTimers();
     const { scrollToEnd, api } = mountAutoScroll(1);
 
-    await act(async () => {
+    act(() => {
       api.handleListLayout(layoutEvent(600));
-      await Promise.resolve();
+      vi.advanceTimersByTime(1);
     });
     closeProgrammaticScrollWindow();
     // Far from the content end: the follow is off.
@@ -137,21 +137,21 @@ describe('useSessionListAutoScroll viewport resize', () => {
     });
     scrollToEnd.mockClear();
 
-    await act(async () => {
+    act(() => {
       api.handleListLayout(layoutEvent(500));
-      await Promise.resolve();
+      vi.advanceTimersByTime(1);
     });
 
     expect(scrollToEnd).not.toHaveBeenCalled();
   });
 
-  it('never yanks a viewport resize during a drag', async () => {
+  it('never yanks a viewport resize during a drag', () => {
     vi.useFakeTimers();
     const { scrollToEnd, api } = mountAutoScroll(1);
 
-    await act(async () => {
+    act(() => {
       api.handleListLayout(layoutEvent(600));
-      await Promise.resolve();
+      vi.advanceTimersByTime(1);
     });
     closeProgrammaticScrollWindow();
     act(() => {
@@ -159,9 +159,9 @@ describe('useSessionListAutoScroll viewport resize', () => {
     });
     scrollToEnd.mockClear();
 
-    await act(async () => {
+    act(() => {
       api.handleListLayout(layoutEvent(500));
-      await Promise.resolve();
+      vi.advanceTimersByTime(1);
     });
 
     expect(scrollToEnd).not.toHaveBeenCalled();

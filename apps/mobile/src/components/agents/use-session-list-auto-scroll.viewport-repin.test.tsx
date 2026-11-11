@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- the coalescing cases share one probe and one task harness. */
+/* eslint-disable max-lines -- the coalescing cases share one probe and one frame harness. */
 import { createElement } from 'react';
 import { type LayoutChangeEvent } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,21 +20,40 @@ type ProbeApi = {
 
 type ScrollList = { scrollToEnd: ReturnType<typeof vi.fn> };
 
-const layoutAt = (height: number): LayoutChangeEvent => {
+function layoutAt(height: number): LayoutChangeEvent {
   const event = { nativeEvent: { layout: { x: 0, y: 0, width: 400, height } } };
   return event as unknown as LayoutChangeEvent;
-};
+}
+
+/** A frame queue the cases run by hand, like the shared coalescer's tests. */
+const frames: (() => void)[] = [];
+
+function runFrame() {
+  const queued = frames.splice(0);
+  act(() => {
+    for (const frame of queued) {
+      frame();
+    }
+  });
+}
 
 const mounted: ReactTestRenderer[] = [];
 
 beforeEach(() => {
-  // Mount arms an 80 ms retry on real timers; left running it adds a call to
-  // the counts these cases assert.
+  // Mount arms a real 80 ms retry; left running it adds a call to the counts.
   vi.useFakeTimers();
+  vi.stubGlobal('requestAnimationFrame', (frame: FrameRequestCallback) => {
+    frames.push(() => {
+      frame(0);
+    });
+    return frames.length;
+  });
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.useRealTimers();
+  frames.length = 0;
   for (const renderer of mounted.splice(0)) {
     renderer.unmount();
   }
@@ -43,8 +62,8 @@ afterEach(() => {
 /**
  * A keyboard slide reaches the list as a burst of layout and content-size
  * events: the viewport changes on every native keyboard step, and the composer
- * beside the transcript changes the content height in the same task. The hook
- * must turn that burst into one tail correction, not one per event.
+ * beside the transcript changes the content height in the same frame. The hook
+ * must turn that burst into one tail correction per frame, not one per event.
  */
 function mountProbe() {
   const list: ScrollList = { scrollToEnd: vi.fn() };
@@ -77,53 +96,57 @@ function mountProbe() {
 }
 
 describe('useSessionListAutoScroll viewport re-pin', () => {
-  it('coalesces a viewport resize and the content change it causes into one correction', async () => {
+  it('coalesces a viewport resize and the content change it causes into one correction', () => {
     const probe = mountProbe();
 
-    await act(async () => {
+    act(() => {
       probe.api.handleListLayout(layoutAt(500));
       probe.api.handleContentSizeChange(400, 900);
-      await Promise.resolve();
     });
+    expect(probe.list.scrollToEnd).not.toHaveBeenCalled();
 
+    runFrame();
     expect(probe.list.scrollToEnd).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps one correction for every layout step of a keyboard burst', async () => {
+  it('keeps one correction for every layout step of a keyboard burst', () => {
     const probe = mountProbe();
 
-    await act(async () => {
-      probe.api.handleListLayout(layoutAt(571));
-      probe.api.handleContentSizeChange(400, 611);
-      await Promise.resolve();
-    });
-    await act(async () => {
-      probe.api.handleListLayout(layoutAt(427));
-      probe.api.handleContentSizeChange(400, 467);
-      await Promise.resolve();
-    });
-    await act(async () => {
-      probe.api.handleListLayout(layoutAt(405));
-      probe.api.handleContentSizeChange(400, 445);
-      await Promise.resolve();
-    });
-    await act(async () => {
-      probe.api.handleListLayout(layoutAt(394));
-      probe.api.handleContentSizeChange(400, 434);
-      await Promise.resolve();
-    });
+    for (const height of [571, 427, 405, 394]) {
+      act(() => {
+        probe.api.handleListLayout(layoutAt(height));
+        probe.api.handleContentSizeChange(400, height + 40);
+      });
+      runFrame();
+    }
 
     expect(probe.list.scrollToEnd).toHaveBeenCalledTimes(4);
   });
 
-  it('still corrects a streaming content growth that arrives on its own', async () => {
+  it('still corrects a streaming content growth that arrives on its own', () => {
     const probe = mountProbe();
 
-    await act(async () => {
+    act(() => {
       probe.api.handleContentSizeChange(400, 900);
-      await Promise.resolve();
     });
+    runFrame();
 
     expect(probe.list.scrollToEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not correct after the list unmounts', () => {
+    const probe = mountProbe();
+
+    act(() => {
+      probe.api.handleListLayout(layoutAt(500));
+    });
+    for (const renderer of mounted) {
+      act(() => {
+        renderer.unmount();
+      });
+    }
+    runFrame();
+
+    expect(probe.list.scrollToEnd).not.toHaveBeenCalled();
   });
 });

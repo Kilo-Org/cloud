@@ -1,6 +1,7 @@
 import {
   type ReactNode,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -64,6 +65,12 @@ type RememberedPlacement = {
 };
 
 const REMEMBERED_PLACEMENT_LIMIT = 64;
+/**
+ * Upper bound on hiding content that has not reported its own size yet. It
+ * covers one layout pass on a first-ever mount; a view that never reports a
+ * size must not stay invisible.
+ */
+export const CONTENT_MEASURE_FALLBACK_MS = 200;
 const rememberedPlacements = new Map<string, RememberedPlacement>();
 
 /** Test-only: drop the remembered placements so a suite starts from a cold mount. */
@@ -99,6 +106,7 @@ export function CenteredState({
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const [contentMeasured, setContentMeasured] = useState(false);
 
   const register = surface?.register;
   useLayoutEffect(() => register?.(), [register]);
@@ -166,6 +174,7 @@ export function CenteredState({
 
   const measureContent = useCallback((event: LayoutChangeEvent) => {
     setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
+    setContentMeasured(true);
   }, []);
   const layout = useMemo(() => {
     // The stored viewport carries the band it was measured against, and the
@@ -245,6 +254,23 @@ export function CenteredState({
     return { flexGrow: 1, ...style };
   }, [bottomReservation, layout, rememberedStyle]);
 
+  // A first-ever mount has no remembered placement and no content size yet:
+  // painting at the pending centering and then lifting to the measured one is a
+  // visible shift, so the content waits for its own layout callback. A returning
+  // state already knows both and never waits.
+  const unplaced = rememberedStyle === null && !contentMeasured;
+  useEffect(() => {
+    if (!unplaced) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setContentMeasured(true);
+    }, CONTENT_MEASURE_FALLBACK_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [unplaced]);
+
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');
   }
@@ -263,9 +289,11 @@ export function CenteredState({
         keyboardShouldPersistTaps="handled"
       >
         <View
-          className={cn('w-full', contentContainerClassName)}
+          className={cn('w-full', contentContainerClassName, unplaced && 'opacity-0')}
           testID={testID ? `${testID}-content` : undefined}
           onLayout={measureContent}
+          accessibilityElementsHidden={unplaced}
+          importantForAccessibility={unplaced ? 'no-hide-descendants' : 'auto'}
         >
           {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
           {children}

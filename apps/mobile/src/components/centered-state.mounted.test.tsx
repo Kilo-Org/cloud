@@ -19,7 +19,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
 
-import { _resetRememberedSurfaceForTests, CenteredState } from './centered-state';
+import {
+  _resetRememberedSurfaceForTests,
+  CenteredState,
+  CONTENT_MEASURE_FALLBACK_MS,
+} from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
 import { EmptyState } from './empty-state';
 import { InvalidRouteState } from './invalid-route-state';
@@ -440,6 +444,29 @@ describe('CenteredState first-frame paint', () => {
       paddingBottom: 16,
     });
     mounted.unmount();
+  });
+
+  it('holds a first-ever mount back only until its content measures', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      // Nothing to remember and no content size yet: painting now would place
+      // the body at the pending centering and lift it when the size lands. The
+      // hold is one layout pass, and the timer bounds it if none arrives.
+      const mounted = await renderWithProviders(
+        <CenteredState testID="state">{null}</CenteredState>
+      );
+      const content = () =>
+        mounted.renderer.root.findByProps({ testID: 'state-content' }).props as ViewProps;
+      expect(content().className).toContain('opacity-0');
+      await act(async () => {
+        vi.advanceTimersByTime(CONTENT_MEASURE_FALLBACK_MS);
+        await Promise.resolve();
+      });
+      expect(content().className).not.toContain('opacity-0');
+      mounted.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('places a returning state with the band it last painted against', async () => {

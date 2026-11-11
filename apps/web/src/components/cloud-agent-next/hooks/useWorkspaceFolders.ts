@@ -5,10 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
-import type {
-  WorkspaceFolderColor,
-  WorkspaceFolderSortMode,
-} from '@/lib/cloud-agent/workspace-folders';
+import type { WorkspaceFolderColor } from '@/lib/cloud-agent/workspace-folders';
 import {
   controlPlaneSessionIdSchema,
   getInitializedSmartDoneFoldersStorageKey,
@@ -129,15 +126,6 @@ export function useWorkspaceFolders(
       run(
         () => updateFolder({ folderId, color, organizationId: organizationId ?? null }),
         'Folder color updated'
-      ),
-    [organizationId, run, updateFolder]
-  );
-
-  const setFolderSortMode = useCallback(
-    (folderId: string, sortMode: WorkspaceFolderSortMode) =>
-      run(
-        () => updateFolder({ folderId, sortMode, organizationId: organizationId ?? null }),
-        'Folder order updated'
       ),
     [organizationId, run, updateFolder]
   );
@@ -265,7 +253,6 @@ export function useWorkspaceFolders(
     toggleFolder,
     saveFolder,
     setFolderColor,
-    setFolderSortMode,
     deleteFolder,
     moveWorktree,
     moveSession,

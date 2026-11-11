@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import {
   cli_sessions_v2,
   cloud_agent_user_settings,
+  cloud_agent_workspace_folders,
   cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
@@ -71,7 +72,7 @@ async function insertWorktree(
 async function insertPr(
   worktree: string,
   sessionId: string,
-  prState: 'open' | 'draft' | 'merged' = 'open',
+  prState: 'open' | 'draft' | 'merged' | 'closed' = 'open',
   overrides: Partial<NewCliSessionV2> = {}
 ) {
   const prNumber = overrides.pr_number ?? 42;
@@ -122,6 +123,9 @@ beforeEach(async () => {
   await db
     .delete(cloud_agent_user_settings)
     .where(inArray(cloud_agent_user_settings.kilo_user_id, userIds));
+  await db
+    .delete(cloud_agent_workspace_folders)
+    .where(inArray(cloud_agent_workspace_folders.kilo_user_id, userIds));
   await db
     .delete(github_branch_pull_requests)
     .where(
@@ -287,6 +291,55 @@ describe('cliSessionsV2 listWorkspaces', () => {
     });
     expect(searched.workspaces.map(workspace => workspace.worktreeId)).toEqual([oldMerged]);
   });
+
+  it.each(['merged', 'closed'] as const)(
+    'includes existing old %s workspaces only when Done is enabled in the same owner scope',
+    async state => {
+      const worktree = worktreeId();
+      await insertPr(worktree, 'ses_existing_completed', state, {
+        last_activity_at: '2020-01-01T00:00:00.000Z',
+      });
+      await db.insert(cloud_agent_workspace_folders).values([
+        {
+          kilo_user_id: OTHER_USER_ID,
+          name: 'Done',
+          position: 0,
+          kind: 'smart',
+          smart_preset: 'done',
+        },
+        {
+          kilo_user_id: USER_ID,
+          organization_id: ORGANIZATION_ID,
+          name: 'Done',
+          position: 0,
+          kind: 'smart',
+          smart_preset: 'done',
+        },
+      ]);
+      const before = await sessionCaller().listWorkspaces({ organizationId: null });
+      expect(before.workspaces).toEqual([]);
+
+      const [done] = await db
+        .insert(cloud_agent_workspace_folders)
+        .values({
+          kilo_user_id: USER_ID,
+          name: 'Done',
+          position: 0,
+          kind: 'smart',
+          smart_preset: 'done',
+        })
+        .returning();
+      const enabled = await sessionCaller().listWorkspaces({ organizationId: null });
+      expect(enabled.workspaces.map(workspace => workspace.worktreeId)).toEqual([worktree]);
+      expect(enabled.workspaces[0]?.pr?.state).toBe(state);
+
+      await db
+        .delete(cloud_agent_workspace_folders)
+        .where(eq(cloud_agent_workspace_folders.id, done.id));
+      const removed = await sessionCaller().listWorkspaces({ organizationId: null });
+      expect(removed.workspaces).toEqual([]);
+    }
+  );
 
   it('projects the verified PR stack and base fields', async () => {
     const worktree = worktreeId();

@@ -4,7 +4,6 @@ import { useRef, useState, type DragEventHandler, type ReactNode } from 'react';
 import {
   ArrowDown,
   ArrowUp,
-  ArrowUpDown,
   ChevronDown,
   ChevronRight,
   Folder,
@@ -13,7 +12,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import type { WorkspaceFolder, WorkspaceFolderSortMode } from '@/lib/cloud-agent/workspace-folders';
+import type { WorkspaceFolder } from '@/lib/cloud-agent/workspace-folders';
 import { workspaceFolderColorSchema } from '@/lib/cloud-agent/workspace-folders';
 import {
   AlertDialog,
@@ -53,7 +52,6 @@ export function WorkspaceFolderSection({
   onEdit,
   onDelete,
   onMove,
-  onSortModeChange,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -72,7 +70,6 @@ export function WorkspaceFolderSection({
   onEdit: () => void;
   onDelete: () => void;
   onMove: (direction: 'up' | 'down') => void;
-  onSortModeChange?: (sortMode: WorkspaceFolderSortMode) => void;
   onDragStart: DragEventHandler<HTMLDivElement>;
   onDragEnd: DragEventHandler<HTMLDivElement>;
   onDragOver: DragEventHandler<HTMLElement>;
@@ -189,34 +186,6 @@ export function WorkspaceFolderSection({
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            {onSortModeChange && (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger disabled={disabled} className="gap-2">
-                  <ArrowUpDown className="text-muted-foreground size-4" />
-                  Sort workspaces
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup
-                    value={folder.sortMode}
-                    onValueChange={value => {
-                      if (value === 'manual' || value === 'created' || value === 'activity') {
-                        onSortModeChange(value);
-                      }
-                    }}
-                  >
-                    <DropdownMenuRadioItem value="manual" disabled={disabled}>
-                      Manual
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="created" disabled={disabled}>
-                      Created
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="activity" disabled={disabled}>
-                      Last activity
-                    </DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled={disabled || isFirst} onSelect={() => onMove('up')}>
               <ArrowUp className="size-4" />
@@ -277,7 +246,11 @@ export function WorkspaceFolderSection({
             children
           ) : (
             <p className="text-muted-foreground px-3 py-3 text-xs">
-              {count > 0 ? 'No matching workspaces' : 'Drop workspaces here'}
+              {isSmart
+                ? 'No matching workspaces. Workspaces appear here automatically.'
+                : count > 0
+                  ? 'No matching workspaces'
+                  : 'Drop workspaces here'}
             </p>
           )}
         </div>

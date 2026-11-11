@@ -100,17 +100,23 @@ function summaryToolDisplay(
   const stateTitle = status === 'running' || status === 'completed' ? part.state.title : undefined;
   const detail = buildToolDetailSummary(part);
   const summary = detail.name === part.tool ? detail.summary : undefined;
+  // A tool that reports its own id as the state title names nothing the reader
+  // can use, so the row keeps the catalog name instead. Any other state title is
+  // the tool's own prose and stays.
+  const reported =
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a whitespace-only state title must fall through to the projected name; ?? would keep it
+    stateTitle?.trim() || (summary !== undefined ? truncateText(summary, 60) : detail.name);
+  const showsRawId = reported === part.tool;
   return {
     title,
-    subtitle:
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a whitespace-only state title must fall through to the projected name; ?? would keep it
-      stateTitle?.trim() || (summary !== undefined ? truncateText(summary, 60) : detail.name),
+    subtitle: showsRawId ? title : reported,
     // The state title and the projected argument summary are agent prose.
     // A known-tool label (`Publish Image`) is raw English app copy with no
     // catalog, so it must reach the gateway like agent prose; a raw tool id
     // or an `mcp` `server/tool` identifier is an id and stays out, like the
     // already-localized fallback labels above.
-    translatable: Boolean(stateTitle?.trim()) || summary !== undefined || detail.nameIsLabel,
+    translatable:
+      !showsRawId && (Boolean(stateTitle?.trim()) || summary !== undefined || detail.nameIsLabel),
   };
 }
 

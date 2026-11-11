@@ -16,6 +16,11 @@ const TRUNCATED_KEY = '[truncated]';
 // consumed per visited node and per object property, and traversal stops
 // (with a truncation sentinel) the moment it runs out.
 const PROVIDER_HINTS_MAX_NODES = 512;
+// The node budget limits how many values a snapshot holds. This limit caps how
+// long each kept string may be, so the serialized snapshot stays within the
+// node budget times this length. Routing hints are short identifiers, so
+// ordinary hints are copied unchanged.
+const PROVIDER_HINTS_MAX_STRING_LENGTH = 256;
 // Message content, and the Responses input, are client-supplied JSON of
 // unbounded depth: no schema below `content: z.unknown()` constrains their
 // shape. Every walk this module does over them stays inside a fixed amount of
@@ -501,7 +506,13 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
     return null;
   }
 
-  if (typeof value === 'string' || typeof value === 'boolean') {
+  if (typeof value === 'string') {
+    return value.length > PROVIDER_HINTS_MAX_STRING_LENGTH
+      ? value.slice(0, PROVIDER_HINTS_MAX_STRING_LENGTH) + TRUNCATED_VALUE
+      : value;
+  }
+
+  if (typeof value === 'boolean') {
     return value;
   }
 

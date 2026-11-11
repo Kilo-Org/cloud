@@ -391,6 +391,58 @@ describe('classifier input normalization', () => {
     expect(provider['[truncated]']).toBe('[TRUNCATED]');
   });
 
+  it('cuts one oversized string in the provider hints and marks it', () => {
+    const long = 'p'.repeat(2_000_000);
+    const hints = redactProviderHints({
+      provider: { order: ['openai'], passthrough: long },
+      providerOptions: undefined,
+    });
+
+    expect(hints.provider).toEqual({
+      order: ['openai'],
+      passthrough: `${'p'.repeat(256)}[TRUNCATED]`,
+    });
+    expect(JSON.stringify(hints).length).toBeLessThan(1000);
+  });
+
+  it('cuts oversized strings nested in provider options', () => {
+    const long = 'o'.repeat(2_000_000);
+    const hints = redactProviderHints({
+      provider: undefined,
+      providerOptions: { openrouter: { sort: 'price', transforms: [long] } },
+    });
+
+    expect(hints.providerOptions).toEqual({
+      openrouter: { sort: 'price', transforms: [`${'o'.repeat(256)}[TRUNCATED]`] },
+    });
+    expect(JSON.stringify(hints).length).toBeLessThan(1000);
+  });
+
+  it('copies a hint string at the cap unchanged and cuts the next character', () => {
+    const atCap = 'a'.repeat(256);
+    const overCap = 'a'.repeat(257);
+
+    expect(
+      redactProviderHints({ provider: { first: atCap, second: overCap }, providerOptions: null })
+    ).toEqual({
+      provider: { first: atCap, second: `${'a'.repeat(256)}[TRUNCATED]` },
+      providerOptions: null,
+    });
+  });
+
+  it('keeps the mirrored snapshot bounded when every hint string is oversized', () => {
+    const oversized = 'x'.repeat(100_000);
+    const provider = Object.fromEntries(
+      Array.from({ length: 600 }, (_, index) => [`field-${index}`, oversized])
+    );
+
+    const hints = redactProviderHints({ provider, providerOptions: provider });
+
+    // Every visited string is cut to the per-string cap, so the snapshot size
+    // follows the node budget.
+    expect(JSON.stringify(hints).length).toBeLessThan(200_000);
+  });
+
   it('uses caller-captured requestedModel and providerHints over the body values', () => {
     expect(
       normalizeClassifierInput(

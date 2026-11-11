@@ -35,6 +35,16 @@ function catalogValue(tag: SupportedLanguage, key: string): string | undefined {
   return typeof node === 'string' ? node : undefined;
 }
 
+/** The first character of a value that has letter case at all, or undefined. */
+function firstCasedLetter(value: string): string | undefined {
+  for (const letter of value) {
+    if (letter.toLocaleLowerCase('en') !== letter.toLocaleUpperCase('en')) {
+      return letter;
+    }
+  }
+  return undefined;
+}
+
 describe('glanceable failure copy', () => {
   it('keeps the English failure labels in sentence case', () => {
     for (const kind of FAILURE_KINDS) {
@@ -54,21 +64,19 @@ describe('glanceable failure copy', () => {
       for (const kind of FAILURE_KINDS) {
         const value = catalogValue(tag, `glanceable.failure.${kind}`);
         expect(value, `${tag} glanceable.failure.${kind}`).toBeTruthy();
-        const letters = [...String(value)];
-        const firstCased = letters.find(
-          letter => letter.toLocaleLowerCase('en') !== letter.toLocaleUpperCase('en')
-        );
+        const text = String(value);
         // A script without letter case (Han, Arabic, Devanagari, …) has no
-        // sentence-case form, so only a cased value is held to one.
-        if (firstCased === undefined) {
-          continue;
+        // sentence-case form and no capitals either, so it is held to neither
+        // rule.
+        const firstCased = firstCasedLetter(text);
+        if (firstCased !== undefined) {
+          expect(text, `${tag} glanceable.failure.${kind} is set in capitals`).not.toBe(
+            text.toLocaleUpperCase(tag)
+          );
+          expect(text, `${tag} glanceable.failure.${kind} must start with a capital letter`).toBe(
+            text.replace(firstCased, firstCased.toLocaleUpperCase(tag))
+          );
         }
-        expect(value, `${tag} glanceable.failure.${kind} is set in capitals`).not.toBe(
-          String(value).toLocaleUpperCase(tag)
-        );
-        expect(value, `${tag} glanceable.failure.${kind} must start with a capital letter`).toBe(
-          String(value).replace(firstCased, firstCased.toLocaleUpperCase(tag))
-        );
       }
     }
   );

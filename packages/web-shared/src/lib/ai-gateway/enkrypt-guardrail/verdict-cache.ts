@@ -178,7 +178,7 @@ function isLowSurrogate(codeUnit: number): boolean {
 
 /** The last `length` characters, never starting between the two halves of a surrogate pair. */
 function tail(text: string, length: number): string {
-  const start = text.length - length;
+  const start = Math.max(0, text.length - length);
   return text.slice(isLowSurrogate(text.charCodeAt(start)) ? start + 1 : start);
 }
 
@@ -200,7 +200,8 @@ export function conversationScanText(
     const segment = segments[index - 1];
     const text = rendered[index - 1];
     if (!segment || text === undefined) break;
-    if (text.length > remaining) {
+    // The budget counts the body: a body that fits is kept whole, even when its header does not.
+    if (text.length > remaining && (segment.body === null || segment.body.length > remaining)) {
       if (segment.body !== null) {
         const header = segmentHeaderLine(`${segment.header}, beginning omitted`);
         overlap.unshift(`${header}\n${tail(segment.body, remaining)}`);
@@ -308,7 +309,11 @@ async function scanPartWithVerdictCache(
   }
   const fullyCached = cachedSegments === segments.length;
   const scannedText =
-    part === 'conversation' ? conversationScanText(segments, rendered, cachedSegments) : fullyCached ? '' : text;
+    part === 'conversation'
+      ? conversationScanText(segments, rendered, cachedSegments)
+      : fullyCached
+        ? ''
+        : text;
 
   const result = await scanRequest({ ...request, text: scannedText, coverage }, deps);
   const key = keys.at(-1);

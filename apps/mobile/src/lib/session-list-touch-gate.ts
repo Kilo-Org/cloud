@@ -12,7 +12,10 @@
  */
 export const SESSION_LIST_TOUCH_SETTLE_MS = 800;
 
-let holds = 0;
+/** One armed hold, kept so it can be ended without waiting for its timer. */
+type SessionListTouchHold = { end: () => void };
+
+const holds = new Set<SessionListTouchHold>();
 
 /**
  * Shuts the gate for `durationMs`; the returned release ends the hold sooner.
@@ -23,30 +26,31 @@ let holds = 0;
 export function holdSessionListTouch(
   durationMs: number = SESSION_LIST_TOUCH_SETTLE_MS
 ): () => void {
-  holds += 1;
-  let released = false;
-  const release = (): void => {
-    if (released) {
-      return;
-    }
-    released = true;
-    // A test reset clears the count while a timer is still armed; a late
-    // release must not drive the gate below open.
-    holds = Math.max(0, holds - 1);
+  const hold: SessionListTouchHold = {
+    end: () => {
+      if (!holds.delete(hold)) {
+        return;
+      }
+      clearTimeout(timer);
+    },
   };
-  const timer = setTimeout(release, durationMs);
-  return () => {
-    clearTimeout(timer);
-    release();
-  };
+  const timer = setTimeout(hold.end, durationMs);
+  holds.add(hold);
+  return hold.end;
 }
 
 /** Whether a touch that starts now must be kept from the session list. */
 export function isSessionListTouchHeld(): boolean {
-  return holds > 0;
+  return holds.size > 0;
 }
 
-/** Test-only reset; the holds are module state that outlives a mounted tree. */
+/**
+ * Test-only reset; the holds are module state that outlives a mounted tree, so
+ * each armed hold's timer is cleared here instead of firing into a later test.
+ */
 export function __resetSessionListTouchGateForTests(): void {
-  holds = 0;
+  for (const hold of holds) {
+    hold.end();
+  }
+  holds.clear();
 }

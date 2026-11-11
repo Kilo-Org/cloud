@@ -50,4 +50,14 @@ describe('session list touch gate', () => {
     release();
     expect(isSessionListTouchHeld()).toBe(false);
   });
+
+  it('clears an armed hold and its timer on the test reset', () => {
+    holdSessionListTouch();
+    expect(vi.getTimerCount()).toBe(1);
+
+    __resetSessionListTouchGateForTests();
+
+    expect(isSessionListTouchHeld()).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

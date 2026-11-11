@@ -48,7 +48,10 @@ const scanOutcomeShape = {
   verdict_cache: VerdictCacheSchema,
   total_characters: z.number(),
   cached_characters: z.number(),
-  /** Includes the overlap of already-scanned text and omission markers. */
+  /**
+   * Includes the overlaps of already-scanned text ahead of the uncached suffix and of each chunk,
+   * and omission markers, so it can exceed `total_characters`.
+   */
   scanned_characters: z.number(),
   decision: ScanDecisionSchema,
   error: z.string().nullable(),
@@ -91,8 +94,8 @@ export type EnkryptFlaggedTool = z.infer<typeof FlaggedToolSchema>;
 
 /**
  * The scans of a request's tool definitions and response formats by the blocking or the log-only
- * detectors, aggregated: each is cached and scanned on its own, so a request can make one Enkrypt
- * call per tool. `verdict_cache` is `hit` when the cache covered at least one of them. The decision
+ * detectors, aggregated: each is cached and scanned on its own, so a request makes at least one
+ * Enkrypt call per uncached tool. `verdict_cache` is `hit` when the cache covered at least one of them. The decision
  * and error are those of the most severe tool. Characters, calls, and credits are summed; the
  * latency runs until the last tool's scan finished.
  */

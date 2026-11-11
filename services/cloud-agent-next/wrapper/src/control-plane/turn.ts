@@ -658,15 +658,22 @@ export function createTurnManager(deps: TurnManagerDeps) {
         pending.nativeClose = nativeClose;
         markDispatched(turn, pending);
         try {
-          const summarized = await client.compact({
+          const compacted = await client.compact({
             sessionId: route.kiloSessionId,
             directory: route.directory,
             messageId: pending.payload.messageId,
             signal: pending.abort.signal,
             model,
           });
-          if (!summarized) throw new Error('Session summarization failed');
           if (!isCurrent()) return;
+          dispatchSignal.throwIfAborted();
+          if (compacted === 'replayed') {
+            // The retired runtime feed is fenced; replay produces no new execution close.
+            pending.acknowledged = true;
+            pending.nativeObserved = true;
+            void finalize(turn);
+            return;
+          }
           // The response can overtake the feed. Keep follow-ups undispatched until
           // the compact's close is processed, so it cannot complete newer work. Once
           // no native execution is live, the delivery deadline `tick` owns bounds the

@@ -88,11 +88,17 @@ export function createKilo2Harness(options: {
     await select(input);
     await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
     await replaceCloudAgentContext(input);
-    await post(
-      `${kilo2SessionPath(input.sessionId)}/compact`,
-      { id: input.messageId },
-      input.signal
-    );
+    let outcome: Awaited<ReturnType<Harness['compact']>> = 'executed';
+    try {
+      await post(
+        `${kilo2SessionPath(input.sessionId)}/compact`,
+        { id: input.messageId },
+        input.signal
+      );
+    } catch (error) {
+      if (!(error instanceof Kilo2HttpError && error.status === 409)) throw error;
+      outcome = 'replayed';
+    }
     await post(
       `/api/experimental/session/${encodeURIComponent(input.sessionId)}/wait`,
       undefined,
@@ -100,6 +106,7 @@ export function createKilo2Harness(options: {
     );
     const result = z
       .object({
+        id: z.literal(input.messageId),
         type: z.literal('compaction'),
         status: z.enum(['completed', 'failed']),
         error: z.object({ type: z.string().optional(), message: z.string() }).optional(),
@@ -110,6 +117,7 @@ export function createKilo2Harness(options: {
           { signal: input.signal }
         )
       );
+    // Kilo v2 0.0.0-v2-77 reports an empty compaction with this exact type and message.
     if (
       result.status === 'failed' &&
       !(
@@ -120,7 +128,7 @@ export function createKilo2Harness(options: {
       throw new Error(
         `Kilo v2 compaction failed: ${result.error?.message ?? 'Unknown native failure'}`
       );
-    return true;
+    return outcome;
   }
   async function remove(path: string, signal?: AbortSignal) {
     try {
@@ -268,12 +276,8 @@ export function createKilo2Harness(options: {
     compact,
     async condense(input) {
       try {
-        const success = await compact({ ...input, messageId: createMessageId() });
-        return {
-          success,
-          wasAborted: false,
-          ...(success ? {} : { error: 'Kilo v2 compaction failed' }),
-        };
+        await compact({ ...input, messageId: createMessageId() });
+        return { success: true, wasAborted: false };
       } catch (error) {
         return {
           success: false,

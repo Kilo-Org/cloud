@@ -145,7 +145,7 @@ describe('Kilo harness', () => {
         model: 'test/model',
         auto: true,
       })
-    ).toBe(true);
+    ).toBe('executed');
     expect(f.summaries).toEqual([
       { sessionId, directory, messageId: 'm1', model: { modelID: 'test/model' }, auto: true },
     ]);

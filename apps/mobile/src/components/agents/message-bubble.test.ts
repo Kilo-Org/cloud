@@ -149,14 +149,30 @@ vi.mock('./use-message-copy', () => ({
 const BADGE_CLASS = 'flex-row items-center gap-1 self-end pr-1';
 
 describe('MessageBubble compaction', () => {
-  it('passes assistant status to the compaction-only separator', async () => {
-    const message = assistantMessage('compaction');
-    message.parts = [
-      { id: 'part', sessionID: 'ses_1', messageID: 'compaction', type: 'compaction', auto: false },
-    ];
-    const tree = await renderBubble(message);
-    expect(findElementByType(tree, 'CompactionSeparator')?.props.info).toBe(message.info);
-  });
+  it.each([true, false])(
+    'passes live state %s to the compaction-only separator',
+    async isStreaming => {
+      const message = assistantMessage('compaction');
+      message.parts = [
+        {
+          id: 'part',
+          sessionID: 'ses_1',
+          messageID: 'compaction',
+          type: 'compaction',
+          auto: false,
+        },
+      ];
+      const { MessageBubble } = await import('./message-bubble');
+      // eslint-disable-next-line new-cap -- Inspect the component's unrendered tree.
+      const tree = MessageBubble.type({
+        message,
+        isLastAssistantMessage: true,
+        isSessionStreaming: isStreaming,
+      });
+      expect(findElementByType(tree, 'CompactionSeparator')?.props.info).toBe(message.info);
+      expect(findElementByType(tree, 'CompactionSeparator')?.props.isStreaming).toBe(isStreaming);
+    }
+  );
 
   it('passes assistant status to parts in a mixed message', async () => {
     const message = assistantMessage('compaction');

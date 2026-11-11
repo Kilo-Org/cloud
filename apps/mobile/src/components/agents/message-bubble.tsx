@@ -158,7 +158,10 @@ function MessageBubbleImpl({
   if (parts.length === 1 && firstPart?.type === 'compaction') {
     return (
       <View className="px-4">
-        <CompactionSeparator info={message.info} />
+        <CompactionSeparator
+          info={message.info}
+          isStreaming={isLastAssistantMessage && isSessionStreaming}
+        />
       </View>
     );
   }

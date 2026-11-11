@@ -27,7 +27,7 @@ import { WorktreeReviewMessageCard } from '../WorktreeReviewMessageCard';
 import { PreparationRow } from '../PreparationRow';
 import { CommitCard } from '../CommitCard';
 import { MessageErrorBoundary } from '../MessageErrorBoundary';
-import { CloudMessageParts } from './CloudMessageParts';
+import { CloudMessagePartByIndex, CloudMessageParts } from './CloudMessageParts';
 import {
   useCloudMessagePresentation,
   useCloudPresentationActions,
@@ -75,7 +75,33 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
           {presentation.messageIds.slice(1).map(id => (
             <span key={id} data-message-id={id} aria-hidden="true" />
           ))}
-          {child ? (
+          {compaction ? (
+            <>
+              <CompactionSeparator
+                compactionPart={compaction}
+                timestamp={presentation.displayTimestamp}
+                status={
+                  interrupted
+                    ? 'interrupted'
+                    : error != null
+                      ? 'failed'
+                      : first.info.role === 'assistant' && first.info.time.completed === undefined
+                        ? presentation.isStreaming
+                          ? 'running'
+                          : 'interrupted'
+                        : 'completed'
+                }
+              />
+              {errorMessage && errorMessage !== 'Context compaction failed' && (
+                <p className="text-destructive text-sm">{errorMessage}</p>
+              )}
+              {(isUser ? parts : getVisibleAssistantParts(parts)).map((part, index) =>
+                isCompactionPart(part) ? null : (
+                  <CloudMessagePartByIndex key={part.id} index={index} />
+                )
+              )}
+            </>
+          ) : child ? (
             <>
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <Badge variant="outline" className="text-xs">
@@ -88,25 +114,6 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
               <div className="mt-2 space-y-1">
                 <CloudMessageParts />
               </div>
-            </>
-          ) : compaction ? (
-            <>
-              <CompactionSeparator
-                compactionPart={compaction}
-                timestamp={presentation.displayTimestamp}
-                status={
-                  interrupted
-                    ? 'interrupted'
-                    : error != null
-                      ? 'failed'
-                      : first.info.role === 'assistant' && first.info.time.completed === undefined
-                        ? 'running'
-                        : 'completed'
-                }
-              />
-              {errorMessage && errorMessage !== 'Context compaction failed' && (
-                <p className="text-destructive text-sm">{errorMessage}</p>
-              )}
             </>
           ) : isUser ? (
             <>

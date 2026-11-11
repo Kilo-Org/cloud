@@ -90,7 +90,7 @@ export function PartRenderer({
     );
   }
   if (isCompactionPart(part)) {
-    return <CompactionSeparator info={messageInfo} />;
+    return <CompactionSeparator info={messageInfo} isStreaming={isStreaming} />;
   }
   // Standalone PatchPart (`type: 'patch'`) carries only file paths — no diff
   // text — so the diff engine cannot apply. The web renderer renders null for

@@ -41,6 +41,7 @@ type ChildSessionStatus = ToolPart['state']['status'];
 export type RenderPartFn = (props: {
   part: Part;
   messageInfo?: MessageInfo;
+  isStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
 }) => ReactNode;
@@ -221,6 +222,7 @@ function resolveChildMessages(
 
 export function ChildSessionMessage({
   message,
+  isStreaming,
   depth,
   getChildMessages,
   renderPart,
@@ -228,6 +230,7 @@ export function ChildSessionMessage({
   modelOptions,
 }: Readonly<{
   message: StoredMessage;
+  isStreaming?: boolean;
   depth: number;
   getChildMessages: (sessionId: string) => StoredMessage[];
   renderPart: RenderPartFn;
@@ -272,6 +275,7 @@ export function ChildSessionMessage({
             {renderPart({
               part: p,
               messageInfo: message.info,
+              isStreaming,
               getChildMessages,
               onOpenChildSession,
             })}

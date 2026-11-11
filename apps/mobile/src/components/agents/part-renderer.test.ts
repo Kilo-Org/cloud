@@ -87,11 +87,15 @@ it('passes message status to the compaction separator', () => {
   const element = PartRenderer({
     part: { id: 'part', sessionID: 's1', messageID: 'compaction', type: 'compaction', auto: false },
     messageInfo: message.info,
+    isStreaming: true,
   });
   expect(element?.type).toBe(CompactionSeparator);
   expect(
     React.isValidElement<{ info?: StoredMessage['info'] }>(element) && element.props.info
   ).toBe(message.info);
+  expect(
+    React.isValidElement<{ isStreaming?: boolean }>(element) && element.props.isStreaming
+  ).toBe(true);
 });
 
 function makeTextPart(text: string, synthetic?: boolean, ended = true): TextPart {

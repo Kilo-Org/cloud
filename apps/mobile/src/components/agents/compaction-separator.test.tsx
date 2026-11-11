@@ -31,24 +31,41 @@ function textContent(node: unknown): string {
 
 describe('CompactionSeparator', () => {
   it.each([
-    ['pending', undefined, 'Running'],
-    ['running', undefined, 'Running'],
-    ['completed', undefined, 'Context compacted'],
-    ['failed', undefined, 'Failed'],
-    ['failed', { type: 'model', message: 'Model unavailable' }, 'Failed'],
-    ['failed', { type: 'aborted', message: 'Raw abort text' }, 'Cancelled'],
-  ])('renders native %s compaction with error %j as %s', (status, error, label) => {
-    const [message] = readKilo2Messages(
-      {
-        id: 'session',
-        location: { directory: '/workspace' },
-        time: { created: 1, updated: 2 },
-      },
-      [{ id: 'compaction', type: 'compaction', status, time: { created: 1 }, error }]
-    );
-    expect(message).toBeDefined();
-    expect(textContent(renderCompactionSeparator({ info: message?.info }))).toBe(label);
-  });
+    { status: 'pending', error: undefined, label: 'Running', isStreaming: true },
+    { status: 'running', error: undefined, label: 'Running', isStreaming: true },
+    { status: 'pending', error: undefined, label: 'Cancelled', isStreaming: false },
+    { status: 'running', error: undefined, label: 'Cancelled', isStreaming: false },
+    { status: 'completed', error: undefined, label: 'Context compacted', isStreaming: false },
+    { status: 'failed', error: undefined, label: 'Failed', isStreaming: false },
+    {
+      status: 'failed',
+      error: { type: 'model', message: 'Model unavailable' },
+      label: 'Failed',
+      isStreaming: false,
+    },
+    {
+      status: 'failed',
+      error: { type: 'aborted', message: 'Raw abort text' },
+      label: 'Cancelled',
+      isStreaming: false,
+    },
+  ])(
+    'renders native $status compaction with error $error as $label (live: $isStreaming)',
+    ({ status, error, label, isStreaming }) => {
+      const [message] = readKilo2Messages(
+        {
+          id: 'session',
+          location: { directory: '/workspace' },
+          time: { created: 1, updated: 2 },
+        },
+        [{ id: 'compaction', type: 'compaction', status, time: { created: 1 }, error }]
+      );
+      expect(message).toBeDefined();
+      expect(textContent(renderCompactionSeparator({ info: message?.info, isStreaming }))).toBe(
+        label
+      );
+    }
+  );
 
   it('preserves the V1 completed separator without assistant metadata', () => {
     expect(textContent(renderCompactionSeparator({}))).toBe('Context compacted');

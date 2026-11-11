@@ -135,7 +135,7 @@ describe('ChildSessionSection tool-summary translation gate', () => {
     setConfig({ enabled: false, model: MODEL });
   });
 
-  it('passes child message status to its compaction renderer', () => {
+  it.each([true, false])('passes child live state %s to its compaction renderer', isStreaming => {
     const message = assistantMessage('compaction');
     const part = {
       id: 'compaction-part',
@@ -151,6 +151,7 @@ describe('ChildSessionSection tool-summary translation gate', () => {
       renderer = TestRenderer.create(
         createElement(ChildSessionMessage, {
           message,
+          isStreaming,
           depth: 0,
           getChildMessages: () => [],
           renderPart,
@@ -159,7 +160,7 @@ describe('ChildSessionSection tool-summary translation gate', () => {
       );
     });
     expect(renderPart).toHaveBeenCalledWith(
-      expect.objectContaining({ part, messageInfo: message.info })
+      expect.objectContaining({ part, messageInfo: message.info, isStreaming })
     );
     act(() => {
       renderer?.unmount();

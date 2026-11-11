@@ -377,6 +377,46 @@ describe('auth middleware', () => {
     });
     expect(res.status).toBe(401);
   });
+
+  it('requires a bearer token to write the config', async () => {
+    const res = await request('/admin/config', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(TEST_CONFIG),
+    });
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(getConfigRows).not.toHaveBeenCalled();
+    expect(replaceConfig).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a config write with a non-matching bearer token', async () => {
+    const res = await request('/admin/config', {
+      method: 'PUT',
+      headers: { authorization: 'Bearer wrong-token', 'content-type': 'application/json' },
+      body: JSON.stringify(TEST_CONFIG),
+    });
+    expect(res.status).toBe(401);
+    expect(getConfigRows).not.toHaveBeenCalled();
+    expect(replaceConfig).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('requires a bearer token to read the routing table', async () => {
+    const res = await request('/admin/routing-table');
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(getLatestRoutingTable).not.toHaveBeenCalled();
+  });
+
+  it('rejects a routing table read with a non-matching bearer token', async () => {
+    const res = await request('/admin/routing-table', {
+      headers: { authorization: 'Bearer wrong-token' },
+    });
+    expect(res.status).toBe(401);
+    expect(getLatestRoutingTable).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /admin/config', () => {

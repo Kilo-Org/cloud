@@ -2,6 +2,7 @@ import React, { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 import type { StoredSession } from './types';
+import type { WorkspaceFolder } from '@/lib/cloud-agent/workspace-folders';
 
 Object.assign(globalThis, { React });
 
@@ -107,6 +108,45 @@ jest.mock('@/components/ui/dropdown-menu', () => {
     DropdownMenuPortal: passthrough,
     DropdownMenuGroup: passthrough,
     DropdownMenuShortcut: passthrough,
+  };
+});
+
+jest.mock('@/components/ui/alert-dialog', () => {
+  const react = jest.requireActual<typeof React>('react');
+  const Context = react.createContext({ open: false, onOpenChange: (_open: boolean) => {} });
+  const passthrough = ({ children }: { children?: ReactNode }) =>
+    react.createElement(react.Fragment, null, children);
+  return {
+    AlertDialog: ({
+      open,
+      onOpenChange,
+      children,
+    }: {
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+      children?: ReactNode;
+    }) => react.createElement(Context.Provider, { value: { open, onOpenChange } }, children),
+    AlertDialogContent: ({ children }: { children?: ReactNode }) =>
+      react.useContext(Context).open
+        ? react.createElement('div', { role: 'dialog' }, children)
+        : null,
+    AlertDialogHeader: passthrough,
+    AlertDialogTitle: passthrough,
+    AlertDialogDescription: passthrough,
+    AlertDialogFooter: passthrough,
+    AlertDialogCancel: ({ children }: { children?: ReactNode }) => {
+      const { onOpenChange } = react.useContext(Context);
+      return react.createElement('button', { onClick: () => onOpenChange(false) }, children);
+    },
+    AlertDialogAction: ({
+      children,
+      onClick,
+      disabled,
+    }: {
+      children?: ReactNode;
+      onClick: () => void;
+      disabled?: boolean;
+    }) => react.createElement('button', { onClick, disabled }, children),
   };
 });
 
@@ -649,6 +689,15 @@ describe('ChatSidebar row rendering', () => {
           sortMode: 'manual' as const,
           worktreeIds: [] as string[],
         },
+        {
+          id: ids[1],
+          name: 'Needs you',
+          color: 'yellow' as const,
+          kind: 'smart' as const,
+          smartPreset: 'needs_you' as const,
+          sortMode: 'activity' as const,
+          worktreeIds: [] as string[],
+        },
       ],
       isLoading: false,
       isFirstLoadPending: false,
@@ -689,6 +738,58 @@ describe('ChatSidebar row rendering', () => {
     };
     return { sessions, workspaceFolders, dataTransfer, dragEvent };
   }
+
+  it('requires confirmation before deleting a folder and allows cancellation', async () => {
+    const { sessions, workspaceFolders } = folderDragFixture();
+    renderSidebar({ sessions, workspaceFolders });
+    const folder = dom.container.querySelector<HTMLElement>('[data-folder-id]');
+    if (!folder) throw new Error('Folder missing');
+
+    click(menuItem(folder, 'Delete folder'));
+    expect(workspaceFolders.deleteFolder).not.toHaveBeenCalled();
+
+    const dialog = document.querySelector('[role="dialog"]');
+    if (!dialog) throw new Error('Delete confirmation missing');
+    expect(dialog.textContent).toContain('Product');
+    expect(dialog.textContent).toContain('will move to Ungrouped, not be deleted');
+    const cancel = Array.from(dialog.querySelectorAll('button')).find(
+      button => button.textContent === 'Cancel'
+    );
+    if (!cancel) throw new Error('Cancel button missing');
+    click(cancel);
+    expect(workspaceFolders.deleteFolder).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+
+    click(menuItem(folder, 'Delete folder'));
+    const confirm = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')
+    ).find(button => button.textContent === 'Delete folder');
+    if (!confirm) throw new Error('Delete confirmation button missing');
+    await act(async () => {
+      confirm.click();
+    });
+    expect(workspaceFolders.deleteFolder).toHaveBeenCalledTimes(1);
+    expect(workspaceFolders.deleteFolder).toHaveBeenCalledWith(workspaceFolders.folders[0].id);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('removes a smart folder from the sidebar without confirmation', async () => {
+    const { sessions, workspaceFolders } = folderDragFixture();
+    renderSidebar({ sessions, workspaceFolders, workspaceGroups: [] });
+    const smartFolder = workspaceFolders.folders[1];
+    const folder = dom.container.querySelector<HTMLElement>(`[data-folder-id="${smartFolder.id}"]`);
+    if (!folder) throw new Error('Smart folder missing');
+    expect(workspaceFolders.deleteFolder).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+
+    await act(async () => {
+      menuItem(folder, 'Remove from sidebar').click();
+    });
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(workspaceFolders.deleteFolder).toHaveBeenCalledTimes(1);
+    expect(workspaceFolders.deleteFolder).toHaveBeenCalledWith(smartFolder.id);
+  });
 
   it.each([0, 1])('drags only ungrouped workspace row %i from its title into a folder', index => {
     const { sessions, workspaceFolders, dataTransfer, dragEvent } = folderDragFixture();
@@ -1285,7 +1386,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
 
   function workspaceFolders() {
     return {
-      folders: [],
+      folders: [] as WorkspaceFolder[],
       isLoading: false,
       isFirstLoadPending: false,
       isError: false,
@@ -1311,7 +1412,8 @@ describe('ChatSidebar phase 4 drag ordering', () => {
   function dragRows(
     source: Element,
     target: Element,
-    clientY: number
+    clientY: number,
+    afterDragOver?: () => void
   ): { dataTransfer: { setData: jest.Mock; setDragImage: jest.Mock } } {
     const dataTransfer = {
       setData: jest.fn(),
@@ -1334,6 +1436,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       ({ top: 0, left: 0, width: 200, height: 40, bottom: 40, right: 200, x: 0, y: 0 }) as DOMRect;
     event(source, 'dragstart');
     event(target, 'dragover', clientY);
+    afterDragOver?.();
     event(target, 'drop', clientY);
     return { dataTransfer };
   }
@@ -1618,6 +1721,133 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     expect(worktreeId).toBe('worktree_drag_1');
     expect(folderId).toBeNull();
     expect((position as string) < 'a2').toBe(true);
+  });
+
+  function manualFolder(groups: NonNullable<ChatSidebarProps['workspaceGroups']>): WorkspaceFolder {
+    return {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'Product',
+      color: 'default',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'activity',
+      worktreeIds: groups.map(group => group.worktreeId),
+    };
+  }
+
+  function fileGroups(groups: NonNullable<ChatSidebarProps['workspaceGroups']>, folderId: string) {
+    return groups.map(group => ({ ...group, details: { ...group.details!, folderId } }));
+  }
+
+  function workspaceIds(): (string | null)[] {
+    return [...dom.container.querySelectorAll('[data-worktree-id]')].map(row =>
+      row.getAttribute('data-worktree-id')
+    );
+  }
+
+  it('renders saved manual folder positions after a drag, refetch and remount', () => {
+    const folders = workspaceFolders();
+    const initial = [phase4Group(0, null), phase4Group(1, null), phase4Group(2, null)];
+    const folder = manualFolder(initial);
+    folders.folders = [folder];
+    let groups = fileGroups(initial, folder.id);
+    const props = () => ({
+      workspaceGroups: groups,
+      workspaceFolders: folders,
+      workspaceOrder: 'manual' as const,
+    });
+    renderSidebar(props());
+    expect(workspaceIds()).toEqual(initial.map(group => group.worktreeId));
+
+    folders.initializeWorktreePositions.mockImplementation(async ids => {
+      groups = groups.map(group => ({
+        ...group,
+        details: { ...group.details!, sidebarPosition: `a${ids.indexOf(group.worktreeId) + 1}` },
+      }));
+      return true;
+    });
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    dragRows(rows[0]!, rows[1]!, 35, () => {
+      expect(rows[1]?.classList.contains('border-b-2')).toBe(true);
+    });
+    const expected = ['worktree_drag_1', 'worktree_drag_0', 'worktree_drag_2'];
+    expect(folders.initializeWorktreePositions).toHaveBeenCalledWith(expected, folder.id);
+    renderSidebar(props());
+    expect(workspaceIds()).toEqual(expected);
+    expect(dom.container.textContent).not.toContain('Sort workspaces');
+
+    act(() => root.unmount());
+    root = createRoot(dom.container);
+    renderSidebar(props());
+    expect(workspaceIds()).toEqual(expected);
+  });
+
+  it.each(['created', 'activity'] as const)(
+    'does not advertise or save row reordering in %s mode, inside or outside a folder',
+    workspaceOrder => {
+      const folders = workspaceFolders();
+      const groups = [phase4Group(0, 'a2'), phase4Group(1, 'a1')];
+      const folder = { ...manualFolder(groups), sortMode: 'manual' as const };
+      for (const filed of [false, true]) {
+        folders.folders = filed ? [folder] : [];
+        renderSidebar({
+          workspaceGroups: filed ? fileGroups(groups, folder.id) : groups,
+          workspaceFolders: folders,
+          workspaceOrder,
+        });
+        expect(workspaceIds()).toEqual(['worktree_drag_0', 'worktree_drag_1']);
+        const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+        expect(rows[0]?.getAttribute('draggable')).toBe('true');
+        dragRows(rows[0]!, rows[1]!, 35, () => {
+          expect(dom.container.querySelector('[data-worktree-id].border-b-2')).toBeNull();
+          expect(dom.container.querySelector('[data-worktree-id].border-t-2')).toBeNull();
+        });
+        expect(folders.moveWorktree).not.toHaveBeenCalled();
+        expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each(['manual', 'created', 'activity'] as const)(
+    'moves between folders without assigning a row position in %s mode',
+    workspaceOrder => {
+      const folders = workspaceFolders();
+      const groups = [phase4Group(0, 'a1'), phase4Group(1, 'a2')];
+      const first = manualFolder([groups[0]!]);
+      const second = { ...manualFolder([groups[1]!]), id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' };
+      folders.folders = [first, second];
+      renderSidebar({
+        workspaceGroups: [
+          ...fileGroups([groups[0]!], first.id),
+          ...fileGroups([groups[1]!], second.id),
+        ],
+        workspaceFolders: folders,
+        workspaceOrder,
+      });
+      const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+      dragRows(rows[0]!, rows[1]!, 35, () => {
+        expect(dom.container.querySelector('[data-worktree-id].border-b-2')).toBeNull();
+      });
+      expect(folders.moveWorktree).toHaveBeenCalledWith(groups[0]?.worktreeId, second.id);
+      expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not reorder automatically grouped rows using their underlying manual folder', () => {
+    const folders = workspaceFolders();
+    const groups = [phase4Group(0, 'a1'), phase4Group(1, 'a2')].map(group => ({
+      ...group,
+      sessions: group.sessions.map(session => ({ ...session, sessionStatus: 'question' })),
+    }));
+    const folder = manualFolder(groups);
+    folders.folders = [folder, { ...folder, id: 'needs', kind: 'smart', smartPreset: 'needs_you' }];
+    renderSidebar({ workspaceGroups: fileGroups(groups, folder.id), workspaceFolders: folders });
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    dragRows(rows[0]!, rows[1]!, 35, () => {
+      expect(dom.container.querySelector('[data-worktree-id].border-b-2')).toBeNull();
+    });
+    expect(folders.moveWorktree).not.toHaveBeenCalled();
+    expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
   });
 });
 

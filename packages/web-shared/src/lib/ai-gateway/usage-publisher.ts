@@ -4,7 +4,7 @@ import {
   USAGE_INGEST_URL,
   USAGE_INGEST_PUBLISH_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
-import type { EnkryptUsageWriteInput, UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { EnkryptUsageWriteInput, LlmUsageQueueMessage } from '@kilocode/usage-contracts';
 import { enqueueVercelUsage } from '@kilocode/usage-queue/vercel/publisher';
 import { USAGE_VERCEL_QUEUE_ENABLED } from '@kilocode/usage-queue/vercel/config';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
@@ -69,7 +69,7 @@ function parsePublisherUrl(value: string): URL | null {
 
 /** HTTP 202 confirms enqueueing, not a committed usage row. */
 export async function enqueueUsage(
-  payload: UsageRecordRequest,
+  payload: LlmUsageQueueMessage,
   { retryTransientFailures = false }: { retryTransientFailures?: boolean } = {}
 ): Promise<UsageEnqueueOutcome> {
   if (USAGE_VERCEL_QUEUE_ENABLED) {
@@ -114,7 +114,7 @@ export async function enqueueEnkryptUsage(
 async function publishToUsageIngest(
   identity: PublicationIdentity,
   ingestUrl: string | undefined,
-  payload: UsageRecordRequest | EnkryptUsageWriteInput,
+  payload: LlmUsageQueueMessage | EnkryptUsageWriteInput,
   { retryTransientFailures }: { retryTransientFailures: boolean }
 ): Promise<UsageEnqueueOutcome> {
   if (!ingestUrl || !USAGE_INGEST_PUBLISH_SECRET) {

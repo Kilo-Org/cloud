@@ -171,13 +171,25 @@ describe('notificationHistoryTarget', () => {
     expect(notificationHistoryTarget({ type: 'retired_kind' })).toBeNull();
     expect(notificationHistoryTarget({})).toBeNull();
   });
+
+  it.each([
+    {
+      type: 'chat.message',
+      sandboxId: 'sandbox-1',
+      conversationId: 'conversation-1',
+      messageId: 'm1',
+    },
+    { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sandbox-1' },
+    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sandbox-1' },
+  ])('has no history destination for retired $type notifications', payload => {
+    expect(notificationHistoryTarget(payload)).toBeNull();
+  });
 });
 
 describe('notificationHistoryFilters', () => {
-  it('offers every recorded category behind an "All" chip', () => {
+  it('offers supported recorded categories behind an "All" chip', () => {
     expect(NOTIFICATION_HISTORY_FILTERS.map(filter => filter.category)).toEqual([
       null,
-      'chatMessages',
       'agentAttention',
       'sessionStatus',
       'balanceAlerts',
@@ -194,7 +206,6 @@ describe('notificationHistoryFilters', () => {
 
     expect(filters.map(filter => filter.category)).toEqual([
       null,
-      'chatMessages',
       'agentAttention',
       'sessionStatus',
       'spendAlerts',

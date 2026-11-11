@@ -65,7 +65,7 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
 import { admitEnkryptGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/admission';
-import { extractRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import { extractRequestParts } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
   parseLlmProxyRequest,
   readLlmProxyHeaders,
@@ -231,7 +231,7 @@ export async function handleLlmProxyRequest(
   if (enkryptAdmission.kind === 'rejected') return enkryptAdmission.response;
 
   // Like the bouncer decide, the guardrail scan overlaps routing work. Its blocking detectors are
-  // awaited just before the upstream call; log-only detectors are never awaited. Segments are
+  // awaited just before the upstream call; log-only detectors are never awaited. Parts are
   // extracted inside the promise so an extraction failure rejects the guardrail, failing closed.
   const enkryptGuardrail = startEnkryptInputGuardrail(
     Promise.resolve(enkryptAdmission.inputGuardrail).then(
@@ -242,7 +242,7 @@ export async function handleLlmProxyRequest(
           microdollarUsageId: usageId,
           apiKind: requestBodyParsed.kind,
           clientRequestId: headers.clientRequestId,
-          segments: extractRequestSegments(requestBodyParsed),
+          parts: extractRequestParts(requestBodyParsed),
         }
     ),
     request.signal

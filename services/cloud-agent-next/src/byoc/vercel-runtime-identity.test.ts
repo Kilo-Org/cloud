@@ -11,8 +11,29 @@ import {
   getVercelRuntimeIdentity,
 } from './vercel-runtime-identity.js';
 import { getVercelRuntimeArtifacts } from './vercel-runtime-artifacts.js';
+import * as runtimeDistribution from '../shared/runtime-distribution.js';
+import { vercelRuntimeBaseDigest } from './vercel-runtime-base.js';
 
 describe('vercelRuntimeDigest', () => {
+  it.each([{ ghStack: '0.3.1' }, { ghStackSha256: 'a'.repeat(64) }])(
+    'invalidates the downloaded base when the gh-stack pin changes: %j',
+    async changedPin => {
+      const originalDigest = await vercelRuntimeBaseDigest();
+      vi.resetModules();
+      vi.doMock('../shared/runtime-distribution.js', async importOriginal => ({
+        ...(await importOriginal<typeof runtimeDistribution>()),
+        RUNTIME_DISTRIBUTION: { ...runtimeDistribution.RUNTIME_DISTRIBUTION, ...changedPin },
+      }));
+      try {
+        const { vercelRuntimeBaseDigest: changedDigest } = await import('./vercel-runtime-base.js');
+        expect(await changedDigest()).not.toBe(originalDigest);
+      } finally {
+        vi.doUnmock('../shared/runtime-distribution.js');
+        vi.resetModules();
+      }
+    }
+  );
+
   it('uses the same base identity across downloaded CLI and control releases', async () => {
     const first = { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: 'release-a' };
     const second = { ...first, RUNTIME_RELEASE_DESCRIPTOR: 'release-b' };

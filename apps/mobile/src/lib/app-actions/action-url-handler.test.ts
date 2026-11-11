@@ -59,17 +59,30 @@ describe('handleAppActionPath', () => {
     expect(getPendingDeepLink()).toBe('/(app)/pr-review/o/r/7');
   });
 
-  it('opens nothing for a session id the route cannot resolve', () => {
-    // Still the contract's URL, but there is no destination to open: stashing
-    // the composer fallback would replace the current screen with it.
+  it('opens nothing for a session id the route cannot address', () => {
+    // Still the contract's URL, but its capture is not an id any read could
+    // address, so there is no destination to open: stashing it would replace
+    // the current screen with a screen that cannot exist.
     expect(
       handleAppActionPath({
-        path: 'kiloapp:///actions/open-session?sessionId=not-a-session',
+        path: 'kiloapp:///actions/open-session?sessionId=ses%3A1',
         initial: false,
       })
     ).toBe(true);
     expect(getPendingDeepLink()).toBeNull();
     expect(getPendingAppAction()).toBeNull();
+  });
+
+  it('stashes a session id the route can address even when it does not resolve', () => {
+    // The route owns the answer for an id that resolves to nothing: its
+    // not-found state, not a silent drop of the link.
+    expect(
+      handleAppActionPath({
+        path: 'kiloapp:///actions/open-session?sessionId=xmw2l780h18',
+        initial: false,
+      })
+    ).toBe(true);
+    expect(getPendingDeepLink()).toBe('/(app)/agent-chat/xmw2l780h18');
   });
 
   it('accepts the scheme-less path expo-router hands redirectSystemPath', () => {

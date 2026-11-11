@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { HOME_WIDGET_TITLE_LIMIT, homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
-import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  GLANCEABLE_SNAPSHOT_SCHEMA_VERSION,
+  GLANCEABLE_SNAPSHOT_STATUSES,
+  GLANCEABLE_STATUS_KINDS,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   SESSION_LIVE_COMMAND_LIMIT,
   sessionLiveChangesSchema,
@@ -149,11 +153,11 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // into Live Activity/ongoing content-state. Older producers omit them.
   z.object({
     type: z.literal('active_agents_glanceable'),
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(GLANCEABLE_SNAPSHOT_SCHEMA_VERSION),
     revision: z.number().int().min(1),
     scopeKey: nonEmptyStringSchema,
     organizationBound: z.boolean(),
-    status: z.enum(['waiting', 'empty', 'happy', 'stale', 'expired', 'signed_out', 'privacy']),
+    status: z.enum(GLANCEABLE_SNAPSHOT_STATUSES),
     running: z.number().int().min(0),
     needsInput: z.number().int().min(0),
     /**

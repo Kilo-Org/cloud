@@ -5,6 +5,7 @@ import {
   ENKRYPT_MAX_SCAN_CHARACTERS,
   guardrailBlockMessage,
   responseBlockMessage,
+  SCAN_TOO_LARGE_MESSAGES,
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
@@ -39,11 +40,13 @@ function makeScan(overrides: Partial<EnkryptGuardrailScan> = {}): EnkryptGuardra
     clientRequestId: 'client-request-1',
     text: 'tool output',
     coverage: {
+      part: 'conversation',
       cache: 'miss',
       totalCharacters: 11,
       totalSegments: 1,
       cachedCharacters: 0,
       cachedSegments: 0,
+      omittedAttachments: 0,
     },
     config,
     ...overrides,
@@ -152,6 +155,8 @@ describe('scanRequest', () => {
           apiKind: 'chat_completions',
           decision: 'allowed',
           creditsCost: 3,
+          scannedCharacters: 11,
+          totalCharacters: 11,
         },
       ],
     });
@@ -173,6 +178,7 @@ describe('scanRequest', () => {
 
     expect(result.report).toEqual({
       scan: 'blocking',
+      part: 'conversation',
       detectors_enabled: ['injection_attack', 'pii', 'keyword_detector', 'toxicity'],
       detectors_blocking: ['injection_attack', 'toxicity', 'keyword_detector'],
       verdict_cache: 'miss',
@@ -180,6 +186,7 @@ describe('scanRequest', () => {
       total_segments: 1,
       cached_characters: 0,
       cached_segments: 0,
+      omitted_attachments: 0,
       scanned_characters: 32,
       decision: 'blocked',
       error: null,
@@ -193,6 +200,21 @@ describe('scanRequest', () => {
       '[enkrypt-guardrail] decision',
       expect.objectContaining({ ...result.report, organization_id: makeScan().organizationId })
     );
+  });
+
+  it('labels the report and request log with the scanned part and omitted attachments', async () => {
+    const calls: Promise<EnkryptRequestLog>[] = [];
+    const result = await scanRequest(
+      makeScan({ coverage: { ...makeScan().coverage, part: 'system', omittedAttachments: 3 } }),
+      deps(async () => detectResponse({ summary: {} }), {
+        requestLog: { guardrail: 'input', capture: entry => calls.push(entry) },
+      })
+    );
+
+    expect(result.report).toMatchObject({ part: 'system', omitted_attachments: 3 });
+    expect(await Promise.all(calls)).toEqual([
+      expect.objectContaining({ guardrail: 'input', scan: 'blocking', part: 'system' }),
+    ]);
   });
 
   it('blocks when a block-type detector fires and shows the Enkrypt block message', async () => {
@@ -401,6 +423,9 @@ describe('scanRequest', () => {
 
     expect(result.usageRecords).toHaveLength(2);
     expect(result.usageRecords[0]).not.toHaveProperty('detectorsFired');
+    expect(result.usageRecords[0]).toEqual(
+      expect.objectContaining({ scannedCharacters: 11, totalCharacters: 11 })
+    );
     expect(result.usageRecords[1]).toEqual(
       expect.objectContaining({ decision: 'allowed', detectorsFired: ['pii'] })
     );
@@ -420,20 +445,25 @@ describe('scanRequest', () => {
     expect(console.debug).not.toHaveBeenCalled();
   });
 
-  it('logs how much of the conversation was scanned and how much was cached', async () => {
+  it('logs and records how much of the conversation was scanned and how much was cached', async () => {
     const coverage = {
+      part: 'conversation',
       cache: 'hit',
       totalCharacters: 9_000,
       totalSegments: 12,
       cachedCharacters: 8_000,
       cachedSegments: 10,
+      omittedAttachments: 2,
     } as const;
 
-    await scanRequest(
+    const result = await scanRequest(
       makeScan({ coverage }),
       deps(async () => detectResponse({ summary: {} }, { credits: '3' }))
     );
 
+    expect(result.usageRecords).toEqual([
+      expect.objectContaining({ scannedCharacters: 11, totalCharacters: 9_000 }),
+    ]);
     expect(console.debug).toHaveBeenCalledWith(
       '[enkrypt-guardrail] decision',
       expect.objectContaining({
@@ -444,6 +474,7 @@ describe('scanRequest', () => {
         verdict_cache: 'hit',
         cached_characters: 8_000,
         cached_segments: 10,
+        omitted_attachments: 2,
       })
     );
   });
@@ -455,11 +486,13 @@ describe('scanRequest', () => {
       makeScan({
         text: '',
         coverage: {
+          part: 'conversation',
           cache: 'hit',
           totalCharacters: 900,
           totalSegments: 3,
           cachedCharacters: 900,
           cachedSegments: 3,
+          omittedAttachments: 0,
         },
       }),
       dependencies
@@ -483,8 +516,8 @@ describe('scanRequest', () => {
     );
   });
 
-  it('sends a request at the 250,000-character scan limit without truncating', async () => {
-    const text = 'a'.repeat(250_000);
+  it('sends a request at the 100,000-character scan limit without truncating', async () => {
+    const text = 'a'.repeat(100_000);
     const dependencies = deps(async () => detectResponse({ summary: {} }));
 
     const result = await scanRequest(makeScan({ text }), dependencies);
@@ -507,7 +540,7 @@ describe('scanRequest', () => {
         report: expect.any(Object),
         verdict: {
           action: 'block',
-          message: expect.stringContaining('cannot scan more than 250,000 characters'),
+          message: expect.stringContaining('cannot scan more than 100,000 characters'),
         },
         usageRecords: [],
       });
@@ -516,6 +549,33 @@ describe('scanRequest', () => {
       });
       expect(result.verdict).toMatchObject({
         message: expect.stringContaining('Retrying the unchanged request will not help.'),
+      });
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['tools', 'tool definitions', 'Reduce the enabled tools or MCP servers'],
+      ['system', 'system prompt', 'Shorten the system prompt'],
+      ['conversation', 'new conversation text', 'Compact or prune earlier conversation history'],
+      ['response', 'model output', 'Ask for a shorter response'],
+    ] as const)('names what to shorten for the %s', async (part, scope, advice) => {
+      const dependencies = deps(async () => detectResponse({ summary: {} }));
+
+      const result = await scanRequest(
+        makeScan({ text, coverage: { ...makeScan().coverage, part } }),
+        dependencies
+      );
+
+      expect(result.verdict).toEqual({ action: 'block', message: SCAN_TOO_LARGE_MESSAGES[part] });
+      expect(SCAN_TOO_LARGE_MESSAGES[part]).toContain(
+        `cannot scan more than 100,000 characters of ${scope} at once`
+      );
+      expect(SCAN_TOO_LARGE_MESSAGES[part]).toContain(advice);
+      expect(result.report).toMatchObject({
+        part,
+        decision: 'error_fail_closed',
+        error: 'request_too_large',
+        scanned_characters: ENKRYPT_MAX_SCAN_CHARACTERS + 1,
       });
       expect(dependencies.fetch).not.toHaveBeenCalled();
     });
@@ -539,7 +599,7 @@ describe('scanRequest', () => {
     ]);
   });
 
-  it('shares a single 5-second deadline across retry attempts', async () => {
+  it('shares a single 60-second deadline across retry attempts', async () => {
     const timeout = jest.spyOn(AbortSignal, 'timeout');
     const responses = [
       detectResponse({ summary: {} }, { status: 502 }),
@@ -553,7 +613,7 @@ describe('scanRequest', () => {
       await scanRequest(makeScan(), dependencies);
 
       expect(timeout).toHaveBeenCalledTimes(1);
-      expect(timeout).toHaveBeenCalledWith(5_000);
+      expect(timeout).toHaveBeenCalledWith(60_000);
       const calls = fetchCalls(dependencies);
       expect(calls).toHaveLength(2);
       expect(calls[0][1].signal).toBe(calls[1][1].signal);
@@ -781,6 +841,7 @@ describe('scanRequest', () => {
         {
           guardrail: 'output',
           scan: 'blocking',
+          part: 'conversation',
           request: {
             text: 'tool output',
             detectors: config.detectors,

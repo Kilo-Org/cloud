@@ -301,9 +301,6 @@ test('every workflow install job restores a pnpm dependency cache', () => {
 // whenever the runner fleet's apt egress degrades, and the runner images
 // already ship the Chromium system libraries. A browser build that the
 // version-keyed cache does not satisfy is downloaded, never apt-installed.
-// chromatic.yml is disabled in the repository's Actions settings, so its jobs
-// run nowhere; it is left as it is until the workflow is re-enabled.
-const disabledWorkflows = new Set(['chromatic.yml']);
 
 test('every Chromium install skips apt and restores the browser cache first', () => {
   const directory = new URL('../.github/workflows/', import.meta.url);
@@ -313,7 +310,6 @@ test('every Chromium install skips apt and restores the browser cache first', ()
   for (const file of readdirSync(directory)
     .filter(name => /\.ya?ml$/.test(name))
     .sort()) {
-    if (disabledWorkflows.has(file)) continue;
     const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
     for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = (job.steps ?? []).filter(step => step !== null && typeof step === 'object');
@@ -341,11 +337,12 @@ test('every Chromium install skips apt and restores the browser cache first', ()
   assert.deepEqual(
     installs,
     [
+      'chromatic.yml:playwright',
       'ci.yml:mobile-diagram-host',
       'extension-ci.yml:e2e-chrome-shard',
       'setup-smoke.yml:setup-smoke',
     ],
-    'every Chromium install in a live workflow is covered'
+    'every Chromium install in a workflow is covered'
   );
 });
 
@@ -870,22 +867,26 @@ test('kilo-app CI installs the closure the declaration action needs', () => {
   }
 });
 
-// Both harness SDK producers run the same action and no other step that reads
-// a workspace, so both install the same closure. The package has no workspace
-// dependency; the root project supplies the `tsgo` binary the action's key
-// script runs, so it stays in the filter.
+// Every job that produces the harness SDK runs only steps that read this
+// package or the root project, so all of them install the same closure. The
+// package has no workspace dependency; the root project supplies the `tsgo`
+// binary the action's key script runs, so it stays in the filter.
 const harnessProducerInstall =
   "pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo";
 
-test('both harness SDK producers install the harness SDK closure', () => {
-  for (const file of ['kilo-app-ci.yml', 'mobile-native-build.yml']) {
-    const install = workflows[file].jobs[harnessProducer].steps.find(
+test('every harness SDK producer installs the harness SDK closure', () => {
+  for (const [file, job] of [
+    ['kilo-app-ci.yml', harnessProducer],
+    ['mobile-native-build.yml', harnessProducer],
+    ['ci.yml', 'harness-sdk'],
+  ]) {
+    const install = workflows[file].jobs[job].steps.find(
       step => step.name === 'Install dependencies'
     );
     assert.equal(
       install.run,
       harnessProducerInstall,
-      `${file}'s ${harnessProducer} installs the harness SDK closure, not the whole workspace`
+      `${file}'s ${job} installs the harness SDK closure, not the whole workspace`
     );
   }
 });
@@ -1626,6 +1627,40 @@ test('the Chrome e2e shards start only for the inputs their bundle reads', () =>
     'the aggregator still publishes the required context'
   );
   assert.equal(jobs['e2e-chrome'].if, '${{ !cancelled() }}');
+});
+
+// The extension declares @kilocode/trpc and @kilocode/cloud-agent-sdk and no
+// other workspace package, so the extension's closure is what links its
+// Firefox build and its unit suite. `verify` also builds the tRPC declarations,
+// whose program resolves apps/web and web-shared sources through its path
+// aliases; apps/web declares no @kilocode/trpc, so both filters are needed
+// there and neither implies the other. A step that starts reading another
+// workspace widens its job's filter; it does not restore the full install.
+const extensionVerifyInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-extension...' --filter 'web...' --filter kilocode-monorepo";
+
+test('the extension verify job installs the closure its steps read', () => {
+  const verify = workflows['extension-ci.yml'].jobs.verify;
+  const installs = verify.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    [extensionVerifyInstall],
+    'one install links the extension closure, the web closure and the root project'
+  );
+});
+
+// A shard's duration belongs to the Playwright suite, and the workspace install
+// stays under a tenth of it, so a closure install cannot save a tenth of the
+// job. The measured decision leaves this install whole, so only a measurement
+// under this test changes it.
+test('the Chrome e2e shards keep the workspace install and both shards', () => {
+  const job = workflows['extension-ci.yml'].jobs['e2e-chrome-shard'];
+  assert.equal(
+    job.steps.find(step => step.name === 'Install dependencies').run,
+    'pnpm install --frozen-lockfile',
+    'a shard installs the workspace, because the suite sets its duration'
+  );
+  assert.deepEqual(job.strategy.matrix.shard, [1, 2], 'both shards still run');
 });
 
 // The account database job runs the root `drizzle` script, which executes

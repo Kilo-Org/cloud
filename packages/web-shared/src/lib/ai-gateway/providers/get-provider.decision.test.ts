@@ -37,7 +37,12 @@ import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/pro
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { byok_api_keys, claude_billing_connections, type User } from '@kilocode/db/schema';
+import {
+  byok_api_keys,
+  claude_billing_connections,
+  kilocode_users,
+  type User,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
@@ -267,6 +272,48 @@ describe('getProvider routing decision', () => {
       expect(checkOpenAiChatGptByok).not.toHaveBeenCalled();
     }
   );
+
+  test('reports a reconnect for a service run whose shared connection lost its connector', async () => {
+    const requester = await insertTestUser({
+      google_user_email: `service-runner-${crypto.randomUUID()}@example.com`,
+    });
+    const connector = await insertTestUser({
+      google_user_email: `shared-connector-${crypto.randomUUID()}@kilocode.ai`,
+    });
+    const org = await createTestOrganization('Claude shared reconnect', requester.id, 0);
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: null,
+      organization_id: org.id,
+      user_profile_id: `uprof_${crypto.randomUUID()}`,
+      status: 'connected',
+      connection_id: `ocon_${crypto.randomUUID()}`,
+      connected_at: new Date().toISOString(),
+      created_by: connector.id,
+    });
+    await db
+      .update(kilocode_users)
+      .set({
+        google_user_email: `deleted+${connector.id}@deleted.invalid`,
+        blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
+      })
+      .where(eq(kilocode_users.id, connector.id));
+    jest.mocked(isClaudePlatformOAuthEnabled).mockClear();
+    const model = 'anthropic/claude-sonnet-4.6';
+
+    const result = await getProvider(
+      getProviderInput({
+        user: requester,
+        organizationId: org.id,
+        botId: 'reviewer',
+        requestedModel: model,
+        request: { kind: 'messages', body: { model, messages: [], max_tokens: 16 } },
+      })
+    );
+
+    expect(result).toMatchObject({ kind: 'claude-billing-reconnect' });
+    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
+    expect(getStoredByokKeys).not.toHaveBeenCalled();
+  });
 
   test('keeps normal routing for a Claude request without a connection and does not evaluate the gate', async () => {
     const user = await insertTestUser();

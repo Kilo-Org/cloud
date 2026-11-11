@@ -353,6 +353,28 @@ describe('Bitbucket OAuth credential storage', () => {
     ).resolves.toEqual([{ id: existing.integrationId }]);
   });
 
+  it('preserves an organization integration when the authorizing account carries a block timestamp', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Timestamp Callback Org', user.id, 0);
+    const owner = { type: 'org', id: organization.id } as const;
+    const existing = await storeBitbucketIntegration(integrationInput(owner, user.id, 'existing'));
+
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: '2026-01-15T12:00:00.000Z' })
+      .where(eq(kilocode_users.id, user.id));
+
+    await expect(
+      storeBitbucketIntegration(integrationInput(owner, user.id, 'replacement'))
+    ).rejects.toThrow('no longer authorized');
+    await expect(
+      db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, organization.id))
+    ).resolves.toEqual([{ id: existing.integrationId }]);
+  });
+
   it('rechecks current platform-admin access inside the storage transaction', async () => {
     const admin = await insertTestUser();
     const organizationOwner = await insertTestUser();

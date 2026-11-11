@@ -92,7 +92,11 @@ export function PrDiffFileListHeader({
         >
           <Rows3 size={14} color={colors.mutedForeground} />
           <Text className="text-xs font-medium text-foreground">
+            {/* `count` is the listed total: it selects the plural category
+                whose participle agrees with it, while `total` carries the
+                locale-grouped figure the catalogs interpolate. */}
             {t('prReview.fileNavigator.viewedCount', {
+              count: totalListed,
               viewed: formatNumber(viewedCount, i18n.language),
               total: formatNumber(totalListed, i18n.language),
             })}

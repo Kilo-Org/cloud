@@ -1,9 +1,6 @@
-import * as ExpoSecureStore from 'expo-secure-store';
-
 import {
   deleteStoredValue,
   readStoredValue,
-  secureStoreOptionsArgs,
   type SecureStoreReadOptions,
   writeStoredValue,
 } from '@/lib/auth/secure-store-value';
@@ -43,9 +40,7 @@ import {
  * repeating it: one module decides the protected-data guard, the option
  * forwarding, the report fingerprint and the rethrow. The read below is the
  * one intended difference, since the layer's plain read stays silent for the
- * retrying credential read and reports here. The synchronous pair has no
- * counterpart there — the layer is asynchronous — so this module keeps that
- * one path, with the same guard and report.
+ * retrying credential read and reports here.
  */
 
 /** Report one failed operation and rethrow so the caller owns the outcome. */
@@ -82,22 +77,4 @@ export async function deleteItemAsync(
   options?: SecureStoreReadOptions
 ): Promise<void> {
   await deleteStoredValue(key, options);
-}
-
-export function getItem(key: string, options?: SecureStoreReadOptions): string | null {
-  assertProtectedDataAvailable();
-  try {
-    return ExpoSecureStore.getItem(key, ...secureStoreOptionsArgs(options));
-  } catch (error) {
-    return reportAndRethrow('read', error);
-  }
-}
-
-export function setItem(key: string, value: string, options?: SecureStoreReadOptions): void {
-  assertProtectedDataAvailable();
-  try {
-    ExpoSecureStore.setItem(key, value, ...secureStoreOptionsArgs(options));
-  } catch (error) {
-    reportAndRethrow('write', error);
-  }
 }

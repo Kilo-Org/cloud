@@ -244,12 +244,14 @@ function createRecordingDb(options: {
   remediations: Row[];
   ledgerRow?: Row;
   userRow?: Row;
+  claimRefused?: boolean;
   cancellationRequestedAt?: string | null;
   afterClaim?: (attempt: Row) => void;
   afterSelect?: (rows: Row[]) => void;
   beforeAttemptUpdate?: (rows: Row[]) => void;
 }) {
   const updates: RecordedUpdate[] = [];
+  const statements: SQL[] = [];
   const selects: { condition: SQL | undefined; projection: Row | undefined }[] = [];
 
   const rowsFor = (table: unknown): Row[] => {
@@ -283,7 +285,9 @@ function createRecordingDb(options: {
   });
 
   const db = {
-    execute: vi.fn(async () => {
+    execute: vi.fn(async (statement: SQL) => {
+      statements.push(statement);
+      if (options.claimRefused) return { rows: [] };
       const attempt = options.attempts.find(row => row.status === 'queued');
       if (!attempt) return { rows: [] };
       attempt.status = 'launching';
@@ -339,6 +343,7 @@ function createRecordingDb(options: {
   return {
     db,
     updates,
+    statements,
     selects,
     attempt: (id = ATTEMPT_ID) => options.attempts.find(row => row.id === id),
     remediation: (id = REMEDIATION_ID) => options.remediations.find(row => row.id === id),
@@ -954,5 +959,51 @@ describe('remediation prelaunch claim recovery', () => {
       cloud_agent_session_id: 'prepared-session',
     });
     expect(state.remediation()).toMatchObject({ status: 'running' });
+  });
+});
+
+describe('remediation launch claim contention', () => {
+  it('defers the attempt when the claim is refused', async () => {
+    const state = createRecordingDb({
+      attempts: [launchAttemptRow()],
+      remediations: [{ id: REMEDIATION_ID, status: 'queued' }],
+      claimRefused: true,
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(state.db as never);
+    const cloudFetch = cloudAgentFetch();
+
+    await expect(
+      processRemediationAttempt({
+        env: processEnv(cloudFetch),
+        attemptId: ATTEMPT_ID,
+        dispatchId: 'dispatch-1',
+      })
+    ).resolves.toBe('skipped');
+
+    expect(state.statements).toHaveLength(2);
+    const deferral = compiled(state.statements[1]);
+    expect(deferral.sql).toContain('next_retry_at = now() + make_interval');
+    expect(deferral.params).toEqual([60, ATTEMPT_ID]);
+    expect(state.attempt()).toMatchObject({ status: 'queued', launch_attempt_count: 0 });
+    expect(state.updates).toHaveLength(0);
+    expect(cloudFetch).not.toHaveBeenCalled();
+  });
+
+  it('issues no deferral when the claim succeeds', async () => {
+    const state = createRecordingDb({
+      attempts: [launchAttemptRow()],
+      remediations: [{ id: REMEDIATION_ID, status: 'queued' }],
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(state.db as never);
+
+    await expect(
+      processRemediationAttempt({
+        env: processEnv(cloudAgentFetch()),
+        attemptId: ATTEMPT_ID,
+        dispatchId: 'dispatch-1',
+      })
+    ).resolves.toBe('launched');
+
+    expect(state.statements).toHaveLength(1);
   });
 });

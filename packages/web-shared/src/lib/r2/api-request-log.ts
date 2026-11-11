@@ -13,6 +13,7 @@ export type ApiRequestLogBlobUpload = {
 export const enkryptRequestLogSchema = z.object({
   guardrail: z.enum(['input', 'output']),
   scan: z.enum(['blocking', 'log_only']),
+  part: z.enum(['tools', 'system', 'conversation', 'response']),
   request: z.object({
     text: z.string(),
     detectors: z.record(z.string(), z.unknown()),
@@ -30,7 +31,13 @@ export const apiRequestLogBlobSchema = z.object({
   version: z.literal(1),
   request: z.record(z.string(), z.unknown()),
   response: z.string().nullable(),
-  enkrypt: z.array(enkryptRequestLogSchema).optional(),
+  enkrypt: z
+    .array(
+      // Blobs written before scans were split into parts have no `part`, but still hold the
+      // request and response bodies.
+      enkryptRequestLogSchema.extend({ part: enkryptRequestLogSchema.shape.part.optional() })
+    )
+    .optional(),
 });
 
 type ApiRequestLogStorage = { client: S3Client; bucket: string };

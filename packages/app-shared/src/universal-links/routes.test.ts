@@ -11,7 +11,6 @@ import {
 
 const WEB = 'https://app.kilo.ai';
 
-/** Expected targets for the 18 table rows (concrete ids where wildcards). */
 const ROW_CASES = [
   {
     path: '/home',
@@ -24,10 +23,6 @@ const ROW_CASES = [
   {
     path: '/profile/preferences',
     app: '/(app)/(tabs)/(3_profile)/preferences',
-  },
-  {
-    path: '/claw',
-    app: '/(app)/(tabs)/(1_kiloclaw)',
   },
   {
     path: '/cloud/sessions',
@@ -88,8 +83,8 @@ const ROW_CASES = [
 ] as const;
 
 describe('UNIVERSAL_LINK_ROUTES', () => {
-  it('has exactly 18 rows', () => {
-    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(18);
+  it('has exactly 17 rows', () => {
+    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(17);
   });
 });
 
@@ -277,6 +272,7 @@ describe('deliberately unmapped paths', () => {
     '/privacy-app',
     '/terms-app',
     '/vscode-marketplace',
+    '/claw',
     '/claw/chat/conv_1',
     '/s/sess_1',
     '/share/sh_1',
@@ -338,8 +334,8 @@ describe('parseKiloWebPath', () => {
 });
 
 describe('aasaComponents', () => {
-  it('returns 20 entries (18 rows + 2 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(20);
+  it('returns 19 entries (17 rows + 2 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(19);
   });
 
   it('every entry has a "/" key', () => {
@@ -349,22 +345,19 @@ describe('aasaComponents', () => {
     }
   });
 
-  it('emits exclusion immediately before row 7 (/code-reviews/*)', () => {
+  it('emits exclusion immediately before /code-reviews/*', () => {
     const components = aasaComponents();
-    // Rows 1–9 are exact (indices 0–8). Row 10 exclusion then row 10 → indices 9–10.
-    expect(components[9]).toEqual({ '/': '/code-reviews/review-md', exclude: true });
-    expect(components[10]).toEqual({ '/': '/code-reviews/*' });
+    expect(components[8]).toEqual({ '/': '/code-reviews/review-md', exclude: true });
+    expect(components[9]).toEqual({ '/': '/code-reviews/*' });
   });
 
-  it('emits exclusion immediately before row 14 (/organizations/*/code-reviews/*)', () => {
+  it('emits exclusion immediately before /organizations/*/code-reviews/*', () => {
     const components = aasaComponents();
-    // After row 10 pair: rows 11–13 (3 exact) → indices 11,12,13.
-    // Row 14 exclusion + row 14 → indices 14–15.
-    expect(components[14]).toEqual({
+    expect(components[13]).toEqual({
       '/': '/organizations/*/code-reviews/review-md',
       exclude: true,
     });
-    expect(components[15]).toEqual({ '/': '/organizations/*/code-reviews/*' });
+    expect(components[14]).toEqual({ '/': '/organizations/*/code-reviews/*' });
   });
 
   it('keeps table * verbatim (Apple glob crosses /)', () => {
@@ -380,12 +373,11 @@ describe('aasaComponents', () => {
 });
 
 describe('androidPathPatterns', () => {
-  it('deep-equals the expected 18-string list', () => {
+  it('deep-equals the expected mobile path list', () => {
     expect(androidPathPatterns()).toEqual([
       '/home',
       '/profile',
       '/profile/preferences',
-      '/claw',
       '/cloud/sessions',
       '/cloud/sessions/.*',
       '/security-agent',

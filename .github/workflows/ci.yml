@@ -1079,10 +1079,10 @@ jobs:
         run: pnpm run dependency-cycle-check
 
   # Required check. A skipped job (nothing relevant changed) passes; a failed
-  # or cancelled job fails this one. Besides the web tests it covers the
-  # workspace tests, the dependency cycle check, drizzle-check, harness-sdk, the
-  # plugin contract checks and the ai-gateway builds, which have no required
-  # check of their own.
+  # or cancelled job fails this one. Besides the web tests it covers the web
+  # production build, the workspace tests, the dependency cycle check,
+  # drizzle-check, harness-sdk, the plugin contract checks and the ai-gateway
+  # builds, which have no required check of their own.
   test:
     needs:
       - changes
@@ -1096,6 +1096,7 @@ jobs:
       - harness-sdk
       - mobile-diagram-host
       - session-sync-postgres
+      - build
       - build-ai-gateway
       - build-ai-gateway-secure-proxy
     if: ${{ !cancelled() }}
@@ -1390,8 +1391,14 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the harness SDK's dependency closure and the root project are
+      # installed, as the kilo-app CI and mobile-native-build producers of the
+      # same package already do. The check below reads this package alone, and
+      # that package has no workspace dependency; the root project supplies the
+      # toolchain binaries and the `oxlint` config `lint` runs. Widen the filter
+      # when a step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo
 
       # The check below builds the SDK, so this job stores the plugin cache.
       - name: Restore compiler plugins

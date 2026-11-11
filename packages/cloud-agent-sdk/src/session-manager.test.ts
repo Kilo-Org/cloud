@@ -10618,6 +10618,122 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       expect(ids).not.toContain('oldB-0');
     });
 
+    // Loads one older page, fails the next one terminally, then trims the loaded
+    // page out of the retained window. The rewound cursor points at a page the
+    // backend already served, so the advertised load must really fetch.
+    async function trimAfterTerminalOlderPageFailure(
+      terminal: SessionSnapshotPageOutcome | null
+    ): Promise<void> {
+      const loadedPage = makePage({
+        kiloSessionId: 'ses-1',
+        messages: makeMessages('old', 100),
+        nextCursor: 'cursor-B',
+      });
+      const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+      fetchSnapshotPage
+        .mockResolvedValueOnce(
+          makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('init', 150),
+            nextCursor: 'cursor-A',
+          })
+        )
+        .mockResolvedValueOnce(loadedPage)
+        .mockResolvedValueOnce(terminal)
+        .mockResolvedValueOnce(loadedPage);
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.loadOlderMessages();
+      await mgr.loadOlderMessages();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(250);
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).not.toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+
+      mgr.trimRetainedHistory();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(150);
+      // `hasOlderMessages` is the load control's promise: a true value must
+      // produce a real backend fetch from the restored cursor.
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(250);
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toBeNull();
+    }
+
+    it('clears an invalid_data older-page failure when the trim rewinds to a cursor that already loaded', async () => {
+      await trimAfterTerminalOlderPageFailure({ kind: 'invalid_data' });
+    });
+
+    it('clears a too_large older-page failure when the trim rewinds to a cursor that already loaded', async () => {
+      await trimAfterTerminalOlderPageFailure({ kind: 'too_large' });
+    });
+
+    it('clears a worker-404 older-page failure when the trim rewinds to a cursor that already loaded', async () => {
+      await trimAfterTerminalOlderPageFailure(null);
+    });
+
+    it('keeps a retryable older-page error and its retry path when the trim rewinds the cursor', async () => {
+      const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+      fetchSnapshotPage
+        .mockResolvedValueOnce(
+          makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('init', 150),
+            nextCursor: 'cursor-A',
+          })
+        )
+        .mockResolvedValueOnce(
+          makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('old', 100),
+            nextCursor: 'cursor-B',
+          })
+        )
+        .mockResolvedValueOnce({ kind: 'retryable_failure' })
+        .mockResolvedValueOnce(
+          makePage({
+            kiloSessionId: 'ses-1',
+            messages: makeMessages('old', 100),
+            nextCursor: 'cursor-B',
+          })
+        );
+
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.loadOlderMessages();
+      await mgr.loadOlderMessages();
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toEqual({ kind: 'retryable' });
+
+      mgr.trimRetainedHistory();
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(150);
+      // A retryable failure is retried in place, so the trim leaves its banner
+      // up instead of clearing it with a terminal latch.
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toEqual({ kind: 'retryable' });
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(250);
+    });
+
     it('does not evict a root older page when hydrated child rows push the shared store over the window', async () => {
       const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
         if (id === kiloId('child-1')) {

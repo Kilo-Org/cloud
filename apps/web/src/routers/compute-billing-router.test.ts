@@ -4,12 +4,14 @@ import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
+  cli_sessions_v2,
   cloud_billing_sku,
   compute_usage_charge,
   container_usage_interval,
   container_usage_segment,
   organization_memberships,
 } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
 import { CLOUD_AGENT_CONTAINER_SKUS } from '@kilocode/worker-utils/cloud-agent-compute';
 import { computeBillingRouter, computeChargesInputSchema } from './compute-billing-router';
 import { formatComputePrice } from '@/lib/cloud-agent/compute-price';
@@ -84,6 +86,119 @@ async function charge(input: {
     created_at: date,
   });
 }
+
+async function session(input: { userId: string; orgId?: string; worktreeId?: string }) {
+  const cloudAgentSessionId = `workspace_${crypto.randomUUID()}`;
+  await db.insert(cli_sessions_v2).values({
+    session_id: `ses_compute_${crypto.randomUUID()}`,
+    kilo_user_id: input.userId,
+    organization_id: input.orgId,
+    cloud_agent_session_id: cloudAgentSessionId,
+    cloud_agent_worktree_id: input.worktreeId,
+  });
+  return cloudAgentSessionId;
+}
+
+describe('session compute charges', () => {
+  it('sums recorded charges across restarts and all chats in the owned workspace', async () => {
+    const { owner, outsider, skuId } = await fixture();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const root = await session({ userId: owner.id, worktreeId });
+    const sibling = await session({ userId: owner.id, worktreeId });
+    const otherWorkspace = await session({ userId: owner.id });
+    const foreign = await session({ userId: outsider.id, worktreeId });
+    await charge({ skuId, userId: owner.id, sessionId: root, seconds: 100 });
+    await charge({
+      skuId,
+      userId: owner.id,
+      sessionId: root,
+      seconds: 200,
+      day: '2026-11-02T00:00:00.000Z',
+    });
+    await charge({ skuId, userId: owner.id, sessionId: sibling, seconds: 300 });
+    await charge({ skuId, userId: owner.id, sessionId: otherWorkspace, seconds: 900 });
+    await charge({ skuId, userId: outsider.id, sessionId: root, seconds: 900 });
+    await charge({ skuId, userId: owner.id, sessionId: foreign, seconds: 900 });
+    const caller = createCaller({ user: owner });
+    const expected = { amountMicrodollars: 60_000, seconds: 600, scope: 'workspace' };
+    expect(await caller.sessionCharges({ cloudAgentSessionId: root })).toEqual(expected);
+    expect(await caller.sessionCharges({ cloudAgentSessionId: sibling })).toEqual(expected);
+  });
+
+  it('returns zero without paid charges and does not combine worktree-less sessions', async () => {
+    const { owner, skuId } = await fixture();
+    const first = await session({ userId: owner.id });
+    const second = await session({ userId: owner.id });
+    const caller = createCaller({ user: owner });
+    expect(await caller.sessionCharges({ cloudAgentSessionId: first })).toEqual({
+      amountMicrodollars: 0,
+      seconds: 0,
+      scope: 'session',
+    });
+    await charge({ skuId, userId: owner.id, sessionId: first, seconds: 20 });
+    await charge({ skuId, userId: owner.id, sessionId: second, seconds: 90 });
+    expect(await caller.sessionCharges({ cloudAgentSessionId: first })).toEqual({
+      amountMicrodollars: 2_000,
+      seconds: 20,
+      scope: 'session',
+    });
+  });
+
+  it('requires session ownership and the exact payer scope, including for organization billing roles', async () => {
+    const { owner, member, outsider, org, skuId } = await fixture();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const own = await session({ userId: member.id, orgId: org.id, worktreeId });
+    const personal = await session({ userId: member.id, worktreeId });
+    await charge({
+      skuId,
+      orgId: org.id,
+      actorId: member.id,
+      bot: true,
+      sessionId: own,
+      seconds: 200,
+    });
+    await charge({ skuId, userId: member.id, sessionId: personal, seconds: 900 });
+    const input = { cloudAgentSessionId: own, organizationId: org.id };
+    const caller = createCaller({ user: member });
+    expect(await caller.sessionCharges(input)).toEqual({
+      amountMicrodollars: 20_000,
+      seconds: 200,
+      scope: 'workspace',
+    });
+    for (const user of [owner, outsider]) {
+      await expect(createCaller({ user }).sessionCharges(input)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+    }
+    await expect(caller.sessionCharges({ cloudAgentSessionId: own })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(
+      caller.sessionCharges({ ...input, cloudAgentSessionId: personal })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(
+      caller.sessionCharges({ ...input, organizationId: crypto.randomUUID() })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await db
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, org.id),
+          eq(organization_memberships.kilo_user_id, member.id)
+        )
+      );
+    await expect(caller.sessionCharges(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('rejects nonexistent sessions', async () => {
+    const user = await insertTestUser();
+    await expect(
+      createCaller({ user }).sessionCharges({
+        cloudAgentSessionId: `workspace_${crypto.randomUUID()}`,
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+});
 
 describe('customer compute billing PostgreSQL queries', () => {
   it('returns runtime SKU rates and keeps missing prices unavailable', async () => {

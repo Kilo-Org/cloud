@@ -382,6 +382,30 @@ export class SessionSyncDO extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Removes the traces of a registration the tenant refused. The intent stays
+   * when the creator index cannot be cleared, so its alarm retries the removal.
+   */
+  private async discardRegistration(
+    principal: z.infer<typeof principalSchema>,
+    sessionID: string
+  ): Promise<void> {
+    const forgotten = await this.tenantCall(() =>
+      getTenantStub(this.env, { type: 'user', id: principal.userID }).forgetCreatedSession({
+        tenant: principal.tenant,
+        sessionID,
+        bytes: 0,
+      })
+    );
+    if (!forgotten.ok) return;
+    await this.ctx.storage.delete('pendingRegistration');
+    this.pendingRegistration = undefined;
+    // The sweep only adds deadlines, so clear this intent's wakeup and let the
+    // recomputation restore any deadline other state still requires.
+    await this.ctx.storage.deleteAlarm();
+    await this.scheduleSweep();
+  }
+
   async register(input: unknown): Promise<Result<{ created: boolean; state: SessionState }>> {
     const parsed = parse(registerInput, input);
     if (!parsed.ok) return parsed;
@@ -435,7 +459,14 @@ export class SessionSyncDO extends DurableObject<Env> {
           bytes: 0,
         })
       );
-      if (!admitted.ok) return admitted;
+      if (!admitted.ok) {
+        // Only a decision from the tenant settles this registration. Any other
+        // failure may hide a committed reservation, so its intent and sweep stay.
+        if (admitted.error.code === 'tenant_budget_exceeded') {
+          await this.discardRegistration(principal, sessionID);
+        }
+        return admitted;
+      }
       const registered = this.tx(() =>
         session.register(this.db, principal, sessionID, request.sourceID, Date.now())
       );

@@ -123,7 +123,14 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
         model: input.model === undefined ? undefined : { providerID: 'kilo', modelID: input.model },
       });
     },
-    compact: input => client.summarizeSession({ ...input, model: { modelID: input.model } }),
+    async compact(input) {
+      const summarized = await client.summarizeSession({
+        ...input,
+        model: { modelID: input.model },
+      });
+      if (!summarized) throw new Error('Session summarization failed');
+      return 'executed';
+    },
     condense: input =>
       summarizeWithTimeout({
         kiloClient: client,

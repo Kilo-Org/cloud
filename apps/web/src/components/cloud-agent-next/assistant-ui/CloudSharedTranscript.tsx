@@ -2,7 +2,7 @@
 import React from 'react';
 
 import { MessagePrimitive } from '@assistant-ui/react';
-import type { StoredMessage } from '../types';
+import { isCompactionPart, type StoredMessage } from '../types';
 import {
   groupAssistantParts,
   groupConsecutiveAssistantMessages,
@@ -16,7 +16,11 @@ import { AgentWorkGroup } from './AgentWorkGroup';
 
 function SharedMessage() {
   const presentation = useCloudMessagePresentation();
-  if (presentation.sources[0]?.info.role === 'user') return <CloudMessage />;
+  if (
+    presentation.sources[0]?.info.role === 'user' ||
+    presentation.parts.some(part => isCompactionPart(part.source))
+  )
+    return <CloudMessage />;
   const parts = presentation.parts.map(part => part.source);
   const indices = new Map(getVisibleAssistantParts(parts).map((part, index) => [part, index]));
   const segments = groupAssistantParts(parts);

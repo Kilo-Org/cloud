@@ -247,7 +247,7 @@ describe('null-pepper personal webhook compatibility', () => {
         nextAuthSecret: secret,
         connectionString: 'unused',
         resourceAudience: { audience: 'cloud-agent-next', mode: 'allow-legacy' },
-        getUserPepper: async () => ({ pepper: null, blockedReason: null }),
+        getUserPepper: async () => ({ pepper: null, blocked: false }),
       })
     ).resolves.toEqual({ userId: 'oauth/personal' });
     expect(decodeJwt(token).apiTokenPepper).toBeNull();

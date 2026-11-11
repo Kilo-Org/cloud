@@ -31,7 +31,6 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { computeBlacklistStats } from '@/lib/abuse/blacklist-domain-stats';
 import { isDomainOnBlacklist } from './blacklist-domains-router';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
-import type { BlockBlacklistedDomainsBackfillResponse } from '@/lib/abuse/block-blacklisted-domains';
 import {
   BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY,
   LEGACY_BLACKLIST_DOMAINS_REDIS_KEY,
@@ -43,10 +42,7 @@ import {
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import type { User } from '@kilocode/db/schema';
 
-type BackfillBatch = (params: {
-  actorId: string;
-  domains: string[];
-}) => Promise<BlockBlacklistedDomainsBackfillResponse>;
+type BackfillBatch = typeof backfillBlockBlacklistedDomainsBatch;
 
 const actualBackfillModule = jest.requireActual<{
   backfillBlockBlacklistedDomainsBatch: BackfillBatch;

@@ -171,6 +171,7 @@ describe('BitbucketWorkspaceAccessTokenAuthorizationService', () => {
     expect(query.sql).toContain('exists (select');
     expect(query.sql).toContain('"organization_memberships"');
     expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
+    expect(query.sql).toContain('"kilocode_users"."blocked_at" is null');
     expect(query.sql).not.toContain('"kilocode_users"."is_admin"');
     expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" is null');
     expect(query.params).toContain('member-1');

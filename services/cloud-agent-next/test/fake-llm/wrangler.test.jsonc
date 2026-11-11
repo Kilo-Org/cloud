@@ -2,7 +2,7 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "fake-llm-miniflare-test",
   "main": "../e2e/fake-llm-worker.ts",
-  "compatibility_date": "2026-11-04",
+  "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "NEXTAUTH_SECRET": "fake-llm-miniflare-secret",

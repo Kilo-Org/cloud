@@ -82,17 +82,19 @@ const scan: EnkryptGuardrailRequest = {
   apiKind: 'messages',
   clientRequestId: null,
   parts: {
-    context: [],
+    tools: [],
+    system: [],
     conversation: [segment('user', 'run it'), segment('tool result: bash', 'tool output')],
   },
   config,
 };
 
-const contextScan: EnkryptGuardrailRequest = {
+const partsScan: EnkryptGuardrailRequest = {
   ...scan,
   parts: {
     ...scan.parts,
-    context: [segment('tool: bash', 'Runs a command.'), segment('system', 'system prompt')],
+    tools: [segment('tool: bash', 'Runs a command.')],
+    system: [segment('system', 'system prompt')],
   },
 };
 
@@ -657,70 +659,81 @@ describe('startEnkryptInputGuardrail', () => {
     expect(await guardrail.report()).toBeNull();
   });
 
-  describe('with context and conversation parts', () => {
-    const contextReport: EnkryptScanReport = { ...scanReport, part: 'context' };
+  describe('with tools, system, and conversation parts', () => {
+    const systemReport: EnkryptScanReport = { ...scanReport, part: 'system' };
 
-    it('scans the context and the conversation separately for each detector set', async () => {
+    it('scans the tools, system prompt, and conversation separately for each detector set', async () => {
       mockedScanRequest.mockImplementation(async resolved => ({
         verdict: { action: 'allow' },
         report: { ...scanReport, part: partOf(resolved) },
         usageRecords: [call()],
       }));
 
-      const request = { ...mixedScan, parts: contextScan.parts };
+      const request = { ...mixedScan, parts: partsScan.parts };
       const guardrail = startEnkryptInputGuardrail(Promise.resolve(request), signal);
 
       expect(await guardrail.awaitVerdict()).toEqual({ action: 'allow' });
       expect(mockedScanRequest.mock.calls.map(([resolved]) => resolved)).toEqual([
-        scanOf({ ...request, config: scan.config }, 'context'),
+        scanOf({ ...request, config: scan.config }, 'tools'),
+        scanOf({ ...request, config: scan.config }, 'system'),
         scanOf({ ...request, config: scan.config }, 'conversation'),
-        scanOf({ ...request, config: logOnlyScan.config }, 'context'),
+        scanOf({ ...request, config: logOnlyScan.config }, 'tools'),
+        scanOf({ ...request, config: logOnlyScan.config }, 'system'),
         scanOf({ ...request, config: logOnlyScan.config }, 'conversation'),
       ]);
       await runAfterTasks();
       expect(mockedRedisSet.mock.calls.map(([key]) => key)).toEqual([
-        finalKey({ ...request, config: scan.config }, 'context'),
+        finalKey({ ...request, config: scan.config }, 'tools'),
+        finalKey({ ...request, config: scan.config }, 'system'),
         finalKey({ ...request, config: scan.config }, 'conversation'),
-        finalKey({ ...request, config: logOnlyScan.config }, 'context'),
+        finalKey({ ...request, config: logOnlyScan.config }, 'tools'),
+        finalKey({ ...request, config: logOnlyScan.config }, 'system'),
         finalKey({ ...request, config: logOnlyScan.config }, 'conversation'),
       ]);
     });
 
-    it('blocks when the context blocks although the conversation allows', async () => {
+    it('blocks when the system prompt blocks although the tools and conversation allow', async () => {
       mockedScanRequest.mockImplementation(async resolved =>
-        partOf(resolved) === 'context'
+        partOf(resolved) === 'system'
           ? {
-              verdict: { action: 'block', message: 'context blocked' },
+              verdict: { action: 'block', message: 'system prompt blocked' },
               report: {
-                ...contextReport,
+                ...systemReport,
                 decision: 'blocked',
                 detectors_fired: ['injection_attack'],
               },
               usageRecords: [call({ decision: 'blocked' })],
             }
-          : { verdict: { action: 'allow' }, report: scanReport, usageRecords: [call()] }
+          : {
+              verdict: { action: 'allow' },
+              report: { ...scanReport, part: partOf(resolved) },
+              usageRecords: [call()],
+            }
       );
 
-      const guardrail = startEnkryptInputGuardrail(Promise.resolve(contextScan), signal);
+      const guardrail = startEnkryptInputGuardrail(Promise.resolve(partsScan), signal);
 
       expect(await guardrail.awaitVerdict()).toEqual({
         action: 'block',
-        message: 'context blocked',
+        message: 'system prompt blocked',
       });
       expect(mockedRedisSet).toHaveBeenCalledWith(
-        finalKey(contextScan, 'context'),
+        finalKey(partsScan, 'system'),
         { action: 'block', detectors: ['injection_attack'] },
         { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS }
       );
-      expect(mockedRedisSet).toHaveBeenCalledWith(finalKey(contextScan, 'conversation'), 'allow', {
-        ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
-        nx: true,
-      });
+      for (const part of ['tools', 'conversation'] as const) {
+        expect(mockedRedisSet).toHaveBeenCalledWith(finalKey(partsScan, part), 'allow', {
+          ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+          nx: true,
+        });
+      }
       const report = await guardrail.report();
       expect(report?.verdict).toBe('block');
       expect(report?.scans).toEqual([
+        { ...scanReport, part: 'tools', verdict_cache_write: 'written' },
         {
-          ...contextReport,
+          ...systemReport,
           decision: 'blocked',
           detectors_fired: ['injection_attack'],
           verdict_cache_write: 'written',
@@ -737,27 +750,33 @@ describe('startEnkryptInputGuardrail', () => {
               report: { ...scanReport, decision: 'error_fail_closed', error: 'timeout' },
               usageRecords: [call({ decision: 'error' })],
             }
-          : { verdict: { action: 'allow' }, report: contextReport, usageRecords: [call()] }
+          : {
+              verdict: { action: 'allow' },
+              report: { ...scanReport, part: partOf(resolved) },
+              usageRecords: [call()],
+            }
       );
 
-      const guardrail = startEnkryptInputGuardrail(Promise.resolve(contextScan), signal);
+      const guardrail = startEnkryptInputGuardrail(Promise.resolve(partsScan), signal);
 
       expect(await guardrail.awaitVerdict()).toEqual({ action: 'unavailable', reason: 'timeout' });
       const report = await guardrail.report();
       expect(report).toMatchObject({ verdict: 'unavailable', unavailable_reason: 'timeout' });
       expect(report?.scans.map(each => [each.part, each.verdict_cache_write])).toEqual([
-        ['context', 'written'],
+        ['tools', 'written'],
+        ['system', 'written'],
         ['conversation', 'skipped'],
       ]);
       expect(mockedRedisSet.mock.calls.map(([key]) => key)).toEqual([
-        finalKey(contextScan, 'context'),
+        finalKey(partsScan, 'tools'),
+        finalKey(partsScan, 'system'),
       ]);
     });
 
     it('reports blocking scans, then log-only scans, each with its own cache write', async () => {
-      const request = { ...mixedScan, parts: contextScan.parts };
+      const request = { ...mixedScan, parts: partsScan.parts };
       const blockingConversationKey = finalKey({ ...request, config: scan.config });
-      const logOnlyContextKey = finalKey({ ...request, config: logOnlyScan.config }, 'context');
+      const logOnlySystemKey = finalKey({ ...request, config: logOnlyScan.config }, 'system');
       mockedScanRequest.mockImplementation(async resolved => ({
         verdict: { action: 'allow' },
         report: {
@@ -769,7 +788,7 @@ describe('startEnkryptInputGuardrail', () => {
       }));
       mockedRedisSet.mockImplementation(async key => {
         if (key === blockingConversationKey) throw new Error('timeout');
-        return key === logOnlyContextKey ? null : 'OK';
+        return key === logOnlySystemKey ? null : 'OK';
       });
 
       const guardrail = startEnkryptInputGuardrail(Promise.resolve(request), signal);
@@ -781,9 +800,11 @@ describe('startEnkryptInputGuardrail', () => {
           each.verdict_cache_write,
         ])
       ).toEqual([
-        ['blocking', 'context', 'written'],
+        ['blocking', 'tools', 'written'],
+        ['blocking', 'system', 'written'],
         ['blocking', 'conversation', 'failed'],
-        ['log_only', 'context', 'skipped'],
+        ['log_only', 'tools', 'written'],
+        ['log_only', 'system', 'skipped'],
         ['log_only', 'conversation', 'written'],
       ]);
     });
@@ -792,17 +813,22 @@ describe('startEnkryptInputGuardrail', () => {
       mockedScanRequest.mockImplementation(async resolved => ({
         verdict: { action: 'allow' },
         report: { ...scanReport, part: partOf(resolved) },
-        usageRecords: [call({ scannedCharacters: partOf(resolved) === 'context' ? 1 : 2 })],
+        usageRecords: [
+          call({
+            scannedCharacters: ['tools', 'system', 'conversation'].indexOf(partOf(resolved)) + 1,
+          }),
+        ],
       }));
       jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
 
-      const guardrail = startEnkryptInputGuardrail(Promise.resolve(contextScan), signal);
+      const guardrail = startEnkryptInputGuardrail(Promise.resolve(partsScan), signal);
       await guardrail.awaitVerdict();
       await runAfterTasks();
 
       expect(mockedRecordUsage.mock.calls).toEqual([
         [{ ...call({ scannedCharacters: 1 }), addedLatencyMs: null }],
-        [{ ...call({ scannedCharacters: 2 }), addedLatencyMs: 237 }],
+        [{ ...call({ scannedCharacters: 2 }), addedLatencyMs: null }],
+        [{ ...call({ scannedCharacters: 3 }), addedLatencyMs: 237 }],
       ]);
     });
   });

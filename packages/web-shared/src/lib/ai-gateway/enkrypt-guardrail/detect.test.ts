@@ -205,15 +205,15 @@ describe('scanRequest', () => {
   it('labels the report and request log with the scanned part and omitted attachments', async () => {
     const calls: Promise<EnkryptRequestLog>[] = [];
     const result = await scanRequest(
-      makeScan({ coverage: { ...makeScan().coverage, part: 'context', omittedAttachments: 3 } }),
+      makeScan({ coverage: { ...makeScan().coverage, part: 'system', omittedAttachments: 3 } }),
       deps(async () => detectResponse({ summary: {} }), {
         requestLog: { guardrail: 'input', capture: entry => calls.push(entry) },
       })
     );
 
-    expect(result.report).toMatchObject({ part: 'context', omitted_attachments: 3 });
+    expect(result.report).toMatchObject({ part: 'system', omitted_attachments: 3 });
     expect(await Promise.all(calls)).toEqual([
-      expect.objectContaining({ guardrail: 'input', scan: 'blocking', part: 'context' }),
+      expect.objectContaining({ guardrail: 'input', scan: 'blocking', part: 'system' }),
     ]);
   });
 
@@ -554,7 +554,8 @@ describe('scanRequest', () => {
     });
 
     it.each([
-      ['context', 'tool definitions and system prompt', 'Reduce the enabled tools or MCP servers'],
+      ['tools', 'tool definitions', 'Reduce the enabled tools or MCP servers'],
+      ['system', 'system prompt', 'Shorten the system prompt'],
       ['conversation', 'new conversation text', 'Compact or prune earlier conversation history'],
       ['response', 'model output', 'Ask for a shorter response'],
     ] as const)('names what to shorten for the %s', async (part, scope, advice) => {

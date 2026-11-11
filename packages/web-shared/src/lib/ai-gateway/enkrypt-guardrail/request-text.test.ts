@@ -15,7 +15,8 @@ function request(kind: GatewayRequest['kind'], body: Record<string, unknown>): G
 function render(gatewayRequest: GatewayRequest) {
   const parts = extractRequestParts(gatewayRequest);
   return {
-    context: joinSegments(parts.context.map(renderSegment)),
+    tools: joinSegments(parts.tools.map(renderSegment)),
+    system: joinSegments(parts.system.map(renderSegment)),
     conversation: joinSegments(parts.conversation.map(renderSegment)),
   };
 }
@@ -72,7 +73,8 @@ describe('extractRequestParts', () => {
           })
         )
       ).toEqual({
-        context: lines(seg('system', 'system prompt'), seg('developer', 'developer prompt')),
+        tools: '',
+        system: lines(seg('system', 'system prompt'), seg('developer', 'developer prompt')),
         conversation: lines(
           seg('user', 'old question'),
           seg('assistant', 'old answer'),
@@ -98,7 +100,8 @@ describe('extractRequestParts', () => {
           })
         )
       ).toEqual({
-        context: seg('system', 'system prompt'),
+        tools: '',
+        system: seg('system', 'system prompt'),
         conversation: lines(seg('user', 'first'), seg('user', 'second')),
       });
     });
@@ -115,7 +118,8 @@ describe('extractRequestParts', () => {
           })
         )
       ).toEqual({
-        context: '',
+        tools: '',
+        system: '',
         conversation: lines(seg('user', 'read the file'), seg('tool result', 'file contents')),
       });
     });
@@ -156,7 +160,8 @@ describe('extractRequestParts', () => {
           })
         )
       ).toEqual({
-        context: seg('system', 'system prompt'),
+        tools: '',
+        system: seg('system', 'system prompt'),
         conversation: lines(
           seg('user', 'old question'),
           seg('assistant tool call: read', '{}'),
@@ -240,7 +245,8 @@ describe('extractRequestParts', () => {
           })
         )
       ).toEqual({
-        context: '',
+        tools: '',
+        system: '',
         conversation: lines(
           seg('user', 'old question'),
           seg('assistant', 'old answer'),
@@ -254,7 +260,8 @@ describe('extractRequestParts', () => {
   describe('responses', () => {
     it('returns a plain string input as a user message', () => {
       expect(render(request('responses', { input: 'hello' }))).toEqual({
-        context: '',
+        tools: '',
+        system: '',
         conversation: seg('user', 'hello'),
       });
     });
@@ -284,7 +291,8 @@ describe('extractRequestParts', () => {
           })
         )
       ).toEqual({
-        context: seg('instructions', 'system prompt'),
+        tools: '',
+        system: seg('instructions', 'system prompt'),
         conversation: lines(
           seg('user', 'old question'),
           seg('assistant', 'a'),
@@ -347,7 +355,8 @@ describe('extractRequestParts', () => {
 
   it('returns no segments when the request carries no content', () => {
     expect(extractRequestParts(request('chat_completions', {}))).toEqual({
-      context: [],
+      tools: [],
+      system: [],
       conversation: [],
     });
   });
@@ -364,14 +373,14 @@ describe('extractRequestParts', () => {
           ],
         })
       )
-    ).toEqual({ context: [], conversation: [{ header: 'user image', body: null }] });
+    ).toEqual({ tools: [], system: [], conversation: [{ header: 'user image', body: null }] });
   });
 });
 
-describe('context and conversation split', () => {
+describe('tools, system, and conversation split', () => {
   const tool = { type: 'function', function: { name: 'read', parameters: { type: 'object' } } };
 
-  it('puts chat tools, response format, and leading system and developer messages in context', () => {
+  it('puts chat tools and response format in tools, and leading system and developer messages in system', () => {
     expect(
       render(
         request('chat_completions', {
@@ -388,12 +397,11 @@ describe('context and conversation split', () => {
         })
       )
     ).toEqual({
-      context: lines(
-        seg('system', 'system prompt'),
-        seg('developer', 'developer prompt'),
+      tools: lines(
         seg('tool definition: read', '{"type":"object"}'),
         seg('response format', 'answer')
       ),
+      system: lines(seg('system', 'system prompt'), seg('developer', 'developer prompt')),
       conversation: lines(
         seg('user', 'hello'),
         seg('system', 'mid system'),
@@ -403,13 +411,13 @@ describe('context and conversation split', () => {
     });
   });
 
-  it('puts every chat message in context when there are only system messages', () => {
+  it('puts every chat message in system when there are only system messages', () => {
     expect(
       render(request('chat_completions', { messages: [{ role: 'system', content: 'only' }] }))
-    ).toEqual({ context: seg('system', 'only'), conversation: '' });
+    ).toEqual({ tools: '', system: seg('system', 'only'), conversation: '' });
   });
 
-  it('puts Anthropic tools, output format, and system in context but not mid-conversation system', () => {
+  it('puts Anthropic tools and output format in tools, and system but not mid-conversation system in system', () => {
     expect(
       render(
         request('messages', {
@@ -431,16 +439,16 @@ describe('context and conversation split', () => {
         })
       )
     ).toEqual({
-      context: lines(
-        seg('system', 'first system block', 'second system block'),
+      tools: lines(
         seg('tool definition: read', '{"type":"object"}'),
         seg('response format', '{"type":"string"}')
       ),
+      system: seg('system', 'first system block', 'second system block'),
       conversation: lines(seg('user', 'hello'), seg('system', 'mid system')),
     });
   });
 
-  it('puts Responses tools, format, instructions, and leading instruction items in context', () => {
+  it('puts Responses tools and format in tools, and instructions and leading instruction items in system', () => {
     expect(
       render(
         request('responses', {
@@ -457,12 +465,14 @@ describe('context and conversation split', () => {
         })
       )
     ).toEqual({
-      context: lines(
-        seg('instructions', 'instructions text'),
-        seg('developer', 'developer prompt'),
-        seg('system', 'system prompt'),
+      tools: lines(
         seg('tool definition: read', '{"type":"object"}'),
         seg('response format', 'answer', '{"type":"string"}')
+      ),
+      system: lines(
+        seg('instructions', 'instructions text'),
+        seg('developer', 'developer prompt'),
+        seg('system', 'system prompt')
       ),
       conversation: lines(
         seg('user', 'hello'),
@@ -483,7 +493,8 @@ describe('context and conversation split', () => {
         })
       )
     ).toEqual({
-      context: '',
+      tools: '',
+      system: '',
       conversation: lines(seg('tool result', 'tool output'), seg('system', 'late system')),
     });
   });
@@ -494,7 +505,8 @@ describe('context and conversation split', () => {
   ] as const)('separates %s system instructions from the conversation', (kind, body) => {
     const header = kind === 'messages' ? 'system' : 'instructions';
     expect(extractRequestParts(request(kind, body))).toEqual({
-      context: [{ header, body: 'system prompt' }],
+      tools: [],
+      system: [{ header, body: 'system prompt' }],
       conversation: [{ header: 'user', body: 'hello' }],
     });
   });
@@ -840,7 +852,7 @@ describe('same-header merging', () => {
     ]);
   });
 
-  it('does not merge context definitions from different tools', () => {
+  it('does not merge tool definitions from different tools', () => {
     expect(
       extractRequestParts(
         request('messages', {
@@ -849,7 +861,7 @@ describe('same-header merging', () => {
             { name: 'a', description: 'second' },
           ],
         })
-      ).context
+      ).tools
     ).toEqual([
       { header: 'tool definition: a', body: 'first' },
       { header: 'tool definition: a', body: 'second' },
@@ -938,7 +950,8 @@ describe('additional input', () => {
         })
       )
     ).toEqual({
-      context: seg('system', 'system'),
+      tools: '',
+      system: seg('system', 'system'),
       conversation: lines(
         seg('assistant reasoning', 'edited thinking'),
         seg('assistant tool call: read', '{"path":"edited path"}'),
@@ -990,7 +1003,8 @@ describe('additional input', () => {
     );
 
     expect(parts).toEqual({
-      context: lines(seg('system', 'system'), seg('developer', 'developer')),
+      tools: '',
+      system: lines(seg('system', 'system'), seg('developer', 'developer')),
       conversation: lines(
         seg('assistant refusal', 'edited refusal'),
         seg('assistant reasoning', 'edited reasoning'),
@@ -1299,10 +1313,11 @@ describe('tool definitions and output formats', () => {
     ],
   ] as const)('scans selected definition and format fields on %s', (kind, body) => {
     expect(render(request(kind, body))).toEqual({
-      context: lines(
+      tools: lines(
         seg('tool definition: tool', 'edited description', schemaText),
         seg('response format', schemaText)
       ),
+      system: '',
       conversation: '',
     });
   });
@@ -1325,7 +1340,7 @@ describe('tool definitions and output formats', () => {
             },
           ],
         })
-      ).context
+      ).tools
     ).toBe(
       lines(
         seg('tool definition: custom', 'edited grammar'),
@@ -1354,7 +1369,7 @@ describe('tool definitions and output formats', () => {
             },
           ],
         })
-      ).context
+      ).tools
     ).toBe(
       lines(
         seg('tool definition: custom', 'edited grammar'),
@@ -1370,7 +1385,7 @@ describe('tool definitions and output formats', () => {
         request('messages', {
           tools: [{ name: 'example', input_schema: schema, input_examples: [{ text: 'edited' }] }],
         })
-      ).context
+      ).tools
     ).toBe(seg('tool definition: example', schemaText, '[{"text":"edited"}]'));
   });
 
@@ -1401,7 +1416,8 @@ describe('tool definitions and output formats', () => {
     });
 
     expect(render(gatewayRequest)).toEqual({
-      context: '',
+      tools: '',
+      system: '',
       conversation: lines(
         seg('tool definition: discovered', 'edited description', schemaText),
         seg('MCP tool list error', 'edited discovery error'),
@@ -1455,7 +1471,8 @@ describe('tool definitions and output formats', () => {
     );
 
     expect(parts).toEqual({
-      context: seg('tool definition: MCP server remote', 'visible server description'),
+      tools: seg('tool definition: MCP server remote', 'visible server description'),
+      system: '',
       conversation: lines(seg('user', 'visible text'), omit('user image'), omit('user file')),
     });
   });
@@ -1487,11 +1504,11 @@ describe('segment boundaries', () => {
         })
       )
     ).toEqual({
-      context: [
-        { header: 'system', body: 'system prompt' },
+      tools: [
         { header: 'tool definition: read', body: '{"type":"object"}' },
         { header: 'response format', body: 'answer' },
       ],
+      system: [{ header: 'system', body: 'system prompt' }],
       conversation: [
         { header: 'user', body: 'first\n\nsecond' },
         { header: 'tool result', body: 'tool output' },
@@ -1512,11 +1529,26 @@ describe('segment boundaries', () => {
       })
     );
 
-    expect(after.context).toEqual(before.context);
+    expect(after.tools).toEqual(before.tools);
+    expect(after.system).toEqual(before.system);
     expect(after.conversation.slice(0, before.conversation.length)).toEqual(before.conversation);
     expect(after.conversation.slice(before.conversation.length)).toEqual([
       { header: 'user', body: 'next' },
     ]);
+  });
+
+  it('keeps the tools and conversation unchanged when only the system prompt changes', () => {
+    const body = (system: string) => ({
+      system,
+      tools: [{ name: 'read', input_schema: { type: 'object' } }],
+      messages: [{ role: 'user', content: 'hello' }],
+    });
+    const before = extractRequestParts(request('messages', body('Today is Monday.')));
+    const after = extractRequestParts(request('messages', body('Today is Tuesday.')));
+
+    expect(after.tools).toEqual(before.tools);
+    expect(after.conversation).toEqual(before.conversation);
+    expect(after.system).toEqual([{ header: 'system', body: 'Today is Tuesday.' }]);
   });
 
   it.each([

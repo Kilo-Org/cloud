@@ -328,6 +328,46 @@ export function isResponseInterruptedError(error: unknown): boolean {
 }
 
 /**
+ * The longest model name that an error report keeps. A requested model comes
+ * from the client request, so a report bounds it instead of trusting it.
+ */
+export const REPORTED_MODEL_MAX_LENGTH = 200;
+
+/**
+ * The usage-context fields that an error report may carry. `Pick` narrows the
+ * return type, so a context field added later is not attached by default. The
+ * report must not throw, so a missing requested model becomes null and a
+ * missing usage id becomes null.
+ *
+ * The report keeps the two server-derived ids that relate it to a request: the
+ * account id, as the sibling usage reports do, and the usage id, which the
+ * request log lines also carry. The requested model comes from the client
+ * request, so the report bounds its length.
+ */
+export function usageContextReportFields(usageContext: MicrodollarUsageContext): Pick<
+  MicrodollarUsageContext,
+  'kiloUserId' | 'provider' | 'api_kind' | 'isStreaming'
+> & {
+  usageId: string | null;
+  requested_model: string | null;
+  status_code: MicrodollarUsageContext['status_code'];
+} {
+  const requestedModel: unknown = usageContext.requested_model;
+  return {
+    kiloUserId: usageContext.kiloUserId,
+    usageId: usageContext.usageId ?? null,
+    provider: usageContext.provider,
+    api_kind: usageContext.api_kind,
+    requested_model:
+      typeof requestedModel === 'string'
+        ? requestedModel.slice(0, REPORTED_MODEL_MAX_LENGTH)
+        : null,
+    status_code: usageContext.status_code,
+    isStreaming: usageContext.isStreaming,
+  };
+}
+
+/**
  * Identifies why usage could not be read without the error message, which for
  * `JSON.parse` quotes the upstream body.
  */

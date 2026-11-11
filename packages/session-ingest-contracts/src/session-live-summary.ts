@@ -73,10 +73,12 @@ export type SessionLiveSummary = z.infer<typeof sessionLiveSummarySchema>;
 
 /**
  * Whether the code point is a layout format control: a code point with no glyph
- * of its own that does not shape adjacent characters either. Display text keeps
- * the code points that draw themselves and the joiners that shape their
- * neighbours, so these are removed. Compared numerically because a character
- * class naming them reads in the source as the characters themselves.
+ * of its own that does not shape adjacent characters either (directional marks
+ * and embeddings, the zero-width space, the invisible operators, and the byte
+ * order mark). Display text keeps the code points that draw themselves and the
+ * joiners that shape their neighbours, so these are removed. Compared
+ * numerically because a character class naming them reads in the source as the
+ * characters themselves.
  */
 function isFormatControl(code: number): boolean {
   return (
@@ -85,7 +87,7 @@ function isFormatControl(code: number): boolean {
     code === 0x200e ||
     code === 0x200f ||
     (code >= 0x202a && code <= 0x202e) ||
-    code === 0x2060 ||
+    (code >= 0x2060 && code <= 0x2064) ||
     (code >= 0x2066 && code <= 0x2069) ||
     code === 0xfeff
   );

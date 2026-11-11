@@ -385,12 +385,17 @@ export function PrDiffFileNavigator({
         {files.length > 0 && (
           <View className="mx-4 mt-2 flex-row items-center justify-between">
             <Text variant="muted" className="text-xs">
+              {/* `count` is the listed total: it selects the plural category
+                  whose participle agrees with it, while `total` carries the
+                  locale-grouped figure the catalogs interpolate. */}
               {isTruncated
                 ? t('prReview.fileNavigator.viewedOfListed', {
+                    count: files.length,
                     viewed: formatNumber(viewedCount, i18n.language),
                     total: formatNumber(files.length, i18n.language),
                   })
                 : t('prReview.fileNavigator.viewedCount', {
+                    count: files.length,
                     viewed: formatNumber(viewedCount, i18n.language),
                     total: formatNumber(files.length, i18n.language),
                   })}

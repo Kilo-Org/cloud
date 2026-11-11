@@ -2990,7 +2990,13 @@
       "retryLoadingMoreFiles": "ניסיון נוסף לטעינת קבצים נוספים",
       "title": "קבצים",
       "viewedCount": "נצפו {{viewed}} מתוך {{total}}",
-      "viewedOfListed": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה"
+      "viewedCount_one": "נצפו {{viewed}} מתוך {{total}}",
+      "viewedCount_two": "נצפו {{viewed}} מתוך {{total}}",
+      "viewedCount_other": "נצפו {{viewed}} מתוך {{total}}",
+      "viewedOfListed": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
+      "viewedOfListed_one": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
+      "viewedOfListed_two": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
+      "viewedOfListed_other": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה"
     },
     "fileRows": {
       "collapseFile": "כיווץ הקובץ",

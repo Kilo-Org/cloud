@@ -2950,7 +2950,11 @@
       "retryLoadingMoreFiles": "Thử tải thêm tệp",
       "title": "Tệp",
       "viewedCount": "Đã xem {{viewed}}/{{total}}",
-      "viewedOfListed": "Đã xem {{viewed}}/{{total}} tệp trong danh sách"
+      "viewedCount_one": "Đã xem {{viewed}}/{{total}}",
+      "viewedCount_other": "Đã xem {{viewed}}/{{total}}",
+      "viewedOfListed": "Đã xem {{viewed}}/{{total}} tệp trong danh sách",
+      "viewedOfListed_one": "Đã xem {{viewed}}/{{total}} tệp trong danh sách",
+      "viewedOfListed_other": "Đã xem {{viewed}}/{{total}} tệp trong danh sách"
     },
     "fileRows": {
       "collapseFile": "Thu gọn tệp",

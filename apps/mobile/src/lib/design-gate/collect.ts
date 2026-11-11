@@ -36,6 +36,15 @@ export const DESIGN_GATE_ANCHOR_ID = 'design-gate-anchor';
 const ELEMENT_NODE = 1;
 const COMPOSITE_TAGS = new Set([0, 1, 11, 14, 15]);
 const OWNER_LIMIT = 6;
+/**
+ * How many ancestors the route lookup inspects. A pushed route's `Route(...)`
+ * owner sits deeper than the naming budget above, so the nearest one is always
+ * named even when the rest of the chain is cut: the design gate reads the route
+ * from it, and without it a screen on a pushed route could not be told apart
+ * from the tab behind it.
+ */
+const ROUTE_OWNER_SCAN = 40;
+const ROUTE_OWNER = /^Route\(.+\)$/;
 const PRESS_HANDLERS = ['onClick', 'onPress'] as const;
 const STYLE_KEYS = [
   'alignItems',
@@ -99,15 +108,27 @@ function compositeName(fiber: unknown): string | undefined {
 
 function owners(fiber: unknown): readonly string[] | undefined {
   const names: string[] = [];
+  let route: string | undefined = undefined;
+  let scanned = 0;
   let current = field(fiber, 'return');
-  while (current !== undefined && current !== null && names.length < OWNER_LIMIT) {
+  while (current !== undefined && current !== null && scanned < ROUTE_OWNER_SCAN) {
     const tag = field(current, 'tag');
     const name =
       typeof tag === 'number' && COMPOSITE_TAGS.has(tag) ? compositeName(current) : undefined;
-    if (name !== undefined && names.at(-1) !== name) {
-      names.push(name);
+    if (name !== undefined) {
+      if (route === undefined && ROUTE_OWNER.test(name)) {
+        route = name;
+      }
+      if (names.length < OWNER_LIMIT && names.at(-1) !== name) {
+        names.push(name);
+      }
     }
+    scanned += 1;
     current = field(current, 'return');
+  }
+  // The nearest route owner is what tells screens apart, so it survives the cut.
+  if (route !== undefined && !names.includes(route)) {
+    names.push(route);
   }
   return names.length > 0 ? names : undefined;
 }

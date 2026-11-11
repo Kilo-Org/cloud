@@ -435,10 +435,38 @@ describe('StoreCreditProductsError telemetry', () => {
       cause: storeSdkFailure('service-error'),
     });
 
-    expect(error.message).toBe('Store credit pack lookup failed: purchase-error service-error');
+    expect(error.message).toBe('Store credit pack lookup failed: purchase-error (service-error)');
     expect(error.name).toBe('StoreCreditProductsError');
     expect(error.key).toBe(STORE_FAILURE_KEY);
     expect(error.message).not.toContain(STORE_FAILURE_KEY);
+  });
+
+  it('spells a long store code in short words so the report title keeps it', () => {
+    const error = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: storeSdkFailure('purchase-verification-finish-failed'),
+    });
+
+    expect(error.message).toBe(
+      'Store credit pack lookup failed: purchase-error (purchase verification finish failed)'
+    );
+    expect(error[TELEMETRY_DESCRIPTION_KEY].tags?.['credits.store-error-code']).toBe(
+      'purchase-verification-finish-failed'
+    );
+  });
+
+  it('keeps a valid code when the name is not a usable value', () => {
+    const error = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: { name: 42, code: 'service-error' },
+    });
+
+    expect(error[TELEMETRY_DESCRIPTION_KEY].fingerprint).toEqual([
+      'credit-catalog-query',
+      'store-error',
+      'app_store',
+      'unknown',
+      'service-error',
+    ]);
+    expect(error.message).toBe('Store credit pack lookup failed: unknown (service-error)');
   });
 
   it('never carries the store SDK message text', () => {
@@ -467,7 +495,22 @@ describe('StoreCreditProductsError telemetry', () => {
       'type-error',
       'uncoded',
     ]);
-    expect(error.message).toBe('Store credit pack lookup failed: type-error uncoded');
+    expect(error.message).toBe('Store credit pack lookup failed: type-error (uncoded)');
+  });
+
+  it('places both identity fields when the cause has neither', () => {
+    const error = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: 'the store rejected with a string',
+    });
+
+    expect(error[TELEMETRY_DESCRIPTION_KEY].fingerprint).toEqual([
+      'credit-catalog-query',
+      'store-error',
+      'app_store',
+      'unknown',
+      'uncoded',
+    ]);
+    expect(error.message).toBe('Store credit pack lookup failed: unknown (uncoded)');
   });
 });
 

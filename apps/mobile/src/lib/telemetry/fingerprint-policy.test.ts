@@ -52,6 +52,7 @@ beforeEach(() => {
 type ScrubbedEvent = {
   fingerprint?: unknown;
   contexts?: Record<string, unknown>;
+  exception?: { values?: { type?: string; value?: string }[] };
 };
 
 /**
@@ -194,7 +195,7 @@ describe('fingerprint policy', () => {
     expect(second).not.toBe(first);
   });
 
-  it('separates two store failures that differ only in the store SDK failure code', () => {
+  it('separates two store failures by the store SDK failure code and titles each one', () => {
     const diagnostics: StoreCreditProductsDiagnostics = {
       storefront: 'app_store',
       backendPackCount: 4,
@@ -203,7 +204,7 @@ describe('fingerprint policy', () => {
       requestedProductIds: ['credits.usd10.v1'],
       returnedProductIds: [],
     };
-    for (const code of ['service-error', 'query-product']) {
+    for (const code of ['service-error', 'purchase-verification-finish-failed']) {
       reportAppError(
         new StoreCreditProductsError(STORE_FAILURE_KEY, diagnostics, {
           cause: Object.assign(new Error('Failed to query product for sku'), {
@@ -220,8 +221,17 @@ describe('fingerprint policy', () => {
       'credit-catalog-query | store-error | app_store | purchase-error | service-error'
     );
     expect(second).toBe(
-      'credit-catalog-query | store-error | app_store | purchase-error | query-product'
+      'credit-catalog-query | store-error | app_store | purchase-error | purchase-verification-finish-failed'
     );
+
+    const titles = sentryMock.captureException.mock.calls.map(([error, options]) => {
+      const entry = scrubCapture(error, options).exception?.values?.[0];
+      return `${entry?.type ?? 'Error'}: ${entry?.value ?? ''}`;
+    });
+    expect(titles).toEqual([
+      'StoreCreditProductsError: Store credit pack lookup failed: purchase-error (service-error)',
+      'StoreCreditProductsError: Store credit pack lookup failed: purchase-error (purchase verification finish failed)',
+    ]);
   });
 
   it('keeps only the tRPC metadata of the body and no token in the fingerprint', () => {

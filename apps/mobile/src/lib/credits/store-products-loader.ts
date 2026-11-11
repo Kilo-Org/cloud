@@ -49,12 +49,16 @@ export type StoreCreditProductsDiagnostics = {
  * The store SDK's own failure identity. The cause is whatever the SDK rejected
  * with, so only the two name-shaped fields are read: a store error message is
  * internal SDK wording that can embed an account or a product id, so it must
- * never reach a report or an issue title.
+ * never reach a report or an issue title. Each field is validated on its own,
+ * so an odd name cannot erase a code that is there.
  */
-const StoreFailureIdentitySchema = z.object({
-  name: z.string().max(120).optional(),
-  code: z.string().max(120).optional(),
+const StoreFailureFieldsSchema = z.object({
+  name: z.unknown().optional(),
+  code: z.unknown().optional(),
 });
+
+/** One SDK-provided field, bounded before it becomes a report token. */
+const StoreFailureFieldSchema = z.string().max(120);
 
 /** The longest identity token a report carries. */
 const STORE_FAILURE_TOKEN_LIMIT = 48;
@@ -64,11 +68,12 @@ const STORE_FAILURE_TOKEN_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 type StoreFailureIdentity = { name: string; code: string };
 
 /** One bounded lowercase token from an SDK-provided name or code, or undefined. */
-function storeFailureToken(value: string | undefined): string | undefined {
-  if (value === undefined) {
+function storeFailureToken(value: unknown): string | undefined {
+  const parsed = StoreFailureFieldSchema.safeParse(value);
+  if (!parsed.success) {
     return undefined;
   }
-  const slug = value
+  const slug = parsed.data
     .replaceAll(/\[[^\]]*\]/gu, ' ')
     .replaceAll(/([a-z0-9])([A-Z])/gu, '$1-$2')
     .replaceAll(/([A-Z]+)([A-Z][a-z])/gu, '$1-$2')
@@ -88,10 +93,33 @@ function storeFailureToken(value: string | undefined): string | undefined {
  * `purchase-error`.
  */
 function storeFailureIdentity(cause: unknown): StoreFailureIdentity {
-  const parsed = StoreFailureIdentitySchema.safeParse(cause);
-  const name = parsed.success ? storeFailureToken(parsed.data.name) : undefined;
-  const code = parsed.success ? storeFailureToken(parsed.data.code) : undefined;
-  return { name: name ?? 'unknown', code: code ?? 'uncoded' };
+  const fields = StoreFailureFieldsSchema.safeParse(cause);
+  const source = fields.success ? fields.data : {};
+  return {
+    name: storeFailureToken(source.name) ?? 'unknown',
+    code: storeFailureToken(source.code) ?? 'uncoded',
+  };
+}
+
+/** The length at which the report scrubber treats an unbroken run as a token. */
+const STORE_FAILURE_REDACTION_LIMIT = 20;
+/** A title chunk short enough that the scrubber keeps it. */
+const STORE_FAILURE_TITLE_CHUNK = /[\s\S]{1,16}/gu;
+
+/**
+ * One identity token as the issue title reads it. The report scrubber blanks
+ * any 20-character unbroken run in an exception message as a possible
+ * credential (see `redactString` in the Sentry scrubber), so a token that long
+ * is spelled in short words; the tags and the fingerprint keep the exact token.
+ */
+function storeFailureTitleText(token: string): string {
+  if (token.length < STORE_FAILURE_REDACTION_LIMIT) {
+    return token;
+  }
+  return token
+    .split('-')
+    .flatMap(part => part.match(STORE_FAILURE_TITLE_CHUNK) ?? [part])
+    .join(' ');
 }
 
 type StoreProductsOutcome = 'store-unavailable' | 'store-timeout' | 'store-error';
@@ -121,7 +149,9 @@ function storeProductsMessage(outcome: StoreProductsOutcome, cause: unknown): st
     return 'Store did not answer the credit pack lookup in time';
   }
   const identity = storeFailureIdentity(cause);
-  return `Store credit pack lookup failed: ${identity.name} ${identity.code}`;
+  const name = storeFailureTitleText(identity.name);
+  const code = storeFailureTitleText(identity.code);
+  return `Store credit pack lookup failed: ${name} (${code})`;
 }
 
 /**

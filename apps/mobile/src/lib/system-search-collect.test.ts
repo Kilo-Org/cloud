@@ -53,6 +53,7 @@ const ORG_FINDINGS_KEY = [
   { type: 'infinite', input: { organizationId: 'org-1', limit: 50, offset: 0 } },
 ];
 const UNRELATED_KEY = [['user', 'getMe'], { type: 'query' }];
+const ORGANIZATIONS_KEY = [['organizations', 'list'], { type: 'query' }];
 
 // The stored recents list is read whole on every collect, so its per-provider
 // scopes are observed alongside whatever the query cache enumerated.
@@ -264,7 +265,47 @@ describe('collectSystemSearchDocuments', () => {
       documents: [],
       sessions: null,
       observedSources: new Set(RECENTS_SOURCES),
+      accessibleOrganizations: null,
     });
+  });
+
+  it('reads the openable organizations from a settled membership list', async () => {
+    const client = new QueryClient();
+    client.setQueryData(ORGANIZATIONS_KEY, [
+      { organizationId: 'org-1', inheritedChildren: [{ organizationId: 'org-1-child' }] },
+      // A populated entry with no inherited children, as the server renders a
+      // member who owns nothing.
+      { organizationId: 'org-2', inheritedChildren: [] },
+    ]);
+
+    const { accessibleOrganizations } = await collectSystemSearchDocuments(client);
+
+    // The organizations nested under one the account owns are openable too.
+    expect(accessibleOrganizations).toEqual(new Set(['org-1', 'org-1-child', 'org-2']));
+  });
+
+  it('names no organization while the membership list has not settled', async () => {
+    const client = new QueryClient();
+    client.setQueryData(ORGANIZATIONS_KEY, [{ organizationId: 'org-1' }]);
+    // A list that refetched and failed keeps its last payload while it reports
+    // the error: that payload is not an answer this run may act on.
+    client
+      .getQueryCache()
+      .find({ queryKey: ORGANIZATIONS_KEY, exact: true })
+      ?.setState({ status: 'error', error: new Error('organizations.list failed') });
+
+    const { accessibleOrganizations } = await collectSystemSearchDocuments(client);
+
+    expect(accessibleOrganizations).toBeNull();
+  });
+
+  it('names no organization for a membership payload it cannot read', async () => {
+    const client = new QueryClient();
+    client.setQueryData(ORGANIZATIONS_KEY, { organizations: [] });
+
+    const { accessibleOrganizations } = await collectSystemSearchDocuments(client);
+
+    expect(accessibleOrganizations).toBeNull();
   });
 
   it('observes the recents scopes only when the stored list was read', async () => {
@@ -750,6 +791,35 @@ describe('collectSystemSearchDocuments session catalog', () => {
     const { sessions } = await collectSystemSearchDocuments(client);
 
     expect(sessions).toEqual([{ id: 'named', title: 'Deploy review' }]);
+  });
+
+  it('leaves out a session from an organization the membership list dropped', async () => {
+    const client = new QueryClient();
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        { cliSessions: [{ session_id: 'personal', title: 'Personal session' }], nextCursor: null },
+      ],
+    });
+    client.setQueryData(
+      [['cliSessionsV2', 'list'], { type: 'infinite', input: { organizationId: 'org-1' } }],
+      {
+        pages: [
+          {
+            cliSessions: [
+              { session_id: 'org-session', title: 'Org session', organization_id: 'org-1' },
+            ],
+            nextCursor: null,
+          },
+        ],
+      }
+    );
+    // The account's own membership answer no longer carries that organization,
+    // while the cache still holds the last list it delivered.
+    client.setQueryData(ORGANIZATIONS_KEY, [{ organizationId: 'org-2' }]);
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([{ id: 'personal', title: 'Personal session' }]);
   });
 
   it('orders the catalog by each row’s update time across cached queries', async () => {

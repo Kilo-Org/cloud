@@ -75,6 +75,11 @@ vi.mock('react', async () => {
       fn();
     }),
     useImperativeHandle: vi.fn(() => undefined),
+    // The inset the host reserves is published from a layout effect: it must
+    // run before the frame is painted, so the mock runs it like `useEffect`.
+    useLayoutEffect: vi.fn((fn: React.EffectCallback) => {
+      fn();
+    }),
     useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useRef: vi.fn(<T>(initial: T) => {
       const index = refSlots.cursor;
@@ -1076,3 +1081,59 @@ describe('ChatComposer voice status', () => {
     expect(announceForAccessibility).toHaveBeenCalledWith('Transcribing...');
   });
 });
+
+describe('ChatComposer transcript inset', () => {
+  // The host reserves exactly the input's growth past its one-line floor, so a
+  // cleared draft must publish zero again and a taller window that raises the
+  // floor must not read as growth.
+  function findMeasureProps(render: React.ReactElement): Record<string, unknown> {
+    const found = findNode(
+      render,
+      type =>
+        typeof type === 'function' && (type as { name?: string }).name === 'ChatComposerMeasure'
+    );
+    if (found === null) {
+      throw new Error('ChatComposerMeasure element not found');
+    }
+    return found.props;
+  }
+
+  it('publishes the input growth above the one-line floor and clears it again', async () => {
+    const onInputBottomInsetChange = vi.fn<(insetDp: number) => void>();
+    const render = await mount(makeProps({ onInputBottomInsetChange }));
+    const floor = requireInputRowMeasureHeight(render);
+    // The mount publishes nothing: the input sits on its floor.
+    expect(onInputBottomInsetChange).not.toHaveBeenCalled();
+
+    const taller = findMeasureProps(render).onMeasureChange as (
+      height: number,
+      maxHeight: number
+    ) => void;
+    taller(floor + 40, 124);
+    const grown = await rerender(makeProps({ onInputBottomInsetChange }));
+    expect(onInputBottomInsetChange).toHaveBeenLastCalledWith(40);
+
+    (findMeasureProps(grown).onMeasureChange as (h: number, m: number) => void)(floor, 124);
+    await rerender(makeProps({ onInputBottomInsetChange }));
+    expect(onInputBottomInsetChange).toHaveBeenLastCalledWith(0);
+  });
+
+  it('reports the growth once, not on every render that keeps it', async () => {
+    const onInputBottomInsetChange = vi.fn<(insetDp: number) => void>();
+    const render = await mount(makeProps({ onInputBottomInsetChange }));
+    const floor = requireInputRowMeasureHeight(render);
+    (findMeasureProps(render).onMeasureChange as (h: number, m: number) => void)(floor + 26, 124);
+    await rerender(makeProps({ onInputBottomInsetChange }));
+    expect(onInputBottomInsetChange).toHaveBeenCalledTimes(1);
+    await rerender(makeProps({ onInputBottomInsetChange }));
+    expect(onInputBottomInsetChange).toHaveBeenCalledTimes(1);
+  });
+});
+
+function requireInputRowMeasureHeight(render: React.ReactElement): number {
+  const height = findInputRowProps(render)?.measureHeight;
+  if (typeof height !== 'number') {
+    throw new Error('ChatComposerInputRow element did not carry its measured height');
+  }
+  return height;
+}

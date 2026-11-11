@@ -19,6 +19,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -265,6 +266,15 @@ type ChatComposerProps = {
   onDismissSuggestion?: (requestId: string) => Promise<void>;
   /** Imperative handle the host binds to call `setText`. */
   controlRef?: Ref<ChatComposerControl>;
+  /**
+   * How far the input has grown past its one-line floor, in dp. The host reads
+   * it to hold the transcript's bottom edge while this composer takes that
+   * space: a scroll correction issued from the list's later `onLayout` is a
+   * visible late jump of the whole transcript, so the space is reserved in the
+   * same commit the input grows instead. Reported once per rendered line, not
+   * per keystroke, and never for the chrome around the input.
+   */
+  onInputBottomInsetChange?: (insetDp: number) => void;
 };
 
 /**
@@ -320,6 +330,7 @@ export function ChatComposer({
   onAcceptSuggestion,
   onDismissSuggestion,
   controlRef,
+  onInputBottomInsetChange,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const themedSheet = useThemedActionSheetOptions();
@@ -472,6 +483,20 @@ export function ChatComposer({
     setInputMaxHeight(maxHeight);
   }, []);
   const measureHandleRef = useRef<ChatComposerMeasureHandle | null>(null);
+  // The host reserves this in the transcript's layout, so it must change in the
+  // same commit as `measureHeight` and nothing else: a layout effect reports it
+  // before the frame is painted, and only when it actually moved. The floor is
+  // the input's own one-line height, so a taller window or a different font
+  // scale never reads as growth, and a cleared draft reports zero again.
+  const inputBottomInset = Math.max(0, measureHeight - inputMinHeight);
+  const reportedInputBottomInsetRef = useRef(inputBottomInset);
+  useLayoutEffect(() => {
+    const previous = reportedInputBottomInsetRef.current;
+    reportedInputBottomInsetRef.current = inputBottomInset;
+    if (previous !== inputBottomInset) {
+      onInputBottomInsetChange?.(inputBottomInset);
+    }
+  }, [inputBottomInset, onInputBottomInsetChange]);
   // The row reports the real input's content height (dp, padding included) on
   // every content change, and `useTextHeight` reads the line pitch that input
   // lays out at from it, so the capped height it publishes lands on a whole

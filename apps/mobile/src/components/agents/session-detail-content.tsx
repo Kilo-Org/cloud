@@ -146,6 +146,7 @@ import {
 } from '@/components/agents/session-slow-load';
 import { getLanguageSnapshot } from '@/i18n';
 import { SessionMessageList } from '@/components/agents/session-message-list';
+import { resolveTranscriptFrame } from '@/components/agents/session-message-list-anchor';
 import {
   collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
@@ -313,6 +314,17 @@ export function SessionDetailContent({
   });
   const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerControlRef = useRef<ChatComposerControl | null>(null);
+  // How far the composer's input grew past its one-line floor. The transcript
+  // holds its bottom edge on that growth in the same commit it lands: the
+  // list's own `onLayout` reaches JS one frame after the viewport shrank, and
+  // the scroll it issues lands later still, which painted the transcript
+  // clipped and then moved it. Reset when the composer goes away, so the
+  // read-only footer and a blocking card get the whole body.
+  const [composerBottomInset, setComposerBottomInset] = useState(0);
+  const handleComposerBottomInsetChange = useCallback((insetDp: number) => {
+    setComposerBottomInset(insetDp);
+  }, []);
+  const transcriptFrame = resolveTranscriptFrame(composerBottomInset);
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -2128,6 +2140,14 @@ export function SessionDetailContent({
     !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
   const isReadOnlyContinueVisible =
     isReadOnlySession && !hasBlockingInteraction && !isSessionChromePending;
+  // The transcript's bottom inset belongs to the composer it was measured for.
+  // A blocking card or the read-only footer replaces the composer with chrome
+  // of another height on purpose, so the inset must not outlive it.
+  useEffect(() => {
+    if (!isComposerVisible) {
+      setComposerBottomInset(0);
+    }
+  }, [isComposerVisible]);
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id
@@ -2883,6 +2903,7 @@ export function SessionDetailContent({
                   await manager.dismissSuggestion(requestId);
                 }}
                 controlRef={composerControlRef}
+                onInputBottomInsetChange={handleComposerBottomInsetChange}
               />
             </ModelPickerSelectionScopeProvider>
           </View>
@@ -3032,28 +3053,34 @@ export function SessionDetailContent({
       // No entrance animation: the transcript body must paint on its own, not
       // after a `FadeIn` (which starts at `opacity: 0`) completes. The
       // skeleton is swapped for the rows in one commit, so it needs none.
-      <View className="flex-1">
-        <SessionMessageList
-          sessionId={sessionId}
-          items={transcript}
-          keyExtractor={getSessionTranscriptItemKey}
-          getItemType={getSessionTranscriptItemType}
-          hasOlderMessages={hasOlderMessages}
-          isLoadingOlderMessages={isLoadingOlderMessages}
-          olderMessagesError={olderMessagesError}
-          olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-          onLoadOlderMessages={() => {
-            void manager.loadOlderMessages();
-          }}
-          onReachedBottom={() => {
-            manager.trimRetainedHistory();
-          }}
-          onAnchorChange={handleAnchorChange}
-          onOpenSettledChange={handleOpenSettledChange}
-          renderItem={renderItem}
-          resumeAt={resumeAnchor}
-          followTailNonce={followTailNonce}
-        />
+      // The composer's input growth is reserved here, in the same commit that
+      // grows it, so the transcript's bottom edge stays on the composer's top
+      // edge. Correcting from the list's own `onLayout` painted the transcript
+      // clipped for the frames before that callback reached JS, then moved it.
+      <View className="flex-1" style={transcriptFrame.holder}>
+        <View style={transcriptFrame.content}>
+          <SessionMessageList
+            sessionId={sessionId}
+            items={transcript}
+            keyExtractor={getSessionTranscriptItemKey}
+            getItemType={getSessionTranscriptItemType}
+            hasOlderMessages={hasOlderMessages}
+            isLoadingOlderMessages={isLoadingOlderMessages}
+            olderMessagesError={olderMessagesError}
+            olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+            onLoadOlderMessages={() => {
+              void manager.loadOlderMessages();
+            }}
+            onReachedBottom={() => {
+              manager.trimRetainedHistory();
+            }}
+            onAnchorChange={handleAnchorChange}
+            onOpenSettledChange={handleOpenSettledChange}
+            renderItem={renderItem}
+            resumeAt={resumeAnchor}
+            followTailNonce={followTailNonce}
+          />
+        </View>
       </View>
     );
   }

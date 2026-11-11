@@ -12,7 +12,7 @@ import {
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
-import { type Pressable } from 'react-native';
+import { type Pressable, type ViewStyle } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   type AssociatedPrData,
@@ -97,6 +97,9 @@ const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }
 // these cases describe; a test that needs the still-measuring window sets it to
 // `false`, and `null` models a list that never reports.
 const openSettledReport = vi.hoisted(() => ({ value: true as boolean | null }));
+// The props the host hands the transcript list, so the bottom inset it reserves
+// for the composer's growth is readable even though the stub renders nothing.
+const listPropsSlot = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 const connectionHealth = vi.hoisted(() => ({
   isConnected: true,
   reconnectExhausted: false,
@@ -386,6 +389,7 @@ vi.mock('@/components/agents/session-message-list', () => ({
     // describe an open that has settled, so the mock reports it; a test that
     // needs the still-measuring window sets `openSettledReport.value = false`.
     const { onOpenSettledChange, sessionId } = props;
+    listPropsSlot.current = props as unknown as Record<string, unknown>;
     useEffect(() => {
       const report = openSettledReport.value;
       if (report === null) {
@@ -5236,4 +5240,71 @@ describe('session detail duplicate failure state', () => {
 
 function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {
   return view.renderer.root.findAll(node => Object.is(node.type, 'SessionStatusIndicator'));
+}
+
+describe('SessionDetailContent transcript frame', () => {
+  /** The transcript's anchored content frame, or null when nothing is reserved. */
+  function anchoredContent(view: { renderer: ReactTestRenderer }) {
+    return (
+      view.renderer.root
+        .findAll(node => {
+          const style = node.props.style as ViewStyle | null;
+          return style?.position === 'absolute' && typeof style.top === 'number';
+        })
+        .find(node => (node.props.style as ViewStyle).top !== 0) ?? null
+    );
+  }
+
+  function clippingHolders(view: { renderer: ReactTestRenderer }) {
+    return view.renderer.root.findAll(
+      node => (node.props.style as ViewStyle | null)?.overflow === 'hidden'
+    );
+  }
+
+  it('reserves the composer input growth in the same commit and gives it back', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([taskMessage(ROOT_ID, CHILD_IDS)]);
+    // Nothing is reserved while the input sits on its one-line floor.
+    expect(anchoredContent(view)).toBeNull();
+
+    act(() => {
+      (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(64);
+    });
+    // The transcript keeps its previous height and rides up by the growth, so
+    // its bottom edge tracks the composer without a scroll command.
+    expect((anchoredContent(view)?.props.style as ViewStyle).top).toBe(-64);
+    expect(clippingHolders(view).length).toBeGreaterThan(0);
+
+    act(() => {
+      (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(0);
+    });
+    expect(anchoredContent(view)).toBeNull();
+    expect(clippingHolders(view)).toHaveLength(0);
+  });
+
+  it('drops the reservation when the composer is replaced by other chrome', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([taskMessage(ROOT_ID, CHILD_IDS)]);
+    act(() => {
+      (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(64);
+    });
+    expect(anchoredContent(view)).not.toBeNull();
+
+    // The read-only footer is chrome of another height, so the inset measured
+    // for the composer must not outlive it.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    expect(
+      view.renderer.root.findAll(candidate => Object.is(candidate.type, 'ChatComposer'))
+    ).toHaveLength(0);
+    expect(anchoredContent(view)).toBeNull();
+  });
+});
+
+function composerPropsWithInset(view: { renderer: ReactTestRenderer }) {
+  return view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer')).props as {
+    onInputBottomInsetChange?: (dp: number) => void;
+  };
 }

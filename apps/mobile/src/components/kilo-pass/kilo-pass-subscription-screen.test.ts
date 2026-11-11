@@ -20,7 +20,6 @@ vi.mock('expo-router', () => ({ useRouter: () => mockRouter }));
 vi.mock('react-native', () => ({ Platform: mockedPlatform, View: 'View' }));
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => mocks.presentation }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));

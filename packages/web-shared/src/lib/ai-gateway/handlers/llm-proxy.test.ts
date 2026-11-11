@@ -7319,7 +7319,7 @@ describe('BYOK failover', () => {
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 

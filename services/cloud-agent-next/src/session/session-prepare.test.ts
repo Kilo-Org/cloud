@@ -609,6 +609,37 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
+  it('resolves an inherited allowlist to the native containers replacement', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '';
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+      runtime: { egressMode: 'allowlist', egressAllowlist: [] },
+    });
+
+    await runCreate(ctx, request);
+
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledOnce();
+    expect(selectControlPlaneSandboxMock.mock.calls[0][0].sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
+    await expect(selectControlPlaneSandboxMock.mock.results[0].value).resolves.toMatchObject({
+      provider: 'cloudflare-containers',
+      sandboxKind: 'isolated',
+    });
+    expect(createdMetadata(doStub)?.workspace).toMatchObject({
+      sandboxProvider: 'cloudflare-containers',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      sandboxKind: 'isolated',
+      egressMode: 'allowlist',
+      egressAllowlist: [],
+    });
+    expect(createCliSessionMock).toHaveBeenCalledOnce();
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledOnce();
+  });
+
   it('accepts a supported resolved native replacement of cloudflare-single', async () => {
     const doStub = makeDoStub();
     const request = requestForPreset('cloudflare-single');

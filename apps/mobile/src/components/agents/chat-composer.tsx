@@ -488,8 +488,12 @@ export function ChatComposer({
   // before the frame is painted, and only when it actually moved. The floor is
   // the input's own one-line height, so a taller window or a different font
   // scale never reads as growth, and a cleared draft reports zero again.
+  //
+  // The mount reports the floor as well. A composer remounted under another
+  // key starts on that floor and would otherwise publish nothing, leaving the
+  // reservation of the instance it replaced in the transcript.
   const inputBottomInset = Math.max(0, measureHeight - inputMinHeight);
-  const reportedInputBottomInsetRef = useRef(inputBottomInset);
+  const reportedInputBottomInsetRef = useRef<number | null>(null);
   useLayoutEffect(() => {
     const previous = reportedInputBottomInsetRef.current;
     reportedInputBottomInsetRef.current = inputBottomInset;

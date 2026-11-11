@@ -1102,8 +1102,10 @@ describe('ChatComposer transcript inset', () => {
     const onInputBottomInsetChange = vi.fn<(insetDp: number) => void>();
     const render = await mount(makeProps({ onInputBottomInsetChange }));
     const floor = requireInputRowMeasureHeight(render);
-    // The mount publishes nothing: the input sits on its floor.
-    expect(onInputBottomInsetChange).not.toHaveBeenCalled();
+    // The mount publishes the floor: a composer remounted under another key
+    // must not leave the previous instance's reservation behind.
+    expect(onInputBottomInsetChange).toHaveBeenCalledTimes(1);
+    expect(onInputBottomInsetChange).toHaveBeenLastCalledWith(0);
 
     const taller = findMeasureProps(render).onMeasureChange as (
       height: number,
@@ -1124,9 +1126,11 @@ describe('ChatComposer transcript inset', () => {
     const floor = requireInputRowMeasureHeight(render);
     (findMeasureProps(render).onMeasureChange as (h: number, m: number) => void)(floor + 26, 124);
     await rerender(makeProps({ onInputBottomInsetChange }));
-    expect(onInputBottomInsetChange).toHaveBeenCalledTimes(1);
+    // The mount published the floor, the growth published once beside it.
+    expect(onInputBottomInsetChange).toHaveBeenCalledTimes(2);
+    expect(onInputBottomInsetChange).toHaveBeenLastCalledWith(26);
     await rerender(makeProps({ onInputBottomInsetChange }));
-    expect(onInputBottomInsetChange).toHaveBeenCalledTimes(1);
+    expect(onInputBottomInsetChange).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -17,8 +17,10 @@ import { type ViewStyle } from 'react-native';
  * rows, and no scroll command is issued at all.
  *
  * The frame is taller than its holder by the inset, so the holder clips the
- * strip the ride pushes above its top edge. That strip holds rows the user
- * already scrolled past, and it is reachable only at the very top.
+ * strip the ride pushes above its top edge. That strip holds the padding and
+ * the start of the oldest rows: at the tail of a transcript that overflows the
+ * region it lies far above the viewport, and it is the first rows only when the
+ * list is scrolled to its very top.
  */
 export type TranscriptFrame = Readonly<{ holder: ViewStyle; content: ViewStyle }>;
 

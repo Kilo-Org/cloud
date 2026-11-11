@@ -336,7 +336,11 @@ export function SessionDetailContent({
   }>({ sessionId, dp: 0 });
   const handleComposerBottomInsetChange = useCallback(
     (insetDp: number) => {
-      setComposerBottomInset({ sessionId, dp: insetDp });
+      setComposerBottomInset(current =>
+        current.sessionId === sessionId && current.dp === insetDp
+          ? current
+          : { sessionId, dp: insetDp }
+      );
     },
     [sessionId]
   );

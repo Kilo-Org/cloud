@@ -342,6 +342,47 @@ describe('native organization compute accounting', () => {
     }
   );
 
+  it.each([
+    { owner: 'self', trialEndOffsetDays: -1, billingMode: 'shadow' },
+    { owner: 'self', trialEndOffsetDays: 1, billingMode: 'paid' },
+    { owner: 'parent', trialEndOffsetDays: -1, billingMode: 'shadow' },
+    { owner: 'parent', trialEndOffsetDays: 1, billingMode: 'paid' },
+  ])(
+    'uses $billingMode billing when the $owner trial ends in $trialEndOffsetDays days',
+    async ({ owner, trialEndOffsetDays, billingMode }) => {
+      const f = await fixture();
+      f.config.cloudAgentOrgIds = new Set(['*']);
+      f.config.warnRemainingMicrodollars = 5_000_000;
+      const freeTrialEndAt = new Date(f.start + trialEndOffsetDays * 86_400_000).toISOString();
+      if (owner === 'self') {
+        await client.db
+          .update(organizations)
+          .set({ free_trial_end_at: freeTrialEndAt })
+          .where(eq(organizations.id, f.orgId));
+      } else {
+        // A new child has its own recent created_at; only the parent trial counts.
+        const parentOrgId = crypto.randomUUID();
+        parentOrgIds.push(parentOrgId);
+        await client.db.insert(organizations).values({
+          id: parentOrgId,
+          name: 'Compute parent',
+          free_trial_end_at: freeTrialEndAt,
+        });
+        await client.db
+          .update(organizations)
+          .set({ parent_organization_id: parentOrgId })
+          .where(eq(organizations.id, f.orgId));
+      }
+      if (billingMode === 'shadow') await f.limit(0);
+
+      expect(await f.admission()).toMatchObject({ kind: 'applied', billingMode, dedup: false });
+      expect(await f.heartbeat()).toMatchObject({ billingMode, budget: { verdict: 'continue' } });
+      const charged = billingMode === 'paid';
+      expect((await f.payer()).microdollars_used).toBe(charged ? 3_000_000 : 0);
+      expect(await f.usage()).toBe(charged ? 3_000_000 : undefined);
+    }
+  );
+
   it('blocks a $1.50 allowance, counts a running $3 charge once and recovers only after the allowance rises', async () => {
     const f = await fixture();
     await f.limit(1_500_000);

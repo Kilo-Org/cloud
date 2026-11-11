@@ -2611,6 +2611,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/organization-entitlement':
+        specifier: workspace:*
+        version: link:../../packages/organization-entitlement
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

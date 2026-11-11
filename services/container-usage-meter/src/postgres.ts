@@ -9,6 +9,7 @@ import {
   organizations,
   type WorkerDb,
 } from '@kilocode/db';
+import { getOrganizationTrialEndDate } from '@kilocode/organization-entitlement';
 import { and, desc, eq, gt, lt, ne, sql } from 'drizzle-orm';
 import type {
   RecordHeartbeatInput,
@@ -410,35 +411,47 @@ async function recoverMissingInterval(
   return existing;
 }
 
-async function hasPayingSeatSubscription(
+// Compute is charged only while an organization is in its free trial and has
+// not started paying. Child organizations have no trial or subscription of
+// their own; they use their live parent's. The hierarchy is one level deep.
+async function isInUnpaidOrganizationTrial(
   tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
-  organizationId: string
+  organizationId: string,
+  now: Date
 ): Promise<boolean> {
+  const [row] = await tx
+    .select({
+      id: organizations.id,
+      freeTrialEndAt: organizations.free_trial_end_at,
+      createdAt: organizations.created_at,
+      parentId: parentOrganizationsTable.id,
+      parentFreeTrialEndAt: parentOrganizationsTable.free_trial_end_at,
+      parentCreatedAt: parentOrganizationsTable.created_at,
+    })
+    .from(organizations)
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!row) return true;
+  const owner =
+    row.parentId && row.parentCreatedAt
+      ? {
+          id: row.parentId,
+          freeTrialEndAt: row.parentFreeTrialEndAt,
+          createdAt: row.parentCreatedAt,
+        }
+      : row;
+  if (getOrganizationTrialEndDate(owner.freeTrialEndAt, owner.createdAt) <= now) return false;
+
   // Read the latest event, not any historical active subscription. Trialing
-  // subscriptions deliberately remain eligible for compute billing.
+  // subscriptions have not started paying.
   const [purchase] = await tx
     .select({ status: organization_seats_purchases.subscription_status })
     .from(organization_seats_purchases)
-    .where(eq(organization_seats_purchases.organization_id, organizationId))
+    .where(eq(organization_seats_purchases.organization_id, owner.id))
     .orderBy(desc(organization_seats_purchases.created_at))
     .limit(1);
-  return purchase?.status === 'active' || purchase?.status === 'past_due';
-}
-
-// Child organizations have no subscription of their own; they inherit the
-// live parent's. The hierarchy is one level deep, so only the direct parent counts.
-async function isPayingOrganizationOrChild(
-  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
-  organizationId: string
-): Promise<boolean> {
-  if (await hasPayingSeatSubscription(tx, organizationId)) return true;
-  const [organization] = await tx
-    .select({ parentId: parentOrganizationsTable.id })
-    .from(organizations)
-    .innerJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
-    .where(eq(organizations.id, organizationId))
-    .limit(1);
-  return organization?.parentId ? hasPayingSeatSubscription(tx, organization.parentId) : false;
+  return purchase?.status !== 'active' && purchase?.status !== 'past_due';
 }
 
 export async function applyStart(
@@ -518,7 +531,7 @@ export async function applyStartWithDb(
       billingMode === 'paid' &&
       input.service.startsWith('cloud-agent-next-') &&
       input.subject.type === 'org' &&
-      (await isPayingOrganizationOrChild(tx, input.subject.id))
+      !(await isInUnpaidOrganizationTrial(tx, input.subject.id, new Date(receivedAtMs)))
     ) {
       billingMode = 'shadow';
     }

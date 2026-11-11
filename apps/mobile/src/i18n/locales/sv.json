@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Min agent",
       "promptPlaceholder": "Du är en...",
       "tools": "Verktyg",
+      "wholeToolRule": "Den här agenten tillämpar en regel på alla verktyg samtidigt: {{rule}}. Dessa reglage är skrivskyddade.",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primär — visas i väljaren",
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
@@ -4069,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler för kodarkiv",
+      "entryLabel": "Standardprofiler",
       "add": "Lägg till standard",
       "empty": "Inga standardinställningar konfigurerade",
       "emptyDescription": "Lägg till en standard för att automatiskt tillämpa en profil när du startar sessioner för ett kodarkiv.",

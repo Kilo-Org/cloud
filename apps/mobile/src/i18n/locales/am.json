@@ -4034,6 +4034,7 @@
       "namePlaceholder": "የእኔ ወኪል",
       "promptPlaceholder": "አንተ የ...",
       "tools": "መሳሪያዎች",
+      "wholeToolRule": "ይህ ወኪል በአንድ ጊዜ በሁሉም መሳሪያዎች ላይ አንድ ደንብ ይተገብራል፦ {{rule}}። እነዚህ ማብሪያ ማጥፊያዎች ለንባብ ብቻ ናቸው።",
       "visibility": "ታይነት",
       "visibilityPrimary": "ዋና — በቃሚው ውስጥ ይታያል",
       "visibilitySubagent": "ሱባጀንት — ከሌሎች ብቻ የሚጠራ",
@@ -4075,6 +4076,7 @@
     },
     "repoBindings": {
       "title": "ለሪፖዎች ነባሪ መገለጫዎች",
+      "entryLabel": "ነባሪ መገለጫዎች",
       "add": "ነባሪ ያክሉ",
       "empty": "ምንም ነባሪዎች አልተዋቀሩም።",
       "emptyDescription": "ለሪፖ ክፍለ ጊዜዎችን ሲጀምሩ መገለጫን በራስ-ሰር ለመተግበር ነባሪ ያክሉ።",

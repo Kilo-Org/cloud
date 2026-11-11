@@ -38,6 +38,10 @@ import type { SyncAcceptedHandleStorage } from './accepted-handles.js';
 import { lastSentHandleKey } from './scope-handle-delivery.js';
 import { readScopeGrant, removeScopeMember, scopeGrantId } from './scope-grants.js';
 import { admissionFailureStage } from './scope-handle-adoption.js';
+import {
+  OrganizationAccessRevokedError,
+  OrganizationMembershipUnavailableError,
+} from './organization-membership.js';
 import { VercelScmContainmentError } from '../../scm-broker/vercel-identity.js';
 
 export type RouteDatabase = ReturnType<typeof drizzle>;
@@ -380,13 +384,24 @@ const ATTEMPT_POLICY_ATTEMPTS = 2;
 /**
  * The failure reason and diagnostic stage for an error that grant issuance
  * threw. A repository of the environment that cannot be accessed has its own
- * reason, and its stage names the repository; the other errors keep the generic
- * workspace failure with the caller's stage.
+ * reason, and its stage names the repository; an organization membership that
+ * refused or could not answer the read has its own stage; the other errors keep
+ * the generic workspace failure with the caller's stage.
  */
 export function grantIssueFailure(
   error: unknown,
   fallbackStage: string
 ): { reason: ControlPlaneFailureReason; stage: string } {
+  if (error instanceof OrganizationAccessRevokedError) {
+    // The owner left the organization the session belongs to: the route cannot
+    // run on organization authority, and no retry of the same attempt mints it.
+    return { reason: 'workspace_setup_failed', stage: 'organization_access_revoked' };
+  }
+  if (error instanceof OrganizationMembershipUnavailableError) {
+    // The read that would prove membership did not answer. The grant is denied,
+    // and its own stage keeps that deny distinguishable from a grant-mint fault.
+    return { reason: 'workspace_setup_failed', stage: 'organization_membership_unavailable' };
+  }
   if (error instanceof SessionCredentialUpgradeRequiredError) {
     return { reason: 'credential_upgrade_required', stage: 'credential_upgrade_required' };
   }

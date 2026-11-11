@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Ügynököm",
       "promptPlaceholder": "Ön egy...",
       "tools": "Eszközök",
+      "wholeToolRule": "Ez az ügynök egyszerre egy szabályt alkalmaz minden eszközre: {{rule}}. Ezek a kapcsolók csak olvashatók.",
       "visibility": "Láthatóság",
       "visibilityPrimary": "Elsődleges — a választóban látható",
       "visibilitySubagent": "Alügynök — csak másoktól hívható",
@@ -4069,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Alapértelmezett profilok adattárakhoz",
+      "entryLabel": "Alapértelmezett profilok",
       "add": "Alapértelmezés hozzáadása",
       "empty": "Nincsenek beállított alapértelmezett profilok",
       "emptyDescription": "Adjon hozzá egy alapértelmezett profilt, amely automatikusan alkalmazza a profilt az adattár munkameneteinek indításakor.",

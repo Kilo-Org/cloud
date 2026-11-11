@@ -236,8 +236,10 @@ export function useSessionSearchInput({
   // it. An empty persisted value (including '' persisted by a clear) seeds
   // empty, so a previously committed non-empty query is never reloaded, and a
   // settle that lands after a clear is ignored rather than restoring the text
-  // the user just removed. A non-empty restored value remounts the uncontrolled
-  // input so it shows the restored text.
+  // the user just removed. The committed query is the restored text trimmed,
+  // the same value typing that text commits, so a whitespace-only draft keeps
+  // the full list; a non-empty restored value remounts the uncontrolled input
+  // so it shows the restored text exactly as stored.
   useEffect(() => {
     const decision = resolveSearchRestoreDecision({
       settled: restoreSettled,
@@ -248,11 +250,11 @@ export function useSessionSearchInput({
       return;
     }
     seedAppliedRef.current = true;
-    lastTypedRef.current = decision.query;
+    lastTypedRef.current = decision.text;
     setHasText(decision.hasText);
     setSearchQuery(decision.query);
     if (decision.shouldRemount) {
-      replaceInputText(decision.query);
+      replaceInputText(decision.text);
     }
   }, [restoreSettled, restoredQuery, replaceInputText]);
 

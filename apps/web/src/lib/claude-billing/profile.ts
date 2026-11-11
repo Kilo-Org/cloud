@@ -1,25 +1,28 @@
 import 'server-only';
 import { sql } from 'drizzle-orm';
+import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createClaudeUserProfile } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import {
   claudeBillingOwnerKey,
-  getClaudeBillingConnectionIncludingRemoved,
   getGrantedClaudeBillingConnection,
   insertClaudeBillingProfile,
   type ClaudeBillingOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import { cleanupRemovedClaudeProfilesForUser } from '@/lib/claude-billing/delete';
 
 /**
- * The owner's Anthropic user profile, created once and reused after that. The
- * profile is how Anthropic knows which customer a billed request is for, and
- * `POST /v1/user_profiles` creates a new profile on every call, so a
- * per-owner advisory lock keeps two concurrent connects from creating two.
+ * Resolves the Anthropic user profile for an OAuth link attempt. An active or
+ * pending scope reuses its profile; an unlinked scope gets a fresh profile so a
+ * person can link different Claude organizations across scopes.
  */
 export async function ensureClaudeBillingProfile(
   owner: ClaudeBillingOwner,
   createdBy: string
-): Promise<string> {
+): Promise<{ userProfileId: string; connectionVersion: string }> {
+  await cleanupRemovedClaudeProfilesForUser(createdBy, { limit: 3, timeoutMs: 3_000 }).catch(
+    () => undefined
+  );
   const lockKey = claudeBillingOwnerKey(owner);
 
   return await db.transaction(async tx => {
@@ -27,13 +30,12 @@ export async function ensureClaudeBillingProfile(
       sql`select pg_advisory_xact_lock(hashtext(${`claude_billing_profile:${lockKey}`}))`
     );
     const active = await getGrantedClaudeBillingConnection(owner, tx);
-    if (active) return active.user_profile_id;
-
-    const previous = await getClaudeBillingConnectionIncludingRemoved(owner, tx);
-    if (previous) return previous.user_profile_id;
+    if (active && active.status !== ClaudeBillingConnectionStatus.Removed) {
+      return { userProfileId: active.user_profile_id, connectionVersion: active.updated_at };
+    }
 
     const userProfileId = await createClaudeUserProfile();
     const row = await insertClaudeBillingProfile(owner, userProfileId, createdBy, tx);
-    return row.user_profile_id;
+    return { userProfileId: row.user_profile_id, connectionVersion: row.updated_at };
   });
 }

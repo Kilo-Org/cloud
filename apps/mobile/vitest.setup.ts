@@ -61,6 +61,7 @@ vi.mock('expo-background-task', () => ({
 vi.mock('react-native-keyboard-controller', () => ({
   KeyboardProvider: 'KeyboardProvider',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
+  KeyboardAwareScrollView: 'KeyboardAwareScrollView',
   KeyboardChatScrollView: 'KeyboardChatScrollView',
   useWindowDimensions: () => ({ width: 400, height: 800 }),
   useKeyboardState: (selector?: (state: KeyboardStateSnapshot) => unknown) => {

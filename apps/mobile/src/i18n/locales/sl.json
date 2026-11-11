@@ -4152,6 +4152,7 @@
       "namePlaceholder": "Moj agent",
       "promptPlaceholder": "ti si ...",
       "tools": "Orodja",
+      "wholeToolRule": "Ta agent uporabi eno pravilo za vsa orodja hkrati: {{rule}}. Ta stikala so samo za branje.",
       "visibility": "Vidnost",
       "visibilityPrimary": "Primarno — prikazano v izbirniku",
       "visibilitySubagent": "Subagent — na klic samo od drugih",
@@ -4193,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Privzeti profili za skladišča",
+      "entryLabel": "Privzeti profili",
       "add": "Dodaj privzeto",
       "empty": "Privzete nastavitve niso konfigurirane",
       "emptyDescription": "Dodajte privzeto za samodejno uporabo profila ob zagonu sej za repo.",

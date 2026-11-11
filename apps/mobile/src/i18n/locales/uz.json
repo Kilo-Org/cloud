@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Mening agentim",
       "promptPlaceholder": "Siz ...",
       "tools": "Asboblar",
+      "wholeToolRule": "Bu agent bir vaqtning o'zida har bir asbobga bitta qoidani qo'llaydi: {{rule}}. Bu almashtirgichlar faqat o'qish uchun.",
       "visibility": "Ko'rinish",
       "visibilityPrimary": "Asosiy — tanlovchida ko'rsatilgan",
       "visibilitySubagent": "Subagent — faqat boshqalar tomonidan chaqirilishi mumkin",
@@ -4069,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Repos uchun standart profillar",
+      "entryLabel": "Standart profillar",
       "add": "Standart qo‘shish",
       "empty": "Hech qanday standart sozlanmagan",
       "emptyDescription": "Repo uchun seanslarni boshlashda profilni avtomatik ravishda qo'llash uchun standartni qo'shing.",

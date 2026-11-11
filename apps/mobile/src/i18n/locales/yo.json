@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Aṣoju mi",
       "promptPlaceholder": "Iwọ jẹ ...",
       "tools": "Awọn irinṣẹ",
+      "wholeToolRule": "Aṣojú yìí ń lo òfin kan sí gbogbo irinṣẹ lẹ́ẹ̀kan náà: {{rule}}. Àwọn swíṣì wọ̀nyí kìkì fún kíkà nìkan.",
       "visibility": "Hihan",
       "visibilityPrimary": "Alakoko — ti o han ni oluka",
       "visibilitySubagent": "Subagent — nikan callable lati elomiran",
@@ -4068,7 +4069,8 @@
       "duplicateName": "Aṣẹ miiran ti o ni orukọ yẹn wa ninu profaili yii tẹlẹ"
     },
     "repoBindings": {
-      "title": "Awọn profaili Aiyipada fun Repos",
+      "title": "Awọn profaili aiyipada fun Repos",
+      "entryLabel": "Awọn profaili aiyipada",
       "add": "Fi aiyipada kun",
       "empty": "Ko si awọn atunto aiyipada",
       "emptyDescription": "Ṣafikun aiyipada lati kan profaili laifọwọyi nigbati o bẹrẹ awọn akoko fun atunto kan.",

@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Taku Kaihoko",
       "promptPlaceholder": "He...",
       "tools": "Utauta",
+      "wholeToolRule": "Ka whakahāngai tēnei māngai i tētahi ture ki ngā utauta katoa i te wā kotahi: {{rule}}. He pānui anake ēnei whakakā.",
       "visibility": "Tirohanga",
       "visibilityPrimary": "Tuatahi — ka whakaatuhia ki te kaikokoti",
       "visibilitySubagent": "Subagent — ka taea anake te waea mai i etahi atu",
@@ -4068,7 +4069,8 @@
       "duplicateName": "Kua whakamahia tēnei ingoa e tētahi atu whakahau i tēnei kōtaha"
     },
     "repoBindings": {
-      "title": "Kōtaha Taunoa mō Repos",
+      "title": "Kōtaha taunoa mō Repos",
+      "entryLabel": "Kōtaha taunoa",
       "add": "Tāpiri taunoa",
       "empty": "Karekau he taunoa i whirihora",
       "emptyDescription": "Tāpirihia he taunoa ki te tono aunoa i tetahi kōtaha i te wa e tiimata ana nga huihuinga mo te repo.",

@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Wakala Wangu",
       "promptPlaceholder": "Wewe ni...",
       "tools": "Zana",
+      "wholeToolRule": "Wakala huyu hutumia kanuni moja kwa kila zana kwa wakati mmoja: {{rule}}. Swichi hizi ni za kusoma tu.",
       "visibility": "Mwonekano",
       "visibilityPrimary": "Msingi — imeonyeshwa kwenye kiteua",
       "visibilitySubagent": "Subagent — inaitwa tu kutoka kwa wengine",
@@ -4068,7 +4069,8 @@
       "duplicateName": "Jina hilo tayari limehifadhiwa na amri nyingine katika wasifu huu"
     },
     "repoBindings": {
-      "title": "Profaili Chaguomsingi za Repos",
+      "title": "Profaili chaguomsingi za Repos",
+      "entryLabel": "Profaili chaguomsingi",
       "add": "Ongeza chaguomsingi",
       "empty": "Hakuna chaguo-msingi zilizosanidiwa",
       "emptyDescription": "Ongeza chaguomsingi ili kutumia wasifu kiotomatiki unapoanzisha vipindi vya repo.",

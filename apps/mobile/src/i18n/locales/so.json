@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Wakiilkayga",
       "promptPlaceholder": "Waxaad tahay...",
       "tools": "Qalabka",
+      "wholeToolRule": "Wakiilkan waxa uu hal xeer isku mar ku dabaqaa qalab kasta: {{rule}}. Beddelladan waa akhris-kaliya.",
       "visibility": "Muuqashada",
       "visibilityPrimary": "Aasaasiga ah — oo lagu muujiyay dooriyaha",
       "visibilitySubagent": "Subagent — kaliya kuwa kale looga yeeri karo",
@@ -4069,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Profile-ka ugu tala galay Repos",
+      "entryLabel": "Profile-ka ugu tala galay",
       "add": "Kudar default",
       "empty": "Ma jiro wax khalad ah oo la habeeyey",
       "emptyDescription": "Ku dar default si toos ah u codso profile marka la bilaabayo fadhiyada repo.",

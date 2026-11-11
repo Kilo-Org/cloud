@@ -4034,6 +4034,7 @@
       "namePlaceholder": "Ny mpandraharahako",
       "promptPlaceholder": "Ianao dia...",
       "tools": "Fitaovana",
+      "wholeToolRule": "Ity agent ity dia mampihatra fitsipika iray amin'ny fitaovana rehetra indray mandeha: {{rule}}. Vakiana fotsiny ireo mpifamadihana ireo.",
       "visibility": "Fahitana",
       "visibilityPrimary": "Kilonga — aseho ao amin'ny mpanangona",
       "visibilitySubagent": "Subagent — azo antsoina amin'ny hafa ihany",
@@ -4074,7 +4075,8 @@
       "duplicateName": "Efa misy baiko mitondra io anarana io ao amin'ity profil ity"
     },
     "repoBindings": {
-      "title": "Profiles Default ho an'ny Repos",
+      "title": "Profiles default ho an'ny Repos",
+      "entryLabel": "Profil default",
       "add": "Ampio ny default",
       "empty": "Tsy misy default voarindra",
       "emptyDescription": "Manampia default hampihatra ho azy ny mombamomba rehefa manomboka fivoriana ho an'ny repo.",

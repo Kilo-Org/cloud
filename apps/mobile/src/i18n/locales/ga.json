@@ -4214,6 +4214,7 @@
       "namePlaceholder": "Mo Ghníomhaire",
       "promptPlaceholder": "Is duine thú...",
       "tools": "Uirlisí",
+      "wholeToolRule": "Cuireann an gníomhaire seo riail amháin i bhfeidhm ar gach uirlis ag an am céanna: {{rule}}. Tá na lasca seo inléite amháin.",
       "visibility": "Infheictheacht",
       "visibilityPrimary": "Bunscoile — a thaispeántar sa roghnóir",
       "visibilitySubagent": "Fo-ghníomhaire — inghlaoite ó dhaoine eile amháin",
@@ -4254,7 +4255,8 @@
       "duplicateName": "Tá an t-ainm sin in úsáid ag ordú eile sa phróifíl seo"
     },
     "repoBindings": {
-      "title": "Próifílí Réamhshocraithe le haghaidh Repos",
+      "title": "Próifílí réamhshocraithe le haghaidh Repos",
+      "entryLabel": "Próifílí réamhshocraithe",
       "add": "Cuir réamhshocraithe leis",
       "empty": "Níl aon réamhshocruithe cumraithe",
       "emptyDescription": "Cuir réamhshocrú leis chun próifíl a chur i bhfeidhm go huathoibríoch agus seisiúin á gcur ar bun le haghaidh repo.",

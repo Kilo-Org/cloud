@@ -4028,6 +4028,7 @@
       "namePlaceholder": "我的代理",
       "promptPlaceholder": "你是一个...",
       "tools": "工具",
+      "wholeToolRule": "此智能体会同时对每个工具应用一条规则：{{rule}}。这些开关为只读状态。",
       "visibility": "可见性",
       "visibilityPrimary": "主代理 — 显示在选择器中",
       "visibilitySubagent": "子代理 — 仅可由其他代理调用",
@@ -4069,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "仓库的默认配置文件",
+      "entryLabel": "默认配置",
       "add": "添加默认值",
       "empty": "没有配置默认值",
       "emptyDescription": "添加默认值以在启动仓库会话时自动应用配置文件。",

@@ -1,6 +1,7 @@
 import 'server-only';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { appendAnthropicBetaHeader } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/beta-header';
+import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type {
   GatewayChatApiKind,
@@ -141,6 +142,7 @@ export function buildClaudeBillingProvider(
       context.extraHeaders['anthropic-version'] ??= ANTHROPIC_VERSION;
       appendAnthropicBetaHeader(context.extraHeaders, OAUTH_API_BETA);
       appendAnthropicBetaHeader(context.extraHeaders, CLAUDE_BILLING_BETA);
+      dropThinkingBlocksOnPrefixMismatch(context);
       context.extraHeaders['anthropic-user-profile-id'] = userProfileId;
       markBilled(context.request.body, upstreamModel);
     },

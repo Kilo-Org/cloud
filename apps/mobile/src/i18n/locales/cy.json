@@ -4276,6 +4276,7 @@
       "namePlaceholder": "Fy Asiant",
       "promptPlaceholder": "Rydych chi'n ...",
       "tools": "Offer",
+      "wholeToolRule": "Mae'r asiant hwn yn cymhwyso un rheol i bob offeryn ar unwaith: {{rule}}. Mae'r switshis hyn yn ddarllen yn unig.",
       "visibility": "Gwelededd",
       "visibilityPrimary": "Cynradd — a ddangosir yn y codwr",
       "visibilitySubagent": "Subagent — dim ond ei alw gan eraill",
@@ -4316,7 +4317,8 @@
       "duplicateName": "Mae gorchymyn gyda'r enw hwn eisoes yn bodoli yn y proffil hwn"
     },
     "repoBindings": {
-      "title": "Proffiliau Rhagosodedig ar gyfer Repos",
+      "title": "Proffiliau rhagosodedig ar gyfer Repos",
+      "entryLabel": "Proffiliau rhagosodedig",
       "add": "Ychwanegu rhagosodiad",
       "empty": "Dim rhagosodiadau wedi'u ffurfweddu",
       "emptyDescription": "Ychwanegu rhagosodiad i gymhwyso proffil yn awtomatig wrth gychwyn sesiynau ar gyfer repo.",

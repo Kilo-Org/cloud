@@ -8926,14 +8926,15 @@ describe('createSessionManager', () => {
       latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_post_clear', sessionID: 'ses-1' }));
       mockSessionCallbacks.onReplayComplete?.();
 
-      // The successful send left its optimistic row (a `msg_<hex>…` id sorts
-      // before any `msg_p…`), plus the replayed pre- and post-clear history.
+      // The successful send left its optimistic row, stamped with the device
+      // clock, so it is the newest row and closes the transcript. The replayed
+      // pre- and post-clear rows share the stored epoch time and keep id order.
       const ids = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(
         m => m.info.id
       );
       expect(ids).toHaveLength(3);
-      expect(ids[0]).toMatch(/^msg_[0-9a-f]{12}/);
-      expect(ids.slice(1)).toEqual(['msg_post_clear', 'msg_pre_clear']);
+      expect(ids.slice(0, 2)).toEqual(['msg_post_clear', 'msg_pre_clear']);
+      expect(ids[2]).toMatch(/^msg_[0-9a-f]{12}/);
     });
 
     it('re-sets marker on a second /clear after send so reconnect purges again', async () => {
@@ -9860,6 +9861,47 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     const reopened = config.store.get(mgr.atoms.messagesList).map(row => row.info.id);
     expect(reopened).toContain('a-reply');
     expect(reopened.indexOf('z-prompt')).toBeLessThan(reopened.indexOf('a-reply'));
+    mgr.destroy();
+  });
+
+  it('orders a stored transcript by creation time and keeps an older page above the loaded rows', async () => {
+    // A stored session whose ids descend while the clock rises. The store keeps
+    // ids in id order, so the transcript used to read newest-first.
+    const row = (id: string, text: string, created: number) => ({
+      info: stubUserMessage({
+        id,
+        sessionID: 'ses-1',
+        time: { created },
+        agent: 'build',
+        model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+      }),
+      parts: [stubTextPart({ id: `${id}-text`, sessionID: 'ses-1', messageID: id, text })],
+    });
+    const fetchSnapshotPage = createPageFetchMock(async (_id, options) =>
+      options.cursor
+        ? makePage({
+            messages: [row('msg_z_old', 'Older prompt', 10), row('msg_a_old', 'Older reply', 20)],
+            nextCursor: null,
+          })
+        : makePage({
+            messages: [row('msg_z_new', 'Newest prompt', 30), row('msg_a_new', 'Newest reply', 40)],
+            nextCursor: 'opaque-older',
+          })
+    );
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(config.store.get(mgr.atoms.messagesList).map(entry => entry.info.id)).toEqual([
+      'msg_z_new',
+      'msg_a_new',
+    ]);
+    await mgr.loadOlderMessages();
+    expect(config.store.get(mgr.atoms.messagesList).map(entry => entry.info.id)).toEqual([
+      'msg_z_old',
+      'msg_a_old',
+      'msg_z_new',
+      'msg_a_new',
+    ]);
     mgr.destroy();
   });
 

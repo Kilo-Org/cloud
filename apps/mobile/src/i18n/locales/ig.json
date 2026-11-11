@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Onye nnọchi anya m",
       "promptPlaceholder": "Ị bụ onye...",
       "tools": "Ngwa",
+      "wholeToolRule": "Onye nnọchite anya a na-etinye otu iwu n'ọrụ na ngwa ọ bụla n'otu oge: {{rule}}. Mgbanwe ndị a bụ naanị maka ịgụ.",
       "visibility": "Nhụta",
       "visibilityPrimary": "Primary — gosiri na onye na-ahọrọ",
       "visibilitySubagent": "Onye nnọchi anya inyeaka — naanị ndị ọzọ nwere ike ịkpọ",
@@ -4069,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Profaịlụ ndabara maka ebe nchekwa",
+      "entryLabel": "Profaịlụ ndabara",
       "add": "Tinye ndabara",
       "empty": "Ọ nweghị ndabara ahaziri",
       "emptyDescription": "Tinye ndabara ka itinye profaịlụ na-akpaghị aka mgbe ịmalite nnọkọ maka repo.",

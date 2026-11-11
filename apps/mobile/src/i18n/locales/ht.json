@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Ajan mwen an",
       "promptPlaceholder": "Ou se yon...",
       "tools": "Zouti",
+      "wholeToolRule": "Ajan sa a aplike yon sèl règ sou chak zouti an menm tan: {{rule}}. Switch sa yo se lekti sèlman.",
       "visibility": "Vizibilite",
       "visibilityPrimary": "Prensipal — yo montre nan seleksyon an",
       "visibilitySubagent": "Subagent — sèlman rele nan men lòt moun",
@@ -4068,7 +4069,8 @@
       "duplicateName": "Yon kòmandman ki gen non sa a deja egziste nan pwofil sa a"
     },
     "repoBindings": {
-      "title": "Default Profiles pou Repos",
+      "title": "Default profiles pou Repos",
+      "entryLabel": "Pwofil default",
       "add": "Ajoute default",
       "empty": "Pa gen par défaut configuré",
       "emptyDescription": "Ajoute yon default pou aplike otomatikman yon pwofil lè w kòmanse sesyon yo pou yon repo.",

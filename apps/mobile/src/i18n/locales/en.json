@@ -4095,6 +4095,7 @@
       "namePlaceholder": "My Agent",
       "promptPlaceholder": "You are a ...",
       "tools": "Tools",
+      "wholeToolRule": "This agent applies one rule for every tool at once: {{rule}}. These switches are read-only.",
       "visibility": "Visibility",
       "visibilityPrimary": "Primary — shown in the picker",
       "visibilitySubagent": "Subagent — only callable from others",
@@ -4135,7 +4136,8 @@
       "duplicateName": "A command with this name already exists in this profile"
     },
     "repoBindings": {
-      "title": "Default Profiles for Repos",
+      "title": "Default profiles for repos",
+      "entryLabel": "Default profiles",
       "add": "Add default",
       "empty": "No defaults configured",
       "emptyDescription": "Add a default to automatically apply a profile when starting sessions for a repo.",

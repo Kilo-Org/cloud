@@ -4028,6 +4028,7 @@
       "namePlaceholder": "My agent",
       "promptPlaceholder": "Jy is 'n...",
       "tools": "Gereedskap",
+      "wholeToolRule": "Hierdie agent pas een reël gelyktydig op alle gereedskap toe: {{rule}}. Hierdie skakelaars is slegs-lees.",
       "visibility": "Sigbaarheid",
       "visibilityPrimary": "Primêr — gewys in die kieser",
       "visibilitySubagent": "Subagent — slegs oproepbaar vanaf ander",
@@ -4069,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Verstekprofiele vir Repos",
+      "entryLabel": "Verstekprofiele",
       "add": "Voeg verstek by",
       "empty": "Geen verstekke opgestel nie",
       "emptyDescription": "Voeg 'n verstek by om 'n profiel outomaties toe te pas wanneer sessies vir 'n repo begin.",

@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Umboðsmaður minn",
       "promptPlaceholder": "Þú ert a...",
       "tools": "Verkfæri",
+      "wholeToolRule": "Þessi agent beitir einni reglu á öll verkfæri í einu: {{rule}}. Þessir rofar eru skrifvarðir.",
       "visibility": "Skyggni",
       "visibilityPrimary": "Aðal — sýnt í veljarann",
       "visibilitySubagent": "Subagent — aðeins hægt að hringja frá öðrum",
@@ -4069,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Sjálfgefin snið fyrir geymslur",
+      "entryLabel": "Sjálfgefin snið",
       "add": "Bæta við sjálfgefnu",
       "empty": "Engar sjálfgefnar stillingar",
       "emptyDescription": "Bættu við sjálfgefnu til að nota prófíl sjálfkrafa þegar þú byrjar lotur fyrir geymslu.",

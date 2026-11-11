@@ -4090,6 +4090,7 @@
       "namePlaceholder": "El meu agent",
       "promptPlaceholder": "Ets un...",
       "tools": "Eines",
+      "wholeToolRule": "Aquest agent aplica una regla a cada eina alhora: {{rule}}. Aquests interruptors són de només lectura.",
       "visibility": "Visibilitat",
       "visibilityPrimary": "Principal — es mostra al selector",
       "visibilitySubagent": "Subagent — només es pot trucar des d'altres",
@@ -4131,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Perfils predeterminats per a Repos",
+      "entryLabel": "Perfils predeterminats",
       "add": "Afegeix per defecte",
       "empty": "No s'ha configurat cap valor predeterminat",
       "emptyDescription": "Afegiu un valor predeterminat per aplicar automàticament un perfil quan inicieu sessions per a un repo.",

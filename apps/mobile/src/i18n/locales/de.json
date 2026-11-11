@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Mein Agent",
       "promptPlaceholder": "Du bist ein...",
       "tools": "Werkzeuge",
+      "wholeToolRule": "Dieser Agent wendet eine Regel gleichzeitig auf jedes Werkzeug an: {{rule}}. Diese Schalter sind schreibgeschützt.",
       "visibility": "Sichtweite",
       "visibilityPrimary": "Primär — wird im Picker angezeigt",
       "visibilitySubagent": "Subagent — nur von anderen aufrufbar",
@@ -4069,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Standardprofile für Repos",
+      "entryLabel": "Standardprofile",
       "add": "Standard hinzufügen",
       "empty": "Keine Standardeinstellungen konfiguriert",
       "emptyDescription": "Füge einen Standard hinzu, um beim Starten von Sitzungen für ein Repo automatisch ein Profil anzuwenden.",

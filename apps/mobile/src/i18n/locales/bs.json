@@ -4090,6 +4090,7 @@
       "namePlaceholder": "Moj agent",
       "promptPlaceholder": "ti si...",
       "tools": "Alati",
+      "wholeToolRule": "Ovaj agent primjenjuje jedno pravilo na sve alate odjednom: {{rule}}. Ovi prekidači su samo za čitanje.",
       "visibility": "Vidljivost",
       "visibilityPrimary": "Primarni — prikazano u biraču",
       "visibilitySubagent": "Subagent — može se pozvati samo od drugih",
@@ -4131,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Zadani profili za Repos",
+      "entryLabel": "Zadani profili",
       "add": "Dodaj zadano",
       "empty": "Nema konfiguriranih zadanih postavki",
       "emptyDescription": "Dodajte zadano za automatsku primjenu profila pri pokretanju sesija za repo.",

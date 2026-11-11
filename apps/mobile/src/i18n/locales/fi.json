@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Agenttini",
       "promptPlaceholder": "Olet...",
       "tools": "Työkalut",
+      "wholeToolRule": "Tämä agentti soveltaa yhtä sääntöä kaikkiin työkaluihin kerralla: {{rule}}. Nämä kytkimet ovat vain luku -tilassa.",
       "visibility": "Näkyvyys",
       "visibilityPrimary": "Ensisijainen — näkyy valitsimessa",
       "visibilitySubagent": "Aliagentti — vain muiden kutsuttavissa",
@@ -4069,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Koodivarastojen oletusprofiilit",
+      "entryLabel": "Profiilin oletukset",
       "add": "Lisää oletusprofiili",
       "empty": "Ei määritettyjä oletusprofiileja",
       "emptyDescription": "Lisää oletusprofiili, joka ottaa profiilin käyttöön automaattisesti, kun koodivarastolle aloitetaan istuntoja.",

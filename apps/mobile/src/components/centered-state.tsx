@@ -107,10 +107,17 @@ export function CenteredState({
   // first mount paints where it will be measured instead of at the pending
   // centering and then lifting when the surface arrives.
   const liveFrame = surface?.frame ?? null;
-  const frame = useMemo(
-    () => liveFrame ?? { top: 0, bottom: windowSize.height },
-    [liveFrame, windowSize.height]
-  );
+  // Measured bands carry sub-pixel noise: a re-measure of the same layout can
+  // report a different fraction of a point, and a placement derived from it
+  // moves the state by a pixel for no visual reason. Round the band to whole
+  // pixels so repeated measurements of one layout place the state identically.
+  const frame = useMemo(() => {
+    const band = liveFrame ?? { top: 0, bottom: windowSize.height };
+    return {
+      top: PixelRatio.roundToNearestPixel(band.top),
+      bottom: PixelRatio.roundToNearestPixel(band.bottom),
+    };
+  }, [liveFrame, windowSize.height]);
   const topInset = surface?.frame ? surface.topInset : 0;
   const bottomInset = surface?.frame ? surface.bottomInset : (surface?.bottomReservation ?? 0);
   const boundsBottom = surface?.frame ? surface.bounds?.bottom : frame.bottom;
@@ -149,8 +156,14 @@ export function CenteredState({
       if (request !== requestRef.current) {
         return;
       }
-      const bottom = top + height;
-      if (height <= 0 || !Number.isFinite(top) || !Number.isFinite(bottom)) {
+      const measuredTop = PixelRatio.roundToNearestPixel(top);
+      const measuredBottom = PixelRatio.roundToNearestPixel(top + height);
+      if (
+        height <= 0 ||
+        !Number.isFinite(measuredTop) ||
+        !Number.isFinite(measuredBottom) ||
+        measuredBottom <= measuredTop
+      ) {
         setViewport(null);
         return;
       }
@@ -158,10 +171,13 @@ export function CenteredState({
         previous !== null &&
         previous.surface.top === frame.top &&
         previous.surface.bottom === frame.bottom &&
-        previous.frame.top === top &&
-        previous.frame.bottom === bottom
+        previous.frame.top === measuredTop &&
+        previous.frame.bottom === measuredBottom
           ? previous
-          : { surface: { top: frame.top, bottom: frame.bottom }, frame: { top, bottom } }
+          : {
+              surface: { top: frame.top, bottom: frame.bottom },
+              frame: { top: measuredTop, bottom: measuredBottom },
+            }
       );
     });
   }, [frame]);

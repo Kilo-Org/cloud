@@ -66,6 +66,22 @@ function assistantInfoWithoutError(): MessageInfo {
   return info;
 }
 
+/** One catalog value by its dotted path, from a loaded catalog object. */
+function catalogString(catalog: unknown, path: string): string {
+  let value: unknown = catalog;
+  for (const key of path.split('.')) {
+    if (value === null || typeof value !== 'object') {
+      value = undefined;
+      break;
+    }
+    value = (value as Record<string, unknown>)[key];
+  }
+  if (typeof value !== 'string') {
+    throw new TypeError(`no catalog string at ${path}`);
+  }
+  return value;
+}
+
 describe('selectMessageFailure', () => {
   it('returns null when there is no failed delivery and no assistant error', () => {
     expect(selectMessageFailure({ info: userInfo() })).toBeNull();
@@ -133,6 +149,39 @@ describe('selectMessageFailure', () => {
       expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
       expect(result?.canRetry).toBe(true);
       expect(result?.canCopy).toBe(true);
+    });
+
+    it('states the balance that refused the send, with Add credits and no Retry', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      });
+      expect(result).not.toBeNull();
+      expect(result?.kind).toBe('delivery');
+      // The send never left, so the statement sits under the person's own bubble.
+      expect(result?.side).toBe('user');
+      expect(result?.error).toBe(true);
+      expect(result?.title).toBe('Not enough credits to send this message.');
+      // The action under it carries the recovery; a detail line would repeat the
+      // cause the title already names.
+      expect(result?.detailKey).toBeNull();
+      expect(result?.detail).toBeNull();
+      expect(result?.copyDetail).toBe('');
+      // A re-send meets the same balance, so the row offers the action that
+      // settles it instead of a Retry.
+      expect(result?.canRetry).toBe(false);
+      expect(result?.canAddCredits).toBe(true);
+      expect(result?.canCopy).toBe(true);
+    });
+
+    it('offers Add credits on a refused send even where a re-send is impossible', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: '', reason: 'credits' },
+        retryAvailable: false,
+      });
+      expect(result?.canRetry).toBe(false);
+      expect(result?.canAddCredits).toBe(true);
     });
 
     it('exposes no copy detail when the delivery failure carries no transport text', () => {
@@ -228,6 +277,10 @@ describe('selectMessageFailure', () => {
 
       expect(result?.detailKey).toBe('agentChat.messageFailure.assistantCreditsRefusal');
       expect(result?.detail).toBe(i18n.t('agentChat.messageFailure.assistantCreditsRefusal'));
+      expect(result?.detail).toBe('Not enough credits for this request.');
+      // A session can run anywhere, so the statement never names the execution
+      // surface the account did not choose.
+      expect(result?.detail).not.toContain('Cloud Agent');
       expect(result?.canAddCredits).toBe(true);
       // The same request meets the same block, so the row keeps no resend.
       expect(result?.canRetry).toBe(false);
@@ -360,21 +413,6 @@ describe('messageFailureLabel', () => {
   const ADJACENT_TERMINATORS = /[\p{Sentence_Terminal}\u2026]{2}/u;
   const PLACEHOLDER = '{{title}}';
 
-  function catalogString(catalog: unknown, path: string): string {
-    let value: unknown = catalog;
-    for (const key of path.split('.')) {
-      if (value === null || typeof value !== 'object') {
-        value = undefined;
-        break;
-      }
-      value = (value as Record<string, unknown>)[key];
-    }
-    if (typeof value !== 'string') {
-      throw new TypeError(`no catalog string at ${path}`);
-    }
-    return value;
-  }
-
   it('states the failure once, in one terminator, in every catalog', async () => {
     try {
       for (const language of SUPPORTED_LANGUAGES) {
@@ -473,5 +511,51 @@ describe('composeFailureLabel', () => {
     expect(composeFailureLabel('تعذّر تسليم الرسالة.', 'خطأ: {{title}}.')).toBe(
       'خطأ: تعذّر تسليم الرسالة.'
     );
+  });
+});
+
+/**
+ * The gateway's credits refusal reaches a session that runs in the cloud and one
+ * that runs on a computer the person connected, so the statement names the
+ * account's credits for the request and never the surface the person did not
+ * choose. Every language is checked: a translator works from the key name and
+ * its context, and one locale that keeps the old product name would state the
+ * wrong cause on the rows of that language.
+ */
+describe('credits refusal copy', () => {
+  const CREDITS_KEYS = [
+    'agentChat.messageFailure.assistantCreditsRefusal',
+    'agentChat.session.notEnoughCredits',
+  ] as const;
+
+  it('names no execution surface in any catalog', async () => {
+    try {
+      for (const language of SUPPORTED_LANGUAGES) {
+        // The active language is one piece of global i18next state, so each
+        // catalog has to be measured before the next one is selected.
+        // eslint-disable-next-line no-await-in-loop
+        await i18n.changeLanguage(language);
+        const catalog: unknown = CATALOG_LOADERS[language]();
+        for (const key of CREDITS_KEYS) {
+          expect(catalogString(catalog, key), `${language} ${key}`).not.toContain('Cloud Agent');
+        }
+      }
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
+  it('states the cause for the request in the language the finding reported', async () => {
+    try {
+      await i18n.changeLanguage('pt-BR');
+      expect(i18n.t('agentChat.messageFailure.assistantCreditsRefusal')).toBe(
+        'Créditos insuficientes para esta solicitação.'
+      );
+      expect(i18n.t('agentChat.session.notEnoughCredits')).toBe(
+        'Créditos insuficientes para esta solicitação. Adicione créditos e tente novamente.'
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

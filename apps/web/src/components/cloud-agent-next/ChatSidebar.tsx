@@ -40,6 +40,7 @@ import {
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
   getStoredSessionActivityTime,
+  groupSidebarItemsByDate,
   groupSidebarSessionsByDate,
   type SidebarForegroundSessionStatus,
   type SidebarSortPins,
@@ -99,6 +100,7 @@ import {
 } from './workspace-folders';
 import { filterLiveSidebarSessions } from './live-sidebar-sessions';
 import type { ActiveSession } from './hooks/useActiveSessions';
+import { sidebarUpdatedSince } from './hooks/sidebar-queries';
 
 type ChatSidebarProps = {
   sessions: StoredSession[];
@@ -120,7 +122,7 @@ type ChatSidebarProps = {
   workspaceOrder?: WorkspaceOrder;
   workspaceRowsTruncated?: boolean;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
-  onDeleteWorktree?: (worktreeId: string) => void;
+  onDeleteWorktree?: (worktreeId: string, name: string) => void;
   deletingWorktreeIds?: readonly string[];
   isDeletionInProgress?: boolean;
   isInSheet?: boolean;
@@ -398,7 +400,7 @@ function WorktreeGroupRow({
   onOpenWorktree: (group: SidebarWorktreeGroup) => void;
   onCreateWorktreeChat?: (sourceKiloSessionId: string) => void;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
-  onDeleteWorktree?: (worktreeId: string) => void;
+  onDeleteWorktree?: (worktreeId: string, name: string) => void;
   onNewStackedWorkspace?: (
     group: SidebarWorktreeGroup,
     source?: { branch: string; repository: string } | null
@@ -757,7 +759,7 @@ function WorktreeGroupRow({
                         <DropdownMenuItem
                           variant="destructive"
                           disabled={isDeletionInProgress}
-                          onSelect={() => onDeleteWorktree(group.worktreeId)}
+                          onSelect={() => onDeleteWorktree(group.worktreeId, worktreeLabel)}
                         >
                           <Trash2 className="h-4 w-4" />
                           Delete worktree
@@ -1108,23 +1110,45 @@ export function ChatSidebar({
           );
           return { folder, groups };
         }
-        const groups = sortWorkspaceGroups(
-          workspaceDestinations.manual.get(folder.id) ?? [],
-          folder.sortMode
-        );
+        // Regular folders preserve the user's global workspace order.
+        const groups = workspaceDestinations.manual.get(folder.id) ?? [];
         return { folder, groups };
       }),
     [workspaceDestinations, workspaceFolders?.folders]
   );
-  const phase4Ungrouped = workspaceDestinations.unfiled;
+  const phase4Ungrouped = useMemo(() => {
+    if (searchQuery.trim()) return workspaceDestinations.unfiled;
+    const cutoff = new Date(sidebarUpdatedSince(new Date())).getTime();
+    return workspaceDestinations.unfiled.filter(group =>
+      [group.root, ...group.layers].some(row => new Date(row.lastActivityAt).getTime() >= cutoff)
+    );
+  }, [searchQuery, workspaceDestinations.unfiled]);
   const phase4SessionGroups = useMemo(
     () =>
-      dateGroups.flatMap(group => {
-        const items = group.items.filter(item => item.type === 'session');
-        return items.length > 0 ? [{ ...group, items }] : [];
-      }),
-    [dateGroups]
+      groupSidebarSessionsByDate(
+        sessions.filter(session => !session.worktreeId),
+        undefined,
+        {},
+        sortPins
+      ),
+    [sessions, sortPins]
   );
+  const phase4DateGroups = useMemo(() => {
+    const worktrees = phase4Ungrouped.flatMap(group => {
+      const worktree = workspaceGroupsById.get(group.root.worktreeId);
+      return worktree ? [worktree] : [];
+    });
+    return groupSidebarItemsByDate(
+      [...worktrees, ...phase4SessionGroups.flatMap(group => group.items)],
+      undefined,
+      sortPins
+    );
+  }, [phase4SessionGroups, phase4Ungrouped, sortPins, workspaceGroupsById]);
+  const hasStoredRows = hasWorkspaceGroups
+    ? phase4Ungrouped.length > 0 ||
+      phase4SessionGroups.length > 0 ||
+      phase4FolderSections.length > 0
+    : sessions.length > 0 || folderGroups.length > 0;
   const workspaceRootIds = useMemo(
     () => new Set(orderedWorkspaceGroups.map(group => group.root.worktreeId)),
     [orderedWorkspaceGroups]
@@ -1138,17 +1162,27 @@ export function ChatSidebar({
     placement: 'before' | 'after';
   } | null>(null);
 
-  const workspaceGroupsInContainer = useCallback(
-    (folderId: string | null): SidebarWorkspaceGroup[] => {
-      if (folderId === null) return phase4Ungrouped;
-      const folder = workspaceFolders?.folders.find(candidate => candidate.id === folderId);
-      if (!folder) return phase4Ungrouped;
-      if (folder.kind === 'smart' && folder.smartPreset) {
-        return workspaceDestinations.smart.get(folder.smartPreset) ?? [];
+  const getReorderContainer = useCallback(
+    (worktreeId: string) => {
+      if (!hasWorkspaceGroups || !canEditFolders || workspaceOrder !== 'manual') return undefined;
+      if (phase4Ungrouped.some(group => group.root.worktreeId === worktreeId)) {
+        return { folderId: null, groups: workspaceDestinations.unfiled };
       }
-      return workspaceDestinations.manual.get(folder.id) ?? [];
+      const section = phase4FolderSections.find(
+        ({ folder, groups }) =>
+          folder.kind === 'manual' && groups.some(group => group.root.worktreeId === worktreeId)
+      );
+      if (section) return { folderId: section.folder.id, groups: section.groups };
+      return undefined;
     },
-    [phase4Ungrouped, workspaceDestinations, workspaceFolders?.folders]
+    [
+      canEditFolders,
+      hasWorkspaceGroups,
+      phase4FolderSections,
+      phase4Ungrouped,
+      workspaceDestinations.unfiled,
+      workspaceOrder,
+    ]
   );
 
   const rowDropPlacement = useCallback((event: DragEvent<HTMLDivElement>): 'before' | 'after' => {
@@ -1158,52 +1192,35 @@ export function ChatSidebar({
 
   const rowDragOver = useCallback(
     (event: DragEvent<HTMLDivElement>, worktreeId: string) => {
-      if (!hasWorkspaceGroups || dragItem?.type !== 'worktree' || dragItem.id === worktreeId) {
+      const container = getReorderContainer(worktreeId);
+      if (
+        dragItem?.type !== 'worktree' ||
+        dragItem.id === worktreeId ||
+        !container?.groups.some(group => group.root.worktreeId === dragItem.id)
+      ) {
+        setRowDropTarget(null);
         return;
       }
-      const dragged = orderedWorkspaceGroups.find(group => group.root.worktreeId === dragItem.id);
-      const target = orderedWorkspaceGroups.find(group => group.root.worktreeId === worktreeId);
-      if (!dragged || !target) return;
-      const targetFolderId = target.root.folderId ?? null;
-      const draggedFolderId = dragged.root.folderId ?? null;
-      if (targetFolderId !== draggedFolderId) return;
-      const folder = targetFolderId
-        ? workspaceFolders?.folders.find(candidate => candidate.id === targetFolderId)
-        : undefined;
-      if (folder?.kind === 'smart') return;
       event.preventDefault();
       event.stopPropagation();
       event.dataTransfer.dropEffect = 'move';
+      setDropTarget(null);
       setRowDropTarget({ worktreeId, placement: rowDropPlacement(event) });
     },
-    [
-      dragItem,
-      orderedWorkspaceGroups,
-      rowDropPlacement,
-      workspaceFolders?.folders,
-      hasWorkspaceGroups,
-    ]
+    [dragItem, getReorderContainer, rowDropPlacement]
   );
 
   const rowDrop = useCallback(
     (event: DragEvent<HTMLDivElement>, worktreeId: string) => {
-      if (!hasWorkspaceGroups || dragItem?.type !== 'worktree') {
-        setRowDropTarget(null);
-        return;
-      }
-      const draggedId = dragItem.id;
-      const target = orderedWorkspaceGroups.find(group => group.root.worktreeId === worktreeId);
-      const placement = rowDropPlacement(event);
       setRowDropTarget(null);
-      if (!target || draggedId === worktreeId) return;
-      const folderId = target.root.folderId ?? null;
-      const folder = folderId
-        ? workspaceFolders?.folders.find(candidate => candidate.id === folderId)
-        : undefined;
-      if (folder?.kind === 'smart') return;
-      const dragged = orderedWorkspaceGroups.find(group => group.root.worktreeId === draggedId);
-      if (!dragged) return;
-      const container = workspaceGroupsInContainer(folderId).filter(
+      if (dragItem?.type !== 'worktree' || dragItem.id === worktreeId) return;
+      const draggedId = dragItem.id;
+      const reorderContainer = getReorderContainer(worktreeId);
+      const dragged = reorderContainer?.groups.find(group => group.root.worktreeId === draggedId);
+      if (!reorderContainer || !dragged) return;
+      const { folderId } = reorderContainer;
+      const placement = rowDropPlacement(event);
+      const container = reorderContainer.groups.filter(
         group => group.root.worktreeId !== draggedId
       );
       const targetIndex = container.findIndex(group => group.root.worktreeId === worktreeId);
@@ -1233,14 +1250,7 @@ export function ChatSidebar({
       setDragItem(null);
       setDropTarget(null);
     },
-    [
-      dragItem,
-      orderedWorkspaceGroups,
-      rowDropPlacement,
-      workspaceFolders,
-      workspaceGroupsInContainer,
-      hasWorkspaceGroups,
-    ]
+    [dragItem, getReorderContainer, rowDropPlacement, workspaceFolders]
   );
 
   const clearDrag = useCallback(() => {
@@ -1291,6 +1301,7 @@ export function ChatSidebar({
   };
 
   const dragOver = (event: DragEvent<HTMLElement>, target: WorkspaceFolderDropTarget) => {
+    setRowDropTarget(null);
     if (
       !canEditFolders ||
       !getWorkspaceFolderDropAction(
@@ -1384,7 +1395,9 @@ export function ChatSidebar({
           }
         : undefined;
     const dropPlacement =
-      rowDropTarget?.worktreeId === group.worktreeId ? rowDropTarget.placement : null;
+      rowDropTarget?.worktreeId === group.worktreeId && getReorderContainer(group.worktreeId)
+        ? rowDropTarget.placement
+        : null;
     const renderRow = (member: SidebarWorktreeGroup, slots?: StackBaseRowSlots) => (
       <WorktreeGroupRow
         {...slots}
@@ -1687,11 +1700,12 @@ export function ChatSidebar({
         )}
         {isLoading || workspaceFolders?.isFirstLoadPending ? (
           <SidebarListSkeleton />
-        ) : sessions.length === 0 &&
-          liveOnlySessions.length === 0 &&
-          folderGroups.length === 0 &&
-          orderedWorkspaceGroups.length === 0 ? (
-          <div className="text-muted-foreground py-8 text-center text-sm">No sessions yet</div>
+        ) : !hasStoredRows && liveOnlySessions.length === 0 ? (
+          <div className="text-muted-foreground py-8 text-center text-sm">
+            {workspaceGroups?.length
+              ? 'No recent sessions. Use search to find older sessions.'
+              : 'No sessions yet'}
+          </div>
         ) : (
           <>
             {hasWorkspaceGroups && workspaceFolders
@@ -1719,8 +1733,10 @@ export function ChatSidebar({
                       });
                     }}
                     onMove={direction => moveFolder(folder.id, direction)}
-                    onSortModeChange={sortMode =>
-                      void workspaceFolders.setFolderSortMode(folder.id, sortMode)
+                    onSortModeChange={
+                      folder.kind === 'smart'
+                        ? sortMode => void workspaceFolders.setFolderSortMode(folder.id, sortMode)
+                        : undefined
                     }
                     onDragStart={event => startDrag(event, { type: 'folder', id: folder.id })}
                     onDragEnd={clearDrag}
@@ -1829,27 +1845,38 @@ export function ChatSidebar({
                   {phase4FolderSections.length > 0 && phase4Ungrouped.length === 0 && (
                     <p className="text-muted-foreground px-3 py-3 text-xs">Drop workspaces here</p>
                   )}
-                  {phase4Ungrouped.map(renderWorkspaceGroup)}
+                  {workspaceOrder !== 'activity' && phase4Ungrouped.map(renderWorkspaceGroup)}
                   {workspaceRowsTruncated && (
                     <p className="text-muted-foreground px-3 py-2 text-xs">
-                      Showing the first 200 open workspaces. Use search to find older ones.
+                      Workspace list limited to 200. Use search to find more workspaces.
                     </p>
                   )}
-                  {phase4SessionGroups.map((group, groupIdx) => (
-                    <div key={group.label}>
-                      <div
-                        className={cn(
-                          'text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase',
-                          groupIdx === 0 ? 'pt-4' : 'pt-3'
-                        )}
-                      >
-                        {group.label}
+                  {workspaceOrder !== 'activity' &&
+                    phase4Ungrouped.length > 0 &&
+                    phase4SessionGroups.length > 0 && (
+                      <div className="text-muted-foreground px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wider uppercase">
+                        Sessions
                       </div>
-                      {group.items.map(item =>
-                        item.type === 'session' ? renderSession(item.session) : null
-                      )}
-                    </div>
-                  ))}
+                    )}
+                  {(workspaceOrder === 'activity' ? phase4DateGroups : phase4SessionGroups).map(
+                    (group, groupIdx) => (
+                      <div key={group.label}>
+                        <div
+                          className={cn(
+                            'text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase',
+                            groupIdx === 0 ? 'pt-4' : 'pt-3'
+                          )}
+                        >
+                          {group.label}
+                        </div>
+                        {group.items.map(item =>
+                          item.type === 'session'
+                            ? renderSession(item.session)
+                            : renderWorktree(item)
+                        )}
+                      </div>
+                    )
+                  )}
                 </>
               ) : (
                 <>

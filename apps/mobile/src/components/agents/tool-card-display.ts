@@ -23,6 +23,13 @@ export type ToolDisplay = {
    * transcript row skips them.
    */
   translatable: boolean;
+  /**
+   * Whether the part-detail header shows `title` alone instead of
+   * `<title>: <subtitle>`. Set it when the sheet body renders the subtitle
+   * itself: the file chip already names the sent file, so the header repeating
+   * the name adds nothing.
+   */
+  headerTitleOnly?: boolean;
 };
 
 function countResultRows(output: string, kind: 'grep' | 'glob'): number {
@@ -184,6 +191,34 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
           ? getDirectoryName(cloudAgentFileLabel(resolvedPath))
           : i18n.t('agentChat.toolCard.toolList'),
         translatable: resolvedPath !== '',
+      };
+    }
+    case 'send_file': {
+      // The attachment names the file once the delivery completes; until then
+      // the input path is the only name the call carries.
+      const attachmentName = getToolFileAttachments(part)[0]?.filename ?? '';
+      const path = fields.filePath ?? fields.path;
+      const pathName = path ? getFilename(cloudAgentFileLabel(path)) : '';
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty attachment name must fall through to the input path; ?? would keep the blank
+      const name = attachmentName || pathName;
+      const subtitle = name === '' ? undefined : name;
+      // Only a finished call reports the outcome. A call that is still running,
+      // or that failed, carries the tool's own action label, like the read,
+      // edit and write rows, so it never claims a delivery that did not happen.
+      if (status !== 'completed') {
+        return {
+          title: i18n.t('agentChat.toolCard.toolSendFileAction'),
+          subtitle,
+          translatable: name !== '',
+        };
+      }
+      return {
+        title: i18n.t('agentChat.toolCard.toolSendFile'),
+        subtitle,
+        translatable: name !== '',
+        // The sheet body's file chip already names the file, so the header
+        // shows this label alone rather than repeating the name below it.
+        headerTitleOnly: true,
       };
     }
     case 'patch':

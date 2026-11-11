@@ -14,6 +14,7 @@ import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { isEligibleForPlatformAdmin, platformAdminDomains } from '@/lib/admin/platform-admin';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
 import {
   user_admin_notes,
@@ -48,6 +49,7 @@ import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances
 import { adminKiloclawVersionsRouter } from '@/routers/admin-kiloclaw-versions-router';
 import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-router';
 import { adminKiloclawProvidersRouter } from '@/routers/admin-kiloclaw-providers-router';
+import { adminKiloclawStripeRenewalsRouter } from '@/routers/admin-kiloclaw-stripe-renewals-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminCloudAgentNextRouter } from '@/routers/admin-cloud-agent-next-router';
@@ -445,7 +447,7 @@ async function assertNotLastUnblockedSuperadmin(
   tx: DrizzleTransaction,
   target: typeof kilocode_users.$inferSelect
 ) {
-  if (!target.is_admin || !target.is_super_admin || target.blocked_reason !== null) return;
+  if (!target.is_admin || !target.is_super_admin || isBlockedAccount(target)) return;
 
   const [result] = await tx
     .select({ value: sql<number>`count(*)::int` })
@@ -454,6 +456,7 @@ async function assertNotLastUnblockedSuperadmin(
       and(
         eq(kilocode_users.is_admin, true),
         eq(kilocode_users.is_super_admin, true),
+        isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason)
       )
     );
@@ -575,7 +578,7 @@ export const adminRouter = createTRPCRouter({
       where: eq(kilocode_users.id, ctx.user.id),
     });
 
-    if (!currentUser || currentUser.blocked_reason !== null || !currentUser.is_admin) {
+    if (!currentUser || isBlockedAccount(currentUser) || !currentUser.is_admin) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
     }
 
@@ -2036,7 +2039,7 @@ export const adminRouter = createTRPCRouter({
             const actor = lockedRows.find(row => row.id === actorId);
             const target = lockedRows.find(row => row.id === targetId);
 
-            if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
+            if (!actor || isBlockedAccount(actor) || !userIsSuperadmin(actor)) {
               throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
             }
 
@@ -2181,7 +2184,7 @@ export const adminRouter = createTRPCRouter({
           const actor = lockedRows.find(row => row.id === actorId);
           const target = lockedRows.find(row => row.id === targetId);
 
-          if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
+          if (!actor || isBlockedAccount(actor) || !userIsSuperadmin(actor)) {
             throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
           }
           if (!target) {
@@ -2865,6 +2868,7 @@ export const adminRouter = createTRPCRouter({
   kiloclawVersions: adminKiloclawVersionsRouter,
   kiloclawRegions: adminKiloclawRegionsRouter,
   kiloclawProviders: adminKiloclawProvidersRouter,
+  kiloclawStripeRenewals: adminKiloclawStripeRenewalsRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
   contributorChampions: contributorChampionsRouter,

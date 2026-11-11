@@ -137,7 +137,7 @@ const config: ExpoConfig = {
   // Keep in lockstep with AGENT_CHANNEL_SPLIT_APP_VERSION in
   // @kilocode/notifications: this is the first build that creates the split
   // agent channels, so older tokens stay on the legacy `agent` channel.
-  version: '1.0.15',
+  version: '1.0.16',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
@@ -168,11 +168,8 @@ const config: ExpoConfig = {
   // usage-description keys (the plugin options below stay as the base Info.plist
   // value). `ios`-nested because only iOS has this catalog: Android defines no
   // per-locale native string file for permission prompts, so its `withLocales`
-  // resolves each tag to nothing by capability rather than by omission. The
-  // location copy spells the app name out: `.lproj` strings are not
-  // build-expanded, so the upstream `$(PRODUCT_NAME)` would render literally
-  // there. The `Localizable.strings` the same bundle resolves is written by
-  // `withAppIntentLocalizations` below, not here.
+  // resolves each tag to nothing by capability rather than by omission.
+  // `withAppIntentLocalizations` writes the same bundle's `Localizable.strings`.
   locales: nativeLocales,
   ios: {
     // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the
@@ -442,21 +439,6 @@ const config: ExpoConfig = {
         image: './assets/images/logo-mark.png',
         backgroundColor: '#FFDD00',
         imageWidth: 100,
-      },
-    ],
-    [
-      'expo-location',
-      {
-        locationWhenInUsePermission:
-          'Allow $(PRODUCT_NAME) to use your location to set up local weather.',
-        // The app requests only foreground location for weather setup.
-        locationAlwaysAndWhenInUsePermission: false,
-        locationAlwaysPermission: false,
-        // Apple requires this key for the library's linked motion APIs, even though Kilo never calls them.
-        motionUsagePermission: PERMISSION_PROMPT_COPY.en.NSMotionUsageDescription,
-        isIosBackgroundLocationEnabled: false,
-        isAndroidBackgroundLocationEnabled: false,
-        isAndroidForegroundServiceEnabled: false,
       },
     ],
     'expo-apple-authentication',

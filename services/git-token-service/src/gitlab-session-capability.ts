@@ -1,10 +1,11 @@
 import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encryption';
 import { z } from 'zod';
 import { hasCanonicalEncryptedValueFormat } from './github-session-capability.js';
-import { GitLabProjectPathSchema, normalizeGitLabInstanceUrl } from './gitlab-url.js';
 import { CURRENT_CAPABILITY_PREFIX } from '@kilocode/worker-utils/scm-capability-contract';
-export { parseGitLabCloneUrl } from './gitlab-url.js';
-export type { GitLabCloneUrlFailureReason, GitLabCloneUrlResult } from './gitlab-url.js';
+import {
+  GitLabProjectPathSchema,
+  normalizeGitLabInstanceUrl,
+} from '@kilocode/worker-utils/gitlab-url';
 
 const BOUND_CAPABILITY_PREFIX = CURRENT_CAPABILITY_PREFIX.gitlab;
 const CAPABILITY_PURPOSE = 'gitlab_scm_session';

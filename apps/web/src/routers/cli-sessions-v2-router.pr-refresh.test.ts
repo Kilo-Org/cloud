@@ -35,11 +35,13 @@ const RAW_CACHE_UPDATED_AT = '2026-01-01 00:00:00.123+00';
 const selectChain = {
   from: jest.fn(),
   leftJoin: jest.fn(),
+  leftJoinLateral: jest.fn(),
   where: jest.fn(),
   limit: jest.fn(),
 };
 selectChain.from.mockReturnValue(selectChain);
 selectChain.leftJoin.mockReturnValue(selectChain);
+selectChain.leftJoinLateral.mockReturnValue(selectChain);
 selectChain.where.mockReturnValue(selectChain);
 const mockLimit = selectChain.limit;
 
@@ -338,6 +340,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   selectChain.from.mockReturnValue(selectChain);
   selectChain.leftJoin.mockReturnValue(selectChain);
+  selectChain.leftJoinLateral.mockReturnValue(selectChain);
   selectChain.where.mockReturnValue(selectChain);
   mockSelect.mockReturnValue(selectChain);
   mockInsert.mockReturnValue({ values: mockInsertValues });

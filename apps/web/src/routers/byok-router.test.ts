@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, beforeEach, afterAll, afterEach } from '@jest/globals';
 import { randomBytes } from 'crypto';
 // Catalog-mode code reads the catalog snapshot through a process-wide cache. Stubbing those reads
-// keeps the cache unfilled for the listSupportedModels test, which inserts its own snapshot.
+// keeps the cache unfilled for the listSupportedModels test, which stores its own metadata.
 // `jest` stays global rather than imported from @jest/globals, so this mock is hoisted.
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => {
   const actual = jest.requireActual<typeof GatewayModelsCache>(
@@ -25,26 +25,46 @@ import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import {
+  gatewayModelEndpointsUrl,
+  openRouterGatewayModelsSource,
+  vercelGatewayModelsSource,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   ai_gateway_config,
+  ai_gateway_metadata_cache,
   byok_api_keys,
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   direct_byok_model_lists,
-  modelsByProvider,
   organization_audit_logs,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
+import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { byokOwner, getByokKeyStates } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  isFakeByokKmsRequest,
+  TEST_BYOK_DATA_KEY,
+  testByokEnvelope,
+  useFakeByokKms,
+} from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 
 type Caller = Awaited<ReturnType<typeof createCallerForUser>>;
+
+function decryptStoredKey(row: { encrypted_api_key_envelope: BYOKApiKeyEnvelope | null }): string {
+  if (!row.encrypted_api_key_envelope) throw new Error('row has no envelope');
+  return decryptApiKey(row.encrypted_api_key_envelope.encrypted_data, TEST_BYOK_DATA_KEY);
+}
 
 const VERTEX_CREDENTIALS = JSON.stringify({
   project: 'example-project',
@@ -72,6 +92,8 @@ const BEDROCK_API_KEY_CREDENTIALS = {
 };
 
 describe('BYOK Router', () => {
+  useFakeByokKms();
+
   let ownerUser: User;
   let memberUser: User;
   let otherOrgOwner: User;
@@ -296,7 +318,7 @@ describe('BYOK Router', () => {
           (['ollama-cloud', 'chutes-byok'] as const).map((provider_id, index) => ({
             kilo_user_id: ownerUser.id,
             provider_id,
-            encrypted_api_key: encryptApiKey(`key-${provider_id}`, BYOK_ENCRYPTION_KEY),
+            encrypted_api_key_envelope: testByokEnvelope(`key-${provider_id}`),
             created_by: ownerUser.id,
             created_at: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
             settings: { serve_catalog_models: true },
@@ -333,7 +355,7 @@ describe('BYOK Router', () => {
         .values({
           kilo_user_id: ownerUser.id,
           provider_id: 'minimax',
-          encrypted_api_key: encryptApiKey('plan-key', BYOK_ENCRYPTION_KEY),
+          encrypted_api_key_envelope: testByokEnvelope('plan-key'),
           created_by: ownerUser.id,
         })
         .returning({ id: byok_api_keys.id });
@@ -388,7 +410,7 @@ describe('BYOK Router', () => {
       await db.insert(byok_api_keys).values({
         kilo_user_id: ownerUser.id,
         provider_id: 'openai-chatgpt',
-        encrypted_api_key: encryptApiKey('chatgpt-state', BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: testByokEnvelope('chatgpt-state'),
         created_by: ownerUser.id,
       });
 
@@ -604,7 +626,7 @@ describe('BYOK Router', () => {
         .values({
           organization_id: organizationA.id,
           provider_id: 'openai-chatgpt',
-          encrypted_api_key: encryptApiKey('chatgpt-state', BYOK_ENCRYPTION_KEY),
+          encrypted_api_key_envelope: testByokEnvelope('chatgpt-state'),
           created_by: ownerUser.id,
         })
         .returning({ id: byok_api_keys.id });
@@ -639,15 +661,18 @@ describe('BYOK Router', () => {
       expect(result.created_at).toBeDefined();
       expect(result.updated_at).toBeDefined();
 
-      // Verify key is encrypted in database
       const [dbKey] = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, result.id));
 
-      expect(dbKey).toBeDefined();
-      expect(dbKey.encrypted_api_key).toBeDefined();
-      expect(typeof dbKey.encrypted_api_key).toBe('object');
-      expect(dbKey.encrypted_api_key).toHaveProperty('iv');
-      expect(dbKey.encrypted_api_key).toHaveProperty('data');
-      expect(dbKey.encrypted_api_key).toHaveProperty('authTag');
+      expect(dbKey.encrypted_api_key_envelope).toMatchObject({
+        encrypted_data: {
+          iv: expect.any(String),
+          data: expect.any(String),
+          authTag: expect.any(String),
+        },
+        algorithm: 'aes-256-gcm',
+        envelope_version: 1,
+      });
+      expect(JSON.stringify(dbKey.encrypted_api_key_envelope)).not.toContain('sk-ant-test-key-123');
     });
 
     test('should create a Vertex BYOK credential', async () => {
@@ -810,21 +835,26 @@ describe('BYOK Router', () => {
       issuedDataKeys.length = 0;
     });
 
-    test('leaves the envelope NULL when the service is not configured', async () => {
+    test('refuses to store a key when the service is not configured', async () => {
       delete process.env.BYOK_KMS_SERVICE_URL;
       const caller = await createCallerForUser(ownerUser.id);
 
-      const created = await caller.byok.create({
-        organizationId: organizationA.id,
-        provider_id: 'anthropic',
-        api_key: 'sk-ant-no-kms',
-      });
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'anthropic',
+          api_key: 'sk-ant-no-kms',
+        })
+      ).rejects.toThrow('BYOK_KMS_SERVICE_URL is required');
 
-      const [dbKey] = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, created.id));
-      expect(dbKey.encrypted_api_key_envelope).toBeNull();
+      const keys = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.organization_id, organizationA.id));
+      expect(keys).toEqual([]);
     });
 
-    test('writes both columns on create and update when the service is configured', async () => {
+    test('writes the envelope on create and update', async () => {
       const fetchMock = configureKms(dataKeyResponse);
       const caller = await createCallerForUser(ownerUser.id);
 
@@ -842,7 +872,6 @@ describe('BYOK Router', () => {
         wrapped_dek: 'wrapped',
         kms_key_id: 'alias/test',
       });
-      expect(decryptApiKey(createdKey.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('sk-ant-kms');
       expect(
         decryptApiKey(createdKey.encrypted_api_key_envelope!.encrypted_data, issuedDataKeys[0])
       ).toBe('sk-ant-kms');
@@ -857,7 +886,6 @@ describe('BYOK Router', () => {
         .select()
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, created.id));
-      expect(decryptApiKey(updatedKey.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('sk-ant-kms-2');
       expect(
         decryptApiKey(updatedKey.encrypted_api_key_envelope!.encrypted_data, issuedDataKeys[1])
       ).toBe('sk-ant-kms-2');
@@ -924,7 +952,7 @@ describe('BYOK Router', () => {
         .from(byok_api_keys)
         .where(eq(byok_api_keys.organization_id, organizationA.id));
       expect(keys.map(key => key.provider_id)).toEqual(['anthropic']);
-      expect(decryptApiKey(keys[0].encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('sk-ant-before');
+      expect(decryptStoredKey(keys[0])).toBe('sk-ant-before');
     });
   });
 
@@ -950,13 +978,9 @@ describe('BYOK Router', () => {
       expect(updated.provider_id).toBe('anthropic');
       expect(updated.updated_at).not.toBe(created.updated_at);
 
-      // Verify encryption changed
       const [dbKey] = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, created.id));
 
-      expect(dbKey.encrypted_api_key).toBeDefined();
-      expect(typeof dbKey.encrypted_api_key).toBe('object');
-      expect(dbKey.encrypted_api_key).toHaveProperty('iv');
-      expect(dbKey.encrypted_api_key).toHaveProperty('data');
+      expect(decryptStoredKey(dbKey)).toBe('new-key');
     });
 
     test('should reject malformed Vertex credentials on update', async () => {
@@ -1210,15 +1234,15 @@ describe('BYOK Router', () => {
           .where(eq(byok_api_keys.id, created.id));
         expect(stored.organization_id).toBe(owner === 'organization' ? organizationA.id : null);
         expect(stored.kilo_user_id).toBe(owner === 'user' ? ownerUser.id : null);
-        expect(stored.encrypted_api_key).toEqual({
+        expect(stored.encrypted_api_key_envelope?.encrypted_data).toEqual({
           iv: expect.any(String),
           data: expect.any(String),
           authTag: expect.any(String),
         });
-        expect(JSON.stringify(stored.encrypted_api_key)).not.toContain(
+        expect(JSON.stringify(stored.encrypted_api_key_envelope)).not.toContain(
           BEDROCK_API_KEY_CREDENTIALS.apiKey
         );
-        expect(decryptApiKey(stored.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(credential);
+        expect(decryptStoredKey(stored)).toBe(credential);
       }
     );
 
@@ -1251,9 +1275,7 @@ describe('BYOK Router', () => {
           .select()
           .from(byok_api_keys)
           .where(eq(byok_api_keys.id, created.id));
-        expect(decryptApiKey(before.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
-          JSON.stringify(initial)
-        );
+        expect(decryptStoredKey(before)).toBe(JSON.stringify(initial));
 
         const updated = await caller.byok.update({
           ...scope,
@@ -1269,10 +1291,8 @@ describe('BYOK Router', () => {
           .where(eq(byok_api_keys.id, created.id));
         expect(after.organization_id).toBe(before.organization_id);
         expect(after.kilo_user_id).toBe(before.kilo_user_id);
-        expect(after.encrypted_api_key).not.toEqual(before.encrypted_api_key);
-        expect(decryptApiKey(after.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
-          JSON.stringify(replacement)
-        );
+        expect(after.encrypted_api_key_envelope).not.toEqual(before.encrypted_api_key_envelope);
+        expect(decryptStoredKey(after)).toBe(JSON.stringify(replacement));
       }
     );
 
@@ -1559,10 +1579,7 @@ describe('BYOK Router', () => {
         // A preview that decrypted this key would fail.
         await db
           .update(byok_api_keys)
-          .set({
-            encrypted_api_key: { iv: 'unreadable', data: 'unreadable', authTag: 'unreadable' },
-            encrypted_api_key_envelope: null,
-          })
+          .set({ encrypted_api_key_envelope: null })
           .where(eq(byok_api_keys.id, created.id));
         return created;
       }
@@ -1707,7 +1724,7 @@ describe('BYOK Router', () => {
         .select()
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, created.id));
-      expect(decryptApiKey(stored.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('gateway-secret');
+      expect(decryptStoredKey(stored)).toBe('gateway-secret');
     });
 
     test('tests an OpenRouter key against OpenRouter with the stored key', async () => {
@@ -1716,15 +1733,23 @@ describe('BYOK Router', () => {
         provider_id: 'openrouter',
         api_key: 'user-openrouter-key',
       });
-      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(chatCompletionResponse());
+      const fakeKms = globalThis.fetch;
+      const fetchSpy = jest
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(async (input, init) =>
+          isFakeByokKmsRequest(input) ? fakeKms(input, init) : chatCompletionResponse()
+        );
 
       try {
         await expect(caller.byok.testApiKey({ id: key.id })).resolves.toMatchObject({
           success: true,
         });
 
-        expect(fetchSpy).toHaveBeenCalledTimes(1);
-        const [url, init] = fetchSpy.mock.calls[0];
+        const upstreamCalls = fetchSpy.mock.calls.filter(([input]) =>
+          String(input).startsWith('https://')
+        );
+        expect(upstreamCalls).toHaveLength(1);
+        const [url, init] = upstreamCalls[0];
         expect(String(url)).toBe('https://openrouter.ai/api/v1/chat/completions');
         expect(new Headers(init?.headers).get('authorization')).toBe('Bearer user-openrouter-key');
         expect(JSON.parse(String(init?.body))).toMatchObject({ model: 'openai/gpt-5-nano' });
@@ -1739,13 +1764,16 @@ describe('BYOK Router', () => {
         provider_id: 'vercel-ai-gateway',
         api_key: 'revoked-vercel-key',
       });
-      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            error: { message: 'Invalid API key', type: 'authentication_error' },
-          }),
-          { status: 401, headers: { 'content-type': 'application/json' } }
-        )
+      const fakeKms = globalThis.fetch;
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) =>
+        isFakeByokKmsRequest(input)
+          ? fakeKms(input, init)
+          : new Response(
+              JSON.stringify({
+                error: { message: 'Invalid API key', type: 'authentication_error' },
+              }),
+              { status: 401, headers: { 'content-type': 'application/json' } }
+            )
       );
 
       try {
@@ -1754,7 +1782,9 @@ describe('BYOK Router', () => {
           message:
             'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.',
         });
-        const [url, init] = fetchSpy.mock.calls[0];
+        const [url, init] = fetchSpy.mock.calls.find(([input]) =>
+          String(input).startsWith('https://')
+        )!;
         expect(String(url)).toMatch(/^https:\/\/ai-gateway\.vercel\.sh\//);
         expect(new Headers(init?.headers).get('authorization')).toBe('Bearer revoked-vercel-key');
       } finally {
@@ -1765,27 +1795,45 @@ describe('BYOK Router', () => {
 
   describe('listSupportedModels', () => {
     test('lists models as "name (id)" per provider', async () => {
-      const [snapshot] = await db
-        .insert(modelsByProvider)
-        .values({
-          data: { providers: [], total_providers: 0, total_models: 0, generated_at: '' },
-          openrouter: {
-            'anthropic/claude-fixture': {
-              id: 'anthropic/claude-fixture',
-              name: 'Claude Fixture',
-              endpoints: [],
-            },
+      const fillerModels = Array.from({ length: 100 }, (_, index) => ({
+        id: `filler/model-${index}`,
+        name: `Filler ${index}`,
+      }));
+      const fillerEndpointsRows = (gateway: Provider) =>
+        fillerModels.map(model => ({
+          url: gatewayModelEndpointsUrl(gateway, model.id),
+          data: { data: { endpoints: [] } },
+        }));
+      const rows = [
+        {
+          url: openRouterGatewayModelsSource.url,
+          data: {
+            data: [{ id: 'anthropic/claude-fixture', name: 'Claude Fixture' }, ...fillerModels],
           },
-          vercel: {
-            'anthropic/claude-fixture': {
-              id: 'anthropic/claude-fixture',
-              name: 'Claude Fixture',
-              type: 'language',
-              endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }],
-            },
+        },
+        {
+          url: gatewayModelEndpointsUrl(OPENROUTER, 'anthropic/claude-fixture'),
+          data: { data: { endpoints: [] } },
+        },
+        ...fillerEndpointsRows(OPENROUTER),
+        {
+          url: vercelGatewayModelsSource.url,
+          data: {
+            data: [
+              { id: 'anthropic/claude-fixture', name: 'Claude Fixture', type: 'language' },
+              ...fillerModels,
+            ],
           },
-        })
-        .returning({ id: modelsByProvider.id });
+        },
+        {
+          url: gatewayModelEndpointsUrl(VERCEL_AI_GATEWAY, 'anthropic/claude-fixture'),
+          data: {
+            data: { endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }] },
+          },
+        },
+        ...fillerEndpointsRows(VERCEL_AI_GATEWAY),
+      ];
+      await db.insert(ai_gateway_metadata_cache).values(rows);
 
       try {
         const caller = await createCallerForUser(ownerUser.id);
@@ -1797,7 +1845,12 @@ describe('BYOK Router', () => {
           'ByteDance-Seed-Code (byteplus-coding/bytedance-seed-code)'
         );
       } finally {
-        await db.delete(modelsByProvider).where(eq(modelsByProvider.id, snapshot.id));
+        await db.delete(ai_gateway_metadata_cache).where(
+          inArray(
+            ai_gateway_metadata_cache.url,
+            rows.map(row => row.url)
+          )
+        );
       }
     });
   });
@@ -1935,7 +1988,7 @@ describe('BYOK Router', () => {
         .values({
           kilo_user_id: ownerUser.id,
           provider_id: 'minimax',
-          encrypted_api_key: encrypted,
+          encrypted_api_key_envelope: testByokEnvelope('installed-minimax-key'),
           management_source: 'coding_plan',
           created_by: ownerUser.id,
         })
@@ -1979,7 +2032,7 @@ describe('BYOK Router', () => {
         .values({
           kilo_user_id: ownerUser.id,
           provider_id: 'byteplus-coding',
-          encrypted_api_key: encrypted,
+          encrypted_api_key_envelope: testByokEnvelope('installed-byteplus-key'),
           management_source: 'coding_plan',
           created_by: ownerUser.id,
         })
@@ -2040,7 +2093,7 @@ describe('BYOK Router', () => {
         .from(coding_plan_subscriptions)
         .where(eq(coding_plan_subscriptions.id, subscription.id));
 
-      expect(unchangedKey.encrypted_api_key).toStrictEqual(key.encrypted_api_key);
+      expect(unchangedKey.encrypted_api_key_envelope).toStrictEqual(key.encrypted_api_key_envelope);
       expect(unchangedKey.management_source).toBe('coding_plan');
       expect(updatedSubscription.status).toBe('active');
       expect(updatedSubscription.installed_byok_key_id).toBe(key.id);

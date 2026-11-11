@@ -22,9 +22,9 @@ import {
   gatewayModelEndpointsSource,
   gatewayModelEndpointsUrl,
   openRouterGatewayModelsSource,
-  openRouterProvidersSource,
   vercelGatewayModelsSource,
-} from '@/lib/providers/openrouter/sync-providers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { openRouterProvidersSource } from '@/lib/providers/openrouter/sync-providers';
 import { openRouterProviderModelsSource } from '@/lib/providers/openrouter/fetch-provider-models';
 import { modelsDevCatalogSource } from '@/lib/providers/direct-byok/models-dev';
 import { directByokMetadataSources } from '@/lib/providers/direct-byok/sync-direct-byok';

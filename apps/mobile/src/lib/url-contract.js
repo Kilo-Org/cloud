@@ -9,7 +9,6 @@
 export const URL_SCHEMES = {
   apiBaseUrl: ['https:'],
   webBaseUrl: ['https:'],
-  kiloChatUrl: ['https:'],
   notificationsUrl: ['https:'],
   cloudAgentWsUrl: ['wss:'],
   sessionIngestWsUrl: ['wss:'],
@@ -23,7 +22,7 @@ export const URL_SCHEMES = {
 
 /** Production host allowlist, seeded from the committed mobile production
  *  defaults: the apps/mobile/.env URL values (api.kilo.ai, app.kilo.ai,
- *  cloud-agent-next.kilosessions.ai, ingest.kilosessions.ai, chat.kiloapps.io,
+ *  cloud-agent-next.kilosessions.ai, ingest.kilosessions.ai,
  *  events.kiloapps.io, notifications.kiloapps.io) and the latency ingest
  *  default committed in LATENCY_INGEST_URL_DEFAULT below. url-contract.test.ts
  *  asserts every committed default against this list, so a missing host fails
@@ -34,7 +33,6 @@ export const URL_SCHEMES = {
 export const PRODUCTION_HOSTS = [
   'api.kilo.ai',
   'app.kilo.ai',
-  'chat.kiloapps.io',
   'cloud-agent-next.kilosessions.ai',
   'events.kiloapps.io',
   'ingest.kilosessions.ai',

@@ -4,8 +4,9 @@ import type {
   OrganizationMcpConnectDecision,
 } from '@kilocode/db/schema-types';
 import type { Organization, OrganizationGuardrail } from '@kilocode/db/schema';
-import { organization_guardrails } from '@kilocode/db/schema';
+import { organization_group_memberships, organization_guardrails } from '@kilocode/db/schema';
 import {
+  enkryptInputGuardrailGroupId,
   resolveEnkryptInputGuardrail,
   resolveEnkryptOutputGuardrail,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
@@ -67,7 +68,7 @@ export function resolveGuardrailsSettings(organization: GuardrailSettingsOrganiz
   return {
     inputScan: {
       enabled: inputGuardrail !== null,
-      scanToolResults: inputGuardrail?.scanToolResults ?? false,
+      scanToolResults: inputGuardrail !== null,
     },
     outputScan: {
       enabled: outputGuardrail !== null,
@@ -110,12 +111,34 @@ export async function listAllowedMcpServers(organizationId: string): Promise<All
   return rows.map(toAllowedMcpServer);
 }
 
+async function isInGroup(organizationId: string, groupId: string, kiloUserId: string) {
+  const [membership] = await db
+    .select({ groupId: organization_group_memberships.group_id })
+    .from(organization_group_memberships)
+    .where(
+      and(
+        eq(organization_group_memberships.organization_id, organizationId),
+        eq(organization_group_memberships.group_id, groupId),
+        eq(organization_group_memberships.kilo_user_id, kiloUserId)
+      )
+    )
+    .limit(1);
+  return membership !== undefined;
+}
+
+/** What `kiloUserId`'s client must apply: an input guardrail limited to a group skips non-members. */
 export async function getOrganizationGuardrailsPolicy(
-  organization: GuardrailSettingsOrganization
+  organization: GuardrailSettingsOrganization,
+  kiloUserId: string
 ): Promise<OrganizationGuardrailsPolicy> {
   const { mcpEnforcement, inputScan, outputScan, skill } = resolveGuardrailsSettings(organization);
+  const inputGroupId = enkryptInputGuardrailGroupId(organization.settings);
+  const appliesToMember =
+    !inputScan.enabled ||
+    inputGroupId === null ||
+    (await isInGroup(organization.id, inputGroupId, kiloUserId));
   return {
-    inputScan,
+    inputScan: appliesToMember ? inputScan : { enabled: false, scanToolResults: false },
     outputScan,
     skill,
     mcp: {

@@ -74,10 +74,6 @@ vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   clearReasoningPreference: vi.fn(),
 }));
 
-vi.mock('@/lib/last-active-instance', () => ({
-  clearLastActiveInstance: vi.fn(),
-}));
-
 vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));

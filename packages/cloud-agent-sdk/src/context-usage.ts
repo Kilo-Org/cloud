@@ -130,7 +130,8 @@ export function findLatestContextUsage(
     if (message.parts?.some(isCompactionPart)) {
       // The `/compact` request's own marker. It supersedes everything older
       // only while that compaction is still in flight.
-      if (failedCompaction) {
+      // Native v2 keeps the marker and summary outcome in the same message.
+      if (failedCompaction || isFailedCompactionSummary(message.info)) {
         failedCompaction = false;
         continue;
       }

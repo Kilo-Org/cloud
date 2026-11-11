@@ -1,3 +1,4 @@
+import { withTimeout } from '@kilocode/worker-utils';
 import {
   createContainerUsageClient,
   getBillingContext,
@@ -18,6 +19,7 @@ import {
   MeteredBillingLifecycle,
   type BillingIdentity,
   type ContainerStopParams,
+  type BillingStopDetails,
 } from '../metered-billing-lifecycle.js';
 import type { ContainerInstanceSize } from './SandboxContainers.js';
 import { CODE_REVIEW_CONTAINERS_INSTANCE } from './instance-size.js';
@@ -30,9 +32,10 @@ export type ContainersBillingHost = {
   container: BillingContainer;
   storage: BillingContextStorage;
   meter: ContainerUsageRpcMethods;
+  enforceContainerCapacity: boolean;
   heartbeatSeconds: number;
   isContainerRunning: () => boolean;
-  stopContainer: () => Promise<void>;
+  stopContainer: (budget?: BillingStopDetails) => Promise<void>;
   destroyContainer: () => Promise<void>;
   durableObjectId: string;
   waitUntil: (promise: Promise<unknown>) => void;
@@ -58,11 +61,10 @@ export function resolveContainersBillingIdentity(
 export function unavailableContainersBillingAdmission(
   input: unknown
 ): SandboxBillingAdmissionResult {
-  const parsed = parseSandboxBillingInput(input);
-  if (!parsed.enforcementRequested) return { success: true };
+  parseSandboxBillingInput(input);
   return {
     success: false,
-    code: 'meter_unavailable',
+    code: 'invalid_configuration',
     message: 'Container billing is not configured for this instance size',
   };
 }
@@ -237,10 +239,21 @@ export class ContainersBilling {
   constructor(identity: ContainersBillingIdentity, host: ContainersBillingHost) {
     this.identity = identity;
     this.host = host;
-    const usageClient = createContainerUsageClient(host.meter, { service: identity.service });
+    const usageClient = createContainerUsageClient(
+      {
+        recordStart: input =>
+          withTimeout(host.meter.recordStart(input), 10_000, 'Meter start timed out'),
+        recordHeartbeat: input =>
+          withTimeout(host.meter.recordHeartbeat(input), 10_000, 'Meter heartbeat timed out'),
+        recordStop: input =>
+          withTimeout(host.meter.recordStop(input), 10_000, 'Meter stop timed out'),
+      },
+      { service: identity.service }
+    );
     this.lifecycle = new MeteredBillingLifecycle({
       storage: host.storage,
       usageClient,
+      enforceContainerCapacity: host.enforceContainerCapacity,
       schedule: async (delaySeconds, callback, payload) => {
         await host.container.schedule(delaySeconds, callback, payload);
       },
@@ -263,8 +276,8 @@ export class ContainersBilling {
       onGenerationClosed: (context, cause) =>
         this.lifecycle.onGenerationClosed(this.billingIdentity, context, cause),
       onBudgetWarning: budget => this.lifecycle.onBudgetWarning(this.billingIdentity, budget),
-      enforceBudgetStop: (budget, expected) =>
-        this.lifecycle.enforceBudgetStop(this.billingIdentity, budget, expected),
+      enforceBudgetStop: (budget, expected, failureCode) =>
+        this.lifecycle.enforceBudgetStop(this.billingIdentity, budget, expected, failureCode),
     });
     this.lifecycle.attachHeartbeat(this.heartbeat);
   }

@@ -12,6 +12,10 @@ import { subscribeToCodingPlan, uploadKeysToInventory } from '@/lib/coding-plans
 import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+import {
+  testByokEnvelope,
+  useFakeByokKms,
+} from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import {
@@ -91,7 +95,7 @@ async function createGrandfatheredMiniMaxSubscription(planId: CodingPlanId, cost
     .values({
       kilo_user_id: user.id,
       provider_id: 'minimax',
-      encrypted_api_key: inventory.encrypted_api_key!,
+      encrypted_api_key_envelope: testByokEnvelope('grandfathered-installed-key'),
       management_source: 'coding_plan',
       created_by: user.id,
     })
@@ -114,6 +118,8 @@ async function createGrandfatheredMiniMaxSubscription(planId: CodingPlanId, cost
     .returning();
   return { user, subscriptionId: subscription.id };
 }
+
+useFakeByokKms();
 
 afterEach(async () => {
   jest.mocked(maybePerformAutoTopUp).mockClear();

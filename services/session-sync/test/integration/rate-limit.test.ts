@@ -1,4 +1,4 @@
-import { SELF, runInDurableObject } from 'cloudflare:test';
+import { runInDurableObject } from 'cloudflare:test';
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { app } from '../../src/app';
@@ -8,23 +8,44 @@ import { batch, client, grant, newSessionID, personal, testEnv } from '../helper
 
 afterEach(() => vi.restoreAllMocks());
 
-it('limits exchange by IP before credential verification with a retry deadline', async () => {
-  const ip = `192.0.2.${Math.floor(Math.random() * 200) + 1}`;
-  let response: Response | undefined;
-  for (let index = 0; index <= 120; index++) {
-    response = await SELF.fetch('https://session-sync.test/v1/auth/exchange', {
-      method: 'POST',
-      headers: { 'CF-Connecting-IP': ip },
+it.each([undefined, 'synthetic-invalid-credential'])(
+  'limits exchange by IP before credential verification with a retry deadline: %s',
+  async token => {
+    const ip = '192.0.2.1';
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    // Miniflare resets counters at minute boundaries, even during a short request loop.
+    const limit = vi.fn<RateLimit['limit']>().mockResolvedValue({ success: false });
+    const getSecret = vi
+      .fn<() => Promise<string | null>>()
+      .mockRejectedValue(new Error('Credential verification must not start'));
+    const response = await app.request(
+      'https://session-sync.test/v1/auth/exchange',
+      {
+        method: 'POST',
+        headers: {
+          'CF-Connecting-IP': ip,
+          'Content-Type': 'application/json',
+          ...(token === undefined ? {} : { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({ version: 1 }),
+      },
+      {
+        ...testEnv,
+        EXCHANGE_IP_LIMITER: { limit },
+        NEXTAUTH_SECRET: { get: getSecret },
+        SESSION_SYNC_SECRET: { get: getSecret },
+      }
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('60');
+    expect(await response.json()).toMatchObject({
+      error: { code: 'rate_limited', retryAt: now + 60_000 },
     });
-    if (response.status === 429) break;
-    expect(response.status).toBe(401);
+    expect(limit).toHaveBeenCalledExactlyOnceWith({ key: ip });
+    expect(getSecret).not.toHaveBeenCalled();
   }
-  expect(response!.status).toBe(429);
-  expect(response!.headers.get('Retry-After')).toBe('60');
-  expect(await response!.json()).toMatchObject({
-    error: { code: 'rate_limited', retryAt: expect.any(Number) },
-  });
-});
+);
 
 it('limits registration before dispatching to the session object', async () => {
   const response = await app.request(

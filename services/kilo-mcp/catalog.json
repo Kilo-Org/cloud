@@ -4198,7 +4198,7 @@
   "claudeBilling.remove": {
     "path": "claudeBilling.remove",
     "kind": "mutation",
-    "summary": "Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only.",
+    "summary": "Disconnect Claude billing for the selected scope so it stops charging, retiring the Anthropic profile when no other scope shares it; shared-services scope requires an organization owner or admin.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -4207,15 +4207,20 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "scope": {
+          "type": "string",
+          "const": "shared_services"
         }
       }
     },
     "tags": [
       "claudebilling",
       "remove",
-      "organizationid"
+      "organizationid",
+      "scope"
     ],
-    "searchBlob": "claudeBilling.remove Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only. claudebilling remove organizationid organizationId"
+    "searchBlob": "claudeBilling.remove Disconnect Claude billing for the selected scope so it stops charging, retiring the Anthropic profile when no other scope shares it; shared-services scope requires an organization owner or admin. claudebilling remove organizationid scope organizationId scope"
   },
   "claudeBilling.status": {
     "path": "claudeBilling.status",
@@ -4229,15 +4234,20 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "scope": {
+          "type": "string",
+          "const": "shared_services"
         }
       }
     },
     "tags": [
       "claudebilling",
       "status",
-      "organizationid"
+      "organizationid",
+      "scope"
     ],
-    "searchBlob": "claudeBilling.status Check whether Claude billing is connected for a user or organization, including connection state and whether the caller can manage it. claudebilling status organizationid organizationId"
+    "searchBlob": "claudeBilling.status Check whether Claude billing is connected for a user or organization, including connection state and whether the caller can manage it. claudebilling status organizationid scope organizationId scope"
   },
   "cliSessions.create": {
     "path": "cliSessions.create",
@@ -6266,37 +6276,72 @@
     "summary": "Generate a temporary, expiring preview link to open a port or path of an app running in a Cloud Agent session, for sharing or viewing it in a browser.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "cloudAgentSessionId": {
-          "type": "string",
-          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535
+            },
+            "path": {
+              "type": "string",
+              "maxLength": 2048,
+              "format": "starts_with",
+              "pattern": "^\\/.*"
+            },
+            "worktreeId": {
+              "type": "string",
+              "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "cloudAgentSessionId": {
+              "not": {}
+            }
+          },
+          "required": [
+            "port",
+            "worktreeId"
+          ]
         },
-        "port": {
-          "type": "integer",
-          "minimum": 1024,
-          "maximum": 65535
-        },
-        "path": {
-          "type": "string",
-          "maxLength": 2048,
-          "format": "starts_with",
-          "pattern": "^\\/.*"
+        {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535
+            },
+            "path": {
+              "type": "string",
+              "maxLength": 2048,
+              "format": "starts_with",
+              "pattern": "^\\/.*"
+            },
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "worktreeId": {
+              "not": {}
+            }
+          },
+          "required": [
+            "port",
+            "cloudAgentSessionId"
+          ]
         }
-      },
-      "required": [
-        "cloudAgentSessionId",
-        "port"
       ]
     },
     "tags": [
       "cloudagentnext",
       "createpreview",
-      "cloudagentsessionid",
       "port",
-      "path"
+      "path",
+      "worktreeid",
+      "cloudagentsessionid"
     ],
-    "searchBlob": "cloudAgentNext.createPreview Generate a temporary, expiring preview link to open a port or path of an app running in a Cloud Agent session, for sharing or viewing it in a browser. cloudagentnext createpreview cloudagentsessionid port path cloudAgentSessionId port path"
+    "searchBlob": "cloudAgentNext.createPreview Generate a temporary, expiring preview link to open a port or path of an app running in a Cloud Agent session, for sharing or viewing it in a browser. cloudagentnext createpreview port path worktreeid cloudagentsessionid port path worktreeId cloudAgentSessionId"
   },
   "cloudAgentNext.createTerminal": {
     "path": "cloudAgentNext.createTerminal",
@@ -6557,23 +6602,57 @@
     "summary": "Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "cloudAgentSessionId": {
-          "type": "string",
-          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "worktreeId": {
+              "type": "string",
+              "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "cloudAgentSessionId": {
+              "not": {}
+            }
+          },
+          "required": [
+            "worktreeId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "worktreeId": {
+              "not": {}
+            }
+          },
+          "required": [
+            "cloudAgentSessionId"
+          ]
         }
-      },
-      "required": [
-        "cloudAgentSessionId"
       ]
     },
     "tags": [
       "cloudagentnext",
       "getpreviewoptions",
+      "organizationid",
+      "worktreeid",
       "cloudagentsessionid"
     ],
-    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions cloudagentsessionid cloudAgentSessionId"
+    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions organizationid worktreeid cloudagentsessionid organizationId worktreeId cloudAgentSessionId"
   },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
@@ -6956,24 +7035,46 @@
     "summary": "List the live services currently running in a Cloud Agent session's sandbox so you can discover open, previewable ports and open a web server in a new tab. Returns each service's name, port, and description along with whether the sandbox is running, not ready, or unsupported.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "cloudAgentSessionId": {
-          "type": "string",
-          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "worktreeId": {
+              "type": "string",
+              "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "cloudAgentSessionId": {
+              "not": {}
+            }
+          },
+          "required": [
+            "worktreeId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "worktreeId": {
+              "not": {}
+            }
+          },
+          "required": [
+            "cloudAgentSessionId"
+          ]
         }
-      },
-      "required": [
-        "cloudAgentSessionId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "tags": [
       "cloudagentnext",
       "listpreviewservices",
+      "worktreeid",
       "cloudagentsessionid"
     ],
-    "searchBlob": "cloudAgentNext.listPreviewServices List the live services currently running in a Cloud Agent session's sandbox so you can discover open, previewable ports and open a web server in a new tab. Returns each service's name, port, and description along with whether the sandbox is running, not ready, or unsupported. cloudagentnext listpreviewservices cloudagentsessionid cloudAgentSessionId"
+    "searchBlob": "cloudAgentNext.listPreviewServices List the live services currently running in a Cloud Agent session's sandbox so you can discover open, previewable ports and open a web server in a new tab. Returns each service's name, port, and description along with whether the sandbox is running, not ready, or unsupported. cloudagentnext listpreviewservices worktreeid cloudagentsessionid worktreeId cloudAgentSessionId"
   },
   "cloudAgentNext.listRepositoryBranches": {
     "path": "cloudAgentNext.listRepositoryBranches",
@@ -9042,6 +9143,17 @@
     ],
     "searchBlob": "cloudAgentSettings.get Get the Cloud Agent settings for the user or organization, including the context sandbox allocation, per-repository profile allocations, and which sandbox options are available. cloudagentsettings get organizationid organizationId"
   },
+  "cloudAgentSettings.getBuiltinAgents": {
+    "path": "cloudAgentSettings.getBuiltinAgents",
+    "kind": "query",
+    "summary": "Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides.",
+    "inputSchema": {},
+    "tags": [
+      "cloudagentsettings",
+      "getbuiltinagents"
+    ],
+    "searchBlob": "cloudAgentSettings.getBuiltinAgents Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides. cloudagentsettings getbuiltinagents"
+  },
   "cloudAgentSettings.getWorkspaceOrder": {
     "path": "cloudAgentSettings.getWorkspaceOrder",
     "kind": "query",
@@ -10950,6 +11062,109 @@
       "idempotencykey"
     ],
     "searchBlob": "codingPlans.subscribe Start a subscription to a Kilo coding plan. Pay the plan cost in credits and get the managed provider credential installed. codingplans subscribe planid idempotencykey planId idempotencyKey"
+  },
+  "computeBilling.charges": {
+    "path": "computeBilling.charges",
+    "kind": "query",
+    "summary": "List compute usage charges for your personal account or an organization, optionally filtered to your own usage or specific date ranges.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "view": {
+          "default": "self",
+          "type": "string",
+          "enum": [
+            "self",
+            "all"
+          ]
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "groupBy": {
+          "default": "day",
+          "type": "string",
+          "enum": [
+            "day",
+            "session"
+          ]
+        },
+        "page": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        }
+      },
+      "required": [
+        "startDate",
+        "endDate"
+      ]
+    },
+    "tags": [
+      "computebilling",
+      "charges",
+      "organizationid",
+      "view",
+      "startdate",
+      "enddate",
+      "groupby",
+      "page"
+    ],
+    "searchBlob": "computeBilling.charges List compute usage charges for your personal account or an organization, optionally filtered to your own usage or specific date ranges. computebilling charges organizationid view startdate enddate groupby page organizationId view startDate endDate groupBy page"
+  },
+  "computeBilling.rates": {
+    "path": "computeBilling.rates",
+    "kind": "query",
+    "summary": "Get the current compute pricing rates used to bill usage.",
+    "inputSchema": {},
+    "tags": [
+      "computebilling",
+      "rates"
+    ],
+    "searchBlob": "computeBilling.rates Get the current compute pricing rates used to bill usage. computebilling rates"
+  },
+  "computeBilling.sessionCharges": {
+    "path": "computeBilling.sessionCharges",
+    "kind": "query",
+    "summary": "Get recorded compute charges for an owned cloud agent session in its personal or organization billing context. When scope is 'workspace', the total covers the shared sandbox across all chats and restarts in that workspace; do not add sibling chat totals together. Only scope 'session' returns a single session's charges.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "computebilling",
+      "sessioncharges",
+      "cloudagentsessionid",
+      "organizationid"
+    ],
+    "searchBlob": "computeBilling.sessionCharges Get recorded compute charges for an owned cloud agent session in its personal or organization billing context. When scope is 'workspace', the total covers the shared sandbox across all chats and restarts in that workspace; do not add sibling chat totals together. Only scope 'session' returns a single session's charges. computebilling sessioncharges cloudagentsessionid organizationid cloudAgentSessionId organizationId"
   },
   "credits.completeAppStorePurchase": {
     "path": "credits.completeAppStorePurchase",
@@ -17851,33 +18066,90 @@
     "summary": "Generate a shareable, expiring URL for opening a preview of an app running on a specific port in an organization's cloud agent session, so you can view or share the running preview.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
         },
-        "cloudAgentSessionId": {
-          "type": "string",
-          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "port": {
-          "type": "integer",
-          "minimum": 1024,
-          "maximum": 65535
-        },
-        "path": {
-          "type": "string",
-          "maxLength": 2048,
-          "format": "starts_with",
-          "pattern": "^\\/.*"
+        {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "port": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65535
+                },
+                "path": {
+                  "type": "string",
+                  "maxLength": 2048,
+                  "format": "starts_with",
+                  "pattern": "^\\/.*"
+                },
+                "organizationId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "worktreeId": {
+                  "type": "string",
+                  "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "cloudAgentSessionId": {
+                  "not": {}
+                }
+              },
+              "required": [
+                "port",
+                "organizationId",
+                "worktreeId"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "port": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65535
+                },
+                "path": {
+                  "type": "string",
+                  "maxLength": 2048,
+                  "format": "starts_with",
+                  "pattern": "^\\/.*"
+                },
+                "organizationId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "cloudAgentSessionId": {
+                  "type": "string",
+                  "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "worktreeId": {
+                  "not": {}
+                }
+              },
+              "required": [
+                "port",
+                "organizationId",
+                "cloudAgentSessionId"
+              ]
+            }
+          ]
         }
-      },
-      "required": [
-        "organizationId",
-        "cloudAgentSessionId",
-        "port"
       ]
     },
     "tags": [
@@ -17885,11 +18157,12 @@
       "cloudagentnext",
       "createpreview",
       "organizationid",
-      "cloudagentsessionid",
       "port",
-      "path"
+      "path",
+      "worktreeid",
+      "cloudagentsessionid"
     ],
-    "searchBlob": "organizations.cloudAgentNext.createPreview Generate a shareable, expiring URL for opening a preview of an app running on a specific port in an organization's cloud agent session, so you can view or share the running preview. organizations cloudagentnext createpreview organizationid cloudagentsessionid port path organizationId cloudAgentSessionId port path"
+    "searchBlob": "organizations.cloudAgentNext.createPreview Generate a shareable, expiring URL for opening a preview of an app running on a specific port in an organization's cloud agent session, so you can view or share the running preview. organizations cloudagentnext createpreview organizationid port path worktreeid cloudagentsessionid organizationId port path worktreeId cloudAgentSessionId"
   },
   "organizations.cloudAgentNext.createTerminal": {
     "path": "organizations.cloudAgentNext.createTerminal",
@@ -18837,23 +19110,50 @@
           ]
         },
         {
-          "type": "object",
-          "properties": {
-            "cloudAgentSessionId": {
-              "type": "string",
-              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "organizationId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "worktreeId": {
+                  "type": "string",
+                  "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "cloudAgentSessionId": {
+                  "not": {}
+                }
+              },
+              "required": [
+                "organizationId",
+                "worktreeId"
+              ]
             },
-            "organizationId": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            {
+              "type": "object",
+              "properties": {
+                "organizationId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "cloudAgentSessionId": {
+                  "type": "string",
+                  "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "worktreeId": {
+                  "not": {}
+                }
+              },
+              "required": [
+                "organizationId",
+                "cloudAgentSessionId"
+              ]
             }
-          },
-          "required": [
-            "cloudAgentSessionId",
-            "organizationId"
-          ],
-          "additionalProperties": false
+          ]
         }
       ]
     },
@@ -18862,9 +19162,10 @@
       "cloudagentnext",
       "listpreviewservices",
       "organizationid",
+      "worktreeid",
       "cloudagentsessionid"
     ],
-    "searchBlob": "organizations.cloudAgentNext.listPreviewServices List the preview services running for a cloud agent session, such as web servers or apps exposed by the agent's sandbox, so you can find session preview URLs and ports. organizations cloudagentnext listpreviewservices organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+    "searchBlob": "organizations.cloudAgentNext.listPreviewServices List the preview services running for a cloud agent session, such as web servers or apps exposed by the agent's sandbox, so you can find session preview URLs and ports. organizations cloudagentnext listpreviewservices organizationid worktreeid cloudagentsessionid organizationId worktreeId cloudAgentSessionId"
   },
   "organizations.cloudAgentNext.listRepositoryBranches": {
     "path": "organizations.cloudAgentNext.listRepositoryBranches",
@@ -26029,6 +26330,39 @@
     ],
     "searchBlob": "organizations.requestLogs.getDetails Get full details for one organization request log entry, including model, provider, status code, finish reason, streaming, session, editor, mode, and region. organizations requestlogs getdetails organizationid usageid organizationId usageId"
   },
+  "organizations.requestLogs.getEnkryptRequestDetails": {
+    "path": "organizations.requestLogs.getEnkryptRequestDetails",
+    "kind": "query",
+    "summary": "Get one organization request's Enkrypt guardrail calls (decision, fired detectors, guardrail, charge, added latency), its inference model, provider, and cost when recorded, and its routing details, including requests the guardrail blocked before inference.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId",
+        "requestId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "requestlogs",
+      "getenkryptrequestdetails",
+      "organizationid",
+      "requestid"
+    ],
+    "searchBlob": "organizations.requestLogs.getEnkryptRequestDetails Get one organization request's Enkrypt guardrail calls (decision, fired detectors, guardrail, charge, added latency), its inference model, provider, and cost when recorded, and its routing details, including requests the guardrail blocked before inference. organizations requestlogs getenkryptrequestdetails organizationid requestid organizationId requestId"
+  },
   "organizations.requestLogs.isAvailable": {
     "path": "organizations.requestLogs.isAvailable",
     "kind": "query",
@@ -26101,7 +26435,7 @@
   "organizations.requestLogs.listEnkryptUsage": {
     "path": "organizations.requestLogs.listEnkryptUsage",
     "kind": "query",
-    "summary": "Shows recent Enkrypt guardrail request logs for an organization, including per-call decisions (allowed, blocked, error), guardrail type, charged amount, added latency, and the user and session involved, plus summary totals and averages.",
+    "summary": "List an organization's recent Enkrypt guardrail calls, newest first, with user, model, API, guardrail, decision (allowed, flagged, blocked, error), fired detectors, charged amount, added latency, session, and request ID. Filter by start time, user, decision, and guardrail.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -26110,6 +26444,32 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "flagged",
+            "blocked",
+            "error"
+          ]
+        },
+        "guardrail": {
+          "type": "string",
+          "enum": [
+            "input",
+            "output"
+          ]
         }
       },
       "required": [
@@ -26120,9 +26480,13 @@
       "organizations",
       "requestlogs",
       "listenkryptusage",
-      "organizationid"
+      "organizationid",
+      "starttime",
+      "userid",
+      "outcome",
+      "guardrail"
     ],
-    "searchBlob": "organizations.requestLogs.listEnkryptUsage Shows recent Enkrypt guardrail request logs for an organization, including per-call decisions (allowed, blocked, error), guardrail type, charged amount, added latency, and the user and session involved, plus summary totals and averages. organizations requestlogs listenkryptusage organizationid organizationId"
+    "searchBlob": "organizations.requestLogs.listEnkryptUsage List an organization's recent Enkrypt guardrail calls, newest first, with user, model, API, guardrail, decision (allowed, flagged, blocked, error), fired detectors, charged amount, added latency, session, and request ID. Filter by start time, user, decision, and guardrail. organizations requestlogs listenkryptusage organizationid starttime userid outcome guardrail organizationId startTime userId outcome guardrail"
   },
   "organizations.reviewAgent.createManualReviewJob": {
     "path": "organizations.reviewAgent.createManualReviewJob",
@@ -37681,6 +38045,18 @@
             "vercel-large"
           ]
         },
+        "environmentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "profileId": {
           "anyOf": [
             {
@@ -37765,6 +38141,7 @@
       "model",
       "variant",
       "sandboxallocation",
+      "environmentid",
       "profileid",
       "bodyschema",
       "prompttemplate",
@@ -37775,7 +38152,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation environmentid profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation environmentId profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",
@@ -38051,6 +38428,18 @@
             }
           ]
         },
+        "environmentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "promptTemplate": {
           "type": "string",
           "minLength": 1,
@@ -38140,6 +38529,7 @@
       "model",
       "variant",
       "sandboxallocation",
+      "environmentid",
       "prompttemplate",
       "profileid",
       "bodyschema",
@@ -38150,7 +38540,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation environmentid prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation environmentId promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
   },
   "workspaceFolders.create": {
     "path": "workspaceFolders.create",

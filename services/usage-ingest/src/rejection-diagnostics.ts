@@ -1,7 +1,12 @@
-import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
+import { EnkryptUsageWriteSchema, UsageRecordRequestSchema } from '@kilocode/usage-contracts';
 
 type ValidationError = Extract<
   ReturnType<typeof UsageRecordRequestSchema.safeParse>,
+  { success: false }
+>['error'];
+
+type EnkryptValidationError = Extract<
+  ReturnType<typeof EnkryptUsageWriteSchema.safeParse>,
   { success: false }
 >['error'];
 
@@ -177,6 +182,26 @@ export function schemaRejectionDetails(error: ValidationError, parsedJson: unkno
         issue.path.length > MAX_PATH_DEPTH
           ? 'unknown'
           : receivedType(ownValue(parsedJson, issue.path)),
+    })),
+    omitted_issue_count: Math.max(0, error.issues.length - MAX_ISSUES),
+  };
+}
+
+const enkryptFields: readonly string[] = Object.keys(EnkryptUsageWriteSchema.shape);
+
+/** The Enkrypt record is flat, so only a top-level schema key is named; deeper segments are redacted. */
+function enkryptPath(path: PropertyKey[]): string[] {
+  const [field, ...rest] = path;
+  if (field === undefined) return [];
+  if (typeof field !== 'string' || !enkryptFields.includes(field)) return ['[redacted]'];
+  return rest.length === 0 ? [field] : [field, '[redacted]'];
+}
+
+export function enkryptSchemaRejectionDetails(error: EnkryptValidationError): object {
+  return {
+    issues: error.issues.slice(0, MAX_ISSUES).map(issue => ({
+      code: issueCode(issue.code),
+      path: enkryptPath(issue.path),
     })),
     omitted_issue_count: Math.max(0, error.issues.length - MAX_ISSUES),
   };

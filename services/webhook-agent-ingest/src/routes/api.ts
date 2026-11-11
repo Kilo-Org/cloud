@@ -1,12 +1,4 @@
 import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
-/**
- * API Routes (internal API key auth required)
- *
- * These routes provide CRUD operations for triggers and requests.
- * - Personal triggers: /triggers/user/:userId/:triggerId
- * - Organization triggers: /triggers/org/:orgId/:triggerId
- */
-
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import type { HonoContext } from '../index';
@@ -26,16 +18,8 @@ import type {
 
 const api = new Hono<HonoContext>();
 
-// Apply internal API key middleware to all API routes
 api.use('*', internalApiMiddleware);
 
-// ----------------------------------------------------------------------------
-// Personal Trigger Routes (/triggers/user/:userId/:triggerId)
-// ----------------------------------------------------------------------------
-
-/**
- * Create/configure a new personal trigger
- */
 api.post('/triggers/user/:userId/:triggerId', async c => {
   const { triggerId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -51,9 +35,6 @@ api.post('/triggers/user/:userId/:triggerId/invoke', async c => {
   return handleInvokeScheduled(c, `user/${userId}`, triggerId);
 });
 
-/**
- * List captured requests for a personal trigger
- */
 api.get('/triggers/user/:userId/:triggerId/requests', async c => {
   const { triggerId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -62,9 +43,6 @@ api.get('/triggers/user/:userId/:triggerId/requests', async c => {
   return handleListRequests(c, namespace, triggerId);
 });
 
-/**
- * Get a single captured request from a personal trigger
- */
 api.get('/triggers/user/:userId/:triggerId/requests/:requestId', async c => {
   const { triggerId, requestId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -73,9 +51,6 @@ api.get('/triggers/user/:userId/:triggerId/requests/:requestId', async c => {
   return handleGetRequest(c, namespace, triggerId, requestId);
 });
 
-/**
- * Get a personal trigger's configuration
- */
 api.get('/triggers/user/:userId/:triggerId', async c => {
   const { triggerId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -84,9 +59,6 @@ api.get('/triggers/user/:userId/:triggerId', async c => {
   return handleGetTrigger(c, namespace, triggerId);
 });
 
-/**
- * Update a personal trigger's configuration
- */
 api.put('/triggers/user/:userId/:triggerId', async c => {
   const { triggerId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -95,9 +67,6 @@ api.put('/triggers/user/:userId/:triggerId', async c => {
   return handleUpdateTrigger(c, namespace, triggerId);
 });
 
-/**
- * Delete a personal trigger and all its data
- */
 api.delete('/triggers/user/:userId/:triggerId', async c => {
   const { triggerId } = c.req.param();
   const userId = decodeUserIdFromPath(c.req.param('userId'));
@@ -106,13 +75,6 @@ api.delete('/triggers/user/:userId/:triggerId', async c => {
   return handleDeleteTrigger(c, namespace, triggerId);
 });
 
-// ----------------------------------------------------------------------------
-// Organization Trigger Routes (/triggers/org/:orgId/:triggerId)
-// ----------------------------------------------------------------------------
-
-/**
- * Create/configure a new organization trigger
- */
 api.post('/triggers/org/:orgId/:triggerId', async c => {
   const { orgId, triggerId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -126,9 +88,6 @@ api.post('/triggers/org/:orgId/:triggerId/invoke', async c => {
   return handleInvokeScheduled(c, `org/${orgId}`, triggerId);
 });
 
-/**
- * List captured requests for an organization trigger
- */
 api.get('/triggers/org/:orgId/:triggerId/requests', async c => {
   const { orgId, triggerId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -136,9 +95,6 @@ api.get('/triggers/org/:orgId/:triggerId/requests', async c => {
   return handleListRequests(c, namespace, triggerId);
 });
 
-/**
- * Get a single captured request from an organization trigger
- */
 api.get('/triggers/org/:orgId/:triggerId/requests/:requestId', async c => {
   const { orgId, triggerId, requestId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -146,9 +102,6 @@ api.get('/triggers/org/:orgId/:triggerId/requests/:requestId', async c => {
   return handleGetRequest(c, namespace, triggerId, requestId);
 });
 
-/**
- * Get an organization trigger's configuration
- */
 api.get('/triggers/org/:orgId/:triggerId', async c => {
   const { orgId, triggerId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -156,9 +109,6 @@ api.get('/triggers/org/:orgId/:triggerId', async c => {
   return handleGetTrigger(c, namespace, triggerId);
 });
 
-/**
- * Update an organization trigger's configuration
- */
 api.put('/triggers/org/:orgId/:triggerId', async c => {
   const { orgId, triggerId } = c.req.param();
   const namespace = `org/${orgId}`;
@@ -166,19 +116,12 @@ api.put('/triggers/org/:orgId/:triggerId', async c => {
   return handleUpdateTrigger(c, namespace, triggerId);
 });
 
-/**
- * Delete an organization trigger and all its data
- */
 api.delete('/triggers/org/:orgId/:triggerId', async c => {
   const { orgId, triggerId } = c.req.param();
   const namespace = `org/${orgId}`;
 
   return handleDeleteTrigger(c, namespace, triggerId);
 });
-
-// ============================================================================
-// Route Handlers
-// ============================================================================
 
 type RouteContext = Context<HonoContext>;
 
@@ -196,6 +139,7 @@ export const TriggerConfigInput = z
       .regex(/^[a-zA-Z]+$/)
       .optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
+    environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
     profileId: z.string().uuid().nullable().optional(),
     bodySchema: webhookBodySchema.nullable().optional(),
@@ -310,6 +254,13 @@ export const TriggerConfigInput = z
           path: ['sandboxAllocation'],
         });
       }
+      if (data.environmentId != null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'environmentId is not applicable for kiloclaw_chat triggers',
+          path: ['environmentId'],
+        });
+      }
     }
   });
 
@@ -329,6 +280,7 @@ export const TriggerConfigUpdateInput = z
       .nullable()
       .optional(),
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
+    environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
     profileId: z.string().uuid().nullable().optional(),
@@ -521,13 +473,11 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
 
   const updates = parsedUpdates.data;
 
-  // Check if there are any updates to apply
   if (Object.keys(updates).length === 0) {
     return c.json(resError('No updates provided'), 400);
   }
 
   try {
-    // First check if trigger exists
     const existingConfig = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
       async (stub): Promise<TriggerConfig | null> => await stub.getConfig(),
@@ -552,6 +502,10 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
       );
     }
 
+    if (existingConfig.targetType === 'kiloclaw_chat' && updates.environmentId != null) {
+      return c.json(resError('environmentId is not applicable for kiloclaw_chat triggers'), 400);
+    }
+
     const result = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
       stub => stub.updateConfig(updates),
@@ -567,7 +521,6 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
       triggerId,
     });
 
-    // Return updated config (without encryptedSecrets)
     const updatedConfig = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
       async (stub): Promise<TriggerConfigResponse | null> => await stub.getConfigForResponse(),
@@ -598,7 +551,6 @@ async function handleListRequests(c: RouteContext, namespace: string, triggerId:
   const doKey = buildDOKey(namespace, triggerId);
 
   try {
-    // First check if trigger exists, regardless of whether it is paused
     const exists = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
       stub => stub.exists(),
@@ -635,7 +587,6 @@ async function handleGetRequest(
   const doKey = buildDOKey(namespace, triggerId);
 
   try {
-    // First check if trigger exists, regardless of whether it is paused
     const exists = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
       stub => stub.exists(),
@@ -672,7 +623,6 @@ async function handleDeleteTrigger(c: RouteContext, namespace: string, triggerId
   const doKey = buildDOKey(namespace, triggerId);
 
   try {
-    // First check if trigger exists, regardless of whether it is paused
     const exists = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
       stub => stub.exists(),
@@ -713,14 +663,6 @@ async function handleDeleteTrigger(c: RouteContext, namespace: string, triggerId
   }
 }
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Build DO key from namespace and triggerId.
- * Format: "namespace/triggerId" (e.g., "user/abc123/my-webhook" or "org/xyz789/my-webhook")
- */
 function buildDOKey(namespace: string, triggerId: string): string {
   return `${namespace}/${triggerId}`;
 }

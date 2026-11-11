@@ -218,6 +218,17 @@ class FinalPayloadGuard(unittest.TestCase):
         payload["messages"] = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}, {"role": "user", "content": "solve"}]
         tariffs.validate_final_payload(payload, self.contract)
 
+    def test_outbound_messages_drop_response_fields(self):
+        messages = [
+            {"role": "user", "content": "solve"},
+            {"role": "assistant", "content": "next", "reasoning": "analysis", "reasoning_details": {"text": "analysis"}, "extra": {"cost": 1}},
+            {"role": "user", "content": "observation"},
+        ]
+        projected = study.outbound_messages(messages)
+        self.assertEqual(projected, messages[:1] + [{"role": "assistant", "content": "next"}] + messages[2:])
+        payload = study.build_payload({"model": "x/y", "effort": "effort=low"}, projected, self.contract, CFG)
+        tariffs.validate_final_payload(payload, self.contract)
+
     def test_contract_binds_quoted_candidate_max_tokens_and_organization(self):
         other = {**self.candidate, "model": "z/w"}
         with self.assertRaisesRegex(tariffs.TariffError, "candidate identity"):

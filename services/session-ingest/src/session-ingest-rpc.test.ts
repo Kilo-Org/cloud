@@ -50,6 +50,7 @@ vi.mock('./services/user-session-admission', () => ({
   canCreateCliSessionForUser: vi.fn(),
   USER_SESSION_ADMISSION_ERROR: 'User session creation is not allowed',
 }));
+vi.mock('./ingest/metadata', () => ({ applyMetadataChanges: vi.fn() }));
 
 import { getWorkerDb } from '@kilocode/db/client';
 import {
@@ -86,6 +87,49 @@ import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { SessionIngestRPC } from './session-ingest-rpc';
 import { notifyUserSessionEvent } from './session-events';
 import { canCreateCliSessionForUser } from './services/user-session-admission';
+import { applyMetadataChanges } from './ingest/metadata';
+
+describe('publishCloudAgentSessionStatus', () => {
+  const input = {
+    sessionId: 'ses_12345678901234567890123456',
+    kiloUserId: 'oauth/status-test',
+    cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+    status: 'busy',
+    occurredAt: '2026-11-09T12:00:00.000Z',
+    transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+  } as const;
+  const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+  const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } };
+
+  it('forwards only the validated status projection with an immutable runtime-owner fence', async () => {
+    const rpc = new SessionIngestRPC(ctx, env as never);
+    await rpc.publishCloudAgentSessionStatus(input);
+    expect(applyMetadataChanges).toHaveBeenCalledWith(
+      env,
+      input.kiloUserId,
+      input.sessionId,
+      new Map([
+        ['status', 'busy'],
+        ['statusOccurredAt', input.occurredAt],
+        ['statusTransitionId', input.transitionId],
+      ]),
+      ctx,
+      input.cloudAgentSessionId
+    );
+  });
+
+  it.each([
+    { status: 'invented' },
+    { transitionId: 'invalid' },
+    { occurredAt: 'not-a-date' },
+    { transcript: 'not metadata' },
+  ])('rejects invalid publication %j', async invalid => {
+    const rpc = new SessionIngestRPC(ctx, env as never);
+    await expect(
+      rpc.publishCloudAgentSessionStatus({ ...input, ...invalid } as never)
+    ).rejects.toThrow();
+  });
+});
 
 const sdkSessionInfoFixture = {
   id: 'ses_12345678901234567890123456',

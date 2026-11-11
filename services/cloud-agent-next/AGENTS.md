@@ -21,7 +21,7 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 
 ### Wrapper Build
 
-- `pnpm run build:wrapper` - Build wrapper bundle (uses Bun in `wrapper/`)
+- `pnpm run build:wrapper` - Build wrapper artifacts for publication (uses Bun in `wrapper/`)
 
 ### Testing
 
@@ -87,11 +87,11 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 - `src/sandbox-containers/` - `SandboxContainers` provider and container outbound handling
 - `src/legacy-runtime-tombstones.ts` - Export-only no-op tombstones for retired SDK sandbox DO names
 - `src/agent-sandbox/` - Provider protocol and provider REST clients
-- `Dockerfile.containers`, `Dockerfile.containers.runtime-free` - Native sandbox images
+- `Dockerfile.containers.runtime-free` - Native sandbox base image; CLI and wrapper download at startup
 
 ### Wrapper
 
-- `wrapper/` - Wrapper runtime bundled into the sandbox image
+- `wrapper/` - Wrapper runtime published as immutable downloaded artifacts; BYOC Vercel snapshot builds also bundle it
 - `wrapper/src/control-plane/main.ts` - Wrapper entrypoint
 - `wrapper/control-plane-supervisor.sh` - Container supervisor
 - `wrapper/src/control-plane/session-supervisor.ts` - Per-process Kilo supervision and execution clocks
@@ -126,6 +126,8 @@ This pattern blocks API endpoints from running for external contributors who don
 
 `docs/control-plane.md` is the spec. Every session is a `workspace_*` control-plane session. The Worker exports `SandboxSessionV2` as `SandboxSession` and `SandboxControlV2` as `SandboxControl`. Implementation is `src/control-plane/session/`, `src/control-plane/sandbox/`, and `wrapper/src/control-plane/`. The split `prepareSession`/`initiateFromKilocodeSessionV2`/`sendMessageV2` endpoints are public compatibility adapters over the same Session DO, not a separate runtime.
 
+- Sandbox ownership has exactly two supported forms: one standalone session without a workspace per sandbox, or one workspace per sandbox with any number of sessions in that workspace. Independent workspaces and standalone sessions never share a sandbox. The `workspace_*` session ID prefix does not imply workspace membership.
+- Build all new functionality for that exclusive ownership model. Do not add support, fallback paths, or test matrices for sandboxes shared across independent workspaces or standalone sessions. Existing legacy shared-sandbox decoding and cleanup are compatibility-only, not a supported topology or a requirement for new features.
 - One state value per message, route, and allocation. Do not add a flag, proof, or counter that encodes a state the spec already names.
 - The wrapper socket is the liveness signal. A close, or 45 seconds without a heartbeat, moves the allocation to `disconnected`. It then stops at the earlier of the reconnect window and the idle deadline (`connection_lost` or `sandbox_stopped`), and the next message prepares a new sandbox. Do not add a provider poll for a killed container. `sandbox_lost` is not that case: a confirmed provider stop during worktree deletion, or a Vercel network-policy failure on session release.
 - A failure the user can hit has a specific reason. A new message or Stop starts recovery. Do not leave a session waiting on a condition the system already knows.

@@ -23,7 +23,7 @@ import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import {
@@ -142,7 +142,7 @@ async function injectProvider(
   const broker = createFakeCredentialBroker();
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker, {
+    installFakeSandboxEnv(instance, broker, {
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
@@ -1447,16 +1447,23 @@ describe('SandboxSessionV2 preview service discovery', () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
     const sessionStub = await startSessionWithSandbox({
       sessionId,
       sandboxId,
       provider,
-      worktreeId: `worktree_${crypto.randomUUID()}`,
+      worktreeId,
     });
     const wrapper = await connectAndHello(provider, sandboxId, wrapperId);
     await markRouteReady(sessionStub, wrapper, sessionId);
     await settleCaptures(wrapper);
-    return { sessionId, sandboxId, sessionStub, wrapper };
+    return {
+      sessionId,
+      sandboxId,
+      sessionStub,
+      wrapper,
+      scope: { ownerId: USER_ID, organizationId: ORG_ID, scopeId: worktreeId },
+    };
   }
 
   it('relays a bound wrapper scan to the session caller', async () => {
@@ -1479,14 +1486,14 @@ describe('SandboxSessionV2 preview service discovery', () => {
   });
 
   it('surfaces a post-send timeout as an error instead of not_ready', async () => {
-    const { sessionId, sandboxId, wrapper } = await readySession('wr_preview_timeout');
+    const { sandboxId, wrapper, scope } = await readySession('wr_preview_timeout');
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, instance => {
       instance.controlRequestTimeoutMs = 25;
     });
 
     const assertion = expect(
-      runInDurableObject(sandboxStub, instance => instance.previewServices(sessionId))
+      runInDurableObject(sandboxStub, instance => instance.previewServices(scope))
     ).rejects.toThrow('Preview service discovery timed out');
     await awaitFrame(wrapper, 'preview.list');
 
@@ -1495,11 +1502,11 @@ describe('SandboxSessionV2 preview service discovery', () => {
   });
 
   it('surfaces a wrapper scan error', async () => {
-    const { sessionId, sandboxId, wrapper } = await readySession('wr_preview_error');
+    const { sandboxId, wrapper, scope } = await readySession('wr_preview_error');
     const sandboxStub = sandboxes.getByName(sandboxId);
 
     const assertion = expect(
-      runInDurableObject(sandboxStub, instance => instance.previewServices(sessionId))
+      runInDurableObject(sandboxStub, instance => instance.previewServices(scope))
     ).rejects.toThrow('Preview service scan failed (scan_failed)');
     const frame = await awaitFrame(wrapper, 'preview.list');
     wrapper.send({

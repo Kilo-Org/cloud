@@ -19,6 +19,12 @@
  * of the two: it also runs the handler's merge-head guard, so a head that
  * merges base content a review already covers is gated from that review instead
  * of being reviewed a second time.
+ *
+ * A head that already has a review stopped on a transient failure is restarted
+ * through the same sequence the manual retry uses, under an attempt cap. The
+ * restart reapplies the reviewer configuration and the repository, bot and
+ * review-type rules the handler would apply to a new head, because it reaches
+ * no handler itself.
  */
 
 import * as z from 'zod';
@@ -26,7 +32,11 @@ import pLimit from 'p-limit';
 import { inArray, sql, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { platform_integrations, type PlatformIntegration } from '@kilocode/db/schema';
+import {
+  platform_integrations,
+  type CloudAgentCodeReview,
+  type PlatformIntegration,
+} from '@kilocode/db/schema';
 import {
   fetchOpenPullRequests,
   type OpenPullRequest,
@@ -38,11 +48,27 @@ import {
 } from '@/lib/integrations/github/runtime-authorization';
 import { PLATFORM, GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
+import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import { isCouncilEntitledForOwner } from '@/lib/code-reviews/core/council-entitlement';
+import { getManualCodeReviewConfig } from '@/lib/code-reviews/manual-config';
 import {
   findActiveReviewsForPR,
   findExistingReview,
+  listCodeReviewAttempts,
   type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
+import {
+  isAutomaticallyRetryableFailure,
+  isAutomaticallyRetryableReview,
+  retryFailedCodeReview,
+  type ReviewerConfigRow,
+} from './retry-review';
+import {
+  determineAutomatedReviewType,
+  isCouncilActive,
+  type AutomatedReviewPrFacts,
+} from '@kilocode/worker-utils/code-review-council';
+import { CodeReviewAgentConfigSchema } from '@kilocode/db/schema-types';
 import {
   PullRequestPayloadSchema,
   type PullRequestPayload,
@@ -73,9 +99,17 @@ export type RecoverMissedReviewsSummary = {
   repositoriesConsidered: number;
   integrationsUnavailable: number;
   pullRequestsConsidered: number;
+  /**
+   * New reviews this run queued. A restart is reported in `reviewsRetried`
+   * instead, so a reader of this counter still counts first reviews only.
+   */
   reviewsStarted: number;
+  /** Failed reviews reset and handed back to dispatch by this run. */
+  reviewsRetried: number;
   skippedExisting: number;
   skippedActiveReview: number;
+  /** Failed reviews the reviewer configuration does not let a restart run. */
+  skippedRetryRefused: number;
   /**
    * Installed repository entries the sweep cannot address, because the payload
    * needs a numeric platform id. Counted across the installation fleet, so it
@@ -109,8 +143,10 @@ function summaryWith(counts: Partial<RecoverMissedReviewsSummary>): RecoverMisse
     integrationsUnavailable: 0,
     pullRequestsConsidered: 0,
     reviewsStarted: 0,
+    reviewsRetried: 0,
     skippedExisting: 0,
     skippedActiveReview: 0,
+    skippedRetryRefused: 0,
     unaddressableRepositories: 0,
     skippedStale: 0,
     skippedDraft: 0,
@@ -413,6 +449,126 @@ function toPullRequestPayload(
   });
 }
 
+/** The optional part of a stored configuration the restart gate reads. */
+const RestartConfigSchema = CodeReviewAgentConfigSchema.partial();
+
+/** Why a restart does not run under the owner's current configuration. */
+type RestartRefusalReason =
+  /** No readable configuration, so no restart runs unattended. */
+  | 'config_unreadable'
+  /** The owner removed this repository from the selected set. */
+  | 'repository_not_selected'
+  /** The owner asks the sweep to skip bot-authored pull requests. */
+  | 'bot_pull_request'
+  /** The current configuration would run this pull request as a standard review. */
+  | 'review_type_not_selected';
+
+type RestartAdmission =
+  /** The current configuration admits the restart; the row saves it a read. */
+  | { admitted: true; agentConfig: ReviewerConfigRow }
+  | { admitted: false; reason: RestartRefusalReason };
+
+/**
+ * Whether the current configuration still selects the review type this row
+ * stored.
+ *
+ * The webhook handler decides council or standard from the current
+ * configuration and the pull request facts, and the dispatch that runs a
+ * restart only re-checks that a council configuration is still active. Council
+ * is the expensive path, so a restart repeats the whole decision here: a stored
+ * council review the current configuration would start as standard is left for
+ * a person, rather than spending council on a pull request the owner no longer
+ * selects it for.
+ *
+ * An inactive council configuration needs no decision of its own, because the
+ * dispatch already runs that restart as a standard review. A stored standard
+ * review is never widened to council by a restart, which would spend the
+ * council budget without a trigger.
+ */
+async function isStoredReviewTypeStillSelected(params: {
+  owner: Owner;
+  review: CloudAgentCodeReview;
+  pull: OpenPullRequest;
+  config: z.infer<typeof RestartConfigSchema>;
+}): Promise<boolean> {
+  const { owner, review, pull, config } = params;
+  if (review.review_type !== 'council') return true;
+
+  const councilConfigActive = isCouncilActive(config.council);
+  if (!councilConfigActive) return true;
+
+  const councilEnabledForRepo =
+    Array.isArray(config.council_enabled_repository_ids) &&
+    config.council_enabled_repository_ids.includes(pull.baseRepoId);
+  // The entitlement lookup is a database read, so it runs only behind the two
+  // cheap checks the handler also uses first.
+  const councilEntitled = councilEnabledForRepo ? await isCouncilEntitledForOwner(owner) : false;
+  const prFacts: AutomatedReviewPrFacts = {
+    isDraft: pull.draft,
+    isBot: pull.authorType === 'Bot',
+    isFork: pull.headRepoFullName !== pull.baseRepoFullName,
+    author: pull.authorLogin,
+    labels: pull.labels,
+  };
+
+  return (
+    determineAutomatedReviewType(prFacts, {
+      councilEntitled,
+      councilConfigActive,
+      councilEnabledForRepo,
+      selection: { requiredLabels: config.council?.required_labels },
+    }) === 'council'
+  );
+}
+
+/**
+ * Whether the owner's current Code Reviewer configuration admits this restart.
+ *
+ * The sweep hands a pull request without a review to the handler, which applies
+ * every configuration rule. A restart reaches no handler, so it repeats the
+ * rules a stored review can outlive: a repository the owner removed from the
+ * selected set, a bot pull request the owner asks to skip, and a review type the
+ * current configuration no longer selects. A manual review keeps the request a
+ * person made and is not subject to any of them.
+ */
+async function admitRestart(params: {
+  owner: Owner;
+  review: CloudAgentCodeReview;
+  pull: OpenPullRequest;
+}): Promise<RestartAdmission> {
+  if (getManualCodeReviewConfig(params.review) !== null) {
+    return { admitted: true, agentConfig: null };
+  }
+
+  const agentConfig = await getAgentConfigForOwner(params.owner, 'code_review', PLATFORM.GITHUB);
+  const parsedConfig = RestartConfigSchema.safeParse(agentConfig?.config);
+  if (!parsedConfig.success) return { admitted: false, reason: 'config_unreadable' };
+  const config = parsedConfig.data;
+
+  if (
+    config.repository_selection_mode === 'selected' &&
+    Array.isArray(config.selected_repository_ids) &&
+    !config.selected_repository_ids.includes(params.pull.baseRepoId)
+  ) {
+    return { admitted: false, reason: 'repository_not_selected' };
+  }
+
+  const skipBotPullRequests = config.skip_bot_pull_requests ?? true;
+  if (skipBotPullRequests && params.pull.authorType === 'Bot') {
+    return { admitted: false, reason: 'bot_pull_request' };
+  }
+
+  const reviewTypeSelected = await isStoredReviewTypeStillSelected({
+    owner: params.owner,
+    review: params.review,
+    pull: params.pull,
+    config,
+  });
+  if (!reviewTypeSelected) return { admitted: false, reason: 'review_type_not_selected' };
+
+  return { admitted: true, agentConfig };
+}
+
 async function recoverPullRequest(params: {
   pull: OpenPullRequest;
   entry: RecoverableRepository;
@@ -441,9 +597,78 @@ async function recoverPullRequest(params: {
     platformIntegrationId: entry.integration.id,
   };
 
-  if ((await findExistingReview(scope, pull.headSha)) !== null) {
-    summary.skippedExisting += 1;
-    return;
+  const existingReview = await findExistingReview(scope, pull.headSha);
+  if (existingReview !== null) {
+    // A review row at this head used to end the sweep's interest in it. A row
+    // that stopped on a transient failure is not an answer: left alone, it keeps
+    // the pull request's gate failed and its head never gets a review, because
+    // nothing retries it without a person. Restart it here, under an attempt cap
+    // so a persistent fault settles instead of billing a run every sweep.
+    if (!isAutomaticallyRetryableFailure(existingReview)) {
+      summary.skippedExisting += 1;
+      return;
+    }
+    // A new review and a restart each cost one agent run, so both draw on the
+    // same per-run budget: the two counters are added, and neither alone is the
+    // budget.
+    if (summary.reviewsStarted + summary.reviewsRetried >= RECOVER_MISSED_REVIEWS_START_LIMIT) {
+      summary.skippedStartLimit += 1;
+      return;
+    }
+    // Reserve the slot synchronously, before any await, as the start path does:
+    // several repositories sweep at once, and a retry starts a review, so it
+    // spends the same per-run budget. The reservation is released below when
+    // this row does not restart.
+    summary.reviewsRetried += 1;
+    let retried = false;
+    try {
+      // The attempt rows are read only for a review inside the start budget, so
+      // a head that already has its review costs one query.
+      const attempts = await listCodeReviewAttempts(existingReview.id);
+      if (!isAutomaticallyRetryableReview(existingReview, attempts.length)) {
+        summary.skippedExisting += 1;
+        return;
+      }
+      const admission = await admitRestart({ owner, review: existingReview, pull });
+      if (!admission.admitted) {
+        // No run was spent and nothing is left to count as a provider failure.
+        summary.skippedRetryRefused += 1;
+        logExceptInTest('[recoverMissedReviews] Restart refused by the current configuration', {
+          reviewId: existingReview.id,
+          reason: admission.reason,
+        });
+        return;
+      }
+      const retry = await retryFailedCodeReview({
+        review: existingReview,
+        owner,
+        retryReason: 'automatic_recovery',
+        agentConfig: admission.agentConfig,
+      });
+      if (retry.outcome === 'retried') {
+        retried = true;
+        return;
+      }
+      if (retry.outcome === 'already_in_flight') {
+        // Another caller reset this review first, so nothing was dispatched.
+        summary.skippedExisting += 1;
+        return;
+      }
+      if (retry.outcome === 'refused') {
+        // The reviewer configuration cannot run this review, so no run was
+        // spent and nothing is left to count as a provider failure.
+        summary.skippedRetryRefused += 1;
+        return;
+      }
+      // Dispatch refused the retried attempt, so the row is failed again.
+      summary.providerFailures += 1;
+      warnExceptInTest('[recoverMissedReviews] Retried review failed again', {
+        reviewId: existingReview.id,
+      });
+      return;
+    } finally {
+      if (!retried) summary.reviewsRetried -= 1;
+    }
   }
   // A review still in flight at an earlier head must not be superseded by a
   // synthetic synchronize event; the webhook path reaches this handler only
@@ -453,7 +678,9 @@ async function recoverPullRequest(params: {
     summary.skippedActiveReview += 1;
     return;
   }
-  if (summary.reviewsStarted >= RECOVER_MISSED_REVIEWS_START_LIMIT) {
+  // A restart spends the same per-run budget as a new review, so the two
+  // counters are added here: neither alone is the budget.
+  if (summary.reviewsStarted + summary.reviewsRetried >= RECOVER_MISSED_REVIEWS_START_LIMIT) {
     summary.skippedStartLimit += 1;
     return;
   }

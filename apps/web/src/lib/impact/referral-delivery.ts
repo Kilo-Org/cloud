@@ -3,6 +3,7 @@ import 'server-only';
 import { and, asc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   isImpactConfigured,
   sendImpactConversionPayload,
@@ -42,6 +43,26 @@ import {
 type DatabaseClient = typeof db | DrizzleTransaction;
 
 const IMPACT_ADVOCATE_KILO_PASS_REWARD_UNIT = 'Kilo Pass Bonus Credits';
+
+/** Local reward statuses that can still be fulfilled, so Impact reporting may follow. */
+const REDEEMABLE_KILO_PASS_REWARD_STATUSES: ImpactReferralRewardStatus[] = [
+  ImpactReferralRewardStatus.Pending,
+  ImpactReferralRewardStatus.Earned,
+  ImpactReferralRewardStatus.Applied,
+];
+
+function isRedeemableReferralRewardStatus(status: ImpactReferralRewardStatus): boolean {
+  return REDEEMABLE_KILO_PASS_REWARD_STATUSES.includes(status);
+}
+
+/**
+ * A blocked redemption is terminal and non-retryable, so the payout stops until
+ * someone acts. Report it to Sentry with non-sensitive identifiers only.
+ */
+const logBlockedRewardRedemption = sentryLogger(
+  'impact_advocate_reward_redemption_blocked',
+  'error'
+);
 
 export type ImpactConversionReportDispatchSummary = {
   claimed: number;
@@ -255,9 +276,7 @@ export async function queueImpactAdvocateRewardRedemption(params: {
   const isRedeemableKiloPassReward =
     reward.product === ImpactReferralProduct.KiloPass &&
     reward.rewardKind === ImpactReferralRewardKind.KiloPassBonus &&
-    (reward.status === ImpactReferralRewardStatus.Pending ||
-      reward.status === ImpactReferralRewardStatus.Earned ||
-      reward.status === ImpactReferralRewardStatus.Applied) &&
+    isRedeemableReferralRewardStatus(reward.status) &&
     reward.rewardAmountUsd !== null &&
     reward.rewardAmountUsd > 0;
 
@@ -424,6 +443,32 @@ async function dispatchImpactAdvocateRewardRedemptionById(
     return 'failed';
   }
 
+  const reward = await db.query.impact_referral_rewards.findFirst({
+    where: eq(impact_referral_rewards.id, redemption.reward_id),
+    columns: { id: true, status: true },
+  });
+  if (!reward || !isRedeemableReferralRewardStatus(reward.status)) {
+    await db
+      .update(impact_advocate_reward_redemptions)
+      .set({
+        state: ImpactAdvocateRewardRedemptionState.Failed,
+        attempt_count: attemptCount,
+        next_retry_at: null,
+        response_status_code: null,
+        redeem_response_payload: {
+          error: reward ? 'referral_reward_not_redeemable' : 'referral_reward_not_found',
+          rewardStatus: reward?.status ?? null,
+        } satisfies Record<string, unknown>,
+      })
+      .where(eq(impact_advocate_reward_redemptions.id, redemption.id));
+    logBlockedRewardRedemption('impact_advocate_reward_redeem_stopped_by_local_state', {
+      redemptionId: redemption.id,
+      rewardId: redemption.reward_id,
+      rewardStatus: reward?.status ?? null,
+    });
+    return 'failed';
+  }
+
   const advocateScope = { programKey: redemption.request_payload.programKey };
 
   const lookupResult = await sendImpactAdvocateRewardLookupPayload(
@@ -530,11 +575,7 @@ async function queueMissingImpactAdvocateRewardRedemptions(limit: number): Promi
       and(
         eq(impact_referral_rewards.product, ImpactReferralProduct.KiloPass),
         eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloPassBonus),
-        inArray(impact_referral_rewards.status, [
-          ImpactReferralRewardStatus.Pending,
-          ImpactReferralRewardStatus.Earned,
-          ImpactReferralRewardStatus.Applied,
-        ]),
+        inArray(impact_referral_rewards.status, REDEEMABLE_KILO_PASS_REWARD_STATUSES),
         sql`${impact_referral_rewards.reward_amount_usd} > 0`,
         sql`NOT EXISTS (
           SELECT 1

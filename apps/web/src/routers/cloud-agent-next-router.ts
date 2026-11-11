@@ -81,6 +81,7 @@ import {
   baseCreatePreviewNextOutputSchema,
   basePreviewOptionsNextOutputSchema,
   basePreviewOptionsNextSchema,
+  previewTargetFromInput,
   baseListPreviewServicesNextOutputSchema,
   baseListPreviewServicesNextSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
@@ -99,6 +100,7 @@ import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { buildPreviewOpenUrl, buildPreviewUrlTemplate } from '@/lib/cloud-agent/preview-open-url';
+import { verifyUserOwnsPreviewWorktree } from '@/lib/cloud-agent-next/preview-worktree-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
@@ -655,28 +657,52 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseCreatePreviewNextSchema)
     .output(baseCreatePreviewNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const target = previewTargetFromInput(input);
+      if (target === null) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'A preview target is required' });
+      }
+
+      if (target.worktreeId !== undefined) {
+        const ownsWorktree = await verifyUserOwnsPreviewWorktree(
+          db,
+          ctx.user.id,
+          target.worktreeId
+        );
+        if (!ownsWorktree) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Worktree not found or access denied',
+          });
+        }
+      } else if (target.cloudAgentSessionId !== undefined) {
+        await assertUserOwnsSession(ctx.user.id, target.cloudAgentSessionId);
+      }
 
       const { ticket, expiresAt } = signPreviewTicket({
         userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
         port: input.port,
+        ...target,
       });
       return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
     }),
 
   /**
    * Whether the Worker shows preview for this session, and the preview URL with
-   * a `{port}` placeholder. The Worker owns both preview switches. This is only
+   * a `{port}` placeholder. The Worker owns preview availability. This is only
    * a UI gate, so a Worker failure hides preview instead of failing the query.
    */
   getPreviewOptions: baseProcedure
     .input(basePreviewOptionsNextSchema)
     .output(basePreviewOptionsNextOutputSchema)
     .query(async ({ ctx, input }) => {
+      const target = previewTargetFromInput(input);
+      if (target === null) return { enabled: false };
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const options = await createCloudAgentNextClient(authToken)
-        .getPreviewOptions({ cloudAgentSessionId: input.cloudAgentSessionId })
+        .getPreviewOptions({
+          ...target,
+          organizationId: input.organizationId,
+        })
         .catch((error: unknown) => {
           console.warn('[cloud-agent-next.getPreviewOptions] Worker call failed:', {
             error: error instanceof Error ? error.message : String(error),
@@ -696,11 +722,26 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseListPreviewServicesNextSchema)
     .output(baseListPreviewServicesNextOutputSchema)
     .query(async ({ ctx, input }) => {
-      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const target = previewTargetFromInput(input);
+      if (target === null)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing preview target' });
+      if (target.worktreeId !== undefined) {
+        const ownsWorktree = await verifyUserOwnsPreviewWorktree(
+          db,
+          ctx.user.id,
+          target.worktreeId
+        );
+        if (!ownsWorktree) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Worktree not found or access denied',
+          });
+        }
+      } else if (target.cloudAgentSessionId !== undefined) {
+        await assertUserOwnsSession(ctx.user.id, target.cloudAgentSessionId);
+      }
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
-      return await createCloudAgentNextClient(authToken).listPreviewServices({
-        cloudAgentSessionId: input.cloudAgentSessionId,
-      });
+      return await createCloudAgentNextClient(authToken).listPreviewServices(target);
     }),
 
   refreshTerminalTicket: baseProcedure

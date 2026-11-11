@@ -98,23 +98,24 @@ describe('uninstallGitHubOrganizationInstallation', () => {
     mockUnlinkTeamKiloUsers.mockResolvedValue(0);
   });
 
-  test.each([{ is_admin: false }, { blocked_reason: 'blocked' }])(
-    'rejects a currently inactive admin before upstream work: %j',
-    async change => {
-      const actor = await insertTestUser({ is_admin: true });
-      const owner = await insertTestUser();
-      const row = await integration({ userId: owner.id });
-      await db.update(kilocode_users).set(change).where(eq(kilocode_users.id, actor.id));
+  test.each([
+    { is_admin: false },
+    { blocked_reason: 'blocked' },
+    { blocked_at: '2026-01-15T12:00:00.000Z' },
+  ])('rejects a currently inactive admin before upstream work: %j', async change => {
+    const actor = await insertTestUser({ is_admin: true });
+    const owner = await insertTestUser();
+    const row = await integration({ userId: owner.id });
+    await db.update(kilocode_users).set(change).where(eq(kilocode_users.id, actor.id));
 
-      await expect(
-        uninstallGitHubOrganizationInstallation({
-          input: request(row, { type: 'user', id: owner.id }),
-          actor: { id: actor.id, email: actor.google_user_email, name: actor.google_user_name },
-        })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-      expect(upstream).not.toHaveBeenCalled();
-    }
-  );
+    await expect(
+      uninstallGitHubOrganizationInstallation({
+        input: request(row, { type: 'user', id: owner.id }),
+        actor: { id: actor.id, email: actor.google_user_email, name: actor.google_user_name },
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(upstream).not.toHaveBeenCalled();
+  });
 
   test.each([
     { owner: { type: 'user' as const, id: 'other' } },

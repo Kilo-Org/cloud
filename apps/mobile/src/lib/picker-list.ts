@@ -4,14 +4,19 @@ import { Keyboard } from 'react-native';
  * The tap contract for a picker whose search field holds the software keyboard:
  * the first tap on a row always reaches that row.
  *
- * `keyboardShouldPersistTaps="handled"` does not deliver that tap. React Native
- * implements the prop in JS (`ScrollView._handleStartShouldSetResponder`): while
- * the keyboard is dismissible and the touched node is not the focused input, the
- * scroll view asks to become the responder itself, and when it wins the press is
- * swallowed — the row never fires and the keyboard stays up, so a second tap is
- * lost the same way. `"always"` never makes that claim, so the row's own press
- * handler runs; the keyboard then closes through `dismissSearchPickerKeyboard`
- * because the pick was applied, not on the way to it.
+ * React Native implements the prop in JS, and the phase that loses the tap is
+ * the capture one: `ScrollView._handleStartShouldSetResponderCapture` claims the
+ * touch start before any row sees it, and it does that for `"never"`, the
+ * platform default, only. `"handled"` claims in the bubble phase instead
+ * (`_handleStartShouldSetResponder`), after a nested pressable had its chance,
+ * so a row tap already reaches the row there.
+ *
+ * These pickers ask for `"always"` because the keyboard must close on the pick,
+ * not on the way to it, and `"always"` is the only value that never lets the
+ * scroll view unfocus the search field: `_handleResponderRelease` skips that
+ * blur for `"always"`, so a touch on the sheet background or a drag keeps the
+ * keyboard up. `dismissSearchPickerKeyboard` then closes it exactly once, when a
+ * pick is applied.
  *
  * Every list that holds searchable rows carries these, whether it is a
  * `FlashList` body or a `ScrollView` of mapped rows.

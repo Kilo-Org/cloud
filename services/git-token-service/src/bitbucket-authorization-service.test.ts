@@ -196,6 +196,8 @@ describe('BitbucketAuthorizationService', () => {
     }).toSQL();
 
     expect(query.sql).toContain('exists (select');
+    expect(query.sql).toContain('"kilocode_users"."blocked_at" is null');
+    expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
     expect(query.sql).toContain('"organization_memberships"');
     expect(query.params).toContain('member-1');
     expect(query.params).toContain('123e4567-e89b-12d3-a456-426614174030');

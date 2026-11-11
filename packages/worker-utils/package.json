@@ -22,6 +22,9 @@
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
+    "./microdollars": "./src/microdollars.ts",
+    "./compute-member": "./src/compute-member.ts",
+    "./cloud-agent-compute": "./src/cloud-agent-compute.ts",
     "./egress-allowlist": "./src/egress-allowlist.ts",
     "./egress-audit": "./src/egress-audit.ts",
     "./scm-capability-contract": "./src/scm-capability-contract.ts",
@@ -34,6 +37,7 @@
     "./kiloclaw-billing-observability": "./src/kiloclaw-billing-observability.ts",
     "./kilo-pass-bonus-projection": "./src/kilo-pass-bonus-projection.ts",
     "./git-url": "./src/git-url.ts",
+    "./gitlab-url": "./src/gitlab-url.ts",
     "./callback-token": "./src/callback-token.ts",
     "./cf-access": "./src/cf-access.ts",
     "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
@@ -62,7 +66,9 @@
     "./usage-writer-client": "./src/usage-writer-client.ts",
     "./vercel-execution-region": "./src/vercel-execution-region.ts",
     "./organization-membership": "./src/organization-membership.ts",
-    "./webhook-body-validation": "./src/webhook-body-validation.ts"
+    "./webhook-body-validation": "./src/webhook-body-validation.ts",
+    "./organization-usage": "./src/organization-usage.ts",
+    "./organization-consumption": "./src/organization-consumption.ts"
   },
   "scripts": {
     "test": "vitest run",

@@ -176,7 +176,7 @@ describe('workspace snapshot diagnostics with durable SQLite', () => {
       change: descriptor({ capturedAt: Date.now() - WORKSPACE_SNAPSHOT_TTL_MS - 1 }),
       reason: 'expired',
     },
-    { change: descriptor({ baseImage: 'old-image' }), reason: 'image_mismatch' },
+    { change: descriptor({ baseImage: 'old-image' }), reason: 'selected' },
     { change: descriptor(), reason: 'selected' },
   ])('reports $reason without changing the descriptor', async ({ change, reason }) =>
     withDatabase(db => {

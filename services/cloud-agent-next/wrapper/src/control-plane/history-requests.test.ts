@@ -9,7 +9,8 @@ function setup() {
   const requests = createHistoryRequests({ send: frame => sent.push(frame) });
   const requestId = () => {
     const frame = sent.at(-1);
-    if (frame?.type !== 'history.page') throw new Error('expected history.page');
+    if (frame?.type !== 'history.page' && frame?.type !== 'history.recent')
+      throw new Error('expected history request');
     return frame.requestId;
   };
   return { sent, requests, requestId };
@@ -25,6 +26,32 @@ async function rejection(promise: Promise<unknown>): Promise<string> {
 }
 
 describe('history requests', async () => {
+  it('discovers recent workspace sessions and validates the five-session bound', async () => {
+    const { sent, requests, requestId } = setup();
+    const recent = requests.readRecent({ sessionId: request.sessionId });
+    const sessions = [request];
+    expect(sent).toEqual([
+      { type: 'history.recent', requestId: requestId(), sessionId: request.sessionId },
+    ]);
+    requests.handle({ type: 'history.result', requestId: requestId(), ok: true, page: sessions });
+    expect(await recent).toEqual(sessions);
+    const oversized = requests.readRecent({ sessionId: request.sessionId });
+    requests.handle({
+      type: 'history.result',
+      requestId: requestId(),
+      ok: true,
+      page: Array(6).fill(request),
+    });
+    expect(await rejection(oversized)).toContain('Too big');
+  });
+
+  it('carries the hosted workspace route on sibling history reads', async () => {
+    const { sent, requests, requestId } = setup();
+    const page = requests.readPage({ ...request, workspaceSessionId: 'workspace_anchor' });
+    expect(sent[0]).toMatchObject({ type: 'history.page', workspaceSessionId: 'workspace_anchor' });
+    requests.handle({ type: 'history.result', requestId: requestId(), ok: true, page: {} });
+    await page;
+  });
   it('sends one page request and resolves its result', async () => {
     const { sent, requests, requestId } = setup();
     const page = requests.readPage({ ...request, cursor: 'next' });

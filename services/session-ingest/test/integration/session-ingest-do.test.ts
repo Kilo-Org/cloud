@@ -1664,14 +1664,17 @@ describe('SessionIngestDO integration', () => {
       });
     });
 
-    it('returns bounded pages by sortable message item_id while preserving native id/time cursors', async () => {
+    it('returns bounded pages in creation order when the stored ids do not follow the clock', async () => {
       const sessionId = 'ses_sdk_page_000000000000001';
       const stub = getStub(kiloUserId, sessionId);
+      // Written as the conversation happened, with ids that descend: a session
+      // an older or foreign writer stored. The newest page is the newest turn,
+      // and the rows inside it stay chronological.
       const messages = [
-        { id: 'msg_400', created: 100 },
-        { id: 'msg_300', created: 400 },
-        { id: 'msg_100', created: 300 },
-        { id: 'msg_200', created: 200 },
+        { id: 'msg_d', created: 100 },
+        { id: 'msg_c', created: 200 },
+        { id: 'msg_b', created: 300 },
+        { id: 'msg_a', created: 400 },
       ].map(message => ({
         id: message.id,
         sessionID: sessionId,
@@ -1689,17 +1692,47 @@ describe('SessionIngestDO integration', () => {
       );
 
       const latest = await stub.readKiloSdkMessages({ limit: 2 });
-      expect(latest.messages.map(message => message.info.id)).toEqual(['msg_300', 'msg_400']);
+      expect(latest.messages.map(message => message.info.id)).toEqual(['msg_b', 'msg_a']);
       expect(latest.nextCursor).toBeTruthy();
       if (!latest.nextCursor) throw new Error('Expected cursor for an older message page');
       expect(JSON.parse(atob(latest.nextCursor.replace(/-/g, '+').replace(/_/g, '/')))).toEqual({
-        id: 'msg_300',
-        time: 400,
+        id: 'msg_b',
+        time: 300,
       });
 
       const earlier = await stub.readKiloSdkMessages({ limit: 2, before: latest.nextCursor });
-      expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_100', 'msg_200']);
+      expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_d', 'msg_c']);
       expect(earlier.nextCursor).toBeNull();
+    });
+
+    it('orders one bounded page by creation time even when arrival order disagrees', async () => {
+      const sessionId = 'ses_sdk_page_order_0000000001';
+      const stub = getStub(kiloUserId, sessionId);
+      // Written out of order, with ids that do not sort with the clock either:
+      // the page is still chronological inside itself.
+      const messages = [
+        { id: 'msg_2', created: 300 },
+        { id: 'msg_1', created: 100 },
+        { id: 'msg_3', created: 200 },
+      ].map(message => ({
+        id: message.id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: message.created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      }));
+
+      await stub.ingest(
+        messages.map(info => ({ type: 'message' as const, data: info })),
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const page = await stub.readKiloSdkMessages({ limit: 3 });
+      expect(page.messages.map(message => message.info.id)).toEqual(['msg_1', 'msg_3', 'msg_2']);
+      expect(page.nextCursor).toBeNull();
     });
 
     it('omits a message identity outside the cursor contract from a bounded page', async () => {

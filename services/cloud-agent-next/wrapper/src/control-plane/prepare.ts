@@ -1,4 +1,5 @@
 import type { HistoryPageRequest } from './history-requests.js';
+import { createWorkspaceHistoryPreloader } from './workspace-history.js';
 import { runSetupScript } from '../setup-script.js';
 import {
   createRuntimeProfileMaterializer,
@@ -19,6 +20,7 @@ import {
   type ControlPlaneWorkspaceOutcome,
   type ControlPlaneWrapperFrame,
   type WorkspaceConfig,
+  type WorkspaceHistorySession,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
@@ -140,6 +142,10 @@ export type PrepareDeps = {
   emit: (frame: ControlPlaneWrapperFrame) => void;
   /** Reads one page of a session's Cloud history over the control connection. */
   readHistoryPage?: (request: HistoryPageRequest) => Promise<unknown>;
+  readRecentHistory?: (request: {
+    sessionId: string;
+    signal?: AbortSignal;
+  }) => Promise<WorkspaceHistorySession[]>;
   runtimes: PrepareRuntimePort;
   /** This wrapper's allocation; a workspace stamped by another one came from a snapshot. */
   allocationId: string;
@@ -259,6 +265,11 @@ type InflightCleanup = {
 export function createPreparationManager(deps: PrepareDeps): PreparationManager {
   const timers = deps.timers.wrapper;
   const log = deps.log ?? ((): void => undefined);
+  const workspaceHistory = createWorkspaceHistoryPreloader({
+    readRecent: deps.readRecentHistory,
+    readPage: deps.readHistoryPage,
+    log,
+  });
   const inheritedEnv = deps.inheritedEnv ?? process.env;
   const profileMaterializer = createRuntimeProfileMaterializer();
   const workspaceConfigurations = new Map<string, WorkspaceConfig>();
@@ -927,15 +938,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(
       `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} environmentBuildCommands=${skippedSetupCommands} sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
     );
-    if (skippedSetupCommands > 0) {
-      emitProgress(
-        spec.sessionId,
-        'setup',
-        fromEnvironmentSnapshot
-          ? 'Setup already ran in the environment snapshot'
-          : 'Environment build commands run in the environment build'
-      );
-    }
     const commandFailures: ControlPlaneCommandFailure[] = [];
     await runPreparationCommands(
       spec,
@@ -1022,7 +1024,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     restoreRoots: RestoreRoots | undefined
   ): Promise<void> {
     const readHistoryPage = deps.readHistoryPage;
-    await client.open({
+    await workspaceHistory.open(client, {
       sessionId: spec.kiloSessionId,
       ...(readHistoryPage
         ? {
@@ -1321,23 +1323,26 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         await settleReleaseCleanup(sessionId);
         await withOneRetry(
           () =>
-            withinStep('kilo_session', timers.kiloSessionMs, signal =>
-              resolveKiloSession(
-                spec,
-                directory,
-                builtEnv,
-                client,
-                signal,
-                restoreFiles,
-                // A V2 route sends each restored diff to the root that contains it.
-                hasEnvironmentRoots(roots)
-                  ? {
-                      directories: roots.map(root => root.directory),
-                      recovered: [...recoveredRoots],
-                    }
-                  : undefined
-              )
-            ),
+            withinStep('kilo_session', timers.kiloSessionMs, async signal => {
+              await Promise.all([
+                resolveKiloSession(
+                  spec,
+                  directory,
+                  builtEnv,
+                  client,
+                  signal,
+                  restoreFiles,
+                  // A V2 route sends each restored diff to the root that contains it.
+                  hasEnvironmentRoots(roots)
+                    ? {
+                        directories: roots.map(root => root.directory),
+                        recovered: [...recoveredRoots],
+                      }
+                    : undefined
+                ),
+                workspaceHistory.preload(client, spec, builtEnv, signal),
+              ]);
+            }),
           () => !owner.released
         );
       };

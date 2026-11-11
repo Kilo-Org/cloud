@@ -11,6 +11,20 @@ export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentW
 
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
+export const publishCloudAgentSessionStatusSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    kiloUserId: z.string().min(1),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
+    status: z.enum(['busy', 'retry', 'question', 'permission', 'idle', 'failed']),
+    occurredAt: z.iso.datetime(),
+    transitionId: z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/),
+  })
+  .strict();
+export type PublishCloudAgentSessionStatusParams = z.infer<
+  typeof publishCloudAgentSessionStatusSchema
+>;
+
 export const cloudAgentWorktreeLocationSchema = z
   .object({
     sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
@@ -193,6 +207,8 @@ export const createSessionForCloudAgentSchema = z.object({
   title: z.string().optional(),
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
   gitUrl: z.string().optional(),
+  /** The workspace working branch, selected before the first registration. */
+  gitBranch: z.string().min(1).max(256).optional(),
   // The profile the session was prepared with, as resolved by the caller
   // (explicit pick, effective default, or repository binding). Optional and
   // nullable so a caller that predates profile recording still creates the
@@ -1353,6 +1369,7 @@ export type AuthorizedSessionMessages = {
 export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 
 export type SessionIngestRpcMethods = {
+  publishCloudAgentSessionStatus: (params: PublishCloudAgentSessionStatusParams) => Promise<void>;
   beginCloudAgentWorktreeDeletion: (
     params: CloudAgentWorktreeDeletionParams
   ) => Promise<CloudAgentWorktreeDeletionState>;

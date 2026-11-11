@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive suite for the sheet title, the centering rule and the auto-follow rule */
 import {
   type Part,
   type ReasoningPart,
@@ -125,6 +126,35 @@ describe('getPartDetailTitle', () => {
     // header must show the tool title rather than a blank.
     getToolDisplay.mockReturnValue({ title: 'bash', subtitle: '', translatable: true });
     expect(getPartDetailTitle(makeToolPart())).toEqual(untranslated('bash'));
+  });
+
+  it('shows the label alone when the sheet body already shows the subtitle', () => {
+    // The sent-file chip names the file, so the header keeps the label and
+    // never repeats the name or the raw tool id.
+    getToolDisplay.mockReturnValue({
+      title: 'Sent file',
+      subtitle: 'random.txt',
+      translatable: true,
+      headerTitleOnly: true,
+    });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'send_file' }))).toEqual(
+      untranslated('Sent file')
+    );
+  });
+
+  it('keeps the file name in the header while a send is unfinished', () => {
+    // The body renders no chip until the delivery completes, so the header is
+    // the only place that names the file.
+    getToolDisplay.mockReturnValue({
+      title: 'Send file',
+      subtitle: 'random.txt',
+      translatable: true,
+    });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'send_file' }))).toEqual({
+      prefix: 'Send file',
+      text: 'random.txt',
+      translatable: true,
+    });
   });
 
   it('never marks reasoning or other part types translatable', () => {

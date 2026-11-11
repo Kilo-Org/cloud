@@ -4,13 +4,24 @@ import { pathToFileURL } from 'node:url';
 const shaPattern = /^[a-f0-9]{40}$/;
 const catalogPath = 'services/cloud-agent-next/runtime-targets.json';
 
-/** A catalog needs publication when its default or any named target uses downloaded startup. */
 export function catalogNeedsPublication(catalog) {
-  if (typeof catalog?.default !== 'object' || typeof catalog?.targets !== 'object')
+  if (
+    !catalog?.default ||
+    !catalog.targets ||
+    typeof catalog.targets !== 'object' ||
+    Array.isArray(catalog.targets)
+  )
     throw new Error('Invalid runtime target catalog');
-  return [catalog.default, ...Object.values(catalog.targets)].some(
-    target => target?.mode === 'downloaded'
-  );
+  if (
+    [catalog.default, ...Object.values(catalog.targets)].some(
+      target =>
+        target?.mode !== 'downloaded' ||
+        target?.image !== 'runtime-free' ||
+        target.interactiveOrgIds !== undefined
+    )
+  )
+    throw new Error('Invalid runtime target: only downloaded runtime-free startup is supported');
+  return true;
 }
 
 /** Read the runtime target catalog exactly as committed at the source SHA. */

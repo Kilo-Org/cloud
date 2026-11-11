@@ -83,6 +83,13 @@ const CONFIG_SETTLE_MS = 750;
 const RELOAD_QUIET_MS = 1_000;
 const RELOAD_QUIET_TIMEOUT_MS = 10_000;
 const IN_APP_SAMPLING_SLACK_MS = 10_000;
+// A screen that paints its loading placeholder gets this long to replace it
+// with content before the sample is reported as unsettled.
+const LOADING_SETTLE_TIMEOUT_MS = 30_000;
+// The deep link must land before its placeholder can be judged. A link that
+// never lands is the navigation retry's business, not the loading wait's, so the
+// wait releases itself instead of spending the whole settle budget on it.
+const LOADING_ARRIVAL_TIMEOUT_MS = 10_000;
 // The iOS dev client re-downloads the bundle through the SSH tunnel after a reload.
 const RELOAD_WAIT_MS = 150_000;
 const RTL_LANGUAGE = 'ar';
@@ -94,8 +101,38 @@ export type Sampled = {
   /** Consecutive probe states agree; this does not establish native paint. */
   settled: boolean;
   elapsedMs: number;
+  /** Set when the measured screen still paints a loading placeholder. */
+  blockedBy?: 'loading-placeholder';
+  /** Milliseconds this capture spent waiting for the placeholder to clear. */
+  loadingWaitMs?: number;
   alignment?: CaptureAlignment;
 };
+
+/**
+ * The placeholders a screen paints while its own content is still loading.
+ *
+ * A loading layout holds still, so a settle loop that only compares two dumps
+ * accepts it and the capture measures the skeleton instead of the screen. The
+ * app marks these nodes with a `-skeleton` test ID or a `Skeleton` owner, so a
+ * settled sample must contain none of them.
+ */
+const LOADING_TEST_ID = /(?:^|-)skeleton$/u;
+const LOADING_OWNERS: Readonly<Record<string, true>> = {
+  SessionComposerSkeleton: true,
+  SessionListSkeletonRows: true,
+  SessionReadOnlyFooterPlaceholder: true,
+  SessionRowSkeleton: true,
+  SessionSectionHeaderSkeleton: true,
+  SessionSkeletonMessages: true,
+  Skeleton: true,
+};
+
+export function loadingPlaceholder(tree: LayoutTree): boolean {
+  return tree.nodes.some(node => {
+    if (node.probe.testID !== undefined && LOADING_TEST_ID.test(node.probe.testID)) return true;
+    return (node.probe.owners ?? []).some(owner => LOADING_OWNERS[owner] === true);
+  });
+}
 
 export async function sampleUntilSettled(
   probe: Pick<ProbeClient, 'dump'>,
@@ -118,6 +155,48 @@ export async function sampleUntilSettled(
     }
     if (elapsedMs >= observeMs + SETTLE_TIMEOUT_MS) {
       return { dump, timeline, settled: false, elapsedMs };
+    }
+    await clock.sleep(SAMPLE_INTERVAL_MS);
+  }
+}
+
+/**
+ * The result of waiting for a target's loading placeholder.
+ *
+ * `observed` is true only when the target itself painted a placeholder, so a
+ * caller never reports one it did not see.
+ */
+export type LoadingWait = { cleared: boolean; observed: boolean; elapsedMs: number };
+
+/**
+ * Wait for a screen that is painting its own loading placeholder to finish.
+ *
+ * Only the screen the link opened is judged: the wait starts once `arrived`
+ * reports one of the dumps. The wait is bounded, so a placeholder that outlives
+ * it is reported as unsettled rather than measured as the screen. A link that
+ * never lands releases the wait at the arrival bound.
+ */
+export async function waitForLoadingPlaceholder(
+  probe: Pick<ProbeClient, 'dump'>,
+  clock: Clock,
+  arrived: (dump: ProbeDump) => boolean = () => true,
+  timeoutMs = LOADING_SETTLE_TIMEOUT_MS,
+  arrivalMs = LOADING_ARRIVAL_TIMEOUT_MS
+): Promise<LoadingWait> {
+  const started = clock.now();
+  let onTarget = false;
+  let observed = false;
+  for (;;) {
+    const dump = await probe.dump();
+    onTarget ||= arrived(dump);
+    const elapsedMs = clock.now() - started;
+    if (!onTarget) {
+      if (elapsedMs >= arrivalMs) return { cleared: false, observed, elapsedMs };
+    } else if (!loadingPlaceholder(normalize(dump))) {
+      return { cleared: true, observed, elapsedMs };
+    } else {
+      observed = true;
+      if (elapsedMs >= timeoutMs) return { cleared: false, observed, elapsedMs };
     }
     await clock.sleep(SAMPLE_INTERVAL_MS);
   }
@@ -211,7 +290,13 @@ export function screenFindings(args: {
           cell: args.cell,
           target: args.target,
           dump: args.dump,
-          elapsedMs: args.sampled.elapsedMs,
+          // A placeholder it waited on is reported by the wait that ran, not by
+          // the settle loop that only saw the screen hold still.
+          elapsedMs:
+            args.sampled.blockedBy === 'loading-placeholder'
+              ? (args.sampled.loadingWaitMs ?? args.sampled.elapsedMs)
+              : args.sampled.elapsedMs,
+          blockedBy: args.sampled.blockedBy,
         })
       );
     }
@@ -340,13 +425,32 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     screenTexts(dump) !== beforeTexts ||
     (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
     (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
-  await ctx.probe.startSampling(SAMPLE_INTERVAL_MS, ctx.observeMs + IN_APP_SAMPLING_SLACK_MS);
+  await ctx.probe.startSampling(
+    SAMPLE_INTERVAL_MS,
+    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
+  );
   await ctx.probe.openLink(target.link);
+  // A cold screen paints its own loading placeholder and holds it still, so a
+  // settle loop would measure the placeholder. Wait for it to clear first, and
+  // never claim a placeholder the target did not paint.
+  let placeholderWaitedMs = 0;
+  const waitForPlaceholder = async (): Promise<void> => {
+    const wait = await waitForLoadingPlaceholder(ctx.probe, ctx.clock, opened);
+    placeholderWaitedMs += wait.elapsedMs;
+    if (!wait.cleared && wait.observed) {
+      ctx.log(
+        `design-gate: ${target.id} still paints its loading placeholder after ${wait.elapsedMs}ms`
+      );
+    }
+  };
+  await waitForPlaceholder();
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
   let unopened: string | undefined;
   if (!opened(settled.dump)) {
     ctx.log(`design-gate: ${target.id} did not change the screen; opening the link again`);
     await ctx.probe.openLink(target.link);
+    // The retry opens the same cold screen, so it gets the same wait.
+    await waitForPlaceholder();
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
   }
@@ -384,12 +488,19 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     layoutSignature,
     screenshotObservation(dump, image)
   );
+  const stillLoading = loadingPlaceholder(normalize(dump));
   const sampled: Sampled = {
     ...settled,
     dump,
     timeline: expandSamples(samples),
     alignment,
-    settled: settled.settled && layoutSignature(settled.dump) === layoutSignature(dump),
+    // A screen that still paints its loading placeholder is never the settled
+    // screen the target describes, whatever the settle loop saw before it. The
+    // finding reports the wait that ran, not the settle loop's own elapsed time.
+    settled:
+      settled.settled && !stillLoading && layoutSignature(settled.dump) === layoutSignature(dump),
+    ...(stillLoading ? { blockedBy: 'loading-placeholder' as const } : {}),
+    ...(placeholderWaitedMs > 0 ? { loadingWaitMs: placeholderWaitedMs } : {}),
   };
   writeJson(files.absolute(files.capture), alignment);
   const screen: Screen = {
@@ -450,7 +561,23 @@ export function unsettledFinding(args: {
   target: string;
   dump: ProbeDump;
   elapsedMs: number;
+  blockedBy?: Sampled['blockedBy'];
 }): Finding {
+  if (args.blockedBy === 'loading-placeholder') {
+    return {
+      rule: 'unsettled',
+      severity: 'warning',
+      cell: args.cell,
+      target: args.target,
+      element: rootRef(args.dump),
+      measured: args.elapsedMs,
+      expected: 'the screen content after its loading placeholder',
+      unit: 'ms',
+      message:
+        `The screen still paints its loading placeholder after ${args.elapsedMs} ms, so it is not ` +
+        'settled; layout rules were skipped for this screen.',
+    };
+  }
   return {
     rule: 'unsettled',
     severity: 'warning',

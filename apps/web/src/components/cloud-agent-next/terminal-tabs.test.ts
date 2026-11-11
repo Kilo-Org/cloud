@@ -19,6 +19,10 @@ import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
 import type { useWorktreeReview } from './useWorktreeReview';
 import type { WorktreeReviewDialog } from './WorktreeReviewDialog';
 import type { WorktreeReviewComment } from './worktree-review';
+import type {
+  usePreviewController as UsePreviewController,
+  PreviewControllerInput,
+} from './use-preview-controller';
 import { worktreeFileIdentity } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   CHAT_TAB_ID,
@@ -50,6 +54,9 @@ let mockParentSession:
   | undefined;
 const mockSkipToken = Symbol('skip');
 const mockParentQuery = jest.fn();
+const mockPreviewOptions = jest.fn(
+  (_target: unknown, _organizationId?: string): string | null => null
+);
 const mockParentQueryOptions = jest.fn((input: unknown) => ({
   queryKey: [['worktreeParent'], input],
 }));
@@ -135,7 +142,8 @@ jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () =
 jest.mock('./useChatStackInfo', () => ({ useChatStackInfo: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),
-  usePreviewUrlTemplate: () => null,
+  usePreviewUrlTemplate: (target: unknown, organizationId?: string) =>
+    mockPreviewOptions(target, organizationId),
   useOpenPreview: () => ({ openPreview: jest.fn(), isOpening: false }),
 }));
 jest.mock('./CloudAgentProvider', () => ({
@@ -354,6 +362,75 @@ function installTerminalTestDom() {
   return { container, cleanup: () => Object.assign(globalThis, previous) };
 }
 
+describe('preview dialog lifecycle', () => {
+  let usePreviewController: typeof UsePreviewController;
+  let dom: ReturnType<typeof installTerminalTestDom>;
+  let root: Root;
+  const input: PreviewControllerInput = {
+    selectedWorktreeId: 'worktree_shared',
+    sessionId: 'workspace_recent',
+    canOpenPreview: true,
+    organizationId: undefined,
+  };
+
+  function PreviewControllerTest(props: PreviewControllerInput) {
+    const preview = usePreviewController(props);
+    return createElement(
+      'button',
+      { onClick: preview.openDialog, 'data-dialog-open': preview.dialog?.open },
+      'Preview'
+    );
+  }
+
+  function render(props: Partial<PreviewControllerInput> = {}) {
+    act(() => root.render(createElement(PreviewControllerTest, { ...input, ...props })));
+  }
+
+  const dialogOpen = () => dom.container.querySelector('button')?.getAttribute('data-dialog-open');
+
+  beforeAll(async () => {
+    ({ usePreviewController } = await import('./use-preview-controller'));
+  });
+
+  beforeEach(() => {
+    mockPreviewOptions.mockReturnValue('https://preview.example/{port}');
+    dom = installTerminalTestDom();
+    root = createRoot(dom.container);
+    render();
+    act(() => dom.container.querySelector('button')?.click());
+    expect(dialogOpen()).toBe('true');
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    dom.cleanup();
+    mockPreviewOptions.mockReturnValue(null);
+  });
+
+  it('stays closed when preview access returns for the same cached target', () => {
+    render({ canOpenPreview: false });
+    expect(dialogOpen()).toBeNull();
+    render();
+    expect(dialogOpen()).toBe('false');
+    act(() => dom.container.querySelector('button')?.click());
+    expect(dialogOpen()).toBe('true');
+  });
+
+  it.each<Partial<PreviewControllerInput>>([
+    { selectedWorktreeId: 'worktree_other' },
+    { organizationId: 'organization_other' },
+    { selectedWorktreeId: null, sessionId: 'workspace_other' },
+  ])('closes when the preview scope changes: %j', props => {
+    render(props);
+    expect(dialogOpen()).toBe('false');
+  });
+
+  it('stays open across chats within the same worktree', () => {
+    render({ sessionId: 'workspace_sibling' });
+    expect(dialogOpen()).toBe('true');
+  });
+});
+
 describe('cloud agent workspace terminal tabs', () => {
   it('starts on the chat tab without terminals', () => {
     expect(createWorkspaceTabsState()).toEqual({
@@ -500,6 +577,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     mockQueryClient.query.mockReset();
     mockParentSession = undefined;
     mockParentQuery.mockClear();
+    mockPreviewOptions.mockClear();
     mockParentQueryOptions.mockClear();
     mockAtomValues = {
       sessionId: 'workspace_recent',
@@ -531,6 +609,30 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     const { currentUserId = 'owner', ...rest } = props;
     act(() => root.render(createElement(CloudChatPage, { ...rest, currentUserId })));
   }
+
+  it('keeps preview workspace-scoped across main, unregistered sibling and worktree-only views', () => {
+    render();
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(
+      { worktreeId: 'worktree_shared' },
+      undefined
+    );
+
+    mockSessionId = 'ses_new_sibling';
+    mockAtomValues.sessionId = null;
+    mockAtomValues.fetchedSessionData = null;
+    render();
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(
+      { worktreeId: 'worktree_shared' },
+      undefined
+    );
+
+    mockSessionId = null;
+    render();
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(
+      { worktreeId: 'worktree_shared' },
+      undefined
+    );
+  });
 
   it('preserves parent navigation across sibling, terminal, and worktree-only views', () => {
     mockParentSession = {

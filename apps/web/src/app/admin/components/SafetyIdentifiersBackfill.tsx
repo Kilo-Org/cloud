@@ -21,10 +21,17 @@ export function SafetyIdentifiersBackfill() {
   const [logs, setLogs] = useState<BatchLog[]>([]);
   const queryClient = useQueryClient();
 
-  const { data: counts, isLoading } = useQuery<SafetyIdentifierCountsResponse>({
+  const {
+    data: counts,
+    isLoading,
+    error,
+  } = useQuery<SafetyIdentifierCountsResponse>({
     queryKey: ['safety-identifier-counts'],
     queryFn: async () => {
       const res = await adminFetch('/admin/api/safety-identifiers');
+      if (!res.ok) {
+        throw new Error(`Could not load backfill status (HTTP ${res.status})`);
+      }
       return res.json() as Promise<SafetyIdentifierCountsResponse>;
     },
     refetchInterval: false,
@@ -50,23 +57,31 @@ export function SafetyIdentifiersBackfill() {
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        Backfill safety identifiers for users missing any of the three fields. Each click processes
-        up to 50 000 users (50 batches of 1 000). Click repeatedly until the counter reaches zero.
+        Fill in OpenRouter and Vercel safety identifiers for users missing any of them. Existing
+        identifiers are never changed. Each click processes up to 50 000 users.
       </p>
 
-      <div className="bg-background rounded-lg border p-6 space-y-4">
+      <div className="bg-background space-y-4 rounded-lg border p-6">
         <div className="flex items-center gap-3">
           <span className="font-medium">Users missing a safety identifier</span>
           {isLoading ? (
-            <Badge variant="secondary">Loading…</Badge>
+            <Badge variant="secondary">Loading...</Badge>
+          ) : !counts ? (
+            <Badge variant="destructive">Status unavailable</Badge>
           ) : isDone ? (
             <Badge variant="default" className="bg-green-600">
               All filled
             </Badge>
           ) : (
-            <Badge variant="destructive">{(counts?.missing ?? 0).toLocaleString()} missing</Badge>
+            <Badge variant="destructive">{counts.missing.toLocaleString()} missing</Badge>
           )}
         </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error.message}</AlertDescription>
+          </Alert>
+        )}
 
         {mutation.isError && (
           <Alert variant="destructive">
@@ -76,15 +91,19 @@ export function SafetyIdentifiersBackfill() {
 
         <Button
           onClick={() => mutation.mutate()}
-          disabled={isLoading || isDone || mutation.isPending}
+          disabled={!counts || isDone || mutation.isPending}
           variant={isDone ? 'outline' : 'default'}
         >
-          {mutation.isPending ? 'Backfilling…' : isDone ? 'Nothing to do' : 'Backfill next 50 000'}
+          {mutation.isPending
+            ? 'Backfilling...'
+            : isDone
+              ? 'Nothing to do'
+              : 'Backfill next 50 000'}
         </Button>
       </div>
 
       {logs.length > 0 && (
-        <div className="bg-background rounded-lg border p-4 space-y-2">
+        <div className="bg-background space-y-2 rounded-lg border p-4">
           <h4 className="text-sm font-medium">Batch log</h4>
           <div className="space-y-1 font-mono text-xs">
             {logs.map((log, i) => (

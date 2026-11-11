@@ -33,7 +33,10 @@ import {
   findSupportedFimModel,
   type FimProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -258,26 +261,23 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.status_code = proxyRes.status;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: false,
-      isStreaming: requestBody.stream === true,
-      userByok: !!userByokEntry,
-      provider: fimProvider,
-      requestedModel: requestBody.model,
-      resolvedModel: requestBody.model,
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: proxyRes.status,
-    },
-    proxyRes.clone(),
-    requestStartedAt
-  );
+  const metricsParams = {
+    kiloUserId: user.id,
+    organizationId,
+    isAnonymous: false,
+    isStreaming: requestBody.stream === true,
+    userByok: !!userByokEntry,
+    provider: fimProvider,
+    requestedModel: requestBody.model,
+    resolvedModel: requestBody.model,
+    toolsAvailable: [],
+    toolsUsed: [],
+    ttfbMs,
+    statusCode: proxyRes.status,
+  };
 
   if (!proxyRes.body) {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
     return NextResponse.json(
       {
         error: 'No body returned from upstream',
@@ -299,8 +299,8 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
 
   const clonedResponse = proxyRes.clone(); // reading from body is side-effectful
 
-  // Account for usage using FIM-specific parser
-  countAndStoreFimUsage(clonedResponse, usageContext, fimRequestSpan);
+  const accounting = countAndStoreFimUsage(clonedResponse, usageContext, fimRequestSpan);
+  emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
 
   return upstreamErrorResponse ?? wrapInSafeNextResponse(proxyRes);
 }

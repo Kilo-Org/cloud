@@ -23,13 +23,16 @@ type DetectorSettings = z.infer<typeof DetectorSettingsSchema>;
 
 const GuardrailSettingsSchema = z.object({
   status: z.enum(['ready', 'invalid']),
-  scan_tool_results: z.boolean(),
   detectors: z.array(DetectorSettingsSchema),
 });
 
-/** One Enkrypt scan of the request: the blocking detectors' or the log-only detectors'. */
+/**
+ * One Enkrypt scan: of the blocking detectors or the log-only detectors, over the request's tool
+ * definitions, its system prompt, its conversation, or the model's response.
+ */
 export const EnkryptScanReportSchema = z.object({
   scan: z.enum(['blocking', 'log_only']),
+  part: z.enum(['tools', 'system', 'conversation', 'response']),
   detectors_enabled: z.array(DetectorIdSchema),
   detectors_blocking: z.array(DetectorIdSchema),
   verdict_cache: z.enum(['off', 'miss', 'hit', 'error']),
@@ -37,6 +40,9 @@ export const EnkryptScanReportSchema = z.object({
   total_segments: z.number(),
   cached_characters: z.number(),
   cached_segments: z.number(),
+  /** Attachments, such as images, sent to Enkrypt only as an omission marker. */
+  omitted_attachments: z.number(),
+  /** Includes the overlap of already-scanned text and omission markers. */
   scanned_characters: z.number(),
   decision: z.enum(['allowed', 'blocked', 'error_fail_closed', 'error_logged', 'client_aborted']),
   error: z.string().nullable(),
@@ -132,7 +138,6 @@ export function guardrailSettings(
 ): z.infer<typeof GuardrailSettingsSchema> {
   return {
     status: config.status,
-    scan_tool_results: config.scanToolResults,
     detectors:
       config.status === 'ready' ? detectorSettings(config.detectors, config.blockingDetectors) : [],
   };

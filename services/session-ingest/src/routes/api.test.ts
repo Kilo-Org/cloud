@@ -405,7 +405,7 @@ describe('api routes', () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
     const probeOrder: string[] = [];
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([]);
     fns.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
       probeOrder.push('insert-transaction');
@@ -438,7 +438,7 @@ describe('api routes', () => {
   it('POST /session recovers when the initial ingest probe fails but the final check succeeds', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -481,7 +481,7 @@ describe('api routes', () => {
   it('POST /session emits created only for newly inserted rows', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -532,7 +532,7 @@ describe('api routes', () => {
   it('POST /session does not emit created when row already exists', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([]);
 
     const sessionCache = {
@@ -563,7 +563,7 @@ describe('api routes', () => {
   it('POST /session rejects a tombstoned session and removes the resurrected row', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -604,7 +604,7 @@ describe('api routes', () => {
   it('POST /session rejects an existing tombstoned parent without deleting its row', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([]);
     fns.delete.mockImplementation(() => {
       throw new Error('parent row is still referenced by descendants');
@@ -631,7 +631,7 @@ describe('api routes', () => {
   it('POST /session keeps a newly created row when the ingest tombstone is absent', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -675,7 +675,7 @@ describe('api routes', () => {
   it('POST /session removes a newly created row when the tombstone check fails', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -721,7 +721,7 @@ describe('api routes', () => {
   it('POST /session caches a newly created personal session', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -773,7 +773,7 @@ describe('api routes', () => {
   it('POST /session succeeds when cache warming is unavailable during rollout', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
-    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_at: null, blocked_reason: null }]);
     fns.insertResult.mockResolvedValueOnce([
       {
         session_id: 'ses_12345678901234567890123456',
@@ -829,6 +829,27 @@ describe('api routes', () => {
     expect(fns.insert).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+  });
+
+  it('POST /session returns 403 and does not insert when the block timestamp is set', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([
+      { blocked_at: '2026-01-15T12:00:00.000Z', blocked_reason: null },
+    ]);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(403);
+    expect(fns.insert).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 
   it('POST /session returns 403 and does not insert when the user is missing', async () => {

@@ -49,6 +49,8 @@ beforeAll(async () => {
       parent_worktree_id text,
       base_branch text,
       base_sha text,
+      git_url text,
+      git_branch text,
       sidebar_position text,
       name text,
       created_at timestamptz NOT NULL DEFAULT now(),

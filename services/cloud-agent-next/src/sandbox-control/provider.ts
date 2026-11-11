@@ -1,4 +1,5 @@
 import type { SandboxBillingInput, SandboxClassName } from '../container-usage-context.js';
+import type { CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { SessionCredentialGrant } from './session-credentials.js';
 import {
@@ -8,7 +9,7 @@ import {
 import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { z } from 'zod';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
-import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
+import type { NativeRuntimeImage } from './startup-selection.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import type { NativeCaptureResult } from '../sandbox-containers/native-capture.js';
@@ -21,7 +22,10 @@ export type ProviderCreationCause =
   | 'invalid_configuration';
 
 export class ProviderCreationError extends AgentSandboxUnavailableError {
-  constructor(public readonly code: ProviderCreationCause) {
+  constructor(
+    public readonly code: ProviderCreationCause,
+    public readonly billingFailure?: CustomerBillingFailure
+  ) {
     super(
       code === 'insufficient_credits'
         ? 'Sandbox billing requires additional credits'
@@ -111,7 +115,7 @@ export type ProviderLaunchOptions = {
   /** Start from this snapshot; a provider without snapshot support ignores it. */
   snapshot?: ProviderSnapshotStart;
   deadlineAt?: number;
-  nativeImage?: RuntimeStartupConfig['image'];
+  nativeImage?: NativeRuntimeImage;
 };
 
 export type ProviderLaunchResult = {

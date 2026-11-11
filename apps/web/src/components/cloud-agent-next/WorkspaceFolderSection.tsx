@@ -1,6 +1,6 @@
 'use client';
 
-import type { DragEventHandler, ReactNode } from 'react';
+import { useRef, useState, type DragEventHandler, type ReactNode } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -15,6 +15,16 @@ import {
 } from 'lucide-react';
 import type { WorkspaceFolder, WorkspaceFolderSortMode } from '@/lib/cloud-agent/workspace-folders';
 import { workspaceFolderColorSchema } from '@/lib/cloud-agent/workspace-folders';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,6 +80,8 @@ export function WorkspaceFolderSection({
   onDrop: DragEventHandler<HTMLElement>;
   children: ReactNode;
 }) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const actionsRef = useRef<HTMLButtonElement>(null);
   const collapsed = controller.collapsedFolderIds.includes(folder.id);
   const disabled = controller.isSaving || controller.isError;
   const color = getWorkspaceFolderColor(folder.color);
@@ -129,6 +141,7 @@ export function WorkspaceFolderSection({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
+              ref={actionsRef}
               type="button"
               aria-label={`Folder actions for ${folder.name}`}
               aria-busy={controller.isSaving || undefined}
@@ -214,13 +227,50 @@ export function WorkspaceFolderSection({
               Move down
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" disabled={disabled} onSelect={onDelete}>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={disabled}
+              onSelect={() => {
+                if (isSmart) onDelete();
+                else setDeleteDialogOpen(true);
+              }}
+            >
               <Trash2 className="size-4" />
               {isSmart ? 'Remove from sidebar' : 'Delete folder'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent
+          onCloseAutoFocus={event => {
+            event.preventDefault();
+            actionsRef.current?.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete folder?</AlertDialogTitle>
+            <AlertDialogDescription className="break-words">
+              This deletes the folder{' '}
+              <span className="text-foreground font-medium">{folder.name}</span>. Its workspaces
+              will move to Ungrouped, not be deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={disabled}
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                onDelete();
+              }}
+            >
+              Delete folder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {!collapsed && (
         <div className="ml-3.5 pl-1">
           {visibleCount > 0 ? (

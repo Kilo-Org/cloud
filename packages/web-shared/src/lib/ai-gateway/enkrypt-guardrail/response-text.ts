@@ -84,7 +84,7 @@ const chatMessageSchema = z.object({
   refusal: text,
   reasoning: text,
   reasoning_content: text,
-  reasoning_details: z.array(z.object({ type: z.string(), text, summary: text })).nullish(),
+  reasoning_details: z.array(z.object({ type: z.string(), text })).nullish(),
   tool_calls: z
     .array(
       z.object({
@@ -113,13 +113,13 @@ const chatChunkSchema = z.object({
 
 /**
  * Providers often send the same reasoning in several fields, so identical copies are scanned once.
- * Encrypted reasoning details are never scanned.
+ * Reasoning summaries restate the raw reasoning, and encrypted reasoning cannot be read, so neither
+ * is scanned.
  */
 function chatReasoning(message: ChatMessage): Text {
   const details = (message.reasoning_details ?? [])
     .map(detail => {
       if (detail.type === 'reasoning.text') return detail.text ?? '';
-      if (detail.type === 'reasoning.summary') return detail.summary ?? '';
       return '';
     })
     .join('');
@@ -237,14 +237,13 @@ const responsesItemSchema = z.looseObject({
   arguments: text,
   input: text,
   content: z.array(z.object({ type: z.string(), text, refusal: text })).nullish(),
-  summary: z.array(z.object({ text })).nullish(),
 });
 
 type ResponsesItem = z.infer<typeof responsesItemSchema>;
 
 /**
- * Reasoning items carry their encrypted content in a field that is never scanned, and tool
- * results are not model output.
+ * Reasoning items carry their encrypted content and their summary in fields that are never
+ * scanned, and tool results are not model output.
  */
 function addResponsesItem(groups: TextGroups, key: string, item: ResponsesItem) {
   switch (item.type) {
@@ -252,9 +251,6 @@ function addResponsesItem(groups: TextGroups, key: string, item: ResponsesItem) 
     case 'reasoning':
       (item.content ?? []).forEach((part, index) =>
         groups.add(`${key}:content:${index}`, part.type === 'refusal' ? part.refusal : part.text)
-      );
-      (item.summary ?? []).forEach((part, index) =>
-        groups.add(`${key}:summary:${index}`, part.text)
       );
       return;
     case 'function_call':
@@ -283,7 +279,6 @@ const RESPONSES_DELTA_GROUPS = new Map([
   ['response.refusal.delta', 'content'],
   ['response.reasoning_text.delta', 'content'],
   ['response.reasoning.delta', 'content'],
-  ['response.reasoning_summary_text.delta', 'summary'],
   ['response.function_call_arguments.delta', 'arguments'],
   ['response.custom_tool_call_input.delta', 'arguments'],
   ['response.mcp_call_arguments.delta', 'arguments'],
@@ -293,7 +288,6 @@ const responsesEventSchema = z.object({
   type: z.string(),
   output_index: z.number().optional(),
   content_index: z.number().optional(),
-  summary_index: z.number().optional(),
   delta: z.unknown().optional(),
   item: responsesItemSchema.optional(),
 });
@@ -319,8 +313,7 @@ const addResponsesEvent: AddJson = (groups, json) => {
   if (group === 'arguments' && typeof event.delta === 'string') {
     groups.add(`${key}:arguments`, event.delta);
   } else if (group && typeof event.delta === 'string') {
-    const part = group === 'summary' ? event.summary_index : event.content_index;
-    groups.add(`${key}:${group}:${part ?? 0}`, event.delta);
+    groups.add(`${key}:${group}:${event.content_index ?? 0}`, event.delta);
   }
   return true;
 };
@@ -345,7 +338,7 @@ function addJson(groups: TextGroups, data: string, add: AddJson) {
 
 /**
  * The text of an upstream model response that reaches the client: assistant text and refusals,
- * reasoning that is not encrypted, and tool-call names and arguments, which clients execute and
+ * raw reasoning, and tool-call names and arguments, which clients execute and
  * which can carry the same content as text. Response metadata, usage, and server tool results are
  * not scanned.
  */

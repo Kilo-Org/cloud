@@ -14,6 +14,7 @@ import { TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { NextAuthOptions, JWT, LoggerInstance, Session } from 'next-auth';
 import { getServerSession } from 'next-auth';
@@ -70,8 +71,8 @@ import {
 } from '@kilocode/worker-utils/kilo-token-policy';
 
 import {
-  getBlacklistedDomains,
   getBlockedSignupTlds,
+  isEmailBlacklisted,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
@@ -402,7 +403,7 @@ export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   if (!user) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
-  if (user.blocked_reason) {
+  if (isBlockedAccount(user)) {
     redirect('/account-blocked');
   }
   return user;
@@ -612,7 +613,7 @@ export async function getUserFromAuthOrRedirect(
   if (!user) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
-  if (user.blocked_reason) {
+  if (isBlockedAccount(user)) {
     redirect('/account-blocked');
   }
   return user;
@@ -698,14 +699,14 @@ async function validateUserAuthorization({
       tokenSource,
       cloudAgentAuthority,
     });
-  } else if (await isUserBlacklistedByDomain(user)) {
+  } else if (await isUserBlacklistedByDomain(user, readDb)) {
     return authError(403, 'Access denied (R0)', kiloUserId, {
       authorizationRefused: true,
       internalApiUse,
       tokenSource,
       cloudAgentAuthority,
     });
-  } else if (!opts.DANGEROUS_allowBlockedUsers && user.blocked_reason) {
+  } else if (!opts.DANGEROUS_allowBlockedUsers && isBlockedAccount(user)) {
     return authError(403, 'Access denied (R1)', kiloUserId, {
       authorizationRefused: true,
       internalApiUse,
@@ -799,16 +800,11 @@ async function readActiveDeviceSession(
   return session !== undefined;
 }
 
-export async function isUserBlacklistedByDomain(
-  existingUser: Pick<User, 'google_user_email'>
+export function isUserBlacklistedByDomain(
+  existingUser: Pick<User, 'google_user_email'>,
+  fromDb: typeof db = db
 ): Promise<boolean> {
-  const domains = await getBlacklistedDomains();
-  return isEmailBlacklistedByDomain(existingUser.google_user_email, domains);
-}
-
-export async function isEmailBlacklistedByDomainAsync(email: string): Promise<boolean> {
-  const domains = await getBlacklistedDomains();
-  return isEmailBlacklistedByDomain(email, domains);
+  return isEmailBlacklisted(existingUser.google_user_email, fromDb);
 }
 
 /**

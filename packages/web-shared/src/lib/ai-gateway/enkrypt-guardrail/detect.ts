@@ -25,7 +25,7 @@ export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
  * upstream request, so this is the most latency an enabled organization's request can gain. It also
  * bounds the deferred work of a log-only scan, which the request does not wait for.
  */
-export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 30_000;
+export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 60_000;
 
 const MAX_ATTEMPTS = 2;
 const MAX_ERROR_BODY_BYTES = 64 * 1024;
@@ -34,13 +34,19 @@ const ERROR_BODY_TIMEOUT_MS = 1_000;
 /**
  * A larger request is not sent to Enkrypt. It is never truncated: the model would still read the
  * unscanned remainder, which is where an injected instruction in a large file read would sit.
- * The limit is about 1M tokens of code, which tokenizes at roughly 3 characters per token.
  */
-export const ENKRYPT_MAX_SCAN_CHARACTERS = 3_000_000;
+export const ENKRYPT_MAX_SCAN_CHARACTERS = 100_000;
 
 const MAX_BLOCK_MESSAGE_LENGTH = 500;
 
-const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of conversation text at once, so this request was not sent. Compact or prune earlier conversation history, reduce tool output or tool definitions, or start a new session, then retry. Retrying the unchanged request will not help.`;
+const MAX_SCAN_CHARACTERS_LABEL = ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US');
+
+export const SCAN_TOO_LARGE_MESSAGES: Record<EnkryptScanPart, string> = {
+  tools: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of tool definitions at once, so this request was not sent. Reduce the enabled tools or MCP servers, then retry. Retrying the unchanged request will not help.`,
+  system: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of system prompt at once, so this request was not sent. Shorten the system prompt, for example by removing custom instructions or rules files, then retry. Retrying the unchanged request will not help.`,
+  conversation: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of new conversation text at once, so this request was not sent. Compact or prune earlier conversation history, reduce tool output, or start a new session, then retry. Retrying the unchanged request will not help.`,
+  response: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry.`,
+};
 
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
@@ -48,15 +54,24 @@ const detectResponseSchema = z.object({
 });
 
 /**
- * How much of the request `text` covers. With a cached prefix, `text` is only the uncached suffix
- * plus an overlap of already-scanned text.
+ * What a scan covers: the request's tool definitions, its system prompt, its conversation, or the
+ * model's response.
+ */
+export type EnkryptScanPart = 'tools' | 'system' | 'conversation' | 'response';
+
+/**
+ * How much of the part `text` covers. With a cached conversation prefix, `text` is only the
+ * uncached suffix plus an overlap of already-scanned text.
  */
 export type EnkryptScanCoverage = {
+  part: EnkryptScanPart;
   cache: 'off' | 'miss' | 'hit' | 'error';
   totalCharacters: number;
   totalSegments: number;
   cachedCharacters: number;
   cachedSegments: number;
+  /** Attachments, such as images, represented only by an omission marker. */
+  omittedAttachments: number;
 };
 
 export type EnkryptGuardrailScan = {
@@ -392,10 +407,10 @@ export async function scanRequest(
       session_id: scan.sessionId,
       client_request_id: scan.clientRequestId,
       api_kind: scan.apiKind,
-      scan_tool_results: config.scanToolResults,
     },
     report: {
       scan: kind,
+      part: coverage.part,
       detectors_enabled: config.status === 'ready' ? enabledDetectors(config) : [],
       detectors_blocking: config.status === 'ready' ? config.blockingDetectors : [],
       verdict_cache: coverage.cache,
@@ -403,6 +418,7 @@ export async function scanRequest(
       total_segments: coverage.totalSegments,
       cached_characters: coverage.cachedCharacters,
       cached_segments: coverage.cachedSegments,
+      omitted_attachments: coverage.omittedAttachments,
       scanned_characters: text.length,
     },
   };
@@ -425,7 +441,7 @@ export async function scanRequest(
     return failedVerdict([], scope, {
       error: 'request_too_large',
       latencyMs: 0,
-      closedVerdict: { action: 'block', message: REQUEST_TOO_LARGE_MESSAGE },
+      closedVerdict: { action: 'block', message: SCAN_TOO_LARGE_MESSAGES[coverage.part] },
     });
   }
 
@@ -449,6 +465,7 @@ export async function scanRequest(
       ? {
           guardrail: deps.requestLog.guardrail,
           scan: kind,
+          part: coverage.part,
           request,
           response: null,
           status_code: null,
@@ -473,6 +490,8 @@ export async function scanRequest(
     apiKind: scan.apiKind,
     decision: attemptDecision(each, config),
     creditsCost: each.creditsCost,
+    scannedCharacters: text.length,
+    totalCharacters: coverage.totalCharacters,
     ...(each.kind === 'detected' && each.firedDetectors.length > 0
       ? { detectorsFired: each.firedDetectors }
       : {}),
@@ -506,6 +525,7 @@ type ScanScope = {
   report: Pick<
     EnkryptScanReport,
     | 'scan'
+    | 'part'
     | 'detectors_enabled'
     | 'detectors_blocking'
     | 'verdict_cache'
@@ -513,6 +533,7 @@ type ScanScope = {
     | 'total_segments'
     | 'cached_characters'
     | 'cached_segments'
+    | 'omitted_attachments'
     | 'scanned_characters'
   >;
 };

@@ -1,6 +1,7 @@
 import type { EventSourceMessage } from 'eventsource-parser';
-import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
+import { captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
+import { z } from 'zod';
 import { sentryRootSpan } from '../getRootSpan';
 import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
@@ -12,43 +13,54 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
+  contentPartSchema,
   drainSseStream,
   extractVercelUpstreamId,
   reportUpstreamStreamError,
   selectUsageCostFields,
+  upstreamStreamErrorSchema,
+  usageCostSchema,
+  vercelProviderMetadataSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
-import type Anthropic from '@anthropic-ai/sdk';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
-type MaybeHasVercelProviderMetadata = {
-  provider_metadata?: VercelProviderMetaData;
-};
+const messagesUsageSchema = usageCostSchema.extend({
+  input_tokens: z.number().nullish(),
+  output_tokens: z.number().nullish(),
+  cache_creation_input_tokens: z.number().nullish(),
+  cache_read_input_tokens: z.number().nullish(),
+});
 
-// OpenRouter augments the Anthropic Messages envelope with a top-level `provider`
-// field (e.g. "Anthropic", "Bedrock") indicating the upstream inference provider
-// that served the request. The Anthropic SDK type does not model it.
-type MaybeHasOpenRouterProvider = {
-  provider?: string | null;
-};
+type MessagesApiUsage = z.infer<typeof messagesUsageSchema>;
 
-type MessagesApiStreamErrorEvent = {
-  type: 'error';
-  error?: {
-    type?: string | null;
-    error_type?: string | null;
-    message?: string | null;
-  };
-};
+const messageSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string(),
+  usage: messagesUsageSchema.nullish(),
+  provider_metadata: vercelProviderMetadataSchema.nullish(),
+  provider: z.string().nullish(),
+});
 
-// Anthropic usage combined with OpenRouter cost fields
-// ref: https://docs.anthropic.com/en/api/messages
-// ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
-type MessagesApiUsage = Anthropic.Messages.MessageDeltaUsage & {
-  cost?: number;
-  is_byok?: boolean | null;
-  cost_details?: { upstream_inference_cost: number };
-};
+const messageEventSchema = z.looseObject({
+  type: z.string(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
+
+const contentDeltaSchema = contentPartSchema('text_delta');
+
+const messageDeltaSchema = z.object({
+  delta: z.object({ stop_reason: z.unknown().optional() }).nullish(),
+  usage: messagesUsageSchema.nullish(),
+  provider_metadata: vercelProviderMetadataSchema.nullish(),
+});
+
+// Upstream error bodies carry no model; they are recorded as errors, not parse failures.
+const messageResponseSchema = messageSchema.extend({
+  model: z.string().nullish(),
+  stop_reason: z.unknown().optional(),
+  content: z.array(contentPartSchema('text').nullable()).nullish(),
+});
 
 // message_start already reports the input and cache tokens, so a stream that
 // stops before message_delta still records the prompt it consumed. Providers
@@ -128,7 +140,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
   let firstTokenReceived = false;
   let startUsage: MessagesApiUsage | null = null;
   let deltaUsage: MessagesApiUsage | null = null;
-  let finish_reason: string | null = null;
+  let finish_reason: unknown = null;
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
 
@@ -147,62 +159,51 @@ export async function parseMessagesMicrodollarUsageFromStream(
       return;
     }
 
-    const json = JSON.parse(event.data) as
-      | Anthropic.Messages.MessageStreamEvent
-      | MessagesApiStreamErrorEvent;
+    const payload: unknown = JSON.parse(event.data);
+    metadataCapture?.captureVercelMetadata(payload);
+    const json = messageEventSchema.parse(payload);
 
-    if (!json) {
-      captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-        extra: { event },
-      });
-      return;
-    }
-
-    const eventProviderMetadata = (
-      (json.type === 'message_start' ? json.message : json) as
-        | MaybeHasVercelProviderMetadata
-        | undefined
-    )?.provider_metadata;
-    metadataCapture?.captureVercelMetadata(json);
-
-    if (json.type === 'error') {
+    if (json.type === 'error' && json.error != null) {
       reportedError = true;
-      finish_reason = json.error?.error_type ?? json.error?.type ?? 'error';
+      finish_reason = json.error.error_type ?? json.error.type ?? 'error';
       reportUpstreamStreamError({
         label: 'Messages API stream error',
         source: 'messages_sse_processing',
-        error: json.error ?? {},
+        error: json.error,
         usesUserCredentials,
         logContext: { provider, inference_provider, messageId, model },
-        sentryExtra: { json, event },
+        sentryExtra: { kiloUserId, provider, messageId, model },
       });
       return;
     }
 
+    let eventProviderMetadata: VercelProviderMetaData | null | undefined;
     if (json.type === 'message_start') {
-      messageId = json.message.id;
-      model = json.message.model;
-      startUsage = json.message.usage ?? startUsage;
-      const openRouterProvider = (json.message as MaybeHasOpenRouterProvider).provider;
-      if (openRouterProvider) {
-        inference_provider = openRouterProvider;
+      const message = messageSchema.parse(json.message);
+      messageId = message.id ?? messageId;
+      model = message.model;
+      startUsage = message.usage ?? startUsage;
+      eventProviderMetadata = message.provider_metadata;
+      if (message.provider) {
+        inference_provider = message.provider;
       }
     }
 
-    if (
-      json.type === 'content_block_delta' &&
-      json.delta.type === 'text_delta' &&
-      json.delta.text
-    ) {
-      responseContent += json.delta.text;
+    if (json.type === 'content_block_delta') {
+      const delta = contentDeltaSchema.parse(json.delta);
+      if (delta.type === 'text_delta' && delta.text) {
+        responseContent += delta.text;
+      }
     }
 
     if (json.type === 'message_delta') {
-      finish_reason = json.delta.stop_reason;
-      deltaUsage = json.usage ?? deltaUsage;
+      const delta = messageDeltaSchema.parse(json);
+      finish_reason = delta.delta?.stop_reason ?? finish_reason;
+      deltaUsage = delta.usage ?? deltaUsage;
+      eventProviderMetadata = delta.provider_metadata;
     }
 
-    if (eventProviderMetadata && (json.type === 'message_start' || json.type === 'message_delta')) {
+    if (eventProviderMetadata) {
       providerMetadata = eventProviderMetadata;
       model = getVercelResolvedModel(eventProviderMetadata) ?? model;
       inference_provider =
@@ -210,11 +211,12 @@ export async function parseMessagesMicrodollarUsageFromStream(
     }
   };
 
-  const { wasAborted, timing } = await drainSseStream(
+  const { wasAborted, malformedEventCount, timing } = await drainSseStream(
     stream,
     onEvent,
     streamProcessingSpan,
-    requestStartedAt
+    requestStartedAt,
+    () => ({ kiloUserId, provider, messageId, model })
   );
 
   if (!reportedError && !deltaUsage) {
@@ -227,7 +229,8 @@ export async function parseMessagesMicrodollarUsageFromStream(
 
   const coreProps = {
     messageId,
-    hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
+    hasError:
+      reportedError || wasAborted || malformedEventCount > 0 || isErrorFinishReason(finish_reason),
     model,
     responseContent,
     inference_provider,
@@ -252,25 +255,24 @@ export function parseMessagesMicrodollarUsageFromString(
   provider: ProviderType,
   metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
-  const responseJson = JSON.parse(fullResponse) as
-    | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & MaybeHasOpenRouterProvider)
-    | null;
-  const usage = responseJson?.usage;
-  const providerMetadata = responseJson?.provider_metadata ?? null;
-  metadataCapture?.captureVercelMetadata(responseJson);
+  const payload: unknown = JSON.parse(fullResponse);
+  metadataCapture?.captureVercelMetadata(payload);
+  const responseJson = messageResponseSchema.parse(payload);
+  const usage = responseJson.usage;
+  const providerMetadata = responseJson.provider_metadata ?? null;
   const inference_provider =
-    providerMetadata?.gateway?.routing?.finalProvider ?? responseJson?.provider ?? null;
+    providerMetadata?.gateway?.routing?.finalProvider ?? responseJson.provider ?? null;
 
-  const responseContent = (responseJson?.content ?? [])
-    .filter((c): c is Anthropic.Messages.TextBlock => c != null && c.type === 'text')
-    .map(c => c.text)
+  const responseContent = (responseJson.content ?? [])
+    .filter(c => c?.type === 'text')
+    .map(c => c?.text)
     .join('');
 
-  const finish_reason = responseJson?.stop_reason ?? null;
+  const finish_reason = responseJson.stop_reason ?? null;
   const coreProps = {
-    messageId: responseJson?.id ?? null,
-    hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
-    model: getVercelResolvedModel(providerMetadata) ?? responseJson?.model ?? null,
+    messageId: responseJson.id ?? null,
+    hasError: !responseJson.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
+    model: getVercelResolvedModel(providerMetadata) ?? responseJson.model ?? null,
     responseContent,
     inference_provider,
     upstream_id: extractVercelUpstreamId(providerMetadata),

@@ -1,0 +1,458 @@
+import { describe, expect, it, mock } from 'bun:test';
+import type { ControlPlaneRouteSpec } from '../../../src/shared/control-plane-protocol.js';
+import type { Harness } from './harness.js';
+import { createWorkspaceHistoryPreloader } from './workspace-history.js';
+import { createKilo2Harness } from './kilo2-harness.js';
+import { createKilo2Lifecycle } from './kilo2-lifecycle.js';
+
+const sessions = Array.from({ length: 5 }, (_, index) => ({
+  sessionId: `workspace_${index}`,
+  kiloSessionId: `ses_${String(index).repeat(26)}`,
+}));
+const spec: ControlPlaneRouteSpec = {
+  ...sessions[0],
+  directory: '/workspace/project',
+  attemptId: 'attempt',
+  kilo: {
+    scopeId: 'worktree_6a7199ec-d6d7-4788-b5a5-d74960f401e3',
+    token: 'test-token',
+    targets: {
+      backendBaseUrl: 'https://backend.test',
+      providerBaseUrl: 'https://provider.test',
+      sessionIngestBaseUrl: 'https://ingest.test',
+    },
+  },
+};
+
+function setup(open = mock(async (_input: Parameters<Harness['open']>[0]) => true)) {
+  const readRecent = mock(async () => sessions);
+  const readPage = mock(async (_request: unknown) => ({}));
+  const log = mock((_message: string) => {});
+  const preloader = createWorkspaceHistoryPreloader({ readRecent, readPage, log });
+  const client = { open, supportsHistoryPreload: true } as unknown as Harness;
+  return { preloader, client, readRecent, readPage, log, open };
+}
+
+describe('workspace history preload', () => {
+  it('imports recent siblings in parallel, once per live runtime, without restoring files', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const open = mock(async (input: Parameters<Harness['open']>[0]) => {
+      if (open.mock.calls.length === 4) started.resolve();
+      await input.readHistoryPage?.('older');
+      await release.promise;
+      return true;
+    });
+    const h = setup(open);
+    const signal = new AbortController().signal;
+    const first = h.preloader.preload(h.client, spec, { HOME: '/workspace/home' }, signal);
+    const sibling = h.preloader.preload(h.client, { ...spec, ...sessions[1] }, {}, signal);
+    await started.promise;
+    expect(h.readRecent).toHaveBeenCalledTimes(1);
+    expect(open.mock.calls.map(([input]) => input.sessionId)).toEqual(
+      sessions.slice(1).map(session => session.kiloSessionId)
+    );
+    for (const [input] of open.mock.calls) {
+      expect(input.restoreFiles).toBe(false);
+      expect(input.directory).toBe(spec.directory);
+      expect(input.env.HOME).toBe('/workspace/home');
+    }
+    expect(h.readPage.mock.calls).toHaveLength(4);
+    expect(h.readPage.mock.calls[0][0]).toMatchObject({
+      ...sessions[1],
+      cursor: 'older',
+      workspaceSessionId: spec.sessionId,
+    });
+    release.resolve();
+    await Promise.all([first, sibling]);
+    await h.preloader.preload(h.client, spec, {}, signal);
+    expect(h.readRecent).toHaveBeenCalledTimes(1);
+    await h.preloader.preload(
+      { open, supportsHistoryPreload: true } as unknown as Harness,
+      spec,
+      {},
+      signal
+    );
+    expect(h.readRecent).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a transient import once and keeps other imports independent of a permanent failure', async () => {
+    const attempts = new Map<string, number>();
+    const h = setup(
+      mock(async input => {
+        const attempt = (attempts.get(input.sessionId) ?? 0) + 1;
+        attempts.set(input.sessionId, attempt);
+        if (input.sessionId === sessions[1].kiloSessionId && attempt === 1)
+          throw new Error('transient');
+        if (input.sessionId === sessions[2].kiloSessionId) throw new Error('permanent');
+        return true;
+      })
+    );
+    await h.preloader.preload(h.client, spec, {}, new AbortController().signal);
+    expect([...attempts.values()]).toEqual([2, 2, 1, 1]);
+    expect(h.log).toHaveBeenCalledWith('workspace history preload sessions=4 failures=1');
+  });
+
+  it('does not turn discovery failure or cancellation into a preparation failure', async () => {
+    const h = setup();
+    h.readRecent.mockImplementation(async () => {
+      throw new Error('unavailable');
+    });
+    await h.preloader.preload(h.client, spec, {}, new AbortController().signal);
+    expect(h.open).not.toHaveBeenCalled();
+    expect(h.log).toHaveBeenCalledWith(
+      'workspace history preload incomplete; continuing session preparation'
+    );
+
+    const hung = setup();
+    const started = Promise.withResolvers<void>();
+    hung.readRecent.mockImplementation(async () => {
+      started.resolve();
+      return new Promise(() => {});
+    });
+    const controller = new AbortController();
+    const waiting = hung.preloader.preload(hung.client, spec, {}, controller.signal);
+    await started.promise;
+    controller.abort();
+    await waiting;
+    expect(hung.open).not.toHaveBeenCalled();
+  });
+
+  it('serializes a racing on-demand open while preserving its restore inputs', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const h = setup(
+      mock(async input => {
+        if (input.sessionId === sessions[1].kiloSessionId) {
+          started.resolve();
+          await release.promise;
+        }
+        return true;
+      })
+    );
+    const preload = h.preloader.preload(h.client, spec, {}, new AbortController().signal);
+    await started.promise;
+    const input: Parameters<Harness['open']>[0] = {
+      sessionId: sessions[1].kiloSessionId,
+      directory: spec.directory,
+      env: {},
+      signal: new AbortController().signal,
+      restoreFiles: true,
+      roots: { directories: ['/workspace/project'], recovered: [] },
+      readHistoryPage: async () => ({}),
+      onRestore() {},
+    };
+    const onDemand = h.preloader.open(h.client, input);
+    release.resolve();
+    await Promise.all([preload, onDemand]);
+    expect(
+      h.open.mock.calls.filter(([input]) => input.sessionId === sessions[1].kiloSessionId)
+    ).toHaveLength(2);
+    expect(h.open.mock.calls.at(-1)?.[0]).toBe(input);
+  });
+
+  it.each(['success', 'failure'] as const)(
+    'holds an aborted preload import lock until its underlying open settles with %s',
+    async outcome => {
+      const started = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<boolean>();
+      let active = 0;
+      let maximumActive = 0;
+      const h = setup(
+        mock(async input => {
+          if (input.sessionId !== sessions[1].kiloSessionId) return true;
+          active++;
+          maximumActive = Math.max(maximumActive, active);
+          try {
+            if (!input.restoreFiles) {
+              started.resolve();
+              return await release.promise;
+            }
+            return true;
+          } finally {
+            active--;
+          }
+        })
+      );
+      const controller = new AbortController();
+      const preload = h.preloader.preload(h.client, spec, {}, controller.signal);
+      await started.promise;
+      const signal = new AbortController().signal;
+      const onDemand = h.preloader.open(h.client, {
+        sessionId: sessions[1].kiloSessionId,
+        directory: spec.directory,
+        env: {},
+        signal,
+        restoreFiles: true,
+        onRestore() {},
+      });
+      controller.abort(new Error('preload budget exhausted'));
+      await preload;
+      const later = h.preloader.open(h.client, {
+        sessionId: sessions[1].kiloSessionId,
+        directory: spec.directory,
+        env: {},
+        signal,
+        restoreFiles: true,
+        onRestore() {},
+      });
+      try {
+        await Bun.sleep(0);
+        expect(
+          h.open.mock.calls.filter(([input]) => input.sessionId === sessions[1].kiloSessionId)
+        ).toHaveLength(1);
+        expect(h.open.mock.calls[0][0].signal?.aborted).toBe(true);
+      } finally {
+        if (outcome === 'failure') release.reject(new Error('aborted import finished'));
+        else release.resolve(true);
+        await Promise.all([onDemand, later]);
+      }
+      expect(maximumActive).toBe(1);
+      expect(signal.aborted).toBe(false);
+    }
+  );
+
+  it('cancels a waiting caller without cancelling the preload or releasing its import lock', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const h = setup(
+      mock(async input => {
+        if (input.sessionId === sessions[1].kiloSessionId) {
+          started.resolve();
+          await release.promise;
+        }
+        return true;
+      })
+    );
+    const preload = h.preloader.preload(h.client, spec, {}, new AbortController().signal);
+    await started.promise;
+    const controller = new AbortController();
+    const input: Parameters<Harness['open']>[0] = {
+      sessionId: sessions[1].kiloSessionId,
+      directory: spec.directory,
+      env: {},
+      signal: controller.signal,
+      restoreFiles: true,
+      onRestore() {},
+    };
+    const waiting = h.preloader.open(h.client, input);
+    controller.abort(new Error('caller cancelled'));
+    const error: unknown = await waiting.catch((failure: unknown) => failure);
+    expect(error).toEqual(new Error('caller cancelled'));
+    const later = h.preloader.open(h.client, { ...input, signal: undefined });
+    expect(h.open.mock.calls.filter(([value]) => value.sessionId === input.sessionId)).toHaveLength(
+      1
+    );
+    expect(h.open.mock.calls[0][0].signal?.aborted).toBe(false);
+    release.resolve();
+    await preload;
+    expect(await later).toBe(true);
+    expect(h.open.mock.calls.filter(([value]) => value.sessionId === input.sessionId)).toHaveLength(
+      2
+    );
+  });
+
+  it('leaves legacy session-ingest file restoration on demand', async () => {
+    const h = setup();
+    h.client.supportsHistoryPreload = undefined;
+    await h.preloader.preload(h.client, spec, {}, new AbortController().signal);
+    expect(h.readRecent).not.toHaveBeenCalled();
+    expect(h.open).not.toHaveBeenCalled();
+    await h.preloader.open(h.client, {
+      sessionId: sessions[1].kiloSessionId,
+      directory: spec.directory,
+      env: {},
+      restoreFiles: true,
+      onRestore() {},
+    });
+    expect(h.open.mock.calls[0][0].restoreFiles).toBe(true);
+  });
+
+  it('bounds an on-demand wait when an aborted preload ignores cancellation', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const h = setup(
+      mock(async input => {
+        if (input.sessionId === sessions[1].kiloSessionId) {
+          started.resolve();
+          await release.promise;
+        }
+        return true;
+      })
+    );
+    const controller = new AbortController();
+    const preload = h.preloader.preload(h.client, spec, {}, controller.signal);
+    await started.promise;
+    controller.abort();
+    await preload;
+    const caller = new AbortController();
+    const waiting = h.preloader.open(h.client, {
+      sessionId: sessions[1].kiloSessionId,
+      directory: spec.directory,
+      env: {},
+      signal: caller.signal,
+      restoreFiles: false,
+      onRestore() {},
+    });
+    caller.abort(new Error('requested open deadline exceeded'));
+    try {
+      expect(await waiting.catch((error: unknown) => error)).toEqual(
+        new Error('requested open deadline exceeded')
+      );
+      expect(
+        h.open.mock.calls.filter(([input]) => input.sessionId === sessions[1].kiloSessionId)
+      ).toHaveLength(1);
+    } finally {
+      release.resolve();
+    }
+  });
+
+  it.each([
+    { ...spec, runtimeIsolation: 'per-session' as const },
+    {
+      ...spec,
+      workspaceSnapshot: {
+        workspaceId: 'worktree_6a7199ec-d6d7-4788-b5a5-d74960f401e3' as const,
+        directory: spec.directory,
+        sourceAllocationId: 'old',
+      },
+    },
+    { ...spec, kilo: { ...spec.kilo!, scopeId: 'session-scope' } },
+  ])('skips snapshot restores and non-shared runtimes (%j)', async route => {
+    const h = setup();
+    await h.preloader.preload(h.client, route, {}, new AbortController().signal);
+    expect(h.readRecent).not.toHaveBeenCalled();
+  });
+
+  it('imports native v2 history and titles into the shared runtime before completing startup', async () => {
+    const imported: unknown[] = [];
+    const nativeSessions = new Set<string>();
+    const importsStarted = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+        if (url.pathname.startsWith('/api/session/')) {
+          const id = url.pathname.slice('/api/session/'.length);
+          return nativeSessions.has(id)
+            ? Response.json({
+                data: {
+                  id,
+                  location: { directory: spec.directory },
+                  time: { created: 1, updated: 1 },
+                },
+              })
+            : new Response(null, { status: 404 });
+        }
+        if (url.pathname === '/api/location') return Response.json({ project: { id: 'project' } });
+        if (url.pathname === '/api/experimental/session/import') {
+          imported.push(await request.json());
+          if (imported.length === 4) importsStarted.resolve();
+          await release.promise;
+          for (const session of sessions.slice(1)) nativeSessions.add(session.kiloSessionId);
+          return new Response(null, { status: 204 });
+        }
+        throw new Error(`Unexpected request: ${url.pathname}`);
+      },
+    });
+    try {
+      const client = createKilo2Harness({
+        server: { url: server.url.toString() },
+        directory: spec.directory,
+        lifecycle: createKilo2Lifecycle(),
+      });
+      const preloader = createWorkspaceHistoryPreloader({
+        readRecent: async () => sessions,
+        readPage: async request => ({
+          kind: 'success',
+          source: { version: 'v2', session: { id: request.kiloSessionId } },
+          info: { id: request.kiloSessionId, title: `Chat ${request.sessionId}` },
+          messages: [
+            {
+              message: {
+                id: `msg_${'a'.repeat(26)}`,
+                type: 'user',
+                text: 'Previous work',
+                time: { created: 1 },
+              },
+            },
+          ],
+          nextCursor: null,
+          omittedItemCount: 0,
+        }),
+        log() {},
+      });
+      const preload = preloader.preload(client, spec, {}, new AbortController().signal);
+      await importsStarted.promise;
+      const onRestore = mock(() => {});
+      const onDemand = preloader.open(client, {
+        sessionId: sessions[1].kiloSessionId,
+        directory: spec.directory,
+        env: {},
+        signal: new AbortController().signal,
+        restoreFiles: true,
+        readHistoryPage: async () => {
+          throw new Error('existing session must not be reimported');
+        },
+        onRestore,
+      });
+      expect(imported).toHaveLength(4);
+      for (const session of sessions.slice(1)) {
+        expect(imported).toContainEqual(
+          expect.objectContaining({
+            location: { directory: spec.directory },
+            info: expect.objectContaining({
+              id: session.kiloSessionId,
+              title: `Chat ${session.sessionId}`,
+            }),
+            messages: [expect.objectContaining({ text: 'Previous work' })],
+          })
+        );
+      }
+      release.resolve();
+      await Promise.all([preload, onDemand]);
+      expect(imported).toHaveLength(4);
+      expect(onRestore).not.toHaveBeenCalled();
+    } finally {
+      release.resolve();
+      await server.stop(true);
+    }
+  });
+
+  it('bounds a hung preload to ten seconds and cancels its history reads', async () => {
+    const started = Promise.withResolvers<void>();
+    const h = setup(
+      mock(async input => {
+        if (input.restoreFiles) throw new Error('requested history unavailable');
+        started.resolve();
+        return new Promise<boolean>((_resolve, reject) => {
+          input.signal?.addEventListener('abort', () => reject(input.signal?.reason), {
+            once: true,
+          });
+        });
+      })
+    );
+    const startedAt = Date.now();
+    const preload = h.preloader.preload(h.client, spec, {}, new AbortController().signal);
+    await started.promise;
+    const signal = new AbortController().signal;
+    const onDemand = h.preloader.open(h.client, {
+      sessionId: sessions[1].kiloSessionId,
+      directory: spec.directory,
+      env: {},
+      signal,
+      restoreFiles: true,
+      onRestore() {},
+    });
+    const error: unknown = await onDemand.catch((failure: unknown) => failure);
+    expect(error).toEqual(new Error('requested history unavailable'));
+    await preload;
+    expect(Date.now() - startedAt).toBeLessThan(12_000);
+    expect(signal.aborted).toBe(false);
+    expect(h.open.mock.calls[0][0].signal?.aborted).toBe(true);
+    expect(h.log).toHaveBeenCalledWith(
+      'workspace history preload incomplete; continuing session preparation'
+    );
+  }, 15_000);
+});

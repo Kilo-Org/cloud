@@ -70,7 +70,7 @@ describe('SessionStatusIndicator mounted', () => {
         message: 'Assistant request failed: insufficient credits',
         timestamp: 0,
       })
-    ).resolves.toEqual(['Not enough credits to run Cloud Agent. Add credits and try again.']);
+    ).resolves.toEqual(['Not enough credits for this request. Add credits and try again.']);
   });
 
   // The DO's safe projection is already the reader's copy and has no translated
@@ -91,7 +91,7 @@ describe('SessionStatusIndicator mounted', () => {
         message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
         timestamp: 0,
       })
-    ).resolves.toEqual(['Not enough credits to run Cloud Agent. Add credits and try again.']);
+    ).resolves.toEqual(['Not enough credits for this request. Add credits and try again.']);
   });
 
   // The SDK codes the fixed lines it writes itself, so the status line renders

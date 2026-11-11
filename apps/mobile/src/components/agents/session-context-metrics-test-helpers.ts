@@ -56,11 +56,45 @@ export function render(
   return SessionContextMetrics(props) as React.ReactElement;
 }
 
+export type TestProps = {
+  testID?: string;
+  className?: string;
+  accessibilityLabel?: string;
+  accessibilityRole?: string;
+  accessibilityElementsHidden?: boolean;
+  importantForAccessibility?: string;
+  numberOfLines?: number;
+  children?: unknown;
+  onPress?: () => void;
+};
+
+/**
+ * The props of an element these tests render. The host components are mocked as
+ * plain strings, so React typed them as their own prop types; the assert names
+ * the handful of props an assertion reads.
+ */
+export function propsOf(el: React.ReactElement): TestProps {
+  const props: unknown = el.props;
+  return props !== null && typeof props === 'object' ? (props as TestProps) : {};
+}
+
+export function classNameOf(el: React.ReactElement): string {
+  return propsOf(el).className ?? '';
+}
+
+export function pillOf(root: React.ReactElement): React.ReactElement {
+  const [pill] = findAll(root, el => propsOf(el).testID === 'session-context-metrics');
+  if (pill === undefined) {
+    throw new Error('expected the context pill');
+  }
+  return pill;
+}
+
 export const PILL_LAYOUT_TOKENS = [
   'h-[44px]',
   'flex-row',
   'items-center',
-  'gap-2',
+  'gap-1',
   'rounded-full',
   'border',
   'border-border',
@@ -75,16 +109,18 @@ export const PILL_LAYOUT_TOKENS = [
 
 export function expectHiddenReservedBox(root: React.ReactElement): void {
   expect(root.type).toBe('View');
-  const className = (root.props as { className?: string }).className ?? '';
+  // The reserve itself never hides: the box holds the widest content in every
+  // state, so the trailing cluster keeps its width. Only the pill paints
+  // nothing while there is nothing to open.
+  expect(classNameOf(root)).toContain('items-end');
+  const pill = pillOf(root);
+  const className = classNameOf(pill);
   expect(className).toContain('opacity-0');
   for (const token of PILL_LAYOUT_TOKENS) {
     expect(className).toContain(token);
   }
   expect(findAll(root, el => el.type === 'ContextUsageRing').length).toBeGreaterThan(0);
-  const props = root.props as {
-    accessibilityElementsHidden?: boolean;
-    importantForAccessibility?: string;
-  };
+  const props = propsOf(pill);
   expect(props.accessibilityElementsHidden).toBe(true);
   expect(props.importantForAccessibility).toBe('no');
 }

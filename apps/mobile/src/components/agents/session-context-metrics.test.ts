@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one case per pill state: permission controls, reserved box, slot widths and the loading bar share these render helpers. */
+/* eslint-disable max-lines -- one case per pill state: permission controls, the reserved box, the hugging content and the loading bar share these render helpers. */
 import { describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -7,10 +7,13 @@ import { formatPercent } from '@/lib/format';
 import { formatSessionCostBadge } from './session-list-helpers';
 import { WIDEST_COST_MICRODOLLARS, WIDEST_PERCENTAGE_VALUE } from './session-context-metrics';
 import {
+  classNameOf,
   expectHiddenReservedBox,
   findAll,
   info,
   PILL_LAYOUT_TOKENS,
+  pillOf,
+  propsOf,
   render,
 } from './session-context-metrics-test-helpers';
 
@@ -33,20 +36,16 @@ describe('SessionContextMetrics', () => {
       autoApproveAvailable: true,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityRole: string;
-      accessibilityLabel: string;
-      onPress: () => void;
-      className: string;
-    };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.accessibilityRole).toBe('button');
     expect(props.accessibilityLabel).toContain('Tap to view context details.');
-    expect(props.className).not.toContain('opacity-0');
+    expect(props.className ?? '').not.toContain('opacity-0');
     for (const token of PILL_LAYOUT_TOKENS) {
       expect(props.className).toContain(token);
     }
-    props.onPress();
+    props.onPress?.();
     expect(onPress).toHaveBeenCalledOnce();
   });
 
@@ -63,12 +62,9 @@ describe('SessionContextMetrics', () => {
       loading: true,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityRole?: string;
-      onPress?: () => void;
-      className?: string;
-    };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.accessibilityRole).toBe('button');
     expect(props.className ?? '').not.toContain('opacity-0');
     props.onPress?.();
@@ -85,12 +81,9 @@ describe('SessionContextMetrics', () => {
       hasMessages: false,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityRole?: string;
-      onPress?: () => void;
-      className?: string;
-    };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.accessibilityRole).toBe('button');
     expect(props.className ?? '').not.toContain('opacity-0');
     props.onPress?.();
@@ -109,13 +102,9 @@ describe('SessionContextMetrics', () => {
       autoApproveAvailable: false,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityRole?: string;
-      accessibilityLabel?: string;
-      onPress?: () => void;
-      className?: string;
-    };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.accessibilityRole).toBe('button');
     expect(props.accessibilityLabel).toContain('Tap to view context details.');
     expect(props.className ?? '').not.toContain('opacity-0');
@@ -135,41 +124,45 @@ describe('SessionContextMetrics', () => {
   });
 
   it('empty session is invisible and a11y-hidden', () => {
-    const root = render({
-      info: undefined,
-      totalCostMicrodollars: null,
-      hasMessages: false,
-    });
-    expectHiddenReservedBox(root);
+    expectHiddenReservedBox(
+      render({
+        info: undefined,
+        totalCostMicrodollars: null,
+        hasMessages: false,
+      })
+    );
   });
 
   it('empty session with a cost stays fully hidden', () => {
-    const root = render({
-      info: undefined,
-      totalCostMicrodollars: 150_000,
-      hasMessages: false,
-    });
-    expectHiddenReservedBox(root);
+    expectHiddenReservedBox(
+      render({
+        info: undefined,
+        totalCostMicrodollars: 150_000,
+        hasMessages: false,
+      })
+    );
   });
 
   it('loading keeps the reserved invisible box', () => {
-    const root = render({
-      loading: true,
-      hasMessages: true,
-      info: undefined,
-      totalCostMicrodollars: null,
-    });
-    expectHiddenReservedBox(root);
+    expectHiddenReservedBox(
+      render({
+        loading: true,
+        hasMessages: true,
+        info: undefined,
+        totalCostMicrodollars: null,
+      })
+    );
   });
 
   it('loading wins over missing messages', () => {
-    const root = render({
-      loading: true,
-      hasMessages: false,
-      info: undefined,
-      totalCostMicrodollars: null,
-    });
-    expectHiddenReservedBox(root);
+    expectHiddenReservedBox(
+      render({
+        loading: true,
+        hasMessages: false,
+        info: undefined,
+        totalCostMicrodollars: null,
+      })
+    );
   });
 
   it('first message with cost but no context info shows a visible, non-pressable pill', () => {
@@ -178,22 +171,19 @@ describe('SessionContextMetrics', () => {
       info: undefined,
       totalCostMicrodollars: 150_000,
     });
-    expect(root.type).toBe('View');
-    const className = (root.props as { className?: string }).className ?? '';
-    expect(className).not.toContain('opacity-0');
-    expect(
-      (root.props as { accessibilityElementsHidden?: boolean }).accessibilityElementsHidden
-    ).toBeUndefined();
-    // The badge takes the cost slot, which is the one sized for it, and never
-    // the percentage slot.
-    const texts = findAll(root, el => el.type === 'Text');
+    const pill = pillOf(root);
+    expect(pill.type).toBe('View');
+    const props = propsOf(pill);
+    expect(props.className ?? '').not.toContain('opacity-0');
+    expect(props.accessibilityElementsHidden).toBeUndefined();
+    const texts = findAll(pill, el => el.type === 'Text');
     expect(
       texts.some(el => {
-        const children = (el.props as { children?: unknown }).children;
+        const children = propsOf(el).children;
         return typeof children === 'string' && children.includes('$0.15');
       })
     ).toBe(true);
-    expect(root.type).not.toBe('Pressable');
+    expect(pill.type).not.toBe('Pressable');
   });
 
   it('context info with onPress renders the pressable pill', () => {
@@ -204,19 +194,15 @@ describe('SessionContextMetrics', () => {
       totalCostMicrodollars: 150_000,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityRole?: string;
-      accessibilityLabel?: string;
-      className?: string;
-      onPress?: () => void;
-    };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.accessibilityRole).toBe('button');
     expect(props.accessibilityLabel).toContain('Tap to view context details.');
     expect(props.className ?? '').not.toContain('opacity-0');
     props.onPress?.();
     expect(onPress).toHaveBeenCalledOnce();
-    const ring = findAll(root, el => el.type === 'ContextUsageRing')[0];
+    const ring = findAll(pill, el => el.type === 'ContextUsageRing')[0];
     expect(ring).toBeDefined();
     if (ring == null) {
       throw new Error('expected ContextUsageRing');
@@ -232,80 +218,86 @@ describe('SessionContextMetrics', () => {
       info: info(),
       totalCostMicrodollars: 150_000,
     });
-    expect(root.type).toBe('View');
-    const className = (root.props as { className?: string }).className ?? '';
-    expect(className).not.toContain('opacity-0');
-    const label = (root.props as { accessibilityLabel?: string }).accessibilityLabel ?? '';
-    expect(label).not.toContain('Tap to view');
+    const pill = pillOf(root);
+    expect(pill.type).toBe('View');
+    const props = propsOf(pill);
+    expect(props.className ?? '').not.toContain('opacity-0');
+    expect(props.accessibilityLabel ?? '').not.toContain('Tap to view');
   });
 
   // The header caps the trailing cluster, and RN's flexShrink is 0 by default,
-  // so the pill, its row and its slots must all opt in or they paint off-screen.
-  it('lets the pill and its text row compress inside a constrained header row', () => {
+  // so the pill, its reading and the box around it must all opt in or they
+  // paint off-screen.
+  it('lets the pill and its reading compress inside a constrained header row', () => {
     const root = render({
       hasMessages: true,
       info: info(),
       totalCostMicrodollars: 150_000,
       onPress: vi.fn<() => void>(),
     });
-    const classOf = (el: React.ReactElement) =>
-      (el.props as { className?: string }).className ?? '';
-    const textRow = findAll(
-      root,
-      el => el.type === 'View' && classOf(el).includes('flex-row')
-    ).find(el => classOf(el).includes('gap-1'));
-    if (textRow == null) {
-      throw new Error('expected the inner text row');
-    }
-    // The row shrinks, but the slots inside it keep RN's default flexShrink: 0
-    // unless they opt in too, so a squeezed row could never compress them and
-    // the second slot paints past the pill's right edge.
-    expect(classOf(textRow)).toContain('min-w-0');
-    expect(classOf(textRow)).toContain('shrink');
-    const slots = findAll(
-      root,
-      el =>
-        el.type === 'View' &&
-        classOf(el).includes('items-center') &&
-        classOf(el).includes('justify-center')
-    ).filter(el => !classOf(el).includes('absolute'));
-    expect(slots).toHaveLength(2);
-    for (const slot of slots) {
-      expect(classOf(slot)).toContain('shrink');
-      expect(classOf(slot)).toContain('min-w-0');
-    }
-    const texts = findAll(root, el => el.type === 'Text');
-    for (const text of texts) {
-      expect((text.props as { numberOfLines?: number }).numberOfLines).toBe(1);
+    expect(classNameOf(root)).toContain('min-w-0');
+    expect(classNameOf(root)).toContain('shrink');
+    const pill = pillOf(root);
+    expect(classNameOf(pill)).toContain('max-w-full');
+    const runs = findAll(pill, el => propsOf(el).numberOfLines === 1);
+    expect(runs).toHaveLength(1);
+    for (const run of runs) {
+      expect(classNameOf(run)).toContain('shrink');
+      expect(classNameOf(run)).toContain('min-w-0');
     }
   });
 
-  it('messages with neither info nor cost keep the reserved value slots invisible', () => {
+  // A transcript that reports no usage and no cost paints a bare ring: the pill
+  // hugs what it holds instead of holding a value slot open for a reading that
+  // will never arrive.
+  it('paints only the ring when there is no value to show', () => {
     const root = render({ hasMessages: true, info: undefined, totalCostMicrodollars: null });
-    const propsOf = (el: React.ReactElement) =>
-      el.props as { className?: string; accessibilityElementsHidden?: boolean };
-    expect(root.type).toBe('View');
-    expect(propsOf(root).className ?? '').not.toContain('opacity-0');
-    expect(propsOf(root).accessibilityElementsHidden).toBeUndefined();
-    // A transcript that reports neither usage nor cost paints no value, but the
-    // row keeps both slots: the pill ends the header's trailing cluster, so a row
-    // that collapsed here would pull the Follow control across the header when
-    // usage arrives. Only the two invisible sizers paint, and only the ring is
-    // spoken.
-    const texts = findAll(root, el => el.type === 'Text');
-    expect(texts).toHaveLength(2);
-    for (const text of texts) {
-      expect(propsOf(text).className ?? '').toContain('opacity-0');
+    const pill = pillOf(root);
+    expect(propsOf(pill).className ?? '').not.toContain('opacity-0');
+    expect(propsOf(pill).accessibilityElementsHidden).toBeUndefined();
+    // The only texts in the pill are the hidden sizers of the reserve, which
+    // paint nothing and stay out of the reading.
+    for (const text of findAll(pill, el => el.type === 'Text')) {
+      expect(classNameOf(text)).toContain('opacity-0');
       expect(propsOf(text).accessibilityElementsHidden).toBe(true);
     }
+    // Nothing paints beside the ring: the value run is absent, not reserved.
+    expect(findAll(pill, el => el.type === 'ContextUsageRing')).toHaveLength(1);
+    expect(
+      findAll(pill, el => el.type === 'Text' && !classNameOf(el).includes('opacity-0'))
+    ).toHaveLength(0);
   });
 
-  // No usage yet: both value slots stay, dashes while settled, one bar while loading.
-  it('holds the value slots over the bare ring, loading them as one bar', () => {
-    const classOf = (el: React.ReactElement) =>
-      (el.props as { className?: string }).className ?? '';
+  // The reserve is a zero-height copy of the widest reading the pill can show, so
+  // the box keeps one width while the pill paints only what arrived.
+  it('reserves the widest reading without painting it', () => {
+    const root = render({
+      hasMessages: true,
+      info: info(),
+      totalCostMicrodollars: 150_000,
+      onPress: vi.fn<() => void>(),
+    });
+    const percentageSizer = formatPercent(WIDEST_PERCENTAGE_VALUE, i18n.language);
+    const costSizer = formatSessionCostBadge(WIDEST_COST_MICRODOLLARS);
+    expect(costSizer).not.toBeNull();
+    const reserved = findAll(root, el => classNameOf(el).includes('h-0'));
+    expect(reserved).toHaveLength(1);
+    const reserve = reserved[0] ?? root;
+    expect(classNameOf(reserve)).toContain('overflow-hidden');
+    const runs = findAll(reserve, el => propsOf(el).numberOfLines === 1);
+    expect(runs).toHaveLength(1);
+    expect(classNameOf(runs[0] ?? root)).toContain('opacity-0');
+    expect(findAll(reserve, el => propsOf(el).children === percentageSizer)).toHaveLength(1);
+    expect(findAll(reserve, el => propsOf(el).children === costSizer)).toHaveLength(1);
+  });
+
+  // No usage yet: the pill paints its dashes, and while loading one bar covers
+  // the widest reading instead of a fixed width that fits only the default font
+  // scale.
+  it('paints the dashes while settled and one bar while loading', () => {
+    const classOf = classNameOf;
     const textsWith = (root: React.ReactElement, text: string) =>
-      findAll(root, el => (el.props as { children?: unknown }).children === text);
+      findAll(root, el => propsOf(el).children === text);
     const bars = (root: React.ReactElement) => findAll(root, el => el.type === 'Skeleton');
     const onPress = vi.fn<() => void>();
 
@@ -317,39 +309,26 @@ describe('SessionContextMetrics', () => {
         loading,
         onPress,
       });
-    const settled = bare();
-    const props = settled.props as { accessibilityLabel?: string };
-    expect(props.accessibilityLabel).toContain('usage unavailable');
-    expect(textsWith(settled, '—')).toHaveLength(2);
-    // Each slot is sized by an invisible copy of the widest value it can show,
-    // built by the formatter itself, so the row keeps one width across the
-    // loading, unresolved and settled states; the dashes themselves paint.
-    const sizers = [
-      textsWith(settled, formatPercent(WIDEST_PERCENTAGE_VALUE, i18n.language)),
-      textsWith(settled, formatSessionCostBadge(WIDEST_COST_MICRODOLLARS) ?? ''),
-    ];
-    for (const found of sizers) {
-      expect(found).toHaveLength(1);
-      expect(classOf(found[0] ?? settled)).toContain('opacity-0');
-    }
+    const settled = pillOf(bare());
+    expect(propsOf(settled).accessibilityLabel).toContain('usage unavailable');
+    // The usage dash is a real reading: the session reported tokens but no
+    // window to divide them by. The cost never arrived, so it paints nothing.
+    expect(textsWith(settled, '—')).toHaveLength(1);
     for (const dash of textsWith(settled, '—')) {
       expect(classOf(dash)).not.toContain('opacity-0');
     }
     expect(bars(settled)).toHaveLength(0);
 
-    const loading = bare(true);
-    expect((loading.props as { accessibilityLabel?: string }).accessibilityLabel).not.toContain(
-      'usage unavailable'
-    );
-    const hiddenRows = findAll(
+    const loading = pillOf(bare(true));
+    expect(propsOf(loading).accessibilityLabel ?? '').not.toContain('usage unavailable');
+    const hiddenRuns = findAll(
       loading,
-      el => el.type === 'View' && classOf(el).includes('opacity-0')
+      el => el.type === 'Text' && classOf(el).includes('opacity-0')
     );
-    expect(hiddenRows).toHaveLength(1);
-    // Two sizers and two dashes sit in the row the bar covers.
-    expect(findAll(hiddenRows[0] ?? loading, el => el.type === 'Text')).toHaveLength(4);
+    expect(hiddenRuns).toHaveLength(1);
+    expect(textsWith(loading, '—')).toHaveLength(0);
     const [loadingBar] = bars(loading);
-    // A box over the row, not a fixed width that fits only the default font scale.
+    // A box over the run, not a fixed width that fits only the default font scale.
     expect(classOf(loadingBar ?? loading)).toContain('w-full');
     expect(classOf(loadingBar ?? loading)).toContain('bg-muted-soft');
   });

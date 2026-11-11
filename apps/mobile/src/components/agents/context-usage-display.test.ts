@@ -58,10 +58,10 @@ const trackOnly: HeaderPillContent = {
 /** A transcript without usage: the same ring, no dash slot. */
 const trackOnlyWhileLoading: HeaderPillContent = { ...trackOnly, usageUnavailable: false };
 
-/** No usage reported yet: both value slots stay open, the cost one with a dash. */
+/** No usage reported yet: the usage dash paints, and no cost holds the pill open. */
 const unreported: HeaderPillContent = {
   primary: '—',
-  secondary: '—',
+  secondary: null,
   costSlot: 'unreported',
   tone: 'neutral',
   arcFraction: 0,
@@ -70,9 +70,9 @@ const unreported: HeaderPillContent = {
 };
 
 /**
- * The same pill while the session still resolves: the two dashes keep the row's
- * layout and paint invisible, with one bar across it, so the pill is already as
- * wide as its settled form.
+ * The same pill while the session still resolves: the widest run lays out
+ * invisibly with one bar across it, so the bar is as wide as the reading can
+ * become.
  */
 const unreportedWhileLoading: HeaderPillContent = {
   ...unreported,

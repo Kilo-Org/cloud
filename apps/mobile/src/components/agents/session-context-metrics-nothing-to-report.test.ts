@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { expectHiddenReservedBox, info, render } from './session-context-metrics-test-helpers';
+import {
+  expectHiddenReservedBox,
+  info,
+  pillOf,
+  propsOf,
+  render,
+} from './session-context-metrics-test-helpers';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -33,8 +39,9 @@ describe('SessionContextMetrics nothing to report', () => {
       onNothingToReport: true,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as { className?: string; onPress?: () => void };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.className ?? '').not.toContain('opacity-0');
     props.onPress?.();
     expect(onPress).toHaveBeenCalledOnce();
@@ -51,8 +58,9 @@ describe('SessionContextMetrics nothing to report', () => {
       onNothingToReport: false,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as { className?: string; onPress?: () => void };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.className ?? '').not.toContain('opacity-0');
     props.onPress?.();
     expect(onPress).toHaveBeenCalledOnce();

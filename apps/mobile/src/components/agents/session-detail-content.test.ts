@@ -1591,17 +1591,21 @@ describe('session detail header right cluster', () => {
       throw new Error('expected a formatted cost badge');
     }
     const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
-    const cost = metrics.find(
+    // The reading is one text run and the cost is a nested run inside it, so the
+    // whole reading truncates on one line inside the pill instead of pushing a
+    // neighbour.
+    const [cost] = metrics.findAll(
       node =>
         Object.is(node.type, 'Text') &&
         node.children.some(child => typeof child === 'string' && child.includes(expected))
     );
-    expect(cost.props.numberOfLines).toBe(1);
-    // The value sits in a slot sized by the widest badge and shrinks with the
-    // pill, so a longer total truncates inside the pill instead of crossing it.
-    const slot = cost.parent?.parent;
-    expect(slot?.props.className).toContain('shrink');
-    expect(slot?.props.className).toContain('min-w-0');
+    if (cost === undefined) {
+      throw new Error('expected the cost text');
+    }
+    const run = cost.parent;
+    expect(run?.props.numberOfLines).toBe(1);
+    expect(run?.props.className).toContain('shrink');
+    expect(run?.props.className).toContain('min-w-0');
   });
 });
 

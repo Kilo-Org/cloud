@@ -66,12 +66,29 @@ import {
   parseTranscriptionUsageFromResponse,
   requestedLogprobs,
   requestedSamples,
+  claudeBillingReconnectResponse,
 } from './llm-proxy-helpers';
 import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-body.helper';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 const clock = createControlledClock();
 
 const waitForUsageWrite = () => new Promise(resolve => setImmediate(resolve));
+
+describe('claudeBillingReconnectResponse', () => {
+  it('points the owner at the organization billing page', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000042';
+    const response = claudeBillingReconnectResponse('The connector is unusable.', organizationId);
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('retry-after')).toBeNull();
+    const body = (await response.json()) as { error: string; error_type: string; message: string };
+    expect(body.error_type).toBe(ProxyErrorType.byok_error);
+    expect(body.message).toContain('An organization owner must reconnect Claude billing');
+    expect(body.message).toContain(`/organizations/${organizationId}/byok`);
+    expect(body.error).toBe(body.message);
+  });
+});
 
 describe('getOutputHeaders', () => {
   it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(

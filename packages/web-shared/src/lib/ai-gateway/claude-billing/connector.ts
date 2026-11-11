@@ -2,7 +2,6 @@ import 'server-only';
 import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { readDb, type db } from '@kilocode/web-shared/lib/drizzle';
-import type { ClaudeBillingOwner } from './store';
 
 /**
  * The person a Claude billing row names as the one who linked it. A
@@ -35,19 +34,4 @@ export async function resolveClaudeBillingConnector(
   if (!user || isGoneOrDeletingBlockedReason(user.blocked_reason)) return { kind: 'gone' };
   const email = user.google_user_email?.trim();
   return email ? { kind: 'present', email } : { kind: 'gone' };
-}
-
-/**
- * Whether an owner's connection must be reconnected before service runs can
- * bill again. Only the organization's shared-services connection records a
- * connector that decides its flag; every other owner is gated on the person
- * making the request.
- */
-export async function claudeBillingConnectorIsGone(
-  owner: ClaudeBillingOwner,
-  createdBy: string | null | undefined,
-  fromDb: typeof db = readDb
-): Promise<boolean> {
-  if (owner.kind !== 'shared_services') return false;
-  return (await resolveClaudeBillingConnector(createdBy, fromDb)).kind === 'gone';
 }

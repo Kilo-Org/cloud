@@ -189,7 +189,7 @@ export async function resolveProviderAndPolicy(
   if (providerResult.kind === 'claude-billing-reconnect') {
     // The organization's shared-services Claude link was connected by a person
     // who is gone. Only an owner reconnecting it changes the outcome.
-    return reject(claudeBillingReconnectResponse(providerResult.message));
+    return reject(claudeBillingReconnectResponse(providerResult.message, input.organizationId));
   }
   if (providerResult.kind === 'claude-billing-unavailable') {
     // The owner's Claude billing connection cannot bill. Never serve it on

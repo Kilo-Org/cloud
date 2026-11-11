@@ -236,11 +236,15 @@ describe('emitApiMetricsForResponse', () => {
 
     now.mockReturnValue(1000);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(mockedFetch.mock.calls[0][1]?.body as string)).toMatchObject({
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(new Headers(init?.headers).get('X-O11Y-ADMIN-TOKEN')).toBe('test-secret');
+    const body = init?.body as string;
+    expect(JSON.parse(body)).toMatchObject({
       inferenceProvider: 'Fireworks',
       completeRequestMs: 225,
-      clientSecret: 'test-secret',
     });
+    expect(JSON.parse(body)).not.toHaveProperty('clientSecret');
+    expect(body).not.toContain('test-secret');
   });
 
   test.each([
@@ -318,11 +322,14 @@ describe('emitApiMetricsForResponse', () => {
       expect(clone).not.toHaveBeenCalled();
       expect(mockedFetch).toHaveBeenCalledTimes(1);
       const [, init] = mockedFetch.mock.calls[0];
-      expect(JSON.parse(init?.body as string)).toMatchObject({
+      expect(new Headers(init?.headers).get('X-O11Y-ADMIN-TOKEN')).toBe('test-secret');
+      const body = init?.body as string;
+      expect(JSON.parse(body)).toMatchObject({
         inferenceProvider,
         completeRequestMs: 250,
-        clientSecret: 'test-secret',
       });
+      expect(JSON.parse(body)).not.toHaveProperty('clientSecret');
+      expect(body).not.toContain('test-secret');
     }
   );
 
@@ -349,5 +356,22 @@ describe('emitApiMetricsForResponse', () => {
     const body = JSON.parse(mockedFetch.mock.calls[0][1]?.body as string);
     expect(body).toMatchObject({ statusCode: 200, ttfbMs: 10, completeRequestMs: 300 });
     expect(body).not.toHaveProperty('inferenceProvider');
+  });
+
+  test('sends nothing when the ingest credential is unset', async () => {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+      O11Y_SERVICE_URL: 'https://o11y.test',
+      O11Y_KILO_GATEWAY_CLIENT_SECRET: undefined,
+    }));
+    // The credential is read when the module loads, so the guard needs a second module instance.
+    const moduleWithoutSecret = await import('./api-metrics.server');
+    jest.dontMock('@kilocode/web-shared/lib/config.server');
+
+    moduleWithoutSecret.emitApiMetricsForResponse(params, Promise.resolve(null), 100);
+    moduleWithoutSecret.emitGatewayApiMetrics({ ...params, completeRequestMs: 20 });
+    await Promise.resolve();
+
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 });

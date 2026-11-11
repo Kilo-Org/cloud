@@ -24,7 +24,7 @@ import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products'
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatPrefixedMoney, formatUsd } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { useTRPC } from '@/lib/trpc';
@@ -223,8 +223,13 @@ export function CreditPurchaseScreen() {
 
           {!isLoading &&
             products.map(pack => {
+              // The pack names a credit amount in the same shape as the balance
+              // above it. The store's own localized price stays as the store
+              // wrote it.
               const packLabel = t('credits.packLabel', {
-                amount: formatUsd(pack.backend.amountUsd, i18n.language),
+                amount: isolateLtrBidiText(
+                  formatPrefixedMoney(pack.backend.amountUsd, i18n.language)
+                ),
               });
               const expiryMessageKey = getStoreCreditExpiryMessageKey(pack.backend, storefront);
               const expiryMessage = expiryMessageKey ? t(expiryMessageKey) : undefined;

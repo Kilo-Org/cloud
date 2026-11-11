@@ -248,6 +248,7 @@ function createHarness(
   options: {
     runCondense?: TurnManagerDeps['runCondense'];
     runAutoCommit?: TurnManagerDeps['runAutoCommit'];
+    flushArtifacts?: () => void;
     materializeAttachments?: (
       message: { prompt?: string; parts?: unknown[] },
       deps?: { signal?: AbortSignal }
@@ -289,6 +290,7 @@ function createHarness(
     log: message => logs.push(message),
     onDiagnostic: (event, fields) => diagnostics.push({ event, fields }),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
+    ...(options.flushArtifacts === undefined ? {} : { flushArtifacts: options.flushArtifacts }),
     now: () => clock,
     scheduler,
     materializeAttachments: (async (
@@ -566,6 +568,24 @@ describe('turn manager submission', () => {
     const outcomes = outcomeFrames(h.frames);
     expect(outcomes).toHaveLength(1);
     expect(outcomes[0]).toMatchObject({ status: 'completed', lastMessageId: 'm1' });
+  });
+
+  it('flushes artifacts when a turn reaches an outcome', async () => {
+    let flushes = 0;
+    const h = createHarness({
+      flushArtifacts: () => {
+        flushes += 1;
+      },
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(flushes).toBe(0);
+
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+    expect(flushes).toBe(1);
   });
 
   it('routes /compact without auto and fails when summarize returns false', async () => {

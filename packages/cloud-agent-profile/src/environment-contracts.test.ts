@@ -26,6 +26,8 @@ describe('reserved environment keys', () => {
       'CONTROL_LOG_UPLOAD_URL',
       'CONTROL_LOG_UPLOAD_GRANT',
       'CONTROL_WRAPPER_INSTANCE_ID',
+      'SANDBOX_TRANSFER_URL',
+      'SANDBOX_TRANSFER_GRANT',
       'XDG_DATA_HOME',
       'KILOCODE_TOKEN',
       'KILO_PLATFORM',

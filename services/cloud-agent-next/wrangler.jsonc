@@ -71,6 +71,7 @@
     "CLI_TIMEOUT_SECONDS": "900",
     "REAPER_INTERVAL_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
+    "WORKSPACE_ARTIFACTS_BUCKET_NAME": "kilocode-workspace-artifacts",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
     "TOOL_CGROUP_RESERVE_MB": "2048",
@@ -174,6 +175,10 @@
     {
       "binding": "R2_BUCKET",
       "bucket_name": "kilocode-sessions",
+    },
+    {
+      "binding": "WORKSPACE_ARTIFACTS_BUCKET",
+      "bucket_name": "kilocode-workspace-artifacts",
     },
   ],
   // Native Cloudflare Containers is the only sandbox runtime. The retired
@@ -370,6 +375,7 @@
         "CLI_TIMEOUT_SECONDS": "900",
         "REAPER_INTERVAL_MS": "300000",
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
+        "WORKSPACE_ARTIFACTS_BUCKET_NAME": "kilocode-workspace-artifacts-dev",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
@@ -413,6 +419,10 @@
         {
           "binding": "R2_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
+        },
+        {
+          "binding": "WORKSPACE_ARTIFACTS_BUCKET",
+          "bucket_name": "kilocode-workspace-artifacts-dev",
         },
         {
           "binding": "RUNTIME_RELEASE_BUCKET",

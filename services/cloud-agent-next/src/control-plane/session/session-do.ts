@@ -197,6 +197,10 @@ import {
   worktreeChangesReadySchema,
   type WorktreeChangesReady,
 } from '../worktree-changes-ready.js';
+import {
+  WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+  type WorkspaceArtifactsChanged,
+} from '../sandbox/notifications.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
 import type {
@@ -294,6 +298,11 @@ const EVENT_RECEIPT_RETENTION_MS = 5 * 60_000;
  */
 const rootStatusSchema = z.object({ type: z.string(), settled: z.boolean() });
 type RootStatus = z.infer<typeof rootStatusSchema>;
+
+const workspaceArtifactsChangedSchema = z
+  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+  .strict();
+
 const rootStatusEventSchema = z.object({
   sessionID: z.string(),
   status: z.object({ type: z.string() }),
@@ -2429,6 +2438,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (this.metadata?.workspace?.worktreeId !== parsed.worktreeId) return false;
       this.worktreeChanges.ready(parsed.revision);
       return true;
+    });
+  }
+
+  async onWorkspaceArtifactsChanged(notification: WorkspaceArtifactsChanged): Promise<void> {
+    await this.initialized;
+    const parsed = workspaceArtifactsChangedSchema.parse(notification);
+    return this.enqueue(async () => {
+      const payload = JSON.stringify({ revision: parsed.revision });
+      const timestamp = Date.now();
+      const id = this.eventQueries.insertUnique({
+        executionId: '',
+        sessionId: this.sessionId,
+        streamEventType: WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+        payload,
+        timestamp,
+        entityId: `workspace-artifacts/${parsed.revision}`,
+      });
+      if (id === null) return;
+      this.broadcast({
+        id,
+        execution_id: '',
+        session_id: this.sessionId,
+        stream_event_type: WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+        payload,
+        timestamp,
+      });
     });
   }
 

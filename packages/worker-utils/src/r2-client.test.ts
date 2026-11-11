@@ -20,6 +20,27 @@ describe('R2 presigned downloads', () => {
     expect(signed.searchParams.get('response-content-disposition')).toBe(
       'attachment; filename="kilo-data-export.jsonl.gz"'
     );
+    expect(signed.searchParams.get('response-content-type')).toBeNull();
     expect(signed.searchParams.get('X-Amz-Signature')).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('overrides the response content type when requested', async () => {
+    const client = createR2Client({
+      accessKeyId: 'test-access-key',
+      secretAccessKey: 'test-secret-key',
+      endpoint: 'https://account.r2.cloudflarestorage.com',
+    });
+
+    const signed = new URL(
+      await client.getSignedURL('artifacts', 'sandbox/object', 300, {
+        responseContentDisposition: "attachment; filename*=UTF-8''report.html",
+        responseContentType: 'application/octet-stream',
+      })
+    );
+
+    expect(signed.searchParams.get('response-content-disposition')).toBe(
+      "attachment; filename*=UTF-8''report.html"
+    );
+    expect(signed.searchParams.get('response-content-type')).toBe('application/octet-stream');
   });
 });

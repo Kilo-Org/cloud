@@ -338,11 +338,14 @@ export type KiloRuntimeOptions = {
   isIdle?: (client: Harness, directory: string, signal: AbortSignal) => Promise<boolean>;
   /** Names the reserved port in the agent rules; unknown leaves that rule out. */
   sandboxProvider?: AgentSandboxProvider;
+  /** Adds the workspace Artifacts guidance to the agent rules when sync is running. */
+  artifacts?: boolean;
   /** Creates the Kilo home/auth/runtime directories before spawn (spec §7). */
   prepareFilesystem?: (
     env: Record<string, string>,
     directory: string,
-    sandboxProvider?: AgentSandboxProvider
+    sandboxProvider?: AgentSandboxProvider,
+    artifacts?: boolean
   ) => Promise<void>;
 };
 
@@ -520,13 +523,15 @@ async function defaultIsIdle(
 export async function prepareKiloFilesystem(
   env: Record<string, string>,
   directory: string,
-  sandboxProvider?: AgentSandboxProvider
+  sandboxProvider?: AgentSandboxProvider,
+  artifacts?: boolean
 ): Promise<void> {
   const home = env.HOME;
   if (home !== undefined && home.length > 0) {
     await writeCloudAgentRulesFile(home, {
       bashDefaultTimeoutMs: env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
       ...(sandboxProvider ? { sandboxProvider } : {}),
+      ...(artifacts ? { artifacts } : {}),
     });
   }
   const dataHome = env.XDG_DATA_HOME;
@@ -932,7 +937,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     // Spec §7 pre-spawn filesystem: Kilo reads auth.json from disk, and a route
     // with no git and no setup commands never created the worktree directory.
     const env = options.env;
-    await prepareFilesystem(env, options.directory, options.sandboxProvider);
+    await prepareFilesystem(env, options.directory, options.sandboxProvider, options.artifacts);
     if (currentPhase() === 'stopped') throw new Error('Kilo runtime is shutting down');
     const controller = new AbortController();
     startAbort = controller;

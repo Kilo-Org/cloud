@@ -673,6 +673,63 @@ describe('createSessionManager', () => {
     });
   });
 
+  describe('workspaceArtifactsRefresh', () => {
+    const changed = {
+      type: 'workspace.artifacts.changed',
+      cloudSessionId: 'agent-1',
+      revision: 2,
+    } satisfies NormalizedEvent;
+    const connected = {
+      type: 'connected',
+      cloudSessionId: 'agent-1',
+      sessionStatus: { type: 'idle' },
+    } satisfies NormalizedEvent;
+
+    it('ignores stale revisions and bumps the connection version on reconnect', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toBeNull();
+
+      mockSessionCallbacks.onEvent?.(changed);
+      const firstChange = config.store.get(mgr.atoms.workspaceArtifactsRefresh);
+      expect(firstChange).toEqual({
+        cloudSessionId: 'agent-1',
+        revision: 2,
+        connectionVersion: 0,
+      });
+
+      mockSessionCallbacks.onEvent?.({ ...changed, revision: 2 });
+      mockSessionCallbacks.onEvent?.({ ...changed, revision: 1 });
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toBe(firstChange);
+
+      mockSessionCallbacks.onEvent?.(connected);
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toEqual({
+        cloudSessionId: 'agent-1',
+        revision: 2,
+        connectionVersion: 1,
+      });
+
+      mockSessionCallbacks.onEvent?.({ ...changed, revision: 3 });
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toEqual({
+        cloudSessionId: 'agent-1',
+        revision: 3,
+        connectionVersion: 1,
+      });
+      mgr.destroy();
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toBeNull();
+    });
+
+    it('ignores other Cloud sessions', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onEvent?.({ ...changed, cloudSessionId: 'agent-other' });
+      expect(config.store.get(mgr.atoms.workspaceArtifactsRefresh)).toBeNull();
+      mgr.destroy();
+    });
+  });
+
   describe('switchSession', () => {
     it('saves the latest live transcript before clearing the outgoing session', async () => {
       const cached = new Map<string, SessionSnapshotPage>();

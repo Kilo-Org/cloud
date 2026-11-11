@@ -1090,6 +1090,12 @@ const controlPlaneHelloFrameSchema = z
      */
     startCommands: z.literal(true).optional(),
     worktreeGit: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper renews short-lived sandbox transfer
+     * grants over this connection with `transfer.grant`. A wrapper that did not
+     * advertise it keeps the launch-time grant.
+     */
+    transferGrants: z.literal(true).optional(),
   })
   .strict();
 
@@ -1541,6 +1547,33 @@ const controlPlanePreviewListFrameSchema = z
   })
   .strict();
 
+const controlPlaneTransferGrantFrameSchema = z
+  .object({
+    type: z.literal('transfer.grant'),
+    requestId: z.string().min(1).max(128),
+  })
+  .strict();
+
+const controlPlaneTransferGrantResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('transfer.grant.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      grant: z.string().min(1).max(4096),
+      expiresAt: z.number().int().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('transfer.grant.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: controlPlaneRequestErrorSchema,
+    })
+    .strict(),
+]);
+
 const controlPlanePreviewResultFrameSchema = z.discriminatedUnion('ok', [
   z
     .object({
@@ -1647,6 +1680,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneKiloResultFrameSchema,
   controlPlanePreviewListFrameSchema,
   controlPlanePreviewResultFrameSchema,
+  controlPlaneTransferGrantFrameSchema,
+  controlPlaneTransferGrantResultFrameSchema,
   controlPlaneHistoryPageFrameSchema,
   controlPlaneHistoryRecentFrameSchema,
   controlPlaneHistoryResultFrameSchema,
@@ -1745,6 +1780,10 @@ export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloReques
 export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
 export type ControlPlanePreviewListFrame = z.infer<typeof controlPlanePreviewListFrameSchema>;
 export type ControlPlanePreviewResultFrame = z.infer<typeof controlPlanePreviewResultFrameSchema>;
+export type ControlPlaneTransferGrantFrame = z.infer<typeof controlPlaneTransferGrantFrameSchema>;
+export type ControlPlaneTransferGrantResultFrame = z.infer<
+  typeof controlPlaneTransferGrantResultFrameSchema
+>;
 export type ControlPlaneHistoryPageFrame = z.infer<typeof controlPlaneHistoryPageFrameSchema>;
 export type ControlPlaneHistoryRecentFrame = z.infer<typeof controlPlaneHistoryRecentFrameSchema>;
 export type ControlPlaneHistoryResultFrame = z.infer<typeof controlPlaneHistoryResultFrameSchema>;

@@ -53,6 +53,7 @@ function createFakeConnection(): {
     connection: {
       wrapperId: 'wrapper_test',
       snapshot: () => ({ phase: 'idle', attempt: 0, outboxBytes: 0 }),
+      supportsTransferGrants: () => false,
       start: () => {
         started += 1;
       },

@@ -5,6 +5,7 @@ import {
   type EnvironmentReferenceRepository,
   type EnvironmentRepositoryIdentity,
 } from '@kilocode/cloud-agent-profile';
+import { parseGitLabCloneUrl } from '@kilocode/worker-utils/gitlab-url';
 import type { PersistenceEnv } from '../persistence/types.js';
 import {
   isServiceSideManagedGitLabTokenFailure,
@@ -104,6 +105,11 @@ async function assertBitbucketAccess(
  * Ordinary GitLab sessions check integration access here. Capability issuance
  * validates the instance and binds the project path; GitLab enforces project
  * access when the token is used. Code-review sessions require a project-exact token.
+ *
+ * The token for an ordinary origin comes from the caller's integration, which
+ * resolves without matching the clone URL. The URL is matched against the
+ * resolved instance here, so the request is answered with the reason the
+ * credential attachment requires.
  */
 async function assertGitLabAccess(
   input: AccessContext & { createdOnPlatform?: string },
@@ -121,6 +127,14 @@ async function assertGitLabAccess(
         ? 'SERVICE_UNAVAILABLE'
         : 'BAD_REQUEST',
       message: `GitLab repository authorization failed (${result.reason})`,
+    });
+  }
+
+  const repository = parseGitLabCloneUrl(cloneUrl, result.instanceUrl);
+  if (!repository.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `GitLab repository authorization failed (${repository.reason})`,
     });
   }
 }

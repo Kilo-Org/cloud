@@ -239,6 +239,50 @@ describe('GitLab session creation preflight', () => {
     });
   });
 
+  it('rejects a launch URL that does not belong to the resolved integration', async () => {
+    const getGitLabToken = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'token',
+      instanceUrl: 'https://gitlab.example.com',
+      glabIsOAuth2: false,
+    });
+
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { getGitLabToken } } as never,
+        userId: 'user-1',
+        orgId,
+        createdOnPlatform: 'cloud-agent-web',
+        repository: gitlabRepository,
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'GitLab repository authorization failed (unsupported_gitlab_instance)',
+    });
+  });
+
+  it('rejects a launch URL that is not a secure GitLab clone URL', async () => {
+    const getGitLabToken = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'token',
+      instanceUrl: 'https://gitlab.com',
+      glabIsOAuth2: false,
+    });
+
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { getGitLabToken } } as never,
+        userId: 'user-1',
+        orgId,
+        createdOnPlatform: 'cloud-agent-web',
+        repository: { type: 'gitlab', url: 'http://gitlab.com/group/sub/project.git' },
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'GitLab repository authorization failed (invalid_gitlab_url)',
+    });
+  });
+
   it('keeps the code-review origin, which resolves a project-exact token', async () => {
     const getGitLabToken = vi.fn().mockResolvedValue({
       success: true,

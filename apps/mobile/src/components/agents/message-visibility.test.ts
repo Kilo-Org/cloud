@@ -274,7 +274,9 @@ describe('userBubbleRendersContent', () => {
 
   it('returns false for blank text and for a prompt sanitization removes', () => {
     expect(userBubbleRendersContent([textPart({ text: '   \n ' })])).toBe(false);
-    expect(userBubbleRendersContent([textPart({ text: "<script>alert('x')</script>" })])).toBe(false);
+    expect(userBubbleRendersContent([textPart({ text: "<script>alert('x')</script>" })])).toBe(
+      false
+    );
   });
 
   it('returns false for tool, reasoning and patch parts the bubble never draws', () => {

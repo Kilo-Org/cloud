@@ -1356,9 +1356,7 @@ describe('MessageBubble rows with nothing to draw', () => {
     expect(pressableProps(tree)).toBeNull();
     expect(footerOf(tree)).not.toBeNull();
     expect(findText(tree, t => t === 'Message not sent')).toBe(true);
-    expect(
-      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')
-    ).not.toBeNull();
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).not.toBeNull();
   });
 
   it('keeps the queued row wrapper while an empty row holds its badge slot', async () => {

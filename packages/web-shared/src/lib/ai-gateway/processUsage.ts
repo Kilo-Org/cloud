@@ -93,6 +93,8 @@ import {
   parseUsageWithRecovery,
   reportUpstreamStreamError,
   readResponseText,
+  REPORTED_MODEL_MAX_LENGTH,
+  usageContextReportFields,
   openRouterUsageSchema,
   upstreamStreamErrorSchema,
   vercelProviderMetadataSchema,
@@ -115,6 +117,17 @@ import type { BouncerUsageEventEnqueue, LlmUsageQueueMessage } from '@kilocode/u
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 const posthogClient = PostHogClient();
+
+/**
+ * The request fields a prompt-extraction failure reports. The body is untrusted
+ * at this point, because a malformed one is what threw, so the model is read
+ * through a runtime type check and its length is bounded.
+ */
+function promptExtractionReportFields(body: unknown) {
+  if (typeof body !== 'object' || body === null || !('model' in body)) return {};
+  const { model } = body;
+  return typeof model === 'string' ? { model: model.slice(0, REPORTED_MODEL_MAX_LENGTH) } : {};
+}
 
 export function extractPromptInfo(body: OpenRouterChatCompletionRequest): PromptInfo {
   try {
@@ -141,7 +154,7 @@ export function extractPromptInfo(body: OpenRouterChatCompletionRequest): Prompt
     captureException(e, {
       level: 'warning',
       tags: { source: 'prompt_extraction' },
-      extra: { body },
+      extra: promptExtractionReportFields(body),
     });
     return { system_prompt_prefix: '', system_prompt_length: -1, user_prompt_prefix: '' };
   }
@@ -1646,7 +1659,7 @@ export async function processTokenData(
     captureMessage('SUSPICIOUS: No usage information', {
       level: 'error',
       tags: { source: 'usage_processing' },
-      extra: { usageContext },
+      extra: { usageContext: usageContextReportFields(usageContext) },
     });
     return null;
   }
@@ -1680,7 +1693,8 @@ export async function processTokenData(
       genStats.cacheWriteTokens = usageStats.cacheWriteTokens;
     }
 
-    genStats.model = usageStats.model; // openrouter bug?
+    // Prefer the response alias over a dated generation ID, but keep a recovered model.
+    genStats.model = usageStats.model || genStats.model;
     genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
     genStats.latency = usageStats.latency;
     genStats.generation_time = usageStats.generation_time;

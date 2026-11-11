@@ -22,6 +22,8 @@
     "expired": "Iraungita"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Utzi",
     "done": "Eginda",
     "retry": "Saiatu berriro",
@@ -361,7 +363,11 @@
       "retryLoadingFiles": "Saiatu fitxategiak berriro kargatzen",
       "filterPlaceholder": "Fitxategiaren bidea",
       "viewedCount": "{{viewed}} / {{total}} ikusita",
+      "viewedCount_one": "{{viewed}} / {{total}} ikusita",
+      "viewedCount_other": "{{viewed}} / {{total}} ikusita",
       "viewedOfListed": "zerrendatutako {{total}} fitxategietatik {{viewed}} ikusita",
+      "viewedOfListed_one": "zerrendatutako {{total}} fitxategietatik {{viewed}} ikusita",
+      "viewedOfListed_other": "zerrendatutako {{total}} fitxategietatik {{viewed}} ikusita",
       "loadingFiles": "{{loaded}} / {{total}} kargatzen…",
       "failedToLoadAllFiles": "Ezin izan dira fitxategi guztiak kargatu.",
       "couldNotLoadMoreFiles": "Ezin izan dira fitxategi gehiago kargatu.",
@@ -2457,7 +2463,8 @@
       "selectedProfile": "Hautatutako profila",
       "manualOverrides": "Eskuzko baliogabetzeak",
       "openSettingsToReview": "Ireki Ezarpenak berrikusteko",
-      "profileSelection": "Profila hautatzea"
+      "profileSelection": "Profila hautatzea",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da.",
@@ -2754,7 +2761,7 @@
       "positionHint": "(1 / {{displayCount}})",
       "movedPastPrompt": "Agenteak eskaera hau atzean utzi du. Txartel hau saioak aurrera egiten duenean itxiko da.",
       "waitingForAnswer": "Agentea zure erantzunaren zain dago. Galdera hau irekita dagoen bitartean, agenteari bidali nahi diozun mezua zain geratuko da.",
-      "waitingForPermission": "Agentea baimenaren zain dago. Eskaera hau irekita dagoen bitartean, agenteari bidali nahi diozun mezua zain geratuko da."
+      "waitingForPermission": "Eskaera hau irekita dagoen bitartean, agenteari bidali nahi diozun mezua zain geratuko da."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3535,7 +3542,7 @@
       "provider": "Geldituta: hornitzailearen errorea",
       "tool": "Geldituta: tresnaren errorea",
       "cancelled": "Geldituta: bertan behera utzita",
-      "other": "GELDITUTA"
+      "other": "Geldituta"
     }
   },
   "transcriptionModel": {
@@ -4271,10 +4278,10 @@
     "snapshotSummaryFailed": "AI laburpenak huts egin du. Zure egoera-argazki egituratua erabilgarri dago oraindik.",
     "scheduledContextEnabled": "Programatutako txostenak",
     "scheduledContextSettings": "Programatutako txostenak · {{context}}",
-    "scheduledContextHint": "Gaitu programatutako egoera-bilketa eta ordainpeko AI laburpenak testuinguru honetarako soilik. Hautatutako zatiak, datu sentikorrak ezabatuta, eta datu egituratuak zure eredura bidaltzen dira. Laburpenek txostenaren ezarpenak berariaz eguneratzean gordetako aplikazioaren hizkuntza erabiltzen dute; hizkuntza hori ez da automatikoki aldatzen aplikazioaren hizkuntza aldatzean. Karguak testuinguru honen saldotik ordaintzen dira. Jarduerarik gabeko egoera-argazkiek ez dute AI erabiltzen.",
+    "scheduledContextHint": "Gaitu programatutako egoera-bilketa eta ordainpeko AI laburpenak testuinguru honetarako soilik. Hautatutako zatiak, datu sentikorrak ezabatuta, eta datu egituratuak zure eredura bidaltzen dira. Laburpenek txostenaren ezarpenak eguneratzean gordetako aplikazioaren hizkuntza erabiltzen dute. Karguak testuinguru honen saldotik ordaintzen dira. Jarduerarik gabeko egoera-argazkiek ez dute AI erabiltzen.",
     "snapshotSafeguards": "Laburpen bakoitzeko denbora- eta gastu-mugak programatutako egoera-argazki bakoitzari aplikatzen zaizkio; ez dira eguneko aurrekontua.",
     "snapshotEstimateInputTooLarge": "Egoera-argazki honek ebidentzia gehiegi ditu hautatutako eredurako.",
-    "quietSnapshot": "Ahal den neurrian egindako hautaketan, ez da saioen jarduerarik hautatu egoera-argazki honetarako. Ez zaio AI ereduari deirik egin, eta ez da kargurik aplikatu.",
+    "quietSnapshot": "Ez da saioen jarduerarik hautatu egoera-argazki honetarako. Ez da AI laburpenik eskatu, eta ez da kargurik aplikatu.",
     "noEnabledContexts": "Ez dago testuingururik gaituta programatutako txostenetarako",
     "sourceBlocker": "Saioak arreta behar du",
     "sourceMetadata": "Jasotako saioaren metadatuak"

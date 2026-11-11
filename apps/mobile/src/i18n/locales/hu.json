@@ -22,6 +22,8 @@
     "expired": "Lejárt"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Mégse",
     "done": "Kész",
     "retry": "Újrapróbálkozás",
@@ -361,7 +363,11 @@
       "retryLoadingFiles": "Fájlok betöltésének megismétlése",
       "filterPlaceholder": "Fájlok szűrése elérési út alapján",
       "viewedCount": "{{viewed}} / {{total}} megtekintve",
+      "viewedCount_one": "{{viewed}} / {{total}} megtekintve",
+      "viewedCount_other": "{{viewed}} / {{total}} megtekintve",
       "viewedOfListed": "{{viewed}} / {{total}} megtekintve a felsorolt fájlokból",
+      "viewedOfListed_one": "{{viewed}} / {{total}} megtekintve a felsorolt fájlokból",
+      "viewedOfListed_other": "{{viewed}} / {{total}} megtekintve a felsorolt fájlokból",
       "loadingFiles": "Betöltés: {{loaded}} / {{total}}…",
       "failedToLoadAllFiles": "Nem sikerült betölteni az összes fájlt.",
       "couldNotLoadMoreFiles": "Nem sikerült betölteni a további fájlokat.",
@@ -2457,7 +2463,8 @@
       "selectedProfile": "Kiválasztott profil",
       "manualOverrides": "Kézi felülírások",
       "openSettingsToReview": "Nyisd meg a Beállításokat az áttekintéshez",
-      "profileSelection": "Profil kiválasztása"
+      "profileSelection": "Profil kiválasztása",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissült.",
@@ -2754,7 +2761,7 @@
       "positionHint": "(1., összesen {{displayCount}})",
       "movedPastPrompt": "Az ügynök már továbblépett erről a kérésről. A kártya bezárul, amikor a munkamenet folytatódik.",
       "waitingForAnswer": "Az ügynök a válaszodra vár. Amíg nem válaszolsz erre a kérdésre, az ügynöknek szánt üzeneted küldése szünetel.",
-      "waitingForPermission": "Az ügynök engedélyre vár. Amíg nem döntesz erről a kérésről, az ügynöknek szánt üzeneted küldése szünetel."
+      "waitingForPermission": "Amíg nem döntesz erről a kérésről, az ügynöknek szánt üzeneted küldése szünetel."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -4271,10 +4278,10 @@
     "snapshotSummaryFailed": "Az AI-összefoglaló sikertelen. A strukturált pillanatkép továbbra is elérhető.",
     "scheduledContextEnabled": "Ütemezett jelentések",
     "scheduledContextSettings": "Ütemezett jelentések · {{context}}",
-    "scheduledContextHint": "Engedélyezd az ütemezett rögzítést és a fizetős AI-összefoglalókat csak ebben a környezetben. Kiválasztott, az érzékeny adatok kitakarásával előkészített részleteket és strukturált adatokat küldünk a modellednek. Az összefoglalók a jelentés beállításainak módosításakor mentett alkalmazásnyelven készülnek. Ezt a nyelvet csak akkor mentjük, amikor módosítod a jelentés beállításait; az alkalmazás nyelvének változásakor nem frissül automatikusan. A díjakat ennek a környezetnek az egyenlege fedezi. A tevékenység nélküli pillanatképekhez nem használunk AI-t.",
+    "scheduledContextHint": "Engedélyezd az ütemezett rögzítést és a fizetős AI-összefoglalókat csak ebben a környezetben. Kiválasztott, az érzékeny adatok kitakarásával előkészített részleteket és strukturált adatokat küldünk a modellednek. Az összefoglalók a jelentés beállításainak módosításakor mentett alkalmazásnyelven készülnek. A díjakat ennek a környezetnek az egyenlege fedezi. A tevékenység nélküli pillanatképekhez nem használunk AI-t.",
     "snapshotSafeguards": "Az összefoglalónkénti idő- és költési korlátok minden ütemezett pillanatképre külön érvényesek, nem napi keretet jelentenek.",
     "snapshotEstimateInputTooLarge": "Ez a pillanatkép túl sok forrásadatot tartalmaz a kiválasztott modell számára.",
-    "quietSnapshot": "A rendelkezésre álló adatok alapján nem választottunk ki munkamenet-tevékenységet ehhez a pillanatképhez. Nem kértünk AI-összefoglalót, nem történt modellhívás vagy díjfelszámítás.",
+    "quietSnapshot": "Nem választottunk ki munkamenet-tevékenységet ehhez a pillanatképhez. Nem kértünk AI-összefoglalót, és nem történt díjfelszámítás.",
     "noEnabledContexts": "Egyetlen környezetben sincsenek engedélyezve az ütemezett jelentések",
     "sourceBlocker": "A munkamenet figyelmet igényel",
     "sourceMetadata": "A munkamenet rögzített metaadatai"

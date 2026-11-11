@@ -22,6 +22,8 @@
     "expired": "Isteklo"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Otkaži",
     "done": "Gotovo",
     "retry": "Pokušaj ponovo",
@@ -361,7 +363,13 @@
       "retryLoadingFiles": "Ponovo pokušaj da učitaš datoteke",
       "filterPlaceholder": "Putanja datoteke",
       "viewedCount": "pregledano {{viewed}} od {{total}}",
+      "viewedCount_one": "pregledano {{viewed}} od {{total}}",
+      "viewedCount_few": "pregledano {{viewed}} od {{total}}",
+      "viewedCount_other": "pregledano {{viewed}} od {{total}}",
       "viewedOfListed": "pregledano {{viewed}} od {{total}} navedenih datoteka",
+      "viewedOfListed_one": "pregledano {{viewed}} od {{total}} navedenih datoteka",
+      "viewedOfListed_few": "pregledano {{viewed}} od {{total}} navedenih datoteka",
+      "viewedOfListed_other": "pregledano {{viewed}} od {{total}} navedenih datoteka",
       "loadingFiles": "Učitavanje {{loaded}} od {{total}}…",
       "failedToLoadAllFiles": "Nije moguće učitati sve datoteke.",
       "couldNotLoadMoreFiles": "Nije moguće učitati još datoteka.",
@@ -2499,7 +2507,8 @@
       "selectedProfile": "Izabrani profil",
       "manualOverrides": "Ručno zamena",
       "openSettingsToReview": "Otvorite Podešavanja za pregled",
-      "profileSelection": "Izbor profila"
+      "profileSelection": "Izbor profila",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažuriran je {{displayCount}} fajl.",
@@ -2800,7 +2809,7 @@
       "positionHint": "(1 od {{displayCount}})",
       "movedPastPrompt": "Agent je već nastavio dalje od ovog upita. Ova kartica će se zatvoriti kada se sesija nastavi.",
       "waitingForAnswer": "Agent čeka tvoj odgovor. Dok je ovo pitanje otvoreno, slanje tvoje poruke agentu je pauzirano.",
-      "waitingForPermission": "Agent čeka dozvolu. Dok je ovaj zahtev otvoren, slanje tvoje poruke agentu je pauzirano."
+      "waitingForPermission": "Dok je ovaj zahtev otvoren, slanje tvoje poruke agentu je pauzirano."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3590,7 +3599,7 @@
       "provider": "Zaustavljeno: greška provajdera",
       "tool": "Zaustavljeno: greška alata",
       "cancelled": "Zaustavljeno: otkazano",
-      "other": "ZAUSTAVLJENO"
+      "other": "Zaustavljeno"
     }
   },
   "transcriptionModel": {
@@ -4337,10 +4346,10 @@
     "snapshotSummaryFailed": "AI rezime nije uspeo. Strukturisan snimak stanja je i dalje dostupan.",
     "scheduledContextEnabled": "Zakazani izveštaji",
     "scheduledContextSettings": "Zakazani izveštaji · {{context}}",
-    "scheduledContextHint": "Omogućite zakazano beleženje stanja i plaćene AI rezimee samo za ovaj kontekst. Izabrani odlomci sa uklonjenim osetljivim podacima i strukturisane činjenice šalju se vašem modelu. Rezimei koriste jezik aplikacije koji se čuva samo kada sami promenite podešavanja izveštaja, a ne ažurira se automatski pri promeni jezika aplikacije. Naplata ide sa stanja ovog konteksta. Snimci bez aktivnosti ne koriste AI.",
+    "scheduledContextHint": "Omogućite zakazano beleženje stanja i plaćene AI rezimee samo za ovaj kontekst. Izabrani odlomci sa uklonjenim osetljivim podacima i strukturisane činjenice šalju se vašem modelu. Rezimei koriste jezik aplikacije koji se čuva kada promenite podešavanja izveštaja. Naplata ide sa stanja ovog konteksta. Snimci bez aktivnosti ne koriste AI.",
     "snapshotSafeguards": "Ograničenja vremena i potrošnje po rezimeu važe za svaki zakazani snimak stanja, a ne kao dnevni budžet.",
     "snapshotEstimateInputTooLarge": "Ovaj snimak stanja sadrži previše dokaza za izabrani model.",
-    "quietSnapshot": "Za ovaj snimak stanja nije izabrana nijedna aktivnost sesija. Izbor može biti nepotpun. AI model nije pozvan, a AI rezime nije zatražen niti naplaćen.",
+    "quietSnapshot": "Za ovaj snimak stanja nije izabrana nijedna aktivnost sesija. AI rezime nije zatražen niti naplaćen.",
     "noEnabledContexts": "Nijedan kontekst nije omogućen za zakazane izveštaje",
     "sourceBlocker": "Sesija zahteva pažnju",
     "sourceMetadata": "Zabeleženi metapodaci sesije"

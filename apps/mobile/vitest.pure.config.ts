@@ -45,6 +45,7 @@ export default defineProject({
       'src/lib/analytics/**/*.test.ts',
       'src/lib/auth/**/*.test.ts',
       'src/lib/chat/**/*.test.ts',
+      'src/lib/design-gate/**/*.test.ts',
       'src/lib/auth/**/*.test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',

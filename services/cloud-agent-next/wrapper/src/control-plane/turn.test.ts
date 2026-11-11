@@ -63,7 +63,12 @@ type PromptCall = {
   model?: { providerID?: string; modelID: string };
   signal?: AbortSignal;
 };
-type SummaryCall = { sessionId: string; model: { modelID: string }; auto?: boolean };
+type SummaryCall = {
+  sessionId: string;
+  messageId?: string;
+  model: { modelID: string };
+  auto?: boolean;
+};
 type CommandCall = { sessionId: string; command: string; messageId?: string; args?: string };
 type QuestionCall = { questionId: string; answers: string[][]; directory?: string };
 type RejectCall = { questionId: string; directory?: string };
@@ -571,6 +576,7 @@ describe('turn manager submission', () => {
     h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
     await settle();
     expect(client.summaries).toHaveLength(1);
+    expect(client.summaries[0]).toMatchObject({ messageId: 'c1' });
     expect(client.summaries[0].auto).toBeUndefined();
     expect(client.prompts).toHaveLength(0);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({
@@ -679,7 +685,7 @@ describe('turn manager submission', () => {
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
     await settle();
-    expect(h.client(routeSpec()).summaries).toHaveLength(2);
+    expect(h.client(routeSpec()).summaries.map(call => call.messageId)).toEqual(['c1', 'c1']);
     expect(h.client(routeSpec()).prompts).toEqual([]);
     expect(outcomeFrames(h.frames)).toEqual([]);
     h.manager.observeKiloEvent(completedKiloTurn());
@@ -690,6 +696,34 @@ describe('turn manager submission', () => {
     await settle();
     expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
   });
+
+  it.each([false, true])(
+    'settles a replayed compact without another native close (queued follow-up: %s)',
+    async followup => {
+      const h = createHarness();
+      const route = routeSpec();
+      h.registerRoute(route);
+      h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+      await settle();
+      if (followup) h.manager.submit(SESSION_ID, promptPayload('m1'));
+      h.retireClient(route);
+      h.client(route).client.compact = async input => {
+        expect(input.messageId).toBe('c1');
+        return 'replayed';
+      };
+      h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+      await settle();
+      if (followup) {
+        expect(h.client(route).prompts.map(call => call.messageId)).toEqual(['m1']);
+        expect(outcomeFrames(h.frames)).toEqual([]);
+        h.manager.observeKiloEvent(completedKiloTurn());
+        await settle();
+      }
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'completed', lastMessageId: followup ? 'm1' : 'c1' },
+      ]);
+    }
+  );
 
   it('drains the inbox when a heartbeat arrives after Kilo recovers', async () => {
     const h = createHarness();
@@ -727,6 +761,86 @@ describe('turn manager submission', () => {
     expect(available?.properties.commands).toEqual([
       { name: 'compact', description: 'Compact the conversation' },
     ]);
+  });
+
+  it('refreshes command catalogs for the changed runtime, including sibling chats', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.registerRoute(routeSpec({ sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' }));
+    h.registerRoute(routeSpec({ sessionId: 'workspace_other', directory: '/workspace/other' }));
+    h.manager.observeKiloEvent(kiloEvent('command.updated', {}, runtimeKey(routeSpec())));
+    await settle();
+    const catalogs = h.frames.flatMap(frame =>
+      frame.type === 'session.events' &&
+      frame.events.some(event => event.type === 'commands.available')
+        ? [frame.sessionId]
+        : []
+    );
+    expect(catalogs.sort()).toEqual([SESSION_ID, 'workspace_sibling'].sort());
+    expect(outcomeFrames(h.frames)).toEqual([]);
+  });
+
+  it('coalesces catalog updates with prepare and publishes the latest snapshot to every sibling', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.registerRoute(routeSpec({ sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' }));
+    type Catalog = Awaited<ReturnType<Harness['listCommands']>>;
+    const first = Promise.withResolvers<Catalog>();
+    const latest = Promise.withResolvers<Catalog>();
+    let reads = 0;
+    h.client(routeSpec()).client.listCommands = () =>
+      ++reads === 1 ? first.promise : latest.promise;
+    const prepared = h.manager.publishCommands(SESSION_ID);
+    for (let index = 0; index < 10; index++)
+      h.manager.observeKiloEvent(kiloEvent('command.updated', {}, runtimeKey(routeSpec())));
+    expect(reads).toBe(1);
+    first.resolve({ commands: [{ name: 'old', hints: [] }], dropped: 0, overLimit: false });
+    await settle();
+    expect(reads).toBe(2);
+    latest.resolve({ commands: [{ name: 'latest', hints: [] }], dropped: 0, overLimit: false });
+    await prepared;
+    expect(reads).toBe(2);
+    for (const sessionId of [SESSION_ID, 'workspace_sibling']) {
+      const catalogs = h.frames.flatMap(frame =>
+        frame.type === 'session.events' && frame.sessionId === sessionId
+          ? frame.events
+              .filter(event => event.type === 'commands.available')
+              .map(event => event.properties.commands)
+          : []
+      );
+      expect(catalogs).toEqual([[{ name: 'old', hints: [] }], [{ name: 'latest', hints: [] }]]);
+    }
+  });
+
+  it('releases a failed catalog publish so a later native update can recover', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const client = h.client(routeSpec()).client;
+    const listCommands = client.listCommands;
+    client.listCommands = async () => {
+      throw new Error('catalog unavailable');
+    };
+    await h.manager.publishCommands(SESSION_ID);
+    expect(eventFrames(h.frames)).toEqual([]);
+    expect(h.logs).toContain('turn: listCommands failed - catalog unavailable');
+    client.listCommands = listCommands;
+    h.manager.observeKiloEvent(kiloEvent('command.updated', {}, runtimeKey(routeSpec())));
+    await settle();
+    expect(eventFrames(h.frames)).toContainEqual(
+      expect.objectContaining({ type: 'commands.available' })
+    );
+  });
+
+  it('does not publish an in-flight catalog to a released route', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const catalog = Promise.withResolvers<Awaited<ReturnType<Harness['listCommands']>>>();
+    h.client(routeSpec()).client.listCommands = () => catalog.promise;
+    const published = h.manager.publishCommands(SESSION_ID);
+    h.manager.release(SESSION_ID);
+    catalog.resolve({ commands: [{ name: 'latest', hints: [] }], dropped: 0, overLimit: false });
+    await published;
+    expect(eventFrames(h.frames)).toEqual([]);
   });
 });
 

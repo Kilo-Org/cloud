@@ -22,6 +22,8 @@
     "expired": "Verlopen"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Annuleren",
     "done": "Klaar",
     "retry": "Opnieuw proberen",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "Geselecteerd profiel",
       "manualOverrides": "Handmatige overschrijvingen",
       "openSettingsToReview": "Open Instellingen om te bekijken",
-      "profileSelection": "Profiel selectie"
+      "profileSelection": "Profiel selectie",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Er is {{displayCount}} bestand bijgewerkt.",
@@ -2216,7 +2219,7 @@
       "positionHint": "(1 van {{displayCount}})",
       "movedPastPrompt": "De agent is al verdergegaan. Deze kaart sluit zodra de sessie verdergaat.",
       "waitingForAnswer": "De agent wacht op je antwoord. Zolang je deze vraag niet beantwoordt, wordt je bericht aan de agent niet verzonden.",
-      "waitingForPermission": "De agent wacht op toestemming. Zolang je niet op dit verzoek reageert, wordt je bericht aan de agent niet verzonden."
+      "waitingForPermission": "Zolang je niet op dit verzoek reageert, wordt je bericht aan de agent niet verzonden."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2947,7 +2950,11 @@
       "retryLoadingMoreFiles": "Meer bestanden opnieuw proberen te laden",
       "title": "Bestanden",
       "viewedCount": "{{viewed}} van {{total}} bekeken",
-      "viewedOfListed": "{{viewed}} van de {{total}} bestanden in de lijst bekeken"
+      "viewedCount_one": "{{viewed}} van {{total}} bekeken",
+      "viewedCount_other": "{{viewed}} van {{total}} bekeken",
+      "viewedOfListed": "{{viewed}} van de {{total}} bestanden in de lijst bekeken",
+      "viewedOfListed_one": "{{viewed}} van de {{total}} bestanden in de lijst bekeken",
+      "viewedOfListed_other": "{{viewed}} van de {{total}} bestanden in de lijst bekeken"
     },
     "fileRows": {
       "collapseFile": "Bestand inklappen",
@@ -3535,7 +3542,7 @@
       "provider": "Gestopt: providerfout",
       "tool": "Gestopt: toolfout",
       "cancelled": "Gestopt: geannuleerd",
-      "other": "GESTOPT"
+      "other": "Gestopt"
     }
   },
   "transcriptionModel": {
@@ -4252,7 +4259,7 @@
     "estimate": "Schatting {{estimate}} · maximaal {{maximum}}",
     "estimateUnavailable": "Er is geen betaalde samenvatting beschikbaar voor deze instellingen.",
     "confirmPaid": "Betaalde samenvattingen inschakelen voor {{context}}?",
-    "paidDisclosure": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} minuten. Kosten gelden ook als het genereren mislukt.",
+    "paidDisclosure": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} min. Kosten gelden ook als het genereren mislukt.",
     "enable": "Betaalde samenvattingen inschakelen",
     "allContexts": "Persoonlijke en organisatiebriefings blijven gescheiden.",
     "emptyHistory": "Geen opgeslagen briefings",
@@ -4271,10 +4278,10 @@
     "snapshotSummaryFailed": "AI-samenvatting mislukt. Je gestructureerde momentopname is nog steeds beschikbaar.",
     "scheduledContextEnabled": "Geplande briefings",
     "scheduledContextSettings": "Geplande briefings · {{context}}",
-    "scheduledContextHint": "Schakel geplande vastlegging en betaalde AI-samenvattingen in voor alleen deze context. Geselecteerde fragmenten waaruit gevoelige gegevens zijn verwijderd en gestructureerde feiten worden naar je model gestuurd. Samenvattingen gebruiken de apptaal die wordt opgeslagen wanneer je de briefinginstellingen expliciet wijzigt. Deze opgeslagen taal verandert niet automatisch mee als je de apptaal wijzigt. Kosten gaan van het saldo van deze context af. Momentopnamen zonder activiteit gebruiken geen AI.",
+    "scheduledContextHint": "Schakel geplande vastlegging en betaalde AI-samenvattingen in voor alleen deze context. Geselecteerde fragmenten waaruit gevoelige gegevens zijn verwijderd en gestructureerde feiten worden naar je model gestuurd. Samenvattingen gebruiken de apptaal die wordt opgeslagen wanneer je de briefinginstellingen wijzigt. Kosten gaan van het saldo van deze context af. Momentopnamen zonder activiteit gebruiken geen AI.",
     "snapshotSafeguards": "De tijd- en uitgavenlimieten per samenvatting gelden voor elke geplande momentopname, niet als dagbudget.",
     "snapshotEstimateInputTooLarge": "Deze momentopname bevat te veel bewijsmateriaal voor het geselecteerde model.",
-    "quietSnapshot": "Voor deze momentopname is geen sessieactiviteit geselecteerd. De selectie is zo goed mogelijk uitgevoerd op basis van de beschikbare gegevens. Er is geen AI-model aangeroepen en er zijn geen AI-kosten in rekening gebracht.",
+    "quietSnapshot": "Voor deze momentopname is geen sessieactiviteit geselecteerd. Er is geen AI-samenvatting aangevraagd of in rekening gebracht.",
     "noEnabledContexts": "Geen contexten ingeschakeld voor geplande briefings",
     "sourceBlocker": "Sessie heeft aandacht nodig",
     "sourceMetadata": "Vastgelegde sessiemetadata"

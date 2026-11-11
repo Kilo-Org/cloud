@@ -945,6 +945,155 @@ describe('extractPromptInfo approval tests', () => {
   });
 });
 
+describe('usage accounting error reports', () => {
+  beforeEach(() => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  describe('extractPromptInfo failure', () => {
+    test('reports the requested model', () => {
+      extractPromptInfo(JSON.parse('{"messages":"not-a-message-list","model":"openai/gpt-4o"}'));
+
+      const [error, options] = jest.mocked(captureException).mock.calls[0];
+      expect(error).toBeInstanceOf(TypeError);
+      expect(options).toEqual({
+        level: 'warning',
+        tags: { source: 'prompt_extraction' },
+        extra: { model: 'openai/gpt-4o' },
+      });
+      expect(JSON.stringify(options)).not.toContain('not-a-message-list');
+    });
+
+    test('reports no request field when the body carries no string model', () => {
+      extractPromptInfo(JSON.parse('{"messages":"not-a-message-list","model":{"nested":true}}'));
+
+      const [error, options] = jest.mocked(captureException).mock.calls[0];
+      expect(error).toBeInstanceOf(TypeError);
+      expect(options).toEqual({
+        level: 'warning',
+        tags: { source: 'prompt_extraction' },
+        extra: {},
+      });
+      expect(JSON.stringify(options)).not.toContain('not-a-message-list');
+    });
+
+    test('bounds the reported model length', () => {
+      const model = 'm'.repeat(5000);
+      extractPromptInfo(JSON.parse(`{"messages":"not-a-message-list","model":"${model}"}`));
+
+      const [, options] = jest.mocked(captureException).mock.calls[0];
+      expect(options).toMatchObject({ extra: { model: 'm'.repeat(200) } });
+    });
+  });
+
+  describe('processTokenData without usage statistics', () => {
+    const contextSentinel = {
+      system_prompt_prefix: 'zzq-system-prefix',
+      user_prompt_prefix: 'zzq-user-prefix',
+      email: 'zzq-account@example.com',
+      machine_id: 'zzq-machine',
+      session_id: 'zzq-session',
+      client_request_id: 'zzq-request',
+      organization_id: 'zzq-organization',
+    };
+    const usageId = '6f2a1c9b-4d3e-4f5a-8b7c-1d2e3f4a5b6c';
+
+    const makeContext = (
+      overrides: Partial<MicrodollarUsageContext> = {}
+    ): MicrodollarUsageContext => ({
+      api_kind: 'chat_completions',
+      usageId,
+      kiloUserId: 'report-user',
+      provider: 'openrouter',
+      requested_model: 'anthropic/claude-3.7-sonnet',
+      promptInfo: {
+        system_prompt_prefix: contextSentinel.system_prompt_prefix,
+        system_prompt_length: contextSentinel.system_prompt_prefix.length,
+        user_prompt_prefix: contextSentinel.user_prompt_prefix,
+      },
+      fraudHeaders: getFraudDetectionHeaders(
+        new Headers({ 'user-agent': 'zzq-agent', 'x-forwarded-for': '203.0.113.7' })
+      ),
+      posthog_distinct_id: contextSentinel.email,
+      machine_id: contextSentinel.machine_id,
+      session_id: contextSentinel.session_id,
+      clientRequestId: contextSentinel.client_request_id,
+      project_id: null,
+      max_tokens: 200,
+      has_middle_out_transform: null,
+      isStreaming: true,
+      prior_microdollar_usage: 0,
+      status_code: 200,
+      editor_name: null,
+      user_byok: false,
+      is_free: false,
+      has_tools: true,
+      feature: null,
+      mode: null,
+      auto_model: null,
+      reasoning_setting: null,
+      inference_region: null,
+      ttfb_ms: null,
+      custom_llm_pricing: null,
+      organizationId: undefined,
+      ...overrides,
+    });
+
+    test.each([
+      { name: 'a personal request', organization_id: undefined },
+      { name: 'an organization request', organization_id: contextSentinel.organization_id },
+    ])('reports only operational context fields for $name', async ({ organization_id }) => {
+      expect(
+        await processTokenData(null, makeContext({ organizationId: organization_id }))
+      ).toBeNull();
+
+      expect(captureMessage).toHaveBeenCalledWith('SUSPICIOUS: No usage information', {
+        level: 'error',
+        tags: { source: 'usage_processing' },
+        extra: {
+          usageContext: {
+            kiloUserId: 'report-user',
+            usageId,
+            provider: 'openrouter',
+            api_kind: 'chat_completions',
+            requested_model: 'anthropic/claude-3.7-sonnet',
+            status_code: 200,
+            isStreaming: true,
+          },
+        },
+      });
+      expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain('zzq-');
+    });
+
+    test('reports a null usage id when the context carries none', async () => {
+      await processTokenData(null, makeContext({ usageId: undefined }));
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        'SUSPICIOUS: No usage information',
+        expect.objectContaining({
+          extra: { usageContext: expect.objectContaining({ usageId: null }) },
+        })
+      );
+    });
+
+    test('bounds the reported requested model', async () => {
+      const model = 'm'.repeat(5000);
+
+      await processTokenData(null, makeContext({ requested_model: model }));
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        'SUSPICIOUS: No usage information',
+        expect.objectContaining({
+          extra: {
+            usageContext: expect.objectContaining({ requested_model: 'm'.repeat(200) }),
+          },
+        })
+      );
+    });
+  });
+});
+
 describe('mapToUsageStats approval tests', () => {
   const claudeSonnetGeneration = 'claude-3-7-sonnet-generation.log.generation.json';
   test(claudeSonnetGeneration, async () => {
@@ -1314,6 +1463,107 @@ describe('logMicrodollarUsage', () => {
       );
     }
   );
+
+  describe('served model recovery', () => {
+    const generationModel = 'anthropic/claude-3-7-sonnet-20250219';
+    const responseAlias = 'anthropic/claude-3.7-sonnet';
+    const requestedModel = 'openrouter/free';
+
+    test.each([
+      {
+        name: 'recovers the generation model when the response model is missing',
+        responseModel: undefined,
+        generationModel,
+        expectedModel: generationModel,
+      },
+      {
+        name: 'recovers the generation model when the response model is null',
+        responseModel: null,
+        generationModel,
+        expectedModel: generationModel,
+      },
+      {
+        name: 'recovers the generation model when the response model is empty',
+        responseModel: '',
+        generationModel,
+        expectedModel: generationModel,
+      },
+      {
+        name: 'prefers the response alias over the dated generation model',
+        responseModel: responseAlias,
+        generationModel,
+        expectedModel: responseAlias,
+      },
+      {
+        name: 'falls back to the requested model when the generation model is empty',
+        responseModel: null,
+        generationModel: '',
+        expectedModel: requestedModel,
+      },
+      {
+        name: 'falls back to the requested model when the generation lookup fails',
+        responseModel: null,
+        generationModel: undefined,
+        expectedModel: requestedModel,
+      },
+    ])('$name', async ({ responseModel, generationModel, expectedModel }) => {
+      const user = await insertTestUser();
+      const messageId = `gen-model-recovery-${crypto.randomUUID()}`;
+      jest.mocked(fetchGeneration).mockReset();
+      jest.mocked(fetchGeneration).mockResolvedValueOnce(
+        generationModel === undefined
+          ? undefined
+          : {
+              data: {
+                id: messageId,
+                model: generationModel,
+                provider_name: 'Amazon Bedrock',
+                is_byok: false,
+                total_cost: 0,
+                created_at: new Date().toISOString(),
+                origin: '',
+                usage: 0,
+                native_tokens_prompt: 10,
+                native_tokens_completion: 2,
+              },
+            }
+      );
+
+      const result = await countAndStoreUsage(
+        new Response(
+          JSON.stringify({
+            id: messageId,
+            model: responseModel,
+            choices: [{ message: { content: 'Test response' }, finish_reason: 'stop' }],
+            usage: {
+              cost: 0,
+              is_byok: false,
+              prompt_tokens: 10,
+              completion_tokens: 2,
+              total_tokens: 12,
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        ),
+        { ...createBaseUsageContext(user), requested_model: requestedModel, isStreaming: false },
+        undefined
+      ).usagePromise;
+
+      assert(result);
+      expect(fetchGeneration).toHaveBeenCalledTimes(1);
+      expect(fetchGeneration).toHaveBeenCalledWith(messageId, OPENROUTER);
+      const usage = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.id, result.usageId),
+      });
+      expect(usage).toMatchObject({
+        model: expectedModel,
+        requested_model: requestedModel,
+      });
+      if (generationModel !== undefined) {
+        expect(usage?.inference_provider).toBe('Amazon Bedrock');
+      }
+    });
+  });
 
   async function waitForExpectation(expectation: () => Promise<void>): Promise<void> {
     const deadline = Date.now() + 2000;

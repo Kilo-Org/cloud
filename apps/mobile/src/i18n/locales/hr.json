@@ -22,6 +22,8 @@
     "expired": "Isteklo"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Odustani",
     "done": "Gotovo",
     "retry": "Pokušaj ponovno",
@@ -361,7 +363,13 @@
       "retryLoadingFiles": "Pokušaj ponovno učitati datoteke",
       "filterPlaceholder": "Putanja datoteke",
       "viewedCount": "pregledano {{viewed}} od {{total}}",
+      "viewedCount_one": "pregledano {{viewed}} od {{total}}",
+      "viewedCount_few": "pregledano {{viewed}} od {{total}}",
+      "viewedCount_other": "pregledano {{viewed}} od {{total}}",
       "viewedOfListed": "pregledano {{viewed}} od {{total}} navedenih datoteka",
+      "viewedOfListed_one": "pregledano {{viewed}} od {{total}} navedenih datoteka",
+      "viewedOfListed_few": "pregledano {{viewed}} od {{total}} navedenih datoteka",
+      "viewedOfListed_other": "pregledano {{viewed}} od {{total}} navedenih datoteka",
       "loadingFiles": "Učitavanje {{loaded}} od {{total}}…",
       "failedToLoadAllFiles": "Nije moguće učitati sve datoteke.",
       "couldNotLoadMoreFiles": "Nije moguće učitati dodatne datoteke.",
@@ -2499,7 +2507,8 @@
       "selectedProfile": "Odabrani profil",
       "manualOverrides": "Ručna nadjačavanja",
       "openSettingsToReview": "Otvorite Postavke za pregled",
-      "profileSelection": "Izbor profila"
+      "profileSelection": "Izbor profila",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana je {{displayCount}} datoteka.",
@@ -2800,7 +2809,7 @@
       "positionHint": "(1 od {{displayCount}})",
       "movedPastPrompt": "Agent je nastavio dalje od ovog upita. Ova će se kartica zatvoriti kad se sesija nastavi.",
       "waitingForAnswer": "Agent čeka tvoj odgovor. Dok je ovo pitanje otvoreno, slanje tvoje poruke agentu je na čekanju.",
-      "waitingForPermission": "Agent čeka dopuštenje. Dok je ovaj zahtjev otvoren, slanje tvoje poruke agentu je na čekanju."
+      "waitingForPermission": "Dok je ovaj zahtjev otvoren, slanje tvoje poruke agentu je na čekanju."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3590,7 +3599,7 @@
       "provider": "Zaustavljeno: pogreška pružatelja",
       "tool": "Zaustavljeno: pogreška alata",
       "cancelled": "Zaustavljeno: otkazano",
-      "other": "ZAUSTAVLJENO"
+      "other": "Zaustavljeno"
     }
   },
   "transcriptionModel": {
@@ -4337,10 +4346,10 @@
     "snapshotSummaryFailed": "AI sažetak nije uspio. Vaša strukturirana snimka stanja i dalje je dostupna.",
     "scheduledContextEnabled": "Zakazana izvješća",
     "scheduledContextSettings": "Zakazana izvješća · {{context}}",
-    "scheduledContextHint": "Omogućite zakazano bilježenje stanja i plaćene AI sažetke samo za ovaj kontekst. Odabrani izvaci s uklonjenim osjetljivim informacijama i strukturirane činjenice šalju se vašem modelu. Sažeci koriste jezik aplikacije koji se sprema samo kada izričito promijenite postavke izvješća. Sama promjena jezika aplikacije ne ažurira spremljeni jezik sažetaka. Naplata ide sa salda ovog konteksta. Snimke bez aktivnosti ne koriste AI.",
+    "scheduledContextHint": "Omogućite zakazano bilježenje stanja i plaćene AI sažetke samo za ovaj kontekst. Odabrani izvaci s uklonjenim osjetljivim informacijama i strukturirane činjenice šalju se vašem modelu. Sažeci koriste jezik aplikacije koji se sprema kada ažurirate postavke izvješća. Naplata ide sa salda ovog konteksta. Snimke bez aktivnosti ne koriste AI.",
     "snapshotSafeguards": "Ograničenja vremena i potrošnje po sažetku primjenjuju se na svaku zakazanu snimku stanja, a ne kao dnevni proračun.",
     "snapshotEstimateInputTooLarge": "Ova snimka stanja sadrži previše dokaza za odabrani model.",
-    "quietSnapshot": "Za ovu snimku stanja nije odabrana nijedna aktivnost sesija. Odabir ovisi o dostupnim podacima i može biti nepotpun. AI model nije pozvan, a AI sažetak nije zatražen ni naplaćen.",
+    "quietSnapshot": "Za ovu snimku stanja nije odabrana nijedna aktivnost sesija. AI sažetak nije zatražen ni naplaćen.",
     "noEnabledContexts": "Nijedan kontekst nije omogućen za zakazana izvješća",
     "sourceBlocker": "Sesija zahtijeva pozornost",
     "sourceMetadata": "Zabilježeni metapodaci sesije"

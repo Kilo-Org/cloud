@@ -22,6 +22,8 @@
     "expired": "Lokaci ya ƙare"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Soke",
     "done": "An gama",
     "retry": "Sake gwadawa",
@@ -361,7 +363,11 @@
       "retryLoadingFiles": "Sake gwada loda fayiloli",
       "filterPlaceholder": "Tacewa bisa hanyar fayil",
       "viewedCount": "an duba {{viewed}} cikin {{total}}",
+      "viewedCount_one": "an duba {{viewed}} cikin {{total}}",
+      "viewedCount_other": "an duba {{viewed}} cikin {{total}}",
       "viewedOfListed": "an duba {{viewed}} cikin fayiloli {{total}} da aka jera",
+      "viewedOfListed_one": "an duba {{viewed}} cikin fayiloli {{total}} da aka jera",
+      "viewedOfListed_other": "an duba {{viewed}} cikin fayiloli {{total}} da aka jera",
       "loadingFiles": "Ana loda {{loaded}} cikin {{total}}…",
       "failedToLoadAllFiles": "An kasa loda duk fayilolin.",
       "couldNotLoadMoreFiles": "Ba a iya loda ƙarin fayiloli ba.",
@@ -2457,7 +2463,8 @@
       "selectedProfile": "Bayanan martaba da aka zaɓa",
       "manualOverrides": "Hannu ya soke",
       "openSettingsToReview": "Bude Saituna don dubawa",
-      "profileSelection": "Zaɓin bayanin martaba"
+      "profileSelection": "Zaɓin bayanin martaba",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta fayil {{displayCount}}.",
@@ -2754,7 +2761,7 @@
       "positionHint": "(1 cikin {{displayCount}})",
       "movedPastPrompt": "Wakilin ya wuce wannan tambaya. Wannan katin zai rufe idan zaman ya ci gaba.",
       "waitingForAnswer": "Wakilin yana jiran amsarka. An dakatar da saƙonka zuwa wakilin har sai ka amsa wannan tambayar.",
-      "waitingForPermission": "Wakilin yana jiran izini. An dakatar da saƙonka zuwa wakilin har sai ka amsa wannan buƙatar."
+      "waitingForPermission": "An dakatar da saƙonka zuwa wakilin har sai ka amsa wannan buƙatar."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3535,7 +3542,7 @@
       "provider": "An tsaya: kuskuren mai bayarwa",
       "tool": "An tsaya: kuskuren kayan aiki",
       "cancelled": "An tsaya: an soke",
-      "other": "YA TSAYA"
+      "other": "Ya tsaya"
     }
   },
   "transcriptionModel": {
@@ -4252,7 +4259,7 @@
     "estimate": "Kimanin {{estimate}} · iyaka mafi girma {{maximum}}",
     "estimateUnavailable": "Ba a samun taƙaitawar da ake biya don waɗannan saituna.",
     "confirmPaid": "Kunna taƙaitawa ta biya don {{context}}?",
-    "paidDisclosure": "Ƙiyasin {{estimate}}, har zuwa {{maximum}}, tare da iyakar mintuna {{minutes}}. Ana caji ko da ƙirƙira ta gaza.",
+    "paidDisclosure": "Ƙiyasin {{estimate}}, har zuwa {{maximum}}, tare da iyakar minti {{minutes}}. Ana caji ko da ƙirƙira ta gaza.",
     "enable": "Kunna taƙaitawa ta biya",
     "allContexts": "Rahotanninka na kanka da na ƙungiya suna zama daban.",
     "emptyHistory": "Babu rahotanni da aka adana",
@@ -4271,10 +4278,10 @@
     "snapshotSummaryFailed": "Taƙaitawar AI ta gaza. Rahoton yanayinka mai tsari yana nan har yanzu.",
     "scheduledContextEnabled": "Rahotannin da aka tsara",
     "scheduledContextSettings": "Rahotannin da aka tsara · {{context}}",
-    "scheduledContextHint": "Kunna adana yanayi a lokacin da aka tsara da taƙaitawar AI ta biya don wannan mahallin kawai. Ana aika zaɓaɓɓun ɓangarori da aka ɓoye bayanan sirri a cikinsu da bayanai masu tsari zuwa model ɗinka. Taƙaitawa suna amfani da harshen manhaja da aka adana lokacin da ka sabunta saitunan rahoto da kanka. Sauya harshen manhaja kaɗai ba ya sauya harshen taƙaitawa kai tsaye. Ana cire caji daga ma'aunin wannan mahallin. Rahotannin yanayi da babu aiki a cikinsu ba sa amfani da AI.",
+    "scheduledContextHint": "Kunna adana yanayi a lokacin da aka tsara da taƙaitawar AI ta biya don wannan mahallin kawai. Ana aika zaɓaɓɓun ɓangarori da aka ɓoye bayanan sirri a cikinsu da bayanai masu tsari zuwa model ɗinka. Taƙaitawa suna amfani da harshen manhaja da aka adana lokacin da ka sabunta saitunan rahoto. Ana cire caji daga ma'aunin wannan mahallin. Rahotannin yanayi da babu aiki a cikinsu ba sa amfani da AI.",
     "snapshotSafeguards": "Iyakokin lokaci da kashe kuɗi na kowace taƙaitawa sun shafi kowane rahoton yanayi da aka tsara, ba kasafin kuɗin yau da kullum ba.",
     "snapshotEstimateInputTooLarge": "Wannan rahoton yanayi yana da shaidu da yawa fiye da abin da samfurin da aka zaɓa zai iya ɗauka.",
-    "quietSnapshot": "Ba a zaɓi wani aikin zaman aiki don wannan rahoton yanayi ba, bisa abin da aka samu. Ba a kira model don taƙaitawar AI ba, kuma ba a yi caji ba.",
+    "quietSnapshot": "Ba a zaɓi wani aikin zaman aiki don wannan rahoton yanayi ba. Ba a nemi taƙaitawar AI ba, kuma ba a yi caji ba.",
     "noEnabledContexts": "Babu mahallin da aka kunna rahotannin da aka tsara a cikinsa",
     "sourceBlocker": "Zaman aiki yana buƙatar kulawa",
     "sourceMetadata": "Bayanan metadata na zaman aiki da aka adana"

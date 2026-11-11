@@ -22,6 +22,8 @@
     "expired": "Skada"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Ikkanċella",
     "done": "Lest",
     "retry": "Erġa' pprova",
@@ -361,7 +363,17 @@
       "retryLoadingFiles": "Erġa' pprova tgħabbi l-fajls",
       "filterPlaceholder": "Filtru skont il-mogħdija tal-fajl",
       "viewedCount": "rajt {{viewed}} minn {{total}}",
+      "viewedCount_one": "rajt {{viewed}} minn {{total}}",
+      "viewedCount_two": "rajt {{viewed}} minn {{total}}",
+      "viewedCount_few": "rajt {{viewed}} minn {{total}}",
+      "viewedCount_many": "rajt {{viewed}} minn {{total}}",
+      "viewedCount_other": "rajt {{viewed}} minn {{total}}",
       "viewedOfListed": "rajt {{viewed}} minn {{total}} fajl fil-lista",
+      "viewedOfListed_one": "rajt {{viewed}} minn {{total}} fajl fil-lista",
+      "viewedOfListed_two": "rajt {{viewed}} minn {{total}} fajl fil-lista",
+      "viewedOfListed_few": "rajt {{viewed}} minn {{total}} fajl fil-lista",
+      "viewedOfListed_many": "rajt {{viewed}} minn {{total}} fajl fil-lista",
+      "viewedOfListed_other": "rajt {{viewed}} minn {{total}} fajl fil-lista",
       "loadingFiles": "Qed jitgħabbew {{loaded}} minn {{total}}…",
       "failedToLoadAllFiles": "Ma setgħux jitgħabbew il-fajls kollha.",
       "couldNotLoadMoreFiles": "Ma setgħux jitgħabbew aktar fajls.",
@@ -2583,7 +2595,8 @@
       "selectedProfile": "Profil magħżul",
       "manualOverrides": "Manwal overrides",
       "openSettingsToReview": "Iftaħ Settings biex tirrevedi",
-      "profileSelection": "Għażla tal-profil"
+      "profileSelection": "Għażla tal-profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ġie aġġornat {{displayCount}} fajl.",
@@ -2892,7 +2905,7 @@
       "positionHint": "(1 minn {{displayCount}})",
       "movedPastPrompt": "L-aġent diġà għadda għal wara din l-istruzzjoni. Din il-karta se tingħalaq meta s-sessjoni tkompli.",
       "waitingForAnswer": "L-aġent qed jistenna t-tweġiba tiegħek. Il-messaġġ tiegħek lill-aġent jibqa' jistenna sakemm twieġeb din il-mistoqsija.",
-      "waitingForPermission": "L-aġent qed jistenna l-permess. Il-messaġġ tiegħek lill-aġent jibqa' jistenna sakemm tiddeċiedi dwar din it-talba."
+      "waitingForPermission": "Il-messaġġ tiegħek lill-aġent jibqa' jistenna sakemm tiddeċiedi dwar din it-talba."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3700,7 +3713,7 @@
       "provider": "Waqaf: żball tal-fornitur",
       "tool": "Waqaf: żball tal-għodda",
       "cancelled": "Waqaf: ikkanċellat",
-      "other": "WAQFET"
+      "other": "Waqfet"
     }
   },
   "transcriptionModel": {
@@ -4469,10 +4482,10 @@
     "snapshotSummaryFailed": "Is-sommarju AI falla. L-istantanja strutturata tiegħek għadha disponibbli.",
     "scheduledContextEnabled": "Briefings skedati",
     "scheduledContextSettings": "Briefings skedati · {{context}}",
-    "scheduledContextHint": "Ixgħel il-ġbir skedat u s-sommarji AI bi ħlas għal dan il-kuntest biss. Siltiet magħżula b'dettalji sensittivi moħbija u fatti strutturati jintbagħtu lill-mudell tiegħek. Is-sommarji jużaw il-lingwa tal-app issejvjata meta tibdel espliċitament is-settings tal-briefing. Din il-lingwa ma tiġix aġġornata awtomatikament meta tinbidel il-lingwa tal-app. Il-ħlasijiet jużaw il-bilanċ ta' dan il-kuntest. Istantanji mingħajr attività ma jużawx AI.",
+    "scheduledContextHint": "Ixgħel il-ġbir skedat u s-sommarji AI bi ħlas għal dan il-kuntest biss. Siltiet magħżula b'dettalji sensittivi moħbija u fatti strutturati jintbagħtu lill-mudell tiegħek. Is-sommarji jużaw il-lingwa tal-app issejvjata meta tibdel is-settings tal-briefing. Il-ħlasijiet jużaw il-bilanċ ta' dan il-kuntest. Istantanji mingħajr attività ma jużawx AI.",
     "snapshotSafeguards": "Il-limiti tal-ħin u tal-infiq għal kull sommarju japplikaw għal kull istantanja skedata, mhux bħala baġit ta' kuljum.",
     "snapshotEstimateInputTooLarge": "Din l-istantanja fiha wisq evidenza għall-mudell magħżul.",
-    "quietSnapshot": "L-għażla għal din l-istantanja saret bl-aħjar sforz possibbli, iżda ma ntgħażlet l-ebda attività tas-sessjonijiet. Ma ntalab l-ebda sommarju AI, ma saret l-ebda sejħa lill-mudell u ma ġie ddebitat l-ebda ħlas.",
+    "quietSnapshot": "Ma ntgħażlet l-ebda attività tas-sessjonijiet għal din l-istantanja. Ma ntalab l-ebda sommarju AI u ma ġie ddebitat l-ebda ħlas.",
     "noEnabledContexts": "L-ebda kuntest mixgħul għall-briefings skedati",
     "sourceBlocker": "Is-sessjoni teħtieġ attenzjoni",
     "sourceMetadata": "Metadata maqbuda tas-sessjoni"

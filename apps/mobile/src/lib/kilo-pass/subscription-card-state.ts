@@ -19,7 +19,7 @@ export function getKiloPassSubscriptionCardAccessibility(cardState: KiloPassSubs
       cardState.action === 'open-web' ? i18n.t('kiloPass.opensManagementOnWeb') : undefined,
     accessibilityLabel: [cardState.title, cardState.description, cardState.actionLabel]
       .filter(Boolean)
-      .join('. '),
+      .join(i18n.t('common.sentenceJoiner')),
   };
 }
 

@@ -7,7 +7,6 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import { i18n } from '@/i18n';
 import { FileHeaderRow } from './pr-diff-file-rows';
 import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';

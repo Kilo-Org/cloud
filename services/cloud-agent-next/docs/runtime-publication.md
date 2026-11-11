@@ -68,7 +68,7 @@ Publication requires these approved and provisioned resources:
 
 The admission job reads `runtime-targets.json` through the GitHub API for the exact source SHA and
 requires downloaded/runtime-free for every target. Preinstalled and all-in-one selections are rejected.
-A target marked `vercel: true` declares BYOC Vercel support and requires the published release. Every
+BYOC Vercel startup uses the same published release. Every
 eligible successful main-push CI run publishes its exact-SHA handoff, even without runtime changes.
 The publisher reuses a verified cached base when its inputs have not changed.
 

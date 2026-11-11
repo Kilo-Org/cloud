@@ -38,18 +38,6 @@ const baseline = () => ({
   },
 });
 
-it('the committed catalog enables Vercel for the downloaded runtime', async () => {
-  const catalog: unknown = JSON.parse(
-    readFileSync(new URL('../runtime-targets.json', import.meta.url), 'utf8')
-  );
-  const selected = {
-    mode: 'downloaded',
-    image: 'runtime-free',
-    vercel: true,
-  };
-  expect(selectRuntimeTarget(catalog, 'production')).toMatchObject(selected);
-  expect(selectRuntimeTarget(catalog, 'dev')).toEqual(selectRuntimeTarget(catalog, 'production'));
-});
 it('renders the selected runtime-free digest and retains unrelated target settings', () => {
   const original = baseline();
   const output = renderRuntimeTarget({
@@ -73,50 +61,6 @@ it('renders the selected runtime-free digest and retains unrelated target settin
   expect(original.containers[0].images['runtime-free']).toEqual({
     dockerfile: './Dockerfile.containers.runtime-free',
   });
-});
-it('renders a Vercel-enabled downloaded target with the published release', () => {
-  const config = baseline();
-  Object.assign(config.vars, { BYOC_VERCEL_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56' });
-  const output = renderRuntimeTarget({
-    config,
-    environment: 'production',
-    startup: { ...startup, vercel: true },
-    release,
-  });
-  expect(output.vars).toMatchObject({
-    EXISTING: 'keep',
-    RUNTIME_STARTUP_MODE: 'downloaded',
-    NATIVE_RUNTIME_IMAGE: 'runtime-free',
-    RUNTIME_RELEASE_DESCRIPTOR: release.descriptorSha256,
-  });
-  expect(output.r2_buckets).toContainEqual({
-    binding: 'RUNTIME_RELEASE_BUCKET',
-    bucket_name: release.bucket,
-  });
-  expect(output.containers?.[0].images?.['runtime-free']).toEqual({ image: release.baseImage });
-});
-it('requires a release for a Vercel-enabled target', () => {
-  const config = baseline();
-  Object.assign(config.vars, { BYOC_VERCEL_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56' });
-  expect(() =>
-    renderRuntimeTarget({
-      config,
-      environment: 'production',
-      startup: { ...startup, vercel: true },
-    })
-  ).toThrow('verified runtime handoff');
-});
-it('rejects a Vercel-enabled target that does not declare Vercel in the catalog', () => {
-  const config = baseline();
-  Object.assign(config.vars, { BYOC_VERCEL_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56' });
-  expect(() =>
-    renderRuntimeTarget({
-      config,
-      environment: 'production',
-      startup,
-      release,
-    })
-  ).toThrow('Vercel support belongs in runtime-targets.json');
 });
 it('isolated rendering leaves production selection and vars untouched', () => {
   const output = renderRuntimeTarget({
@@ -225,11 +169,6 @@ it('rejects an invalid startup pair in the target catalog', () => {
     )
   ).toThrow();
 });
-it('rejects a non-boolean Vercel declaration in the target catalog', () => {
-  expect(() =>
-    selectRuntimeTarget({ default: { ...startup, vercel: 'yes' }, targets: {} }, 'production')
-  ).toThrow();
-});
 
 it('an unlisted constructor environment inherits the default rather than the prototype', () => {
   const fallback = { mode: 'downloaded', image: 'runtime-free' };
@@ -249,7 +188,7 @@ it('keeps verified downloaded runtime selection in deployed E2E configuration', 
   const prepared = renderRuntimeTarget({
     config: source,
     environment: 'production',
-    startup: { ...startup, vercel: true },
+    startup,
     release,
   });
   const output = buildE2eWorkerConfig(prepared, {

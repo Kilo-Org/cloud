@@ -4,7 +4,6 @@ import { catalogNeedsPublication, readSourceCatalog } from './runtime-publicatio
 
 const preinstalled = { mode: 'preinstalled', image: 'all-in-one' };
 const downloaded = { mode: 'downloaded', image: 'runtime-free' };
-const downloadedVercel = { ...downloaded, vercel: true };
 
 test('every valid target needs publication and retired selections are rejected', () => {
   assert.throws(() => catalogNeedsPublication({ default: preinstalled, targets: {} }), /Invalid/);
@@ -13,16 +12,7 @@ test('every valid target needs publication and retired selections are rejected',
     /Invalid/
   );
   assert.equal(catalogNeedsPublication({ default: downloaded, targets: {} }), true);
-  assert.equal(catalogNeedsPublication({ default: downloadedVercel, targets: {} }), true);
-  assert.equal(
-    catalogNeedsPublication({ default: downloaded, targets: { production: downloadedVercel } }),
-    true
-  );
   assert.throws(() => catalogNeedsPublication({ default: preinstalled }), /Invalid/);
-  assert.throws(
-    () => catalogNeedsPublication({ default: { ...downloaded, vercel: 'yes' }, targets: {} }),
-    /Invalid runtime target catalog/
-  );
 });
 
 test('reads the catalog at the exact source SHA', async () => {

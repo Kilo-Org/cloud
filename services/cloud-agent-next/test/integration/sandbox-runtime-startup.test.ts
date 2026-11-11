@@ -28,7 +28,7 @@ import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { waitFor } from './wait-for.js';
 
@@ -161,7 +161,7 @@ function configureHarness(
   peer: FakeSessionPeer,
   envOverrides: Record<string, unknown> = {}
 ) {
-  installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
+  installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
     NEXTAUTH_SECRET: workerSecret,
     WORKER_URL: 'https://worker.test',
     SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,

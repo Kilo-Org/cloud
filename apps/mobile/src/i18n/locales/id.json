@@ -1777,7 +1777,7 @@
       "cloningSession": "Menyalin sesi",
       "couldNotLoadThisSession": "Tidak dapat memuat sesi ini.",
       "cloneFailedRetry": "Tidak dapat menyalin sesi ini. Coba lagi.",
-      "notEnoughCredits": "Kredit tidak cukup untuk menjalankan Cloud Agent. Tambah kredit dan coba lagi.",
+      "notEnoughCredits": "Kredit tidak cukup untuk permintaan ini. Tambah kredit dan coba lagi.",
       "previousTaskFinishing": "Tugas sebelumnya belum selesai. Tunggu sebentar.",
       "serviceUnavailable": "Layanan tidak tersedia saat ini. Coba lagi.",
       "connectionTrouble": "Koneksi bermasalah. Coba lagi sebentar lagi.",
@@ -1939,6 +1939,8 @@
       "toolList": "tampilkan daftar",
       "toolPatch": "tambal",
       "toolTask": "tugas",
+      "toolSendFile": "File terkirim",
+      "toolSendFileAction": "kirim file",
       "readTodos": "Baca rencana",
       "updateTodos": "Perbarui rencana",
       "linesBadge": "{{displayCount}} baris",
@@ -2039,7 +2041,21 @@
       "thought": "Pemikiran",
       "showDetails": "Tampilkan detail",
       "pending": "Menunggu…",
-      "running": "Berjalan…"
+      "running": "Berjalan…",
+      "field": {
+        "filePath": "Jalur berkas",
+        "path": "Jalur",
+        "offset": "Offset",
+        "limit": "Batas",
+        "pattern": "Pola",
+        "include": "Sertakan",
+        "patchText": "Teks patch",
+        "query": "Kueri",
+        "prompt": "Arahan",
+        "header": "Judul",
+        "question": "Pertanyaan",
+        "options": "Pilihan"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Gagal menampilkan konten."
@@ -2055,7 +2071,7 @@
       "assistantContextOverflow": "Percakapan ini terlalu panjang untuk diproses oleh model.",
       "assistantProviderError": "Penyedia mengembalikan error.",
       "assistantProviderRefused": "Penyedia menolak permintaan ini dan permintaan tidak dapat dicoba lagi.",
-      "assistantCreditsRefusal": "Kredit tidak cukup untuk menjalankan Cloud Agent.",
+      "assistantCreditsRefusal": "Kredit tidak cukup untuk permintaan ini.",
       "assistantOutputLimit": "Respons mencapai batas output model.",
       "assistantStructuredOutput": "Respons tidak sesuai dengan format yang diminta.",
       "assistantFailed": "Gagal menghasilkan respons."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Agen saya",
       "promptPlaceholder": "Anda adalah ...",
       "tools": "Peralatan",
+      "wholeToolRule": "Agen ini menerapkan satu aturan ke setiap Peralatan sekaligus: {{rule}}. Sakelar ini bersifat hanya-baca.",
       "visibility": "Visibilitas",
       "visibilityPrimary": "Utama — ditampilkan di alat pilih",
       "visibilitySubagent": "Subagen — hanya dapat dihubungi dari orang lain",
@@ -4052,7 +4069,8 @@
       "duplicateName": "Nama itu sudah digunakan oleh perintah lain di profil ini"
     },
     "repoBindings": {
-      "title": "Profil Default untuk Repo",
+      "title": "Profil default untuk Repo",
+      "entryLabel": "Profil bawaan",
       "add": "Tambahkan bawaan",
       "empty": "Tidak ada konfigurasi default",
       "emptyDescription": "Tambahkan default untuk menerapkan profil secara otomatis saat memulai sesi untuk repo.",

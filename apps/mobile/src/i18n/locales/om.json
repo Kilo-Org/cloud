@@ -2315,7 +2315,7 @@
       "cloningSession": "Turtii kopii gochaa jira",
       "couldNotLoadThisSession": "Turtii kana fe'uu hin danda'amne.",
       "cloneFailedRetry": "Turtii kana kopii gochuu hin danda'amne. Deebi'ii yaali.",
-      "notEnoughCredits": "Cloud Agent hojjechiisuuf kiriiditii gahaa hin qabdu. Kiriiditii dabaliitii deebi'ii yaali.",
+      "notEnoughCredits": "Gaaffii kanaaf kiriiditii gahaa hin qabdu. Kiriiditii dabaliitii deebi'ii yaali.",
       "previousTaskFinishing": "Hojiin duraanii amma iyyuu xumuramaa jira. Yeroo muraasa eegi.",
       "serviceUnavailable": "Tajaajilli yeroo ammaa hin argamu. Deebi'ii yaali.",
       "connectionTrouble": "Walqabannaan rakkoo qaba. Yeroo muraasa booda deebi'ii yaali.",
@@ -2477,6 +2477,8 @@
       "toolList": "tarreessi",
       "toolPatch": "sirreessi",
       "toolTask": "hojii",
+      "toolSendFile": "Faayilii ergame",
+      "toolSendFileAction": "Faayilii ergi",
       "readTodos": "Karoora dubbisi",
       "updateTodos": "Karoora haaromsi",
       "linesBadge": "Sarara {{displayCount}}",
@@ -2577,7 +2579,21 @@
       "thought": "Yaada",
       "showDetails": "Ibsa agarsiisi",
       "pending": "Eegachaa jira…",
-      "running": "Hojjechaa jira…"
+      "running": "Hojjechaa jira…",
+      "field": {
+        "filePath": "Daandii faayilii",
+        "path": "Daandii",
+        "offset": "Lakkoofsa jalqabaa",
+        "limit": "Daangaa",
+        "pattern": "Fakkaataa",
+        "include": "Dabalata",
+        "patchText": "Barreeffama sirreeffamaa",
+        "query": "Gaaffii barbaacha",
+        "prompt": "Qajeelfama",
+        "header": "Mataduree",
+        "question": "Gaaffii",
+        "options": "Filannoo"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Qabiyyee agarsiisuu hin danda'amne."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Mariin kun moodelichaaf baay'ee dheeraadha.",
       "assistantProviderError": "Dhiyeessaan dogoggora deebisee.",
       "assistantProviderRefused": "Dhiyeessaan gaaffii kana dideera, kanaaf irra deebi'uun hin danda'amu.",
-      "assistantCreditsRefusal": "Cloud Agent hojjechiisuuf kiriiditii gahaa hin qabdu.",
+      "assistantCreditsRefusal": "Gaaffii kanaaf kiriiditii gahaa hin qabdu.",
       "assistantOutputLimit": "Deebiin daangaa baha moodelichaa ga'e.",
       "assistantStructuredOutput": "Deebiin akkaataa barbaachisu waliin hin wal simane.",
       "assistantFailed": "Deebii kennuun hin milkoofne."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Bakka bu'aa koo",
       "promptPlaceholder": "Ati nama ...",
       "tools": "Meeshaalee",
+      "wholeToolRule": "Maajentiin kun seera tokko meeshaalee hunda irratti yeroo tokkotti hojiirra oolcha: {{rule}}. Qalqalloonni kunneen dubbisuu qofa danda'u.",
       "visibility": "Mul’achuu",
       "visibilityPrimary": "Primary — kan agarsiifame picker keessatti",
       "visibilitySubagent": "Subagent — kanneen biroo irraa qofa kan waamamu",
@@ -4052,7 +4069,8 @@
       "duplicateName": "Ajajni maqaa kana qabu durseen profaayilii kana keessaa jira"
     },
     "repoBindings": {
-      "title": "Profaayilota Durtii Repos",
+      "title": "Profaayilota durtii Repos",
+      "entryLabel": "Profaayilota durtii",
       "add": "Durtii itti dabali",
       "empty": "Durtii hin qindaa'e",
       "emptyDescription": "Yeroo turtii repo'f jalqabdu ofumaan piroofaayilii hojii irra oolchuuf durtii dabali.",

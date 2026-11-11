@@ -2357,7 +2357,7 @@
       "cloningSession": "Clonant la sessió…",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
-      "notEnoughCredits": "No tens prou crèdits per executar Cloud Agent. Afegeix crèdits i torna-ho a provar.",
+      "notEnoughCredits": "No tens prou crèdits per a aquesta sol·licitud. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara no ha acabat. Espera un moment.",
       "serviceUnavailable": "El servei no està disponible ara mateix. Torna-ho a provar.",
       "connectionTrouble": "Hi ha problemes de connexió. Torna-ho a provar d'aquí a un moment.",
@@ -2520,6 +2520,8 @@
       "toolList": "llista",
       "toolPatch": "aplica un pedaç",
       "toolTask": "tasca",
+      "toolSendFile": "Fitxer enviat",
+      "toolSendFileAction": "envia fitxer",
       "readTodos": "Llegeix el pla",
       "updateTodos": "Actualitza el pla",
       "linesBadge": "{{displayCount}} línies",
@@ -2623,7 +2625,21 @@
       "thought": "Raonament",
       "showDetails": "Mostra els detalls",
       "pending": "Pendent…",
-      "running": "En execució…"
+      "running": "En execució…",
+      "field": {
+        "filePath": "Camí del fitxer",
+        "path": "Camí",
+        "offset": "Desplaçament",
+        "limit": "Límit",
+        "pattern": "Patró",
+        "include": "Inclusió",
+        "patchText": "Text del pedaç",
+        "query": "Consulta",
+        "prompt": "Indicació",
+        "header": "Encapçalament",
+        "question": "Pregunta",
+        "options": "Opcions"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "No s'ha pogut mostrar el contingut."
@@ -2639,7 +2655,7 @@
       "assistantContextOverflow": "La conversa és massa llarga per al model.",
       "assistantProviderError": "El proveïdor ha retornat un error.",
       "assistantProviderRefused": "El proveïdor ha rebutjat aquesta sol·licitud i no es pot tornar a intentar.",
-      "assistantCreditsRefusal": "No tens prou crèdits per executar Cloud Agent.",
+      "assistantCreditsRefusal": "No tens prou crèdits per a aquesta sol·licitud.",
       "assistantOutputLimit": "La resposta ha arribat al límit de sortida del model.",
       "assistantStructuredOutput": "La resposta no coincideix amb el format requerit.",
       "assistantFailed": "No s'ha pogut generar la resposta."
@@ -4074,6 +4090,7 @@
       "namePlaceholder": "El meu agent",
       "promptPlaceholder": "Ets un...",
       "tools": "Eines",
+      "wholeToolRule": "Aquest agent aplica una regla a cada eina alhora: {{rule}}. Aquests interruptors són de només lectura.",
       "visibility": "Visibilitat",
       "visibilityPrimary": "Principal — es mostra al selector",
       "visibilitySubagent": "Subagent — només es pot trucar des d'altres",
@@ -4115,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Perfils predeterminats per a Repos",
+      "entryLabel": "Perfils predeterminats",
       "add": "Afegeix per defecte",
       "empty": "No s'ha configurat cap valor predeterminat",
       "emptyDescription": "Afegiu un valor predeterminat per aplicar automàticament un perfil quan inicieu sessions per a un repo.",

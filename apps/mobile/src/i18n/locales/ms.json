@@ -2315,7 +2315,7 @@
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba semula.",
-      "notEnoughCredits": "Kredit tidak mencukupi untuk menjalankan Cloud Agent. Tambah kredit dan cuba semula.",
+      "notEnoughCredits": "Kredit tidak mencukupi untuk permintaan ini. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugasan sebelumnya masih dalam proses penyelesaian. Sila tunggu sebentar.",
       "serviceUnavailable": "Perkhidmatan tidak tersedia buat masa ini. Sila cuba semula.",
       "connectionTrouble": "Sambungan bermasalah. Sila cuba semula sebentar lagi.",
@@ -2477,6 +2477,8 @@
       "toolList": "senaraikan",
       "toolPatch": "tampal",
       "toolTask": "tugasan",
+      "toolSendFile": "Fail telah dihantar",
+      "toolSendFileAction": "Hantar fail",
       "readTodos": "Baca pelan",
       "updateTodos": "Kemas kini pelan",
       "linesBadge": "{{displayCount}} baris",
@@ -2577,7 +2579,21 @@
       "thought": "Pemikiran",
       "showDetails": "Paparkan butiran",
       "pending": "Menunggu…",
-      "running": "Sedang berjalan…"
+      "running": "Sedang berjalan…",
+      "field": {
+        "filePath": "Laluan fail",
+        "path": "Laluan",
+        "offset": "Ofset",
+        "limit": "Had",
+        "pattern": "Corak",
+        "include": "Sertakan",
+        "patchText": "Teks tampalan",
+        "query": "Pertanyaan",
+        "prompt": "Gesaan",
+        "header": "Pengepala",
+        "question": "Soalan",
+        "options": "Pilihan"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Gagal memaparkan kandungan."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Perbualan terlalu panjang untuk model.",
       "assistantProviderError": "Penyedia mengembalikan ralat.",
       "assistantProviderRefused": "Penyedia menolak permintaan ini dan ia tidak boleh dicuba semula.",
-      "assistantCreditsRefusal": "Kredit tidak mencukupi untuk menjalankan Cloud Agent.",
+      "assistantCreditsRefusal": "Kredit tidak mencukupi untuk permintaan ini.",
       "assistantOutputLimit": "Respons mencapai had output model.",
       "assistantStructuredOutput": "Respons tidak sepadan dengan format yang diperlukan.",
       "assistantFailed": "Respons gagal."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Ejen saya",
       "promptPlaceholder": "Anda seorang...",
       "tools": "Alatan",
+      "wholeToolRule": "Ejen ini menggunakan satu peraturan pada setiap alat sekali gus: {{rule}}. Suis ini adalah baca sahaja.",
       "visibility": "Keterlihatan",
       "visibilityPrimary": "Utama — ditunjukkan dalam pemilih",
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",
@@ -4052,7 +4069,8 @@
       "duplicateName": "Arahan dengan nama ini telah wujud dalam profil ini"
     },
     "repoBindings": {
-      "title": "Profil Lalai untuk Repos",
+      "title": "Profil lalai untuk Repos",
+      "entryLabel": "Profil lalai",
       "add": "Tambah lalai",
       "empty": "Tiada lalai dikonfigurasikan",
       "emptyDescription": "Tambahkan lalai untuk menggunakan profil secara automatik apabila memulakan sesi untuk repo.",

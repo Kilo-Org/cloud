@@ -2441,7 +2441,7 @@
       "cloningSession": "Ag clónáil an tseisiúin",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
       "cloneFailedRetry": "Níorbh fhéidir an seisiún seo a chlónáil. Bain triail as arís.",
-      "notEnoughCredits": "Níl go leor creidmheasanna agat chun Cloud Agent a rith. Cuir creidmheasanna leis agus bain triail as arís.",
+      "notEnoughCredits": "Níl go leor creidmheasanna agat don iarratas seo. Cuir creidmheasanna leis agus bain triail as arís.",
       "previousTaskFinishing": "Níl an tasc roimhe seo críochnaithe fós. Fan nóiméad, le do thoil.",
       "serviceUnavailable": "Níl an tseirbhís ar fáil faoi láthair. Bain triail as arís le do thoil.",
       "connectionTrouble": "Tá fadhb leis an nasc. Bain triail eile as i gceann nóiméid.",
@@ -2606,6 +2606,8 @@
       "toolList": "liostaigh",
       "toolPatch": "cuir paiste i bhfeidhm",
       "toolTask": "tasc",
+      "toolSendFile": "Sheol comhad",
+      "toolSendFileAction": "Seol comhad",
       "readTodos": "Léigh an plean",
       "updateTodos": "Nuashonraigh an plean",
       "linesBadge": "{{displayCount}} líne",
@@ -2715,7 +2717,21 @@
       "thought": "Machnamh",
       "showDetails": "Taispeáin sonraí",
       "pending": "Ar feitheamh…",
-      "running": "Ar siúl…"
+      "running": "Ar siúl…",
+      "field": {
+        "filePath": "Conair comhaid",
+        "path": "Conair",
+        "offset": "Fritháireamh",
+        "limit": "Teorainn",
+        "pattern": "Patrún",
+        "include": "Cuimsiú",
+        "patchText": "Téacs paiste",
+        "query": "Fiosrú",
+        "prompt": "Leid",
+        "header": "Ceannteideal",
+        "question": "Ceist",
+        "options": "Roghanna"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Níorbh fhéidir an t-ábhar a thaispeáint."
@@ -2731,7 +2747,7 @@
       "assistantContextOverflow": "Tá an comhrá rófhada don tsamhail.",
       "assistantProviderError": "Chuir an soláthraí earráid ar ais.",
       "assistantProviderRefused": "Dhiúltaigh an soláthraí don iarratas seo agus ní féidir é a ath-thriail.",
-      "assistantCreditsRefusal": "Níl go leor creidmheasanna agat chun Cloud Agent a rith.",
+      "assistantCreditsRefusal": "Níl go leor creidmheasanna agat don iarratas seo.",
       "assistantOutputLimit": "Shroicheadh an teorainn aschuir den tsamhail.",
       "assistantStructuredOutput": "Ní raibh an freagra ag teacht leis an bhformáid riachtanach.",
       "assistantFailed": "Theip ar an bhfreagra."
@@ -4198,6 +4214,7 @@
       "namePlaceholder": "Mo Ghníomhaire",
       "promptPlaceholder": "Is duine thú...",
       "tools": "Uirlisí",
+      "wholeToolRule": "Cuireann an gníomhaire seo riail amháin i bhfeidhm ar gach uirlis ag an am céanna: {{rule}}. Tá na lasca seo inléite amháin.",
       "visibility": "Infheictheacht",
       "visibilityPrimary": "Bunscoile — a thaispeántar sa roghnóir",
       "visibilitySubagent": "Fo-ghníomhaire — inghlaoite ó dhaoine eile amháin",
@@ -4238,7 +4255,8 @@
       "duplicateName": "Tá an t-ainm sin in úsáid ag ordú eile sa phróifíl seo"
     },
     "repoBindings": {
-      "title": "Próifílí Réamhshocraithe le haghaidh Repos",
+      "title": "Próifílí réamhshocraithe le haghaidh Repos",
+      "entryLabel": "Próifílí réamhshocraithe",
       "add": "Cuir réamhshocraithe leis",
       "empty": "Níl aon réamhshocruithe cumraithe",
       "emptyDescription": "Cuir réamhshocrú leis chun próifíl a chur i bhfeidhm go huathoibríoch agus seisiúin á gcur ar bun le haghaidh repo.",

@@ -27,7 +27,6 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useStackedWorkspaceSource } from './hooks/useStackedWorkspaceSource';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Badge } from '@/components/ui/badge';
-import { ComputePrice } from './ComputePrice';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
@@ -1116,20 +1115,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     !!selectedModelOption &&
     (selectedModelOption.isFree || selectedModelOption.hasUserByokAvailable);
 
-  const sandboxSelectionInput = {
-    repositoryType: hasPublicRepo ? ('git' as const) : selectedPlatform,
-    repositoryFullName: selectedRepo || undefined,
-  };
-  const sandboxOptions = useQuery({
-    ...(organizationId
-      ? trpc.organizations.cloudAgentNext.getSandboxSelectionOptions.queryOptions({
-          organizationId,
-          ...sandboxSelectionInput,
-        })
-      : trpc.cloudAgentNext.getSandboxSelectionOptions.queryOptions(sandboxSelectionInput)),
-    retry: false,
-  });
-
   const creationInput = useMemo(() => {
     const trimmed = prompt.trim();
     const slashMatch = /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed);
@@ -1982,19 +1967,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               />
             </div>
           </div>
-          {sandboxOptions.isError ? (
-            <span className="text-muted-foreground self-end text-xs">
-              Compute price unavailable
-            </span>
-          ) : (
-            <ComputePrice
-              destination={
-                sandboxOptions.data?.effectiveDestination ?? sandboxOptions.data?.defaultDestination
-              }
-              label="Compute"
-              className="self-end text-xs"
-            />
-          )}
           {stackedTarget && !stackedSource && stackedSourceQuery.isError && (
             <p className="text-status-destructive text-xs" role="status">
               This workspace is being deleted or no longer exists. Remove the stack target and start

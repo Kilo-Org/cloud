@@ -31,7 +31,6 @@ import {
 import { TRPCError } from '@trpc/server';
 import { and, asc, desc, eq, gt, lte, sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
-import { isRequestLogsEnabled } from '@/lib/request-logs/availability';
 import {
   ENKRYPT_USAGE_OUTCOMES,
   ENKRYPT_USAGE_WINDOW_HOURS,
@@ -74,15 +73,6 @@ const EnkryptUsageListInputSchema = OrganizationIdInputSchema.extend({
 export type RequestLogMetadata =
   | { status: 'available'; routing: RequestLogRoutingDetails }
   | { status: 'not-found' | 'not-configured' | 'unreadable' };
-
-async function assertRequestLogsEnabled(organizationId: string): Promise<void> {
-  if (!(await isRequestLogsEnabled(organizationId))) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Request logs are not available for this organization.',
-    });
-  }
-}
 
 /** The table lists newest first, so the window covers the hour leading up to the start time. */
 function withinRequestLogWindow(startTime: string | undefined) {
@@ -220,12 +210,9 @@ async function readRequestLogMetadata(usageId: string): Promise<RequestLogMetada
 }
 
 export const organizationRequestLogsRouter = createTRPCRouter({
-  isAvailable: organizationBillingProcedure.query(async ({ input }) => {
-    return { available: await isRequestLogsEnabled(input.organizationId) };
-  }),
+  isAvailable: organizationBillingProcedure.query(() => ({ available: true })),
 
   list: organizationBillingProcedure.input(RequestLogsListInputSchema).query(async ({ input }) => {
-    await assertRequestLogsEnabled(input.organizationId);
     const rows = await timedUsageQuery(
       {
         db: readDb,
@@ -303,7 +290,6 @@ export const organizationRequestLogsRouter = createTRPCRouter({
   listEnkryptUsage: organizationBillingProcedure
     .input(EnkryptUsageListInputSchema)
     .query(async ({ input }) => {
-      await assertRequestLogsEnabled(input.organizationId);
       const rows = await timedUsageQuery(
         {
           db: readDb,
@@ -333,7 +319,6 @@ export const organizationRequestLogsRouter = createTRPCRouter({
   getEnkryptRequestDetails: organizationBillingProcedure
     .input(OrganizationIdInputSchema.extend({ requestId: z.uuid() }))
     .query(async ({ input }) => {
-      await assertRequestLogsEnabled(input.organizationId);
       const calls = await selectEnkryptCalls(
         readDb,
         and(
@@ -378,7 +363,6 @@ export const organizationRequestLogsRouter = createTRPCRouter({
   getDetails: organizationBillingProcedure
     .input(OrganizationIdInputSchema.extend({ usageId: z.uuid() }))
     .query(async ({ input }) => {
-      await assertRequestLogsEnabled(input.organizationId);
       const [request] = await readDb
         .select({
           model: microdollar_usage.model,

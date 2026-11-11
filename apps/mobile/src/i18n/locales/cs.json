@@ -2399,7 +2399,7 @@
       "cloningSession": "Klonování relace",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
-      "notEnoughCredits": "Nemáte dost kreditů ke spuštění služby Cloud Agent. Dobijte si kredity a zkuste to znovu.",
+      "notEnoughCredits": "Nemáte dost kreditů pro tento požadavek. Dobijte si kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úkol se ještě dokončuje. Chvíli prosím počkejte.",
       "serviceUnavailable": "Služba je právě nedostupná. Zkuste to prosím znovu.",
       "connectionTrouble": "Došlo k problému s připojením. Zkuste to prosím za chvíli znovu.",
@@ -2563,6 +2563,8 @@
       "toolList": "výpis",
       "toolPatch": "úprava",
       "toolTask": "úkol",
+      "toolSendFile": "Odeslaný soubor",
+      "toolSendFileAction": "odesílání souboru",
       "readTodos": "Přečíst plán",
       "updateTodos": "Aktualizovat plán",
       "linesBadge": "řádky: {{displayCount}}",
@@ -2669,7 +2671,21 @@
       "thought": "Úvaha",
       "showDetails": "Zobrazit podrobnosti",
       "pending": "Čeká…",
-      "running": "Běží…"
+      "running": "Běží…",
+      "field": {
+        "filePath": "Souborová cesta",
+        "path": "Cesta",
+        "offset": "Posun",
+        "limit": "Limit",
+        "pattern": "Vzor",
+        "include": "Zahrnutí",
+        "patchText": "Text záplaty",
+        "query": "Dotaz",
+        "prompt": "Pokyn",
+        "header": "Nadpis",
+        "question": "Otázka",
+        "options": "Možnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Obsah se nepodařilo zobrazit."
@@ -2685,7 +2701,7 @@
       "assistantContextOverflow": "Konverzace je pro model příliš dlouhá.",
       "assistantProviderError": "Poskytovatel vrátil chybu.",
       "assistantProviderRefused": "Poskytovatel tento požadavek odmítl a nelze jej znovu odeslat.",
-      "assistantCreditsRefusal": "Nemáte dost kreditů ke spuštění služby Cloud Agent.",
+      "assistantCreditsRefusal": "Nemáte dost kreditů pro tento požadavek.",
       "assistantOutputLimit": "Odpověď dosáhla limitu výstupu modelu.",
       "assistantStructuredOutput": "Odpověď neodpovídala požadovanému formátu.",
       "assistantFailed": "Odpověď se nepodařilo vytvořit."
@@ -4136,6 +4152,7 @@
       "namePlaceholder": "Můj agent",
       "promptPlaceholder": "ty jsi...",
       "tools": "Nástroje",
+      "wholeToolRule": "Tento agent aplikuje jedno pravidlo na všechny nástroje najednou: {{rule}}. Tyto přepínače jsou pouze pro čtení.",
       "visibility": "Viditelnost",
       "visibilityPrimary": "Primární — zobrazí se ve výběru",
       "visibilitySubagent": "Subagent — lze volat pouze od ostatních",
@@ -4177,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Výchozí profily pro úložiště",
+      "entryLabel": "Výchozí profily",
       "add": "Přidat výchozí",
       "empty": "Nejsou nakonfigurována žádná výchozí nastavení",
       "emptyDescription": "Přidejte výchozí nastavení pro automatické použití profilu při zahájení relací pro repo.",

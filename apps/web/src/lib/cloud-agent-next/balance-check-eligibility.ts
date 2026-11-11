@@ -24,7 +24,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { resolveClaudeBillingModel } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
 import {
-  getClaudeBillingConnection,
+  getGrantedClaudeBillingConnection,
   type ClaudeBillingOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
@@ -206,7 +206,7 @@ async function hasClaudeBillingForModel(params: {
   );
 
   for (const owner of owners) {
-    const row = await getClaudeBillingConnection(owner, params.fromDb);
+    const row = await getGrantedClaudeBillingConnection(owner, params.fromDb);
     if (row?.status === ClaudeBillingConnectionStatus.Connected) return true;
     if (row?.status === ClaudeBillingConnectionStatus.BillingUnavailable) return false;
   }

@@ -2315,7 +2315,7 @@
       "cloningSession": "Ń ṣe àdàkọ ìgbà iṣẹ́",
       "couldNotLoadThisSession": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
       "cloneFailedRetry": "A kò lè ṣe àdàkọ ìgbà iṣẹ́ yìí. Gbìyànjú lẹ́ẹ̀kan sí i.",
-      "notEnoughCredits": "Kirẹ́dítì kò tó láti lo Cloud Agent. Fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
+      "notEnoughCredits": "Kirẹ́dítì kò tó fún ìbéèrè yìí. Fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "previousTaskFinishing": "Iṣẹ́ tó ṣáájú kò tíì parí. Jọ̀wọ́ dúró díẹ̀.",
       "serviceUnavailable": "Iṣẹ́ náà kò sí lárọ̀ọ́wọ́tó báyìí. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "connectionTrouble": "Ìṣòro wà pẹ̀lú àsopọ̀. Jọ̀wọ́ dúró díẹ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
@@ -2477,6 +2477,8 @@
       "toolList": "ṣe àkójọ",
       "toolPatch": "ṣàtúnṣe",
       "toolTask": "iṣẹ́",
+      "toolSendFile": "Ti fi fáìlì ránṣẹ́",
+      "toolSendFileAction": "Fi fáìlì ránṣẹ́",
       "readTodos": "Ka ètò",
       "updateTodos": "Ṣe ìmúdójúìwọ̀n ètò",
       "linesBadge": "ìlà {{displayCount}}",
@@ -2577,7 +2579,21 @@
       "thought": "Ìrònú",
       "showDetails": "Fi àwọn àlàyé hàn",
       "pending": "Ń dúró…",
-      "running": "Ń ṣiṣẹ́…"
+      "running": "Ń ṣiṣẹ́…",
+      "field": {
+        "filePath": "Ọ̀nà fáìlì",
+        "path": "Ọ̀nà",
+        "offset": "Ìbẹ̀rẹ̀",
+        "limit": "Ààlà",
+        "pattern": "Àpẹẹrẹ",
+        "include": "Ìmúpẹ̀lú",
+        "patchText": "Ọ̀rọ̀ àtúnṣe",
+        "query": "Ìwádìí",
+        "prompt": "Ìtọ́ni",
+        "header": "Àkọlé",
+        "question": "Ìbéèrè",
+        "options": "Àwọn àṣàyàn"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "A kò lè fi àkóónú hàn."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Ìjíròrò náà gùn ju ohun tí àwòṣe náà lè gbà lọ.",
       "assistantProviderError": "Olùpèsè náà da àṣìṣe padà.",
       "assistantProviderRefused": "Olùpèsè náà kọ ìbéèrè náà, a kò sì lè tún gbìyànjú rẹ̀.",
-      "assistantCreditsRefusal": "Kirẹ́dítì kò tó láti lo Cloud Agent.",
+      "assistantCreditsRefusal": "Kirẹ́dítì kò tó fún ìbéèrè yìí.",
       "assistantOutputLimit": "Ìdáhùn náà dé ààlà ìjade ti àwòṣe náà.",
       "assistantStructuredOutput": "Ìdáhùn náà kò bá àgbékalẹ̀ tí a fẹ́ mu.",
       "assistantFailed": "Ìdáhùn náà kùnà."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Aṣoju mi",
       "promptPlaceholder": "Iwọ jẹ ...",
       "tools": "Awọn irinṣẹ",
+      "wholeToolRule": "Aṣojú yìí ń lo òfin kan sí gbogbo irinṣẹ lẹ́ẹ̀kan náà: {{rule}}. Àwọn swíṣì wọ̀nyí kìkì fún kíkà nìkan.",
       "visibility": "Hihan",
       "visibilityPrimary": "Alakoko — ti o han ni oluka",
       "visibilitySubagent": "Subagent — nikan callable lati elomiran",
@@ -4052,7 +4069,8 @@
       "duplicateName": "Aṣẹ miiran ti o ni orukọ yẹn wa ninu profaili yii tẹlẹ"
     },
     "repoBindings": {
-      "title": "Awọn profaili Aiyipada fun Repos",
+      "title": "Awọn profaili aiyipada fun Repos",
+      "entryLabel": "Awọn profaili aiyipada",
       "add": "Fi aiyipada kun",
       "empty": "Ko si awọn atunto aiyipada",
       "emptyDescription": "Ṣafikun aiyipada lati kan profaili laifọwọyi nigbati o bẹrẹ awọn akoko fun atunto kan.",

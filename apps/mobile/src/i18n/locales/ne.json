@@ -2315,7 +2315,7 @@
       "cloningSession": "सत्रको प्रतिलिपि बनाउँदै",
       "couldNotLoadThisSession": "यो सत्र लोड गर्न सकिएन।",
       "cloneFailedRetry": "यो सत्रको प्रतिलिपि बनाउन सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "notEnoughCredits": "Cloud Agent चलाउन पर्याप्त क्रेडिट छैन। क्रेडिट थपेर फेरि प्रयास गर्नुहोस्।",
+      "notEnoughCredits": "यो अनुरोधका लागि पर्याप्त क्रेडिट छैन। क्रेडिट थपेर फेरि प्रयास गर्नुहोस्।",
       "previousTaskFinishing": "अघिल्लो काम सकिन बाँकी छ। केही बेर पर्खनुहोस्।",
       "serviceUnavailable": "सेवा अहिले उपलब्ध छैन। फेरि प्रयास गर्नुहोस्।",
       "connectionTrouble": "जडानमा समस्या छ। केही बेरपछि फेरि प्रयास गर्नुहोस्।",
@@ -2477,6 +2477,8 @@
       "toolList": "सूची देखाउनुहोस्",
       "toolPatch": "संशोधन लागू गर्नुहोस्",
       "toolTask": "कार्य",
+      "toolSendFile": "फाइल पठाइयो",
+      "toolSendFileAction": "फाइल पठाउनुहोस्",
       "readTodos": "योजना पढ्नुहोस्",
       "updateTodos": "योजना अद्यावधिक गर्नुहोस्",
       "linesBadge": "{{displayCount}} पङ्क्ति",
@@ -2577,7 +2579,21 @@
       "thought": "विचार",
       "showDetails": "विवरण देखाउनुहोस्",
       "pending": "पर्खाइमा…",
-      "running": "चलिरहेको…"
+      "running": "चलिरहेको…",
+      "field": {
+        "filePath": "फाइल पथ",
+        "path": "पथ",
+        "offset": "अफसेट",
+        "limit": "सीमा",
+        "pattern": "ढाँचा",
+        "include": "समावेश",
+        "patchText": "प्याच पाठ",
+        "query": "क्वेरी",
+        "prompt": "निर्देश",
+        "header": "शीर्षक",
+        "question": "प्रश्न",
+        "options": "विकल्पहरू"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "सामग्री देखाउन सकिएन।"
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "कुराकानी मोडेलका लागि धेरै लामो छ।",
       "assistantProviderError": "प्रदायकले त्रुटि फर्कायो।",
       "assistantProviderRefused": "प्रदायकले यो अनुरोध अस्वीकार गर्‍यो र यसलाई फेरि प्रयास गर्न सकिँदैन।",
-      "assistantCreditsRefusal": "Cloud Agent चलाउन पर्याप्त क्रेडिट छैन।",
+      "assistantCreditsRefusal": "यो अनुरोधका लागि पर्याप्त क्रेडिट छैन।",
       "assistantOutputLimit": "उत्तर मोडेलको आउटपुट सीमामा पुग्यो।",
       "assistantStructuredOutput": "उत्तर अपेक्षित ढाँचासँग मिलेन।",
       "assistantFailed": "उत्तर दिन सकिएन।"
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "मेरो एजेन्ट",
       "promptPlaceholder": "तिमी एक...",
       "tools": "उपकरणहरू",
+      "wholeToolRule": "यो एजेन्टले एकैचोटि हरेक उपकरणमा एउटै नियम लागू गर्छ: {{rule}}। यी स्विचहरू पढ्नका लागि मात्र हुन्।",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकरमा देखाइएको छ",
       "visibilitySubagent": "Subagent — अरूबाट मात्र कल गर्न मिल्ने",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "रिपोसका लागि पूर्वनिर्धारित प्रोफाइलहरू",
+      "entryLabel": "पूर्वनिर्धारित प्रोफाइलहरू",
       "add": "पूर्वनिर्धारित थप्नुहोस्",
       "empty": "कुनै पूर्वनिर्धारित कन्फिगर गरिएको छैन",
       "emptyDescription": "रिपोको लागि सत्रहरू सुरु गर्दा स्वचालित रूपमा प्रोफाइल लागू गर्न पूर्वनिर्धारित थप्नुहोस्।",

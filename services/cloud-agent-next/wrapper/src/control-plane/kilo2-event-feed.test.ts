@@ -295,6 +295,29 @@ it.each([
   expect(classifyAssistantFailure(nativeTurnError(error)).reason).toBe(reason);
 });
 
+// Kilo v2 0.0.0-v2-77 reports every model catalog load failure with this text.
+const catalogFailure = (detail: string) =>
+  `Failed to load the Kilo model catalog (${detail}). Check your connection and credentials.`;
+
+it.each([
+  [catalogFailure('HTTP 404'), 'model_catalog_unavailable'],
+  [
+    `SessionRunnerModel.ModelUnavailableError: ${catalogFailure('HTTP 404')}`,
+    'model_catalog_unavailable',
+  ],
+  [catalogFailure('HTTP 503'), 'provider_unavailable'],
+  [catalogFailure('HTTP 401'), 'provider_authentication'],
+  [catalogFailure('network'), 'unknown'],
+  ['No model is selected', 'unknown'],
+] as const)('classifies a native no-route failure %s as %s', (message, reason) => {
+  const failure = classifyAssistantFailure(nativeTurnError({ type: 'provider.no-route', message }));
+  expect(failure.reason).toBe(reason);
+  if (reason === 'model_catalog_unavailable') {
+    expect(failure.safeMessage).toBe('The Kilo model catalog could not be loaded');
+    expect(failure.terminalCode).toBeUndefined();
+  }
+});
+
 it('restricts step starts to their message and emits each pending permission once', async () => {
   const directory = '/workspace';
   const sessionID = 'ses_local';

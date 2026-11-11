@@ -2321,7 +2321,7 @@
       "cloningSession": "Kinokopya ang sesyon",
       "couldNotLoadThisSession": "Hindi ma-load ang sesyong ito.",
       "cloneFailedRetry": "Hindi makopya ang sesyong ito. Subukang muli.",
-      "notEnoughCredits": "Kulang ang kredito para patakbuhin ang Cloud Agent. Magdagdag ng kredito at subukang muli.",
+      "notEnoughCredits": "Kulang ang kredito para sa kahilingang ito. Magdagdag ng kredito at subukang muli.",
       "previousTaskFinishing": "Tinatapos pa ang naunang gawain. Maghintay sandali.",
       "serviceUnavailable": "Hindi magamit ang serbisyo ngayon. Subukang muli.",
       "connectionTrouble": "May problema sa koneksyon. Subukang muli pagkalipas ng ilang sandali.",
@@ -2483,6 +2483,8 @@
       "toolList": "ilista",
       "toolPatch": "ilapat ang pagbabago",
       "toolTask": "gawain",
+      "toolSendFile": "Naipadala ang file",
+      "toolSendFileAction": "Ipadala ang file",
       "readTodos": "Basahin ang plano",
       "updateTodos": "I-update ang plano",
       "linesBadge": "{{displayCount}} na linya",
@@ -2583,7 +2585,21 @@
       "thought": "Naisip",
       "showDetails": "Ipakita ang mga detalye",
       "pending": "Nakabinbin…",
-      "running": "Tumatakbo…"
+      "running": "Tumatakbo…",
+      "field": {
+        "filePath": "Landas ng file",
+        "path": "Landas",
+        "offset": "Offset",
+        "limit": "Hangganan",
+        "pattern": "Padron",
+        "include": "Kasama",
+        "patchText": "Tekstong patch",
+        "query": "Paghahanap",
+        "prompt": "Panuto",
+        "header": "Pamagat",
+        "question": "Tanong",
+        "options": "Pagpipilian"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Hindi maipakita ang nilalaman."
@@ -2599,7 +2615,7 @@
       "assistantContextOverflow": "Masyadong mahaba ang pag-uusap para sa modelo.",
       "assistantProviderError": "Nagbalik ang tagapagbigay ng serbisyo ng error.",
       "assistantProviderRefused": "Tinanggihan ng tagapagbigay ng serbisyo ang kahilingang ito at hindi na ito maaaring muling subukan.",
-      "assistantCreditsRefusal": "Kulang ang kredito para patakbuhin ang Cloud Agent.",
+      "assistantCreditsRefusal": "Kulang ang kredito para sa kahilingang ito.",
       "assistantOutputLimit": "Naabot ng tugon ang limitasyon ng output ng modelo.",
       "assistantStructuredOutput": "Hindi tumugma ang tugon sa kinakailangang format.",
       "assistantFailed": "Nabigo ang pagtugon."
@@ -4018,6 +4034,7 @@
       "namePlaceholder": "Aking Ahente",
       "promptPlaceholder": "ikaw ay isang...",
       "tools": "Mga gamit",
+      "wholeToolRule": "Naglalapat ang ahenteng ito ng isang panuntunan sa lahat ng gamit nang sabay-sabay: {{rule}}. Ang mga switch na ito ay basahin lamang.",
       "visibility": "Bisibilidad",
       "visibilityPrimary": "Pangunahin — ipinapakita sa picker",
       "visibilitySubagent": "Subagent — matatawag lang mula sa iba",
@@ -4058,7 +4075,8 @@
       "duplicateName": "Mayroon nang command na may ganyang pangalan sa profile na ito"
     },
     "repoBindings": {
-      "title": "Mga Default na Profile para sa Repos",
+      "title": "Mga default na profile para sa Repos",
+      "entryLabel": "Mga default na profile",
       "add": "Magdagdag ng default",
       "empty": "Walang mga default na na-configure",
       "emptyDescription": "Magdagdag ng default para awtomatikong maglapat ng profile kapag nagsisimula ng mga session para sa isang repo.",

@@ -1819,7 +1819,7 @@
       "cloningSession": "Klonowanie sesji",
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
       "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
-      "notEnoughCredits": "Brakuje środków na uruchomienie Cloud Agent. Doładuj konto i spróbuj ponownie.",
+      "notEnoughCredits": "Brakuje środków na to żądanie. Doładuj konto i spróbuj ponownie.",
       "previousTaskFinishing": "Trwa kończenie poprzedniego zadania. Poczekaj chwilę.",
       "serviceUnavailable": "Usługa jest teraz niedostępna. Spróbuj ponownie.",
       "connectionTrouble": "Problem z połączeniem. Spróbuj ponownie za chwilę.",
@@ -1983,6 +1983,8 @@
       "toolList": "lista plików",
       "toolPatch": "poprawka",
       "toolTask": "zadanie",
+      "toolSendFile": "Wysłano plik",
+      "toolSendFileAction": "wysyłanie pliku",
       "readTodos": "Odczytaj plan",
       "updateTodos": "Zaktualizuj plan",
       "linesBadge": "wiersze: {{displayCount}}",
@@ -2089,7 +2091,21 @@
       "thought": "Tok rozumowania",
       "showDetails": "Pokaż szczegóły",
       "pending": "Oczekiwanie…",
-      "running": "Wykonywanie…"
+      "running": "Wykonywanie…",
+      "field": {
+        "filePath": "Ścieżka pliku",
+        "path": "Ścieżka",
+        "offset": "Przesunięcie",
+        "limit": "Limit",
+        "pattern": "Wzorzec",
+        "include": "Filtr plików",
+        "patchText": "Tekst łatki",
+        "query": "Zapytanie",
+        "prompt": "Instrukcja",
+        "header": "Nagłówek",
+        "question": "Pytanie",
+        "options": "Opcje"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nie udało się wyświetlić treści."
@@ -2105,7 +2121,7 @@
       "assistantContextOverflow": "Rozmowa jest zbyt długa dla modelu.",
       "assistantProviderError": "Dostawca zwrócił błąd.",
       "assistantProviderRefused": "Dostawca odrzucił to żądanie i nie można go ponowić.",
-      "assistantCreditsRefusal": "Brakuje środków na uruchomienie Cloud Agent.",
+      "assistantCreditsRefusal": "Brakuje środków na to żądanie.",
       "assistantOutputLimit": "Odpowiedź osiągnęła limit wyjścia modelu.",
       "assistantStructuredOutput": "Odpowiedź nie była zgodna z wymaganym formatem.",
       "assistantFailed": "Nie udało się wygenerować odpowiedzi."
@@ -4136,6 +4152,7 @@
       "namePlaceholder": "Mój agent",
       "promptPlaceholder": "Jesteś...",
       "tools": "Narzędzia",
+      "wholeToolRule": "Ten agent stosuje jedną regułę do wszystkich narzędzi jednocześnie: {{rule}}. Te przełączniki są tylko do odczytu.",
       "visibility": "Widoczność",
       "visibilityPrimary": "Podstawowy — pokazany w selektorze",
       "visibilitySubagent": "Subagent — można go wywołać tylko od innych osób",
@@ -4177,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Domyślne profile dla repozytoriów",
+      "entryLabel": "Profile domyślne",
       "add": "Dodaj domyślne",
       "empty": "Nie skonfigurowano żadnych ustawień domyślnych",
       "emptyDescription": "Dodaj ustawienie domyślne, aby automatycznie stosować profil podczas rozpoczynania sesji dla repozytorium.",

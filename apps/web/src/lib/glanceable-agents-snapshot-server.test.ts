@@ -294,7 +294,9 @@ describe('buildGlanceableDeliveryForUser', () => {
         return Object.assign(rows, { limit: async (_count: number) => rows });
       };
       // The followed session read joins the pull request cache.
-      return { from: () => ({ where, leftJoin: () => ({ where }) }) };
+      return {
+        from: () => ({ where, leftJoin: () => ({ where }), leftJoinLateral: () => ({ where }) }),
+      };
     }) as never);
   });
 

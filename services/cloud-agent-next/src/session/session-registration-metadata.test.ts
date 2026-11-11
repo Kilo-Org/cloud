@@ -58,12 +58,14 @@ const GITHUB_REPOSITORY = {
   repo: 'acme/widgets',
   pullRequestNumber: 17,
 };
+const GENERATED_BRANCH = 'kilo/eager-hub-j9o';
 
 describe('session registration repository metadata', () => {
   it.each(['webhook', 'scheduled'])(
     'preserves a repository agent without runtimeAgents for %s',
     async createdOnPlatform => {
       const result = await buildSessionMetadataFromRegistration({
+        generatedBranch: GENERATED_BRANCH,
         identity: {
           sessionId: 'workspace_probe',
           userId: 'user_fixture',
@@ -85,6 +87,7 @@ describe('session registration repository metadata', () => {
     'does not defer to a client-supplied %s label with a public billing origin',
     async createdOnPlatform => {
       const result = await buildSessionMetadataFromRegistration({
+        generatedBranch: GENERATED_BRANCH,
         identity: {
           sessionId: 'workspace_probe',
           userId: 'user_fixture',
@@ -107,6 +110,7 @@ describe('session registration repository metadata', () => {
     'retains missing custom-agent rejection for %s',
     async createdOnPlatform => {
       const result = await buildSessionMetadataFromRegistration({
+        generatedBranch: GENERATED_BRANCH,
         identity: {
           sessionId: 'workspace_probe',
           userId: 'user_fixture',
@@ -132,6 +136,7 @@ describe('session registration repository metadata', () => {
       { allowSubagentSessions: true, parentCloudAgentSessionId: 'workspace_parent' },
     ]) {
       const result = await buildSessionMetadataFromRegistration({
+        generatedBranch: GENERATED_BRANCH,
         identity: { sessionId: 'workspace_child', userId: 'user_fixture' },
         auth: {},
         agent: { mode: 'code', model: 'kilo/test-model' },
@@ -148,6 +153,7 @@ describe('session registration repository metadata', () => {
 
   it('persists the GitHub pull request number from the registration input', async () => {
     const result = await buildSessionMetadataFromRegistration({
+      generatedBranch: GENERATED_BRANCH,
       identity: { sessionId: 'agent_test', userId: 'user_test' },
       auth: {},
       agent: { mode: 'code', model: 'kilo/test-model' },
@@ -165,6 +171,7 @@ describe('session registration repository metadata', () => {
 
   it('persists the GitHub user authorization decision from the registration input', async () => {
     const result = await buildSessionMetadataFromRegistration({
+      generatedBranch: GENERATED_BRANCH,
       identity: { sessionId: 'agent_test', userId: 'user_test', orgId: 'org_test' },
       auth: {},
       agent: { mode: 'code', model: 'kilo/test-model' },
@@ -183,6 +190,7 @@ describe('session registration repository metadata', () => {
   it('persists stacked base fields and the parent worktree, and appends the stack instruction', async () => {
     const baseSha = 'a'.repeat(40);
     const result = await buildSessionMetadataFromRegistration({
+      generatedBranch: GENERATED_BRANCH,
       identity: { sessionId: 'workspace_child', userId: 'user_fixture' },
       auth: {},
       agent: { mode: 'code', model: 'kilo/test-model', appendSystemPrompt: 'Be concise.' },
@@ -212,6 +220,7 @@ describe('session registration repository metadata', () => {
 
   it('does not write stacked fields or the stack instruction for a fork/clone create', async () => {
     const result = await buildSessionMetadataFromRegistration({
+      generatedBranch: GENERATED_BRANCH,
       identity: { sessionId: 'workspace_fork', userId: 'user_fixture' },
       auth: {},
       agent: { mode: 'code', model: 'kilo/test-model' },
@@ -251,6 +260,7 @@ describe('session registration environment metadata', () => {
   };
   const build = async (overrides: Record<string, unknown>) => {
     const result = await buildSessionMetadataFromRegistration({
+      generatedBranch: GENERATED_BRANCH,
       identity: { sessionId: 'agent_test', userId: 'user_fixture' },
       auth: {},
       agent: { mode: 'code', model: 'kilo/test-model' },
@@ -268,7 +278,7 @@ describe('session registration environment metadata', () => {
     });
 
     const generated = metadata.workspace?.generatedBranchName;
-    expect(generated).toMatch(/^kilo\/.+/);
+    expect(generated).toBe(GENERATED_BRANCH);
     expect(metadata.workspace?.branchName).toBe(generated);
     expect(
       metadata.environment?.repositories?.map(entry => [entry.repoFullName, entry.branch])
@@ -287,7 +297,7 @@ describe('session registration environment metadata', () => {
 
     const generated = metadata.workspace?.generatedBranchName;
     expect(metadata.workspace?.branchName).toBe('release/1');
-    expect(generated).toMatch(/^kilo\/.+/);
+    expect(generated).toBe(GENERATED_BRANCH);
     expect(
       metadata.environment?.repositories?.map(entry => [entry.repoFullName, entry.branch])
     ).toEqual([
@@ -316,6 +326,7 @@ describe('session registration environment metadata', () => {
 
   it('rejects a V2 environment on a repository that has no environment identity', async () => {
     const result = await buildSessionMetadataFromRegistration({
+      generatedBranch: GENERATED_BRANCH,
       identity: { sessionId: 'agent_test', userId: 'user_fixture' },
       auth: {},
       agent: { mode: 'code', model: 'kilo/test-model' },

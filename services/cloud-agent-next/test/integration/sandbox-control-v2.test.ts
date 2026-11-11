@@ -48,10 +48,7 @@ import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { logger } from '../../src/logger.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
-import {
-  createFakeCredentialBroker,
-  installFakeCredentialEnv,
-} from './helpers/fake-credentials.js';
+import { createFakeCredentialBroker, installFakeSandboxEnv } from './helpers/fake-credentials.js';
 import { FakeSessionPeer, createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
@@ -2527,7 +2524,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     }));
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
+      installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
         WORKER_URL: 'https://worker.example.com',
         KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com',
         KILO_OPENROUTER_BASE: 'https://gateway.example.com/api',
@@ -3107,7 +3104,7 @@ describe('SandboxControlV2 prepare frame secrets', () => {
     }));
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
+      installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
         AGENT_ENV_VARS_PRIVATE_KEY: privateKey,
       });
       Object.assign(instance, {

@@ -4198,7 +4198,7 @@
   "claudeBilling.remove": {
     "path": "claudeBilling.remove",
     "kind": "mutation",
-    "summary": "Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only.",
+    "summary": "Disconnect Claude billing for the selected scope so it stops charging, retiring the Anthropic profile when no other scope shares it; shared-services scope requires an organization owner or admin.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -4220,7 +4220,7 @@
       "organizationid",
       "scope"
     ],
-    "searchBlob": "claudeBilling.remove Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only. claudebilling remove organizationid scope organizationId scope"
+    "searchBlob": "claudeBilling.remove Disconnect Claude billing for the selected scope so it stops charging, retiring the Anthropic profile when no other scope shares it; shared-services scope requires an organization owner or admin. claudebilling remove organizationid scope organizationId scope"
   },
   "claudeBilling.status": {
     "path": "claudeBilling.status",

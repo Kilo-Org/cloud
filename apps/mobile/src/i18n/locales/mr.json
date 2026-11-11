@@ -2315,7 +2315,7 @@
       "cloningSession": "सत्राची प्रत तयार होत आहे",
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही.",
       "cloneFailedRetry": "या सत्राची प्रत तयार करता आली नाही. पुन्हा प्रयत्न करा.",
-      "notEnoughCredits": "Cloud Agent चालवण्यासाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडून पुन्हा प्रयत्न करा.",
+      "notEnoughCredits": "या विनंतीसाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडून पुन्हा प्रयत्न करा.",
       "previousTaskFinishing": "मागील काम अजून पूर्ण झालेले नाही. कृपया थोडा वेळ थांबा.",
       "serviceUnavailable": "सेवा सध्या अनुपलब्ध आहे. पुन्हा प्रयत्न करा.",
       "connectionTrouble": "कनेक्शनमध्ये अडचण आहे. कृपया थोड्या वेळाने पुन्हा प्रयत्न करा.",
@@ -2477,6 +2477,8 @@
       "toolList": "यादी",
       "toolPatch": "पॅच लागू करणे",
       "toolTask": "काम",
+      "toolSendFile": "फाइल पाठवली",
+      "toolSendFileAction": "फाइल पाठवणे",
       "readTodos": "योजना वाचा",
       "updateTodos": "योजना अद्ययावत करा",
       "linesBadge": "{{displayCount}} ओळी",
@@ -2577,7 +2579,21 @@
       "thought": "विचार",
       "showDetails": "तपशील दाखवा",
       "pending": "प्रलंबित…",
-      "running": "चालू आहे…"
+      "running": "चालू आहे…",
+      "field": {
+        "filePath": "फाइल मार्ग",
+        "path": "मार्ग",
+        "offset": "ऑफसेट",
+        "limit": "मर्यादा",
+        "pattern": "नमुना",
+        "include": "समावेश",
+        "patchText": "पॅच मजकूर",
+        "query": "क्वेरी",
+        "prompt": "प्रॉम्प्ट",
+        "header": "शीर्षक",
+        "question": "प्रश्न",
+        "options": "पर्याय"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "मजकूर किंवा इतर सामग्री दाखवता आली नाही."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "हे संभाषण मॉडेलच्या मर्यादेपेक्षा मोठे आहे.",
       "assistantProviderError": "सेवा पुरवठादाराने त्रुटी दिली.",
       "assistantProviderRefused": "सेवा पुरवठादाराने ही विनंती नाकारली आणि ती पुन्हा प्रयत्न करता येणार नाही.",
-      "assistantCreditsRefusal": "Cloud Agent चालवण्यासाठी पुरेसे क्रेडिट नाहीत.",
+      "assistantCreditsRefusal": "या विनंतीसाठी पुरेसे क्रेडिट नाहीत.",
       "assistantOutputLimit": "प्रतिसाद मॉडेलची आउटपुट मर्यादा गाठली.",
       "assistantStructuredOutput": "प्रतिसाद आवश्यक स्वरूपाशी जुळला नाही.",
       "assistantFailed": "प्रतिसाद तयार करता आला नाही."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "माझा एजंट",
       "promptPlaceholder": "तुम्ही एक...",
       "tools": "साधने",
+      "wholeToolRule": "हा एजंट एकाच वेळी प्रत्येक साधनावर एक नियम लागू करतो: {{rule}}. हे स्विचेस केवळ वाचनासाठी आहेत.",
       "visibility": "दृश्यमानता",
       "visibilityPrimary": "प्राथमिक — पिकरमध्ये दाखवले आहे",
       "visibilitySubagent": "उपएजंट — फक्त इतरांकडून कॉल करण्यायोग्य",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "रेपॉजिटरींसाठी डीफॉल्ट प्रोफाइल",
+      "entryLabel": "मूलभूत प्रोफाइल",
       "add": "डीफॉल्ट जोडा",
       "empty": "कोणतेही डीफॉल्ट कॉन्फिगर केलेले नाहीत",
       "emptyDescription": "रेपॉजिटरीसाठी सत्र सुरू करताना प्रोफाइल स्वयंचलितपणे लागू करण्यासाठी डीफॉल्ट जोडा.",

@@ -2465,6 +2465,20 @@
       "when": 1794335141995,
       "tag": "0351_byok_legacy_key_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 352,
+      "version": "7",
+      "when": 1794342041544,
+      "tag": "0352_worktree_pull_request_branch",
+      "breakpoints": true
+    },
+    {
+      "idx": 353,
+      "version": "7",
+      "when": 1794346750792,
+      "tag": "0353_claude_billing_connection_grants",
+      "breakpoints": true
     }
   ]
 }

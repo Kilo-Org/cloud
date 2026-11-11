@@ -568,8 +568,8 @@ export type Env = {
   VERCEL_SANDBOX_RUNTIME?: string;
   VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
-  WORKSPACE_SNAPSHOT_ORG_IDS?: string;
-  WORKSPACE_SNAPSHOT_USER_IDS?: string;
+  /** Comma-separated user or organization IDs allowed workspace snapshots; `*` includes everyone. */
+  WORKSPACE_SNAPSHOT_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

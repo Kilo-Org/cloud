@@ -1,5 +1,4 @@
 /** Builds the grouped metadata used by control-plane session registration. */
-import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import { sessionReferenceOf, type EnvironmentScope } from '../environment-build/reference.js';
 import {
   isLegacySharedSandboxWorkspace,
@@ -19,6 +18,8 @@ import type { SessionRepositoryRequest } from './session-requests.js';
 import { withStackedWorkspaceInstruction } from './stacked-workspace-instruction.js';
 
 export type GroupedRegisterSessionInput = {
+  /** Worker-selected before ownership registration, stable across retries. */
+  generatedBranch: string;
   allowSubagentSessions?: boolean;
   parentCloudAgentSessionId?: string;
   /** Parent worktree for a stacked workspace; persisted on the workspace. */
@@ -234,7 +235,7 @@ export async function buildSessionMetadataFromRegistration(
     };
   }
 
-  const generatedBranch = `kilo/${generateBranchSlug()}`;
+  const generatedBranch = input.generatedBranch;
   const environment = environmentReferenceFromRegistration(input, generatedBranch);
   if (!environment.ok) return environment;
 

@@ -2363,7 +2363,7 @@
       "cloningSession": "A clonar a sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
       "cloneFailedRetry": "Não foi possível clonar esta sessão. Tente novamente.",
-      "notEnoughCredits": "Créditos insuficientes para executar o Cloud Agent. Adicione créditos e tente novamente.",
+      "notEnoughCredits": "Créditos insuficientes para este pedido. Adicione créditos e tente novamente.",
       "previousTaskFinishing": "A tarefa anterior ainda está a terminar. Aguarde um momento.",
       "serviceUnavailable": "O serviço está indisponível neste momento. Tente novamente.",
       "connectionTrouble": "Há um problema de ligação. Tente novamente dentro de instantes.",
@@ -2526,6 +2526,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar alterações",
       "toolTask": "tarefa",
+      "toolSendFile": "Ficheiro enviado",
+      "toolSendFileAction": "Enviar ficheiro",
       "readTodos": "Ler plano",
       "updateTodos": "Atualizar plano",
       "linesBadge": "{{displayCount}} linhas",
@@ -2629,7 +2631,21 @@
       "thought": "Raciocínio",
       "showDetails": "Mostrar detalhes",
       "pending": "Pendente…",
-      "running": "Em execução…"
+      "running": "Em execução…",
+      "field": {
+        "filePath": "Caminho do ficheiro",
+        "path": "Caminho",
+        "offset": "Deslocamento",
+        "limit": "Limite",
+        "pattern": "Padrão",
+        "include": "Incluir",
+        "patchText": "Texto da alteração",
+        "query": "Consulta",
+        "prompt": "Instrução",
+        "header": "Título",
+        "question": "Pergunta",
+        "options": "Opções"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Não foi possível apresentar o conteúdo."
@@ -2645,7 +2661,7 @@
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
       "assistantProviderError": "O fornecedor devolveu um erro.",
       "assistantProviderRefused": "O fornecedor rejeitou este pedido e não é possível repeti-lo.",
-      "assistantCreditsRefusal": "Créditos insuficientes para executar o Cloud Agent.",
+      "assistantCreditsRefusal": "Créditos insuficientes para este pedido.",
       "assistantOutputLimit": "A resposta atingiu o limite de saída do modelo.",
       "assistantStructuredOutput": "A resposta não correspondeu ao formato exigido.",
       "assistantFailed": "A resposta falhou."
@@ -4080,6 +4096,7 @@
       "namePlaceholder": "Meu agente",
       "promptPlaceholder": "És um...",
       "tools": "Ferramentas",
+      "wholeToolRule": "Este agente aplica uma regra a todas as ferramentas de uma só vez: {{rule}}. Esses interruptores são somente leitura.",
       "visibility": "Visibilidade",
       "visibilityPrimary": "Primário — mostrado no seletor",
       "visibilitySubagent": "Subagente — só pode ser invocado por outros",
@@ -4121,6 +4138,7 @@
     },
     "repoBindings": {
       "title": "Perfis predefinidos para repositórios",
+      "entryLabel": "Perfis predefinidos",
       "add": "Adicionar padrão",
       "empty": "Nenhuma predefinição configurada",
       "emptyDescription": "Adicione um padrão para aplicar automaticamente um perfil ao iniciar sessões de um repositório.",

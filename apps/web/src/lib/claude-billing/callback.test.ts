@@ -5,6 +5,7 @@ jest.mock('./pending', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => ({
   createClaudeUserProfile: jest.fn(async () => `uprof_${crypto.randomUUID()}`),
+  isClaudeOperatorConfigured: jest.fn(() => false),
 }));
 jest.mock('./access', () => ({
   canManageClaudeBillingOrganization: jest.fn(),
@@ -34,7 +35,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
 import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
-import { consumeClaudeBillingPending } from './pending';
+import { consumeClaudeBillingPending, saveClaudeBillingPending } from './pending';
 import { canManageClaudeBillingOrganization, isClaudeBillingOrganizationMember } from './access';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { exchangeClaudeBillingCode, ClaudeBillingExchangeError } from './protocol';
@@ -43,8 +44,11 @@ import { GET as connect } from '@/app/claude/billing/connect/route';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   clearClaudeBillingRefusal,
+  getGrantedClaudeBillingConnection,
   markClaudeBillingUnavailable,
   recordClaudeBillingRefusal,
+  removeClaudeBillingGrant,
+  shareClaudeBillingConnection,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 
 beforeEach(() => {
@@ -322,6 +326,105 @@ describe('Claude billing callback', () => {
       status: 'connected',
       connection_id: 'ocon_new',
       last_refusal_code: null,
+    });
+  });
+
+  it('does not undo a scope removal during approval when another scope shares the payer', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('Claude shared concurrent remove', user.id, 0);
+    const [payer] = await db
+      .insert(claude_billing_connections)
+      .values({
+        kilo_user_id: user.id,
+        user_profile_id: `uprof_${user.id}`,
+        connection_id: 'ocon_shared',
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: user.id,
+      })
+      .returning();
+    if (!payer) throw new Error('Missing payer fixture');
+    const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
+    const member: ClaudeBillingOwner = {
+      kind: 'member',
+      kiloUserId: user.id,
+      organizationId: org.id,
+    };
+    await shareClaudeBillingConnection(personal, member, user.id);
+    jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
+    jest.mocked(saveClaudeBillingPending).mockClear();
+
+    await connect(
+      new NextRequest('http://localhost/claude/billing/connect?owner=personal&return=%2Fbyok')
+    );
+    const savedPending = jest.mocked(saveClaudeBillingPending).mock.calls[0]?.[0];
+    if (!savedPending) throw new Error('Missing saved pending fixture');
+
+    await removeClaudeBillingGrant(personal);
+    jest.mocked(consumeClaudeBillingPending).mockResolvedValueOnce(savedPending);
+    const response = await callback(`state=${savedPending.state}&code=one-use-code`);
+
+    expect(response.headers.get('location')).toContain('claude_billing=failed');
+    await expect(getGrantedClaudeBillingConnection(personal)).resolves.toBeNull();
+    await expect(getGrantedClaudeBillingConnection(member)).resolves.toMatchObject({
+      id: payer.id,
+      status: 'connected',
+    });
+  });
+
+  it('allocates a fresh profile for a second Claude account after removing a shared grant, keeping cancelled attempts inactive', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('Claude second account', user.id, 0);
+    const [payer] = await db
+      .insert(claude_billing_connections)
+      .values({
+        kilo_user_id: user.id,
+        user_profile_id: `uprof_${user.id}`,
+        connection_id: 'ocon_shared',
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: user.id,
+      })
+      .returning();
+    if (!payer) throw new Error('Missing payer fixture');
+    const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
+    const member: ClaudeBillingOwner = {
+      kind: 'member',
+      kiloUserId: user.id,
+      organizationId: org.id,
+    };
+    await shareClaudeBillingConnection(personal, member, user.id);
+    await removeClaudeBillingGrant(personal);
+    jest.mocked(getUserFromSession).mockResolvedValue({ id: user.id });
+    jest.mocked(saveClaudeBillingPending).mockClear();
+
+    await connect(
+      new NextRequest('http://localhost/claude/billing/connect?owner=personal&return=%2Fbyok')
+    );
+    const savedPending = jest.mocked(saveClaudeBillingPending).mock.calls[0]?.[0];
+    if (!savedPending) throw new Error('Missing saved pending fixture');
+    expect(savedPending.userProfileId).not.toBe(payer.user_profile_id);
+
+    jest.mocked(consumeClaudeBillingPending).mockResolvedValueOnce(savedPending);
+    const declined = await callback(`state=${savedPending.state}&error=access_denied`);
+    expect(declined.headers.get('location')).toContain('claude_billing=declined');
+    await expect(getGrantedClaudeBillingConnection(personal)).resolves.toMatchObject({
+      status: 'pending',
+      connection_id: null,
+    });
+
+    jest.mocked(consumeClaudeBillingPending).mockResolvedValueOnce(savedPending);
+    const approved = await callback(`state=${savedPending.state}&code=one-use-code`);
+    expect(approved.headers.get('location')).toContain('claude_billing=connected');
+    await expect(getGrantedClaudeBillingConnection(personal)).resolves.toMatchObject({
+      user_profile_id: savedPending.userProfileId,
+      status: 'connected',
+      connection_id: 'ocon_new',
+    });
+    await expect(getGrantedClaudeBillingConnection(member)).resolves.toMatchObject({
+      id: payer.id,
+      user_profile_id: payer.user_profile_id,
+      status: 'connected',
     });
   });
 

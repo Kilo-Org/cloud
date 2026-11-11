@@ -1798,7 +1798,7 @@
       "cloningSession": "משכפל סשן…",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
-      "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
+      "notEnoughCredits": "אין מספיק קרדיטים לבקשה הזו. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין לא הסתיימה. המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. נסה שוב.",
       "connectionTrouble": "יש בעיה בחיבור. נסה שוב בעוד רגע.",
@@ -1961,6 +1961,8 @@
       "toolList": "הצגת רשימה",
       "toolPatch": "החלת תיקון",
       "toolTask": "משימה",
+      "toolSendFile": "הקובץ נשלח בהצלחה",
+      "toolSendFileAction": "שליחת קובץ",
       "readTodos": "קריאת התוכנית",
       "updateTodos": "עדכון התוכנית",
       "linesBadge": "{{displayCount}} שורות",
@@ -2064,7 +2066,21 @@
       "thought": "מחשבה",
       "showDetails": "הצגת פרטים",
       "pending": "ממתין…",
-      "running": "פועל…"
+      "running": "פועל…",
+      "field": {
+        "filePath": "נתיב קובץ",
+        "path": "נתיב",
+        "offset": "היסט",
+        "limit": "מגבלה",
+        "pattern": "תבנית",
+        "include": "הכללה",
+        "patchText": "טקסט טלאי",
+        "query": "שאילתה",
+        "prompt": "הנחיה",
+        "header": "כותרת",
+        "question": "שאלה",
+        "options": "אפשרויות"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "לא ניתן היה להציג את התוכן."
@@ -2080,7 +2096,7 @@
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
       "assistantProviderError": "הספק החזיר שגיאה.",
       "assistantProviderRefused": "הספק סירב לבקשה זו ולא ניתן לנסות אותה שוב.",
-      "assistantCreditsRefusal": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent.",
+      "assistantCreditsRefusal": "אין מספיק קרדיטים לבקשה הזו.",
       "assistantOutputLimit": "התשובה הגיעה למגבלת הפלט של המודל.",
       "assistantStructuredOutput": "התשובה לא התאימה לפורמט הנדרש.",
       "assistantFailed": "יצירת התשובה נכשלה."
@@ -4074,6 +4090,7 @@
       "namePlaceholder": "הסוכן שלי",
       "promptPlaceholder": "אתה...",
       "tools": "כְּלֵי עֲבוֹדָה",
+      "wholeToolRule": "סוֹכֵן זֶה מְיַשֵּׂם כְּלָל אֶחָד עַל כָּל כְּלִי עֲבוֹדָה בְּבַת אַחַת: {{rule}}. הַמְּתָגִים הָאֵלֶּה לִקְרִיאָה בִּלְבַד.",
       "visibility": "רְאוּת",
       "visibilityPrimary": "ראשי — מוצג בבוחר",
       "visibilitySubagent": "סוכן משנה — ניתן להתקשרות מאחרים בלבד",
@@ -4115,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "פרופילי ברירת מחדל עבור Repos",
+      "entryLabel": "פרופילים המוגדרים כברירת מחדל",
       "add": "הוסף ברירת מחדל",
       "empty": "לא הוגדרו ברירת מחדל",
       "emptyDescription": "הוסף ברירת מחדל להחלה אוטומטית של פרופיל בעת תחילת הפעלות עבור ריפו.",

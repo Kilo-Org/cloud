@@ -2357,7 +2357,7 @@
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Učitavanje ove sesije nije uspelo.",
       "cloneFailedRetry": "Kloniranje ove sesije nije uspelo. Pokušaj ponovo.",
-      "notEnoughCredits": "Nema dovoljno kredita za pokretanje agenta Cloud Agent. Dodaj kredite i pokušaj ponovo.",
+      "notEnoughCredits": "Nema dovoljno kredita za ovaj zahtev. Dodaj kredite i pokušaj ponovo.",
       "previousTaskFinishing": "Prethodni zadatak se privodi kraju. Sačekaj trenutak.",
       "serviceUnavailable": "Usluga trenutno nije dostupna. Pokušaj ponovo.",
       "connectionTrouble": "Došlo je do problema s vezom. Pokušaj ponovo za trenutak.",
@@ -2520,6 +2520,8 @@
       "toolList": "prikaz spiska",
       "toolPatch": "primena zakrpe",
       "toolTask": "zadatak",
+      "toolSendFile": "Poslata datoteka",
+      "toolSendFileAction": "Slanje datoteke",
       "readTodos": "Prikaži plan",
       "updateTodos": "Ažuriraj plan",
       "linesBadge": "redova: {{displayCount}}",
@@ -2623,7 +2625,21 @@
       "thought": "Misao",
       "showDetails": "Prikaži detalje",
       "pending": "Na čekanju…",
-      "running": "Radi…"
+      "running": "Radi…",
+      "field": {
+        "filePath": "Putanja datoteke",
+        "path": "Putanja",
+        "offset": "Pomeraj",
+        "limit": "Ograničenje",
+        "pattern": "Obrazac",
+        "include": "Uključivanje",
+        "patchText": "Tekst zakrpe",
+        "query": "Upit",
+        "prompt": "Uputstvo",
+        "header": "Naslov",
+        "question": "Pitanje",
+        "options": "Opcije"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Prikaz sadržaja nije uspeo."
@@ -2639,7 +2655,7 @@
       "assistantContextOverflow": "Razgovor je predugačak za model.",
       "assistantProviderError": "Provajder je vratio grešku.",
       "assistantProviderRefused": "Provajder je odbio ovaj zahtev i ponovni pokušaj nije moguć.",
-      "assistantCreditsRefusal": "Nema dovoljno kredita za pokretanje agenta Cloud Agent.",
+      "assistantCreditsRefusal": "Nema dovoljno kredita za ovaj zahtev.",
       "assistantOutputLimit": "Odgovor je dostigao ograničenje izlaza modela.",
       "assistantStructuredOutput": "Odgovor nije odgovarao zahtevanom formatu.",
       "assistantFailed": "Generisanje odgovora nije uspelo."
@@ -4074,6 +4090,7 @@
       "namePlaceholder": "Moj agent",
       "promptPlaceholder": "ti si...",
       "tools": "Alati",
+      "wholeToolRule": "Ovaj agent primenjuje jedno pravilo na sve alate odjednom: {{rule}}. Ovi prekidači su samo za čitanje.",
       "visibility": "Vidljivost",
       "visibilityPrimary": "Primarni — prikazuje se u biraču",
       "visibilitySubagent": "Subagent — može se pozvati samo od drugih",
@@ -4115,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Podrazumevani profili za Repos",
+      "entryLabel": "Podrazumevani profili",
       "add": "Dodaj podrazumevano",
       "empty": "Nema konfigurisanih podrazumevanih vrednosti",
       "emptyDescription": "Dodajte podrazumevano za automatsku primenu profila pri pokretanju sesija za repo.",

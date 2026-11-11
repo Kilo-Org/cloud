@@ -28,7 +28,7 @@ import {
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -124,9 +124,8 @@ async function setup(
   };
   await runInDurableObject(sandbox, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance['env'], createFakeCredentialBroker(), {
-      WORKSPACE_SNAPSHOT_USER_IDS: options.enabled === false ? '' : USER,
-      WORKSPACE_SNAPSHOT_ORG_IDS: '',
+    installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
+      WORKSPACE_SNAPSHOT_IDS: options.enabled === false ? '' : USER,
       RUNTIME_STARTUP_MODE: 'preinstalled',
       NATIVE_RUNTIME_IMAGE: 'all-in-one',
       RUNTIME_RELEASE_DESCRIPTOR: '',
@@ -942,7 +941,7 @@ describe('idle workspace disk checkpoint', () => {
     const test = await setup();
     const wrapper = await test.checkpoint();
     await runInDurableObject(test.sandbox, instance => {
-      instance['env'].WORKSPACE_SNAPSHOT_USER_IDS = '';
+      instance['env'].WORKSPACE_SNAPSHOT_IDS = '';
     });
     await test.idle(wrapper);
     await test.alarm();
@@ -960,7 +959,7 @@ describe('idle workspace disk checkpoint', () => {
     const sourceAllocationId = (await test.sandbox.getAllocationState()).allocationId;
     await test.cold();
     await runInDurableObject(test.sandbox, instance => {
-      instance['env'].WORKSPACE_SNAPSHOT_USER_IDS = '';
+      instance['env'].WORKSPACE_SNAPSHOT_IDS = '';
     });
     await test.session.send(prompt('m2'));
     const { wrapper } = await test.connect(1);
@@ -978,7 +977,7 @@ describe('idle workspace disk checkpoint', () => {
     await test.messageState('m2', 'completed');
     await test.cold();
     await runInDurableObject(test.sandbox, instance => {
-      instance['env'].WORKSPACE_SNAPSHOT_USER_IDS = USER;
+      instance['env'].WORKSPACE_SNAPSHOT_IDS = USER;
     });
     await test.session.send(prompt('m3'));
     const resumed = await test.connect(2);

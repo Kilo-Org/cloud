@@ -53,7 +53,7 @@ import {
 import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
   type FakeCredentialBroker,
 } from './helpers/fake-credentials.js';
 import { createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
@@ -334,7 +334,7 @@ async function setup(
   }));
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker, {
+    installFakeSandboxEnv(instance, broker, {
       WORKER_URL: VERCEL_TARGET,
       KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
       KILO_OPENROUTER_BASE: 'https://api.kilo.ai',
@@ -496,6 +496,9 @@ async function reconstructPreB(
     Object.assign(reconstructed, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
+      // A reconstructed instance keeps the fixture membership reader, so these
+      // route tests run against a current member.
+      organizationMembershipFor: async () => true,
       sessionPeerFor: (_ownerId: string, sessionId: string) => ({
         onRoute: async (update: ControlPlaneRouteUpdate) => {
           updates.push({ sessionId, update });
@@ -1043,6 +1046,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       Object.assign(reconstructed, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
+        organizationMembershipFor: async () => true,
         sessionPeerFor: () => ({
           onRoute: async () => {},
           onEvents: async () => {},
@@ -2516,6 +2520,32 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const state = await stub.getAllocationState();
     expect(state.kind === 'stopping' || state.kind === 'stopped').toBe(true);
     expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
+  it('releases a session without a route and keeps the shared policy', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+    );
+    const policyCalls = provider.policyCalls.length;
+    const framesBefore = wrapper.receivedFrames();
+
+    // The session holds no alias, so its release keeps the shared policy and
+    // the live route connected.
+    provider.failPolicy = true;
+    await stub.release({ sessionId: SESSION_NEXT });
+
+    expect(provider.policyCalls.length).toBe(policyCalls);
+    expect((await stub.getAllocationState()).kind).toBe('connected');
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+    expect(wrapper.receivedFrames()).toBe(framesBefore);
+    expect(await wrapper.next(50)).toBeNull();
+    wrapper.close();
   });
 
   it('stops a live Vercel sandbox when the provider adapter lacks the policy hook', async () => {

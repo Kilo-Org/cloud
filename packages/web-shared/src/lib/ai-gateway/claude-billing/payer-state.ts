@@ -5,7 +5,7 @@ import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { getClaudeBillingConnection, type ClaudeBillingOwner } from './store';
+import { getGrantedClaudeBillingConnection, type ClaudeBillingOwner } from './store';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
 export const ClaudeBillingOwnerSchema = z.discriminatedUnion('kind', [
@@ -87,7 +87,8 @@ export async function getAuthoritativeClaudeBillingState(
 ): Promise<ClaudeBillingPayerState | null> {
   // A stale absent row would switch payer after connect. Read the primary in
   // Frankfurt; SFO delegates there without holding a cross-region pool connection.
-  if (!isUSRegion()) return claudeBillingPayerState(await getClaudeBillingConnection(owner, db));
+  if (!isUSRegion())
+    return claudeBillingPayerState(await getGrantedClaudeBillingConnection(owner, db));
   if (!INTERNAL_API_SECRET) throw new Error('Claude payer-state authentication is not configured');
   const response = await fetchClaudeWithRetry(
     new URL('/api/internal/claude-billing/payer-state', APP_URL).toString(),

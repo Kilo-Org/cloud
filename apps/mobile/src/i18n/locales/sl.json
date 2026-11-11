@@ -2399,7 +2399,7 @@
       "cloningSession": "Kloniranje seje",
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
       "cloneFailedRetry": "Te seje ni bilo mogoče klonirati. Poskusi znova.",
-      "notEnoughCredits": "Za zagon storitve Cloud Agent ni dovolj kreditov. Dodaj kredite in poskusi znova.",
+      "notEnoughCredits": "Za to zahtevo ni dovolj kreditov. Dodaj kredite in poskusi znova.",
       "previousTaskFinishing": "Prejšnja naloga se še zaključuje. Počakaj trenutek.",
       "serviceUnavailable": "Storitev trenutno ni na voljo. Poskusi znova.",
       "connectionTrouble": "Prišlo je do težave s povezavo. Čez trenutek poskusi znova.",
@@ -2563,6 +2563,8 @@
       "toolList": "izpiši seznam",
       "toolPatch": "uporabi popravek",
       "toolTask": "naloga",
+      "toolSendFile": "Poslana datoteka",
+      "toolSendFileAction": "pošlji datoteko",
       "readTodos": "Preberi načrt",
       "updateTodos": "Posodobi načrt",
       "linesBadge": "{{displayCount}} vrstic",
@@ -2669,7 +2671,21 @@
       "thought": "Misel",
       "showDetails": "Prikaži podrobnosti",
       "pending": "Čakanje…",
-      "running": "Izvajanje…"
+      "running": "Izvajanje…",
+      "field": {
+        "filePath": "Pot datoteke",
+        "path": "Pot",
+        "offset": "Odmik",
+        "limit": "Omejitev",
+        "pattern": "Vzorec",
+        "include": "Vključitev",
+        "patchText": "Besedilo popravka",
+        "query": "Poizvedba",
+        "prompt": "Navodilo",
+        "header": "Naslov",
+        "question": "Vprašanje",
+        "options": "Možnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Vsebine ni bilo mogoče prikazati."
@@ -2685,7 +2701,7 @@
       "assistantContextOverflow": "Pogovor je predolg za model.",
       "assistantProviderError": "Ponudnik je vrnil napako.",
       "assistantProviderRefused": "Ponudnik je zavrnil to zahtevo in poskusa ni mogoče ponoviti.",
-      "assistantCreditsRefusal": "Za zagon storitve Cloud Agent ni dovolj kreditov.",
+      "assistantCreditsRefusal": "Za to zahtevo ni dovolj kreditov.",
       "assistantOutputLimit": "Odgovor je dosegel omejitev izhoda modela.",
       "assistantStructuredOutput": "Odgovor ni ustrezal zahtevanemu formatu.",
       "assistantFailed": "Odgovora ni bilo mogoče ustvariti."
@@ -4136,6 +4152,7 @@
       "namePlaceholder": "Moj agent",
       "promptPlaceholder": "ti si ...",
       "tools": "Orodja",
+      "wholeToolRule": "Ta agent uporabi eno pravilo za vsa orodja hkrati: {{rule}}. Ta stikala so samo za branje.",
       "visibility": "Vidnost",
       "visibilityPrimary": "Primarno — prikazano v izbirniku",
       "visibilitySubagent": "Subagent — na klic samo od drugih",
@@ -4177,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Privzeti profili za skladišča",
+      "entryLabel": "Privzeti profili",
       "add": "Dodaj privzeto",
       "empty": "Privzete nastavitve niso konfigurirane",
       "emptyDescription": "Dodajte privzeto za samodejno uporabo profila ob zagonu sej za repo.",

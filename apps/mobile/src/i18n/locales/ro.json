@@ -2357,7 +2357,7 @@
       "cloningSession": "Se clonează sesiunea",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
       "cloneFailedRetry": "Nu s-a putut clona această sesiune. Încearcă din nou.",
-      "notEnoughCredits": "Nu ai suficiente credite pentru a rula Cloud Agent. Adaugă credite și încearcă din nou.",
+      "notEnoughCredits": "Nu ai suficiente credite pentru această solicitare. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară este în curs de finalizare. Așteaptă puțin.",
       "serviceUnavailable": "Serviciul nu este disponibil momentan. Încearcă din nou.",
       "connectionTrouble": "Există o problemă de conexiune. Încearcă din nou peste puțin timp.",
@@ -2520,6 +2520,8 @@
       "toolList": "listare",
       "toolPatch": "aplicare de modificări",
       "toolTask": "sarcină",
+      "toolSendFile": "fișier trimis",
+      "toolSendFileAction": "trimitere fișier",
       "readTodos": "Citește planul",
       "updateTodos": "Actualizează planul",
       "linesBadge": "{{displayCount}} linii",
@@ -2623,7 +2625,21 @@
       "thought": "Raționament",
       "showDetails": "Afișează detaliile",
       "pending": "În așteptare…",
-      "running": "În curs…"
+      "running": "În curs…",
+      "field": {
+        "filePath": "Cale fișier",
+        "path": "Cale",
+        "offset": "Decalaj",
+        "limit": "Limită",
+        "pattern": "Model",
+        "include": "Includere",
+        "patchText": "Text corecție",
+        "query": "Interogare",
+        "prompt": "Instrucțiune",
+        "header": "Titlu",
+        "question": "Întrebare",
+        "options": "Opțiuni"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nu s-a putut afișa conținutul."
@@ -2639,7 +2655,7 @@
       "assistantContextOverflow": "Conversația este prea lungă pentru model.",
       "assistantProviderError": "Furnizorul a returnat o eroare.",
       "assistantProviderRefused": "Furnizorul a refuzat această cerere și nu poate fi reîncercată.",
-      "assistantCreditsRefusal": "Nu ai suficiente credite pentru a rula Cloud Agent.",
+      "assistantCreditsRefusal": "Nu ai suficiente credite pentru această solicitare.",
       "assistantOutputLimit": "Răspunsul a atins limita de ieșire a modelului.",
       "assistantStructuredOutput": "Răspunsul nu a corespuns formatului cerut.",
       "assistantFailed": "Generarea răspunsului a eșuat."
@@ -4074,6 +4090,7 @@
       "namePlaceholder": "Agentul meu",
       "promptPlaceholder": "esti un...",
       "tools": "Instrumente",
+      "wholeToolRule": "Acest agent aplică o singură regulă tuturor instrumentelor simultan: {{rule}}. Aceste comutatoare sunt doar pentru citire.",
       "visibility": "Vizibilitate",
       "visibilityPrimary": "Primar — afișat în selector",
       "visibilitySubagent": "Subagent — apelabil numai de la alții",
@@ -4115,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Profiluri implicite pentru Repos",
+      "entryLabel": "Profiluri implicite",
       "add": "Adăugați implicit",
       "empty": "Nu sunt configurate implicite",
       "emptyDescription": "Adăugați o valoare prestabilită pentru a aplica automat un profil la pornirea sesiunilor pentru un depozit.",

@@ -2321,7 +2321,7 @@
       "cloningSession": "સત્રની નકલ બની રહી છે",
       "couldNotLoadThisSession": "આ સત્ર લોડ કરી શકાયું નહીં",
       "cloneFailedRetry": "આ સત્રની નકલ બનાવી શકાઈ નહીં. ફરી પ્રયાસ કરો.",
-      "notEnoughCredits": "Cloud Agent ચલાવવા માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરીને ફરી પ્રયાસ કરો.",
+      "notEnoughCredits": "આ વિનંતી માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરીને ફરી પ્રયાસ કરો.",
       "previousTaskFinishing": "પાછલું કાર્ય હજી પૂરું થઈ રહ્યું છે. થોડી રાહ જુઓ.",
       "serviceUnavailable": "સેવા હાલ ઉપલબ્ધ નથી. ફરી પ્રયાસ કરો.",
       "connectionTrouble": "કનેક્શનમાં સમસ્યા છે. થોડી વાર પછી ફરી પ્રયાસ કરો.",
@@ -2483,6 +2483,8 @@
       "toolList": "યાદી બનાવો",
       "toolPatch": "પૅચ લાગુ કરો",
       "toolTask": "કાર્ય",
+      "toolSendFile": "ફાઇલ મોકલી",
+      "toolSendFileAction": "ફાઇલ મોકલો",
       "readTodos": "યોજના વાંચો",
       "updateTodos": "યોજના અપડેટ કરો",
       "linesBadge": "{{displayCount}} પંક્તિઓ",
@@ -2583,7 +2585,21 @@
       "thought": "વિચાર",
       "showDetails": "વિગતો બતાવો",
       "pending": "બાકી છે…",
-      "running": "ચાલી રહ્યું છે…"
+      "running": "ચાલી રહ્યું છે…",
+      "field": {
+        "filePath": "ફાઇલ પાથ",
+        "path": "પાથ",
+        "offset": "ઑફસેટ",
+        "limit": "મર્યાદા",
+        "pattern": "પેટર્ન",
+        "include": "સમાવેશ",
+        "patchText": "પેચ લખાણ",
+        "query": "ક્વેરી",
+        "prompt": "સૂચના",
+        "header": "શીર્ષક",
+        "question": "પ્રશ્ન",
+        "options": "વિકલ્પો"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "સામગ્રી બતાવી શકાઈ નહીં."
@@ -2599,7 +2615,7 @@
       "assistantContextOverflow": "મોડલ માટે વાતચીત ખૂબ લાંબી છે.",
       "assistantProviderError": "પ્રદાતાએ ભૂલ પરત મોકલી.",
       "assistantProviderRefused": "પ્રદાતાએ આ વિનંતી નકારી કાઢી છે અને તેનો ફરી પ્રયાસ કરી શકાતો નથી.",
-      "assistantCreditsRefusal": "Cloud Agent ચલાવવા માટે પૂરતા ક્રેડિટ નથી.",
+      "assistantCreditsRefusal": "આ વિનંતી માટે પૂરતા ક્રેડિટ નથી.",
       "assistantOutputLimit": "જવાબ મોડલની આઉટપુટ મર્યાદા સુધી પહોંચી ગયો.",
       "assistantStructuredOutput": "જવાબ જરૂરી ફોર્મેટ સાથે બંધબેસતો નથી.",
       "assistantFailed": "જવાબ મળી શક્યો નહીં."
@@ -4018,6 +4034,7 @@
       "namePlaceholder": "મારા એજન્ટ",
       "promptPlaceholder": "તમે એક...",
       "tools": "સાધનો",
+      "wholeToolRule": "આ એજન્ટ એક જ સમયે દરેક સાધન પર એક નિયમ લાગુ કરે છે: {{rule}}. આ સ્વિચ ફક્ત વાંચન માટે છે.",
       "visibility": "દૃશ્યતા",
       "visibilityPrimary": "પ્રાથમિક — પીકરમાં બતાવેલ છે",
       "visibilitySubagent": "સબએજન્ટ — ફક્ત અન્ય એજન્ટો પાસેથી કૉલ કરી શકાય છે",
@@ -4059,6 +4076,7 @@
     },
     "repoBindings": {
       "title": "રિપોઝિટરીઓ માટે ડિફૉલ્ટ પ્રોફાઇલ્સ",
+      "entryLabel": "ડિફોલ્ટ પ્રોફાઇલ",
       "add": "ડિફૉલ્ટ ઉમેરો",
       "empty": "કોઈ ડિફૉલ્ટ ગોઠવેલ નથી",
       "emptyDescription": "રિપોઝિટરી માટે સત્રો શરૂ કરતી વખતે આપમેળે પ્રોફાઇલ લાગુ કરવા માટે ડિફૉલ્ટ ઉમેરો.",

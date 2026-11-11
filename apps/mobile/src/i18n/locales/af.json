@@ -2315,7 +2315,7 @@
       "cloningSession": "Sessie word gekloon",
       "couldNotLoadThisSession": "Hierdie sessie kon nie gelaai word nie.",
       "cloneFailedRetry": "Hierdie sessie kon nie gekloon word nie. Probeer weer.",
-      "notEnoughCredits": "Jy het nie genoeg krediete om Cloud Agent te gebruik nie. Voeg krediete by en probeer weer.",
+      "notEnoughCredits": "Jy het nie genoeg krediete vir hierdie versoek nie. Voeg krediete by en probeer weer.",
       "previousTaskFinishing": "Die vorige taak word nog afgehandel. Wag asseblief 'n oomblik.",
       "serviceUnavailable": "Die diens is tans onbeskikbaar. Probeer asseblief weer.",
       "connectionTrouble": "Daar is 'n verbindingsprobleem. Probeer asseblief oor 'n oomblik weer.",
@@ -2477,6 +2477,8 @@
       "toolList": "lys",
       "toolPatch": "pas wysiging toe",
       "toolTask": "taak",
+      "toolSendFile": "Lêer gestuur",
+      "toolSendFileAction": "Stuur lêer",
       "readTodos": "Lees plan",
       "updateTodos": "Werk plan by",
       "linesBadge": "{{displayCount}} reëls",
@@ -2577,7 +2579,21 @@
       "thought": "Gedagte",
       "showDetails": "Wys besonderhede",
       "pending": "Hangende…",
-      "running": "Besig…"
+      "running": "Besig…",
+      "field": {
+        "filePath": "Lêerpad",
+        "path": "Pad",
+        "offset": "Afset",
+        "limit": "Limiet",
+        "pattern": "Patroon",
+        "include": "Insluiting",
+        "patchText": "Wysigingsteks",
+        "query": "Soektog",
+        "prompt": "Aanwysing",
+        "header": "Opskrif",
+        "question": "Vraag",
+        "options": "Keuses"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Die inhoud kon nie vertoon word nie."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Die gesprek is te lank vir die model.",
       "assistantProviderError": "Die verskaffer het 'n fout teruggestuur.",
       "assistantProviderRefused": "Die verskaffer het die versoek geweier en dit kan nie weer probeer word nie.",
-      "assistantCreditsRefusal": "Jy het nie genoeg krediete om Cloud Agent te gebruik nie.",
+      "assistantCreditsRefusal": "Jy het nie genoeg krediete vir hierdie versoek nie.",
       "assistantOutputLimit": "Die antwoord het die model se afvoerlimiet bereik.",
       "assistantStructuredOutput": "Die antwoord het nie aan die vereiste formaat voldoen nie.",
       "assistantFailed": "Die antwoord het misluk."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "My agent",
       "promptPlaceholder": "Jy is 'n...",
       "tools": "Gereedskap",
+      "wholeToolRule": "Hierdie agent pas een reël gelyktydig op alle gereedskap toe: {{rule}}. Hierdie skakelaars is slegs-lees.",
       "visibility": "Sigbaarheid",
       "visibilityPrimary": "Primêr — gewys in die kieser",
       "visibilitySubagent": "Subagent — slegs oproepbaar vanaf ander",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Verstekprofiele vir Repos",
+      "entryLabel": "Verstekprofiele",
       "add": "Voeg verstek by",
       "empty": "Geen verstekke opgestel nie",
       "emptyDescription": "Voeg 'n verstek by om 'n profiel outomaties toe te pas wanneer sessies vir 'n repo begin.",

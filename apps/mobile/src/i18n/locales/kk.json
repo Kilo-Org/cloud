@@ -2315,7 +2315,7 @@
       "cloningSession": "Сессия көшірмесі жасалуда",
       "couldNotLoadThisSession": "Бұл сессияны жүктеу мүмкін болмады.",
       "cloneFailedRetry": "Бұл сессияның көшірмесін жасау мүмкін болмады. Қайталап көріңіз.",
-      "notEnoughCredits": "Cloud Agent қызметін іске қосуға кредит жеткіліксіз. Кредит қосып, қайталап көріңіз.",
+      "notEnoughCredits": "Бұл сұрауға кредит жеткіліксіз. Кредит қосып, қайталап көріңіз.",
       "previousTaskFinishing": "Алдыңғы тапсырма әлі аяқталуда. Сәл күте тұрыңыз.",
       "serviceUnavailable": "Қызмет қазір қолжетімсіз. Қайталап көріңіз.",
       "connectionTrouble": "Байланыста ақау бар. Сәлден кейін қайталап көріңіз.",
@@ -2477,6 +2477,8 @@
       "toolList": "тізімдеу",
       "toolPatch": "түзету енгізу",
       "toolTask": "тапсырма",
+      "toolSendFile": "Файл жіберілді",
+      "toolSendFileAction": "Файл жіберу",
       "readTodos": "Жоспарды оқу",
       "updateTodos": "Жоспарды жаңарту",
       "linesBadge": "{{displayCount}} жол",
@@ -2577,7 +2579,21 @@
       "thought": "Ой",
       "showDetails": "Мәліметтерді көрсету",
       "pending": "Күтілуде…",
-      "running": "Орындалуда…"
+      "running": "Орындалуда…",
+      "field": {
+        "filePath": "Файл жолы",
+        "path": "Жол",
+        "offset": "Ығысу",
+        "limit": "Шектеу",
+        "pattern": "Үлгі",
+        "include": "Қосу",
+        "patchText": "Жамау мәтіні",
+        "query": "Сұраныс",
+        "prompt": "Нұсқау",
+        "header": "Тақырып",
+        "question": "Сұрақ",
+        "options": "Нұсқалар"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Мазмұнды көрсету мүмкін болмады."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Сөйлесу көлемі модельдің шегінен асты.",
       "assistantProviderError": "Провайдер қате қайтарды.",
       "assistantProviderRefused": "Провайдер бұл сұрауды қабылдамады және оны қайталау мүмкін емес.",
-      "assistantCreditsRefusal": "Cloud Agent қызметін іске қосуға кредит жеткіліксіз.",
+      "assistantCreditsRefusal": "Бұл сұрауға кредит жеткіліксіз.",
       "assistantOutputLimit": "Жауап модельдің шығыс шегіне жетті.",
       "assistantStructuredOutput": "Жауап қажетті форматқа сәйкес келмеді.",
       "assistantFailed": "Жауапты жасау мүмкін болмады."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Менің агентім",
       "promptPlaceholder": "Сіз ...",
       "tools": "Құралдар",
+      "wholeToolRule": "Бұл агент барлық құралға бір ережені бірден қолданады: {{rule}}. Бұл қосқыштар тек оқуға арналған.",
       "visibility": "Көріну",
       "visibilityPrimary": "Негізгі — таңдаушыда көрсетіледі",
       "visibilitySubagent": "Субагент — тек басқалардан шақыруға болады",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Репо үшін әдепкі профильдер",
+      "entryLabel": "Әдепкі профильдер",
       "add": "Әдепкі қосу",
       "empty": "Әдепкі параметрлер конфигурацияланбаған",
       "emptyDescription": "Репо сеанстарын бастаған кезде профильді автоматты түрде қолдану үшін әдепкі параметрді қосыңыз.",

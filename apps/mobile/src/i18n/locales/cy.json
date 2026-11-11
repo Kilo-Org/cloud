@@ -2483,7 +2483,7 @@
       "cloningSession": "Yn clonio sesiwn",
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
       "cloneFailedRetry": "Methu clonio'r sesiwn hon. Ceisiwch eto.",
-      "notEnoughCredits": "Nid oes digon o gredydau i redeg Cloud Agent. Ychwanegwch gredydau a cheisiwch eto.",
+      "notEnoughCredits": "Nid oes digon o gredydau ar gyfer y cais hwn. Ychwanegwch gredydau a cheisiwch eto.",
       "previousTaskFinishing": "Nid yw'r dasg flaenorol wedi gorffen eto. Arhoswch am eiliad.",
       "serviceUnavailable": "Nid yw'r gwasanaeth ar gael ar hyn o bryd. Ceisiwch eto.",
       "connectionTrouble": "Mae problem gyda'r cysylltiad. Ceisiwch eto ymhen ychydig.",
@@ -2649,6 +2649,8 @@
       "toolList": "rhestru",
       "toolPatch": "clytio",
       "toolTask": "tasg",
+      "toolSendFile": "Anfonwyd ffeil",
+      "toolSendFileAction": "Anfon ffeil",
       "readTodos": "Darllen y cynllun",
       "updateTodos": "Diweddaru'r cynllun",
       "linesBadge": "{{displayCount}} llinell",
@@ -2761,7 +2763,21 @@
       "thought": "Syniad",
       "showDetails": "Dangos manylion",
       "pending": "Yn aros…",
-      "running": "Yn rhedeg…"
+      "running": "Yn rhedeg…",
+      "field": {
+        "filePath": "Llwybr ffeil",
+        "path": "Llwybr",
+        "offset": "Dadleoliad",
+        "limit": "Terfyn",
+        "pattern": "Patrwm",
+        "include": "Cynnwys",
+        "patchText": "Testun clwt",
+        "query": "Ymholiad",
+        "prompt": "Anogiad",
+        "header": "Pennawd",
+        "question": "Cwestiwn",
+        "options": "Opsiynau"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Methu dangos y cynnwys."
@@ -2777,7 +2793,7 @@
       "assistantContextOverflow": "Mae'r sgwrs yn rhy hir i'r model.",
       "assistantProviderError": "Roedd gwall gan y darparwr.",
       "assistantProviderRefused": "Gwrthododd y darparwr y cais ac ni ellir ei ailgynnig.",
-      "assistantCreditsRefusal": "Nid oes digon o gredydau i redeg Cloud Agent.",
+      "assistantCreditsRefusal": "Nid oes digon o gredydau ar gyfer y cais hwn.",
       "assistantOutputLimit": "Cyrhaeddodd yr ymateb derfyn allbwn y model.",
       "assistantStructuredOutput": "Nid oedd yr ymateb yn cyd-fynd â'r fformat gofynnol.",
       "assistantFailed": "Methodd yr ymateb."
@@ -4260,6 +4276,7 @@
       "namePlaceholder": "Fy Asiant",
       "promptPlaceholder": "Rydych chi'n ...",
       "tools": "Offer",
+      "wholeToolRule": "Mae'r asiant hwn yn cymhwyso un rheol i bob offeryn ar unwaith: {{rule}}. Mae'r switshis hyn yn ddarllen yn unig.",
       "visibility": "Gwelededd",
       "visibilityPrimary": "Cynradd — a ddangosir yn y codwr",
       "visibilitySubagent": "Subagent — dim ond ei alw gan eraill",
@@ -4300,7 +4317,8 @@
       "duplicateName": "Mae gorchymyn gyda'r enw hwn eisoes yn bodoli yn y proffil hwn"
     },
     "repoBindings": {
-      "title": "Proffiliau Rhagosodedig ar gyfer Repos",
+      "title": "Proffiliau rhagosodedig ar gyfer Repos",
+      "entryLabel": "Proffiliau rhagosodedig",
       "add": "Ychwanegu rhagosodiad",
       "empty": "Dim rhagosodiadau wedi'u ffurfweddu",
       "emptyDescription": "Ychwanegu rhagosodiad i gymhwyso proffil yn awtomatig wrth gychwyn sesiynau ar gyfer repo.",

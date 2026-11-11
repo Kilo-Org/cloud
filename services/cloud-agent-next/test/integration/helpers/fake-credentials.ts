@@ -2,6 +2,8 @@
 export const FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN =
   'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
 
+import type { SandboxControlV2 } from '../../../src/control-plane/sandbox/sandbox-do.js';
+
 /**
  * Shared fakes for the B3 credential tests. The git-token-service is a service
  * binding the Miniflare Worker test runtime does not provide, so capability
@@ -63,15 +65,23 @@ export function fakeOutboundContainerId(logicalSandboxId: string): string {
   return FAKE_SANDBOX_CONTAINERS_NAMESPACE.idFromName(logicalSandboxId).toString();
 }
 
-export function installFakeCredentialEnv(
-  target: unknown,
+/**
+ * Installs the fakes a Sandbox DO fixture needs: the credential bindings the
+ * fake-provider suite has no binding for, and a current organization membership
+ * for the gate on organization-attributed grant issuance (the suite has no
+ * Postgres binding). A suite that exercises a denial replaces
+ * `organizationMembershipFor` afterwards.
+ */
+export function installFakeSandboxEnv(
+  instance: Pick<SandboxControlV2, 'env' | 'organizationMembershipFor'>,
   broker: FakeCredentialBroker,
   extra: Record<string, unknown> = {}
 ): void {
-  Object.assign(target as object, {
+  Object.assign(instance.env as object, {
     GIT_TOKEN_SERVICE: broker,
     SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
     WORKER_URL: 'https://worker.example.com',
     ...extra,
   });
+  instance.organizationMembershipFor = async () => true;
 }

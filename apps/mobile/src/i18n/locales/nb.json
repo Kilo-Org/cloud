@@ -2315,7 +2315,7 @@
       "cloningSession": "Kloner økten",
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten.",
       "cloneFailedRetry": "Kunne ikke klone denne økten. Prøv igjen.",
-      "notEnoughCredits": "Du har ikke nok kreditter til å kjøre Cloud Agent. Fyll på kreditter og prøv igjen.",
+      "notEnoughCredits": "Du har ikke nok kreditter til denne forespørselen. Fyll på kreditter og prøv igjen.",
       "previousTaskFinishing": "Den forrige oppgaven er ikke helt avsluttet ennå. Vent et øyeblikk.",
       "serviceUnavailable": "Tjenesten er utilgjengelig akkurat nå. Prøv igjen.",
       "connectionTrouble": "Det er problemer med tilkoblingen. Prøv igjen om et øyeblikk.",
@@ -2477,6 +2477,8 @@
       "toolList": "list opp",
       "toolPatch": "bruk endringer",
       "toolTask": "oppgave",
+      "toolSendFile": "Sendte fil",
+      "toolSendFileAction": "send fil",
       "readTodos": "Les planen",
       "updateTodos": "Oppdater planen",
       "linesBadge": "{{displayCount}} linjer",
@@ -2577,7 +2579,21 @@
       "thought": "Resonnement",
       "showDetails": "Vis detaljer",
       "pending": "Venter…",
-      "running": "Kjører…"
+      "running": "Kjører…",
+      "field": {
+        "filePath": "Filsti",
+        "path": "Sti",
+        "offset": "Forskyvning",
+        "limit": "Grense",
+        "pattern": "Mønster",
+        "include": "Inkludering",
+        "patchText": "Endringstekst",
+        "query": "Søk",
+        "prompt": "Instruks",
+        "header": "Overskrift",
+        "question": "Spørsmål",
+        "options": "Alternativer"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Kunne ikke vise innholdet."
@@ -2593,7 +2609,7 @@
       "assistantContextOverflow": "Samtalen er for lang for modellen.",
       "assistantProviderError": "Leverandøren returnerte en feil.",
       "assistantProviderRefused": "Leverandøren avviste denne forespørselen, og den kan ikke gjentas.",
-      "assistantCreditsRefusal": "Du har ikke nok kreditter til å kjøre Cloud Agent.",
+      "assistantCreditsRefusal": "Du har ikke nok kreditter til denne forespørselen.",
       "assistantOutputLimit": "Svaret nådde utdatagrensen til modellen.",
       "assistantStructuredOutput": "Svaret samsvarte ikke med det påkrevde formatet.",
       "assistantFailed": "Svaret kunne ikke genereres."
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "Agenten min",
       "promptPlaceholder": "Du er en...",
       "tools": "Verktøy",
+      "wholeToolRule": "Denne agenten bruker én regel på alle verktøy samtidig: {{rule}}. Disse bryterne er skrivebeskyttede.",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primær — vist i velgeren",
       "visibilitySubagent": "Subagent — kan kun ringes opp fra andre",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler for Repos",
+      "entryLabel": "Standardprofiler",
       "add": "Legg til standard",
       "empty": "Ingen standardinnstillinger er konfigurert",
       "emptyDescription": "Legg til en standard for automatisk å bruke en profil når du starter økter for en repo.",

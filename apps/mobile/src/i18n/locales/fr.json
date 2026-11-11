@@ -1703,7 +1703,7 @@
       "cloningSession": "Clonage de la session…",
       "couldNotLoadThisSession": "Impossible de charger cette session.",
       "cloneFailedRetry": "Impossible de cloner cette session. Réessayez.",
-      "notEnoughCredits": "Crédits insuffisants pour exécuter Cloud Agent. Ajoutez des crédits et réessayez.",
+      "notEnoughCredits": "Crédits insuffisants pour cette requête. Ajoutez des crédits et réessayez.",
       "previousTaskFinishing": "La tâche précédente se termine. Patientez un instant.",
       "serviceUnavailable": "Le service est indisponible pour le moment. Réessayez.",
       "connectionTrouble": "Problème de connexion. Réessayez dans un instant.",
@@ -1866,6 +1866,8 @@
       "toolList": "lister",
       "toolPatch": "appliquer un correctif",
       "toolTask": "tâche",
+      "toolSendFile": "Fichier envoyé",
+      "toolSendFileAction": "envoyer le fichier",
       "readTodos": "Lire le programme",
       "updateTodos": "Mettre à jour le programme",
       "linesBadge": "{{displayCount}} lignes",
@@ -1969,7 +1971,21 @@
       "thought": "Réflexion",
       "showDetails": "Afficher les détails",
       "pending": "En attente…",
-      "running": "En cours…"
+      "running": "En cours…",
+      "field": {
+        "filePath": "Chemin du fichier",
+        "path": "Chemin",
+        "offset": "Décalage",
+        "limit": "Limite",
+        "pattern": "Motif",
+        "include": "Inclusion",
+        "patchText": "Texte correctif",
+        "query": "Requête",
+        "prompt": "Consigne",
+        "header": "En-tête",
+        "question": "Question",
+        "options": "Options"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Impossible d'afficher le contenu."
@@ -1985,7 +2001,7 @@
       "assistantContextOverflow": "La conversation est trop longue pour le modèle.",
       "assistantProviderError": "Le fournisseur a renvoyé une erreur.",
       "assistantProviderRefused": "Le fournisseur a refusé cette requête et aucune nouvelle tentative n'est possible.",
-      "assistantCreditsRefusal": "Crédits insuffisants pour exécuter Cloud Agent.",
+      "assistantCreditsRefusal": "Crédits insuffisants pour cette requête.",
       "assistantOutputLimit": "La réponse a atteint la limite de sortie du modèle.",
       "assistantStructuredOutput": "La réponse ne correspondait pas au format requis.",
       "assistantFailed": "La génération de la réponse a échoué."
@@ -4080,6 +4096,7 @@
       "namePlaceholder": "Mon agent",
       "promptPlaceholder": "Vous êtes un...",
       "tools": "Outils",
+      "wholeToolRule": "Cet agent applique une règle à tous les outils à la fois : {{rule}}. Ces interrupteurs sont en lecture seule.",
       "visibility": "Visibilité",
       "visibilityPrimary": "Primaire — affiché dans le sélecteur",
       "visibilitySubagent": "Sous-agent — appelable uniquement par d'autres",
@@ -4121,6 +4138,7 @@
     },
     "repoBindings": {
       "title": "Profils par défaut pour les dépôts",
+      "entryLabel": "Profils par défaut",
       "add": "Ajouter une valeur par défaut",
       "empty": "Aucune valeur par défaut configurée",
       "emptyDescription": "Ajoutez une valeur par défaut pour appliquer automatiquement un profil lors du démarrage des sessions pour un dépôt.",

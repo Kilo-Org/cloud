@@ -1777,7 +1777,7 @@
       "cloningSession": "正在克隆会话",
       "couldNotLoadThisSession": "无法加载此会话",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
-      "notEnoughCredits": "额度不足，无法运行 Cloud Agent。请充值后重试。",
+      "notEnoughCredits": "额度不足，无法处理此请求。请充值后重试。",
       "previousTaskFinishing": "上一个任务正在收尾，请稍等。",
       "serviceUnavailable": "服务当前不可用。请重试。",
       "connectionTrouble": "连接出现问题。请稍后重试。",
@@ -1939,6 +1939,8 @@
       "toolList": "列出目录",
       "toolPatch": "应用补丁",
       "toolTask": "任务",
+      "toolSendFile": "已发送文件",
+      "toolSendFileAction": "发送文件",
       "readTodos": "读取计划",
       "updateTodos": "更新计划",
       "linesBadge": "{{displayCount}} 行",
@@ -2039,7 +2041,21 @@
       "thought": "思考过程",
       "showDetails": "显示详情",
       "pending": "待处理……",
-      "running": "正在运行……"
+      "running": "正在运行……",
+      "field": {
+        "filePath": "文件路径",
+        "path": "路径",
+        "offset": "偏移量",
+        "limit": "上限",
+        "pattern": "模式",
+        "include": "包含",
+        "patchText": "补丁文本",
+        "query": "查询",
+        "prompt": "提示词",
+        "header": "标题",
+        "question": "问题",
+        "options": "选项"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "无法显示内容。"
@@ -2055,7 +2071,7 @@
       "assistantContextOverflow": "对话长度已超出模型的处理范围。",
       "assistantProviderError": "提供商返回了错误。",
       "assistantProviderRefused": "提供商拒绝了该请求，且无法重试。",
-      "assistantCreditsRefusal": "额度不足，无法运行 Cloud Agent。",
+      "assistantCreditsRefusal": "额度不足，无法处理此请求。",
       "assistantOutputLimit": "回复已达到模型的输出上限。",
       "assistantStructuredOutput": "回复与所需格式不匹配。",
       "assistantFailed": "生成回复失败。"
@@ -4012,6 +4028,7 @@
       "namePlaceholder": "我的代理",
       "promptPlaceholder": "你是一个...",
       "tools": "工具",
+      "wholeToolRule": "此智能体会同时对每个工具应用一条规则：{{rule}}。这些开关为只读状态。",
       "visibility": "可见性",
       "visibilityPrimary": "主代理 — 显示在选择器中",
       "visibilitySubagent": "子代理 — 仅可由其他代理调用",
@@ -4053,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "仓库的默认配置文件",
+      "entryLabel": "默认配置",
       "add": "添加默认值",
       "empty": "没有配置默认值",
       "emptyDescription": "添加默认值以在启动仓库会话时自动应用配置文件。",

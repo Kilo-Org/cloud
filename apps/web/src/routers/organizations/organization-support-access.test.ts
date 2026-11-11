@@ -16,7 +16,10 @@ afterEach(async () => {
   await db.delete(support_access_grants);
 });
 
-async function adminWithGrant(actionClass: 'support_read' | 'support_write' = 'support_read') {
+async function adminWithGrant(
+  actionClass: 'support_read' | 'support_write' = 'support_read',
+  accountState: { blocked_at?: string | null } = {}
+) {
   const owner = await insertTestUser({ is_admin: false });
   const organization = await createTestOrganization(
     `support-callsite-${crypto.randomUUID()}`,
@@ -25,6 +28,7 @@ async function adminWithGrant(actionClass: 'support_read' | 'support_write' = 's
   );
   const admin = await insertTestUser({
     is_admin: true,
+    ...accountState,
   });
   const now = new Date();
   await db.insert(support_access_grants).values({
@@ -69,5 +73,17 @@ describe('allowlisted support read call sites', () => {
     await expect(
       caller.organizations.bitbucket.getStatus({ organizationId: organization.id })
     ).resolves.toBeDefined();
+  });
+
+  test('a support read admits only an available admin account', async () => {
+    enableSupportAccess(true);
+    const { admin, organization } = await adminWithGrant('support_read', {
+      blocked_at: new Date().toISOString(),
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.organizations.usageStats({ organizationId: organization.id })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

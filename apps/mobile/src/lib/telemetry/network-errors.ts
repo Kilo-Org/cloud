@@ -387,6 +387,16 @@ function failureIdentity(
  */
 const reportedNetworkErrors = new Set<string>();
 
+/**
+ * The most fingerprints one process remembers. A `source: 'fetch'` key holds
+ * the normalized path, which keeps a dynamic segment (`/v1/files/<id>`), and
+ * the wrapper covers every non-tRPC URL, so a long-lived process could grow the
+ * set with each distinct failing path. Past the cap the oldest claim is
+ * released first: a late repeat of that fingerprint files once more, which is
+ * bounded and rare, while a new defect still files its first event.
+ */
+const MAX_REPORTED_NETWORK_ERRORS = 200;
+
 /** Test seam: forget the process's network-error reports. */
 export function resetNetworkErrorReports(): void {
   reportedNetworkErrors.clear();
@@ -404,6 +414,13 @@ function claimNetworkErrorReport(fingerprint: readonly string[]): boolean {
   const key = JSON.stringify(fingerprint);
   if (reportedNetworkErrors.has(key)) {
     return false;
+  }
+  while (reportedNetworkErrors.size >= MAX_REPORTED_NETWORK_ERRORS) {
+    const oldest = reportedNetworkErrors.values().next();
+    if (oldest.done === true) {
+      break;
+    }
+    reportedNetworkErrors.delete(oldest.value);
   }
   reportedNetworkErrors.add(key);
   return true;

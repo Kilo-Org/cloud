@@ -980,6 +980,39 @@ describe('reportNetworkError', () => {
     expect(breadcrumbs).toHaveLength(2);
   });
 
+  it('bounds the claim set and keeps filing a new endpoint past the cap', () => {
+    const report = (index: number) => {
+      reportNetworkError({
+        source: 'fetch',
+        url: `https://example.com/v1/files/${String(index)}`,
+        durationMs: 2,
+      });
+    };
+
+    // A dynamic path segment forces one fingerprint per object id; the set
+    // remembers the newest 200.
+    for (let index = 0; index <= 200; index += 1) {
+      report(index);
+    }
+
+    expect(events).toHaveLength(201);
+    expect(events.at(-1)?.fingerprint).toEqual([
+      'network-error',
+      'fetch',
+      '/v1/files/200',
+      'failed',
+    ]);
+
+    // A remembered fingerprint stays claimed.
+    report(200);
+    expect(events).toHaveLength(201);
+    expect(breadcrumbs).toHaveLength(1);
+
+    // The oldest claim was released, so the set cannot grow without limit.
+    report(0);
+    expect(events).toHaveLength(202);
+  });
+
   it('synthesizes a failure message without a status', () => {
     reportNetworkError({
       source: 'fetch',

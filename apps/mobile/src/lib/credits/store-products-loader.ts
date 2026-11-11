@@ -159,11 +159,7 @@ export class StoreCreditProductsError extends Error {
     this.name = 'StoreCreditProductsError';
     this.key = key;
     this.diagnostics = diagnostics;
-    this[TELEMETRY_DESCRIPTION_KEY] = StoreCreditProductsError.telemetry(
-      key,
-      diagnostics,
-      cause
-    );
+    this[TELEMETRY_DESCRIPTION_KEY] = StoreCreditProductsError.telemetry(key, diagnostics, cause);
   }
 
   private static telemetry(

@@ -83,8 +83,19 @@ jobs:
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate
 
+  # Both Vercel staging deploys start as soon as check-changes publishes the
+  # SHAs, beside the database gate, which is how deploy-production.yml already
+  # starts its stage jobs. A custom environment cannot separate the build from
+  # the traffic switch: `vercel deploy --target=staging` publishes at build
+  # success, vercel@59.5.0 rejects `--skip-domain` for any target other than
+  # production, and its only promote path targets production. So staging code can
+  # become reachable while db-gate is still migrating. The measured deploy runs
+  # far longer than the gate, so the gate normally finishes first; the window
+  # exists only while a migration outlasts the deploy, bounded by the gate's
+  # timeout. A failed migration still fails db-gate, which stops the Worker
+  # deploy and the release record below.
   deploy-app:
-    needs: [check-changes, db-gate]
+    needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
@@ -96,7 +107,7 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   deploy-ai-gateway:
-    needs: [check-changes, db-gate]
+    needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml

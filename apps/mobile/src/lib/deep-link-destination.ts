@@ -12,7 +12,7 @@
 
 import { parseKiloWebPath } from '@kilocode/app-shared/universal-links';
 
-import { isPlausibleKiloSessionId } from './session-id-shape';
+import { isAddressableStoredSessionId } from './session-id-shape';
 import {
   APP_SCHEME,
   canonicalSystemSearchId,
@@ -47,19 +47,22 @@ const SESSION_FAMILY_PREFIX = deeplinkPathFromHref(SESSION_HREF_PREFIX);
 /**
  * Whether a universal-link destination opens something the app can show. Every
  * row but the session row names a fixed screen; the session row accepts any
- * capture, so its capture has to be the composer's `new` or an id this app can
- * prove openable. A link is the one entry point that is not tied to a row the
- * store issued, so it keeps the canonical `isPlausibleKiloSessionId` rule: an
- * unrecognized capture opens nothing and never replaces the visible screen.
- * (The session route itself accepts every id the store can hold, because a
- * stored row can carry an id minted before the canonical shape.)
+ * capture, so its capture has to be the composer's `new` or an id the session
+ * route can address. A session link can be built on one device and arrive on
+ * another, so it keeps the store's own id rule (`isAddressableStoredSessionId`,
+ * the rule the session route and the server read apply) instead of the
+ * canonical shape: an id minted before that shape still names a stored session,
+ * and a link must never be refused by a rule stricter than the route that would
+ * open it. The app cannot prove from the id alone that the session exists, so a
+ * capture the store cannot address opens nothing, and any other capture reaches
+ * the route, whose denial shows the not-found state.
  */
 export function opensDestination(href: string): boolean {
   if (!href.startsWith(SESSION_HREF_PREFIX)) {
     return true;
   }
   const capture = href.slice(SESSION_HREF_PREFIX.length);
-  return capture === NEW_SESSION_CAPTURE || isPlausibleKiloSessionId(capture);
+  return capture === NEW_SESSION_CAPTURE || isAddressableStoredSessionId(capture);
 }
 
 /**

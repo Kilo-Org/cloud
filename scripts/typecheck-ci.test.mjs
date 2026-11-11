@@ -1680,24 +1680,25 @@ test('the ci-wiring job installs its closure in one pass', () => {
 });
 
 // The measured per-job install share of wall time keeps a narrowing above one
-// tenth of the job it saves: the mobile-test shards, `mobile-lint` and
-// `check-unused` clear that bar, and `mobile-typecheck`'s sample run does not,
-// so it keeps the whole workspace for now. When a measurement moves a job over
-// the bar, name it here; a step that starts importing another workspace widens
-// its job's filter, and no job restores the full install to hide an undeclared
-// import. Dependency postinstalls stay enabled across these jobs.
+// tenth of the job it saves: `mobile-typecheck`'s install step is the only step
+// the narrowing changes, and on the project's CI runs it costs well over a tenth
+// of that job, so the job installs the app closure too. When a measurement moves
+// a job below the bar, name it here; a step that starts importing another
+// workspace widens its job's filter, and no job restores the full install to
+// hide an undeclared import. Dependency postinstalls stay enabled across these
+// jobs.
 const appClosureInstall =
   "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
 
 test('the kilo-app CI consumers install the app closure', () => {
-  // The producer jobs install their own build closure, and `mobile-typecheck`
-  // keeps the whole workspace until its measured saving clears the bar; every
-  // other install in this workflow is the app's.
+  // The producer jobs install their own build closure; every other install in
+  // this workflow is the app's, including the typecheck job's: its only program
+  // resolves the app's sources and its workspace dependencies' declarations,
+  // and the two built trees it reads arrive as artifacts.
   const consumerJobs = Object.entries(kiloAppJobs)
     .filter(
       ([name, job]) =>
         !name.startsWith('prepare') &&
-        name !== 'mobile-typecheck' &&
         (job.steps ?? []).some(step => /^pnpm install --frozen-lockfile\b/.test(step.run ?? ''))
     )
     .map(([name]) => name);
@@ -1711,7 +1712,7 @@ test('the kilo-app CI consumers install the app closure', () => {
   }
   assert.deepEqual(
     consumerJobs,
-    ['mobile-lint', 'check-unused', 'mobile-test'],
+    ['mobile-typecheck', 'mobile-lint', 'check-unused', 'mobile-test'],
     'the app closure covers the measured consumer installs and leaves the others alone'
   );
 });

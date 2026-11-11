@@ -48,8 +48,15 @@ export type CodeReviewDispatchBilling =
       skipBalanceCheck: true;
       reason: 'free_model' | 'byok' | 'sponsored_organization';
     }
+  /**
+   * The organization's shared-services Claude connection must be reconnected by
+   * an owner. Routing refuses every request for the review model until it is,
+   * so no balance and no sponsorship runs the review.
+   */
+  | { skipBalanceCheck: false; reconnectRequired: true }
   | {
       skipBalanceCheck: false;
+      reconnectRequired: false;
       canAfford: boolean;
       balanceMicrodollars: number;
     };
@@ -124,6 +131,9 @@ export async function resolveCodeReviewDispatchBilling(params: {
       organizationId,
       includeSharedServicesConnection: true,
     });
+    if (eligibility.reconnectRequired === 'claude_billing') {
+      return { skipBalanceCheck: false, reconnectRequired: true };
+    }
     if (!eligibility.isFree && !eligibility.hasUserByokAvailable) {
       everyModelExempt = false;
       break;
@@ -150,7 +160,12 @@ export async function resolveCodeReviewDispatchBilling(params: {
 
   const user = await loadPayerUser(params.owner);
   if (!user) {
-    return { skipBalanceCheck: false, canAfford: false, balanceMicrodollars: 0 };
+    return {
+      skipBalanceCheck: false,
+      reconnectRequired: false,
+      canAfford: false,
+      balanceMicrodollars: 0,
+    };
   }
 
   const balanceMicrodollars = await loadEffectiveBalanceMicrodollars({
@@ -159,6 +174,7 @@ export async function resolveCodeReviewDispatchBilling(params: {
   });
   return {
     skipBalanceCheck: false,
+    reconnectRequired: false,
     canAfford: balanceMicrodollars >= MIN_CODE_REVIEW_BALANCE_MICRODOLLARS,
     balanceMicrodollars,
   };

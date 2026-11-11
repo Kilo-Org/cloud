@@ -258,8 +258,27 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,
         hasUserByokAvailable: false,
+        reconnectRequired: 'claude_billing',
       });
       expect(mockResolveClaudeBillingConnector).toHaveBeenCalledWith('connector', fakeDb);
+    });
+
+    it('reports the reconnect requirement for a shared-services link before a member link', async () => {
+      // Routing tries the shared link first, so a member's own link does not keep
+      // the model billable while the shared link needs a reconnect.
+      mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
+        owner.kind === 'shared_services'
+          ? { status: 'connected', created_by: 'connector' }
+          : { status: 'connected', created_by: 'member' }
+      );
+      mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'gone' });
+
+      expect(await eligibility(true, 'org-1')).toEqual({
+        isFree: false,
+        hasUserByokAvailable: false,
+        reconnectRequired: 'claude_billing',
+      });
+      expect(mockResolveClaudeBillingConnector).toHaveBeenCalledTimes(1);
     });
 
     it('counts a shared-services link whose recorded connector still resolves', async () => {

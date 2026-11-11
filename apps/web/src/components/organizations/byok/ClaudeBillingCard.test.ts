@@ -143,7 +143,7 @@ describe('ClaudeBillingCardView', () => {
 
     expect(html).toContain('Reconnect required');
     expect(html).not.toContain('>Linked<');
-    expect(html).toContain('is no longer a member');
+    expect(html).toContain('is no longer available');
     expect(
       buttons({
         status: status('reconnect_required'),
@@ -160,7 +160,7 @@ describe('ClaudeBillingCardView', () => {
       scope: 'shared_services',
     });
     expect(html).toContain('Reconnect required');
-    expect(html).toContain('is no longer a member');
+    expect(html).toContain('is no longer available');
     expect(html).toContain(
       'Ask a Kilo organization owner or admin to manage Claude shared services.'
     );

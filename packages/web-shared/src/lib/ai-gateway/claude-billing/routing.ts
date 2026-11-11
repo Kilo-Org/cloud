@@ -27,12 +27,15 @@ export const CLAUDE_BILLING_REQUIRED_MESSAGE =
   'Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/connected-platforms.';
 
 /**
- * Shown when the person who linked an organization's shared-services connection
- * is gone. The connection belongs to the organization, so an owner reconnects it
- * instead of losing it.
+ * Shown when the account that linked an organization's shared-services
+ * connection is gone: the account row is missing, the account is soft-deleted or
+ * being deleted, or it holds no usable email. The copy names that condition
+ * instead of an organization membership, which routing never checks. The
+ * connection belongs to the organization, so an owner reconnects it instead of
+ * losing it.
  */
 export const CLAUDE_BILLING_RECONNECT_MESSAGE =
-  'The person who linked Claude billing for this organization is no longer a member, so shared services cannot bill through it.';
+  'The account that linked Claude billing for this organization is no longer available, so shared services cannot bill through it.';
 
 const ANTHROPIC_VERSION = '2023-06-01';
 /** Marks a request as authenticated by an OAuth token rather than an API key. */

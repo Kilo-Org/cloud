@@ -108,7 +108,7 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
 
 function refusalMessage(status: ClaudeBillingStatus) {
   if (status.state === 'reconnect_required') {
-    return 'The person who linked Claude billing for this organization is no longer a member. An organization owner must reconnect Claude billing before Kilo shared services can bill this organization again.';
+    return 'The account that linked Claude billing for this organization is no longer available. An organization owner must reconnect Claude billing before Kilo shared services can bill this organization again.';
   }
   if (status.state === 'billing_unavailable') {
     return 'Claude billing is unavailable. The link may have ended, the Claude organization may be ineligible, or Kilo may have an authentication problem. Check Claude Console, link it again if needed, or contact Kilo support.';

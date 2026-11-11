@@ -856,11 +856,11 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLink()).toBeNull();
     });
 
-    it('does not capture a session link whose capture cannot open', () => {
+    it('does not capture a session link whose capture cannot address a session', () => {
       // The slot is the layout's only navigation input, so capturing a
-      // destination that resolves to the composer would replace the restored
-      // screen with it on the next launch.
-      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/not-a-real-session');
+      // destination the session route can never read would replace the
+      // restored screen with it on the next launch.
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses:1');
       captureLaunchDeepLink();
       expect(getPendingDeepLink()).toBeNull();
 

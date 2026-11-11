@@ -75,9 +75,11 @@ export function redirectSystemPath({
     }
     const { href, anchorMessageId } = resume;
     // A table route that cannot open its destination is not a link either: the
-    // session row accepts any capture, and the session route answers an id that
-    // can never be a session with the composer, which is not what the link
-    // named and not a reason to leave the current screen.
+    // session row accepts any capture, and a capture the session store cannot
+    // address names no session screen, so following it would replace the
+    // current screen with one that cannot exist. A capture the store CAN
+    // address is followed even though it may not resolve: the route owns that
+    // answer and shows its not-found state.
     if (!opensDestination(href)) {
       return null;
     }

@@ -74,30 +74,6 @@ const turns = asMessages({
 type AssistantFailure = NonNullable<Extract<StoredMessage['info'], { role: 'assistant' }>['error']>;
 
 /**
- * The gateway's answer to a paid request from an account that cannot pay it:
- * status 402 with its named credit block in the body
- * (`usageLimitExceededResponse` in packages/web-shared). This is the failure
- * the row states as the credits copy beside Add credits.
- */
-const CREDITS_REFUSAL: AssistantFailure = {
-  name: 'APIError',
-  data: {
-    message: 'Add credits to continue, or switch to a free model',
-    statusCode: 402,
-    isRetryable: false,
-    responseBody: JSON.stringify({
-      error: {
-        title: 'Paid Model - Credits Required',
-        message: 'Add credits to continue, or switch to a free model',
-        balance: 0,
-        buyCreditsUrl: 'https://app.kilo.ai/profile',
-      },
-      error_type: 'usage_limit_exceeded',
-    }),
-  },
-};
-
-/**
  * The turn the provider refused: a contentless assistant row carrying the
  * gateway's verdict for the failure. A retryable one (the default) is what the
  * transcript shows after a transient upstream failure, and its row draws the
@@ -138,7 +114,6 @@ function failedAnswerWith(error: AssistantFailure): StoredMessage {
 
 const retryableMessages = [...turns, failedAnswer(true)];
 const terminalMessages = [...turns, failedAnswer(false)];
-const creditsMessages = [...turns, failedAnswerWith(CREDITS_REFUSAL)];
 
 /**
  * The question whose answer failed, drawn the way the chat screen draws it: the
@@ -208,22 +183,14 @@ const ignoreCopy = (): void => undefined;
 const ignoreAddCredits = (): void => undefined;
 
 /**
- * The failure the fixture draws: the retryable answer, the terminal one, the one
- * the account's balance caused for the answer, the one it refused to send, or
- * the asked question's.
+ * The failure the fixture draws: the retryable answer, the terminal one, the
+ * one the account's balance refused to send, or the asked question's.
  */
-type FixtureFailure =
-  | 'retryable'
-  | 'terminal'
-  | 'credits'
-  | 'creditsDelivery'
-  | 'execution'
-  | 'undelivered';
+type FixtureFailure = 'retryable' | 'terminal' | 'creditsDelivery' | 'execution' | 'undelivered';
 
 const MESSAGES_BY_FAILURE = {
   retryable: retryableMessages,
   terminal: terminalMessages,
-  credits: creditsMessages,
   creditsDelivery: creditsDeliveryMessages,
   execution: executionFailureMessages,
   undelivered: turns,

@@ -579,9 +579,9 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
       assert.match(production.jobs[job].if, new RegExp(`needs\\.${dependency}\\.result`));
     }
   }
-  // Staging Workers read nothing from the Vercel jobs, so they start with them
-  // after the gate and the matrix lookup; record-deployment below still requires
-  // all three.
+  // Staging Workers read nothing the Vercel staging deploys produce, so they
+  // start with the gate and the matrix lookup rather than with those deploys,
+  // which now start earlier; record-deployment below still requires all three.
   assert.deepEqual(staging.jobs['deploy-workers'].needs, [
     'check-changes',
     'db-gate',

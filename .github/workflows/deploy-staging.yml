@@ -131,8 +131,8 @@ jobs:
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
       target_environment: staging
 
-  # The Worker deploy reads only the gate and the matrix above, so it starts with
-  # the two Vercel staging deploys instead of after them. record-deployment still
+  # The Worker deploy waits for the gate and the matrix above; the two Vercel
+  # staging deploys start earlier, beside the gate. record-deployment still
   # requires every one of the three.
   deploy-workers:
     needs: [check-changes, db-gate, detect-workers]

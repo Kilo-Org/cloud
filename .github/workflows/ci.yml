@@ -1079,10 +1079,10 @@ jobs:
         run: pnpm run dependency-cycle-check
 
   # Required check. A skipped job (nothing relevant changed) passes; a failed
-  # or cancelled job fails this one. Besides the web tests it covers the
-  # workspace tests, the dependency cycle check, drizzle-check, harness-sdk, the
-  # plugin contract checks and the ai-gateway builds, which have no required
-  # check of their own.
+  # or cancelled job fails this one. Besides the web tests it covers the web
+  # production build, the workspace tests, the dependency cycle check,
+  # drizzle-check, harness-sdk, the plugin contract checks and the ai-gateway
+  # builds, which have no required check of their own.
   test:
     needs:
       - changes
@@ -1096,6 +1096,7 @@ jobs:
       - harness-sdk
       - mobile-diagram-host
       - session-sync-postgres
+      - build
       - build-ai-gateway
       - build-ai-gateway-secure-proxy
     if: ${{ !cancelled() }}

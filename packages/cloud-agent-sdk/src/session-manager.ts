@@ -3889,11 +3889,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // hit the generation guard and return without clearing these atoms.
     store.set(isLoadingOlderMessagesAtom, false);
     store.set(olderMessagesErrorAtom, null);
-    // The pages a terminal older-page failure described are gone with the
-    // transcript, so the latch must not outlive them: clearAllAtoms resets it
-    // for the same reason. The cursor is null here, so this cannot cause a
-    // fetch on its own.
-    olderMessagesTerminal = false;
     olderMessagesInFlight = null;
     loadOlderGeneration += 1;
     store.set(transcriptClearedAtom, true);

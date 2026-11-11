@@ -617,8 +617,10 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   real admission outcome.
 - **No fallback.** A failed snapshot start stops that container and retries the same snapshot once
   within the original deadline. A permanent reason (expired, missing, image mismatch, provenance, or a
-  provider that started the image instead) fails at once. The route then fails with "Rebuild
-  environment"; the image is never launched. A wrapper that connected during the launch receives no
+  provider that started the image instead) fails at once and asks to rebuild the environment.
+  A repeated transient failure asks to send the message again, and to rebuild only if the failure
+  repeats. Neither failure allows the session to continue from the base image.
+  A wrapper that connected during the launch receives no
   preparation until the launch reports how the container started. A failure never changes the
   published snapshot.
 - **No legacy capture.** A wrapper that predates this change may still send `workspace.capture`;

@@ -1,4 +1,5 @@
 import { withTimeout } from '@kilocode/worker-utils';
+import { workspaceFailureUserMessage } from '@kilocode/worker-utils/cloud-agent-failure';
 import type { EnvironmentBuild } from '../../environment-build/environment-build-do.js';
 import type { SnapshotResolution } from '../../environment-build/coordinator.js';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../../environment-build/reference.js';
 import type { BuildState } from '../../environment-build/sqlite-schema.js';
 import type { ProviderSnapshotStart } from '../../sandbox-control/provider.js';
+import type { SnapshotStartFailureReason } from '../../sandbox-containers/snapshot-start-failures.js';
 import {
   environmentWorkspaceDirectory,
   ISOLATED_CONTAINER_WORKSPACE_PATH,
@@ -180,6 +182,7 @@ export type EnvironmentSnapshotDecision =
 // failure reasons in the control plane and diagnostics.
 export const ENVIRONMENT_SNAPSHOT_MESSAGES = {
   rebuild: 'Environment snapshot is unavailable. Rebuild the environment.',
+  startFailed: `${workspaceFailureUserMessage('environment_snapshot_required')}. Send the message again to retry. Rebuild the environment only if this failure repeats.`,
   retry: 'Environment snapshot is temporarily unavailable. Try again.',
   unsupported: 'Environment snapshots are not supported for this session.',
   newSession: 'This session cannot use the environment snapshot. Start a new session.',
@@ -362,14 +365,38 @@ function blockedLookup(
 /** The final state after a required environment snapshot start failed and was not retried again. */
 export function environmentSnapshotStartBlock(
   candidate: EnvironmentLaunchCandidate,
-  buildId: string | null
+  buildId: string | null,
+  failureReason: SnapshotStartFailureReason = 'transient'
 ): EnvironmentSnapshotBlock {
-  return {
-    reason: 'environment_snapshot_start_failed',
-    detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
-    environmentId: candidate.reference.environmentId,
-    buildId,
-  };
+  const block = { environmentId: candidate.reference.environmentId, buildId };
+  switch (failureReason) {
+    case 'expired':
+      return {
+        ...block,
+        reason: 'environment_snapshot_expired',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
+      };
+    case 'image_mismatch':
+    case 'provenance':
+    case 'unsupported':
+      return {
+        ...block,
+        reason: 'environment_snapshot_incompatible',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
+      };
+    case 'missing':
+      return {
+        ...block,
+        reason: 'environment_snapshot_unavailable',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
+      };
+    case 'transient':
+      return {
+        ...block,
+        reason: 'environment_snapshot_start_failed',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.startFailed,
+      };
+  }
 }
 /**
  * The startup source for an environment session. An environment with build

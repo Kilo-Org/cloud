@@ -186,6 +186,7 @@ function createFakeProvider(
     vercel?: boolean;
     events?: string[];
     stopResult?: StopResult;
+    stopError?: Error;
     stopDelayMs?: number;
   } = {}
 ): FakeProvider {
@@ -240,7 +241,15 @@ function createFakeProvider(
       const launchIndex = provider.launchEnvs.length;
       provider.launchEnvs.push({ ...launchEnv });
       provider.launchCommands.push(command);
-      const { deadlineAt, ...recordedOptions } = launchOptions ?? {};
+      const { deadlineAt, snapshotDiagnostic, ...recordedOptions } = launchOptions ?? {};
+      if (snapshotDiagnostic) {
+        expect(snapshotDiagnostic).toMatchObject({
+          allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID,
+          source: 'environment',
+          attempt: expect.any(Number),
+          startedAt: expect.any(Number),
+        });
+      }
       provider.launchOptions.push(launchOptions === undefined ? undefined : recordedOptions);
       provider.launchDeadlines.push(deadlineAt);
       provider.launchRefs.push(ref);
@@ -269,6 +278,7 @@ function createFakeProvider(
     },
     async stop(ref) {
       provider.stopRefs.push(ref);
+      if (options.stopError) throw options.stopError;
       if (options.stopDelayMs) {
         await new Promise(resolve => setTimeout(resolve, options.stopDelayMs));
       }
@@ -512,7 +522,8 @@ describe('environment snapshot launch', () => {
     expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'failed')).toBe(false);
   });
 
-  it('fails with "Rebuild the environment" after a repeated transient failure, without an image launch', async () => {
+  it('offers a message retry after a repeated transient failure, without an image launch', async () => {
+    const fields = vi.spyOn(logger, 'withFields');
     const provider = createFakeProvider({
       launches: [
         { startSource: 'repository', snapshotFailed: true, snapshotFailureReason: 'transient' },
@@ -528,9 +539,65 @@ describe('environment snapshot launch', () => {
       provider.launchOptions.every(options => options?.snapshot?.snapshotId === 'snap-env')
     ).toBe(true);
     expect(environmentSnapshotDetails(peer).at(-1)).toBe(
-      'Environment snapshot is unavailable. Rebuild the environment.'
+      'Sandbox could not start from the environment snapshot. Send the message again to retry. Rebuild the environment only if this failure repeats.'
     );
     expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed');
+    expect(fields.mock.calls.map(([record]) => record)).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'snapshot_start_blocked',
+        failureStage: 'provider_snapshot',
+        reason: 'environment_snapshot_start_failed',
+        attempt: 2,
+        source: 'environment',
+      })
+    );
+  });
+
+  it.each([
+    {
+      name: 'unconfirmed stop',
+      stopError: undefined,
+      errorName: 'none',
+      cause: 'stop_not_confirmed',
+    },
+    {
+      name: 'rejected stop',
+      stopError: new TypeError('provider stop rejected'),
+      errorName: 'TypeError',
+      cause: 'provider_stop_rejected',
+    },
+  ])('records a $name without changing the route failure or launching again', async scenario => {
+    const fields = vi.spyOn(logger, 'withFields');
+    const provider = createFakeProvider({
+      launches: [new TypeError('provider rejected start')],
+      stopResult: 'retryable',
+      stopError: scenario.stopError,
+    });
+    const { stub, peer } = await setup('sbx__repo_retry_stop_failed', provider);
+    await stub.prepare(prepareInput(BUILD));
+    await waitForFailed(peer);
+    expect(provider.launchEnvs).toHaveLength(1);
+    const records = fields.mock.calls.map(([record]) => record);
+    expect(records.filter(record => record.diagnosticEvent === 'snapshot_launch_failed')).toEqual([
+      expect.objectContaining({
+        source: 'environment',
+        failureStage: 'retry_stop',
+        reason: 'stop_failed',
+        errorName: scenario.errorName,
+        cause: scenario.cause,
+        launchErrorName: 'TypeError',
+        launchCause: 'provider_rejected_start',
+        attempt: 1,
+      }),
+    ]);
+    expect(records.filter(record => record.diagnosticEvent === 'snapshot_start_blocked')).toEqual([
+      expect.objectContaining({
+        reason: 'environment_snapshot_start_failed',
+        failureStage: 'retry_stop',
+        errorName: scenario.errorName,
+        cause: scenario.cause,
+      }),
+    ]);
   });
 
   it.each([
@@ -549,6 +616,10 @@ describe('environment snapshot launch', () => {
     await stub.prepare(prepareInput(BUILD));
     await waitForFailed(peer);
     expect(provider.launchEnvs).toHaveLength(1);
+    expect(environmentSnapshotDetails(peer).at(-1)).toBe(
+      'Environment snapshot is unavailable. Rebuild the environment.'
+    );
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed');
   });
 
   it('holds preparation for an early hello until the snapshot launch reports its source', async () => {

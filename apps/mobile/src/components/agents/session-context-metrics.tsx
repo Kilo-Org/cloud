@@ -187,39 +187,47 @@ export function SessionContextMetrics({
   // The reserve: a zero-height copy of the widest reading the pill can show. Its
   // width decides the box; it paints nothing, and its own height is clipped so
   // it never adds to the pill's.
-  const reservedBox = (
-    <View className="h-[44px] shrink min-w-0 items-end">
-      <View className="h-0 shrink min-w-0 overflow-hidden" aria-hidden>
-        <View className={PILL_CLASS}>
-          <View style={{ width: RING_SIZE, height: RING_SIZE }} />
-          {valueRun(percentageSizer, costSizer, true)}
-        </View>
+  const reserve = (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="h-0 shrink min-w-0 overflow-hidden"
+    >
+      <View className={PILL_CLASS}>
+        <View style={{ width: RING_SIZE, height: RING_SIZE }} />
+        {valueRun(percentageSizer, costSizer, true)}
       </View>
-      {pressable ? (
-        <Pressable
-          onPress={onPress}
-          accessibilityRole="button"
-          accessibilityLabel={accessibilityLabel}
-          hitSlop={8}
-          className={cn(PILL_CLASS, 'active:opacity-70', hidden && 'opacity-0')}
-          testID="session-context-metrics"
-        >
-          {pill}
-        </Pressable>
-      ) : (
-        <View
-          accessibilityLabel={accessibilityLabel || undefined}
-          {...(hidden
-            ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
-            : {})}
-          className={cn(PILL_CLASS, hidden && 'opacity-0')}
-          testID="session-context-metrics"
-        >
-          {pill}
-        </View>
-      )}
     </View>
   );
 
-  return reservedBox;
+  const paintedPill = pressable ? (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={8}
+      className={cn(PILL_CLASS, 'active:opacity-70')}
+      testID="session-context-metrics"
+    >
+      {pill}
+    </Pressable>
+  ) : (
+    <View
+      accessibilityLabel={accessibilityLabel || undefined}
+      {...(hidden
+        ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+        : {})}
+      className={cn(PILL_CLASS, hidden && 'opacity-0')}
+      testID="session-context-metrics"
+    >
+      {pill}
+    </View>
+  );
+
+  return (
+    <View className="h-[44px] shrink min-w-0 items-end">
+      {reserve}
+      {paintedPill}
+    </View>
+  );
 }

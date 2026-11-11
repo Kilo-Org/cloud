@@ -8,6 +8,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { i18n } from '@/i18n';
 import { FileHeaderRow } from './pr-diff-file-rows';
 import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 
@@ -60,7 +61,7 @@ function hostTexts(): TestRenderer.ReactTestInstance[] {
   );
 }
 
-function mountRow(): void {
+function mountRow(status = 'modified'): void {
   i18nManager.isRTL = true;
   act(() => {
     renderer = TestRenderer.create(
@@ -68,7 +69,7 @@ function mountRow(): void {
         file: {
           path: 'src/greeting.ts',
           previousPath: null,
-          status: 'modified',
+          status,
           additions: 3,
           deletions: 1,
           patch: '@@ -1 +1 @@\n-export const greeting = "Hi";\n+export const greeting = "Hello";',
@@ -102,5 +103,30 @@ describe('FileHeaderRow diff stats under an RTL interface', () => {
       expect(host?.props.className).toContain('text-muted-foreground');
       expect(host?.props.className).toContain('text-xs');
     }
+  });
+});
+
+/**
+ * Each status paints from its own key. A mode-only change and an edited file
+ * are different statuses, so their labels must differ; before this change the
+ * catalog gave both the same word.
+ */
+describe('FileHeaderRow status label in French', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('paints the changed and the modified status with different labels', async () => {
+    await i18n.changeLanguage('fr');
+
+    mountRow('modified');
+    const modified = i18n.t('prReview.fileStatus.modified');
+    expect(hostTexts().some(node => node.props.children === modified)).toBe(true);
+    act(() => renderer?.unmount());
+
+    mountRow('changed');
+    const changed = i18n.t('prReview.fileStatus.changed');
+    expect(changed).not.toBe(modified);
+    expect(hostTexts().some(node => node.props.children === changed)).toBe(true);
   });
 });

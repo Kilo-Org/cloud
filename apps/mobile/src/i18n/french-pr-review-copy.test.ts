@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
+import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { i18n } from '@/i18n';
 import { type ProviderPrPlatform } from '@kilocode/app-shared/provider-review';
 
@@ -125,6 +126,74 @@ describe('French provider-noun sentences', () => {
       expect(withTerm('prReview.mutationError.reviewNotSubmittedTerm', platform)).toBe(
         `Impossible d'envoyer cette revue en l'état (${term}). Le contenu a peut-être changé, ou vous ne pouvez pas examiner votre propre travail (${term}).`
       );
+    }
+  });
+});
+
+/**
+ * Three controls take their visible label from one key and their accessible
+ * name from another, and in English each pair shares one verb and one noun, so
+ * the spoken name holds the word on screen. A pair that loses that shape makes
+ * the spoken name differ from what is shown.
+ *
+ * The block also covers labels a reader compares side by side: two file
+ * statuses, the open chip against the combined chips, the review-service
+ * failure against the neighbouring generic failures, and the merge button
+ * against the heading of the sheet it opens.
+ */
+describe('French PR-review labels and the names announced for them', () => {
+  it('starts each accessible name with the visible label it belongs to', () => {
+    const pairs = [
+      ['prReview.floatingActions.clear', 'prReview.floatingActions.clearSelection'],
+      ['prReview.hunkRows.goToOverview', 'prReview.hunkRows.goToOverviewTab'],
+      ['prReview.review', 'prReview.reviewPullRequest'],
+    ] as const;
+    for (const [visible, name] of pairs) {
+      expect(i18n.t(name).startsWith(i18n.t(visible)), `${name} names ${visible}`).toBe(true);
+    }
+  });
+
+  it('gives a changed file its own label beside the modified one', () => {
+    expect(i18n.t('prReview.fileStatus.changed')).not.toBe(i18n.t('prReview.fileStatus.modified'));
+  });
+
+  it('reads the open chip like the combined chips on the same screen', () => {
+    const open = i18n.t('prReview.overview.stateOpen');
+    expect(i18n.t('prReview.overview.stateOpenApproved').startsWith(open)).toBe(true);
+    expect(i18n.t('prReview.overview.stateOpenReviewRequired').startsWith(open)).toBe(true);
+  });
+
+  it('names the review service in the unavailable copy', () => {
+    expect(i18n.t('prReview.reviewServiceUnavailable')).toContain('revue');
+    expect(i18n.t('prReview.reviewServiceUnavailableDescription')).toContain('service de revue');
+  });
+
+  it('keeps the end-of-file warning marker on a fragment', () => {
+    const label = i18n.t('prReview.sideBySide.noNewlineAtEndOfFile');
+    expect(label.startsWith('⚠️ ')).toBe(true);
+    expect(label.endsWith('.')).toBe(false);
+  });
+
+  it('asks the file field to filter by path, as its own accessible name does', () => {
+    expect(i18n.t('prReview.fileNavigator.filterPlaceholder').startsWith('Filtrer')).toBe(true);
+  });
+
+  it('words the merge action as a verb and the sheet heading as a noun', () => {
+    const action = i18n.t('prReview.merge.merge');
+    const pullRequestAction = i18n.t('prReview.merge.mergePullRequest');
+    // The section button and the merge sheet's submit label read `merge`, so
+    // the heading above them cannot be the same bare verb.
+    expect(pullRequestAction.startsWith(`${action} `)).toBe(true);
+    expect(i18n.t('prReview.merge.mergeTitle')).not.toBe(action);
+    // The merge screen and the section button both consume the helper, so the
+    // split has to hold there. Only the merge-request arm words its action as a
+    // bare verb; the other two name the object inside the action.
+    for (const platform of ['github', 'gitlab'] as const) {
+      const titles = providerPrMergeTitles(i18n.getFixedT('fr'), platform);
+      if (platform === 'gitlab') {
+        expect(titles.action).toBe(action);
+        expect(titles.title).toBe(i18n.t('prReview.merge.mergeTitle'));
+      }
     }
   });
 });

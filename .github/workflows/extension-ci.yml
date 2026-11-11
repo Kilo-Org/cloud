@@ -181,8 +181,14 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the extension's dependency closure, the web closure that the tRPC
+      # declaration build reaches through the aliases in
+      # packages/trpc/tsconfig.json, and the root project are installed. The
+      # extension declares @kilocode/trpc, so the first filter also brings the
+      # declaration program's own workspace inputs. Widen the filter when a
+      # step here imports a workspace outside these closures.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-extension...' --filter 'web...' --filter kilocode-monorepo
 
       - name: Restore or build tRPC declarations
         uses: ./.github/actions/trpc-declarations
@@ -249,8 +255,13 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the extension's dependency closure and the root project are
+      # installed: the bundle below resolves the extension, the two workspace
+      # packages it imports and the root project's tooling, and no source under
+      # apps/web. Widen the filter when a step here imports a workspace outside
+      # the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-extension...' --filter kilocode-monorepo
 
       # Builds the bundle the shard loads, with the analytics key the analytics
       # specs need at build time. A build failure fails this shard before the

@@ -1629,6 +1629,38 @@ test('the Chrome e2e shards start only for the inputs their bundle reads', () =>
   assert.equal(jobs['e2e-chrome'].if, '${{ !cancelled() }}');
 });
 
+// The extension declares @kilocode/trpc and @kilocode/cloud-agent-sdk and no
+// other workspace package, so the extension's closure is what links a bundle
+// build, a Firefox build and the unit suite. `verify` also builds the tRPC
+// declarations, whose program resolves apps/web and web-shared sources through
+// its path aliases; apps/web declares no @kilocode/trpc, so both filters are
+// needed there and neither implies the other. A step that starts reading
+// another workspace widens its job's filter; it does not restore the full
+// install.
+const extensionVerifyInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-extension...' --filter 'web...' --filter kilocode-monorepo";
+const extensionShardInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-extension...' --filter kilocode-monorepo";
+
+test('extension CI installs the closure each job reads', () => {
+  const jobs = workflows['extension-ci.yml'].jobs;
+  assert.equal(
+    jobs.verify.steps.find(step => step.name === 'Install dependencies').run,
+    extensionVerifyInstall,
+    'verify installs the extension closure plus the web closure its declarations read'
+  );
+  assert.equal(
+    jobs['e2e-chrome-shard'].steps.find(step => step.name === 'Install dependencies').run,
+    extensionShardInstall,
+    'a shard installs the extension closure alone'
+  );
+  assert.deepEqual(
+    jobs['e2e-chrome-shard'].strategy.matrix.shard,
+    [1, 2],
+    'both shards still run'
+  );
+});
+
 // The account database job runs the root `drizzle` script, which executes
 // drizzle-kit inside packages/db, and one session-sync suite whose workspace
 // imports are @kilocode/db and @kilocode/worker-utils, both declared by the

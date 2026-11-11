@@ -4080,7 +4080,7 @@
       "model": "Remplacement du modèle",
       "modelPlaceholder": "Utiliser le modèle par défaut de la session",
       "prompt": "Invite système",
-      "steps": "Étapes max",
+      "steps": "Étapes max.",
       "stepsPlaceholder": "p. ex. 50",
       "temperature": "Température",
       "temperaturePlaceholder": "p. ex. 0.2",

@@ -512,6 +512,83 @@ describe('selectFixReviewCommentsForReview', () => {
       diagnostics.length = 0;
     });
 
+    it('answers a failed installation-token mint with one user-facing message', async () => {
+      const client = clientFixture();
+      const createCommentClient = jest.fn<FixReviewSelectionDeps['createCommentClient']>();
+
+      await expectSanitizedRejection(
+        selectFixReviewCommentsForReview({
+          ...baseInput,
+          integration: {
+            id: 'integration-1',
+            platform_installation_id: '42',
+            github_app_type: 'standard',
+          },
+          deps: depsFixture(client, {
+            createCommentClient,
+            generateInstallationToken: async () => {
+              throw providerFailure(401);
+            },
+          }),
+        }),
+        'GitHub review comments are unavailable. Try again.'
+      );
+
+      expect(createCommentClient).not.toHaveBeenCalled();
+      expect(diagnostics).toEqual([
+        ['Fix-review comment read failed', { credential: 'unresolved', status: 401 }],
+      ]);
+    });
+
+    it('answers a failed personal-credential fetch with one user-facing message', async () => {
+      const client = clientFixture();
+      const createCommentClient = jest.fn<FixReviewSelectionDeps['createCommentClient']>();
+
+      await expectSanitizedRejection(
+        selectFixReviewCommentsForReview({
+          ...baseInput,
+          integration: null,
+          deps: depsFixture(client, {
+            createCommentClient,
+            getUserAccessToken: async () => {
+              throw providerFailure(503);
+            },
+          }),
+        }),
+        'GitHub review comments are unavailable. Try again.'
+      );
+
+      expect(createCommentClient).not.toHaveBeenCalled();
+      expect(diagnostics).toEqual([
+        ['Fix-review comment read failed', { credential: 'unresolved', status: 503 }],
+      ]);
+    });
+
+    it('answers a failed initiator-identity lookup with one user-facing message', async () => {
+      const client = clientFixture();
+
+      await expectSanitizedRejection(
+        selectFixReviewCommentsForReview({
+          ...baseInput,
+          integration: {
+            id: 'integration-1',
+            platform_installation_id: '42',
+            github_app_type: 'standard',
+          },
+          deps: depsFixture(client, {
+            getInitiatorIdentity: async () => {
+              throw new Error(`database unavailable ${PROVIDER_CREDENTIAL}`);
+            },
+          }),
+        }),
+        'GitHub review comments are unavailable. Try again.'
+      );
+
+      expect(diagnostics).toEqual([
+        ['Fix-review comment read failed', { credential: 'unresolved', status: null }],
+      ]);
+    });
+
     it('answers a failed comment read on the installation token with one user-facing message', async () => {
       const getUserAccessToken = jest.fn<FixReviewSelectionDeps['getUserAccessToken']>();
       const client = clientFixture({

@@ -555,6 +555,26 @@ const defaultDeps: FixReviewSelectionDeps = {
     ),
 };
 
+/**
+ * Raised when there is no credential to read with at all, so the caller can
+ * offer a reconnection. This module throws it, so it carries no provider data
+ * and keeps its own message.
+ */
+class FixReviewCredentialUnavailableError extends Error {
+  constructor() {
+    super('No GitHub credential available to verify review comments');
+    this.name = 'FixReviewCredentialUnavailableError';
+  }
+}
+
+/** Which credential a fix-review read used, as the diagnostic reports it. */
+type FixReviewCredentialSource =
+  | 'installation'
+  | 'github_app'
+  | 'provided_token'
+  | 'personal'
+  | 'unresolved';
+
 async function resolveCommentClient(input: {
   repositoryFullName: string;
   pullNumber: number;
@@ -592,7 +612,7 @@ async function resolveCommentClient(input: {
     op: 'fetch',
   });
   if (credential.status !== 'connected') {
-    throw new Error('No GitHub credential available to verify review comments');
+    throw new FixReviewCredentialUnavailableError();
   }
   return {
     client: input.deps.createCommentClient(credential.credential.token, target),
@@ -616,8 +636,9 @@ export type FixReviewSelection = {
  *
  * Throws when the credential or the GitHub response cannot be established, so
  * the caller can refuse to start a session it cannot verify. The thrown value
- * is always a newly constructed error with no request, response, or cause, so
- * every credential source returns the same error shape.
+ * is a newly constructed error with no request, response, or cause, whether the
+ * credential or the read failed, so every credential source returns the same
+ * error shape.
  */
 export async function selectFixReviewCommentsForReview(input: {
   repositoryFullName: string;
@@ -631,12 +652,18 @@ export async function selectFixReviewCommentsForReview(input: {
   deps?: Partial<FixReviewSelectionDeps>;
 }): Promise<FixReviewSelection> {
   const deps: FixReviewSelectionDeps = { ...defaultDeps, ...input.deps };
-  const { client, initiator, userCredential } = await resolveCommentClient({
-    ...input,
-    deps,
-  });
+  let credentialSource: FixReviewCredentialSource = 'unresolved';
+  let userCredential: GitHubUserAccessTokenConnected | undefined;
 
   try {
+    const resolved = await resolveCommentClient({ ...input, deps });
+    userCredential = resolved.userCredential;
+    credentialSource =
+      resolved.userCredential === undefined
+        ? 'installation'
+        : (resolved.userCredential.credentialSource ?? 'personal');
+
+    const { client, initiator } = resolved;
     const [listing, settledCommentIds] = await Promise.all([
       client.listComments(),
       client.listSettledCommentIds(input.prAuthor),
@@ -651,6 +678,8 @@ export async function selectFixReviewCommentsForReview(input: {
 
     return selectWithinPromptBudget(selected, listing.unreadCount);
   } catch (error) {
+    // The caller shows this message, so it keeps its own text.
+    if (error instanceof FixReviewCredentialUnavailableError) throw error;
     // The diagnostic records the credential source and HTTP status only.
     const status =
       typeof error === 'object' &&
@@ -659,13 +688,7 @@ export async function selectFixReviewCommentsForReview(input: {
       typeof error.status === 'number'
         ? error.status
         : null;
-    logExceptInTest('Fix-review comment read failed', {
-      credential:
-        userCredential === undefined
-          ? 'installation'
-          : (userCredential.credentialSource ?? 'personal'),
-      status,
-    });
+    logExceptInTest('Fix-review comment read failed', { credential: credentialSource, status });
     if (userCredential?.refreshSupported === false && status === 401) {
       await deps.getUserAccessToken(input.initiatorKiloUserId, {
         op: 'reportRejected',

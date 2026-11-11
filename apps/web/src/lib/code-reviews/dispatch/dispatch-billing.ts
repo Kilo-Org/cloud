@@ -135,8 +135,10 @@ export async function resolveCodeReviewDispatchBilling(params: {
       return { skipBalanceCheck: false, reconnectRequired: true };
     }
     if (!eligibility.isFree && !eligibility.hasUserByokAvailable) {
+      // Keep scanning: a later model can still carry the reconnect requirement,
+      // which decides the review on its own.
       everyModelExempt = false;
-      break;
+      continue;
     }
     if (eligibility.hasUserByokAvailable) {
       anyByok = true;

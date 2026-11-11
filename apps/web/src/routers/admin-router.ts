@@ -50,6 +50,7 @@ import { adminKiloclawVersionsRouter } from '@/routers/admin-kiloclaw-versions-r
 import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-router';
 import { adminKiloclawProvidersRouter } from '@/routers/admin-kiloclaw-providers-router';
 import { adminKiloclawStripeRenewalsRouter } from '@/routers/admin-kiloclaw-stripe-renewals-router';
+import { adminKiloclawCreditRenewalsRouter } from '@/routers/admin-kiloclaw-credit-renewals-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminCloudAgentNextRouter } from '@/routers/admin-cloud-agent-next-router';
@@ -2869,6 +2870,7 @@ export const adminRouter = createTRPCRouter({
   kiloclawRegions: adminKiloclawRegionsRouter,
   kiloclawProviders: adminKiloclawProvidersRouter,
   kiloclawStripeRenewals: adminKiloclawStripeRenewalsRouter,
+  kiloclawCreditRenewals: adminKiloclawCreditRenewalsRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
   contributorChampions: contributorChampionsRouter,

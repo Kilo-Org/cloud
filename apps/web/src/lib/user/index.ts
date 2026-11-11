@@ -399,6 +399,24 @@ export async function findUserByEmailCaseInsensitive(email: string): Promise<Use
   });
 }
 
+/**
+ * The account a sign-in's address resolves to, before any provider is linked.
+ *
+ * WorkOS SSO also matches a case variant: identity providers such as Entra ID
+ * send the directory's spelling (`John.Doe@Contoso.com`), which often differs
+ * from the one an earlier personal sign-in stored. An exact match missed that
+ * account and fell through to the insert, which the normalized-email dedup then
+ * refused with `EMAIL-ALREADY-USED`, so the person could never join through SSO.
+ * Only case is ignored: `+` aliases can name a different mailbox. Two rows that
+ * differ only in case leave the match ambiguous, so none is chosen.
+ */
+async function findUserByEmailForSignIn(args: CreateOrUpdateUserArgs): Promise<User | undefined> {
+  const exact = await findUserByEmail(args.google_user_email);
+  if (exact || args.provider !== 'workos') return exact;
+  const caseVariants = await findUserByEmailCaseInsensitive(args.google_user_email);
+  return caseVariants.length === 1 ? caseVariants[0] : undefined;
+}
+
 export async function findUserByNormalizedEmail(email: string): Promise<User | undefined> {
   const normalizedEmail = normalizeEmail(email);
   return await db.query.kilocode_users.findFirst({
@@ -626,7 +644,7 @@ export async function createOrUpdateUser(
   }
 
   // check to see if we have a user with the same email
-  const userByEmail = await findUserByEmail(args.google_user_email);
+  const userByEmail = await findUserByEmailForSignIn(args);
   if (userByEmail) {
     const existingProviders = await getUserAuthProviders(userByEmail.id);
     const hasThisProvider = existingProviders.some(p => p.provider === args.provider);

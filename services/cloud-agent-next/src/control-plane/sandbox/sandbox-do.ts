@@ -5094,6 +5094,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       let createdRef: string | null = null;
       let billingAdmissionDeadlineAt: number | undefined;
       let billingAdmissionTimedOut = false;
+      let selectedLaunch:
+        | { options: ProviderLaunchOptions; selection: SnapshotStartSelection | null }
+        | undefined;
       try {
         const pin = this.providerPin;
         if (pin === null) throw new ProviderCreationError('invalid_configuration');
@@ -5126,7 +5129,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
         if (pin.billing) await assertContainerAccountAvailable(this.env, pin.billing);
-        const selectedLaunch =
+        selectedLaunch =
           pin.provider === 'vercel'
             ? await this.environmentSnapshotLaunch(state, allocationId, createDeadline)
             : undefined;
@@ -5331,7 +5334,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
           await clearNativeBillingAdmissionDeadline(this.ctx.storage);
         }
         if (error instanceof ProviderSnapshotCreationError) {
-          await this.failSnapshotStart(allocationId, this.snapshotStartFailure(null, error.reason));
+          await this.failSnapshotStart(
+            allocationId,
+            this.snapshotStartFailure(selectedLaunch?.selection ?? null, error.reason)
+          );
           return;
         }
         if (error instanceof RetiredSandboxProviderError) {

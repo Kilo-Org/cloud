@@ -1,5 +1,6 @@
 import { env, reset, runInDurableObject } from 'cloudflare:test';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { logger } from '../../src/logger.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { sessionDoName } from '../../src/session-identity.js';
@@ -419,6 +420,7 @@ async function prepareFrameOf(wrapper: FakeWrapper) {
 
 afterEach(async () => {
   await reset();
+  vi.restoreAllMocks();
 });
 /** An environment with one build command: it may only start from its snapshot. */
 const BUILD: RouteOverrides = { setupCommands: ['env-build'], environmentSetupCommandCount: 1 };
@@ -1015,11 +1017,13 @@ describe('Vercel BYOC environment snapshot restore', () => {
   });
 
   it('reports a missing Vercel environment snapshot without creating a clean-base replacement', async () => {
+    const diagnostics = vi.spyOn(logger, 'withFields');
+    const sandboxId = 'sbx__vercel_snapshot_missing';
     const provider = createFakeProvider({
       vercel: true,
       createErrorsBeforeRef: [new ProviderSnapshotCreationError('missing')],
     });
-    const { stub, peer } = await setup('sbx__vercel_snapshot_missing', provider, {
+    const { stub, peer } = await setup(sandboxId, provider, {
       ...VERCEL_ENV,
       ENVIRONMENT_BUILD: fakeEnvironmentBuild(RESOLVED_VERCEL).namespace,
     });
@@ -1031,6 +1035,16 @@ describe('Vercel BYOC environment snapshot restore', () => {
     expect(provider.launchEnvs).toEqual([]);
     expect(environmentSnapshotDetails(peer)).toContain(
       'Environment snapshot is unavailable. Rebuild the environment.'
+    );
+    await waitFor(() =>
+      expect(diagnostics).toHaveBeenCalledWith(
+        expect.objectContaining({
+          diagnosticEvent: 'snapshot_start_blocked',
+          sandboxId,
+          environmentId: REFERENCE.environmentId,
+          buildId: '77777777-7777-4777-8777-777777777777',
+        })
+      )
     );
   });
 

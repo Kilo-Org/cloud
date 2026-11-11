@@ -194,6 +194,7 @@ const NAMED_BUILD_FAILURES = new Set([
   'validator_command_missing',
   'validator_control_missing',
   'provider_configuration_failed',
+  'runtime_startup_unavailable',
 ]);
 
 function failureCode(error: unknown): string {

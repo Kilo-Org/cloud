@@ -2017,7 +2017,7 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     expect(storedRow(fixture)).toMatchObject({
       step: 'launch_validator_wrapper',
       retry_count: 1,
-      last_error: 'provider_request_failed',
+      last_error: 'runtime_startup_unavailable',
     });
     expect(mocks.client.executeCommand).not.toHaveBeenCalled();
 
@@ -2028,6 +2028,36 @@ describe('VercelSnapshotBuild runtime preparation', () => {
       step: 'verify_validator_call_home',
       validator_wrapper_requested: 1,
     });
+  });
+
+  it('projects the runtime startup failure after its retry budget is exhausted', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'launch_validator_wrapper',
+      snapshot_id: 'snapshot-validator',
+      validator_session_id: 'validator-session',
+      retry_count: 5,
+    });
+    mocks.downloadedStartup.mockRejectedValueOnce(new Error('runtime storage unavailable'));
+
+    await fixture.build.alarm();
+
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'project_failure',
+      last_error: 'runtime_startup_unavailable',
+    });
+    expect(mocks.client.executeCommand).not.toHaveBeenCalled();
+
+    await runNextAlarm(fixture);
+
+    expect(mocks.projectStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        setupStatus: 'failed',
+        setupError: 'runtime_startup_unavailable',
+      })
+    );
   });
 
   it('fails the build for a permanent runtime configuration error', async () => {
@@ -2275,7 +2305,7 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     const command = mocks.client.executeCommand.mock.calls[0]?.[1];
     expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.url);
     expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.sha256);
-    expect(command.args[1]).not.toContain(RUNTIME_TOOLCHAIN.kilo.url);
+    expect(command.args[1]).not.toContain('https://registry.npmjs.org/@kilocode/cli/');
     expect(command.args[1]).toContain("check_sha256 '/usr/local/bin/bun'");
     expect(command.args[1]).not.toContain('npm install -g --loglevel=error "$work/package.tgz"');
     expect(command.args[1]).toContain(
@@ -2310,7 +2340,7 @@ describe('VercelSnapshotBuild runtime preparation', () => {
 
       const command = mocks.client.executeCommand.mock.calls[0]?.[1];
       expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.url);
-      expect(command.args[1]).not.toContain(RUNTIME_TOOLCHAIN.kilo.url);
+      expect(command.args[1]).not.toContain('https://registry.npmjs.org/@kilocode/cli/');
       expect(command.args[1]).not.toContain('kilocode-control-plane-wrapper');
       expect(storedRow(fixture)).toMatchObject({ step: 'snapshot_builder' });
     }
@@ -2328,7 +2358,7 @@ describe('VercelSnapshotBuild runtime preparation', () => {
 
     const command = mocks.client.executeCommand.mock.calls[0]?.[1];
     expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.url);
-    expect(command.args[1]).not.toContain(RUNTIME_TOOLCHAIN.kilo.url);
+    expect(command.args[1]).not.toContain('https://registry.npmjs.org/@kilocode/cli/');
     expect(command.args[1]).toContain('git --version');
     expect(command.args[1]).not.toContain('kilocode-control-plane-wrapper');
     expect(storedRow(fixture)).toMatchObject({

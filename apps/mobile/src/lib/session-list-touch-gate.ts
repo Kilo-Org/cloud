@@ -4,13 +4,13 @@
  *
  * Measured on the Android emulator: the no-match body's Clear action swaps the
  * empty state for the row list in the same commit, so a session row lands under
- * the point the finger just released. A repeat tap 400 ms behind the Clear tap
- * opened that row and left the list; at 200 ms the rows were not targets yet
- * and nothing opened. The bound covers that repeat and the platform's own
- * double-tap window (~300 ms), and ends well before a user can read a row to
- * tap it.
+ * the point the finger just released. A repeat tap behind the Clear tap opened
+ * that row and left the list; measured gaps of 500, 600 and 700 ms all opened
+ * one, and 400 ms was a race with the row mount. The bound covers those repeats
+ * with margin and matches the hold `sheet-touch-guard.ts` measured for the same
+ * kind of handover; it still ends well before a user can read a row to tap it.
  */
-export const SESSION_LIST_TOUCH_SETTLE_MS = 500;
+export const SESSION_LIST_TOUCH_SETTLE_MS = 800;
 
 let holds = 0;
 

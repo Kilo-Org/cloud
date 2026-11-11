@@ -181,15 +181,17 @@ RUN_SKILLS_SH_INSTALL_TEST=1 pnpm exec tsx services/cloud-agent-next/test/e2e/pr
 ```
 
 The driver discovers local ports and refuses a database outside this stack.
-It needs migrated PostgreSQL, sandbox billing SKUs, the usage meter, and a local
-`AGENT_ENV_VARS_PRIVATE_KEY` configured before Worker startup. It creates a
-synthetic saved profile and tests variables, encrypted secrets, ordered setup,
+It needs migrated PostgreSQL, sandbox billing SKUs, the usage meter, and
+`AGENT_ENV_VARS_PRIVATE_KEY` in `services/cloud-agent-next/.dev.vars` before Worker
+startup. The driver uses that same key, not an exported driver-only value.
+It creates a synthetic saved profile and tests variables, encrypted secrets, ordered setup,
 instructions, custom agents, custom and marketplace skills, skill companion
 files, local and remote MCP credentials, disabled entries, slash-command catalog
 delivery, command arguments, subtask commands, sibling reuse, and native restart.
 The optional flag also installs `vercel-labs/skills@find-skills` through the real
 skills.sh installer. Only model inference uses the deterministic fake.
 The driver deletes its workspace and profile after the run.
+The entire run has a 180-second deadline. Individual step waits cannot extend it.
 
 Typecheck the driver with
 `pnpm --filter cloud-agent-next exec tsgo --noEmit -p tsconfig.profiles-local.json`.

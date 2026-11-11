@@ -147,10 +147,10 @@ const address = remote.address();
 assert(address && typeof address !== 'string');
 
 try {
-  const privateKey = process.env.AGENT_ENV_VARS_PRIVATE_KEY;
+  const privateKey = vars.AGENT_ENV_VARS_PRIVATE_KEY?.replaceAll('\\n', '\n');
   assert(
     privateKey,
-    'Configure a worktree-local AGENT_ENV_VARS_PRIVATE_KEY before starting the stack'
+    'Configure AGENT_ENV_VARS_PRIVATE_KEY in services/cloud-agent-next/.dev.vars before starting the stack'
   );
   const publicKey = Buffer.from(
     createPublicKey(privateKey).export({ type: 'spki', format: 'pem' })

@@ -726,6 +726,33 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
+  it('normalizes an inherited allowlist on the resolved native sandbox', async () => {
+    const doStub = makeDoStub();
+    await runCreate(
+      selectedContext(doStub),
+      makeRequest({
+        options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+        runtime: { egressMode: 'allowlist', egressAllowlist: ['Z.Example.COM.', 'example.com'] },
+      })
+    );
+
+    expect(createdMetadata(doStub)?.workspace).toMatchObject({
+      sandboxProvider: 'cloudflare-containers',
+      sandboxKind: 'isolated',
+      egressMode: 'allowlist',
+      egressAllowlist: ['example.com', 'z.example.com'],
+    });
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sandboxSelection: expect.objectContaining({
+          provider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist: ['example.com', 'z.example.com'],
+        }),
+      })
+    );
+  });
+
   it('records a spawned child in the parent registry before returning', async () => {
     const doStub = makeDoStub();
     const ctx = modernContext(makeContext(doStub));

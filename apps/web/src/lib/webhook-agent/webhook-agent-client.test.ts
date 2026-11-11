@@ -285,6 +285,23 @@ describe('scheduled trigger invocation', () => {
     });
   });
 
+  it('flags a worker conflict caused by a run in progress', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ success: false, error: 'RUN_IN_PROGRESS' }), { status: 409 })
+      );
+
+    await expect(
+      invokeWorkerScheduledTrigger('user-1', undefined, 'scheduled-trigger')
+    ).resolves.toEqual({
+      success: false,
+      error: 'Scheduled trigger invocation failed',
+      status: 409,
+      runInProgress: true,
+    });
+  });
+
   it('handles malformed successful responses safely', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ success: true, data: { requestId: 'not-a-uuid' } }), {

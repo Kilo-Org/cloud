@@ -139,6 +139,7 @@ export function EditWebhookTriggerContent({
       bodySchema: triggerData.bodySchema,
       autoCommit: triggerData.autoCommit ?? undefined,
       condenseOnComplete: triggerData.condenseOnComplete ?? undefined,
+      skipIfRunning: triggerData.skipIfRunning ?? false,
       isActive: triggerData.isActive,
       webhookAuthHeader: triggerData.webhookAuthHeader ?? undefined,
       webhookAuthConfigured: triggerData.webhookAuthConfigured,
@@ -193,6 +194,7 @@ export function EditWebhookTriggerContent({
         bodySchema: formData.bodySchema,
         autoCommit: formData.autoCommit ?? null,
         condenseOnComplete: formData.condenseOnComplete ?? null,
+        skipIfRunning: formData.skipIfRunning,
         isActive: formData.isActive,
         webhookAuth: formData.webhookAuth.enabled
           ? {

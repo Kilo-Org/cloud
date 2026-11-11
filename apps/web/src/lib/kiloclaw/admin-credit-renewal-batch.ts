@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -29,7 +29,7 @@ function creditScope() {
 function eligibleScope() {
   return and(
     creditScope(),
-    eq(kiloclaw_subscriptions.status, 'active'),
+    inArray(kiloclaw_subscriptions.status, ['active', 'past_due']),
     eq(kiloclaw_subscriptions.cancel_at_period_end, false)
   );
 }
@@ -37,8 +37,8 @@ function eligibleScope() {
 export async function getCreditRenewalPreview() {
   const [counts] = await db
     .select({
-      renewing: sql<number>`count(*) filter (where ${kiloclaw_subscriptions.cancel_at_period_end} = false and ${kiloclaw_subscriptions.status} = 'active')::int`,
-      ending: sql<number>`count(*) filter (where ${kiloclaw_subscriptions.cancel_at_period_end} = true and ${kiloclaw_subscriptions.status} = 'active')::int`,
+      renewing: sql<number>`count(*) filter (where ${kiloclaw_subscriptions.cancel_at_period_end} = false and ${kiloclaw_subscriptions.status} in ('active', 'past_due'))::int`,
+      ending: sql<number>`count(*) filter (where ${kiloclaw_subscriptions.cancel_at_period_end} = true and ${kiloclaw_subscriptions.status} in ('active', 'past_due'))::int`,
     })
     .from(kiloclaw_subscriptions)
     .where(creditScope());
@@ -52,10 +52,9 @@ export async function getCreditRenewalPreview() {
 export async function stopCreditRenewals(actor: CreditRenewalAdminActor) {
   const deadlineAtMs = Date.now() + WORK_BUDGET_MS;
   let updated = 0;
-  let remaining = true;
 
   while (Date.now() < deadlineAtMs) {
-    const processed = await db.transaction(async tx => {
+    const fetched = await db.transaction(async tx => {
       const rows = await tx
         .select()
         .from(kiloclaw_subscriptions)
@@ -64,7 +63,6 @@ export async function stopCreditRenewals(actor: CreditRenewalAdminActor) {
         .limit(CHUNK_SIZE)
         .for('update', { skipLocked: true });
 
-      let count = 0;
       for (const before of rows) {
         const [after] = await tx
           .update(kiloclaw_subscriptions)
@@ -87,32 +85,38 @@ export async function stopCreditRenewals(actor: CreditRenewalAdminActor) {
           before,
           after,
         });
-        count += 1;
+        updated += 1;
       }
-      return count;
+      return rows.length;
     });
 
-    updated += processed;
-    if (processed < CHUNK_SIZE) {
-      remaining = false;
-      break;
-    }
+    if (fetched < CHUNK_SIZE) break;
   }
 
-  await createKiloClawAdminAuditLog({
-    action: AUDIT_ACTION,
-    actor_id: actor.id,
-    actor_email: actor.email,
-    actor_name: actor.name,
-    target_user_id: actor.id,
-    message: `Stopped credit renewal for ${updated} KiloClaw subscriptions${remaining ? '; more remain' : ''}`,
-    metadata: {
-      reason: 'KiloClaw end of life',
-      scope: 'credit_renewals',
-      updated,
-      remaining,
-    },
-  });
+  const [pending] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(kiloclaw_subscriptions)
+    .where(eligibleScope());
+  const remaining = (pending?.count ?? 0) > 0;
+
+  try {
+    await createKiloClawAdminAuditLog({
+      action: AUDIT_ACTION,
+      actor_id: actor.id,
+      actor_email: actor.email,
+      actor_name: actor.name,
+      target_user_id: actor.id,
+      message: `Stopped credit renewal for ${updated} KiloClaw subscriptions${remaining ? '; more remain' : ''}`,
+      metadata: {
+        reason: 'KiloClaw end of life',
+        scope: 'credit_renewals',
+        updated,
+        remaining,
+      },
+    });
+  } catch (error) {
+    console.error('[admin-credit-renewals] Failed to write admin audit log:', error);
+  }
 
   return { updated, remaining };
 }

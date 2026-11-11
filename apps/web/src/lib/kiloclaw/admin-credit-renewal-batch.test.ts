@@ -9,6 +9,18 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
+import { stopCreditRenewals } from './admin-credit-renewal-batch';
+import { createKiloClawAdminAuditLog } from './admin-audit-log';
+import type * as AdminAuditLogModule from './admin-audit-log';
+
+jest.mock('./admin-audit-log', () => {
+  const actual = jest.requireActual<typeof AdminAuditLogModule>('./admin-audit-log');
+  return {
+    ...actual,
+    createKiloClawAdminAuditLog: jest.fn(actual.createKiloClawAdminAuditLog),
+  };
+});
+
 const CONFIRMATION = 'STOP CREDIT RENEWALS';
 
 type SubscriptionInput = {
@@ -47,11 +59,13 @@ async function superadminCaller() {
 describe('admin credit renewal controls', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
+    jest.mocked(createKiloClawAdminAuditLog).mockClear();
   });
 
   it('previews only credit subscriptions that are actively renewing', async () => {
     await insertSubscription();
     await insertSubscription();
+    await insertSubscription({ status: 'past_due' });
     await insertSubscription({ cancel_at_period_end: true });
     await insertSubscription({ status: 'canceled' });
     await insertSubscription({ payment_source: 'stripe', stripe_subscription_id: 'sub_stripe' });
@@ -62,13 +76,14 @@ describe('admin credit renewal controls', () => {
     const { caller } = await superadminCaller();
 
     await expect(caller.admin.kiloclawCreditRenewals.preview()).resolves.toEqual({
-      renewing: 2,
+      renewing: 3,
       ending: 1,
     });
   });
 
   it('stops renewals for eligible credit subscriptions only', async () => {
     const eligible = await insertSubscription({ stripe_schedule_id: 'sched_1' });
+    const pastDue = await insertSubscription({ status: 'past_due' });
     const ending = await insertSubscription({ cancel_at_period_end: true });
     const canceled = await insertSubscription({ status: 'canceled' });
     const stripe = await insertSubscription({
@@ -83,7 +98,7 @@ describe('admin credit renewal controls', () => {
     const { caller } = await superadminCaller();
     await expect(
       caller.admin.kiloclawCreditRenewals.stop({ confirmation: CONFIRMATION })
-    ).resolves.toEqual({ updated: 1, remaining: false });
+    ).resolves.toEqual({ updated: 2, remaining: false });
 
     const [stopped] = await db
       .select()
@@ -95,6 +110,11 @@ describe('admin credit renewal controls', () => {
       scheduled_plan: null,
       scheduled_by: null,
     });
+    const [stoppedPastDue] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, pastDue.subscription.id));
+    expect(stoppedPastDue.cancel_at_period_end).toBe(true);
 
     for (const untouched of [ending, canceled, stripe, transferred]) {
       const [row] = await db
@@ -146,6 +166,45 @@ describe('admin credit renewal controls', () => {
       updated: 2,
       remaining: false,
     });
+  });
+
+  it('reports remaining when eligible rows are locked by another transaction', async () => {
+    const { subscription } = await insertSubscription();
+
+    const result = await db.transaction(async tx => {
+      await tx
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.id, subscription.id))
+        .for('update');
+      return stopCreditRenewals({
+        id: 'admin-lock',
+        email: 'admin@example.com',
+        name: null,
+      });
+    });
+
+    expect(result).toEqual({ updated: 0, remaining: true });
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    expect(row.cancel_at_period_end).toBe(false);
+  });
+
+  it('keeps the result when the audit log write fails', async () => {
+    await insertSubscription();
+    jest.mocked(createKiloClawAdminAuditLog).mockRejectedValueOnce(new Error('audit unavailable'));
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      await expect(
+        stopCreditRenewals({ id: 'admin-audit', email: 'admin@example.com', name: null })
+      ).resolves.toEqual({ updated: 1, remaining: false });
+      expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it('is idempotent on a second run', async () => {

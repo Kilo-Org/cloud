@@ -1452,6 +1452,7 @@ type EmbeddingResponse = {
   id?: string;
   object?: 'list';
   model?: string;
+  provider?: string;
   usage?: EmbeddingUsage;
   providerMetadata?: VercelProviderMetaData;
 };
@@ -1511,7 +1512,7 @@ export function parseEmbeddingUsageFromResponse(
     model: json.model ?? null,
     responseContent: '',
     hasError,
-    inference_provider: null,
+    inference_provider: json.provider ?? null,
     upstream_id: null,
     finish_reason: null,
     latency: null,

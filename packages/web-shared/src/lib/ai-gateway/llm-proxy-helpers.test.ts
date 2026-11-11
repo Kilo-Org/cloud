@@ -1140,6 +1140,22 @@ describe('parseEmbeddingUsageFromResponse', () => {
 
     expect(result.inputTokens).toBe(42);
   });
+
+  it('extracts the inference provider OpenRouter reports', () => {
+    const result = parseEmbeddingUsageFromResponse(
+      makeResponse({ provider: 'OpenAI' }),
+      200,
+      'openrouter'
+    );
+
+    expect(result.inference_provider).toBe('OpenAI');
+  });
+
+  it('sets the inference provider to null when the response has none', () => {
+    const result = parseEmbeddingUsageFromResponse(makeResponse(), 200, 'openrouter');
+
+    expect(result.inference_provider).toBeNull();
+  });
 });
 
 describe('parseEmbeddingUsageFromResponse upstream cost shapes', () => {

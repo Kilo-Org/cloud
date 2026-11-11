@@ -1,10 +1,15 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpLink } from '@trpc/client';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
-import { TRPCProvider } from '@/lib/trpc';
-import { type StoreCreditProductListing } from '@/lib/credits/store-products';
+import {
+  joinStoreCreditProducts,
+  type StoreCreditProductListing,
+} from '@/lib/credits/store-products';
+import { getCreditStorefront } from '@/lib/credits/storefront';
+import { creditStoreProductsKey } from '@/lib/credits/use-store-credit-products';
+import { TRPCProvider, useTRPC } from '@/lib/trpc';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
 import {
   CreditNativeIapContext,
@@ -124,6 +129,44 @@ function createFixtureClient() {
   });
 }
 
+/**
+ * Seeds the reads the screen and the store hook use, then mounts the screen.
+ *
+ * The screen reserves skeleton rows while its store loader runs, so a capture
+ * started on that first paint measures the rows arriving rather than the row
+ * layout. Seeding the same cache entries the screen reads makes its first paint
+ * the state under test; a later background read replaces them with identical
+ * data and moves nothing.
+ */
+function SeededScreen({ state }: { state: CreditPackPricesFixtureState }) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const me = useQuery(trpc.user.getMe.queryOptions());
+  const balance = useQuery(trpc.user.getContextBalance.queryOptions({}));
+  const blocks = useQuery(trpc.user.getCreditBlocks.queryOptions({}));
+  const userId = me.data?.id;
+
+  useEffect(() => {
+    if (userId === undefined) {
+      return;
+    }
+    queryClient.setQueryData(
+      creditStoreProductsKey(userId),
+      joinStoreCreditProducts({
+        appAccountToken: backends.appAccountToken,
+        backendProducts: backends.products,
+        storeProducts: listings(state),
+        storefront: getCreditStorefront(),
+      })
+    );
+  }, [queryClient, state, userId]);
+
+  if (userId === undefined || !balance.isSuccess || !blocks.isSuccess) {
+    return null;
+  }
+  return <CreditPurchaseScreen />;
+}
+
 export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixtureState }) {
   const queryClient = useMemo(
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
@@ -159,7 +202,7 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
     <QueryClientProvider client={queryClient}>
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         <CreditNativeIapContext.Provider value={store}>
-          <CreditPurchaseScreen />
+          <SeededScreen state={state} />
         </CreditNativeIapContext.Provider>
       </TRPCProvider>
     </QueryClientProvider>

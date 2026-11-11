@@ -42,6 +42,15 @@ export type StoreCreditProductsOptions = {
 };
 
 /**
+ * The cache key of the joined credit-pack catalog for one account. Exported so
+ * a development fixture can seed the exact entry this hook reads; there is no
+ * second spelling of the key anywhere.
+ */
+export function creditStoreProductsKey(userId: string | undefined) {
+  return ['credits', 'store-products', userId] as const;
+}
+
+/**
  * What the screen has settled on: the packs it renders, whether the store is
  * unavailable, and the message key for it. Kept across a retry so the screen
  * keeps showing this view instead of blanking back to the loading placeholders.
@@ -88,7 +97,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     storefront === 'play' ? STORE_FAILURE_PLAY_KEY : STORE_FAILURE_KEY;
 
   const productsQuery = useQuery({
-    queryKey: ['credits', 'store-products', userId],
+    queryKey: creditStoreProductsKey(userId),
     queryFn: async () => {
       const loadedProducts = await loadStoreCreditProducts({
         fetchStoreProducts: options.fetchStoreProducts,

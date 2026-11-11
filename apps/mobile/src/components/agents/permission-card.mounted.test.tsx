@@ -40,8 +40,8 @@ function findByAccessibilityLabel(
 /** Every literal string child of a rendered text node, in tree order. */
 function textLines(root: TestRenderer.ReactTestInstance): string[] {
   return root
-    .findAll(node => node.type === 'Text')
-    .flatMap(node => node.children.filter(value => typeof value === 'string'));
+    .findAll(node => String(node.type) === 'Text')
+    .flatMap(node => node.children.filter((value: unknown) => typeof value === 'string'));
 }
 
 type CardOverrides = {

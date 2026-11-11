@@ -997,11 +997,13 @@ describe('usage accounting error reports', () => {
       client_request_id: 'zzq-request',
       organization_id: 'zzq-organization',
     };
+    const usageId = '6f2a1c9b-4d3e-4f5a-8b7c-1d2e3f4a5b6c';
 
     const makeContext = (
       overrides: Partial<MicrodollarUsageContext> = {}
     ): MicrodollarUsageContext => ({
       api_kind: 'chat_completions',
+      usageId,
       kiloUserId: 'report-user',
       provider: 'openrouter',
       requested_model: 'anthropic/claude-3.7-sonnet',
@@ -1051,6 +1053,8 @@ describe('usage accounting error reports', () => {
         tags: { source: 'usage_processing' },
         extra: {
           usageContext: {
+            kiloUserId: 'report-user',
+            usageId,
             provider: 'openrouter',
             api_kind: 'chat_completions',
             requested_model: 'anthropic/claude-3.7-sonnet',
@@ -1060,6 +1064,17 @@ describe('usage accounting error reports', () => {
         },
       });
       expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain('zzq-');
+    });
+
+    test('reports a null usage id when the context carries none', async () => {
+      await processTokenData(null, makeContext({ usageId: undefined }));
+
+      expect(captureMessage).toHaveBeenCalledWith(
+        'SUSPICIOUS: No usage information',
+        expect.objectContaining({
+          extra: { usageContext: expect.objectContaining({ usageId: null }) },
+        })
+      );
     });
 
     test('bounds the reported requested model', async () => {

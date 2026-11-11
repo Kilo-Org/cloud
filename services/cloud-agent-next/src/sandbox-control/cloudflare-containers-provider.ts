@@ -117,7 +117,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
   };
 
   return {
-    environmentSnapshots: true,
+    environmentSnapshots: 'launch',
     workspaceSnapshots: {
       currentImage: image => deps.getContainer(deps.logicalSandboxId).currentImage(image),
       async capture(ref, captureId) {

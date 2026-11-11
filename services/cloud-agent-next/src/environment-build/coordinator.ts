@@ -107,8 +107,6 @@ export type CoordinatorDeps = {
   armAlarm(at: number): Promise<void>;
   environment: CoordinatorEnvironment;
   provider: BuilderProvider;
-  /** Non-secret mutable provider state, stored per build outside the input JSON. */
-  lifecycle(buildId: string): BuilderLifecycleState;
   /** The builder's control base URL for `buildId`, or null when the Worker URL is unknown. */
   runnerUrl(environmentId: string, buildId: string): string | null;
   /** The signed runner credential bound to this build and allocation. */
@@ -188,7 +186,8 @@ export type SnapshotResolution = {
     | 'newer_than_session'
     | 'expired'
     | 'deleted'
-    | 'unsupported';
+    | 'unsupported'
+    | 'provider_mismatch';
   admission: SnapshotAdmission;
   /** The image a session would start with now, or null when it could not be read. */
   currentBaseImage?: string | null;
@@ -325,7 +324,7 @@ export class EnvironmentBuildCoordinator {
         actor_user_id: actorUserId,
         input: JSON.stringify(record),
         encrypted_secrets: JSON.stringify(input.encryptedSecrets),
-        instance: target.provider === 'cloudflare-containers' ? target.instance : 'vercel',
+        instance: target.instance,
         runtime_release: runtimeRelease,
         state: 'queued',
         cleanup_attempts: 0,
@@ -355,10 +354,14 @@ export class EnvironmentBuildCoordinator {
   /**
    * Session launch lookup (plan "Session launch"). It reads snapshot metadata and
    * may admit one background build; it never waits for build execution.
+   * `provider` is the session's pinned provider. Builds always use the
+   * environment's saved target, so a session on another provider can never be
+   * served by a rebuild and gets `provider_mismatch` instead.
    */
   async resolveSnapshot(request: {
     reference: EnvironmentScope;
     actorUserId: string;
+    provider: PublishedSnapshot['provider'];
   }): Promise<SnapshotResolution> {
     if (this.deps.unsupportedReason(request.reference.owner) !== null) {
       return {
@@ -396,6 +399,13 @@ export class EnvironmentBuildCoordinator {
       return {
         snapshot: null,
         reason: 'unsupported',
+        admission: { status: 'skipped', reason: 'unsupported' },
+      };
+    }
+    if (target.target.provider !== request.provider) {
+      return {
+        snapshot: null,
+        reason: 'provider_mismatch',
         admission: { status: 'skipped', reason: 'unsupported' },
       };
     }
@@ -530,15 +540,28 @@ export class EnvironmentBuildCoordinator {
     };
   }
 
-  private async currentTarget(): Promise<BuildTargetResolution | null> {
-    const input = await this.deps.environment.buildInput(this.environmentId);
-    if (input === null) return null;
-    return this.deps.environment.buildTarget({
-      reference: input.reference,
-      repoFullName: input.repoFullName,
-      commands: input.commands,
-      sandboxAllocation: input.sandboxAllocation,
-    });
+  /**
+   * The current target for a status read, or `unknown` when it could not be
+   * resolved now. A transient resolver failure must not fail the read or mark
+   * the published snapshot incompatible.
+   */
+  private async currentTarget(): Promise<BuildTargetResolution | null | 'unknown'> {
+    try {
+      const input = await this.deps.environment.buildInput(this.environmentId);
+      if (input === null) return null;
+      return await this.deps.environment.buildTarget({
+        reference: input.reference,
+        repoFullName: input.repoFullName,
+        commands: input.commands,
+        sandboxAllocation: input.sandboxAllocation,
+      });
+    } catch (error) {
+      this.deps.log('Environment build target is temporarily unavailable', {
+        environmentId: this.environmentId,
+        error: error instanceof Error ? error.name : 'unknown',
+      });
+      return 'unknown';
+    }
   }
 
   async status(
@@ -548,14 +571,22 @@ export class EnvironmentBuildCoordinator {
     const { store } = this.deps;
     const now = this.deps.now();
     const target = await this.currentTarget();
-    const current = await this.compatibility(target);
     const active = store.activeBuild();
     const latest = store.latestTerminal();
     const published = store.published();
+    const current: SnapshotCompatibility =
+      target === 'unknown'
+        ? {
+            provider: published?.provider ?? 'cloudflare-containers',
+            baseImage: published?.baseImage ?? null,
+            runtimeAbi: RUNTIME_BASE_ABI,
+          }
+        : await this.compatibility(target);
     const attempt = store.autoAttempt(currentRevision);
     const backoff = automaticAdmission(attempt, now);
     const unsupported =
-      this.deps.unsupportedReason(owner) ?? (target !== null && !target.ok ? target.reason : null);
+      this.deps.unsupportedReason(owner) ??
+      (target !== null && target !== 'unknown' && !target.ok ? target.reason : null);
     return {
       environmentId: this.environmentId,
       supported: unsupported === null,
@@ -759,9 +790,7 @@ export class EnvironmentBuildCoordinator {
     });
     if (now - this.lastLeaseRenewalAt >= LEASE_RENEW_INTERVAL_MS) {
       this.lastLeaseRenewalAt = now;
-      await this.deps.provider
-        .renewLease(this.allocationOf(build), this.deps.lifecycle(build.id))
-        .catch(() => undefined);
+      await this.deps.provider.renewLease(this.allocationOf(build)).catch(() => undefined);
     }
     return { action: 'continue' };
   }
@@ -955,7 +984,7 @@ export class EnvironmentBuildCoordinator {
 
   private async launch(build: BuildRow): Promise<void> {
     const allocation = this.allocationOf(build);
-    const state = this.deps.lifecycle(build.id);
+    const state = this.lifecycleOf(build.id);
     const url = this.deps.runnerUrl(this.environmentId, build.id);
     if (url === null) {
       this.beginStopping(build.id, ['preparing'], 'failed', { reason: 'builder_start_failed' });
@@ -1057,9 +1086,7 @@ export class EnvironmentBuildCoordinator {
     }
     if (now - this.lastLeaseRenewalAt >= LEASE_RENEW_INTERVAL_MS) {
       this.lastLeaseRenewalAt = now;
-      await this.deps.provider
-        .renewLease(this.allocationOf(build), this.deps.lifecycle(build.id))
-        .catch(() => undefined);
+      await this.deps.provider.renewLease(this.allocationOf(build)).catch(() => undefined);
     }
   }
 
@@ -1073,15 +1100,13 @@ export class EnvironmentBuildCoordinator {
       this.beginStopping(build.id, ['capturing'], 'failed', { reason: 'capture_failed' });
       return;
     }
-    await this.deps.provider
-      .renewLease(this.allocationOf(build), this.deps.lifecycle(build.id))
-      .catch(() => undefined);
+    await this.deps.provider.renewLease(this.allocationOf(build)).catch(() => undefined);
     let result;
     try {
       result = await this.deps.provider.capture(
         this.allocationOf(build),
         build.capture_id,
-        this.deps.lifecycle(build.id)
+        this.lifecycleOf(build.id)
       );
     } catch {
       // The reply was lost; the next pass reads the stored result by capture id.
@@ -1197,10 +1222,7 @@ export class EnvironmentBuildCoordinator {
     }
     let result: 'terminal' | 'retryable';
     try {
-      result = await this.deps.provider.stop(
-        this.allocationOf(build),
-        this.deps.lifecycle(build.id)
-      );
+      result = await this.deps.provider.stop(this.allocationOf(build), this.lifecycleOf(build.id));
     } catch {
       result = 'retryable';
     }
@@ -1273,6 +1295,16 @@ export class EnvironmentBuildCoordinator {
       next_cleanup_at: null,
       stage_times: withStage(current, 'stopping', now),
     });
+  }
+
+  /** Non-secret provider reconciliation state, kept in the build row. */
+  private lifecycleOf(buildId: string): BuilderLifecycleState {
+    const { store } = this.deps;
+    return {
+      get: async () => store.providerState(buildId),
+      set: async value => store.setProviderState(buildId, value),
+      clear: async () => store.setProviderState(buildId, undefined),
+    };
   }
 
   private targetOf(build: BuildRow, input: BuildInputRecord): EnvironmentBuildTarget {
@@ -1362,7 +1394,7 @@ function buildPublishedDescriptor(args: {
     baseImage: target.provider === 'vercel' ? vercelSnapshotBaseImage(target) : capture.baseImage,
     runtimeAbi: RUNTIME_BASE_ABI,
     runtimeRelease: build.runtime_release,
-    builderInstance: target.provider === 'cloudflare-containers' ? target.instance : 'vercel',
+    builderInstance: target.instance,
     snapshotId: capture.snapshotId,
     ...(capture.size === undefined ? {} : { size: capture.size }),
     capturedAt: capture.capturedAt,

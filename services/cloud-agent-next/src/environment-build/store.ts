@@ -137,6 +137,31 @@ export class BuildStore {
   }
 
   /**
+   * The provider lifecycle state of one build, or undefined when none is stored.
+   * Malformed JSON is returned as its raw text so the provider's own schema
+   * rejects it as invalid state instead of reading it as empty.
+   */
+  providerState(buildId: string): unknown {
+    const row = this.db
+      .select({ value: builds.provider_state })
+      .from(builds)
+      .where(eq(builds.id, buildId))
+      .get();
+    if (row?.value == null) return undefined;
+    try {
+      return JSON.parse(row.value) as unknown;
+    } catch {
+      return row.value;
+    }
+  }
+
+  setProviderState(buildId: string, value: unknown): void {
+    this.update(buildId, {
+      provider_state: value === undefined ? null : JSON.stringify(value),
+    });
+  }
+
+  /**
    * Append redacted lines within the per-build byte bound. Past the bound one
    * truncation marker is kept and later lines are dropped.
    */

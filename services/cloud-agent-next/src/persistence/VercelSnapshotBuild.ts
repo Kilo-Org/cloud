@@ -55,6 +55,10 @@ import {
 } from '../byoc/vercel-runtime-base.js';
 import { toolchainVerificationScript } from '../shared/runtime-toolchain.js';
 import { downloadedStartup } from '../sandbox-control/downloaded-startup.js';
+import {
+  hasStartupMarker,
+  markedStartupCommand,
+} from '../sandbox-control/startup-command-marker.js';
 import { ProviderCreationError } from '../sandbox-control/provider.js';
 import { selectStartup } from '../sandbox-control/startup-selection.js';
 import { withDORetry } from '../utils/do-retry.js';
@@ -149,6 +153,10 @@ function operationId(prefix: string, generation: string): string {
 
 function controlId(generation: string): string {
   return `ses-byoc-validator-${generation.replace(/-/g, '').slice(0, 32)}`;
+}
+
+function callHomeMarker(generation: string): string {
+  return `byoc-call-home:${generation}`;
 }
 
 function requiredBuildField(value: string | null, error: string): string {
@@ -739,9 +747,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
             client.listCommands(validatorSessionId)
           );
           const matches = commands.filter(command =>
-            command.args.some(argument =>
-              argument.includes(`byoc-call-home:${state.build_generation}`)
-            )
+            hasStartupMarker(command.args, callHomeMarker(state.build_generation))
           );
           if (matches.length > 1) throw new Error('validator_call_home_ambiguous');
           const command = matches[0];
@@ -823,17 +829,18 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
             throw new SnapshotBuildRetryableError('runtime_startup_unavailable', { cause: error });
           }
         });
-        const [startupCommand, ...startupArgs] = startup.argv;
-        if (!startupCommand || startupArgs.length === 0)
+        let launched: { command: string; args: string[] };
+        try {
+          launched = markedStartupCommand(startup, callHomeMarker(state.build_generation));
+        } catch {
           throw new Error('provider_configuration_failed');
-        const launchedArgs = [...startupArgs];
-        launchedArgs[launchedArgs.length - 1] += `\n# byoc-call-home:${state.build_generation}`;
+        }
         const intent = this.next(prepared, { validator_wrapper_requested: 1 });
         if (!this.save(intent)) throw new SnapshotBuildOwnershipLostError();
         const command = await this.external(intent, () =>
           client.executeCommand(validatorSessionId, {
-            command: startupCommand,
-            args: launchedArgs,
+            command: launched.command,
+            args: launched.args,
             cwd: '/',
             env: {
               ...buildControlWrapperLaunchEnv({

@@ -546,11 +546,15 @@ class EnvironmentSnapshotRequiredError extends Error {
   }
 }
 
-type EnvironmentSnapshotUnusableReason = 'provider_no_snapshots' | 'not_isolated';
+type EnvironmentSnapshotUnusableReason =
+  | 'provider_no_snapshots'
+  | 'not_isolated'
+  | 'provider_mismatch';
 
 const ENVIRONMENT_SNAPSHOT_UNUSABLE_DETAIL: Record<EnvironmentSnapshotUnusableReason, string> = {
   provider_no_snapshots: ENVIRONMENT_SNAPSHOT_MESSAGES.unsupported,
   not_isolated: ENVIRONMENT_SNAPSHOT_MESSAGES.newSession,
+  provider_mismatch: ENVIRONMENT_SNAPSHOT_MESSAGES.providerMismatch,
 };
 
 /**
@@ -2877,7 +2881,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const previous = await this.readAllocation();
     const timers = { ...this.sandboxTimers() };
     if (
-      this.provider.environmentSnapshots === true &&
+      this.provider.environmentSnapshots !== undefined &&
       (event.type === 'ensure' || event.type === 'tick')
     ) {
       const routes = await listRoutes(this.db);
@@ -5130,7 +5134,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
         if (pin.billing) await assertContainerAccountAvailable(this.env, pin.billing);
         selectedLaunch =
-          pin.provider === 'vercel'
+          this.provider.environmentSnapshots === 'create'
             ? await this.environmentSnapshotLaunch(state, allocationId, createDeadline)
             : undefined;
         const intent: ProviderCreateIntent = {
@@ -5648,7 +5652,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // Build commands run only in an environment build. When no environment
       // snapshot can serve this start, rebuilding cannot help: fail at once.
       const unusable =
-        this.provider.environmentSnapshots !== true
+        this.provider.environmentSnapshots === undefined
           ? 'provider_no_snapshots'
           : 'reason' in selected && selected.reason === 'not_isolated'
             ? 'not_isolated'
@@ -5677,21 +5681,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
       log({ reason: 'no_build_commands' });
       return { options: {}, selection: null };
     }
-    let lookup = await lookupEnvironmentSnapshot({
+    const lookup = await lookupEnvironmentSnapshot({
       namespace: this.env.ENVIRONMENT_BUILD,
       candidate,
+      provider: this.currentProvider() === 'vercel' ? 'vercel' : 'cloudflare-containers',
       launchDeadlineAt,
     });
-    if (
-      lookup.kind === 'resolved' &&
-      lookup.resolution.snapshot !== null &&
-      lookup.resolution.snapshot.provider !==
-        (this.currentProvider() === 'vercel' ? 'vercel' : 'cloudflare-containers')
-    ) {
-      lookup = {
-        kind: 'resolved',
-        resolution: { ...lookup.resolution, snapshot: null, reason: 'incompatible' },
-      };
+    if (lookup.kind === 'resolved' && lookup.resolution.reason === 'provider_mismatch') {
+      log({ reason: 'provider_mismatch' });
+      throw new EnvironmentSnapshotUnusableError(
+        'provider_mismatch',
+        ENVIRONMENT_SNAPSHOT_UNUSABLE_DETAIL.provider_mismatch,
+        candidate.reference.environmentId
+      );
     }
     const decision = environmentSnapshotDecision(candidate, lookup);
     if (decision.kind === 'blocked') {
@@ -5838,9 +5840,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
           'Sandbox launch timed out'
         );
       } catch (error) {
-        // Vercel fixes the snapshot at create time. Retry creation through the
-        // allocation lifecycle, not launch on a session that stop made terminal.
-        if (!requestedSnapshot || this.currentProvider() === 'vercel') throw error;
+        // A create-time snapshot cannot be retried by launch. Retry creation
+        // through the allocation lifecycle instead.
+        if (!requestedSnapshot || this.provider.environmentSnapshots === 'create') throw error;
         if (await this.allocationOwnedElsewhere(input.allocationId)) {
           return {
             result: { startSource: 'repository' },

@@ -177,15 +177,23 @@ describe('environmentLaunchCandidate for a V2 environment', () => {
 
 describe('environment snapshot lookup', () => {
   it('returns the coordinator resolution within the budget', async () => {
+    const requests: unknown[] = [];
     const namespace = {
-      getByName: () => ({ resolveSnapshot: async () => RESOLVED }),
+      getByName: () => ({
+        resolveSnapshot: async (request: unknown) => {
+          requests.push(request);
+          return RESOLVED;
+        },
+      }),
     } as unknown as DurableObjectNamespace<never>;
     const lookup = await lookupEnvironmentSnapshot({
       namespace: namespace as never,
       candidate: { reference: REFERENCE, actorUserId: 'user-1', buildCommands: 0 },
+      provider: 'vercel',
       launchDeadlineAt: Date.now() + 60_000,
     });
     expect(lookup).toEqual({ kind: 'resolved', resolution: RESOLVED });
+    expect(requests).toEqual([{ reference: REFERENCE, actorUserId: 'user-1', provider: 'vercel' }]);
     expect(snapshotStart(RESOLVED)).toEqual({
       snapshotId: 'snap-1',
       baseImage: 'registry.example/app:1',
@@ -200,6 +208,7 @@ describe('environment snapshot lookup', () => {
     const lookup = await lookupEnvironmentSnapshot({
       namespace: namespace as never,
       candidate: { reference: REFERENCE, actorUserId: 'user-1', buildCommands: 0 },
+      provider: 'cloudflare-containers',
       launchDeadlineAt: Date.now() + 50,
     });
     expect(lookup).toEqual({ kind: 'timeout' });
@@ -220,6 +229,7 @@ describe('environment snapshot lookup', () => {
       lookupEnvironmentSnapshot({
         namespace: namespace as never,
         candidate: { reference: REFERENCE, actorUserId: 'user-1', buildCommands: 0 },
+        provider: 'cloudflare-containers',
         launchDeadlineAt: Date.now() + 60_000,
       })
     ).resolves.toEqual({ kind: 'unavailable' });
@@ -228,6 +238,7 @@ describe('environment snapshot lookup', () => {
       lookupEnvironmentSnapshot({
         namespace: undefined,
         candidate: { reference: REFERENCE, actorUserId: 'user-1', buildCommands: 0 },
+        provider: 'cloudflare-containers',
         launchDeadlineAt: Date.now() + 60_000,
       })
     ).resolves.toEqual({ kind: 'unavailable' });
@@ -298,6 +309,11 @@ describe('environmentSnapshotDecision', () => {
       'incompatible',
       'environment_snapshot_incompatible',
       'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+    [
+      'provider_mismatch',
+      'environment_not_supported',
+      "This session runs on different compute than the environment's snapshot. Use the environment's compute.",
     ],
   ] as const)(
     'explains a %s snapshot without exposing build IDs',

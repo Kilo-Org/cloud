@@ -36,6 +36,7 @@ import {
   type SnapshotResolution,
 } from './coordinator.js';
 import { mintRunnerCredential } from './runner-credential.js';
+import type { PublishedSnapshot } from './policy.js';
 import type { EnvironmentScope } from './reference.js';
 import type { BuildTrigger } from './sqlite-schema.js';
 import { BuildStore } from './store.js';
@@ -142,18 +143,6 @@ export class EnvironmentBuild extends DurableObject<Env> {
         containers: env.SANDBOX_CONTAINERS,
         env,
       }),
-      lifecycle: buildId => {
-        const key = `environment-build:lifecycle:v1:${buildId}`;
-        return {
-          get: () => storage.get(key),
-          set: async value => {
-            await storage.put(key, value);
-          },
-          clear: async () => {
-            await storage.delete(key);
-          },
-        };
-      },
       runnerUrl: (environmentId, buildId) => {
         const base = env.WORKER_URL?.replace(/\/$/, '');
         return base ? `${base}/environment-build/${environmentId}/${buildId}` : null;
@@ -240,6 +229,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
   async resolveSnapshot(input: {
     reference: EnvironmentScope;
     actorUserId: string;
+    provider: PublishedSnapshot['provider'];
   }): Promise<SnapshotResolution> {
     return (await this.coordinatorFor(input.reference.environmentId)).resolveSnapshot(input);
   }

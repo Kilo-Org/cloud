@@ -32,13 +32,13 @@ const allocation: VercelBuilderAllocation = {
     projectId: 'project-1',
     runtimeBuildId: 'runtime-1',
     baseSnapshotId: 'snap-base',
-    resources: { vcpus: 2, memory: 4096 },
+    instance: 'vercel-small',
   },
 };
 
 const runner = { url: 'https://worker.test/environment-build/test', credential: 'synthetic' };
 const command = { argv: ['/bin/sh', '-c', 'download-selected-builder'], user: 'root' as const };
-const START_MARKER = `--kilocode-envbuild-start=${allocation.allocationId}`;
+const START_MARKER = `kilocode-envbuild-start:${allocation.allocationId}`;
 const now = () => 1_800_000_000_000;
 const afterSettle = () => now() + DEADLINE_MS.createSettle + 1;
 
@@ -71,7 +71,10 @@ function createEnvelope(sessionId = 'session-1') {
   } as never;
 }
 
-function commandRecord(exitCode: number | null, args: string[] = [START_MARKER]) {
+function commandRecord(
+  exitCode: number | null,
+  args: string[] = ['-c', `script\n# ${START_MARKER}`]
+) {
   return {
     id: 'command-1',
     name: '/bin/sh',
@@ -95,6 +98,7 @@ function client(overrides: Partial<Record<keyof VercelBuilderClient, unknown>> =
     createSnapshot: vi.fn(async () => snapshot('snap-env')),
     listCommands: vi.fn(async () => []),
     listSnapshots: vi.fn(async () => []),
+    getSnapshot: vi.fn(async (id: string) => snapshot(id)),
     ...overrides,
   } as unknown as VercelBuilderClient;
 }
@@ -141,7 +145,7 @@ describe('Vercel environment builder', () => {
     const start = vi.mocked(rest.executeCommand).mock.calls[1];
     expect(start?.[1]).toMatchObject({
       command: '/bin/sh',
-      args: ['-c', 'download-selected-builder', START_MARKER],
+      args: ['-c', `download-selected-builder\n# ${START_MARKER}`],
       env: {},
       sudo: true,
       wait: false,
@@ -597,6 +601,60 @@ describe('Vercel environment builder', () => {
 
     expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('terminal');
     expect(await state.get()).toBeUndefined();
+  });
+
+  it('reads a known snapshot by ID without listing the project', async () => {
+    const pending = { ...snapshot('snap-env'), status: 'creating' } as VercelSandboxSnapshot;
+    const rest = client({ getSnapshot: vi.fn(async () => pending) });
+    const state = memoryState({
+      sessionId: 'session-1',
+      snapshotId: 'snap-env',
+      captureStartedAt: now(),
+    });
+    const capture = (clock: () => number) =>
+      captureVercelBuilder({
+        allocation,
+        captureId: 'capture',
+        state,
+        client: rest,
+        runtime: 'node24',
+        now: clock,
+      });
+
+    await expect(capture(now)).resolves.toEqual({ status: 'in_progress' });
+    vi.mocked(rest.getSnapshot).mockResolvedValue(snapshot('snap-env'));
+    await expect(capture(now)).resolves.toMatchObject({ status: 'stored', snapshotId: 'snap-env' });
+    expect(rest.getSnapshot).toHaveBeenCalledWith('snap-env');
+    expect(rest.listSnapshots).not.toHaveBeenCalled();
+    expect(rest.createSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('fails a known snapshot that stays missing past the settle bound', async () => {
+    const rest = client({
+      getSnapshot: vi.fn(async () => {
+        throw new VercelSandboxRestError('request_failed', 'get-snapshot', 404);
+      }),
+    });
+    const state = memoryState({
+      sessionId: 'session-1',
+      snapshotId: 'snap-env',
+      captureStartedAt: now(),
+    });
+    const capture = (clock: () => number) =>
+      captureVercelBuilder({
+        allocation,
+        captureId: 'capture',
+        state,
+        client: rest,
+        runtime: 'node24',
+        now: clock,
+      });
+
+    await expect(capture(now)).resolves.toEqual({ status: 'in_progress' });
+    await expect(capture(afterSettle)).resolves.toEqual({
+      status: 'failed',
+      reason: 'snapshot_failed',
+    });
   });
 
   it('clears a rate-limited capture request and retries within the deadline', async () => {

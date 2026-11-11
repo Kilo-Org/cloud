@@ -177,7 +177,7 @@ export function createVercelProviderAdapter(deps: {
   };
 
   return {
-    environmentSnapshots: true,
+    environmentSnapshots: 'create',
     ensureBillingAdmission,
     describeRuntime(ref) {
       const parsed = decodeOwnedProviderRef(ref);

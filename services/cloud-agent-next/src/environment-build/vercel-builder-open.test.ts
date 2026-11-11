@@ -28,6 +28,7 @@ const allocation: VercelBuilderAllocation = {
     projectId: 'project-1',
     runtimeBuildId: 'runtime-1',
     baseSnapshotId: 'snap-base',
+    instance: 'vercel-small',
   },
 };
 

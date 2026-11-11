@@ -295,6 +295,41 @@ export async function scanProcessIdentities(input: ProcessScan): Promise<Process
   );
 }
 
+/**
+ * Live processes that appeared after the pre-spawn baseline and descend from
+ * this scope. A new process belongs to setup when its chain of new ancestors
+ * reaches `selfPid`, or ends at init or an exited parent (a setup daemon that
+ * reparented). A new process under another pre-existing process, such as a
+ * provider agent that started a command after the baseline, is not touched.
+ */
+export function setupDescendants(
+  entries: readonly ProcessIdentity[],
+  baseline: ReadonlySet<string>,
+  selfPid: number
+): ProcessIdentity[] {
+  const byPid = new Map(entries.map(entry => [entry.pid, entry]));
+  const isNew = (entry: ProcessIdentity) => !baseline.has(entry.identity);
+  const ownedBySetup = (entry: ProcessIdentity): boolean => {
+    let current = entry;
+    for (let depth = 0; depth < entries.length; depth += 1) {
+      const parentPid = current.parent;
+      if (parentPid === selfPid || parentPid <= 1) return true;
+      const parent = byPid.get(parentPid);
+      if (parent === undefined) return true;
+      if (!isNew(parent)) return false;
+      current = parent;
+    }
+    return false;
+  };
+  return entries.filter(
+    entry =>
+      entry.pid !== selfPid &&
+      isLiveProcessState(entry.state) &&
+      isNew(entry) &&
+      ownedBySetup(entry)
+  );
+}
+
 export function classifyDirectProcessState(input: {
   exited: boolean;
   pid: number | undefined;
@@ -1004,12 +1039,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
       readdir: () => deadline.wait(() => readdir('/proc')),
       readFile: file => readText(file, deadline),
     });
-    return entries.filter(
-      entry =>
-        entry.pid !== process.pid &&
-        isLiveProcessState(entry.state) &&
-        !preSpawnIdentities.has(entry.identity)
-    );
+    return setupDescendants(entries, preSpawnIdentities, process.pid);
   };
 
   const signalUnbaselinedProcesses = async (

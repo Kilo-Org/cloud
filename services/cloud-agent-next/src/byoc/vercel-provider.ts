@@ -55,7 +55,7 @@ export function createByocVercelProviderAdapter(deps: {
   }
 
   return {
-    environmentSnapshots: true,
+    environmentSnapshots: 'create',
     ensureBillingAdmission: async () => {},
     async create(intent) {
       let snapshot: ByocVercelRuntimeSnapshot | undefined;
@@ -91,7 +91,7 @@ export function createByocVercelProviderAdapter(deps: {
           if (
             requested !== undefined &&
             error instanceof VercelSandboxRestError &&
-            (error.status === 400 || error.status === 404 || error.status === 410)
+            (error.status === 404 || error.status === 410)
           )
             throw new ProviderSnapshotCreationError('missing');
           throw error;

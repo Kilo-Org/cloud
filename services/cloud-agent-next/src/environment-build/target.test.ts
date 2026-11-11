@@ -92,7 +92,7 @@ describe('resolveEnvironmentBuildTarget', () => {
         projectId: 'project-1',
         runtimeBuildId: 'runtime-1',
         baseSnapshotId: 'snap-base',
-        resources: { vcpus: 2, memory: 4096 },
+        instance: 'vercel-small',
       },
     });
   });

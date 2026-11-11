@@ -13,6 +13,10 @@ import {
 import { vercelSnapshotBaseImage } from '../byoc/vercel-snapshot-compatibility.js';
 import type { ProviderStartupCommand } from '../sandbox-control/provider.js';
 import {
+  hasStartupMarker,
+  markedStartupCommand,
+} from '../sandbox-control/startup-command-marker.js';
+import {
   ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT,
   ENVIRONMENT_BUILD_RUNNER_ENV,
 } from '../shared/environment-build-protocol.js';
@@ -22,6 +26,7 @@ import type {
   BuilderLifecycleState,
   VercelBuilderAllocation,
 } from './builder-provider.js';
+import { vercelBuilderResources } from './target.js';
 import type { NativeCaptureResult } from '../sandbox-containers/SandboxContainers.js';
 import {
   BuilderCreateUncertainError,
@@ -36,7 +41,7 @@ import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
  * builder as a command rather than PID 1, so the builder process owns cleanup
  * (see the wrapper's owned-process scope). Snapshot creation and sandbox stop
  * are platform calls; both replies can be lost, so every mutating call is
- * preceded by an inspect/reconcile step and tracked in DO KV.
+ * preceded by an inspect/reconcile step and tracked in the build row.
  */
 
 export type VercelBuilderClient = Pick<
@@ -49,6 +54,7 @@ export type VercelBuilderClient = Pick<
   | 'createSnapshot'
   | 'listCommands'
   | 'listSnapshots'
+  | 'getSnapshot'
 >;
 
 export type OpenedVercelBuilder = {
@@ -80,7 +86,7 @@ const TERMINAL_SESSION_STATUSES = new Set(['failed', 'aborted', 'stopped']);
 const TERMINAL_SNAPSHOT_STATUSES = new Set(['failed', 'aborted', 'deleted']);
 const MAX_BUILDER_TIMEOUT_MS = 45 * 60_000;
 const CREATE_LANDING_MARGIN_MS = DEADLINE_MS.createSettle;
-const START_MARKER_PREFIX = '--kilocode-envbuild-start=';
+const START_MARKER_PREFIX = 'kilocode-envbuild-start:';
 
 async function readState(state: BuilderLifecycleState): Promise<LifecycleState> {
   const raw = await state.get();
@@ -201,7 +207,7 @@ function inspectInput(allocation: VercelBuilderAllocation, runtime: VercelSandbo
     operationId: allocation.allocationId,
     runtimeBuildId: allocation.target.runtimeBuildId,
     runtime,
-    ...(allocation.target.resources ? { resources: allocation.target.resources } : {}),
+    resources: vercelBuilderResources(allocation.target),
     source: { type: 'snapshot' as const, snapshotId: allocation.target.baseSnapshotId },
   };
 }
@@ -245,9 +251,6 @@ export async function launchVercelBuilder(input: {
       created = await input.client.createSandbox({
         ...inspectInput(input.allocation, input.runtime),
         timeoutMs,
-        ...(input.allocation.target.resources
-          ? { resources: input.allocation.target.resources }
-          : {}),
       });
     } catch (error) {
       if (isDefiniteRejection(error)) {
@@ -272,7 +275,7 @@ export async function launchVercelBuilder(input: {
     let command: VercelSandboxCommand | undefined;
     try {
       command = (await input.client.listCommands(sessionId)).find(candidate =>
-        candidate.args.includes(marker)
+        hasStartupMarker(candidate.args, marker)
       );
     } catch (error) {
       wrapTransient(error, 'Vercel builder start reconciliation failed');
@@ -309,9 +312,7 @@ export async function launchVercelBuilder(input: {
   } catch (error) {
     wrapTransient(error, 'Vercel builder startup failed');
   }
-  const [command, ...args] = input.command.argv;
-  if (!command) throw new Error('Empty builder startup command');
-  args.push(marker);
+  const { command, args } = markedStartupCommand(input.command, marker);
   state = await writeState(input.state, { ...state, startRequestedAt: now() });
   try {
     const started = await input.client.executeCommand(sessionId, {
@@ -372,9 +373,12 @@ async function storedFromState(
   state: LifecycleState
 ): Promise<NativeCaptureResult | null> {
   if (state.snapshotId === undefined) return null;
-  const snapshot = (await listSnapshotsForCapture(input.client)).find(
-    candidate => candidate.id === state.snapshotId
-  );
+  let snapshot: VercelSandboxSnapshot | undefined;
+  try {
+    snapshot = await input.client.getSnapshot(state.snapshotId);
+  } catch (error) {
+    if (!hasStatus(error, 404)) wrapTransient(error, 'Vercel snapshot lookup failed');
+  }
   if (snapshot === undefined) {
     return input.now() - (state.captureStartedAt ?? input.now()) >= DEADLINE_MS.createSettle
       ? { status: 'failed', reason: 'snapshot_failed' }

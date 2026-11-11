@@ -183,7 +183,7 @@ describe('BYOC Vercel provider on the current control plane', () => {
     expect(projectByocVercelSnapshotMissing).not.toHaveBeenCalled();
   });
 
-  it.each([400, 404, 410])(
+  it.each([404, 410])(
     'fails without a clean-base fallback from an unavailable environment snapshot (%s)',
     async status => {
       const snapshots: string[] = [];
@@ -202,6 +202,13 @@ describe('BYOC Vercel provider on the current control plane', () => {
       expect(projectByocVercelSnapshotMissing).not.toHaveBeenCalled();
     }
   );
+
+  it('does not report a rejected snapshot create request as a missing snapshot', async () => {
+    vi.stubGlobal('fetch', async () => new Response('', { status: 400 }));
+    await expect(
+      adapter().create({ ...intent, snapshot: environmentSnapshot })
+    ).rejects.toMatchObject({ name: 'VercelSandboxRestError', status: 400 });
+  });
 
   it.each([
     { ...environmentSnapshot, provider: 'cloudflare-containers' as const },

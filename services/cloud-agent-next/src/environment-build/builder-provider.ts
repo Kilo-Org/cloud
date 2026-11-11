@@ -87,7 +87,7 @@ export type BuilderProvider = {
     allocation: BuilderAllocation,
     state: BuilderLifecycleState
   ): Promise<'terminal' | 'retryable'>;
-  renewLease(allocation: BuilderAllocation, state: BuilderLifecycleState): Promise<void>;
+  renewLease(allocation: BuilderAllocation): Promise<void>;
   /** SHA-256 of the runtime release descriptor, or null when unavailable. */
   runtimeReleaseId(): Promise<string | null>;
   /** The image a native container in `sandboxId` starts from now, or null when unreadable. */

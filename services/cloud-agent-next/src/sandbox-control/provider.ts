@@ -185,8 +185,13 @@ export type ProviderAdapter = {
   stop(ref: string | null, intent?: ProviderAllocationIntent | null): Promise<StopResult>;
   ensureLeaseAtLeast(ref: string, ms: number): Promise<void>;
   logs(ref: string): Promise<string>;
-  /** Present on a provider that can start a session from an environment snapshot. */
-  readonly environmentSnapshots?: true;
+  /**
+   * Present on a provider that can start a session from an environment snapshot.
+   * `create` fixes the snapshot in the create request, so the lookup runs before
+   * create and a failed snapshot start retries creation. `launch` restores the
+   * snapshot when the created sandbox launches.
+   */
+  readonly environmentSnapshots?: 'create' | 'launch';
   readonly workspaceSnapshots?: {
     currentImage(image: 'all-in-one' | 'runtime-free'): Promise<string>;
     capture(ref: string, captureId: string): Promise<NativeCaptureResult>;

@@ -4,6 +4,7 @@ import {
   PF_KTHREAD,
   processIdentity,
   scanProcessIdentities,
+  setupDescendants,
   type ProcessScan,
 } from './owned-processes';
 
@@ -98,5 +99,37 @@ describe('process identity scan', () => {
         readFile: async () => '1 (node) malformed',
       })
     ).rejects.toThrow('Process identity unavailable');
+  });
+});
+
+describe('setup descendants', () => {
+  const proc = (pid: number, parent: number, state = 'S') => ({
+    pid,
+    parent,
+    group: pid,
+    identity: `${pid}:1`,
+    state,
+    flags: 0,
+  });
+  const self = 100;
+  const baseline = new Set(['1:1', '50:1', '100:1']);
+
+  it('selects new children, their descendants and reparented daemons only', () => {
+    const entries = [
+      proc(1, 0),
+      proc(50, 1),
+      proc(100, 50),
+      proc(201, self),
+      proc(202, 201),
+      proc(203, 1),
+      proc(204, 999),
+      proc(301, 50),
+      proc(302, 301),
+      proc(205, self, 'Z'),
+    ];
+
+    expect(setupDescendants(entries, baseline, self).map(entry => entry.pid)).toEqual([
+      201, 202, 203, 204,
+    ]);
   });
 });

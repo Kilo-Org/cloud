@@ -1988,7 +1988,7 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     );
     await fixture.build.alarm();
     mocks.client.listCommands.mockResolvedValueOnce([
-      { id: 'recovered-command', args: [`byoc-call-home:${FIRST_GENERATION}`] },
+      { id: 'recovered-command', args: [`exec supervisor # byoc-call-home:${FIRST_GENERATION}`] },
     ]);
 
     await runNextAlarm(fixture);

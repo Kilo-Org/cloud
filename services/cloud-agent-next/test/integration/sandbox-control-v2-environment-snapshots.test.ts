@@ -8,6 +8,7 @@ import { allocation as allocationTable } from '../../src/control-plane/sandbox/s
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import type { SnapshotResolution } from '../../src/environment-build/coordinator.js';
+import { ENVIRONMENT_SNAPSHOT_MESSAGES } from '../../src/control-plane/sandbox/environment-snapshot-launch.js';
 import type { SessionEnvironmentReference } from '../../src/environment-build/reference.js';
 import type {
   ProviderAdapter,
@@ -283,7 +284,9 @@ function createFakeProvider(
       return '';
     },
     ...(options.vercel ? { applyContainedCredentials: async () => {} } : {}),
-    ...(options.snapshots === false ? {} : { environmentSnapshots: true as const }),
+    ...(options.snapshots === false
+      ? {}
+      : { environmentSnapshots: options.vercel ? ('create' as const) : ('launch' as const) }),
   };
   provider.adapterFor = allocationName =>
     options.vercel
@@ -594,7 +597,9 @@ describe('environment snapshot launch', () => {
     const frame = await prepareFrameOf(wrapper);
 
     expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'runtime-free' }]);
-    expect(lookups.lookups).toEqual([{ reference: REFERENCE, actorUserId: 'user_123' }]);
+    expect(lookups.lookups).toEqual([
+      { reference: REFERENCE, actorUserId: 'user_123', provider: 'cloudflare-containers' },
+    ]);
     expect(frame.spec.capture).toBeUndefined();
     expect(frame.spec).not.toHaveProperty('environment');
     await waitFor(() =>
@@ -993,7 +998,9 @@ describe('Vercel BYOC environment snapshot restore', () => {
     await prepareFrameOf(wrapper);
 
     expect(events).toEqual(['lookup', 'create']);
-    expect(lookups.lookups).toEqual([{ reference: REFERENCE, actorUserId: 'user_123' }]);
+    expect(lookups.lookups).toEqual([
+      { reference: REFERENCE, actorUserId: 'user_123', provider: 'vercel' },
+    ]);
     expect(provider.createIntents).toHaveLength(1);
     expect(provider.createIntents[0]?.allocationName).toMatch(/^sbx-[0-9a-f]{32}$/);
     const selectedSnapshot = {
@@ -1063,7 +1070,10 @@ describe('Vercel BYOC environment snapshot restore', () => {
     await waitFor(async () => expect((await stub.getAllocationState()).providerRef).toBeNull());
     await runInDurableObject(stub, async (instance, state) => {
       const db = drizzle(state.storage, { logger: false });
-      await db.update(allocationTable).set({ create_deadline_at: Date.now() - 1 });
+      await db
+        .update(allocationTable)
+        .set({ create_deadline_at: Date.now() - 1 })
+        .where(eq(allocationTable.id, 'current'));
       await instance.alarm();
     });
     await connect(sandboxId, provider, 2);
@@ -1077,9 +1087,13 @@ describe('Vercel BYOC environment snapshot restore', () => {
     expect(provider.stopRefs).toContain(provider.launchRefs[0]);
   });
 
-  it('blocks a Vercel start when the only snapshot came from another provider', async () => {
+  it('fails a Vercel start at once, without a rebuild instruction, when the environment builds on other compute', async () => {
     const sandboxId = 'sbx__vercel_snapshot_provider_mismatch';
-    const lookups = fakeEnvironmentBuild(RESOLVED);
+    const lookups = fakeEnvironmentBuild({
+      snapshot: null,
+      reason: 'provider_mismatch',
+      admission: { status: 'skipped', reason: 'unsupported' },
+    });
     const provider = createFakeProvider({ startSource: 'image', vercel: true });
     const { stub, peer } = await setup(sandboxId, provider, {
       ...VERCEL_ENV,
@@ -1088,11 +1102,19 @@ describe('Vercel BYOC environment snapshot restore', () => {
     await stub.prepare({ ...prepareInput(BUILD), sandboxSelection: VERCEL_SELECTION });
     await waitForFailed(peer);
 
-    expect(lookups.lookups).toHaveLength(1);
+    expect(lookups.lookups).toEqual([
+      { reference: REFERENCE, actorUserId: 'user_123', provider: 'vercel' },
+    ]);
     expect(provider.createIntents).toHaveLength(0);
     expect((await stub.getAllocationState()).provider).toBe('vercel');
-    expect(environmentSnapshotDetails(peer).at(-1)).toBe(
-      'Environment snapshot is unavailable. Rebuild the environment.'
-    );
+    expect(environmentSnapshotDetails(peer)).toEqual([]);
+    const sandboxDetails = peer
+      .routeUpdatesFor(SESSION)
+      .flatMap(update =>
+        update.state === 'preparing' && update.step === 'sandbox_create' && update.detail
+          ? [update.detail]
+          : []
+      );
+    expect(sandboxDetails).toContain(ENVIRONMENT_SNAPSHOT_MESSAGES.providerMismatch);
   });
 });

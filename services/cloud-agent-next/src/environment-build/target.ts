@@ -10,7 +10,6 @@ import {
   getSandboxAllocationResources,
   type SandboxAllocation,
   type VercelSandboxResources,
-  vercelSandboxResourcesSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import { z } from 'zod';
@@ -31,6 +30,8 @@ import type { Env } from '../types.js';
  * the build input because saved allocation and BYOC setup can change without a
  * configuration revision; a running build must never switch accounts midway.
  */
+const vercelBuilderInstanceSchema = z.enum(['vercel-small', 'vercel-large']);
+
 export const environmentBuildTargetSchema = z.discriminatedUnion('provider', [
   z
     .object({
@@ -46,12 +47,19 @@ export const environmentBuildTargetSchema = z.discriminatedUnion('provider', [
       projectId: z.string().min(1),
       runtimeBuildId: z.string().min(1),
       baseSnapshotId: z.string().min(1),
-      resources: vercelSandboxResourcesSchema.optional(),
+      instance: vercelBuilderInstanceSchema,
     })
     .strict(),
 ]);
 export type EnvironmentBuildTarget = z.infer<typeof environmentBuildTargetSchema>;
 export type VercelBuildTarget = Extract<EnvironmentBuildTarget, { provider: 'vercel' }>;
+
+/** The builder sandbox size of a pinned Vercel target. */
+export function vercelBuilderResources(target: VercelBuildTarget): VercelSandboxResources {
+  const resources = getSandboxAllocationResources(target.instance);
+  if (resources === undefined) throw new Error('Vercel builder instance has no resources');
+  return resources;
+}
 
 export type BuildTargetResolution =
   | { ok: true; target: EnvironmentBuildTarget }
@@ -235,10 +243,14 @@ async function resolveVercelTarget(
     ) {
       return { ok: false, provider: 'vercel', reason: 'Vercel compute setup is not ready' };
     }
-    const resources: VercelSandboxResources = getSandboxAllocationResources(allocation) ?? {
-      vcpus: 2,
-      memory: 4096,
-    };
+    const instance = vercelBuilderInstanceSchema.safeParse(allocation);
+    if (!instance.success) {
+      return {
+        ok: false,
+        provider: 'vercel',
+        reason: 'The saved Vercel allocation is not supported',
+      };
+    }
     return {
       ok: true,
       target: {
@@ -248,7 +260,7 @@ async function resolveVercelTarget(
         projectId: credential.projectId,
         runtimeBuildId: credential.runtimeBuildId,
         baseSnapshotId: credential.runtimeSnapshotId,
-        resources,
+        instance: instance.data,
       },
     };
   } catch (error) {

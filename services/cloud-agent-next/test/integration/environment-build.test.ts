@@ -48,6 +48,7 @@ type Harness = {
   launchError: Error | null;
   accountError?: Error;
   target: BuildTargetResolution;
+  targetError?: Error;
   /** The image a container would start from now; null when it cannot be read. */
   currentImage: string | null;
   alarms: number[];
@@ -167,7 +168,10 @@ async function setup(): Promise<Harness> {
                   },
                 },
               },
-        buildTarget: async () => harness.target,
+        buildTarget: async () => {
+          if (harness.targetError) throw harness.targetError;
+          return harness.target;
+        },
         actorAccess: async () => {
           if (harness.accountError) throw harness.accountError;
           return harness.environment.access;
@@ -185,11 +189,6 @@ async function setup(): Promise<Harness> {
               },
       },
       provider,
-      lifecycle: () => ({
-        get: async () => null,
-        set: async () => undefined,
-        clear: async () => undefined,
-      }),
       runnerUrl: (environment, build) =>
         `https://worker.test/environment-build/${environment}/${build}`,
       runnerCredential: async claims => `cred:${claims.buildId}:${claims.allocationId}`,
@@ -654,8 +653,13 @@ describe('environment build lifecycle', () => {
           })),
         };
         expect(
-          (await harness.stub.resolveSnapshot({ reference: session, actorUserId: 'user-1' }))
-            .snapshot
+          (
+            await harness.stub.resolveSnapshot({
+              reference: session,
+              actorUserId: 'user-1',
+              provider: 'cloudflare-containers',
+            })
+          ).snapshot
         ).toMatchObject({ buildId });
         const persisted = await runInDurableObject(harness.stub, instance => {
           const host = instance as unknown as { store: BuildStore };
@@ -686,6 +690,7 @@ describe('environment build lifecycle', () => {
                 ),
               },
               actorUserId: 'user-1',
+              provider: 'cloudflare-containers',
             })
           ).snapshot
         ).toBeNull();
@@ -841,6 +846,7 @@ describe('environment snapshot resolution', () => {
       await harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).toEqual({
       snapshot: null,
@@ -872,6 +878,7 @@ describe('environment snapshot resolution', () => {
       await harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).toMatchObject({
       snapshot: null,
@@ -937,10 +944,12 @@ describe('environment snapshot resolution', () => {
     const first = await harness.stub.resolveSnapshot({
       reference: sessionReference(harness, 1),
       actorUserId: 'user-2',
+      provider: 'cloudflare-containers',
     });
     const second = await harness.stub.resolveSnapshot({
       reference: sessionReference(harness, 1),
       actorUserId: 'user-3',
+      provider: 'cloudflare-containers',
     });
 
     expect(first).toMatchObject({
@@ -969,6 +978,7 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({
       reason: 'eligible',
@@ -980,6 +990,7 @@ describe('environment snapshot resolution', () => {
     const after = await harness.stub.resolveSnapshot({
       reference: sessionReference(harness, 2),
       actorUserId: 'user-1',
+      provider: 'cloudflare-containers',
     });
     expect(after).toMatchObject({
       reason: 'eligible',
@@ -1006,6 +1017,7 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({
       reason: 'eligible',
@@ -1030,6 +1042,7 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 2),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({ admission: { status: 'skipped', reason: 'revision_superseded' } });
 
@@ -1039,6 +1052,7 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 3),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({ reason: 'deleted', admission: { status: 'skipped' } });
   });
@@ -1051,12 +1065,14 @@ describe('environment snapshot resolution', () => {
     await harness.stub.resolveSnapshot({
       reference: sessionReference(harness, 1),
       actorUserId: 'user-1',
+      provider: 'cloudflare-containers',
     });
     await drive(harness);
     await expect(
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({ admission: { status: 'skipped', reason: 'backoff' } });
     expect((await status(harness)).automaticBackoff).toMatchObject({ revision: 1, failures: 1 });
@@ -1072,6 +1088,7 @@ describe('environment snapshot resolution', () => {
     const lookup = await harness.stub.resolveSnapshot({
       reference: sessionReference(harness, 1),
       actorUserId: 'user-1',
+      provider: 'cloudflare-containers',
     });
     const buildId = (lookup.admission as { buildId: string }).buildId;
     await tick(harness);
@@ -1087,6 +1104,7 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({ admission: { status: 'skipped', reason: 'backoff' } });
     expect((await status(harness)).automaticBackoff).toMatchObject({ revision: 1, failures: 1 });
@@ -1105,7 +1123,7 @@ describe('environment snapshot resolution', () => {
       projectId: 'project-1',
       runtimeBuildId: 'runtime-1',
       baseSnapshotId: 'snap-base',
-      resources: { vcpus: 2 as const, memory: 4096 as const },
+      instance: 'vercel-small' as const,
     };
     harness.target = { ok: true, target };
 
@@ -1124,11 +1142,44 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'vercel',
       })
     ).resolves.toMatchObject({
       reason: 'eligible',
       snapshot: { provider: 'vercel', baseImage: vercelSnapshotBaseImage(target) },
     });
+
+    // A session pinned to native containers cannot use the snapshot, and a
+    // rebuild would target Vercel again, so no replacement build is admitted.
+    await expect(
+      harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
+      })
+    ).resolves.toEqual({
+      snapshot: null,
+      reason: 'provider_mismatch',
+      admission: { status: 'skipped', reason: 'unsupported' },
+    });
+    expect((await status(harness)).activeBuild).toBeNull();
+  });
+
+  it('keeps status readable and the snapshot current while the target cannot be resolved', async () => {
+    const harness = await setup();
+    const { auth } = await readyBuild(harness);
+    await harness.stub.runnerResult(auth, {
+      outcome: 'ready',
+      commit: 'a'.repeat(40),
+      branch: 'main',
+      setupDurationMs: 1,
+    });
+    await drive(harness);
+
+    harness.targetError = new Error('resolver unavailable');
+    const read = await status(harness);
+    expect(read.supported).toBe(true);
+    expect(read.published).toMatchObject({ stale: null });
   });
 
   it('retries a retryable Vercel builder launch instead of failing the build', async () => {

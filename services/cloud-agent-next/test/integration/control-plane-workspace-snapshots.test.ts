@@ -110,7 +110,7 @@ async function setup(
     async logs() {
       return '';
     },
-    environmentSnapshots: true,
+    environmentSnapshots: 'launch',
     workspaceSnapshots: {
       currentImage: async () => {
         controls.imageLookups += 1;

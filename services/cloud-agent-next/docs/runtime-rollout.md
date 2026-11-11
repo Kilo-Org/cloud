@@ -14,13 +14,12 @@ New allocations support only downloaded startup on the runtime-free image, on na
 Containers and BYOC Vercel. Preinstalled and all-in-one deployment selections are rejected. Missing
 runtime descriptors fail configuration preflight instead of falling back to a baked runtime.
 Persisted allocation readers still recognize historical startup modes and image identities; running
-allocations are not rewritten. Retired SDK provider pins cannot create a new allocation. A catalog
-target marked `vercel: true` declares BYOC Vercel support and requires the published runtime release.
-Because every target downloads the runtime, one release serves native and Vercel startup.
+allocations are not rewritten. Retired SDK provider pins cannot create a new allocation. Because
+every target downloads the runtime, one published release serves native and BYOC Vercel startup.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
 path and Bun version required by the bootstrap. `src/shared/runtime-toolchain.ts` pins every base tool
-(`bun`, `rg`, `gh`, `glab`, `pnpm`, `kilo`) to a release archive or registry tarball whose SHA-256 sits
+(`bun`, `rg`, `gh`, `glab`, `pnpm`) to a release archive or registry tarball whose SHA-256 sits
 next to `RUNTIME_DISTRIBUTION`. The Durable Object build installs `bun` and the base tools from those pins,
 checks the downloaded bytes before unpacking or installing, and re-checks the tools it installed by exact
 version and digest before the snapshot is created or accepted.
@@ -105,14 +104,15 @@ Native builds require a downloaded runtime-free deployment and a published runti
 builds use the saved allocation's customer-owned base snapshot and require a published runtime release,
 not native container enrollment. Vercel snapshot compatibility includes the credential, project and
 exact base snapshot, so runtime-only updates do not invalidate it. Missing or incompatible snapshots
-fail with a rebuild instruction, never a clean-base fallback. Existing all-in-one environment snapshots are incompatible and trigger replacement
-builds. Runtime-only updates retain snapshot
-compatibility when the runtime-free base image and ABI stay unchanged.
+fail with a rebuild instruction, never a clean-base fallback. Builds always use the environment's
+saved compute. A session pinned to another provider fails at once with a provider-mismatch reason,
+because a rebuild cannot serve it. Existing all-in-one environment snapshots are incompatible and
+trigger replacement builds. Runtime-only updates retain snapshot compatibility when the runtime-free
+base image and ABI stay unchanged.
 
 ## Deployment and qualification
 
-The checked-in catalog selects downloaded runtime-free deployment-wide for all targets and declares
-BYOC Vercel support. A downloaded target makes eligible successful main CI publish a handoff for that
+The checked-in catalog selects downloaded runtime-free deployment-wide for all targets. A downloaded target makes eligible successful main CI publish a handoff for that
 SHA, and downloaded deployment waits for that handoff. Use a dedicated test organization for
 real-provider qualification; the current catalog does not limit downloaded startup to that
 organization. Record the Worker name, exact source SHA, bucket and instance type for each
@@ -178,7 +178,7 @@ Provider metadata retention remains unmeasured until the approved real-provider 
 
 Roll back by selecting a previously verified source SHA and its retained runtime handoff/base digest.
 Do not change the catalog to preinstalled or all-in-one; those selections are no longer accepted.
-A target marked `vercel: true` continues to require that release and the runtime bucket binding.
+BYOC Vercel startup also requires that release and the runtime bucket binding.
 Keep earlier descriptors, payloads, handoffs and image digests. Do not delete snapshots or publication
 objects during rollback. Existing allocations retain their mode, image and deadlines. Keep the runtime
 bucket binding available for allocations that are still bootstrapping, and do not deploy a Worker that

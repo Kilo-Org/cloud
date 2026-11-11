@@ -96,31 +96,6 @@ jobs:
           test -d node_modules/.pnpm-store && echo "mounted store present"
           echo "top-level links: $(find node_modules -maxdepth 1 -type l | wc -l)"
 
-      - name: Resolve Playwright version
-        id: playwright
-        run: echo "version=$(pnpm --filter web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}
-
-      - name: Report the restored browser tree
-        run: ls ~/.cache/ms-playwright || echo "no browser tree before install"
-
-      - name: Install Playwright Chromium
-        run: pnpm --filter web exec playwright install chromium
-
-      - name: Launch Chromium
-        run: |
-          pnpm --filter web exec node -e "
-          const { chromium } = require('@playwright/test');
-          (async () => {
-            const browser = await chromium.launch();
-            const page = await browser.newPage();
-            await page.setContent('<h1>probe</h1>');
-            console.log('heading:', await page.textContent('h1'));
-            await browser.close();
-          })();
-          "
+      # No Playwright steps here: the ubuntu-latest image is Ubuntu 26.04,
+      # which this @playwright/test version refuses outright, with or without
+      # --with-deps.

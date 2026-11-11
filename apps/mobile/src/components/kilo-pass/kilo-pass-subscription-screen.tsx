@@ -1,4 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openExternalUrl } from '@/lib/external-link';
+import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
 import { useTRPC } from '@/lib/trpc';
 import {
   KILO_PASS_TITLE,
@@ -20,11 +22,35 @@ import {
   type PurchaseStatusClass,
 } from '@kilocode/app-shared/commerce';
 
-function KiloPassLoadingScreen() {
+/**
+ * The screen's frame: one header for every presentation kind, above the body it
+ * owns. The route presents as a full-screen modal on Android, so the sheet edge
+ * reaches the window top there and this frame clears the status-bar inset
+ * itself; the iOS page sheet presents below the status bar, reserves nothing,
+ * and the header keeps its own grabber clearance.
+ */
+function KiloPassFrame({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
+  const windowTopClearance = useSheetHeaderTopClearance('android-window-top');
+  const surfaceOwnsWindowTop = windowTopClearance > 0;
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('kiloPass.title')} modal />
+      <View style={surfaceOwnsWindowTop ? { paddingTop: windowTopClearance } : undefined}>
+        <ScreenHeader
+          title={t('kiloPass.title')}
+          modal
+          safeAreaTop={!surfaceOwnsWindowTop}
+          className={surfaceOwnsWindowTop ? 'pt-2' : undefined}
+        />
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function KiloPassLoadingScreen() {
+  return (
+    <KiloPassFrame>
       <View className="flex-1 px-5">
         <DetailScreenScrollView
           className="-mx-1 flex-1"
@@ -37,15 +63,14 @@ function KiloPassLoadingScreen() {
           ))}
         </DetailScreenScrollView>
       </View>
-    </View>
+    </KiloPassFrame>
   );
 }
 
 function KiloPassPresentationErrorScreen({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation();
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title={t('kiloPass.title')} modal />
+    <KiloPassFrame>
       <CenteredState>
         <View className="items-center gap-3 px-6">
           <Text className="text-center font-semibold text-foreground">
@@ -63,7 +88,7 @@ function KiloPassPresentationErrorScreen({ onRetry }: { onRetry: () => void }) {
           </Button>
         </View>
       </CenteredState>
-    </View>
+    </KiloPassFrame>
   );
 }
 
@@ -84,9 +109,16 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
   const router = useRouter();
 
   if (presentation.kind === 'unavailable') {
+    // The ended fact plus the unavailability sentence. Each catalog holds its own
+    // sentence once, so the two compose here rather than one spelling the other;
+    // they already carry their terminal punctuation, so the separator is a space
+    // and not the locale's `sentenceJoiner`, which would add a second period.
+    const description =
+      presentation.statusClass === 'terminal'
+        ? [t('kiloPass.purchaseUnavailableEnded'), t('kiloPass.purchaseUnavailable')].join(' ')
+        : undefined;
     return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title={t('kiloPass.title')} modal />
+      <KiloPassFrame>
         {/* This screen owns the body below the header, so the state centres in
             it directly. The measured placement would start at the window's
             centre and lift by half the header, a jump on every open. */}
@@ -95,14 +127,9 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
             placement="static"
             icon={Crown}
             title={t('kiloPass.purchaseUnavailableTitle')}
-            // Only a pass the server reports as ended has something the title does
-            // not say; the plain kind would restate the title, which the state's
-            // own guide forbids.
-            description={
-              presentation.statusClass === 'terminal'
-                ? t('kiloPass.purchaseUnavailableEnded')
-                : undefined
-            }
+            // The plain kind has nothing the title does not say, and the state's
+            // own guide forbids a description that restates it.
+            description={description}
             action={
               <Button
                 accessibilityLabel={t('credits.title')}
@@ -111,20 +138,18 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
                   // Replacing the dead-end modal keeps one sheet on screen.
                   router.replace('/(app)/credits' as Href);
                 }}
-                variant="outline"
               >
                 <Text>{t('credits.title')}</Text>
               </Button>
             }
           />
         </View>
-      </View>
+      </KiloPassFrame>
     );
   }
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title={t('kiloPass.title')} modal />
+    <KiloPassFrame>
       <CenteredState>
         <View className="items-center gap-3 px-6">
           <Text className="text-center text-sm leading-[1.25rem] text-muted-foreground">
@@ -155,7 +180,7 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
           ) : null}
         </View>
       </CenteredState>
-    </View>
+    </KiloPassFrame>
   );
 }
 

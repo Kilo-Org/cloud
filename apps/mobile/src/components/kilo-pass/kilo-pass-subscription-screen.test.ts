@@ -7,6 +7,7 @@ import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
 
 const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' as string }));
 const mockRouter = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
+const mockClearance = vi.hoisted(() => ({ windowTop: 0 }));
 const mocks = vi.hoisted(() => ({
   presentation: {
     isPending: false,
@@ -29,6 +30,9 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'min-h-[48px]' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/form-sheet', () => ({
+  useSheetHeaderTopClearance: () => mockClearance.windowTop,
+}));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ kiloPass: { getPurchasePresentation: { queryOptions: () => ({}) } } }),
 }));
@@ -73,6 +77,7 @@ function nodesOfType(
 describe('KiloPassSubscriptionScreen', () => {
   beforeEach(() => {
     mockedPlatform.OS = 'ios';
+    mockClearance.windowTop = 0;
     mocks.presentation.isPending = false;
     mocks.presentation.isError = false;
     mocks.presentation.data = null;
@@ -114,12 +119,34 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('unavailable: a lapsed pass states that the pass ended', async () => {
+  it('unavailable: a lapsed pass states that the pass ended, then the unavailability', async () => {
     mocks.presentation.data = { kind: 'unavailable', statusClass: 'terminal', webUrl: null };
     const renderer = await renderScreen();
-    expect(nodesOfType(renderer, 'EmptyState')[0]?.props.description).toBe(
-      'Your Kilo Pass has ended.'
+    const emptyState = nodesOfType(renderer, 'EmptyState')[0];
+    expect(emptyState?.props.title).toBe('Not available right now');
+    expect(emptyState?.props.description).toBe(
+      'Your Kilo Pass has ended. Kilo Pass purchase is not available right now.'
     );
+    renderer.unmount();
+  });
+
+  it('clears the window top inset when the modal surface reaches the window top', async () => {
+    mockClearance.windowTop = 51.8;
+    mocks.presentation.data = { kind: 'unavailable', statusClass: 'inactive', webUrl: null };
+    const renderer = await renderScreen();
+    const padded = nodesOfType(renderer, 'View').filter(
+      node => (node.props.style as { paddingTop?: number } | undefined)?.paddingTop === 51.8
+    );
+    expect(padded).toHaveLength(1);
+    renderer.unmount();
+    mockClearance.windowTop = 0;
+  });
+
+  it('leaves the header to the presented sheet when the surface sits below the window top', async () => {
+    mocks.presentation.data = { kind: 'unavailable', statusClass: 'inactive', webUrl: null };
+    const renderer = await renderScreen();
+    const padded = nodesOfType(renderer, 'View').filter(node => node.props.style !== undefined);
+    expect(padded).toHaveLength(0);
     renderer.unmount();
   });
 

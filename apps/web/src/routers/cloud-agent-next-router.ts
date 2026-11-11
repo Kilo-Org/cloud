@@ -15,7 +15,7 @@ import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-ac
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import type { User } from '@kilocode/db/schema';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
-import { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
+import { resolveGitHubPrepareParams } from '@/lib/cloud-agent-next/github-prepare-params';
 import {
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
@@ -322,30 +322,19 @@ export const cloudAgentNextRouter = createTRPCRouter({
         gitParams = { gitUrl: publicRepoUrl };
         repository = { platform: 'git', fullName: publicRepoUrl, canonicalUrl: publicRepoUrl };
       } else {
-        // The runtime's repository preflight runs only when the request names
-        // the integration that owns the repository, so resolve it for the
-        // caller here. An explicitly supplied id wins, and an unresolvable
-        // repository stays unqualified (the previous behaviour) rather than
-        // refusing a request the runtime can still serve.
-        const resolvedIntegrationId =
-          githubIntegrationId ??
-          (githubRepo === undefined
-            ? null
-            : await resolveGitHubIntegrationIdForRepository(
-                { type: 'user', id: ctx.user.id },
-                githubRepo
-              ));
-        gitParams = {
+        gitParams = await resolveGitHubPrepareParams({
+          userId: ctx.user.id,
           githubRepo,
-          githubIntegrationId: resolvedIntegrationId ?? undefined,
-          platform: PLATFORM.GITHUB,
-        };
+          ...(githubIntegrationId === undefined ? {} : { githubIntegrationId }),
+        });
         if (githubRepo) {
           repository = {
             platform: 'github',
             fullName: githubRepo,
             canonicalUrl: `https://github.com/${githubRepo}`,
-            ...(resolvedIntegrationId ? { githubIntegrationId: resolvedIntegrationId } : {}),
+            ...(gitParams.githubIntegrationId
+              ? { githubIntegrationId: gitParams.githubIntegrationId }
+              : {}),
           };
         }
       }

@@ -11,6 +11,10 @@ import {
   type CloudAgentAuthority,
 } from './cloud-agent-authority';
 import {
+  environmentSetupAgentOperations,
+  environmentSetupProcedure,
+} from './environment-setup-authority';
+import {
   buildModernKiloTokenPayload,
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,
@@ -789,6 +793,127 @@ describe('Cloud Agent authority contract', () => {
   });
 });
 
+describe('environment setup authority', () => {
+  const setupRunId = '66666666-6666-4666-8666-666666666666';
+  const otherRunId = '88888888-8888-4888-8888-888888888888';
+  const draftEnvironmentId = '77777777-7777-4777-8777-777777777777';
+  const otherEnvironmentId = '99999999-9999-4999-8999-999999999999';
+  const setupChildSessionId = 'workspace_33333333-3333-4333-8333-333333333333';
+  const setupScope: CloudAgentAuthority = {
+    ...scope,
+    environmentSetup: { runId: setupRunId, environmentId: draftEnvironmentId },
+  };
+  const updateDraft = {
+    runId: setupRunId,
+    expectedRevision: 3,
+    requiredHosts: ['registry.npmjs.org'],
+  };
+  const verificationLaunch = {
+    ...launch,
+    requestedEnvironment: { id: draftEnvironmentId },
+    verificationOf: { runId: setupRunId },
+  };
+
+  it('binds the claim to one run and draft without extra keys', () => {
+    expect(CloudAgentAuthoritySchema.parse(setupScope)).toEqual(setupScope);
+    expect(
+      CloudAgentAuthoritySchema.safeParse({
+        ...scope,
+        environmentSetup: {
+          runId: setupRunId,
+          environmentId: draftEnvironmentId,
+          role: 'setup',
+        },
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([null, organizationId])(
+    'exposes the egress audit and agent procedures to a claimed %s authority',
+    org => {
+      const prefix = org === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
+      const authority = { ...setupScope, organizationId: org };
+      const procedures = cloudAgentAuthorityProcedures(authority);
+      expect(procedures).toEqual(
+        expect.arrayContaining([
+          `${prefix}.getEgressAudit`,
+          ...Object.keys(environmentSetupAgentOperations).map(name =>
+            environmentSetupProcedure(name as keyof typeof environmentSetupAgentOperations)
+          ),
+        ])
+      );
+      expect(cloudAgentAuthorityProcedureKind(`${prefix}.getEgressAudit`)).toBe('query');
+      const auditInput = {
+        cloudAgentSessionId: setupChildSessionId,
+        ...(org === null ? {} : { organizationId: org }),
+      };
+      expect(
+        validateCloudAgentAuthorityRequest(authority, `${prefix}.getEgressAudit`, auditInput)
+      ).toEqual(auditInput);
+    }
+  );
+
+  it('withholds setup procedures and the egress audit without the claim', () => {
+    for (const procedure of [
+      'cloudEnvironments.setupRuns.agent.getDraft',
+      'cloudEnvironments.setupRuns.agent.updateDraft',
+      'cloudAgentNext.getEgressAudit',
+    ]) {
+      expect(cloudAgentAuthorityProcedures(scope)).not.toContain(procedure);
+      expect(() => validateCloudAgentAuthorityRequest(scope, procedure, {})).toThrow();
+      expect(() => cloudAgentAuthorityInputSchema(scope, procedure)).toThrow();
+      expect(isCloudAgentAuthorityHttpPathAllowed(scope, `/api/trpc/${procedure}`)).toBe(false);
+    }
+  });
+
+  it('pins agent operations to the claimed run and advertises no runId', () => {
+    const procedure = 'cloudEnvironments.setupRuns.agent.updateDraft';
+    expect(cloudAgentAuthorityProcedureKind(procedure)).toBe('mutation');
+    expect(validateCloudAgentAuthorityRequest(setupScope, procedure, updateDraft)).toEqual(
+      updateDraft
+    );
+    for (const runId of [otherRunId, undefined]) {
+      expect(() =>
+        validateCloudAgentAuthorityRequest(setupScope, procedure, { ...updateDraft, runId })
+      ).toThrow();
+    }
+    const schema = cloudAgentAuthorityInputSchema(setupScope, procedure);
+    expect(schema).toMatchObject({ additionalProperties: false });
+    expect(schema).not.toHaveProperty('properties.runId');
+    expect(schema).toHaveProperty('required', expect.arrayContaining(['expectedRevision']));
+  });
+
+  it('allows only a matching draft and verification launch pair', () => {
+    const procedure = 'cloudAgentNext.prepareSession';
+    expect(validateCloudAgentAuthorityRequest(setupScope, procedure, verificationLaunch)).toEqual(
+      verificationLaunch
+    );
+    for (const request of [
+      { ...launch, requestedEnvironment: { id: draftEnvironmentId } },
+      { ...launch, verificationOf: { runId: setupRunId } },
+      { ...verificationLaunch, requestedEnvironment: { id: otherEnvironmentId } },
+      { ...verificationLaunch, verificationOf: { runId: otherRunId } },
+      { ...verificationLaunch, requestedEnvironment: { id: draftEnvironmentId, extra: true } },
+    ]) {
+      expect(() => validateCloudAgentAuthorityRequest(setupScope, procedure, request)).toThrow();
+    }
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, procedure, verificationLaunch)
+    ).toThrow();
+  });
+
+  it('never advertises draft or verification launch fields', () => {
+    for (const authority of [scope, setupScope]) {
+      const schema = cloudAgentAuthorityInputSchema(authority, 'cloudAgentNext.prepareSession');
+      if (authority.environmentSetup)
+        expect(schema).not.toHaveProperty('properties.requestedEnvironment');
+      else expect(schema).toHaveProperty('properties.requestedEnvironment');
+      expect(schema).not.toHaveProperty('properties.verificationOf');
+      expect(schema).toHaveProperty('additionalProperties', false);
+    }
+  });
+});
+
 describe('scoped JWT policy', () => {
   it('retains verified scope and cannot exchange for a human credential', async () => {
     const auth = await verifyKiloTokenForPolicy(await sign(claims()), secret, {
@@ -885,5 +1010,25 @@ describe('scoped JWT policy', () => {
         extra: { organizationId, cloudAgentAuthority: { ...scope, organizationId } },
       }).cloudAgentAuthority
     ).toMatchObject({ organizationId });
+  });
+});
+
+describe('environment setup advertised input', () => {
+  it('does not require the hidden run id for getDraft', () => {
+    const authority: CloudAgentAuthority = {
+      version: 1,
+      ownerId: 'user',
+      parentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+      organizationId: null,
+      authorizationId: '22222222-2222-4222-8222-222222222222',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      environmentSetup: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        environmentId: '44444444-4444-4444-8444-444444444444',
+      },
+    };
+    const schema = cloudAgentAuthorityInputSchema(authority, environmentSetupProcedure('getDraft'));
+    expect(schema.required).toEqual([]);
+    expect(schema.properties).not.toHaveProperty('runId');
   });
 });

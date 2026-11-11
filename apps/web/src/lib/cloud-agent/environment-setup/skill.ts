@@ -1,0 +1,56 @@
+import { SETUP_SCRIPT_LIMITS } from '@kilocode/cloud-agent-profile/setup-script';
+import type { RuntimeSkillInput } from '@/lib/cloud-agent-next/cloud-agent-client';
+
+const MAX_SCRIPT_CHARACTERS = SETUP_SCRIPT_LIMITS.MAX_LENGTH.toLocaleString('en-US');
+
+export const ENVIRONMENT_SETUP_SKILL: RuntimeSkillInput = {
+  name: 'environment-setup',
+  rawMarkdown: `---
+name: environment-setup
+description: Work out, test, and save a Cloud Agent repository environment using optional user guidance.
+---
+
+# Environment setup
+
+If the user gives no guidance, inspect the repositories and choose a useful development setup. Prepare dependencies and configuration, then check that the environment works.
+
+## Where to look
+- AGENTS.md, DEVELOPMENT.md, README files.
+- Existing setup scripts: .kilo/cloud-agent-setup.sh, scripts/*setup*.sh, bin/setup.
+- .devcontainer/, docker-compose*.yml, Makefile, package.json scripts.
+- Tool versions: .tool-versions, .nvmrc, .python-version, flake.nix.
+- Example env files: .env*.example. CI workflows under .github/workflows.
+
+## Preparation contract
+- One Bash script, at most ${MAX_SCRIPT_CHARACTERS} characters, run with \`bash -e -o pipefail\` in the setup working directory after all repositories are cloned.
+- It runs on every session start and rebuild, also on top of a snapshot. Make it idempotent and fast: skip work that is already done.
+- Timeouts: 5 minutes without output, 8 minutes total.
+- Variables: keys match [A-Za-z_][A-Za-z0-9_]*, at most 50 variables, plain values at most 256 characters, secrets at most 8,192. Reserved: HOME, SESSION_*, XDG_*, KILO*, OPENCODE*, and sandbox control names.
+
+## Prefer what the repository has
+- If the repository ships a setup script, call it (for example \`bash .kilo/cloud-agent-setup.sh\`) instead of copying it.
+- If the setup needs more than ${MAX_SCRIPT_CHARACTERS} characters, or belongs in the repository, commit a script file on a new branch and open a pull request. Ask the user in chat to merge it and end your turn. Verification sessions use the default branch, so verify after the user confirms the merge.
+
+## Sandbox size
+- This setup session runs on standard-4 so you have room to develop the setup script.
+- Prove the setup and smoke checks on standard-3, the default Cloudflare size. The draft starts with that allocation, including refinements.
+- Keep the draft on standard-3 for verification. If it lacks resources, report the failure and ask the user before selecting a larger allocation.
+- A successful run here on standard-4 does not prove the setup works on the default size.
+
+## Variables and secrets
+- Generate local-only values yourself (random secrets for local services) and save them as secrets with update_environment_draft.
+- Request real third-party credentials with request_environment_secrets. Give a reason and the files that use the key. Prefer test or restricted keys and say so in the reason.
+- Never ask for secret values in chat.
+
+## Existing network policy
+- Leave the network policy unchanged. Do not discover, recommend, request, or set hosts.
+- If the policy prevents setup, stop with the specific blocked operation.
+
+## Smoke checks
+- Define checks that prove the requirements, not only that the script exited 0. Examples: a status command, a health request with curl, one focused test.
+- Each check has a name, the exact command, and the expected result.
+
+## When to stop
+- Call fail_environment_setup with a specific reason when requirements need privileged kernel features, unreachable private networks, or missing repository access.
+`,
+};

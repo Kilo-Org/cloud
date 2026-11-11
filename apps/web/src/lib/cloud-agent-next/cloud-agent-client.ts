@@ -152,6 +152,8 @@ type PrepareSessionSharedFields = {
     id: string;
     repositories?: { repoFullName: string; branch?: string }[];
   };
+  environmentSetupRunId?: string;
+  verificationOf?: { runId: string };
   /** Set by a client that shows an environment picker; see the worker's `requireEnvironmentChoice`. */
   requireEnvironmentChoice?: true;
   /** Profile ID forwarded to cloud-agent-next for server-side merge. */
@@ -464,6 +466,18 @@ export type GetSessionOutput = {
   preparedAt?: number;
   initiatedAt?: number;
   routeReady?: boolean;
+
+  environment?: { environmentId: string; configurationRevision: number };
+
+  latestPreparation?: {
+    status: 'running' | 'completed' | 'failed';
+    startedAt: number;
+    completedAt?: number;
+    setupDurationMs?: number;
+    safeError?: string;
+  };
+
+  egress?: { mode: 'unrestricted' | 'allowlist'; allowlist?: string[]; audit: boolean };
 
   // Callback configuration is intentionally NOT exposed: the stored target
   // may carry service-to-service auth headers (e.g. X-Internal-Secret used
@@ -1129,7 +1143,14 @@ export class CloudAgentNextClient {
 
   async getEgressAudit(input: GetEgressAuditInput): Promise<GetEgressAuditResponse> {
     try {
-      return GetEgressAuditResponseSchema.parse(await this.client.getEgressAudit.query(input));
+      return GetEgressAuditResponseSchema.parse(
+        await this.client.getEgressAudit.query({
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+          ...(input.limit === undefined ? {} : { limit: input.limit }),
+          ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
+        })
+      );
     } catch (error) {
       rethrowCloudAgentError(error);
     }

@@ -9,6 +9,8 @@ import {
   type EnvironmentBuildRequestResult,
   type EnvironmentBuildStatus,
 } from '../../../../../services/cloud-agent-next/src/shared/environment-build-status';
+import type { User } from '@kilocode/db/schema';
+import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import { createCloudAgentNextClient, rethrowCloudAgentError } from './cloud-agent-client';
 
 /**
@@ -84,4 +86,18 @@ export function createEnvironmentBuildClient(authToken: string): EnvironmentBuil
       );
     },
   };
+}
+
+/** A Worker client acting as the caller, scoped to the organization when one is given. */
+export async function environmentBuildClientFor(
+  user: User,
+  headersList: Headers | undefined,
+  organizationId: string | undefined
+): Promise<EnvironmentBuildClient> {
+  const { token } = await createControlTokenForRequest(user, 'cloud-agent-next', {
+    headers: headersList,
+    ...(organizationId ? { organizationId } : {}),
+    tokenSource: 'cloud-agent',
+  });
+  return createEnvironmentBuildClient(token);
 }

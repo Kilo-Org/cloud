@@ -1,14 +1,19 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
+  cloud_agent_environment_setup_runs,
   cloud_agent_environments,
   cloud_agent_environment_vars,
   organizations,
   type CloudAgentEnvironment,
 } from '@kilocode/db/schema';
-import { and, count, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { encryptWithPublicKey } from '@kilocode/encryption';
-import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
+import {
+  egressDomainSchema,
+  egressPolicySchema,
+  type EgressMode,
+} from '@kilocode/worker-utils/egress-allowlist';
 import {
   encryptedEnvelopeSchema,
   assertValidEnvironmentKey,
@@ -34,6 +39,7 @@ import {
   selectActiveEnvironments,
   selectEnvironmentForSession,
   selectEnvironmentsContainingRepository,
+  setupRunOwnershipCondition,
   type EnvironmentSelection,
 } from './environment-lookup';
 import {
@@ -45,6 +51,11 @@ import {
   repositoryColumnsOfCreate,
   repositoryPathOf,
 } from './environment-repositories';
+import {
+  ENVIRONMENT_SETUP_LIMITS,
+  isOpenSetupRunStatus,
+  OPEN_SETUP_RUN_STATUSES,
+} from './environment-setup-contracts';
 
 /** A transaction executor, derived from the worker database connection. */
 export type EnvironmentTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
@@ -131,6 +142,56 @@ function resolveEnvironmentEgressPolicy(input: {
   return parsed.data.egressMode === 'allowlist'
     ? { egress_mode: 'allowlist', egress_allowlist: parsed.data.egressAllowlist ?? [] }
     : { egress_mode: 'unrestricted', egress_allowlist: null };
+}
+
+/**
+ * Validates required hosts with the shared hostname contract and returns the
+ * stored form: lowercased, in submitted order, without duplicates.
+ */
+function resolveEnvironmentRequiredHosts(
+  requiredHosts: string[] | undefined
+): string[] | undefined {
+  if (requiredHosts === undefined) return undefined;
+
+  const parsed: string[] = [];
+  for (const host of requiredHosts) {
+    const result = egressDomainSchema.safeParse(host);
+    if (!result.success) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Invalid required network host: ${host}`,
+      });
+    }
+    if (!parsed.includes(result.data)) parsed.push(result.data);
+  }
+
+  if (parsed.length > ENVIRONMENT_SETUP_LIMITS.MAX_REQUIRED_HOSTS) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `At most ${ENVIRONMENT_SETUP_LIMITS.MAX_REQUIRED_HOSTS} required network hosts are allowed`,
+    });
+  }
+
+  return parsed;
+}
+
+/**
+ * The effective allowlist of a restricted policy is the user's allowed hosts
+ * plus the required hosts, so the shared egress cap covers both.
+ */
+export function assertEffectiveAllowlistWithinLimit(
+  allowedHosts: readonly string[],
+  requiredHosts: readonly string[]
+): void {
+  if (
+    new Set([...allowedHosts, ...requiredHosts]).size >
+    ENVIRONMENT_SETUP_LIMITS.MAX_EFFECTIVE_ALLOWLIST
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Required hosts and allowed hosts together exceed 100 hostnames',
+    });
+  }
 }
 
 function toBaseResponseColumns(environment: CloudAgentEnvironment): {
@@ -392,6 +453,7 @@ export async function updateEnvironment(
       : validateEnvironmentCommands(input.startCommands, 'Start');
   const secretChanges = input.secrets;
   const egress = resolveEnvironmentEgressPolicy(input);
+  const requiredHosts = resolveEnvironmentRequiredHosts(input.requiredHosts);
 
   if (secretChanges !== undefined) {
     for (const change of secretChanges) {
@@ -427,6 +489,26 @@ export async function updateEnvironment(
 
   if (!environment) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
+  }
+
+  if (
+    environment.is_draft &&
+    environment.draft_for_environment_id !== null &&
+    (input.egressMode !== undefined || input.egressAllowlist !== undefined)
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Change the network policy on the target environment',
+    });
+  }
+
+  if (requiredHosts !== undefined || egress !== undefined) {
+    const allowedHosts =
+      egress === undefined ? (environment.egress_allowlist ?? []) : (egress.egress_allowlist ?? []);
+    assertEffectiveAllowlistWithinLimit(
+      allowedHosts,
+      requiredHosts ?? environment.egress_required_hosts ?? []
+    );
   }
 
   const changesVariables =
@@ -503,6 +585,10 @@ export async function updateEnvironment(
     buildInputsChanged = !sameRecord(plainVars, storedPlainVars);
   }
 
+  if (requiredHosts !== undefined && !buildInputsChanged) {
+    buildInputsChanged = !sameStrings(requiredHosts, environment.egress_required_hosts ?? []);
+  }
+
   if (plainVars !== undefined) {
     assertNoPlainSecretCollision(plainVars, [...retainedSecretKeys, ...addedSecretKeys]);
   }
@@ -531,6 +617,13 @@ export async function updateEnvironment(
     await tx
       .update(cloud_agent_environments)
       .set({ start_commands: startCommands })
+      .where(eq(cloud_agent_environments.id, input.environmentId));
+  }
+
+  if (requiredHosts !== undefined) {
+    await tx
+      .update(cloud_agent_environments)
+      .set({ egress_required_hosts: requiredHosts })
       .where(eq(cloud_agent_environments.id, input.environmentId));
   }
 
@@ -575,16 +668,59 @@ export async function deleteEnvironment(
   environmentId: string,
   owner: EnvironmentOwner
 ): Promise<void> {
-  const rows = await db
-    .delete(cloud_agent_environments)
-    .where(
-      and(eq(cloud_agent_environments.id, environmentId), buildEnvironmentOwnershipCondition(owner))
-    )
-    .returning({ id: cloud_agent_environments.id });
+  await db.transaction(async tx => {
+    if (owner.type === 'organization') {
+      await lockActiveOrganization(tx, owner.id);
+    }
 
-  if (rows.length === 0) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
-  }
+    const runs = cloud_agent_environment_setup_runs;
+    const openRuns = await tx
+      .select({ id: runs.id })
+      .from(runs)
+      .where(
+        and(
+          inArray(runs.status, [...OPEN_SETUP_RUN_STATUSES]),
+          or(
+            eq(runs.draft_environment_id, environmentId),
+            eq(runs.target_environment_id, environmentId)
+          )
+        )
+      )
+      .for('update');
+
+    const rows = await tx
+      .delete(cloud_agent_environments)
+      .where(
+        and(
+          eq(cloud_agent_environments.id, environmentId),
+          buildEnvironmentOwnershipCondition(owner)
+        )
+      )
+      .returning({ id: cloud_agent_environments.id });
+
+    // A setup run cannot continue without its draft or its target. Cancel after the
+    // delete: cancelling first made deleting a target fail with a draft foreign-key
+    // violation during the cascade (see the target deletion test).
+    if (openRuns.length > 0) {
+      await tx
+        .update(runs)
+        .set({
+          status: 'cancelled',
+          data: sql`${runs.data} || '{"status_reason":"draft_deleted"}'::jsonb`,
+          completed_at: new Date().toISOString(),
+        })
+        .where(
+          inArray(
+            runs.id,
+            openRuns.map(run => run.id)
+          )
+        );
+    }
+
+    if (rows.length === 0) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
+    }
+  });
 }
 
 export async function getEnvironment(
@@ -640,6 +776,8 @@ export async function getEnvironment(
     startCommands: environment.start_commands,
     egressMode: environment.egress_mode,
     egressAllowlist: environment.egress_allowlist,
+    egressRequiredHosts: environment.egress_required_hosts ?? [],
+    isDraft: environment.is_draft,
     secretKeys: secretKeys.map(row => row.key),
   };
 }
@@ -681,7 +819,9 @@ export async function listEnvironmentsForOwner(
   const environments = await db
     .select()
     .from(cloud_agent_environments)
-    .where(buildEnvironmentOwnershipCondition(owner))
+    .where(
+      and(buildEnvironmentOwnershipCondition(owner), eq(cloud_agent_environments.is_draft, false))
+    )
     .orderBy(cloud_agent_environments.name, cloud_agent_environments.id);
 
   return summarizeEnvironments(db, environments);
@@ -738,13 +878,52 @@ export type EnvironmentSessionResolution =
   | Exclude<EnvironmentSelection, { status: 'match' }>;
 
 /**
+ * The draft a session may see, if the caller asked to allow one: the run must
+ * belong to the owner, still be open and allowed to change, and its draft must
+ * be the requested environment. Any other case leaves the draft invisible.
+ */
+async function allowedDraftEnvironmentId(
+  tx: EnvironmentTransaction,
+  input: {
+    owner: EnvironmentOwner;
+    environmentId?: string;
+    allowDraft?: { setupRunId: string };
+  }
+): Promise<string | undefined> {
+  if (input.allowDraft === undefined || input.environmentId === undefined) return undefined;
+
+  const [run] = await tx
+    .select({
+      draft: cloud_agent_environment_setup_runs.draft_environment_id,
+      status: cloud_agent_environment_setup_runs.status,
+    })
+    .from(cloud_agent_environment_setup_runs)
+    .where(
+      and(
+        eq(cloud_agent_environment_setup_runs.id, input.allowDraft.setupRunId),
+        setupRunOwnershipCondition(input.owner)
+      )
+    );
+
+  if (
+    run?.draft === input.environmentId &&
+    isOpenSetupRunStatus(run.status) &&
+    run.status !== 'failed'
+  ) {
+    return input.environmentId;
+  }
+  return undefined;
+}
+
+/**
  * Load the environment of a session's launch repository: the primitives the
  * session merges, the authorized reference that travels beside them, and the saved
  * allocation. A V1 environment matches by its identity columns and a V2
  * environment by containment of the repository.
  *
  * With `environmentId`, only that environment is considered. Without one, several
- * matches are a `conflict` and no environment is chosen.
+ * matches are a `conflict` and no environment is chosen. Drafts stay invisible
+ * unless `allowDraft` names the setup run that owns the requested draft.
  */
 export async function loadEnvironmentForSession(
   db: WorkerDb,
@@ -752,11 +931,18 @@ export async function loadEnvironmentForSession(
     owner: EnvironmentOwner;
     repository: EnvironmentRepositoryIdentity;
     environmentId?: string;
+    allowDraft?: { setupRunId: string };
   }
 ): Promise<EnvironmentSessionResolution> {
   return db.transaction(
     async tx => {
-      const selection = await selectEnvironmentForSession(tx, input);
+      const draftEnvironmentId = await allowedDraftEnvironmentId(tx, input);
+      const selection = await selectEnvironmentForSession(tx, {
+        owner: input.owner,
+        repository: input.repository,
+        ...(input.environmentId === undefined ? {} : { environmentId: input.environmentId }),
+        ...(draftEnvironmentId === undefined ? {} : { draftEnvironmentId }),
+      });
       if (selection.status !== 'match') return selection;
 
       const { environment } = selection;
@@ -778,6 +964,7 @@ export async function loadEnvironmentForSession(
           sandboxAllocation: environment.sandbox_allocation,
           egressMode: environment.egress_mode,
           egressAllowlist: environment.egress_allowlist,
+          egressRequiredHosts: environment.egress_required_hosts ?? [],
         },
       };
     },

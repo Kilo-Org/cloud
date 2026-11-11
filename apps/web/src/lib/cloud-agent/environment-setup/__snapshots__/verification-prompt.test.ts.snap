@@ -1,0 +1,20 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`buildVerificationPrompt renders the verification prompt 1`] = `
+"You are a verification session for a Cloud Agent environment. The environment's setup already ran before this message.
+
+Run each check below from /workspace/cloud. Do not change files, install extra tools, or fix problems. Report what happened.
+
+Checks:
+1. postgres is reachable
+   Command: pg_isready -h 127.0.0.1 -p 5432
+   Expected: exit code 0
+2. web health endpoint
+   Command: curl -fsS http://localhost:3000/api/health
+   Expected: HTTP 200 with status ok
+
+Reply with only a JSON object on the last line, in this exact shape:
+{"results":[{"name":"<check name>","passed":true|false,"evidence":"<at most 500 characters of relevant output>"}]}
+Never include secret values in evidence.
+"
+`;

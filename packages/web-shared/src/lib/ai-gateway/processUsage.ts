@@ -1406,10 +1406,23 @@ const chatUsageFieldsSchema = z.looseObject({
   error: upstreamStreamErrorSchema.nullish(),
 });
 
+// Reasoning models such as Mistral's send content as `text` and `thinking` chunks.
+const chatContentChunkSchema = z
+  .looseObject({ type: z.string(), text: z.string().optional() })
+  .refine(chunk => chunk.type !== 'text' || chunk.text !== undefined);
+
 const chatMessageSchema = z.looseObject({
-  content: z.string().nullish(),
+  content: z.union([z.string(), z.array(chatContentChunkSchema)]).nullish(),
   provider_metadata: vercelProviderMetadataSchema.nullish(),
 });
+
+function chatContentText(content: z.infer<typeof chatMessageSchema>['content']): string {
+  if (typeof content === 'string') return content;
+  return (content ?? [])
+    .filter(chunk => chunk.type === 'text')
+    .map(chunk => chunk.text)
+    .join('');
+}
 
 const chatUsageChunkSchema = chatUsageFieldsSchema.extend({
   choices: z
@@ -1524,10 +1537,7 @@ export async function parseMicrodollarUsageFromStream(
       json.provider ?? chunkProviderMetadata?.gateway?.routing?.finalProvider ?? inference_provider;
     finish_reason = choice?.finish_reason ?? finish_reason;
 
-    const contentDelta = choice?.delta?.content;
-    if (contentDelta) {
-      responseContent += contentDelta;
-    }
+    responseContent += chatContentText(choice?.delta?.content);
   };
 
   const { wasAborted, malformedEventCount, timing } = await drainSseStream(
@@ -1602,7 +1612,7 @@ export function parseMicrodollarUsageFromString(
       statusCode >= 400 ||
       isErrorFinishReason(finish_reason),
     model: responseJson.model ?? null,
-    responseContent: choice?.message.content ?? '',
+    responseContent: chatContentText(choice?.message.content),
     inference_provider:
       responseJson.provider ?? vercelProviderMetadata?.gateway?.routing?.finalProvider ?? null,
     upstream_id: extractVercelUpstreamId(vercelProviderMetadata),

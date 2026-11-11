@@ -487,7 +487,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       true,
       {
         errorName: 'ZodError',
-        issues: [{ path: 'choices.0.delta.content', code: 'invalid_type' }],
+        issues: [{ path: 'choices.0.delta.content', code: 'invalid_union' }],
       },
     ],
     [
@@ -824,6 +824,92 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.upstream_id).toBe('chatcmpl-non-streamed');
     expect(result.inference_provider).toBe('fireworks');
   });
+
+  // https://docs.mistral.ai/inference/conversations/reasoning#handling-thinking-chunks
+  const mistralReasoningContent = [
+    { type: 'thinking', thinking: [{ type: 'text', text: 'Calculating.' }] },
+    { type: 'text', text: '391' },
+  ];
+
+  test('keeps usage of a non-streamed response with reasoning content chunks', () => {
+    const response = JSON.stringify({
+      id: 'gen-mistral-reasoning',
+      model: 'mistral/magistral-medium',
+      choices: [
+        {
+          message: { role: 'assistant', content: mistralReasoningContent },
+          finish_reason: 'stop',
+        },
+      ],
+      usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+    });
+
+    const result = parseMicrodollarUsageFromString(response, 'fake-user-id', 200, 'custom');
+
+    expect(result).toMatchObject({
+      hasError: false,
+      responseContent: '391',
+      inputTokens: 10,
+      outputTokens: 20,
+    });
+  });
+
+  test('keeps usage of a stream with reasoning content chunks', async () => {
+    jest.mocked(captureMessage).mockClear();
+    const chunks = [
+      {
+        id: 'gen-mistral-reasoning',
+        model: 'mistral/magistral-medium',
+        choices: [{ delta: { content: mistralReasoningContent.slice(0, 1) } }],
+      },
+      { choices: [{ delta: { content: mistralReasoningContent.slice(1) } }] },
+      {
+        choices: [{ delta: { content: '!' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+      },
+    ];
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const data of [...chunks.map(chunk => JSON.stringify(chunk)), '[DONE]']) {
+          controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+        }
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'custom',
+      200,
+      false
+    );
+
+    expect(result).toMatchObject({
+      hasError: false,
+      responseContent: '391!',
+      inputTokens: 10,
+      outputTokens: 20,
+    });
+    expect(captureMessage).not.toHaveBeenCalledWith(
+      'Malformed upstream usage SSE events',
+      expect.anything()
+    );
+  });
+
+  test.each([
+    ['a text chunk without text', [{ type: 'text' }]],
+    ['a chunk without a type', [{ text: 'hi' }]],
+  ])('rejects reasoning content with %s', (_name, content) => {
+    const response = JSON.stringify({
+      model: 'mistral/magistral-medium',
+      choices: [{ message: { content } }],
+    });
+    expect(() =>
+      parseMicrodollarUsageFromString(response, 'fake-user-id', 200, 'custom')
+    ).toThrow();
+  });
 });
 
 const sampleReqDir = join(process.cwd(), 'src/tests/req_sample');
@@ -1032,10 +1118,10 @@ describe('logMicrodollarUsage', () => {
         mockedReportUsageEvent.mockClear();
       });
 
-      const nestedShapeIssuePath = {
-        chat_completions: 'choices.0.message.content',
-        messages: 'content.0.text',
-        responses: 'output.0.content',
+      const nestedShapeIssue = {
+        chat_completions: { path: 'choices.0.message.content', code: 'invalid_union' },
+        messages: { path: 'content.0.text', code: 'invalid_type' },
+        responses: { path: 'output.0.content', code: 'invalid_type' },
       }[apiKind];
 
       test.each([
@@ -1049,7 +1135,7 @@ describe('logMicrodollarUsage', () => {
           true,
           {
             errorName: 'ZodError',
-            issues: [{ path: nestedShapeIssuePath, code: 'invalid_type' }],
+            issues: [nestedShapeIssue],
           },
         ],
         ['missing body', true, { errorName: 'Error' }],

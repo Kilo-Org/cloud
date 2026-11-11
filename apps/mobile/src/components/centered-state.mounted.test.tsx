@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
 
-import { CenteredState } from './centered-state';
+import { CenteredState, _resetRememberedSurfaceForTests } from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
 import { EmptyState } from './empty-state';
 import { InvalidRouteState } from './invalid-route-state';
@@ -154,6 +154,7 @@ function expectPainted(mounted: { content: () => ViewProps }) {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  _resetRememberedSurfaceForTests();
   native.surface = {
     frame: { top: 0, bottom: 500 },
     bounds: { top: 0, bottom: 500 },
@@ -380,19 +381,23 @@ describe('CenteredState measurements', () => {
     const mounted = await mount();
     mounted.settle();
     expectPainted(mounted);
+    const placed = mounted.scroll().contentContainerStyle;
     const frame = native.surface.frame;
     native.surface.frame = null;
     mounted.rerender();
-    // The placement falls back to the centering style, the state stays painted.
+    // The band it painted against is the band it still has: the placement stays
+    // instead of dropping to the pending centering and lifting back.
     expectPainted(mounted);
-    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     native.surface.frame = frame;
     mounted.rerender();
     expectPainted(mounted);
-    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
+    // An unreadable re-measure never drops a painted state back to the pending
+    // centering: the placement it already carries is the placement it keeps.
     mounted.settle(0, 0);
     expectPainted(mounted);
-    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
@@ -439,6 +444,26 @@ describe('CenteredState first-frame paint', () => {
       paddingBottom: 16,
     });
     mounted.unmount();
+  });
+
+  it('places a returning state with the band it last painted against', async () => {
+    // A pushed screen unpublishes its surface for the length of the transition.
+    // The state must paint where it will be measured, not at the pending
+    // centering and then lift ~39 dp to it.
+    const first = await mount();
+    first.settle();
+    const placed = first.scroll().contentContainerStyle;
+    first.unmount();
+
+    native.surface = {
+      ...native.surface,
+      frame: null,
+      bounds: null,
+    };
+    const returning = await mount();
+    returning.settle();
+    expect(returning.scroll().contentContainerStyle).toEqual(placed);
+    returning.unmount();
   });
 
   it('reserves the surface bottom band once while the layout measurement is pending', async () => {

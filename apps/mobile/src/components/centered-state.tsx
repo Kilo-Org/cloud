@@ -44,17 +44,46 @@ type CenteredStateProps = {
 
 type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
 
+/** What a state last painted against, so a returning screen can reuse it. */
+type RememberedSurface = {
+  windowWidth: number;
+  windowHeight: number;
+  /** The surface the band belongs to; a sheet's band is not the screen's. */
+  register: (() => () => void) | undefined;
+  frame: StateFrame;
+  topInset: number;
+  bottomInset: number;
+  boundsBottom: number | undefined;
+  nativeViewportFillsSurface: boolean;
+};
+
+/**
+ * The last surface geometry a state placed against. A screen coming back from a
+ * pushed route unpublishes its surface for the length of the transition: the
+ * frame is momentarily absent while the host view re-attaches, and a state that
+ * waited for it painted at the scroller-relative pending placement and then
+ * lifted about 39 dp to its measured one. The window's band is the band it
+ * already was, so the next mount paints against the remembered geometry and
+ * never moves; a different window (rotation, a resized split) never matches and
+ * measures for itself.
+ */
+let rememberedSurface: RememberedSurface | null = null;
+
+/** Test-only: drop the remembered band so a suite starts from a cold mount. */
+export function _resetRememberedSurfaceForTests(): void {
+  rememberedSurface = null;
+}
+
 /**
  * Centered data state (empty, status, error) inside the band a screen surface
  * reserves.
  *
- * The state paints on its first frame. A surface that has not measured yet — a
- * screen coming back from a pushed route, the tab bar's own layout pass, a
- * rotation — places the content with the pending style (centered, with the
- * surface's bottom reservation) instead of hiding it: a hidden data state is a
- * blank body, which reads as a broken screen and outlasts the measurement on a
- * slow device. When the surface measures, the same content moves to its
- * measured placement.
+ * The state paints on its first frame, and that placement is final for the
+ * mount: a surface that has not measured yet — a screen coming back from a
+ * pushed route, the tab bar's own layout pass, a rotation — carries the
+ * remembered geometry it last painted against, so the first frame is already
+ * the measured placement. A hidden data state is a blank body, which reads as a
+ * broken screen and outlasts the measurement on a slow device.
  */
 export function CenteredState({
   children,
@@ -64,13 +93,49 @@ export function CenteredState({
   refreshControl,
 }: CenteredStateProps) {
   const surface = useStateSurface();
-  const frame = surface?.frame;
   const windowSize = useWindowDimensions();
   const shortBand = isShortViewport(windowSize.width, windowSize.height);
   const scrollRef = useRef<ScrollViewInstance | null>(null);
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
+
+  // The geometry this state paints against: the live surface while it is
+  // published, and otherwise the band this window had last time. A returning
+  // screen unpublishes the surface for the length of its transition, and the
+  // band does not move in that gap.
+  const remembered =
+    rememberedSurface !== null &&
+    rememberedSurface.windowWidth === windowSize.width &&
+    rememberedSurface.windowHeight === windowSize.height &&
+    rememberedSurface.register === surface?.register
+      ? rememberedSurface
+      : null;
+  const frame = surface?.frame ?? remembered?.frame ?? null;
+  const topInset = surface?.frame ? surface.topInset : (remembered?.topInset ?? 0);
+  const bottomInset = surface?.frame ? surface.bottomInset : (remembered?.bottomInset ?? 0);
+  const boundsBottom = surface?.frame ? surface.bounds?.bottom : remembered?.boundsBottom;
+  const nativeViewportFillsSurface = surface?.frame
+    ? surface.nativeViewportFillsSurface
+    : (remembered?.nativeViewportFillsSurface ?? false);
+
+  // Remember what this state painted against, before the frame is painted, so
+  // the next mount of a returning screen places itself exactly here.
+  useLayoutEffect(() => {
+    if (!surface?.frame) {
+      return;
+    }
+    rememberedSurface = {
+      windowWidth: windowSize.width,
+      windowHeight: windowSize.height,
+      register: surface.register,
+      frame: surface.frame,
+      topInset: surface.topInset,
+      bottomInset: surface.bottomInset,
+      boundsBottom: surface.bounds?.bottom,
+      nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
+    };
+  }, [surface, windowSize.width, windowSize.height]);
 
   const register = surface?.register;
   useLayoutEffect(() => register?.(), [register]);
@@ -159,13 +224,13 @@ export function CenteredState({
       surface: frame,
       viewport: measuredFrame,
       contentHeight,
-      topInset: surface.topInset,
-      bottomInset: surface.bottomInset,
-      nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
-      nativeViewportBottom: surface.bounds?.bottom,
+      topInset,
+      bottomInset,
+      nativeViewportFillsSurface,
+      nativeViewportBottom: boundsBottom ?? frame.bottom,
       roundToPixel: value => PixelRatio.roundToNearestPixel(value),
     });
-  }, [surface, frame, viewport, contentHeight]);
+  }, [boundsBottom, bottomInset, contentHeight, frame, nativeViewportFillsSurface, topInset, viewport]);
   const ready = layout !== undefined;
   // While the measured layout is pending, the fallback must still keep the band
   // the surface reserved (the fixed tab bar) free: without it the body centers

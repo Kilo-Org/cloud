@@ -101,8 +101,8 @@ export type Sampled = {
   settled: boolean;
   elapsedMs: number;
   alignment?: CaptureAlignment;
-  /** The measured tree still paints its loading placeholder after the wait. */
-  loading?: true;
+  /** The measured tree still paints its loading placeholder; the wait it saw. */
+  loading?: { elapsedMs: number };
 };
 
 /**
@@ -287,12 +287,13 @@ export function screenFindings(args: {
         })
       );
     }
-    if (args.sampled.loading === true) {
+    if (args.sampled.loading !== undefined) {
       findings.push(
         loadingPlaceholderFinding({
           cell: args.cell,
           target: args.target,
           dump: args.dump,
+          elapsedMs: args.sampled.loading.elapsedMs,
         })
       );
     }
@@ -429,8 +430,10 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // A cold screen paints its own loading placeholder and holds it still, so a
   // settle loop would measure the placeholder. Wait for it to clear first, and
   // never claim a placeholder the target did not paint.
+  let placeholderWaitedMs = 0;
   const waitForPlaceholder = async (): Promise<void> => {
     const wait = await waitForLoadingPlaceholder(ctx.probe, ctx.clock, opened);
+    placeholderWaitedMs += wait.elapsedMs;
     if (!wait.cleared && wait.observed) {
       ctx.log(
         `design-gate: ${target.id} still paints its loading placeholder after ${wait.elapsedMs}ms`
@@ -488,9 +491,10 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     timeline: expandSamples(samples),
     alignment,
     // The measured tree is the screen only if its own loading placeholder is
-    // gone; a target whose state is its loading state reports that separately.
+    // gone; a target whose state is its loading state reports that separately,
+    // and only with the wait it actually performed.
     settled: settled.settled && layoutSignature(settled.dump) === layoutSignature(dump),
-    ...(loadingPlaceholder(normalize(dump)) ? { loading: true as const } : {}),
+    ...(loadingPlaceholder(normalize(dump)) ? { loading: { elapsedMs: placeholderWaitedMs } } : {}),
   };
   writeJson(files.absolute(files.capture), alignment);
   const screen: Screen = {
@@ -576,6 +580,7 @@ export function loadingPlaceholderFinding(args: {
   cell: string;
   target: string;
   dump: ProbeDump;
+  elapsedMs: number;
 }): Finding {
   return {
     rule: 'loading-placeholder',
@@ -583,13 +588,14 @@ export function loadingPlaceholderFinding(args: {
     cell: args.cell,
     target: args.target,
     element: rootRef(args.dump),
-    measured: LOADING_SETTLE_TIMEOUT_MS,
+    measured: args.elapsedMs,
     expected: 'the target screen after its loading placeholder clears',
     unit: 'ms',
     message:
-      `The measured tree still paints the screen's loading placeholder ${LOADING_SETTLE_TIMEOUT_MS} ms ` +
-      'after the link opened. If this target measures a loading state, that placeholder is its ' +
-      'screen; otherwise the capture measured the placeholder instead of the content it describes.',
+      `The measured tree still paints the screen's loading placeholder${
+        args.elapsedMs > 0 ? ` after ${args.elapsedMs} ms of waiting for it to clear` : ''
+      }. If this target measures a loading state, that placeholder is its screen; otherwise the ` +
+      'capture measured the placeholder instead of the content it describes.',
   };
 }
 

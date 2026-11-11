@@ -299,14 +299,21 @@ test('a measured loading placeholder is named instead of escaping as content', (
     target: 'session',
     dump,
     tree: normalize(dump),
-    sampled: { dump, timeline: [dump, dump, dump], settled: true, elapsedMs: 2_500, loading: true },
+    sampled: {
+      dump,
+      timeline: [dump, dump, dump],
+      settled: true,
+      elapsedMs: 2_500,
+      loading: { elapsedMs: 30_000 },
+    },
   });
   assert.deepEqual(
     findings.map(finding => finding.rule),
     ['loading-placeholder']
   );
   assert.equal(findings[0]?.severity, 'warning');
-  assert.match(findings[0]?.message ?? '', /loading placeholder/);
+  assert.equal(findings[0]?.measured, 30_000);
+  assert.match(findings[0]?.message ?? '', /loading placeholder after 30000 ms of waiting/);
 });
 
 type ProbeState = {

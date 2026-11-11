@@ -19,7 +19,8 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { BrowseCommandsDialog } from '../BrowseCommandsDialog';
-import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
+import type { ModeOption } from '@/components/shared/ModeCombobox';
+import { CloudAgentModeCombobox } from '../CloudAgentModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -815,10 +816,9 @@ export function CloudComposer({
                 {!mode && isLoadingModels ? (
                   <Skeleton className="h-9 w-[77px] shrink-0 motion-reduce:animate-none" />
                 ) : (
-                  <ModeCombobox
+                  <CloudAgentModeCombobox
                     value={mode}
                     onValueChange={onModeChange}
-                    options={NEXT_MODE_OPTIONS}
                     customOptions={customModeOptions}
                     variant="compact"
                     disabled={disabled || isStreaming}

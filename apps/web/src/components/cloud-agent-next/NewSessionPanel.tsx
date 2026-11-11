@@ -48,7 +48,8 @@ import {
 } from '@/components/shared/RepositoryCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
-import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
+import type { ModeOption } from '@/components/shared/ModeCombobox';
+import { CloudAgentModeCombobox } from './CloudAgentModeCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
@@ -1576,10 +1577,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             />
             {/* Desktop: individual pickers */}
             <div className="hidden md:contents">
-              <ModeCombobox<AgentMode>
+              <CloudAgentModeCombobox
                 value={mode}
                 onValueChange={setMode}
-                options={NEXT_MODE_OPTIONS}
                 customOptions={customModeOptions}
                 variant="compact"
                 className="min-w-0"

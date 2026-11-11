@@ -205,9 +205,8 @@ jest.mock('@kilocode/cloud-agent-sdk/message-id', () => ({
 }));
 
 jest.mock('@/components/SetPageTitle', () => ({ SetPageTitle: () => null }));
-jest.mock('@/components/shared/ModeCombobox', () => ({
-  ModeCombobox: () => null,
-  NEXT_MODE_OPTIONS: [],
+jest.mock('./CloudAgentModeCombobox', () => ({
+  CloudAgentModeCombobox: () => null,
 }));
 jest.mock('@/components/shared/ModelCombobox', () => ({ ModelCombobox: () => null }));
 jest.mock('@/components/shared/VariantCombobox', () => ({ VariantCombobox: () => null }));

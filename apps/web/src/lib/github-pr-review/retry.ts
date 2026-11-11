@@ -8,6 +8,8 @@ import {
   type ClassifiedGitHubError,
   classifyGitHubHttpError,
   classifyGitHubGraphQlErrors,
+  PRECONDITION_FAILED_MESSAGE,
+  TEMPORARILY_UNAVAILABLE_MESSAGE,
 } from './errors';
 import {
   getGitHubUserAccessToken,
@@ -43,7 +45,7 @@ async function reportAndThrowPrecondition(
   });
   throwTrpcFromClassification({
     code: 'PRECONDITION_FAILED',
-    message: 'GitHub connection is no longer valid — reconnect',
+    message: PRECONDITION_FAILED_MESSAGE,
   });
 }
 
@@ -64,13 +66,13 @@ export async function withGitHubUserTokenRetry<T>(args: {
   if (first.status === 'temporarily_unavailable') {
     throwTrpcFromClassification({
       code: 'BAD_GATEWAY',
-      message: 'GitHub authorization is temporarily unavailable. Try again.',
+      message: TEMPORARILY_UNAVAILABLE_MESSAGE,
     });
   }
   if (first.status !== 'connected') {
     throwTrpcFromClassification({
       code: 'PRECONDITION_FAILED',
-      message: 'GitHub connection is no longer valid — reconnect',
+      message: PRECONDITION_FAILED_MESSAGE,
     });
   }
   const firstOctokit = createGitHubPrReviewOctokit(first.credential.token);
@@ -102,13 +104,13 @@ export async function withGitHubUserTokenRetry<T>(args: {
     if (retryCredential.status === 'temporarily_unavailable') {
       throwTrpcFromClassification({
         code: 'BAD_GATEWAY',
-        message: 'GitHub authorization is temporarily unavailable. Try again.',
+        message: TEMPORARILY_UNAVAILABLE_MESSAGE,
       });
     }
     if (retryCredential.status !== 'connected') {
       throwTrpcFromClassification({
         code: 'PRECONDITION_FAILED',
-        message: 'GitHub connection is no longer valid — reconnect',
+        message: PRECONDITION_FAILED_MESSAGE,
       });
     }
     const secondOctokit = createGitHubPrReviewOctokit(retryCredential.credential.token);

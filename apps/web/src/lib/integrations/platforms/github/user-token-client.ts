@@ -24,24 +24,6 @@ export const GitHubUserAccessTokenOpSchema = z.discriminatedUnion('op', [
 ]);
 export type GitHubUserAccessTokenOp = z.infer<typeof GitHubUserAccessTokenOpSchema>;
 
-const GitHubUserAccessTokenRequestBodySchema = z.union([
-  z.object({ op: z.literal('fetch') }).strict(),
-  z
-    .object({
-      op: z.literal('rotate'),
-      staleAuthorizationId: z.string(),
-      staleCredentialVersion: z.number(),
-    })
-    .strict(),
-  z
-    .object({
-      op: z.literal('reportRejected'),
-      authorizationId: z.string(),
-      credentialVersion: z.number(),
-    })
-    .strict(),
-]);
-
 const GitHubUserAccessTokenConnectedSchema = z
   .object({
     connected: z.literal(true),
@@ -156,10 +138,6 @@ async function callTokenService(
   if (!GIT_TOKEN_SERVICE_API_URL) {
     return { status: 'temporarily_unavailable' };
   }
-  const parsedBody = GitHubUserAccessTokenRequestBodySchema.safeParse(body);
-  if (!parsedBody.success) {
-    return { status: 'temporarily_unavailable' };
-  }
   const serviceToken = generateBoundedInternalServiceToken(userId, {
     expiresIn: TOKEN_EXPIRY.fiveMinutes,
     audience: GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
@@ -175,7 +153,7 @@ async function callTokenService(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${serviceToken}`,
         },
-        body: JSON.stringify(parsedBody.data),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       }
     );

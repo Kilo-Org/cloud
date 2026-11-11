@@ -3,6 +3,7 @@ import type { EnvironmentBuild } from './environment-build/environment-build-do.
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
+  GitHubBrokerRejectionProvenance,
   GitHubRepositoryAuthorizationFailureReason,
   GitHubRepositoryAuthorizationResult,
 } from '@kilocode/worker-utils/github-authorization';
@@ -258,6 +259,7 @@ type IssueGitHubSessionCapabilityResult =
     }
   | {
       success: false;
+      rejectionProvenance?: GitHubBrokerRejectionProvenance;
       reason:
         | GitHubRepositoryAuthorizationFailureReason
         | 'capability_configuration_error'

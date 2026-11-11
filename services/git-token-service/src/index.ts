@@ -9,7 +9,10 @@ import {
   verifyKiloToken,
 } from '@kilocode/worker-utils';
 import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
-import type { GitHubRepositoryAuthorizationFailureReason } from '@kilocode/worker-utils/github-authorization';
+import type {
+  GitHubBrokerRejectionProvenance,
+  GitHubRepositoryAuthorizationFailureReason,
+} from '@kilocode/worker-utils/github-authorization';
 import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
@@ -122,6 +125,7 @@ export type GetTokenForRepoSuccess = {
 export type GetTokenForRepoFailure = {
   success: false;
   reason: GitHubRepositoryAuthorizationFailureReason;
+  rejectionProvenance?: GitHubBrokerRejectionProvenance;
 };
 
 export type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
@@ -888,10 +892,19 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     if (!installation.success) {
       switch (installation.reason) {
         case 'ambiguous_installation':
-          return { success: false, reason: 'no_installation_found' };
+          return {
+            success: false,
+            reason: 'no_installation_found',
+            rejectionProvenance: 'ambiguous_eligible_installations',
+          };
+        case 'no_installation_found':
+          return {
+            success: false,
+            reason: installation.reason,
+            rejectionProvenance: 'managed_lookup_miss',
+          };
         case 'database_not_configured':
         case 'invalid_repo_format':
-        case 'no_installation_found':
         case 'repository_not_installed':
         case 'invalid_org_id':
         case 'integration_mismatch':
@@ -931,7 +944,13 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
           return { success: false, reason: 'repository_permissions_unavailable' };
         }
         if (error instanceof GitHubTokenGenerationError && error.reason !== undefined) {
-          return { success: false, reason: error.reason };
+          return {
+            success: false,
+            reason: error.reason,
+            ...(error.rejectionProvenance !== undefined
+              ? { rejectionProvenance: error.rejectionProvenance }
+              : {}),
+          };
         }
         throw error;
       }

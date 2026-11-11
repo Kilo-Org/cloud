@@ -1,5 +1,7 @@
 import { logger } from '../logger.js';
 import {
+  githubBrokerRejectionProvenanceSchema,
+  type GitHubBrokerRejectionProvenance,
   githubRepositoryAuthorizationResultSchema,
   type GitHubRepositoryAuthorizationFailureReason,
 } from '@kilocode/worker-utils/github-authorization';
@@ -61,6 +63,7 @@ export type ResolvedGitHubToken = {
 };
 
 export type ResolveGitHubTokenError = {
+  rejectionProvenance?: GitHubBrokerRejectionProvenance;
   reason:
     | GitHubRepositoryAuthorizationFailureReason
     | 'capability_configuration_error'
@@ -335,10 +338,14 @@ export async function issueCloudAgentGitHubSessionCapability(
   try {
     const result = await env.GIT_TOKEN_SERVICE.issueGitHubSessionCapability(params);
     if (!result.success) {
+      const provenance = githubBrokerRejectionProvenanceSchema.safeParse(
+        result.rejectionProvenance
+      );
       return {
         success: false,
         error: {
           reason: result.reason,
+          ...(provenance.success ? { rejectionProvenance: provenance.data } : {}),
           message: `GitHub managed auth lookup failed (${result.reason})`,
         },
       };

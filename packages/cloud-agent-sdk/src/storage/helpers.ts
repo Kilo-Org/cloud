@@ -19,7 +19,13 @@ function compareIds(left: string, right: string): number {
  * (`compareKiloSdkMessageInfo`). Reading the id order as the transcript order
  * showed such a session out of sequence, with a newer turn above older rows.
  *
- * Returns `ids` itself while the array already follows the clock, so an
+ * An optimistic or queued row is stamped with the device clock, and every
+ * stored row carries the writer's clock, so the two cannot be ranked against
+ * each other while a phone's clock disagrees with the writer's. Both are marked
+ * `synthetic` until the server echoes the row, and an unconfirmed row closes the
+ * transcript for the turn it belongs to, so they rank after every timed row.
+ *
+ * Returns `ids` itself while the array already follows that order, so an
  * unchanged transcript keeps its reference. A row whose time is unreadable
  * keeps the array as it is: the wire boundary rejects such a row, and a guess
  * here would reorder a transcript on data the store cannot place.
@@ -28,28 +34,40 @@ function orderMessageIdsByCreated(
   ids: readonly string[],
   messages: ReadonlyMap<string, MessageInfo>
 ): readonly string[] {
-  const rows: Array<{ id: string; created: number }> = [];
+  const rows: Array<{ id: string; created: number; unconfirmed: boolean }> = [];
   for (const id of ids) {
-    const created: unknown = messages.get(id)?.time?.created;
-    if (typeof created !== 'number' || !Number.isFinite(created)) return ids;
-    rows.push({ id, created });
+    const info = messages.get(id);
+    const unconfirmed = info?.role === 'user' && info.synthetic === true;
+    const created: unknown = info?.time?.created;
+    if (!unconfirmed && (typeof created !== 'number' || !Number.isFinite(created))) return ids;
+    rows.push({
+      id,
+      created: typeof created === 'number' && Number.isFinite(created) ? created : 0,
+      unconfirmed,
+    });
   }
   let ordered = true;
   for (let index = 1; index < rows.length; index += 1) {
     const previous = rows[index - 1];
     const current = rows[index];
     if (previous === undefined || current === undefined) return ids;
-    if (
-      current.created < previous.created ||
-      (current.created === previous.created && compareIds(previous.id, current.id) > 0)
-    ) {
+    if (compareCreatedRows(previous, current) > 0) {
       ordered = false;
       break;
     }
   }
   if (ordered) return ids;
-  rows.sort((left, right) => left.created - right.created || compareIds(left.id, right.id));
+  rows.sort(compareCreatedRows);
   return rows.map(row => row.id);
+}
+
+function compareCreatedRows(
+  left: { id: string; created: number; unconfirmed: boolean },
+  right: { id: string; created: number; unconfirmed: boolean }
+): number {
+  if (left.unconfirmed !== right.unconfirmed) return left.unconfirmed ? 1 : -1;
+  if (left.created !== right.created) return left.created < right.created ? -1 : 1;
+  return compareIds(left.id, right.id);
 }
 
 /**

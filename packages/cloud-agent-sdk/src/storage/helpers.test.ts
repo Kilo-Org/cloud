@@ -77,6 +77,15 @@ describe('orderMessageIds', () => {
     expect(orderMessageIds(ids, messages)).toBe(ids);
   });
 
+  test('keeps an unconfirmed send below stored rows when the device clock trails them', () => {
+    // The optimistic row carries the device clock and the stored rows carry the
+    // writer's, so the two cannot be ranked until the server echoes the send.
+    const optimistic: MessageInfo = { ...timed('b-optimistic', 5), synthetic: true } as MessageInfo;
+    const ids = ['b-optimistic', 'a-stored'];
+    const messages = new Map([optimistic, timed('a-stored', 100)].map(info => [info.id, info]));
+    expect(orderMessageIds(ids, messages)).toEqual(['a-stored', 'b-optimistic']);
+  });
+
   test('keeps already causal IDs and their array identity', () => {
     const ids = ['a', 'b', 'c'];
     const messages = new Map([

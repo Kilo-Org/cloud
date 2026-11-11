@@ -3,10 +3,14 @@ import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/i
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import { queryAccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
+import { cloudAgentSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import { TRPCError } from '@trpc/server';
 import {
   COMPUTE_CHARGE_MAX_PAGE,
   readComputeCharges,
   readComputeRates,
+  readSessionComputeCharges,
 } from '@/lib/cloud-agent/compute-billing';
 
 export const computeChargesInputSchema = z
@@ -25,6 +29,31 @@ export const computeChargesInputSchema = z
 
 export const computeBillingRouter = createTRPCRouter({
   rates: baseProcedure.query(() => readComputeRates(db)),
+  sessionCharges: baseProcedure
+    .input(
+      z.object({
+        cloudAgentSessionId: z.string().pipe(cloudAgentSessionIdSchema),
+        organizationId: z.uuid().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const session = await queryAccessibleCloudAgentSession(db, {
+        kiloUserId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        expectedOrganizationId: input.organizationId ?? null,
+      });
+      const charges = session
+        ? await readSessionComputeCharges(db, {
+            kiloSessionId: session.kiloSessionId,
+            userId: ctx.user.id,
+            organizationId: session.organizationId,
+          })
+        : null;
+      if (charges === null) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Session not found or access denied' });
+      }
+      return charges;
+    }),
   charges: baseProcedure.input(computeChargesInputSchema).query(async ({ ctx, input }) => {
     if (input.organizationId === undefined) {
       return readComputeCharges(db, { ...input, scope: { type: 'personal', userId: ctx.user.id } });

@@ -67,6 +67,7 @@ export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
 export const CODE_REVIEW_HEALTH_SECRET = getEnvVariable('CODE_REVIEW_HEALTH_SECRET');
 export const UPTIME_PROBE_SECRET = getEnvVariable('UPTIME_PROBE_SECRET');
+export const MODELS_HEALTH_SECRET = getEnvVariable('MODELS_HEALTH_SECRET');
 export const CLOUD_AGENT_DISPATCH_HEALTH_SECRET = getEnvVariable(
   'CLOUD_AGENT_DISPATCH_HEALTH_SECRET'
 );

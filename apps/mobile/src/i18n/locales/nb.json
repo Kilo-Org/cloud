@@ -22,6 +22,8 @@
     "expired": "Utløpt"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Avbryt",
     "done": "Ferdig",
     "retry": "Prøv igjen",
@@ -2461,7 +2463,8 @@
       "selectedProfile": "Valgt profil",
       "manualOverrides": "Manuelle overstyringer",
       "openSettingsToReview": "Åpne Innstillinger for å se gjennom",
-      "profileSelection": "Valg av profil"
+      "profileSelection": "Valg av profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er oppdatert.",
@@ -3539,7 +3542,7 @@
       "provider": "Stoppet: leverandørfeil",
       "tool": "Stoppet: verktøyfeil",
       "cancelled": "Stoppet: avbrutt",
-      "other": "STOPPET"
+      "other": "Stoppet"
     }
   },
   "transcriptionModel": {
@@ -4256,7 +4259,7 @@
     "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "En betalt oppsummering er ikke tilgjengelig for disse innstillingene.",
     "confirmPaid": "Slå på betalte sammendrag for {{context}}?",
-    "paidDisclosure": "Anslått {{estimate}}, opptil {{maximum}}, med en grense på {{minutes}} minutter. Kostnader påløper selv om genereringen mislykkes.",
+    "paidDisclosure": "Anslått {{estimate}}, opptil {{maximum}}, med en grense på {{minutes}} min. Kostnader påløper selv om genereringen mislykkes.",
     "enable": "Slå på betalte sammendrag",
     "allContexts": "Personlige briefer og organisasjonsbriefer holdes atskilt.",
     "emptyHistory": "Ingen lagrede briefer",
@@ -4275,10 +4278,10 @@
     "snapshotSummaryFailed": "AI-sammendraget mislyktes. Det strukturerte øyeblikksbildet er fortsatt tilgjengelig.",
     "scheduledContextEnabled": "Planlagte briefer",
     "scheduledContextSettings": "Planlagte briefer · {{context}}",
-    "scheduledContextHint": "Slå på planlagt lagring av øyeblikksbilder og betalte AI-sammendrag kun for denne konteksten. Utvalgte, sladdede utdrag og strukturerte fakta sendes til modellen din. Sammendrag bruker appens språk som lagres når du eksplisitt endrer brief-innstillingene. Språket for sammendrag oppdateres ikke automatisk når du endrer appens språk. Kostnader trekkes fra denne kontekstens saldo. Øyeblikksbilder uten aktivitet bruker ikke AI.",
+    "scheduledContextHint": "Slå på planlagt lagring av øyeblikksbilder og betalte AI-sammendrag kun for denne konteksten. Utvalgte, sladdede utdrag og strukturerte fakta sendes til modellen din. Sammendrag bruker appens språk som lagres når du oppdaterer brief-innstillingene. Kostnader trekkes fra denne kontekstens saldo. Øyeblikksbilder uten aktivitet bruker ikke AI.",
     "snapshotSafeguards": "Tids- og forbruksgrensene per sammendrag gjelder for hvert planlagte øyeblikksbilde, ikke som et dagsbudsjett.",
     "snapshotEstimateInputTooLarge": "Dette øyeblikksbildet har for mye kildemateriale for den valgte modellen.",
-    "quietSnapshot": "Ingen øktaktivitet ble valgt ut til dette øyeblikksbildet. Utvalget kan være ufullstendig. Ingen AI-modell ble kalt, og ingen kostnader for AI-sammendrag påløp.",
+    "quietSnapshot": "Ingen øktaktivitet ble valgt ut til dette øyeblikksbildet. Ingen AI-sammendrag ble forespurt eller belastet.",
     "noEnabledContexts": "Ingen kontekster er aktivert for planlagte briefer",
     "sourceBlocker": "Økten krever oppmerksomhet",
     "sourceMetadata": "Lagrede øktmetadata"

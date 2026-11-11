@@ -35,10 +35,10 @@ function withTerm(key: string, platform: ProviderPrPlatform): string {
 describe('French counted PR-review copy', () => {
   it('describes one truncated line in the singular and several in the plural', () => {
     expect(i18n.t('prReview.discussion.moreLinesAbove', { count: 1, displayCount: '1' })).toBe(
-      '… 1 ligne supplémentaire au-dessus.'
+      '… 1 ligne supplémentaire au-dessus'
     );
     expect(i18n.t('prReview.discussion.moreLinesAbove', { count: 3, displayCount: '3' })).toBe(
-      '… des lignes supplémentaires se trouvent au-dessus : 3.'
+      '… des lignes supplémentaires se trouvent au-dessus : 3'
     );
   });
 

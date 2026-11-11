@@ -22,6 +22,8 @@
     "expired": "Udløbet"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Annuller",
     "done": "Færdig",
     "retry": "Prøv igen",
@@ -2461,7 +2463,8 @@
       "selectedProfile": "Valgt profil",
       "manualOverrides": "Manuelle tilsidesættelser",
       "openSettingsToReview": "Åbn Indstillinger for at gennemgå",
-      "profileSelection": "Valg af profil"
+      "profileSelection": "Valg af profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er opdateret.",
@@ -3539,7 +3542,7 @@
       "provider": "Stoppet: udbyderfejl",
       "tool": "Stoppet: værktøjsfejl",
       "cancelled": "Stoppet: annulleret",
-      "other": "STOPPET"
+      "other": "Stoppet"
     }
   },
   "transcriptionModel": {
@@ -4260,7 +4263,7 @@
     "estimateModelNotAllowed": "Denne model er ikke tilladt her.",
     "estimateSpendLimitTooLow": "Hæv forbrugsgrænsen for at tillade denne opsummering.",
     "confirmPaid": "Slå betalte resuméer til for {{context}}?",
-    "paidDisclosure": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} minutter. Der opkræves betaling, selv hvis genereringen mislykkes.",
+    "paidDisclosure": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} min. Der opkræves betaling, selv hvis genereringen mislykkes.",
     "enable": "Slå betalte resuméer til",
     "allContexts": "Personlige briefinger og organisationsbriefinger holdes adskilt.",
     "emptyHistory": "Ingen gemte briefinger",
@@ -4275,10 +4278,10 @@
     "snapshotSummaryFailed": "AI-resuméet mislykkedes. Dit strukturerede øjebliksbillede er stadig tilgængeligt.",
     "scheduledContextEnabled": "Planlagte briefinger",
     "scheduledContextSettings": "Planlagte briefinger · {{context}}",
-    "scheduledContextHint": "Slå planlagt lagring og betalte AI-resuméer til for denne kontekst alene. Udvalgte uddrag med følsomme oplysninger fjernet og strukturerede fakta sendes til din model. Resuméer bruger det appsprog, der gemmes, når du udtrykkeligt ændrer briefingindstillingerne. Det gemte sprog opdateres ikke automatisk, når appens sprog ændres. Betalinger trækkes fra denne konteksts saldo. Øjebliksbilleder uden aktivitet bruger ikke AI.",
+    "scheduledContextHint": "Slå planlagt lagring og betalte AI-resuméer til for denne kontekst alene. Udvalgte uddrag med følsomme oplysninger fjernet og strukturerede fakta sendes til din model. Resuméer bruger det appsprog, der gemmes, når du opdaterer briefingindstillingerne. Betalinger trækkes fra denne konteksts saldo. Øjebliksbilleder uden aktivitet bruger ikke AI.",
     "snapshotSafeguards": "Tids- og forbrugsgrænserne pr. resumé gælder for hvert planlagt øjebliksbillede, ikke som et dagligt budget.",
     "snapshotEstimateInputTooLarge": "Dette øjebliksbillede indeholder for meget dokumentation til den valgte model.",
-    "quietSnapshot": "Ingen sessionsaktivitet blev udvalgt til dette øjebliksbillede. Udvælgelsen sker efter bedste evne. Der blev hverken anmodet om et AI-resumé, kaldt en AI-model eller opkrævet betaling.",
+    "quietSnapshot": "Ingen sessionsaktivitet blev udvalgt til dette øjebliksbillede. Der blev hverken anmodet om et AI-resumé eller opkrævet betaling.",
     "noEnabledContexts": "Ingen kontekster er aktiveret for planlagte briefinger",
     "sourceBlocker": "Sessionen kræver opmærksomhed",
     "sourceMetadata": "Gemte sessionsmetadata"

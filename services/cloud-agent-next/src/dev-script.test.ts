@@ -49,7 +49,11 @@ describe('dev.sh', () => {
       fs.mkdirSync(binDir);
       const script = isolatedScript(tempDir);
       const configPath = path.join(tempDir, 'wrangler.kilo2-local.json');
-      if (localConfig) fs.writeFileSync(configPath, '{}');
+      if (localConfig)
+        fs.writeFileSync(
+          configPath,
+          JSON.stringify({ env: { dev: { vars: { RUNTIME_KILO2_ORG_IDS: 'org-test' } } } })
+        );
       const dockerSocket = path.join(tempDir, 'upstream.sock');
       const wranglerEnvLog = path.join(tempDir, 'wrangler-env.log');
       const dockerProbeLog = path.join(tempDir, 'docker-probe.log');
@@ -64,6 +68,14 @@ if [ "$1" = "info" ] && [ "$DOCKER_HOST" = "${expectedDockerHost}" ]; then
 else
   printf '%s\\n' x86_64
 fi
+`
+      );
+      writeExecutable(path.join(binDir, 'pnpm'), '#!/bin/sh\nexit 0\n');
+      writeExecutable(
+        path.join(binDir, 'node'),
+        `#!/bin/sh
+if [ "$1" = "-e" ]; then exec "${process.execPath}" "$@"; fi
+case "$*" in *KILO2*) printf '${'b'.repeat(64)}' ;; *) printf '${'a'.repeat(64)}' ;; esac
 `
       );
       writeExecutable(
@@ -106,6 +118,16 @@ printf '%s\\n' "MINIFLARE_CONTAINER_EGRESS_IMAGE=$MINIFLARE_CONTAINER_EGRESS_IMA
         ...explicitArgs,
         ...wranglerArgs,
         ...(localConfig && explicitConfig === undefined ? ['--config', configPath] : []),
+        '--persist-to',
+        path.join(tempDir, '.wrangler/state'),
+        '--var',
+        'RUNTIME_STARTUP_MODE:downloaded',
+        '--var',
+        'NATIVE_RUNTIME_IMAGE:runtime-free',
+        '--var',
+        `RUNTIME_RELEASE_DESCRIPTOR:${'a'.repeat(64)}`,
+        '--var',
+        `RUNTIME_RELEASE_DESCRIPTOR_KILO2:${'b'.repeat(64)}`,
       ]);
     }
   );

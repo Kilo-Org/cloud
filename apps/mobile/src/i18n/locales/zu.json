@@ -22,6 +22,8 @@
     "expired": "Kuphelelwe yisikhathi"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Khansela",
     "done": "Kwenziwe",
     "retry": "Zama futhi",
@@ -1835,15 +1837,12 @@
       "repoSummaryOpen": "{{displayCount}} okungakaxazululwa",
       "repoSummaryOpen_one": "{{displayCount}} okungakaxazululwa",
       "repoSummaryOpen_other": "{{displayCount}} okungakaxazululwa",
-      "repoSummaryOpen_zero": "{{displayCount}} okungakaxazululwa",
       "repoSummaryCritical": "{{displayCount}} okubucayi kakhulu",
       "repoSummaryCritical_one": "{{displayCount}} okubucayi kakhulu",
       "repoSummaryCritical_other": "{{displayCount}} okubucayi kakhulu",
-      "repoSummaryCritical_zero": "{{displayCount}} okubucayi kakhulu",
       "repoSummaryHigh": "{{displayCount}} okunobucayi obuphezulu",
       "repoSummaryHigh_one": "{{displayCount}} okunobucayi obuphezulu",
       "repoSummaryHigh_other": "{{displayCount}} okunobucayi obuphezulu",
-      "repoSummaryHigh_zero": "{{displayCount}} okunobucayi obuphezulu",
       "couldNotLoad": "Asikwazanga ukulayisha idatha yedeshibhodi.",
       "filterByRepository": "Hlunga ngenqolobane yekhodi",
       "lastSynced": "Kuvumelaniswe okokugcina {{time}}",
@@ -1875,15 +1874,12 @@
       "breakdownCritical": "{{displayCount}} okubucayi",
       "breakdownCritical_one": "{{displayCount}} okubucayi",
       "breakdownCritical_other": "{{displayCount}} okubucayi",
-      "breakdownCritical_zero": "{{displayCount}} okubucayi",
       "breakdownHigh": "{{displayCount}} okuphezulu",
       "breakdownHigh_one": "{{displayCount}} okuphezulu",
       "breakdownHigh_other": "{{displayCount}} okuphezulu",
-      "breakdownHigh_zero": "{{displayCount}} okuphezulu",
       "breakdownMediumLow": "{{displayCount}} obumaphakathi nobuphansi",
       "breakdownMediumLow_one": "{{displayCount}} obumaphakathi nobuphansi",
       "breakdownMediumLow_other": "{{displayCount}} obumaphakathi nobuphansi",
-      "breakdownMediumLow_zero": "{{displayCount}} obumaphakathi nobuphansi",
       "dueThisWeek": "Kufanele kwenziwe kuleli sonto",
       "dueThisWeekDetail": "Okungu-{{exploitable}} kulawa kuqinisekiswe ukuthi kungasetshenziswa ekuhlaseleni",
       "dueThisWeekDetail_one": "Okungu-{{exploitable}} kulawa kuqinisekiswe ukuthi kungasetshenziswa ekuhlaseleni",
@@ -2467,7 +2463,8 @@
       "selectedProfile": "Iphrofayili ekhethiwe",
       "manualOverrides": "Ukukhipha mathupha",
       "openSettingsToReview": "Vula Izilungiselelo ukuze ubuyekeze",
-      "profileSelection": "Ukukhetha iphrofayela"
+      "profileSelection": "Ukukhetha iphrofayela",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}.",
@@ -3545,7 +3542,7 @@
       "provider": "Kumisiwe: iphutha lomhlinzeki",
       "tool": "Kumisiwe: iphutha lethuluzi",
       "cancelled": "Kumisiwe: kukhanseliwe",
-      "other": "IMISIWE"
+      "other": "Imisiwe"
     }
   },
   "transcriptionModel": {
@@ -4281,10 +4278,10 @@
     "snapshotSummaryFailed": "Isifinyezo se-AI sehlulekile. Umbiko wakho wesimo onamaqiniso ahleliwe usatholakala.",
     "scheduledContextEnabled": "Imibiko ehleliwe",
     "scheduledContextSettings": "Imibiko ehleliwe · {{context}}",
-    "scheduledContextHint": "Vula ukuqoqwa kwesimo okuhleliwe nezifinyezo ze-AI ezikhokhelwayo kulo mongo kuphela. Izingcaphuno ezikhethiwe okususwe kuzo imininingwane ebucayi kanye namaqiniso ahleliwe kuthunyelwa kumodeli yakho. Izifinyezo zisebenzisa ulimi lwe-app olulondolozwa kuphela lapho ushintsha izilungiselelo zombiko ngokwakho. Lolu limi olulondoloziwe alushintshi ngokuzenzakalelayo lapho ushintsha ulimi lwe-app. Izindleko zisebenzisa ibhalansi yalo mongo. Imibiko yesimo engenamsebenzi okhethiwe ayisebenzisi i-AI.",
+    "scheduledContextHint": "Vula ukuqoqwa kwesimo okuhleliwe nezifinyezo ze-AI ezikhokhelwayo kulo mongo kuphela. Izingcaphuno ezikhethiwe okususwe kuzo imininingwane ebucayi kanye namaqiniso ahleliwe kuthunyelwa kumodeli yakho. Izifinyezo zisebenzisa ulimi lwe-app olulondolozwa lapho ushintsha izilungiselelo zombiko. Izindleko zisebenzisa ibhalansi yalo mongo. Imibiko yesimo engenamsebenzi okhethiwe ayisebenzisi i-AI.",
     "snapshotSafeguards": "Imikhawulo yesikhathi neyezindleko yesifinyezo ngasinye isebenza embikweni wesimo ngamunye ohleliwe, hhayi njengesabelomali sansuku zonke.",
     "snapshotEstimateInputTooLarge": "Lo mbiko wesimo unobufakazi obuningi kakhulu kunalokho imodeli ekhethiwe engakusingatha.",
-    "quietSnapshot": "Awukho umsebenzi weseshini okhethelwe lo mbiko wesimo ekukhethweni okwenziwe ngokusemandleni. Akucelwanga isifinyezo se-AI, akubizwanga imodeli ye-AI futhi akukho nkokhelo ekhokhisiwe.",
+    "quietSnapshot": "Awukho umsebenzi weseshini okhethelwe lo mbiko wesimo. Akucelwanga isifinyezo se-AI futhi akukho nkokhelo ekhokhisiwe.",
     "noEnabledContexts": "Ayikho imongo evulelwe imibiko ehleliwe",
     "sourceBlocker": "Iseshini idinga ukunakwa",
     "sourceMetadata": "Imethadatha yeseshini eqoqiwe"

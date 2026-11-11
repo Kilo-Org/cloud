@@ -240,6 +240,7 @@ test('waitForLoadingPlaceholder waits for the screen the link opened and its pla
     dump => dump.env.route !== '/'
   );
   assert.equal(waited.cleared, true);
+  assert.equal(waited.observed, true);
   assert.equal(index, 4);
 });
 
@@ -259,7 +260,30 @@ test('waitForLoadingPlaceholder reports a placeholder that outlives its budget',
     1_000
   );
   assert.equal(waited.cleared, false);
+  assert.equal(waited.observed, true);
   assert.ok(waited.elapsedMs >= 1_000);
+});
+
+test('waitForLoadingPlaceholder releases a link that never lands without claiming a placeholder', async () => {
+  const clock = fakeClock();
+  const skeleton = dumpWith({ route: '/elsewhere' });
+  skeleton.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    owners: ['View', 'Skeleton'],
+  });
+  const waited = await waitForLoadingPlaceholder(
+    { dump: async () => skeleton },
+    clock,
+    () => false,
+    30_000,
+    1_000
+  );
+  // A placeholder on another screen is not this target's state.
+  assert.equal(waited.cleared, false);
+  assert.equal(waited.observed, false);
+  assert.ok(waited.elapsedMs >= 1_000 && waited.elapsedMs < 5_000);
 });
 
 test('an unsettled capture from a loading placeholder names that cause', () => {
@@ -282,6 +306,23 @@ test('an unsettled capture from a loading placeholder names that cause', () => {
     ['unsettled']
   );
   assert.match(blocked[0]?.message ?? '', /still paints its loading placeholder/u);
+  // The finding measures the wait that ran, not the settle loop's own elapsed time.
+  const waited = screenFindings({
+    cell: 'base',
+    target: 'loading',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [dump, dump, dump],
+      settled: false,
+      elapsedMs: 12_000,
+      blockedBy: 'loading-placeholder',
+      loadingWaitMs: 30_101,
+    },
+  });
+  assert.equal(waited[0]?.measured, 30_101);
+  assert.match(waited[0]?.message ?? '', /after 30101 ms/u);
   const changing = screenFindings({
     cell: 'base',
     target: 'moving',

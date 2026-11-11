@@ -56,9 +56,9 @@ export type EnkryptGuardrailCall = {
    */
   detectorsFired?: EnkryptDetectorId[];
   /** The text this call sent to Enkrypt, in UTF-16 code units; see the ledger column. */
-  scannedCharacters?: number;
+  scannedCharacters: number;
   /** The text the scan covers, including what the verdict cache covered; see the ledger column. */
-  totalCharacters?: number;
+  totalCharacters: number;
 };
 
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {

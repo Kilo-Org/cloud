@@ -13,6 +13,7 @@ import {
 } from '../sandbox-control/credential.js';
 import { encodeVercelProviderRef } from '../sandbox-control/vercel-provider.js';
 import { RUNTIME_TOOLCHAIN } from '../shared/runtime-toolchain.js';
+import { GH_STACK_INSTALL_PATH, RUNTIME_DISTRIBUTION } from '../shared/runtime-distribution.js';
 
 const mocks = vi.hoisted(() => {
   class CredentialMissingError extends Error {}
@@ -2227,6 +2228,21 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.kilo.sha256);
     expect(command.args[1]).toContain("check_sha256 '/usr/local/bin/bun'");
     expect(command.args[1]).toContain('npm install -g --loglevel=error "$work/package.tgz"');
+    expect(command.args[1]).toContain(
+      `https://github.com/github/gh-stack/releases/download/v${RUNTIME_DISTRIBUTION.ghStack}/linux-amd64`
+    );
+    expect(command.args[1]).toContain(
+      `curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 --retry-delay 2 'https://github.com/github/gh-stack/`
+    );
+    expect(command.args[1]).toContain(
+      `echo '${RUNTIME_DISTRIBUTION.ghStackSha256}  /tmp/gh-stack' | sha256sum -c -`
+    );
+    expect(command.args[1]).toContain(
+      `sudo install -D -m 0755 /tmp/gh-stack '${GH_STACK_INSTALL_PATH}'`
+    );
+    expect(command.args[1]).toContain(
+      `test "$(sha256sum '${GH_STACK_INSTALL_PATH}' | cut -d' ' -f1)" = '${RUNTIME_DISTRIBUTION.ghStackSha256}'`
+    );
     expect(command.args[1]).not.toContain('| bash');
   });
 
@@ -2246,6 +2262,9 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     );
     expect(command.args[1]).toContain(
       `check_sha256 "$npm_root/@kilocode/cli/bin/.kilo" '${RUNTIME_TOOLCHAIN.kilo.installedSha256[0]}'`
+    );
+    expect(command.args[1]).toContain(
+      `test "$(sha256sum '${GH_STACK_INSTALL_PATH}' | cut -d' ' -f1)" = '${RUNTIME_DISTRIBUTION.ghStackSha256}'`
     );
     expect(storedRow(fixture)).toMatchObject({ step: 'snapshot_builder' });
   });

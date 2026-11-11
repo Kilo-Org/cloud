@@ -273,6 +273,7 @@
   ],
   "fr": [
     "all",
+    "block",
     "cancelled",
     "closed",
     "failed",

@@ -164,6 +164,9 @@ export function ChatHeader({
           trigger.focus();
         }}
         sessionId={cloudAgentSessionId}
+        organizationId={organizationId}
+        sandboxScopeId={sandboxScopeId}
+        computeBillingEnabled={sandboxStatusEligible}
         kiloSessionId={kiloSessionId}
         model={model}
         modelDisplayName={modelDisplayName}

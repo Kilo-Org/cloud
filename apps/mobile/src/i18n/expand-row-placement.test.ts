@@ -249,7 +249,7 @@ describe('counted expand rows', () => {
     // verb `se trouvent` cannot meet a count of one, so the singular forms lead
     // a singular noun instead of annotating the count.
     ['fr', ALL_LINES, 'Afficher la ligne (N)'],
-    ['fr', MORE_ABOVE, '… N ligne supplémentaire au-dessus.'],
+    ['fr', MORE_ABOVE, '… N ligne supplémentaire au-dessus'],
     ['el', MORE_ABOVE, '… υπάρχει N επιπλέον γραμμή παραπάνω.'],
     ['am', MORE_ABOVE, '… ከላይ ተጨማሪ N መስመር አለ።'],
     ['eu', MORE_ABOVE, '… Beste N lerro dago goian.'],

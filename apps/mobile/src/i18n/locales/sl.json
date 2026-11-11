@@ -22,6 +22,8 @@
     "expired": "Poteklo"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Prekliči",
     "done": "Končano",
     "retry": "Poskusi znova",
@@ -2549,7 +2551,8 @@
       "selectedProfile": "Izbrani profil",
       "manualOverrides": "Ročne preglasitve",
       "openSettingsToReview": "Odprite nastavitve za pregled",
-      "profileSelection": "Izbira profila"
+      "profileSelection": "Izbira profila",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena je {{displayCount}} datoteka.",
@@ -3653,7 +3656,7 @@
       "provider": "Ustavljeno: napaka ponudnika",
       "tool": "Ustavljeno: napaka orodja",
       "cancelled": "Ustavljeno: preklicano",
-      "other": "USTAVLJENO"
+      "other": "Ustavljeno"
     }
   },
   "transcriptionModel": {
@@ -4411,10 +4414,10 @@
     "snapshotSummaryFailed": "AI povzetek ni uspel. Vaš strukturirani posnetek je še vedno na voljo.",
     "scheduledContextEnabled": "Načrtovana poročila",
     "scheduledContextSettings": "Načrtovana poročila · {{context}}",
-    "scheduledContextHint": "Omogočite načrtovano zajemanje in plačljive AI povzetke samo za ta kontekst. Izbrani izseki s prikritimi občutljivimi podatki in strukturirana dejstva se pošljejo vašemu modelu. Povzetki uporabljajo jezik aplikacije, shranjen ob izrecni posodobitvi nastavitev poročila. Ta jezik se ob spremembi jezika aplikacije ne posodobi samodejno. Stroški bremenijo stanje tega konteksta. Posnetki brez dejavnosti ne uporabljajo AI.",
+    "scheduledContextHint": "Omogočite načrtovano zajemanje in plačljive AI povzetke samo za ta kontekst. Izbrani izseki s prikritimi občutljivimi podatki in strukturirana dejstva se pošljejo vašemu modelu. Povzetki uporabljajo jezik aplikacije, shranjen ob posodobitvi nastavitev poročila. Stroški bremenijo stanje tega konteksta. Posnetki brez dejavnosti ne uporabljajo AI.",
     "snapshotSafeguards": "Časovna omejitev in omejitev porabe na povzetek veljata za vsak načrtovani posnetek, ne kot dnevni proračun.",
     "snapshotEstimateInputTooLarge": "Ta posnetek vsebuje preveč dokaznega gradiva za izbrani model.",
-    "quietSnapshot": "Za ta posnetek ni bila izbrana nobena dejavnost sej. Popolnost izbora ni zagotovljena. AI povzetek ni bil zahtevan ali zaračunan.",
+    "quietSnapshot": "Za ta posnetek ni bila izbrana nobena dejavnost sej. AI povzetek ni bil zahtevan ali zaračunan.",
     "noEnabledContexts": "Za načrtovana poročila ni omogočen noben kontekst",
     "sourceBlocker": "Seja zahteva pozornost",
     "sourceMetadata": "Zajeti metapodatki seje"

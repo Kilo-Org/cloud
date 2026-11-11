@@ -11366,6 +11366,10 @@ export const container_usage_interval = pgTable(
   },
   table => [
     index('IDX_container_usage_interval_sweep').on(table.status, table.last_seen_at),
+    index('IDX_container_usage_interval_session')
+      .on(table.session_id)
+      .concurrently()
+      .where(sql`${table.session_id} IS NOT NULL`),
     index('IDX_container_usage_interval_subject_started').on(
       table.subject_type,
       table.subject_id,

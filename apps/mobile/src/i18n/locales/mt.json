@@ -22,6 +22,8 @@
     "expired": "Skada"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Ikkanċella",
     "done": "Lest",
     "retry": "Erġa' pprova",
@@ -2593,7 +2595,8 @@
       "selectedProfile": "Profil magħżul",
       "manualOverrides": "Manwal overrides",
       "openSettingsToReview": "Iftaħ Settings biex tirrevedi",
-      "profileSelection": "Għażla tal-profil"
+      "profileSelection": "Għażla tal-profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ġie aġġornat {{displayCount}} fajl.",
@@ -3710,7 +3713,7 @@
       "provider": "Waqaf: żball tal-fornitur",
       "tool": "Waqaf: żball tal-għodda",
       "cancelled": "Waqaf: ikkanċellat",
-      "other": "WAQFET"
+      "other": "Waqfet"
     }
   },
   "transcriptionModel": {
@@ -4479,10 +4482,10 @@
     "snapshotSummaryFailed": "Is-sommarju AI falla. L-istantanja strutturata tiegħek għadha disponibbli.",
     "scheduledContextEnabled": "Briefings skedati",
     "scheduledContextSettings": "Briefings skedati · {{context}}",
-    "scheduledContextHint": "Ixgħel il-ġbir skedat u s-sommarji AI bi ħlas għal dan il-kuntest biss. Siltiet magħżula b'dettalji sensittivi moħbija u fatti strutturati jintbagħtu lill-mudell tiegħek. Is-sommarji jużaw il-lingwa tal-app issejvjata meta tibdel espliċitament is-settings tal-briefing. Din il-lingwa ma tiġix aġġornata awtomatikament meta tinbidel il-lingwa tal-app. Il-ħlasijiet jużaw il-bilanċ ta' dan il-kuntest. Istantanji mingħajr attività ma jużawx AI.",
+    "scheduledContextHint": "Ixgħel il-ġbir skedat u s-sommarji AI bi ħlas għal dan il-kuntest biss. Siltiet magħżula b'dettalji sensittivi moħbija u fatti strutturati jintbagħtu lill-mudell tiegħek. Is-sommarji jużaw il-lingwa tal-app issejvjata meta tibdel is-settings tal-briefing. Il-ħlasijiet jużaw il-bilanċ ta' dan il-kuntest. Istantanji mingħajr attività ma jużawx AI.",
     "snapshotSafeguards": "Il-limiti tal-ħin u tal-infiq għal kull sommarju japplikaw għal kull istantanja skedata, mhux bħala baġit ta' kuljum.",
     "snapshotEstimateInputTooLarge": "Din l-istantanja fiha wisq evidenza għall-mudell magħżul.",
-    "quietSnapshot": "L-għażla għal din l-istantanja saret bl-aħjar sforz possibbli, iżda ma ntgħażlet l-ebda attività tas-sessjonijiet. Ma ntalab l-ebda sommarju AI, ma saret l-ebda sejħa lill-mudell u ma ġie ddebitat l-ebda ħlas.",
+    "quietSnapshot": "Ma ntgħażlet l-ebda attività tas-sessjonijiet għal din l-istantanja. Ma ntalab l-ebda sommarju AI u ma ġie ddebitat l-ebda ħlas.",
     "noEnabledContexts": "L-ebda kuntest mixgħul għall-briefings skedati",
     "sourceBlocker": "Is-sessjoni teħtieġ attenzjoni",
     "sourceMetadata": "Metadata maqbuda tas-sessjoni"

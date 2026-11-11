@@ -22,6 +22,8 @@
     "expired": "Wygasło"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Anuluj",
     "done": "Gotowe",
     "retry": "Spróbuj ponownie",
@@ -1961,7 +1963,8 @@
       "selectedProfile": "Wybrany profil",
       "manualOverrides": "Ręczne nadpisania",
       "openSettingsToReview": "Otwórz Ustawienia, aby sprawdzić",
-      "profileSelection": "Wybór profilu"
+      "profileSelection": "Wybór profilu",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik.",
@@ -3653,7 +3656,7 @@
       "provider": "Zatrzymano: błąd dostawcy",
       "tool": "Zatrzymano: błąd narzędzia",
       "cancelled": "Zatrzymano: anulowano",
-      "other": "ZATRZYMANA"
+      "other": "Zatrzymana"
     }
   },
   "transcriptionModel": {
@@ -4411,10 +4414,10 @@
     "snapshotSummaryFailed": "Nie udało się utworzyć podsumowania AI. Ustrukturyzowana migawka jest nadal dostępna.",
     "scheduledContextEnabled": "Zaplanowane raporty",
     "scheduledContextSettings": "Zaplanowane raporty · {{context}}",
-    "scheduledContextHint": "Włącz zaplanowane zapisywanie migawek i płatne podsumowania AI tylko dla tego kontekstu. Wybrane fragmenty z usuniętymi danymi wrażliwymi i ustrukturyzowane fakty są wysyłane do Twojego modelu. Podsumowania korzystają z języka aplikacji zapisanego przy ręcznej zmianie ustawień raportu. Sama zmiana języka aplikacji nie aktualizuje tego ustawienia. Opłaty pobierane są z salda tego kontekstu. Migawki bez aktywności nie korzystają z AI.",
+    "scheduledContextHint": "Włącz zaplanowane zapisywanie migawek i płatne podsumowania AI tylko dla tego kontekstu. Wybrane fragmenty z usuniętymi danymi wrażliwymi i ustrukturyzowane fakty są wysyłane do Twojego modelu. Podsumowania korzystają z języka aplikacji zapisanego przy aktualizacji ustawień raportu. Opłaty pobierane są z salda tego kontekstu. Migawki bez aktywności nie korzystają z AI.",
     "snapshotSafeguards": "Limity czasu i wydatków na podsumowanie dotyczą każdej zaplanowanej migawki osobno — nie są budżetem dziennym.",
     "snapshotEstimateInputTooLarge": "Ta migawka zawiera zbyt dużo materiałów dla wybranego modelu.",
-    "quietSnapshot": "Do tej migawki nie wybrano żadnej aktywności sesji. Wybór może być niepełny. Nie zlecono podsumowania AI, nie wywołano modelu ani nie naliczono opłaty.",
+    "quietSnapshot": "Do tej migawki nie wybrano żadnej aktywności sesji. Nie zlecono podsumowania AI ani nie naliczono opłaty.",
     "noEnabledContexts": "Brak kontekstów z włączonymi zaplanowanymi raportami",
     "sourceBlocker": "Sesja wymaga uwagi",
     "sourceMetadata": "Zapisane metadane sesji"

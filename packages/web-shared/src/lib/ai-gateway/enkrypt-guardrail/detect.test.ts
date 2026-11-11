@@ -152,6 +152,8 @@ describe('scanRequest', () => {
           apiKind: 'chat_completions',
           decision: 'allowed',
           creditsCost: 3,
+          scannedCharacters: 11,
+          totalCharacters: 11,
         },
       ],
     });
@@ -401,6 +403,9 @@ describe('scanRequest', () => {
 
     expect(result.usageRecords).toHaveLength(2);
     expect(result.usageRecords[0]).not.toHaveProperty('detectorsFired');
+    expect(result.usageRecords[0]).toEqual(
+      expect.objectContaining({ scannedCharacters: 11, totalCharacters: 11 })
+    );
     expect(result.usageRecords[1]).toEqual(
       expect.objectContaining({ decision: 'allowed', detectorsFired: ['pii'] })
     );
@@ -420,7 +425,7 @@ describe('scanRequest', () => {
     expect(console.debug).not.toHaveBeenCalled();
   });
 
-  it('logs how much of the conversation was scanned and how much was cached', async () => {
+  it('logs and records how much of the conversation was scanned and how much was cached', async () => {
     const coverage = {
       cache: 'hit',
       totalCharacters: 9_000,
@@ -429,11 +434,14 @@ describe('scanRequest', () => {
       cachedSegments: 10,
     } as const;
 
-    await scanRequest(
+    const result = await scanRequest(
       makeScan({ coverage }),
       deps(async () => detectResponse({ summary: {} }, { credits: '3' }))
     );
 
+    expect(result.usageRecords).toEqual([
+      expect.objectContaining({ scannedCharacters: 11, totalCharacters: 9_000 }),
+    ]);
     expect(console.debug).toHaveBeenCalledWith(
       '[enkrypt-guardrail] decision',
       expect.objectContaining({

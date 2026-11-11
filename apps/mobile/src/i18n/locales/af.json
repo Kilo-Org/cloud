@@ -22,6 +22,8 @@
     "expired": "Verval"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Kanselleer",
     "done": "Klaar",
     "retry": "Probeer weer",
@@ -2461,7 +2463,8 @@
       "selectedProfile": "Geselekteerde profiel",
       "manualOverrides": "Handmatige oorheersing",
       "openSettingsToReview": "Maak Instellings oop om na te gaan",
-      "profileSelection": "Profielkeuse"
+      "profileSelection": "Profielkeuse",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer is bygewerk.",
@@ -3539,7 +3542,7 @@
       "provider": "Gestop: verskafferfout",
       "tool": "Gestop: gereedskapfout",
       "cancelled": "Gestop: gekanselleer",
-      "other": "GESTAAK"
+      "other": "Gestaak"
     }
   },
   "transcriptionModel": {
@@ -4256,7 +4259,7 @@
     "estimate": "Skatting {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "’n Betaalde opsomming is nie beskikbaar vir hierdie instellings nie.",
     "confirmPaid": "Aktiveer betaalde opsommings vir {{context}}?",
-    "paidDisclosure": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} minute. Heffings geld selfs as generering misluk.",
+    "paidDisclosure": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
     "enable": "Aktiveer betaalde opsommings",
     "allContexts": "Persoonlike en organisasieverslae bly apart.",
     "emptyHistory": "Geen gestoorde verslae nie",
@@ -4275,10 +4278,10 @@
     "snapshotSummaryFailed": "AI-opsomming het misluk. Jou gestruktureerde momentopname is steeds beskikbaar.",
     "scheduledContextEnabled": "Geskeduleerde verslae",
     "scheduledContextSettings": "Geskeduleerde verslae · {{context}}",
-    "scheduledContextHint": "Aktiveer geskeduleerde vaslegging en betaalde AI-opsommings slegs vir hierdie konteks. Geselekteerde uittreksels waarvan sensitiewe inligting verberg is en gestruktureerde feite word na jou model gestuur. Opsommings gebruik die apptaal wat gestoor word wanneer jy jou verslaginstellings uitdruklik wysig. Die gestoorde taal word nie outomaties bygewerk wanneer die apptaal verander nie. Heffings gebruik hierdie konteks se saldo. Momentopnames sonder aktiwiteit gebruik nie AI nie.",
+    "scheduledContextHint": "Aktiveer geskeduleerde vaslegging en betaalde AI-opsommings slegs vir hierdie konteks. Geselekteerde uittreksels waarvan sensitiewe inligting verberg is en gestruktureerde feite word na jou model gestuur. Opsommings gebruik die apptaal wat gestoor word wanneer jy jou verslaginstellings bywerk. Heffings gebruik hierdie konteks se saldo. Momentopnames sonder aktiwiteit gebruik nie AI nie.",
     "snapshotSafeguards": "Tyd- en bestedingslimiete per opsomming geld vir elke geskeduleerde momentopname, nie as 'n daaglikse begroting nie.",
     "snapshotEstimateInputTooLarge": "Hierdie momentopname bevat te veel bewyse vir die gekose model.",
-    "quietSnapshot": "Die seleksie is na beste vermoë gedoen, maar geen sessieaktiwiteit is vir hierdie momentopname geselekteer nie. Geen AI-opsomming is aangevra, geen model is aangeroep en geen koste is gehef nie.",
+    "quietSnapshot": "Geen sessieaktiwiteit is vir hierdie momentopname geselekteer nie. Geen AI-opsomming is aangevra of gehef nie.",
     "noEnabledContexts": "Geen kontekste vir geskeduleerde verslae geaktiveer nie",
     "sourceBlocker": "Sessie benodig aandag",
     "sourceMetadata": "Vasgelegde sessiemetadata"

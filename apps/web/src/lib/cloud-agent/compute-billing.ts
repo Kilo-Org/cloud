@@ -1,7 +1,8 @@
 import 'server-only';
 import { computeMemberIdSql } from '@kilocode/worker-utils/compute-member';
-import { and, asc, desc, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import {
+  cli_sessions_v2,
   cloud_billing_sku,
   compute_usage_charge,
   container_usage_interval,
@@ -45,6 +46,73 @@ export const computeChargeMemberId = computeMemberIdSql({
   actorId: container_usage_interval.actor_id,
   metadata: container_usage_interval.metadata,
 });
+
+/** A sandbox is shared by the chats of a worktree, not billed separately per chat. */
+export async function readSessionComputeCharges(
+  database: Database,
+  input: { kiloSessionId: string; userId: string; organizationId: string | null }
+) {
+  const scope = and(
+    eq(cli_sessions_v2.kilo_user_id, input.userId),
+    input.organizationId === null
+      ? isNull(cli_sessions_v2.organization_id)
+      : eq(cli_sessions_v2.organization_id, input.organizationId)
+  );
+  const [session] = await database
+    .select({
+      cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+      worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+    })
+    .from(cli_sessions_v2)
+    .where(and(scope, eq(cli_sessions_v2.session_id, input.kiloSessionId)))
+    .limit(1);
+  if (!session?.cloudAgentSessionId) return null;
+
+  const sessions = database
+    .select({ id: cli_sessions_v2.cloud_agent_session_id })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        scope,
+        session.worktreeId === null
+          ? eq(cli_sessions_v2.cloud_agent_session_id, session.cloudAgentSessionId)
+          : eq(cli_sessions_v2.cloud_agent_worktree_id, session.worktreeId)
+      )
+    );
+  const [total] = await database
+    .select({
+      amountMicrodollars: sql<number>`coalesce(sum(${compute_usage_charge.amount_microdollars}), 0)::double precision`,
+      seconds: sql<number>`coalesce(sum(${compute_usage_charge.quantity}), 0)::double precision`,
+    })
+    .from(container_usage_interval)
+    .innerJoin(
+      container_usage_segment,
+      eq(container_usage_segment.interval_id, container_usage_interval.id)
+    )
+    .innerJoin(
+      compute_usage_charge,
+      and(
+        eq(compute_usage_charge.usage_source, 'container_usage_segment'),
+        eq(compute_usage_charge.usage_source_id, container_usage_segment.idempotency_key)
+      )
+    )
+    .where(
+      and(
+        inArray(container_usage_interval.session_id, sessions),
+        input.organizationId === null
+          ? eq(compute_usage_charge.user_id, input.userId)
+          : and(
+              eq(compute_usage_charge.organization_id, input.organizationId),
+              eq(computeChargeMemberId, input.userId)
+            )
+      )
+    );
+  return {
+    amountMicrodollars: total?.amountMicrodollars ?? 0,
+    seconds: total?.seconds ?? 0,
+    scope: session.worktreeId === null ? ('session' as const) : ('workspace' as const),
+  };
+}
 
 export async function readComputeCharges(
   database: Database,

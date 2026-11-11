@@ -15,6 +15,7 @@ import {
   readTrpcErrorContext,
   readTrpcResponseError,
   reportNetworkError,
+  resetNetworkErrorReports,
   trpcProcedureFromUrl,
 } from '@/lib/telemetry/network-errors';
 import { NETWORK_BODY_CONTEXT, scrubEvent } from '@/lib/telemetry/sentry-scrub';
@@ -25,6 +26,7 @@ let breadcrumbs: TelemetryBreadcrumb[] = [];
 beforeEach(() => {
   events = [];
   breadcrumbs = [];
+  resetNetworkErrorReports();
   setTelemetrySink(event => {
     events.push(event);
   });
@@ -36,6 +38,7 @@ beforeEach(() => {
 afterEach(() => {
   setTelemetrySink(null);
   setBreadcrumbSink(null);
+  resetNetworkErrorReports();
 });
 
 function reportedEvent(): TelemetryEvent | undefined {
@@ -816,6 +819,9 @@ describe('createNetworkErrorFetch status policy', () => {
       'https://example.com/api/trpc/user.getMe',
       Response.json(forbidden, { status: 403 })
     );
+    // Each shape is another process's first report of this endpoint and
+    // outcome; the claim is proved by the reporter cases.
+    resetNetworkErrorReports();
     await respond(
       'https://example.com/api/trpc/user.getMe?batch=1',
       Response.json([batchErrorItem(404), forbidden], { status: 207 })
@@ -830,6 +836,9 @@ describe('createNetworkErrorFetch status policy', () => {
 
   it.each([400, 500])('still reports a %i exactly once', async status => {
     await respond('https://example.com/api/trpc/user.getMe', new Response('', { status }));
+    // The direct body and the batch item are two processes' first report of
+    // this endpoint and outcome; the claim is proved by the reporter cases.
+    resetNetworkErrorReports();
     await respond('https://example.com/api/trpc/user.getMe?batch=1', batchWithInnerStatus(status));
 
     expect(events.map(event => event.fingerprint)).toEqual([
@@ -897,7 +906,7 @@ describe('createNetworkErrorFetch status policy', () => {
 });
 
 describe('reportNetworkError', () => {
-  it('produces a stable fingerprint across repeated identical reports', () => {
+  it('files one event per process for a repeated failure of one endpoint', () => {
     const context: NetworkErrorContext = {
       source: 'fetch',
       url: 'https://example.com/api/trpc/a.b?input=secret',
@@ -908,10 +917,67 @@ describe('reportNetworkError', () => {
 
     reportNetworkError(context);
     reportNetworkError(context);
+    reportNetworkError(context);
 
-    expect(events).toHaveLength(2);
-    expect(events[0]?.fingerprint).toEqual(events[1]?.fingerprint);
+    expect(events).toHaveLength(1);
     expect(events[0]?.fingerprint).toEqual(['network-error', 'fetch', 'a.b', 'failed']);
+    // Every repeat still explains the next real event.
+    expect(breadcrumbs).toHaveLength(2);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/trpc/a.b failed',
+      'POST /api/trpc/a.b failed',
+    ]);
+    expect(breadcrumbs[0]).toMatchObject({
+      category: 'network',
+      level: 'warning',
+      data: { 'error.source': 'fetch', 'network.outcome': 'failed', durationMs: 3 },
+    });
+  });
+
+  it('files its own event for a different status of the same procedure', () => {
+    const report = (status: number) => {
+      reportNetworkError({
+        source: 'trpc',
+        url: 'http://127.0.0.1:10416/api/trpc/activeSessions.createWebTicket',
+        method: 'POST',
+        status,
+        durationMs: 6,
+      });
+    };
+
+    report(401);
+    report(401);
+    report(500);
+    report(500);
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', 'activeSessions.createWebTicket', 'http.401'],
+      ['network-error', 'trpc', 'activeSessions.createWebTicket', 'http.500'],
+    ]);
+    expect(events.map(event => event.tags?.['http.status'])).toEqual([401, 500]);
+  });
+
+  it('files its own event for a different procedure at the same status', () => {
+    const report = (procedure: string) => {
+      reportNetworkError({
+        source: 'trpc',
+        url: `http://127.0.0.1:10416/api/trpc/${procedure}`,
+        method: 'POST',
+        status: 500,
+        durationMs: 5,
+      });
+    };
+
+    report('session.list');
+    report('session.list');
+    report('user.me');
+    report('user.me');
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', 'session.list', 'http.500'],
+      ['network-error', 'trpc', 'user.me', 'http.500'],
+    ]);
+    expect(breadcrumbs).toHaveLength(2);
   });
 
   it('synthesizes a failure message without a status', () => {
@@ -955,6 +1021,9 @@ describe('reportNetworkError', () => {
         status: 401,
         durationMs: 4,
       });
+      // The two ports are two processes' first reports, which is what groups
+      // them: one process files one event for both (see the claim case above).
+      resetNetworkErrorReports();
       return reportedEvent();
     };
 

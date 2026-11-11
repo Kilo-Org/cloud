@@ -15,6 +15,7 @@ import {
   createNetworkErrorFetch,
   readTrpcResponseError,
   reportNetworkError,
+  resetNetworkErrorReports,
 } from '@/lib/telemetry/network-errors';
 import { NETWORK_BODY_CONTEXT, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { installErrorReporting } from './install-error-reporting';
@@ -40,6 +41,8 @@ afterAll(() => {
 
 beforeEach(() => {
   sentryMock.captureException.mockClear();
+  // Each case proves grouping, so every report in it is the process's first.
+  resetNetworkErrorReports();
 });
 
 /** A captured event after the real `beforeSend` (`scrubEvent`) has run. */
@@ -99,6 +102,9 @@ describe('fingerprint policy', () => {
         status: 401,
         durationMs: 5,
       });
+      // One event per endpoint and outcome per process, so the second port is
+      // another process's first report: grouping is what this case proves.
+      resetNetworkErrorReports();
     }
 
     const [first, second] = groupKeys();

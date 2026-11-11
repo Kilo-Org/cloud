@@ -17,6 +17,7 @@ import {
   type GitHubUserAccessTokenConnected,
 } from '@/lib/integrations/platforms/github/user-token-client';
 import { isKiloReviewBotAuthor, normalizeGitHubLogin } from '@/lib/code-reviews/kilo-bot-logins';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * Server-side intake for the fix-review workflow.
@@ -614,7 +615,9 @@ export type FixReviewSelection = {
  * returns only the comments the fix session may act on.
  *
  * Throws when the credential or the GitHub response cannot be established, so
- * the caller can refuse to start a session it cannot verify.
+ * the caller can refuse to start a session it cannot verify. The thrown value
+ * is always a newly constructed error with no request, response, or cause, so
+ * every credential source returns the same error shape.
  */
 export async function selectFixReviewCommentsForReview(input: {
   repositoryFullName: string;
@@ -648,17 +651,32 @@ export async function selectFixReviewCommentsForReview(input: {
 
     return selectWithinPromptBudget(selected, listing.unreadCount);
   } catch (error) {
-    if (userCredential?.refreshSupported !== false) throw error;
-    if (isGitHubAuthenticationRejection(error)) {
+    // The diagnostic records the credential source and HTTP status only.
+    const status =
+      typeof error === 'object' &&
+      error !== null &&
+      'status' in error &&
+      typeof error.status === 'number'
+        ? error.status
+        : null;
+    logExceptInTest('Fix-review comment read failed', {
+      credential:
+        userCredential === undefined
+          ? 'installation'
+          : (userCredential.credentialSource ?? 'personal'),
+      status,
+    });
+    if (userCredential?.refreshSupported === false && status === 401) {
       await deps.getUserAccessToken(input.initiatorKiloUserId, {
         op: 'reportRejected',
         authorizationId: userCredential.authorizationId,
         credentialVersion: userCredential.credentialVersion,
       });
     }
-    // Octokit errors can retain the authenticated request. Never forward them.
     throw new Error(
-      'GitHub review comments are unavailable. Check your personal connection and try again.'
+      userCredential === undefined
+        ? 'GitHub review comments are unavailable. Try again.'
+        : 'GitHub review comments are unavailable. Check your personal connection and try again.'
     );
   }
 }

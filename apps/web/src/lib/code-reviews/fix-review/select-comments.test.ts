@@ -1,4 +1,8 @@
 import { describe, expect, it, jest } from '@jest/globals';
+// Must load before the module under test: it registers the log recorder.
+import { diagnostics } from './diagnostic-recorder.test-harness';
+import { createServer } from 'node:http';
+import { Octokit } from '@octokit/rest';
 import { inArray } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -9,6 +13,7 @@ import {
   FIX_REVIEW_MAX_COMMENTS,
   FIX_REVIEW_PERMISSION_LOOKUP_CONCURRENCY,
   FIX_REVIEW_TOTAL_BODY_MAX_LENGTH,
+  createFixReviewCommentClient,
   getFixReviewInitiatorIdentity,
   selectFixReviewComments,
   selectFixReviewCommentsForReview,
@@ -329,6 +334,63 @@ function depsFixture(
   };
 }
 
+/** A marker value that a thrown error carries nowhere. */
+const PROVIDER_CREDENTIAL = 'sentinel-provider-credential';
+
+/** A read failure as the provider client reports it, including its request metadata. */
+function providerFailure(status: number): Error {
+  return Object.assign(new Error(`Provider failure ${PROVIDER_CREDENTIAL}`), {
+    status,
+    request: {
+      method: 'GET',
+      url: 'https://api.github.com/repos/owner/repo/pulls/123/comments',
+      headers: { authorization: `token ${PROVIDER_CREDENTIAL}` },
+    },
+    response: { status, headers: {}, data: { message: PROVIDER_CREDENTIAL } },
+  });
+}
+
+function connectWith(login: string, source: 'github_app' | 'provided_token') {
+  return {
+    status: 'connected' as const,
+    credential: {
+      connected: true as const,
+      token: 'user-token',
+      expiresAtEpochMs: Date.now() + 60_000,
+      credentialSource: source,
+      refreshSupported: source === 'github_app',
+      githubLogin: login,
+      authorizationId: 'auth-1',
+      credentialVersion: 1,
+    },
+  };
+}
+
+/**
+ * Asserts the shape of a rejected call: the expected message, no request or
+ * provider payload, and no occurrence of the marker value anywhere it reaches.
+ */
+async function expectSanitizedRejection(
+  call: Promise<unknown>,
+  expectedMessage: string
+): Promise<void> {
+  const error: unknown = await call.then(
+    () => new Error('the call resolved instead of rejecting'),
+    (rejection: unknown) => rejection
+  );
+  expect(error).toBeInstanceOf(Error);
+  if (!(error instanceof Error)) return;
+  expect(error.message).toBe(expectedMessage);
+  expect(error).not.toHaveProperty('request');
+  expect(error).not.toHaveProperty('response');
+  expect(error).not.toHaveProperty('status');
+  expect(error).not.toHaveProperty('cause');
+  expect(error.cause).toBeUndefined();
+  expect(JSON.stringify(error)).not.toContain(PROVIDER_CREDENTIAL);
+  expect(String(error.stack)).not.toContain(PROVIDER_CREDENTIAL);
+  expect(JSON.stringify(diagnostics)).not.toContain(PROVIDER_CREDENTIAL);
+}
+
 describe('selectFixReviewCommentsForReview', () => {
   it('reads comments with the linked integration credential and filters them', async () => {
     const client = clientFixture({
@@ -445,24 +507,166 @@ describe('selectFixReviewCommentsForReview', () => {
     ).rejects.toThrow('No GitHub credential available to verify review comments');
   });
 
-  it('propagates a failed comment listing so the caller can refuse the session', async () => {
-    const client = clientFixture({
-      listComments: async () => {
-        throw new Error('GitHub unavailable');
-      },
+  describe('failure from the GitHub read', () => {
+    beforeEach(() => {
+      diagnostics.length = 0;
     });
 
-    await expect(
-      selectFixReviewCommentsForReview({
-        ...baseInput,
-        integration: {
-          id: 'integration-1',
-          platform_installation_id: '42',
-          github_app_type: 'standard',
+    it('answers a failed comment read on the installation token with one user-facing message', async () => {
+      const getUserAccessToken = jest.fn<FixReviewSelectionDeps['getUserAccessToken']>();
+      const client = clientFixture({
+        listComments: async () => {
+          throw providerFailure(403);
         },
-        deps: depsFixture(client),
-      })
-    ).rejects.toThrow('GitHub unavailable');
+      });
+
+      await expectSanitizedRejection(
+        selectFixReviewCommentsForReview({
+          ...baseInput,
+          integration: {
+            id: 'integration-1',
+            platform_installation_id: '42',
+            github_app_type: 'standard',
+          },
+          deps: depsFixture(client, { getUserAccessToken }),
+        }),
+        'GitHub review comments are unavailable. Try again.'
+      );
+
+      expect(getUserAccessToken).not.toHaveBeenCalled();
+      expect(diagnostics).toEqual([
+        ['Fix-review comment read failed', { credential: 'installation', status: 403 }],
+      ]);
+    });
+
+    it('answers a failed review-thread read on the installation token with the same message', async () => {
+      const client = clientFixture({
+        listSettledCommentIds: async () => {
+          throw providerFailure(502);
+        },
+      });
+
+      await expectSanitizedRejection(
+        selectFixReviewCommentsForReview({
+          ...baseInput,
+          integration: {
+            id: 'integration-1',
+            platform_installation_id: '42',
+            github_app_type: 'standard',
+          },
+          deps: depsFixture(client),
+        }),
+        'GitHub review comments are unavailable. Try again.'
+      );
+
+      expect(diagnostics).toEqual([
+        ['Fix-review comment read failed', { credential: 'installation', status: 502 }],
+      ]);
+    });
+
+    it('answers a failed read on a refreshable personal credential with the personal-connection message', async () => {
+      const getUserAccessToken = jest
+        .fn<FixReviewSelectionDeps['getUserAccessToken']>()
+        .mockResolvedValueOnce(connectWith('linked-user', 'github_app'));
+      const client = clientFixture({
+        listComments: async () => {
+          throw providerFailure(403);
+        },
+      });
+
+      await expectSanitizedRejection(
+        selectFixReviewCommentsForReview({
+          ...baseInput,
+          integration: null,
+          deps: depsFixture(client, { getUserAccessToken }),
+        }),
+        'GitHub review comments are unavailable. Check your personal connection and try again.'
+      );
+
+      // The token service refreshes a GitHub App credential itself, so the read
+      // failure is not reported as a rejected credential.
+      expect(getUserAccessToken).toHaveBeenCalledTimes(1);
+      expect(getUserAccessToken).toHaveBeenCalledWith(baseInput.initiatorKiloUserId, {
+        op: 'fetch',
+      });
+      expect(diagnostics).toEqual([
+        ['Fix-review comment read failed', { credential: 'github_app', status: 403 }],
+      ]);
+    });
+
+    it('answers an authentication rejection on a refreshable personal credential without reporting it', async () => {
+      const getUserAccessToken = jest
+        .fn<FixReviewSelectionDeps['getUserAccessToken']>()
+        .mockResolvedValueOnce(connectWith('linked-user', 'github_app'));
+      const client = clientFixture({
+        listComments: async () => {
+          throw providerFailure(401);
+        },
+      });
+
+      await expectSanitizedRejection(
+        selectFixReviewCommentsForReview({
+          ...baseInput,
+          integration: null,
+          deps: depsFixture(client, { getUserAccessToken }),
+        }),
+        'GitHub review comments are unavailable. Check your personal connection and try again.'
+      );
+
+      expect(getUserAccessToken).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers a real provider client failure with one user-facing message', async () => {
+      const receivedAuthorization: (string | undefined)[] = [];
+      const server = createServer((request, response) => {
+        receivedAuthorization.push(request.headers.authorization);
+        response.writeHead(401, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ message: 'Bad credentials' }));
+      });
+      const listening = Promise.withResolvers<void>();
+      server.listen(0, '127.0.0.1', listening.resolve);
+      await listening.promise;
+      const address = server.address();
+      if (address === null || typeof address === 'string') throw new Error('no server address');
+      const baseUrl = `http://127.0.0.1:${address.port}`;
+
+      try {
+        await expectSanitizedRejection(
+          selectFixReviewCommentsForReview({
+            ...baseInput,
+            integration: {
+              id: 'integration-1',
+              platform_installation_id: '42',
+              github_app_type: 'standard',
+            },
+            deps: {
+              generateInstallationToken: async () => ({ token: PROVIDER_CREDENTIAL }),
+              createCommentClient: (token, target) =>
+                createFixReviewCommentClient(
+                  new Octokit({
+                    auth: token,
+                    baseUrl,
+                    log: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+                  }),
+                  target
+                ),
+            },
+          }),
+          'GitHub review comments are unavailable. Try again.'
+        );
+      } finally {
+        const closed = Promise.withResolvers<void>();
+        server.close(() => closed.resolve());
+        await closed.promise;
+      }
+
+      // Every read reached the local server with the token, so each failure came
+      // from the real provider client.
+      expect(receivedAuthorization.length).toBeGreaterThan(0);
+      expect(receivedAuthorization).toEqual(
+        receivedAuthorization.map(() => `token ${PROVIDER_CREDENTIAL}`)
+      );
+    });
   });
 
   it('keeps the most recent comments within the prompt budget and reports the rest', async () => {
@@ -542,6 +746,7 @@ describe('selectFixReviewCommentsForReview', () => {
   it.each([401, 403, 404, 500])(
     'handles provided credential failure %s without exposing the provider request',
     async status => {
+      diagnostics.length = 0;
       const credential = connectedCredential('linked-user');
       const getUserAccessToken = jest
         .fn<FixReviewSelectionDeps['getUserAccessToken']>()
@@ -557,16 +762,17 @@ describe('selectFixReviewCommentsForReview', () => {
         .mockResolvedValueOnce({ status: 'disconnected', reason: 'revoked' });
       const client = clientFixture({
         listComments: async () => {
-          throw { status, message: 'SENTINELSECRET', request: { authorization: 'SENTINELSECRET' } };
+          throw providerFailure(status);
         },
       });
-      await expect(
+      await expectSanitizedRejection(
         selectFixReviewCommentsForReview({
           ...baseInput,
           integration: null,
           deps: depsFixture(client, { getUserAccessToken }),
-        })
-      ).rejects.toThrow('GitHub review comments are unavailable');
+        }),
+        'GitHub review comments are unavailable. Check your personal connection and try again.'
+      );
       expect(getUserAccessToken).toHaveBeenCalledTimes(status === 401 ? 2 : 1);
       if (status === 401)
         expect(getUserAccessToken).toHaveBeenLastCalledWith(baseInput.initiatorKiloUserId, {
@@ -574,6 +780,9 @@ describe('selectFixReviewCommentsForReview', () => {
           authorizationId: credential.credential.authorizationId,
           credentialVersion: credential.credential.credentialVersion,
         });
+      expect(diagnostics).toEqual([
+        ['Fix-review comment read failed', { credential: 'provided_token', status }],
+      ]);
     }
   );
 });

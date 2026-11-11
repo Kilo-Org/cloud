@@ -708,6 +708,8 @@ keep environment snapshots and existing history/worktree recovery.
   Preloading has a ten-second best-effort budget; an import gets one retry, and a failed or timed-out
   preload does not fail the requested chat. Other chats still restore on demand. Kilo v1 chats
   always restore on demand, so history-only warmup cannot suppress their saved file patches.
+  Cancelling a caller stops its wait immediately, but its import lock remains until the underlying
+  harness open settles. A queued requested open keeps its own inputs and cancellation deadline.
 - **Diagnostics and retention.** Existing diagnostics report workspace, requesting session,
   allocation, capture time, selected source and skip/fallback reason. They never log handles,
   credentials or file contents. Replacing a descriptor makes the previous artifact unselectable;

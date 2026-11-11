@@ -151,34 +151,66 @@ describe('workspace history preload', () => {
     expect(h.open.mock.calls.at(-1)?.[0]).toBe(input);
   });
 
-  it('does not let preload cancellation fail a racing on-demand open', async () => {
-    const started = Promise.withResolvers<void>();
-    const h = setup(
-      mock(async input => {
-        if (input.sessionId === sessions[1].kiloSessionId && !input.restoreFiles) {
-          started.resolve();
-          return new Promise<boolean>(() => {});
-        }
-        return true;
-      })
-    );
-    const controller = new AbortController();
-    const preload = h.preloader.preload(h.client, spec, {}, controller.signal);
-    await started.promise;
-    const signal = new AbortController().signal;
-    const onDemand = h.preloader.open(h.client, {
-      sessionId: sessions[1].kiloSessionId,
-      directory: spec.directory,
-      env: {},
-      signal,
-      restoreFiles: true,
-      onRestore() {},
-    });
-    controller.abort(new Error('preload budget exhausted'));
-    expect(await onDemand).toBe(true);
-    await preload;
-    expect(signal.aborted).toBe(false);
-  });
+  it.each(['success', 'failure'] as const)(
+    'holds an aborted preload import lock until its underlying open settles with %s',
+    async outcome => {
+      const started = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<boolean>();
+      let active = 0;
+      let maximumActive = 0;
+      const h = setup(
+        mock(async input => {
+          if (input.sessionId !== sessions[1].kiloSessionId) return true;
+          active++;
+          maximumActive = Math.max(maximumActive, active);
+          try {
+            if (!input.restoreFiles) {
+              started.resolve();
+              return await release.promise;
+            }
+            return true;
+          } finally {
+            active--;
+          }
+        })
+      );
+      const controller = new AbortController();
+      const preload = h.preloader.preload(h.client, spec, {}, controller.signal);
+      await started.promise;
+      const signal = new AbortController().signal;
+      const onDemand = h.preloader.open(h.client, {
+        sessionId: sessions[1].kiloSessionId,
+        directory: spec.directory,
+        env: {},
+        signal,
+        restoreFiles: true,
+        onRestore() {},
+      });
+      controller.abort(new Error('preload budget exhausted'));
+      await preload;
+      const later = h.preloader.open(h.client, {
+        sessionId: sessions[1].kiloSessionId,
+        directory: spec.directory,
+        env: {},
+        signal,
+        restoreFiles: true,
+        onRestore() {},
+      });
+      try {
+        await Bun.sleep(0);
+        expect(
+          h.open.mock.calls.filter(([input]) => input.sessionId === sessions[1].kiloSessionId)
+        ).toHaveLength(1);
+        expect(h.open.mock.calls[0][0].signal?.aborted).toBe(true);
+      } finally {
+        if (outcome === 'failure') release.reject(new Error('aborted import finished'));
+        else release.resolve(true);
+        await Promise.all([onDemand, later]);
+      }
+      expect(maximumActive).toBe(1);
+      expect(signal.aborted).toBe(false);
+    }
+  );
 
   it('cancels a waiting caller without cancelling the preload or releasing its import lock', async () => {
     const started = Promise.withResolvers<void>();
@@ -236,14 +268,14 @@ describe('workspace history preload', () => {
     expect(h.open.mock.calls[0][0].restoreFiles).toBe(true);
   });
 
-  it('does not leave a cancelled preload blocking a later on-demand restore', async () => {
+  it('bounds an on-demand wait when an aborted preload ignores cancellation', async () => {
     const started = Promise.withResolvers<void>();
-    let hang = true;
+    const release = Promise.withResolvers<void>();
     const h = setup(
       mock(async input => {
-        if (hang && input.sessionId === sessions[1].kiloSessionId) {
+        if (input.sessionId === sessions[1].kiloSessionId) {
           started.resolve();
-          return new Promise<boolean>(() => {});
+          await release.promise;
         }
         return true;
       })
@@ -253,16 +285,26 @@ describe('workspace history preload', () => {
     await started.promise;
     controller.abort();
     await preload;
-    hang = false;
-    expect(
-      await h.preloader.open(h.client, {
-        sessionId: sessions[1].kiloSessionId,
-        directory: spec.directory,
-        env: {},
-        restoreFiles: false,
-        onRestore() {},
-      })
-    ).toBe(true);
+    const caller = new AbortController();
+    const waiting = h.preloader.open(h.client, {
+      sessionId: sessions[1].kiloSessionId,
+      directory: spec.directory,
+      env: {},
+      signal: caller.signal,
+      restoreFiles: false,
+      onRestore() {},
+    });
+    caller.abort(new Error('requested open deadline exceeded'));
+    try {
+      expect(await waiting.catch((error: unknown) => error)).toEqual(
+        new Error('requested open deadline exceeded')
+      );
+      expect(
+        h.open.mock.calls.filter(([input]) => input.sessionId === sessions[1].kiloSessionId)
+      ).toHaveLength(1);
+    } finally {
+      release.resolve();
+    }
   });
 
   it.each([
@@ -384,7 +426,11 @@ describe('workspace history preload', () => {
       mock(async input => {
         if (input.restoreFiles) throw new Error('requested history unavailable');
         started.resolve();
-        return new Promise<boolean>(() => {});
+        return new Promise<boolean>((_resolve, reject) => {
+          input.signal?.addEventListener('abort', () => reject(input.signal?.reason), {
+            once: true,
+          });
+        });
       })
     );
     const startedAt = Date.now();

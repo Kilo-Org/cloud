@@ -32,11 +32,11 @@ export function createWorkspaceHistoryPreloader(deps: {
     const onAbort = () =>
       aborted.reject(input.signal?.reason ?? new Error('Session open was aborted'));
     input.signal?.addEventListener('abort', onAbort, { once: true });
-    // Serialize imports, but never borrow another caller's restore inputs or abort budget.
+    // Keep the import lock until open settles, even if its caller stops waiting.
     const run = async () => {
       if (existing) await existing.catch(() => undefined);
       input.signal?.throwIfAborted();
-      return Promise.race([client.open(input), aborted.promise]);
+      return client.open(input);
     };
     const promise = run();
     sessions.set(input.sessionId, promise);

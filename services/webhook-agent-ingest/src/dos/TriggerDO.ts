@@ -8,7 +8,7 @@ import {
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { and, eq, inArray, ne, notInArray, sql, desc } from 'drizzle-orm';
+import { and, eq, gt, inArray, ne, notInArray, sql, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import migrations from '../../drizzle/migrations';
 import {
@@ -18,6 +18,7 @@ import {
 import type { ProcessStatus, RequestUpdates, RequestRow } from '../db/types';
 import { logger } from '../util/logger';
 import {
+  ACTIVE_RUN_STALE_AFTER_SECONDS,
   MAX_INFLIGHT_REQUESTS,
   MAX_PAYLOAD_SIZE,
   MAX_REQUESTS,
@@ -63,6 +64,7 @@ export const TriggerConfig = z.object({
   bodySchema: webhookBodySchema.nullable().optional(),
   autoCommit: z.boolean().optional(),
   condenseOnComplete: z.boolean().optional(),
+  skipIfRunning: z.boolean().optional(),
   webhookAuthHeader: z.string().optional(),
   webhookAuthSecretHash: z.string().optional(),
   activationMode: z.enum(['webhook', 'scheduled']).default('webhook'),
@@ -100,7 +102,13 @@ export type ScheduledInvocationResult =
   | { success: true; requestId: string }
   | {
       success: false;
-      error: 'NOT_FOUND' | 'NOT_SCHEDULED' | 'INACTIVE' | 'INFLIGHT_LIMIT' | 'QUEUE_FAILED';
+      error:
+        | 'NOT_FOUND'
+        | 'NOT_SCHEDULED'
+        | 'INACTIVE'
+        | 'INFLIGHT_LIMIT'
+        | 'RUN_IN_PROGRESS'
+        | 'QUEUE_FAILED';
     };
 
 type ConfigureInput = {
@@ -118,6 +126,7 @@ type ConfigureInput = {
   bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  skipIfRunning?: boolean;
   webhookAuth?: WebhookAuthInput;
   activationMode?: 'webhook' | 'scheduled';
   cronExpression?: string;
@@ -141,6 +150,7 @@ type UpdateConfigInput = {
   bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean | null;
   condenseOnComplete?: boolean | null;
+  skipIfRunning?: boolean;
   webhookAuth?: WebhookAuthUpdateInput;
   cronExpression?: string;
   cronTimezone?: string;
@@ -236,6 +246,7 @@ export class TriggerDO extends DurableObject<Env> {
       bodySchema: bodySchema ?? null,
       autoCommit: configOverrides.autoCommit,
       condenseOnComplete: configOverrides.condenseOnComplete,
+      skipIfRunning: configOverrides.skipIfRunning ?? false,
       webhookAuthHeader: webhookAuth?.header,
       webhookAuthSecretHash: webhookAuth?.secretHash,
       activationMode: configOverrides.activationMode ?? 'webhook',
@@ -265,6 +276,7 @@ export class TriggerDO extends DurableObject<Env> {
       auto_commit: config.autoCommit !== undefined ? (config.autoCommit ? 1 : 0) : null,
       condense_on_complete:
         config.condenseOnComplete !== undefined ? (config.condenseOnComplete ? 1 : 0) : null,
+      skip_if_running: config.skipIfRunning ? 1 : 0,
       webhook_auth_header: webhookAuth?.header ?? null,
       webhook_auth_secret_hash: webhookAuth?.secretHash ?? null,
       activation_mode: config.activationMode,
@@ -342,6 +354,7 @@ export class TriggerDO extends DurableObject<Env> {
       autoCommit: record.auto_commit !== null ? record.auto_commit === 1 : undefined,
       condenseOnComplete:
         record.condense_on_complete !== null ? record.condense_on_complete === 1 : undefined,
+      skipIfRunning: record.skip_if_running === 1,
       webhookAuthHeader: record.webhook_auth_header ?? undefined,
       webhookAuthSecretHash: record.webhook_auth_secret_hash ?? undefined,
       activationMode: record.activation_mode === 'scheduled' ? 'scheduled' : 'webhook',
@@ -434,6 +447,7 @@ export class TriggerDO extends DurableObject<Env> {
         updates.condenseOnComplete,
         existingConfig.condenseOnComplete
       ),
+      skipIfRunning: updates.skipIfRunning ?? existingConfig.skipIfRunning,
       webhookAuthHeader: webhookAuth?.header,
       webhookAuthSecretHash: webhookAuth?.secretHash,
       cronExpression: updates.cronExpression ?? existingConfig.cronExpression,
@@ -460,6 +474,7 @@ export class TriggerDO extends DurableObject<Env> {
               ? 1
               : 0
             : null,
+        skip_if_running: updatedConfig.skipIfRunning ? 1 : 0,
         webhook_auth_header: webhookAuth?.header ?? null,
         webhook_auth_secret_hash: webhookAuth?.secretHash ?? null,
         cron_expression: updatedConfig.cronExpression ?? null,
@@ -666,6 +681,14 @@ export class TriggerDO extends DurableObject<Env> {
       }
     }
 
+    if (config.skipIfRunning && this.hasActiveRun()) {
+      logger.info('Webhook skipped: previous run still in progress', {
+        triggerId: config.triggerId,
+        namespace: config.namespace,
+      });
+      return { success: false, error: 'RUN_IN_PROGRESS' };
+    }
+
     const requestId = crypto.randomUUID();
     const timestamp = new Date().toISOString();
 
@@ -823,6 +846,13 @@ export class TriggerDO extends DurableObject<Env> {
       await this.scheduleNextAlarm(config);
       return;
     }
+    if (!captureResult.success && captureResult.error === 'RUN_IN_PROGRESS') {
+      logger.info('Scheduled run skipped: previous run still in progress', {
+        triggerId: config.triggerId,
+      });
+      await this.scheduleNextAlarm(config);
+      return;
+    }
 
     const updatedConfig = { ...config, lastScheduledAt: timestamp };
     this.db
@@ -852,6 +882,9 @@ export class TriggerDO extends DurableObject<Env> {
     const inflightCount = inflightRows[0]?.count ?? 0;
 
     if (inflightCount >= MAX_INFLIGHT_REQUESTS) return { success: false, error: 'INFLIGHT_LIMIT' };
+    if (config.skipIfRunning && this.hasActiveRun()) {
+      return { success: false, error: 'RUN_IN_PROGRESS' };
+    }
 
     const requestId = crypto.randomUUID();
     this.db
@@ -913,6 +946,22 @@ export class TriggerDO extends DurableObject<Env> {
     }
 
     return { success: true, requestId };
+  }
+
+  private hasActiveRun(): boolean {
+    const staleBefore = Math.floor(Date.now() / 1000) - ACTIVE_RUN_STALE_AFTER_SECONDS;
+    const activeRun = this.db
+      .select({ id: requestsTable.id })
+      .from(requestsTable)
+      .where(
+        and(
+          inArray(requestsTable.process_status, ['captured', 'inprogress']),
+          gt(requestsTable.created_at, staleBefore)
+        )
+      )
+      .limit(1)
+      .get();
+    return activeRun !== undefined;
   }
 
   private async scheduleNextAlarm(config: TriggerConfig): Promise<void> {

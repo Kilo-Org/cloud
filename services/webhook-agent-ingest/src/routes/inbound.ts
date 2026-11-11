@@ -124,6 +124,16 @@ async function handleWebhookCapture(
       'captureRequest'
     );
 
+    if (!result.success && result.error === 'RUN_IN_PROGRESS') {
+      // 2xx so senders do not retry a delivery that was deliberately skipped.
+      return c.json(
+        resSuccess({
+          skipped: true,
+          message: 'Webhook skipped because a previous run is still in progress',
+        })
+      );
+    }
+
     if (!result.success) {
       if (result.error === 'Unauthorized') return c.json(resError('Unauthorized'), 401);
       if (result.issues)

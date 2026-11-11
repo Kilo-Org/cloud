@@ -596,6 +596,7 @@ describe('scheduled trigger invocation routes', () => {
     ['NOT_SCHEDULED', 400],
     ['INACTIVE', 409],
     ['INFLIGHT_LIMIT', 429],
+    ['RUN_IN_PROGRESS', 409],
     ['QUEUE_FAILED', 500],
   ] as const)('maps %s invocation failures to %i', async (error, status) => {
     const { env, invokeScheduled } = createRouteHarness(null);

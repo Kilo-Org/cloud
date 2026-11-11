@@ -95,6 +95,7 @@ export type TriggerFormData = {
   bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  skipIfRunning?: boolean;
   isActive?: boolean;
   webhookAuth: {
     enabled: boolean;
@@ -123,6 +124,7 @@ export type TriggerFormProps = {
     bodySchema?: WebhookBodySchema | null;
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
+    skipIfRunning?: boolean;
     isActive?: boolean;
     webhookAuthHeader?: string;
     webhookAuthConfigured?: boolean;
@@ -288,6 +290,7 @@ export function TriggerForm({
   const [condenseOnComplete, setCondenseOnComplete] = useState(
     initialData?.condenseOnComplete ?? false
   );
+  const [skipIfRunning, setSkipIfRunning] = useState(initialData?.skipIfRunning ?? false);
   const [isActive, setIsActive] = useState(initialData?.isActive ?? true);
   const initialWebhookAuthConfigured = initialData?.webhookAuthConfigured ?? false;
   const [webhookAuthEnabled, setWebhookAuthEnabled] = useState(initialWebhookAuthConfigured);
@@ -322,6 +325,7 @@ export function TriggerForm({
       setBodySchemaValid(true);
       setAutoCommit(initialData.autoCommit ?? false);
       setCondenseOnComplete(initialData.condenseOnComplete ?? false);
+      setSkipIfRunning(initialData.skipIfRunning ?? false);
       setIsActive(initialData.isActive ?? true);
       setWebhookAuthEnabled(initialData.webhookAuthConfigured ?? false);
       setWebhookAuthHeader(initialData.webhookAuthHeader ?? '');
@@ -554,6 +558,7 @@ export function TriggerForm({
       ...(!isScheduled ? { bodySchema } : {}),
       autoCommit,
       condenseOnComplete,
+      skipIfRunning,
       isActive: isEditMode ? isActive : undefined,
       webhookAuth: webhookAuthData,
     };
@@ -582,6 +587,7 @@ export function TriggerForm({
     promptTemplate,
     autoCommit,
     condenseOnComplete,
+    skipIfRunning,
     isEditMode,
     isActive,
     webhookAuthEnabled,
@@ -1225,6 +1231,28 @@ export function TriggerForm({
                 <Label htmlFor="condenseOnComplete" className="cursor-pointer font-normal">
                   Condense context on completion
                 </Label>
+              </div>
+
+              {/* Skip if Running */}
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="skipIfRunning"
+                  checked={skipIfRunning}
+                  onCheckedChange={checked => setSkipIfRunning(checked === true)}
+                  disabled={isLoading}
+                  className="mt-0.5"
+                  aria-describedby="skipIfRunningDescription"
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="skipIfRunning" className="cursor-pointer font-normal">
+                    Skip if a previous run is still in progress
+                  </Label>
+                  <p id="skipIfRunningDescription" className="text-muted-foreground text-xs">
+                    {isScheduled
+                      ? 'Scheduled runs are skipped until the current run finishes.'
+                      : 'Webhook requests are acknowledged and skipped while a run is in progress.'}
+                  </p>
+                </div>
               </div>
 
               {/* Active Toggle (edit mode only) */}

@@ -29,6 +29,7 @@ export type TriggerConfigResponse = {
   bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  skipIfRunning?: boolean;
   webhookAuthHeader?: string;
   webhookAuthConfigured: boolean;
   activationMode: 'webhook' | 'scheduled';
@@ -57,6 +58,7 @@ export type CreateTriggerInput = {
   bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  skipIfRunning?: boolean;
   webhookAuth?: {
     header: string;
     secret: string;
@@ -83,6 +85,7 @@ export type UpdateTriggerInput = {
   bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean | null;
   condenseOnComplete?: boolean | null;
+  skipIfRunning?: boolean;
   webhookAuth?: {
     header?: string | null;
     secret?: string | null;
@@ -130,6 +133,8 @@ const scheduledTriggerInvokeResponseSchema = z.object({
     requestId: z.string().uuid(),
   }),
 });
+
+const scheduledTriggerInvokeFailureSchema = z.object({ error: z.string() });
 
 function buildNamespace(userId?: string, organizationId?: string): string {
   if (organizationId) {
@@ -313,7 +318,8 @@ export async function invokeWorkerScheduledTrigger(
   organizationId: string | undefined,
   triggerId: string
 ): Promise<
-  { success: true; requestId: string } | { success: false; error: string; status: number }
+  | { success: true; requestId: string }
+  | { success: false; error: string; status: number; runInProgress?: boolean }
 > {
   const namespace = buildNamespace(userId, organizationId);
   const path = `${buildTriggerPath(namespace, triggerId)}/invoke`;
@@ -328,10 +334,16 @@ export async function invokeWorkerScheduledTrigger(
     });
 
     if (response.status !== 202) {
+      const failure = scheduledTriggerInvokeFailureSchema.safeParse(
+        await response.json().catch(() => null)
+      );
       return {
         success: false,
         error: 'Scheduled trigger invocation failed',
         status: response.status,
+        ...(failure.success && failure.data.error === 'RUN_IN_PROGRESS'
+          ? { runInProgress: true }
+          : {}),
       };
     }
 

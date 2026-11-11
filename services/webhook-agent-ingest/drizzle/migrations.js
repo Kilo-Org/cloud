@@ -7,6 +7,7 @@ import m0004 from './0004_bumpy_firebird.sql';
 import m0005 from './0005_open_morph.sql';
 import m0006 from './0006_noisy_daredevil.sql';
 import m0007 from './0007_fresh_manta.sql';
+import m0008 from './0008_skip_if_running.sql';
 
 export default {
   journal,
@@ -19,5 +20,6 @@ export default {
     m0005,
     m0006,
     m0007,
+    m0008,
   },
 };

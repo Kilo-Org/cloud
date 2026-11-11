@@ -141,6 +141,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         bodySchema: formData.bodySchema,
         autoCommit: formData.autoCommit,
         condenseOnComplete: formData.condenseOnComplete,
+        skipIfRunning: formData.skipIfRunning,
         webhookAuth: formData.webhookAuth.enabled
           ? {
               header: formData.webhookAuth.header ?? '',

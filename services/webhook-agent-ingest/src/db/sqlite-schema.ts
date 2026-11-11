@@ -60,6 +60,7 @@ export const triggerConfig = sqliteTable('trigger_config', {
   body_schema: text('body_schema', { mode: 'json' }).$type<WebhookBodySchema>(),
   auto_commit: integer('auto_commit'),
   condense_on_complete: integer('condense_on_complete'),
+  skip_if_running: integer('skip_if_running').notNull().default(0),
   webhook_auth_header: text('webhook_auth_header'),
   webhook_auth_secret_hash: text('webhook_auth_secret_hash'),
   activation_mode: text('activation_mode').notNull().default('webhook'),

@@ -1,0 +1,1 @@
+ALTER TABLE `trigger_config` ADD `skip_if_running` integer DEFAULT 0 NOT NULL;

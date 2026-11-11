@@ -1217,6 +1217,147 @@ describe('TriggerDO', () => {
     });
   });
 
+  describe('skipIfRunning', () => {
+    const scheduledConfig = {
+      githubRepo: 'owner/repo',
+      mode: 'code',
+      model: 'openai/gpt-4.1',
+      promptTemplate: 'Run on alarm',
+      activationMode: 'scheduled' as const,
+      cronExpression: '* * * * *',
+    };
+    const webhookRequest = {
+      method: 'POST',
+      path: '/webhook',
+      queryString: null,
+      headers: {},
+      body: '{}',
+      contentType: 'application/json',
+      sourceIp: null,
+    };
+
+    it('defaults to off and round-trips through updates', async () => {
+      const triggerId = 'skip-config';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, scheduledConfig);
+      expect((await stub.getConfig())?.skipIfRunning).toBe(false);
+
+      await stub.updateConfig({ skipIfRunning: true });
+      expect((await stub.getConfig())?.skipIfRunning).toBe(true);
+
+      await stub.updateConfig({ promptTemplate: 'Changed' });
+      expect((await stub.getConfig())?.skipIfRunning).toBe(true);
+
+      await stub.updateConfig({ skipIfRunning: false });
+      expect((await stub.getConfig())?.skipIfRunning).toBe(false);
+    });
+
+    it('skips an alarm while a previous run is in progress and still rearms the schedule', async () => {
+      const triggerId = 'skip-alarm';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        ...scheduledConfig,
+        skipIfRunning: true,
+      });
+
+      await runInDurableObject(stub, async instance => {
+        await instance.alarm();
+      });
+      const [first] = (await stub.listRequests()).requests;
+      await stub.updateRequest(first.id, { process_status: 'inprogress' });
+      const before = await stub.getConfig();
+
+      await runInDurableObject(stub, async (instance, state) => {
+        await state.storage.deleteAlarm();
+        await instance.alarm();
+        expect(await state.storage.getAlarm()).not.toBeNull();
+      });
+      expect((await stub.listRequests()).requests).toHaveLength(1);
+      expect((await stub.getConfig())?.lastScheduledAt).toBe(before?.lastScheduledAt);
+      await expect(stub.invokeScheduled()).resolves.toEqual({
+        success: false,
+        error: 'RUN_IN_PROGRESS',
+      });
+
+      await stub.updateRequest(first.id, { process_status: 'success' });
+      await runInDurableObject(stub, async instance => {
+        await instance.alarm();
+      });
+      expect((await stub.listRequests()).requests).toHaveLength(2);
+    });
+
+    it('runs concurrently when the option is off', async () => {
+      const triggerId = 'skip-off';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, scheduledConfig);
+
+      const first = await stub.invokeScheduled();
+      const second = await stub.invokeScheduled();
+      expect(first.success).toBe(true);
+      expect(second.success).toBe(true);
+      expect((await stub.listRequests()).requests).toHaveLength(2);
+    });
+
+    it('ignores unfinished requests older than the stale threshold', async () => {
+      const triggerId = 'skip-stale';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        ...scheduledConfig,
+        skipIfRunning: true,
+      });
+      const first = await stub.invokeScheduled();
+      if (!first.success) throw new Error('Expected request to be captured');
+      await stub.updateRequest(first.requestId, { process_status: 'inprogress' });
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .update(requests)
+          .set({ created_at: Math.floor(Date.now() / 1000) - 3 * 60 * 60 - 1 })
+          .where(eq(requests.id, first.requestId))
+          .run();
+      });
+
+      const second = await stub.invokeScheduled();
+      expect(second.success).toBe(true);
+      expect((await stub.listRequests()).requests).toHaveLength(2);
+    });
+
+    it('skips webhook captures while a previous run is in progress', async () => {
+      const triggerId = 'skip-webhook';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process {{body}}',
+        skipIfRunning: true,
+      });
+
+      const first = await stub.captureRequest(webhookRequest);
+      expect(first.success).toBe(true);
+      await expect(stub.captureRequest(webhookRequest)).resolves.toEqual({
+        success: false,
+        error: 'RUN_IN_PROGRESS',
+      });
+      expect((await stub.listRequests()).requests).toHaveLength(1);
+
+      if (!first.success) throw new Error('Expected request to be captured');
+      await stub.updateRequest(first.requestId, { process_status: 'failed' });
+      await expect(stub.captureRequest(webhookRequest)).resolves.toMatchObject({ success: true });
+      expect((await stub.listRequests()).requests).toHaveLength(2);
+    });
+  });
+
   describe('listRequests', () => {
     it('should return captured requests for a paused trigger', async () => {
       const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);

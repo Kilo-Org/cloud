@@ -1609,6 +1609,20 @@ describe('scheduled trigger invocation', () => {
       code,
     });
   });
+
+  it('reports a run in progress distinctly from an inactive trigger', async () => {
+    mockInvokeWorkerScheduledTrigger.mockResolvedValueOnce({
+      success: false,
+      error: 'Scheduled trigger invocation failed',
+      status: 409,
+      runInProgress: true,
+    });
+
+    await expect(createCaller({ user }).invoke({ triggerId: 'trigger-id' })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'A previous run is still in progress',
+    });
+  });
 });
 
 describe('webhook trigger request listing', () => {

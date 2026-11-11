@@ -1345,6 +1345,8 @@ describe('CreditsCard credits header', () => {
       node => Object.is(node.type, Pressable) && node.props.accessibilityHint === 'Select account'
     );
     expect(String(picker.props.className)).toContain('min-h-[44px]');
+    // A short account or org name must not shrink the target below 44pt.
+    expect(String(picker.props.className)).toContain('min-w-[44px]');
     expect(String(picker.props.className)).toContain('items-end');
     expect(picker.props.hitSlop).toBeUndefined();
     unmount();

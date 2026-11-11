@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- the credits card renders the balance's loading, error, personal and org states beside the header's account picker; each branch is a small surface over the same queries, and splitting it would pass four query states across files. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
@@ -312,7 +311,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         {canPickContext && (
           <Pressable
             className={cn(
-              'min-h-[44px] min-w-0 flex-row items-end gap-1 active:opacity-70',
+              // A short account or org name must still carry a 44pt target.
+              'min-h-[44px] min-w-[44px] flex-row items-end gap-1 active:opacity-70',
               narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
             )}
             onPress={openPicker}

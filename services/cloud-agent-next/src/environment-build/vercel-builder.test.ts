@@ -462,6 +462,44 @@ describe('Vercel environment builder', () => {
     expect(await state.get()).toBeUndefined();
   });
 
+  it('retains corrupt-state cleanup until expiry when the builder is not discoverable', async () => {
+    const state = memoryState({ createRequestedAt: 'not-a-number' });
+    const rest = client();
+    const open = vi.fn(async () => ({
+      client: rest,
+      runtime: 'node24' as const,
+      initialTimeoutMs: 300_000,
+    }));
+    const expiresAt = now() + 45 * 60_000 + DEADLINE_MS.createSettle;
+
+    for (const at of [now(), afterSettle(), expiresAt - 1]) {
+      expect(await stopVercelBuilder({ allocation, state, open, now: () => at })).toBe('retryable');
+      expect(await state.get()).toEqual({ createExpiresAt: expiresAt });
+    }
+    expect(await stopVercelBuilder({ allocation, state, open, now: () => expiresAt })).toBe(
+      'terminal'
+    );
+    expect(await state.get()).toBeUndefined();
+    expect(open).toHaveBeenCalledTimes(3);
+    expect(rest.stopSession).not.toHaveBeenCalled();
+  });
+
+  it('stops a hidden create when it becomes discoverable after corrupt-state recovery', async () => {
+    const state = memoryState({ createRequestedAt: 'not-a-number' });
+    const rest = client();
+    const open = async () => ({
+      client: rest,
+      runtime: 'node24' as const,
+      initialTimeoutMs: 300_000,
+    });
+
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('retryable');
+    vi.mocked(rest.inspectByName).mockResolvedValueOnce(createEnvelope());
+    expect(await stopVercelBuilder({ allocation, state, open, now: afterSettle })).toBe('terminal');
+    expect(rest.stopSession).toHaveBeenCalledWith('session-1', allocation.sandboxId);
+    expect(await state.get()).toBeUndefined();
+  });
+
   it('retries a transient stop failure and clears state when the provider recovers', async () => {
     const state = memoryState({ sessionId: 'session-1', createExpiresAt: now() + 60_000 });
     const rest = client();

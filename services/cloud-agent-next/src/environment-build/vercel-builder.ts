@@ -544,7 +544,7 @@ export async function stopVercelBuilder(input: {
     }
     if (inspected === null) {
       if (
-        state.createRequestedAt !== undefined &&
+        state.createRequestedAt === undefined ||
         now() < state.createRequestedAt + DEADLINE_MS.createSettle
       ) {
         // The create POST may still land; terminal now could orphan a sandbox.

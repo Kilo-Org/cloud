@@ -460,7 +460,7 @@
       "announceUploaded": "Pièce jointe importée",
       "cantUpload": "Ce fichier ne peut pas être importé.",
       "networkError": "Une erreur réseau s'est produite.",
-      "uploadFailed": "L'envoi a échoué.",
+      "uploadFailed": "L'importation a échoué.",
       "nothingToPaste": "Aucun contenu à coller.",
       "metadataStripFailed": "Impossible de supprimer les métadonnées de la photo.",
       "limit_one": "Vous pouvez joindre jusqu'à {{displayCount}} fichier.",
@@ -469,7 +469,7 @@
     },
     "attachmentPreview": {
       "accessibility": "{{filename}} : {{status}}",
-      "retryUploading": "Réessayer l'envoi de {{filename}}",
+      "retryUploading": "Réessayer l'importation de {{filename}}",
       "remove": "Supprimer {{filename}}"
     },
     "messageBubble": {
@@ -2228,11 +2228,11 @@
     },
     "attachmentPreview": {
       "openFailedRetry": "Impossible d'ouvrir le fichier. Réessayez.",
-      "retryUploading": "Réessayer l'envoi de {{filename}}",
+      "retryUploading": "Réessayer l'importation de {{filename}}",
       "removeAttachment": "Retirer la pièce jointe {{filename}}",
-      "uploading": "Envoi…",
-      "uploaded": "Envoyé",
-      "uploadFailedRetry": "Échec de l'envoi. Touchez pour réessayer.",
+      "uploading": "Importation…",
+      "uploaded": "Importé",
+      "uploadFailedRetry": "Échec de l'importation. Touchez pour réessayer.",
       "moveLeft": "Déplacer {{filename}} vers la gauche",
       "moveRight": "Déplacer {{filename}} vers la droite"
     },
@@ -2256,10 +2256,10 @@
     },
     "composer": {
       "addAttachment": "Ajouter une pièce jointe",
-      "removeOrRetryFailed": "Retirez d'abord les pièces jointes dont l'envoi a échoué, ou réessayez de les envoyer.",
+      "removeOrRetryFailed": "Retirez d'abord les pièces jointes dont l'importation a échoué, ou réessayez de les importer.",
       "attachmentsWithSlashCommands": "Les pièces jointes ne peuvent pas être envoyées avec des commandes commençant par /.",
       "photoMetadataNotRemoved": "Les métadonnées de la photo n'ont pas pu être supprimées d'une pièce jointe.",
-      "waitForUploads": "Attendez la fin de l'envoi des pièces jointes.",
+      "waitForUploads": "Attendez la fin de l'importation des pièces jointes.",
       "pasteFromClipboard": "Coller depuis le presse-papiers",
       "stopGenerating": "Arrêter la génération",
       "selectModelBeforeSending": "Sélectionnez un modèle avant d'envoyer le message.",

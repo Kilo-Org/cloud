@@ -491,9 +491,9 @@ describe('raw provider metadata archive with usage accounting', () => {
 
   test.each(API_KINDS)('%s preserves a route-only archive with an absent body', async apiKind => {
     const { context, decision } = createRequest(apiKind, false);
-    await expect(countAndStoreUsage(new Response(null), context, undefined).usagePromise).resolves.toEqual(
-      expect.objectContaining({ status: 'queued', usageId: USAGE_ID })
-    );
+    await expect(
+      countAndStoreUsage(new Response(null), context, undefined).usagePromise
+    ).resolves.toEqual(expect.objectContaining({ status: 'queued', usageId: USAGE_ID }));
 
     await runArchive();
     expectArchive(decision);

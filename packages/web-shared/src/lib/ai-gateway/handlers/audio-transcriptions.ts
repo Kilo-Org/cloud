@@ -363,7 +363,12 @@ export async function handleAudioTranscriptionsRequest(
     return upstreamErrorResponse;
   }
 
-  const accounting = countAndStoreTranscriptionUsage(response.clone(), usageContext, span, provider);
+  const accounting = countAndStoreTranscriptionUsage(
+    response.clone(),
+    usageContext,
+    span,
+    provider
+  );
   emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
   return wrapInSafeNextResponse(response);
 }

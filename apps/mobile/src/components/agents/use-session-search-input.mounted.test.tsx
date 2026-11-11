@@ -221,6 +221,24 @@ describe('useSessionSearchInput visible text', () => {
     expect(input.mounts.at(-1)?.defaultValue).toBe('Zebra');
   });
 
+  it('clears the pending restore when an empty saved draft settles', () => {
+    const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    expect(hook().restorePending).toBe(true);
+
+    // The saved draft is empty (a clear the last mount persisted). Nothing the
+    // seed writes changes this render's values, so the flag alone has to end
+    // the loading body; otherwise the screen waits for a render that never
+    // comes.
+    act(() => {
+      renderer.update(
+        createElement(Probe, { userId: 'u1', restoredQuery: '', restoreSettled: true })
+      );
+    });
+    expect(hook().restorePending).toBe(false);
+    expect(hook().searchQuery).toBe('');
+    expect(hook().hasText).toBe(false);
+  });
+
   it('does not wait on the draft once the user types', () => {
     const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
     act(() => {

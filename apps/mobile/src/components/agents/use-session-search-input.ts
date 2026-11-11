@@ -91,10 +91,11 @@ export function useSessionSearchInput({
   // emptied, and it must not undo a clear.
   const userInteractedRef = useRef(false);
 
-  // Whether this mount has applied the settled draft to the search state. The
-  // seed below also sets `searchQuery` and `hasText`, so a render that reads
-  // this ref as true already carries the restored query.
-  const seedAppliedRef = useRef(false);
+  // Whether this mount has applied the settled draft to the search state. It is
+  // state, not a ref: a settled empty draft leaves `searchQuery` and `hasText`
+  // as they already are, so a ref would leave the body loading for a render
+  // that never comes.
+  const [seedApplied, setSeedApplied] = useState(false);
 
   // Boolean state whose setter returns its previous value while it stays
   // true, so extra keystrokes before the debounce commits are free of
@@ -249,7 +250,7 @@ export function useSessionSearchInput({
     if (!decision.shouldSeed) {
       return;
     }
-    seedAppliedRef.current = true;
+    setSeedApplied(true);
     lastTypedRef.current = decision.text;
     setHasText(decision.hasText);
     setSearchQuery(decision.query);
@@ -268,7 +269,7 @@ export function useSessionSearchInput({
   // A pending restore outranks any query state: the body must not claim a
   // result for a search text it is about to receive. Interaction wins, so a
   // user who types or clears before the draft lands never waits on it.
-  const restorePending = !(userInteractedRef.current || seedAppliedRef.current);
+  const restorePending = !seedApplied && !userInteractedRef.current;
 
   return {
     searchQuery,

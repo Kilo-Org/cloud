@@ -1,6 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
 import { injectVercelModels } from '@/lib/providers/openrouter/inject-vercel-models';
-import { parseVercelCatalog } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-catalog';
 import {
   modelRetainsPrompts,
   modelTrains,
@@ -23,7 +22,6 @@ function injectSnapshotModels(
 ) {
   injectVercelModels({
     vercelModels,
-    vercelCatalog: new Map(),
     openRouterCatalogModels: [],
     openRouterModelIds: providerModelData.flatMap(({ models }) => models.map(m => m.slug)),
     providerModelData,
@@ -397,22 +395,16 @@ describe('injectVercelModels with providers only Vercel lists', () => {
 });
 
 describe('injectVercelModels with models only Vercel serves', () => {
-  const catalog = {
+  /** The fields Vercel's model list describes each model with. */
+  const described = {
     type: 'language',
     description: 'Qwen3.5 Flash description',
     created: 1_790_000_000,
     context_window: 1_000_000,
     modalities: { input: ['text', 'image'], output: ['text'] },
     pricing: { input: '0.0000001', output: '0.0000004' },
-  };
-  const freeCatalog = { ...catalog, pricing: { input: '0', output: '0' } };
-
-  /** Vercel's model list with the given entries. */
-  function catalogOf(entries: Record<string, typeof catalog>) {
-    return parseVercelCatalog({
-      data: Object.entries(entries).map(([id, entry]) => ({ id, ...entry })),
-    });
-  }
+  } satisfies Partial<GatewayModelWithEndpoints>;
+  const freeDescribed = { ...described, pricing: { input: '0', output: '0' } };
 
   function providerModelData() {
     return [
@@ -433,7 +425,7 @@ describe('injectVercelModels with models only Vercel serves', () => {
       'alibaba/qwen3.5-flash': {
         id: 'alibaba/qwen3.5-flash',
         name: 'Qwen3.5 Flash',
-        type: 'language',
+        ...described,
         endpoints: [
           {
             provider_name: 'bedrock',
@@ -448,14 +440,13 @@ describe('injectVercelModels with models only Vercel serves', () => {
       'alibaba/qwen3-max': {
         id: 'alibaba/qwen3-max',
         name: 'Qwen3 Max',
-        type: 'language',
+        ...described,
         endpoints: [{ provider_name: 'alibaba' }],
       },
     };
 
     injectVercelModels({
       vercelModels,
-      vercelCatalog: catalogOf({ 'alibaba/qwen3.5-flash': catalog, 'alibaba/qwen3-max': catalog }),
       openRouterCatalogModels: [{ id: 'qwen/qwen3-max', name: 'Qwen: Qwen3 Max' }],
       openRouterModelIds: ['qwen/qwen3-max'],
       providerModelData: data,
@@ -493,7 +484,7 @@ describe('injectVercelModels with models only Vercel serves', () => {
     ]);
   });
 
-  test("skips a Vercel-only model that is missing from Vercel's model list", () => {
+  test("skips a Vercel-only model that Vercel's model list does not describe", () => {
     const data = providerModelData();
     injectVercelModels({
       vercelModels: {
@@ -504,7 +495,6 @@ describe('injectVercelModels with models only Vercel serves', () => {
           endpoints: [{ provider_name: 'runinfra' }],
         },
       },
-      vercelCatalog: new Map(),
       openRouterCatalogModels: [],
       openRouterModelIds: [],
       providerModelData: data,
@@ -522,7 +512,7 @@ describe('injectVercelModels with models only Vercel serves', () => {
         'reflection/beam-free': {
           id: 'reflection/beam-free',
           name: 'Beam (Free)',
-          type: 'language',
+          ...freeDescribed,
           endpoints: [
             {
               provider_name: 'reflection',
@@ -533,7 +523,6 @@ describe('injectVercelModels with models only Vercel serves', () => {
           ],
         },
       },
-      vercelCatalog: catalogOf({ 'reflection/beam-free': freeCatalog }),
       openRouterCatalogModels: [],
       openRouterModelIds: [],
       providerModelData: data,
@@ -561,11 +550,10 @@ describe('injectVercelModels with models only Vercel serves', () => {
         'reflection/beam-free': {
           id: 'reflection/beam-free',
           name: 'Beam (Free)',
-          type: 'language',
+          ...freeDescribed,
           endpoints: [{ provider_name: 'bedrock', has_zdr: true, has_no_training: true }],
         },
       },
-      vercelCatalog: catalogOf({ 'reflection/beam-free': freeCatalog }),
       openRouterCatalogModels: [],
       openRouterModelIds: [],
       providerModelData: data,
@@ -604,11 +592,10 @@ describe('injectVercelModels with models only Vercel serves', () => {
         'runinfra/fast-1': {
           id: 'runinfra/fast-1',
           name: 'Fast 1',
-          type: 'language',
+          ...described,
           endpoints: [{ provider_name: 'runinfra', has_zdr: true, has_no_training: true }],
         },
       },
-      vercelCatalog: catalogOf({ 'runinfra/fast-1': catalog }),
       openRouterCatalogModels: [],
       openRouterModelIds: [MODEL_SLUG],
       providerModelData: data,

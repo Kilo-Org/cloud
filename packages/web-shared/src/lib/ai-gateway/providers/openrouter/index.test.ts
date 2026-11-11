@@ -275,12 +275,14 @@ describe('auto models', () => {
     const target = buildModel({ id: 'vendor/current' });
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValueOnce({
       [alias.id]: {
-        ...alias,
+        id: alias.id,
+        name: alias.name,
         endpoints: [],
         alias_target: { slug: target.id },
       },
       [target.id]: {
-        ...target,
+        id: target.id,
+        name: target.name,
         endpoints: [],
         alias_target: { slug: 'vendor/ignored' },
       },

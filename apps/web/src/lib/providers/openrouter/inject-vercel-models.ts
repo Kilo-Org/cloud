@@ -14,7 +14,6 @@ import type {
 import type { Endpoint } from '@kilocode/db/schema-types';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import type { VercelCatalog } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-catalog';
 import {
   findVercelOnlyModels,
   getVendorNamesByModelPrefix,
@@ -198,7 +197,6 @@ function getSnapshotOfferings(
  */
 function getVercelOnlyOfferings(
   vercelModels: GatewayModelMap,
-  vercelCatalog: VercelCatalog,
   openRouterCatalogModels: readonly { id: string; name: string }[],
   openRouterModelIds: Iterable<string>,
   vercelModelIdOverrides: VercelModelIdOverrides,
@@ -208,19 +206,18 @@ function getVercelOnlyOfferings(
   return findVercelOnlyModels({
     openRouterModelIds,
     vercelMetadata: vercelModels,
-    vercelCatalog,
     overrides: vercelModelIdOverrides,
   }).map(vercelOnlyModel => {
-    const { id, storedModel, catalog } = vercelOnlyModel;
+    const { id, storedModel, contextWindow, modalities, pricing } = vercelOnlyModel;
     return {
       model: {
         slug: id,
         name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
         author: id.includes('/') ? id.slice(0, id.indexOf('/')) : 'Other',
-        description: catalog.description,
-        context_length: catalog.context_window,
-        input_modalities: catalog.modalities.input,
-        output_modalities: catalog.modalities.output,
+        description: storedModel.description ?? '',
+        context_length: contextWindow,
+        input_modalities: modalities.input,
+        output_modalities: modalities.output,
         group: 'Other',
         updated_at: updatedAt,
         endpoint: null,
@@ -228,8 +225,8 @@ function getVercelOnlyOfferings(
       endpoints: storedModel.endpoints.map(endpoint => ({
         ...endpoint,
         pricing: endpoint.pricing ?? {
-          prompt: catalog.pricing.input,
-          completion: catalog.pricing.output,
+          prompt: pricing.input,
+          completion: pricing.output,
         },
       })),
       isFree: isFreeModel(id),
@@ -245,7 +242,6 @@ function getVercelOnlyOfferings(
  */
 export function injectVercelModels({
   vercelModels,
-  vercelCatalog,
   openRouterCatalogModels,
   openRouterModelIds,
   providerModelData,
@@ -253,7 +249,6 @@ export function injectVercelModels({
   updatedAt,
 }: {
   vercelModels: GatewayModelMap;
-  vercelCatalog: VercelCatalog;
   openRouterCatalogModels: readonly { id: string; name: string }[];
   openRouterModelIds: Iterable<string>;
   providerModelData: ProviderModelData;
@@ -270,7 +265,6 @@ export function injectVercelModels({
   }
   const vercelOnlyOfferings = getVercelOnlyOfferings(
     vercelModels,
-    vercelCatalog,
     openRouterCatalogModels,
     openRouterModelIds,
     vercelModelIdOverrides,

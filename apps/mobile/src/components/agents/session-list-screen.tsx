@@ -109,10 +109,15 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const noMatchBody = hasLiveRows && visibleSessions.length === 0;
   const showFab = context.isReady && content !== 'empty' && !noMatchBody;
   const keyboard = useOwnedKeyboard();
+  // The pad the shared lift actually wrote. It equals the keyboard height
+  // whenever the window can hold the whole band, and only falls short in a
+  // window too short for it — where the FAB's band must not subtract height the
+  // body never gave up.
+  const [appliedKeyboardPad, setAppliedKeyboardPad] = useState(0);
   const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(
     tabBarHeight,
     showFab,
-    keyboard.occlusion
+    appliedKeyboardPad
   );
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -505,8 +510,12 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         ) : null}
         {/* Android runs edge-to-edge and never resizes the window for the IME,
             so the body clears the IME natively: the shared lift pads by the
-            keyboard this screen's own field raised. */}
-        <OwnedKeyboardLift occlusion={keyboard.occlusion}>{region}</OwnedKeyboardLift>
+            keyboard this screen's own field raised. The lift clamps that pad in
+            a window too short to hold the whole band, so the FAB's band reads
+            the pad it wrote, not the height it was asked for. */}
+        <OwnedKeyboardLift occlusion={keyboard.occlusion} onApplied={setAppliedKeyboardPad}>
+          {region}
+        </OwnedKeyboardLift>
         {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}
         <SessionFilterModal

@@ -18,6 +18,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 import { getEmptyStateFullHeight } from '@/lib/agents-bottom-chrome';
+import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type BannerState } from '@/lib/offline-banner-state';
 
@@ -467,7 +468,10 @@ function press(label: string) {
 }
 /** Fire the body wrapper's layout with the height the list can use. */
 function layoutBody(height: number) {
-  const wrapper = nodes('View').find(node => typeof node.props.onLayout === 'function');
+  const keyboardFrame = liftNode().findByType('View');
+  const wrapper = nodes('View').find(
+    node => node.props.onLayout !== undefined && node !== keyboardFrame
+  );
   if (!wrapper) {
     throw new Error('Missing body wrapper');
   }
@@ -552,6 +556,13 @@ function hideKeyboard() {
 }
 function surfaceBottomInset() {
   return root().findByType(StateSurfaceInsets).props.bottomInset as number;
+}
+/** Report the room the keyboard lift's own frame has, as the layout pass does. */
+function layoutKeyboardFrame(height: number) {
+  const onLayout = liftNode().findByType('View').props.onLayout as (event: {
+    nativeEvent: { layout: { height: number } };
+  }) => void;
+  onLayout({ nativeEvent: { layout: { height } } });
 }
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -1648,6 +1659,40 @@ describe('AgentSessionListScreen live filtering', () => {
       hideKeyboard();
     });
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+  });
+
+  it('keeps the rows and the FAB band on the pad the lift could write in a short window', async () => {
+    // A keyboard height belongs to the window it was measured in. Rotating to a
+    // window shorter than that band used to pad the whole body away: no rows,
+    // no skeleton, no empty state and no error. The lift keeps a minimum
+    // viewport instead, and the FAB's band must subtract only the pad the body
+    // actually gave up.
+    state.platform.OS = 'android';
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
+    const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
+
+    openSearch();
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(liftPad()).toBe(320);
+
+    // The rotation leaves the body less room than the band it is carrying.
+    act(() => {
+      layoutKeyboardFrame(253);
+    });
+
+    expect(liftPad()).toBe(253 - MIN_BODY_VIEWPORT);
+    expect(listStyle()).toEqual({ marginBottom: Math.max(0, fabBand - (253 - MIN_BODY_VIEWPORT)) });
+    expect(nodes('FlashList')).toHaveLength(1);
+
+    // A window with the room keeps the whole band, so portrait is unchanged.
+    act(() => {
+      layoutKeyboardFrame(758);
+    });
+    expect(liftPad()).toBe(320);
   });
 
   it('ignores a keyboard another screen raised, so the rows and centered states stay put', async () => {

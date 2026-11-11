@@ -13,6 +13,7 @@ import {
   type useRecentAgentRepositories,
 } from '@/lib/hooks/use-agent-sessions';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
+import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AGENT_SESSION_NAV_GUARD_MS } from './agent-session-nav-guard';
 import { OwnedKeyboardLift } from './owned-keyboard-lift';
@@ -1066,13 +1067,43 @@ describe('SessionHistoryScreen', () => {
     expect(liftPad(renderer)).toBe(0);
   });
 
+  // A keyboard height belongs to the window it was measured in. Rotating the
+  // history to a window shorter than that band used to pad the whole body away:
+  // the header, search field, filter and tab bar stayed, and the list rendered
+  // nothing — no rows, no skeleton, no empty state, no error. The lift keeps a
+  // minimum body viewport instead, so the rows stay on screen and scrollable.
+  it('keeps the history body rendered when the window is shorter than the keyboard band', async () => {
+    listState.storedSessions = [{ session_id: 'stored-1', organization_id: null }];
+    const renderer = await renderScreen();
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+
+    act(() => {
+      (searchHeader.props.onFocus as () => void)();
+    });
+    act(() => {
+      keyboardLift.setHeight(336);
+    });
+    expect(liftPad(renderer)).toBe(336);
+
+    // The rotation leaves less room than the band the field raised.
+    act(() => {
+      (
+        renderer.root.findByType(OwnedKeyboardLift).findByType('View').props.onLayout as (event: {
+          nativeEvent: { layout: { height: number } };
+        }) => void
+      )({ nativeEvent: { layout: { height: 253 } } });
+    });
+
+    expect(liftPad(renderer)).toBe(253 - MIN_BODY_VIEWPORT);
+    expect(findNodeByType(renderer, 'AgentSessionListContent')).toBeDefined();
+  });
+
   it('pads nothing for a keyboard another screen raised', async () => {
     const renderer = await renderScreen();
 
     act(() => {
       keyboardLift.setHeight(320);
     });
-
     expect(liftPad(renderer)).toBe(0);
   });
 

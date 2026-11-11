@@ -56,8 +56,8 @@ export const EnkryptUsageWriteSchema = z.strictObject({
    */
   scannedCharacters: z.int32().nonnegative().optional(),
   /**
-   * UTF-16 code units of the full text the scan covers, the whole extracted request or response,
-   * including what the verdict cache covered. Optional like `scannedCharacters`.
+   * UTF-16 code units of the full text the scan covers, the request's context or conversation or
+   * the response, including what the verdict cache covered. Optional like `scannedCharacters`.
    */
   totalCharacters: z.int32().nonnegative().optional(),
 });

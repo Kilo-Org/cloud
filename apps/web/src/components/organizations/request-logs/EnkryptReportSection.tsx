@@ -167,6 +167,7 @@ function scanItems(scan: Scan): DetailItem[] {
           { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
         ]
       : []),
+    ...('chunks' in scan ? [{ label: 'Chunks', value: formatCount(scan.chunks) }] : []),
     { label: 'Enkrypt calls', value: formatCount(scan.attempts) },
   ];
 }

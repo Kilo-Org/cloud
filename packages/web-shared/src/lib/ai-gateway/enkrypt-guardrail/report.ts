@@ -62,7 +62,8 @@ const scanOutcomeShape = {
 
 /**
  * One Enkrypt scan: of the blocking detectors or the log-only detectors, over one of the request's
- * tool definitions, its system prompt, its conversation, or the model's response.
+ * tool definitions, its system prompt, its conversation, or the model's response, or one chunk of
+ * them.
  */
 export const EnkryptScanReportSchema = z.object({
   ...scanOutcomeShape,
@@ -101,7 +102,7 @@ export const EnkryptToolScanReportSchema = z.object({
   tools_total: z.number(),
   /** Allowed before with the same organization and detectors, so not scanned again. */
   tools_cached: z.number(),
-  /** Not covered by the cache, so each was scanned by its own call, or failed. */
+  /** Not covered by the cache, so each was scanned by its own calls, or failed. */
   tools_scanned: z.number(),
   tools_flagged: z.number(),
   /** The tools that fired a detector or failed, most severe first, by name only. */
@@ -115,21 +116,31 @@ const VerdictCacheWriteSchema = z.enum(['written', 'failed', 'skipped']);
 /** The verdict cache write of a scan: for tool definitions, `failed` if any write failed, else `written` if any was written. */
 const verdictCacheWriteShape = { verdict_cache_write: VerdictCacheWriteSchema };
 
+/**
+ * The scan of a request's system prompt or conversation by the blocking or the log-only detectors.
+ * Text longer than one Enkrypt call can take is split into chunks, each scanned on its own and
+ * overlapping the one before it. The decision is that of the most severe chunk, and the error that
+ * of the most severe chunk that failed. Characters, calls, and credits are summed; the latency runs
+ * until the last chunk's scan finished.
+ */
+const EnkryptSegmentsScanReportSchema = EnkryptScanReportSchema.extend({
+  part: z.enum(['system', 'conversation']),
+  /** Chunks the uncached text was split into, so 0 when the cache covered all of it. */
+  chunks: z.number(),
+});
+
 /** A scan of the input guardrail: the aggregate of the tool definitions, the system prompt, or the conversation. */
 export const EnkryptInputScanReportSchema = z.union([
   EnkryptToolScanReportSchema.extend(verdictCacheWriteShape),
-  EnkryptScanReportSchema.extend({
-    part: z.enum(['system', 'conversation']),
-    ...verdictCacheWriteShape,
-  }),
+  EnkryptSegmentsScanReportSchema.extend(verdictCacheWriteShape),
 ]);
 
 export type EnkryptInputScanReport = z.infer<typeof EnkryptInputScanReportSchema>;
 
+export type EnkryptSegmentsScanReport = z.infer<typeof EnkryptSegmentsScanReportSchema>;
+
 /** An input guardrail scan before its verdict cache write is known. */
-export type EnkryptInputPartScanReport =
-  | EnkryptToolScanReport
-  | (EnkryptScanReport & { part: 'system' | 'conversation' });
+export type EnkryptInputPartScanReport = EnkryptToolScanReport | EnkryptSegmentsScanReport;
 
 /**
  * What the input guardrail did for one request. Holds settings, counts, outcomes, and the names of

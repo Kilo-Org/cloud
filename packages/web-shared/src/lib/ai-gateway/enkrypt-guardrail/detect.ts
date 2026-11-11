@@ -14,7 +14,6 @@ import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway
 import type { EnkryptScanReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 import type { EnkryptCallLimiter } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
-import type { RequestToolDefinition } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
@@ -36,8 +35,9 @@ const MAX_ERROR_BODY_BYTES = 64 * 1024;
 const ERROR_BODY_TIMEOUT_MS = 1_000;
 
 /**
- * A larger request is not sent to Enkrypt. It is never truncated: the model would still read the
- * unscanned remainder, which is where an injected instruction in a large file read would sit.
+ * The most text one Enkrypt call scans. Longer request text is split into several calls; a scan is
+ * never truncated, since the model would still read the unscanned remainder, which is where an
+ * injected instruction in a large file read would sit.
  */
 export const ENKRYPT_MAX_SCAN_CHARACTERS = 100_000;
 
@@ -45,30 +45,10 @@ const MAX_BLOCK_MESSAGE_LENGTH = 500;
 
 const MAX_SCAN_CHARACTERS_LABEL = ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US');
 
-const MAX_TOOL_NAME_IN_MESSAGE_LENGTH = 100;
+/** Request text is split into scans; only a segment whose header is too long to split is too large. */
+export const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail splits long requests into scans of at most ${MAX_SCAN_CHARACTERS_LABEL} characters, but this request has a name or label, such as a tool or file name, too long to split, so it was not sent. Shorten that name, then retry. Retrying the unchanged request will not help.`;
 
-/** Each tool definition is scanned on its own, so only a single oversized one is rejected. */
-function toolTooLargeMessage(tool: EnkryptScannedTool | undefined): string {
-  const unchanged = 'Retrying the unchanged request will not help.';
-  if (tool?.kind === 'response_format') {
-    return `Your organization's Enkrypt AI guardrail cannot scan a response format longer than ${MAX_SCAN_CHARACTERS_LABEL} characters, so this request was not sent. Shorten the response format schema, then retry. ${unchanged}`;
-  }
-  const name = tool?.name?.replace(/\p{Cc}/gu, ' ').slice(0, MAX_TOOL_NAME_IN_MESSAGE_LENGTH);
-  const subject = name ? `the definition of the tool "${name}"` : 'a tool definition';
-  return `Your organization's Enkrypt AI guardrail cannot scan a tool definition longer than ${MAX_SCAN_CHARACTERS_LABEL} characters, and ${subject} is longer, so this request was not sent. Disable that tool or the MCP server providing it, then retry. ${unchanged}`;
-}
-
-export function scanTooLargeMessage(coverage: Pick<EnkryptScanCoverage, 'part' | 'tool'>): string {
-  return coverage.part === 'tools'
-    ? toolTooLargeMessage(coverage.tool)
-    : SCAN_TOO_LARGE_MESSAGES[coverage.part];
-}
-
-export const SCAN_TOO_LARGE_MESSAGES: Record<Exclude<EnkryptScanPart, 'tools'>, string> = {
-  system: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of system prompt at once, so this request was not sent. Shorten the system prompt, for example by removing custom instructions or rules files, then retry. Retrying the unchanged request will not help.`,
-  conversation: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of new conversation text at once, so this request was not sent. Compact or prune earlier conversation history, reduce tool output, or start a new session, then retry. Retrying the unchanged request will not help.`,
-  response: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry.`,
-};
+export const RESPONSE_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry.`;
 
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
@@ -81,11 +61,10 @@ const detectResponseSchema = z.object({
  */
 export type EnkryptScanPart = 'tools' | 'system' | 'conversation' | 'response';
 
-export type EnkryptScannedTool = Pick<RequestToolDefinition, 'kind' | 'name'>;
-
 /**
  * How much of the part `text` covers. With a cached conversation prefix, `text` is only the
- * uncached suffix plus an overlap of already-scanned text.
+ * uncached suffix plus an overlap of already-scanned text. A part too long for one call is split
+ * into chunks, each scanned on its own; `chunk` locates this one.
  */
 export type EnkryptScanCoverage = {
   part: EnkryptScanPart;
@@ -96,8 +75,7 @@ export type EnkryptScanCoverage = {
   cachedSegments: number;
   /** Attachments, such as images, represented only by an omission marker. */
   omittedAttachments: number;
-  /** The tool definition or response format a `tools` scan covers. */
-  tool?: EnkryptScannedTool;
+  chunk?: { index: number; count: number };
 };
 
 export type EnkryptGuardrailScan = {
@@ -436,6 +414,7 @@ export async function scanRequest(
       session_id: scan.sessionId,
       client_request_id: scan.clientRequestId,
       api_kind: scan.apiKind,
+      ...(coverage.chunk ? { chunk: coverage.chunk } : {}),
     },
     report: {
       scan: kind,
@@ -470,7 +449,11 @@ export async function scanRequest(
     return failedVerdict([], scope, {
       error: 'request_too_large',
       latencyMs: 0,
-      closedVerdict: { action: 'block', message: scanTooLargeMessage(coverage) },
+      closedVerdict: {
+        action: 'block',
+        message:
+          coverage.part === 'response' ? RESPONSE_TOO_LARGE_MESSAGE : REQUEST_TOO_LARGE_MESSAGE,
+      },
     });
   }
 
@@ -504,6 +487,7 @@ export async function scanRequest(
           guardrail: deps.requestLog.guardrail,
           scan: kind,
           part: coverage.part,
+          ...(coverage.chunk ? { chunk: coverage.chunk } : {}),
           request,
           response: null,
           status_code: null,

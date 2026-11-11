@@ -3535,7 +3535,7 @@
       "provider": "Gestopt: providerfout",
       "tool": "Gestopt: toolfout",
       "cancelled": "Gestopt: geannuleerd",
-      "other": "GESTOPT"
+      "other": "Gestopt"
     }
   },
   "transcriptionModel": {

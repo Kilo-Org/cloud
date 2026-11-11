@@ -3590,7 +3590,7 @@
       "provider": "Oprit: eroare furnizor",
       "tool": "Oprit: eroare instrument",
       "cancelled": "Oprit: anulat",
-      "other": "OPRIT"
+      "other": "Oprit"
     }
   },
   "transcriptionModel": {

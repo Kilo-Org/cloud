@@ -3596,7 +3596,7 @@
       "provider": "Arrêté : erreur du fournisseur",
       "tool": "Arrêté : erreur d'outil",
       "cancelled": "Arrêté : annulé",
-      "other": "ARRÊTÉ"
+      "other": "Arrêté"
     }
   },
   "transcriptionModel": {

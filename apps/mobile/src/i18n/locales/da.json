@@ -3535,7 +3535,7 @@
       "provider": "Stoppet: udbyderfejl",
       "tool": "Stoppet: værktøjsfejl",
       "cancelled": "Stoppet: annulleret",
-      "other": "STOPPET"
+      "other": "Stoppet"
     }
   },
   "transcriptionModel": {

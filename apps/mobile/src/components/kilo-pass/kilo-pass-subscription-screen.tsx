@@ -4,6 +4,7 @@ import { Platform, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { CenteredState } from '@/components/centered-state';
+import { StateSurface } from '@/components/centered-state-surface';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -87,31 +88,36 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('kiloPass.title')} modal />
-        <EmptyState
-          icon={Crown}
-          title={t('kiloPass.purchaseUnavailableTitle')}
-          // Only a pass the server reports as ended has something the title does
-          // not say; the plain kind would restate the title, which the state's
-          // own guide forbids.
-          description={
-            presentation.statusClass === 'terminal'
-              ? t('kiloPass.purchaseUnavailableEnded')
-              : undefined
-          }
-          action={
-            <Button
-              accessibilityLabel={t('credits.title')}
-              className={STATE_ACTION_CLASS}
-              onPress={() => {
-                // Replacing the dead-end modal keeps one sheet on screen.
-                router.replace('/(app)/credits' as Href);
-              }}
-              variant="outline"
-            >
-              <Text>{t('credits.title')}</Text>
-            </Button>
-          }
-        />
+        {/* The body publishes its own band. Without it the centered state
+            starts at the whole window's centre and lifts by half the header
+            when its measured frame arrives. */}
+        <StateSurface className="flex-1">
+          <EmptyState
+            icon={Crown}
+            title={t('kiloPass.purchaseUnavailableTitle')}
+            // Only a pass the server reports as ended has something the title does
+            // not say; the plain kind would restate the title, which the state's
+            // own guide forbids.
+            description={
+              presentation.statusClass === 'terminal'
+                ? t('kiloPass.purchaseUnavailableEnded')
+                : undefined
+            }
+            action={
+              <Button
+                accessibilityLabel={t('credits.title')}
+                className={STATE_ACTION_CLASS}
+                onPress={() => {
+                  // Replacing the dead-end modal keeps one sheet on screen.
+                  router.replace('/(app)/credits' as Href);
+                }}
+                variant="outline"
+              >
+                <Text>{t('credits.title')}</Text>
+              </Button>
+            }
+          />
+        </StateSurface>
       </View>
     );
   }

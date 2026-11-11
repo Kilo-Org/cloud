@@ -142,7 +142,7 @@ function chatReasoning(message: MessageWithReasoning): Piece {
     message.reasoning,
     message.reasoning_content,
     (message.reasoning_details ?? []).flatMap(reasoningDetailTexts).join(''),
-  ];
+  ].map(text => text?.trim());
   return piece('assistant reasoning', [...new Set(texts)]);
 }
 
@@ -711,25 +711,23 @@ export function renderSegment({ header, body }: RequestSegment): string {
  * two text parts, are merged.
  */
 function messageSegments(pieces: Piece[]): RequestSegment[] {
-  const segments: RequestSegment[] = [];
+  const groups: { header: string; texts: string[] | null }[] = [];
   for (const { header, texts } of pieces) {
-    const body =
+    const trimmed =
       texts &&
-      joinSegments(
-        texts.flatMap(text => {
-          const trimmed = text?.trim();
-          return trimmed ? [trimmed] : [];
-        })
-      );
-    if (body === '') continue;
-    const previous = segments.at(-1);
-    if (previous && body !== null && previous.body !== null && previous.header === header) {
-      previous.body = joinSegments([previous.body, body]);
+      texts.flatMap(text => {
+        const each = text?.trim();
+        return each ? [each] : [];
+      });
+    if (trimmed?.length === 0) continue;
+    const previous = groups.at(-1);
+    if (previous?.texts && trimmed && previous.header === header) {
+      for (const text of trimmed) previous.texts.push(text);
     } else {
-      segments.push({ header, body });
+      groups.push({ header, texts: trimmed });
     }
   }
-  return segments;
+  return groups.map(({ header, texts }) => ({ header, body: texts && joinSegments(texts) }));
 }
 
 /**

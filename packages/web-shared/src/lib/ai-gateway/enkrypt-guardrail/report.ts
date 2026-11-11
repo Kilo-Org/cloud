@@ -26,9 +26,13 @@ const GuardrailSettingsSchema = z.object({
   detectors: z.array(DetectorSettingsSchema),
 });
 
-/** One Enkrypt scan of the request: the blocking detectors' or the log-only detectors'. */
+/**
+ * One Enkrypt scan: of the blocking detectors or the log-only detectors, over the request's tool
+ * definitions and system prompt (`context`), its conversation, or the model's response.
+ */
 export const EnkryptScanReportSchema = z.object({
   scan: z.enum(['blocking', 'log_only']),
+  part: z.enum(['context', 'conversation', 'response']),
   detectors_enabled: z.array(DetectorIdSchema),
   detectors_blocking: z.array(DetectorIdSchema),
   verdict_cache: z.enum(['off', 'miss', 'hit', 'error']),
@@ -36,6 +40,9 @@ export const EnkryptScanReportSchema = z.object({
   total_segments: z.number(),
   cached_characters: z.number(),
   cached_segments: z.number(),
+  /** Attachments, such as images, sent to Enkrypt only as an omission marker. */
+  omitted_attachments: z.number(),
+  /** Includes the overlap of already-scanned text and omission markers. */
   scanned_characters: z.number(),
   decision: z.enum(['allowed', 'blocked', 'error_fail_closed', 'error_logged', 'client_aborted']),
   error: z.string().nullable(),

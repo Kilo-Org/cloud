@@ -6,6 +6,7 @@ import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
   responseBlockMessage,
+  SCAN_TOO_LARGE_MESSAGES,
   scanRequest,
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
@@ -63,7 +64,6 @@ const SHORTER_RESPONSE_ADVICE =
 
 const HELD_OUTPUT_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot hold back more than ${MAX_HELD_OUTPUT_BYTES / 1024 / 1024} MB of model response at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
 
-const OUTPUT_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of model output at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
 
 type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
   /** Null when Enkrypt was not asked. */
@@ -71,7 +71,7 @@ type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
 };
 
 const outputTooLarge: OutputScanResult = {
-  verdict: { action: 'block', message: OUTPUT_TOO_LARGE_MESSAGE },
+  verdict: { action: 'block', message: SCAN_TOO_LARGE_MESSAGES.response },
   usageRecords: [],
   report: null,
 };
@@ -115,11 +115,13 @@ const notScanned: OutputScanResult = {
 /** A response is scanned whole; output scans never use the verdict cache. */
 function wholeResponseCoverage(text: string): EnkryptScanCoverage {
   return {
+    part: 'response',
     cache: 'off',
     totalCharacters: text.length,
     totalSegments: text.length > 0 ? 1 : 0,
     cachedCharacters: 0,
     cachedSegments: 0,
+    omittedAttachments: 0,
   };
 }
 

@@ -33,6 +33,12 @@ const DECISIONS: Record<Scan['decision'], { label: string; tone: StepTone }> = {
   client_aborted: { label: 'Client aborted', tone: 'skipped' },
 };
 
+const PART_LABELS: Record<Scan['part'], string | null> = {
+  context: 'Tools and system prompt',
+  conversation: 'Conversation',
+  response: null,
+};
+
 const VERDICT_CACHE_LABELS: Record<Scan['verdict_cache'], string> = {
   off: 'Off',
   miss: 'Miss',
@@ -82,11 +88,13 @@ function DetectorList({ detectors }: { detectors: EnkryptDetectorId[] }) {
 
 function ScanCard({ scan }: { scan: Scan }) {
   const decision = DECISIONS[scan.decision];
+  const part = PART_LABELS[scan.part];
   return (
     <li className="flex flex-col gap-3 rounded-md border p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">
           {scan.scan === 'blocking' ? 'Blocking scan' : 'Log-only scan'}
+          {part && <span className="text-muted-foreground font-normal"> · {part}</span>}
         </span>
         <ToneBadge tone={decision.tone}>{decision.label}</ToneBadge>
         <span className="text-muted-foreground ml-auto text-xs tabular-nums">
@@ -107,18 +115,29 @@ function ScanCard({ scan }: { scan: Scan }) {
                 'None'
               ),
           },
-          {
-            label: 'Verdict cache',
-            value: `${VERDICT_CACHE_LABELS[scan.verdict_cache]}${scan.verdict_cache_write === 'written' ? ', stored' : ''}`,
-          },
+          ...(scan.part === 'response'
+            ? []
+            : [
+                {
+                  label: 'Verdict cache',
+                  value: `${VERDICT_CACHE_LABELS[scan.verdict_cache]}${scan.verdict_cache_write === 'written' ? ', stored' : ''}`,
+                },
+              ]),
           {
             label: 'Characters scanned',
             value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
           },
-          {
-            label: 'Segments cached',
-            value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
-          },
+          ...(scan.part === 'conversation'
+            ? [
+                {
+                  label: 'Segments cached',
+                  value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
+                },
+              ]
+            : []),
+          ...(scan.part === 'response'
+            ? []
+            : [{ label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) }]),
           {
             label: 'Enkrypt calls',
             value: formatCount(scan.attempts),

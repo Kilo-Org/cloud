@@ -13,6 +13,7 @@ export type ApiRequestLogBlobUpload = {
 export const enkryptRequestLogSchema = z.object({
   guardrail: z.enum(['input', 'output']),
   scan: z.enum(['blocking', 'log_only']),
+  part: z.enum(['context', 'conversation', 'response']),
   request: z.object({
     text: z.string(),
     detectors: z.record(z.string(), z.unknown()),

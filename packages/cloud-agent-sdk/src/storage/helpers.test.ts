@@ -27,6 +27,56 @@ describe('orderMessageIds', () => {
     } as MessageInfo;
   }
 
+  function timed(id: string, created: number, parentID?: string): MessageInfo {
+    return {
+      ...message(id, parentID),
+      time: { created },
+    } as MessageInfo;
+  }
+
+  test('orders rows by their creation time when the ids do not follow it', () => {
+    // An imported session: the ids say newest-first, the clock says otherwise.
+    const ids = ['b', 'a', 'd', 'c'];
+    const messages = new Map(
+      [timed('a', 10), timed('b', 20), timed('c', 30), timed('d', 40)].map(info => [info.id, info])
+    );
+    expect(orderMessageIds(ids, messages)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  test('keeps the id order for rows created in the same instant', () => {
+    const ids = ['b', 'a', 'c'];
+    const messages = new Map(
+      [timed('a', 5), timed('b', 5), timed('c', 9)].map(info => [info.id, info])
+    );
+    expect(orderMessageIds(ids, messages)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('keeps a reply after its prompt when the clock and the ids disagree', () => {
+    // The prompt's stored time can trail its reply: causality still wins.
+    const ids = ['reply', 'prompt', 'next'];
+    const messages = new Map(
+      [timed('prompt', 100), timed('reply', 90, 'prompt'), timed('next', 200)].map(info => [
+        info.id,
+        info,
+      ])
+    );
+    expect(orderMessageIds(ids, messages)).toEqual(['prompt', 'reply', 'next']);
+  });
+
+  test('returns the same array when the clock and the ids already agree', () => {
+    const ids = ['a', 'b', 'c'];
+    const messages = new Map(
+      [timed('a', 1), timed('b', 2), timed('c', 3)].map(info => [info.id, info])
+    );
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
+  test('keeps the id order while a row has no readable creation time', () => {
+    const ids = ['b', 'a'];
+    const messages = new Map([timed('a', 1), message('b')].map(info => [info.id, info]));
+    expect(orderMessageIds(ids, messages)).toBe(ids);
+  });
+
   test('keeps already causal IDs and their array identity', () => {
     const ids = ['a', 'b', 'c'];
     const messages = new Map([

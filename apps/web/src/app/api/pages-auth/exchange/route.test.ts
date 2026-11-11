@@ -257,6 +257,22 @@ describe('POST /api/pages-auth/exchange', () => {
     expect(mockedGetProfileOrganizations).not.toHaveBeenCalled();
   });
 
+  test('refuses an account whose block timestamp is set', async () => {
+    mockedFindUserById.mockResolvedValueOnce({
+      id: 'user-1',
+      google_user_name: 'Ada Lovelace',
+      google_user_email: 'ada@kilo.test',
+      blocked_at: '2026-01-15T12:00:00.000Z',
+      blocked_reason: null,
+    } as never);
+
+    const response = await exchange({ code: codeFor(), audience: PAGES, state: STATE });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'account_unavailable' });
+    expect(mockedGetProfileOrganizations).not.toHaveBeenCalled();
+  });
+
   test.each([
     ['a body that is not JSON', 'not json'],
     ['no code', { audience: PAGES, state: STATE }],

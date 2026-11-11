@@ -3,6 +3,7 @@ import { browserLandingPath } from '@/lib/app-link-safe-redirect';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { redirect } from 'next/navigation';
 
 export default async function GetStartedPage({ searchParams }: AppPageProps) {
@@ -15,7 +16,7 @@ export default async function GetStartedPage({ searchParams }: AppPageProps) {
     redirect(buildLandingRedirectUrl('/install', await searchParams));
   }
 
-  if (user.blocked_reason) {
+  if (isBlockedAccount(user)) {
     redirect('/account-blocked');
   }
 

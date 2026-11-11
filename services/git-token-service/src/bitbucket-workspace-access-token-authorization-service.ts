@@ -21,6 +21,7 @@ import {
   type BitbucketWorkspaceAccessTokenInvalidationReason,
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { and, eq, exists, isNull, lt, or, sql } from 'drizzle-orm';
+import { availableAccountCondition } from './account-availability.js';
 import { normalizeBitbucketUuid } from './bitbucket-url.js';
 
 export type BitbucketWorkspaceAccessTokenAuthorizationCandidate = {
@@ -198,7 +199,7 @@ export function buildBitbucketWorkspaceAccessTokenAuthorizationQuery(
     )
     .innerJoin(
       kilocode_users,
-      and(eq(kilocode_users.id, input.userId), isNull(kilocode_users.blocked_reason))
+      and(eq(kilocode_users.id, input.userId), availableAccountCondition())
     )
     .where(
       and(

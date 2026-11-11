@@ -6,7 +6,11 @@ import { validateKiloToken } from './validate-kilo-token.js';
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
 const userRowByUserId = vi.hoisted(
-  () => new Map<string, { pepper: string | null; blockedReason: string | null }>()
+  () =>
+    new Map<
+      string,
+      { pepper: string | null; blockedAt?: string | null; blockedReason?: string | null }
+    >()
 );
 const getWorkerDb = vi.hoisted(() => vi.fn());
 const dbFailure = vi.hoisted(() => ({ error: null as Error | null }));
@@ -23,7 +27,13 @@ getWorkerDb.mockImplementation(() => ({
           if (dbFailure.error) throw dbFailure.error;
           const row = userRowByUserId.get('user-1');
           if (!row) return [];
-          return [{ api_token_pepper: row.pepper, blocked_reason: row.blockedReason }];
+          return [
+            {
+              api_token_pepper: row.pepper,
+              blocked_at: row.blockedAt ?? null,
+              blocked_reason: row.blockedReason ?? null,
+            },
+          ];
         },
       }),
     }),
@@ -265,6 +275,27 @@ describe('validateKiloToken', () => {
     const { token } = await signKiloToken({
       userId: 'user-1',
       pepper: 'pepper-stale',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+    });
+
+    await expect(
+      validateKiloToken(`Bearer ${token}`, {
+        secret: TEST_JWT_SECRET,
+        connectionString: 'postgres://test',
+      })
+    ).resolves.toEqual({ success: false, error: 'Invalid or expired token' });
+  });
+
+  it('refuses an account whose block timestamp is set', async () => {
+    userRowByUserId.set('user-1', {
+      pepper: 'pepper-current',
+      blockedAt: '2026-10-01T00:00:00.000Z',
+    });
+    const { token } = await signKiloToken({
+      userId: 'user-1',
+      pepper: 'pepper-current',
       secret: TEST_JWT_SECRET,
       expiresInSeconds: 3600,
       env: 'production',

@@ -1629,6 +1629,40 @@ test('the Chrome e2e shards start only for the inputs their bundle reads', () =>
   assert.equal(jobs['e2e-chrome'].if, '${{ !cancelled() }}');
 });
 
+// The extension declares @kilocode/trpc and @kilocode/cloud-agent-sdk and no
+// other workspace package, so the extension's closure is what links its
+// Firefox build and its unit suite. `verify` also builds the tRPC declarations,
+// whose program resolves apps/web and web-shared sources through its path
+// aliases; apps/web declares no @kilocode/trpc, so both filters are needed
+// there and neither implies the other. A step that starts reading another
+// workspace widens its job's filter; it does not restore the full install.
+const extensionVerifyInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-extension...' --filter 'web...' --filter kilocode-monorepo";
+
+test('the extension verify job installs the closure its steps read', () => {
+  const verify = workflows['extension-ci.yml'].jobs.verify;
+  const installs = verify.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    [extensionVerifyInstall],
+    'one install links the extension closure, the web closure and the root project'
+  );
+});
+
+// A shard's duration belongs to the Playwright suite, and the workspace install
+// stays under a tenth of it, so a closure install cannot save a tenth of the
+// job. The measured decision leaves this install whole, so only a measurement
+// under this test changes it.
+test('the Chrome e2e shards keep the workspace install and both shards', () => {
+  const job = workflows['extension-ci.yml'].jobs['e2e-chrome-shard'];
+  assert.equal(
+    job.steps.find(step => step.name === 'Install dependencies').run,
+    'pnpm install --frozen-lockfile',
+    'a shard installs the workspace, because the suite sets its duration'
+  );
+  assert.deepEqual(job.strategy.matrix.shard, [1, 2], 'both shards still run');
+});
+
 // The account database job runs the root `drizzle` script, which executes
 // drizzle-kit inside packages/db, and one session-sync suite whose workspace
 // imports are @kilocode/db and @kilocode/worker-utils, both declared by the

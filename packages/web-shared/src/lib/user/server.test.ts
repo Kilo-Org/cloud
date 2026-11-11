@@ -1010,6 +1010,20 @@ describe('credential issuance authentication guards', () => {
     expect(result.authorizationRefused).toBe(true);
   });
 
+  test('does not authorize credential issuance when the block timestamp is set', async () => {
+    const user = await insertTestUser({
+      blocked_reason: null,
+      blocked_at: '2026-01-15T12:00:00.000Z',
+    });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
+  });
+
   test('leaves generic bearer authentication available', async () => {
     const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
     mockHeaders.mockResolvedValue(
@@ -1033,6 +1047,20 @@ describe('credential issuance authentication guards', () => {
 
   test('redirects blocked sessions to the blocked account page', async () => {
     const user = await insertTestUser({ blocked_reason: 'blocked for test' });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/profile' }));
+    mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/account-blocked'
+    );
+    expect(mockRedirect).toHaveBeenCalledWith('/account-blocked');
+  });
+
+  test('redirects a session with a block timestamp to the blocked account page', async () => {
+    const user = await insertTestUser({
+      blocked_reason: null,
+      blocked_at: '2026-01-15T12:00:00.000Z',
+    });
     mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/profile' }));
     mockGetServerSession.mockResolvedValue({ kiloUserId: user.id, webSessionPepper: null });
 

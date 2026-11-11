@@ -77,7 +77,7 @@ describe('E2E API token', () => {
       await expect(
         verifyKiloBearerAgainstCurrentPepper({
           ...auth,
-          getUserPepper: async () => ({ pepper, blockedReason: null }),
+          getUserPepper: async () => ({ pepper, blocked: false }),
         })
       ).resolves.toEqual({ userId: user.id });
       await expect(
@@ -85,7 +85,7 @@ describe('E2E API token', () => {
           ...auth,
           getUserPepper: async () => ({
             pepper: pepper === null ? '' : null,
-            blockedReason: null,
+            blocked: false,
           }),
         })
       ).resolves.toBeNull();

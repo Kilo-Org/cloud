@@ -2606,6 +2606,8 @@
       "toolList": "liostaigh",
       "toolPatch": "cuir paiste i bhfeidhm",
       "toolTask": "tasc",
+      "toolSendFile": "Sheol comhad",
+      "toolSendFileAction": "Seol comhad",
       "readTodos": "Léigh an plean",
       "updateTodos": "Nuashonraigh an plean",
       "linesBadge": "{{displayCount}} líne",

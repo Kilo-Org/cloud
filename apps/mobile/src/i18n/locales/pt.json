@@ -2526,6 +2526,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar alterações",
       "toolTask": "tarefa",
+      "toolSendFile": "Ficheiro enviado",
+      "toolSendFileAction": "Enviar ficheiro",
       "readTodos": "Ler plano",
       "updateTodos": "Atualizar plano",
       "linesBadge": "{{displayCount}} linhas",

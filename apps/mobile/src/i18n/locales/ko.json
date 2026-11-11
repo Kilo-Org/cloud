@@ -1939,6 +1939,8 @@
       "toolList": "목록 보기",
       "toolPatch": "패치",
       "toolTask": "작업",
+      "toolSendFile": "파일 전송함",
+      "toolSendFileAction": "파일 전송",
       "readTodos": "플랜 읽기",
       "updateTodos": "플랜 업데이트",
       "linesBadge": "{{displayCount}}줄",

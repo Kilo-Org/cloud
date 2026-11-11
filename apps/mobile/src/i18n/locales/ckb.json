@@ -2477,6 +2477,8 @@
       "toolList": "پێرستکردن",
       "toolPatch": "پینەکردن",
       "toolTask": "ئەرک",
+      "toolSendFile": "فایل نێردرا",
+      "toolSendFileAction": "ناردنی فایل",
       "readTodos": "خوێندنەوەی پلان",
       "updateTodos": "نوێکردنەوەی پلان",
       "linesBadge": "{{displayCount}} دێڕ",

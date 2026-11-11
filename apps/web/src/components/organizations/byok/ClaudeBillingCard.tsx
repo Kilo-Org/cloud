@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useSyncExternalStore } from 'react';
+import { Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -31,35 +31,55 @@ const CONNECTED_PLATFORMS_URL = 'https://platform.claude.com/connected-platforms
  */
 export type ClaudeBillingScope = 'personal' | 'member' | 'shared_services';
 
+const CARD_TITLE = 'Claude (linked billing)';
+
+const ELIGIBILITY_NOTE =
+  'Linked billing works with Claude API organizations only. Claude Pro and Max subscriptions and cloud marketplace billing do not qualify.';
+const APPROVAL_NOTE =
+  'To link, sign in to Claude Console and approve the link there. Only an owner, admin, or billing admin of the Claude organization can approve.';
+const REFUSED_BILLING_NOTE =
+  'If Anthropic declines billing, Claude requests pause. Kilo does not fall back to Kilo credits.';
+
 const SCOPE_COPY: Record<
   ClaudeBillingScope,
-  { title: string; description: string; manageNote: string; removeNote: string }
+  { description: string; coverageNote: string | null; removeNote: string }
 > = {
   personal: {
-    title: 'Linked billing with Claude Platform',
     description:
-      'Pay Anthropic for Claude usage in Kilo through your Claude API organization. No API key needed. Claude Pro and Max subscriptions and cloud marketplace billing do not qualify.',
-    manageNote: '',
+      'Pay Anthropic directly for your Claude usage in Kilo through your Claude API organization. No API key needed.',
+    coverageNote: null,
     removeNote:
-      'Removing this link restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.',
+      'Removing the link from Kilo restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.',
   },
   member: {
-    title: 'Linked billing with Claude Platform',
     description:
-      'Pay Anthropic for the Claude requests you make in this organization through your Claude API organization. No API key needed. It does not cover shared services such as code review.',
-    manageNote: '',
+      'Pay Anthropic directly for the Claude requests you make in this organization through your own Claude API organization. No API key needed.',
+    coverageNote:
+      'Only your own requests are covered. Shared services such as code review are not.',
     removeNote:
-      'Removing this link restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.',
+      'Removing the link from Kilo restores normal BYOK or Kilo-credit routing. Remove it first to switch to another Claude organization.',
   },
   shared_services: {
-    title: 'Claude billing for shared services',
     description:
-      'Link a Claude organization so Kilo shared services in this organization, such as code review, bill it instead of Kilo credits. Members’ own requests keep their separate billing choices.',
-    manageNote: ' Only an owner or admin of this Kilo organization can link it.',
+      'Link a Claude API organization for this organization. Kilo shared services, such as code review, then bill Anthropic directly instead of using Kilo credits.',
+    coverageNote: 'Only shared services are covered. Members’ own links are separate.',
     removeNote:
-      'Removing this link stops shared services from billing it. Members’ own links are unchanged. Remove it first to switch to another Claude organization.',
+      'Removing the link from Kilo stops shared services from billing it. Members’ own links are unchanged. Remove it first to switch to another Claude organization.',
   },
 };
+
+function ClaudeConsoleLink({ children }: { children: ReactNode }) {
+  return (
+    <a
+      className="text-foreground underline underline-offset-4"
+      href={CONNECTED_PLATFORMS_URL}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {children}
+    </a>
+  );
+}
 
 function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: boolean) {
   switch (outcome) {
@@ -80,7 +100,7 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
       }
       return scope === 'member'
         ? 'Only a member of this Kilo organization with access to this feature can link it.'
-        : 'Linked billing with Claude Platform is not available for your account yet.';
+        : 'Claude linked billing is not available for your account yet.';
     default:
       return 'We could not link your Claude organization. Try again.';
   }
@@ -153,21 +173,17 @@ export function ClaudeBillingCardView({
     shareableLinks.find(link => link.payerId === selectedPayerId) ?? shareableLinks[0];
   return (
     <Card>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
-        <CardTitle className="text-base">{copy.title}</CardTitle>
-        {status ? (
-          <Badge variant={status.state === 'billing_unavailable' ? 'destructive' : 'outline'}>
-            {status.state === 'connected'
-              ? 'Linked'
-              : status.state === 'billing_unavailable'
-                ? 'Billing unavailable'
-                : 'Not linked'}
-          </Badge>
-        ) : (
+      <CardHeader className="grid grid-cols-[1fr_auto] items-start gap-4 pb-4">
+        <CardTitle>{CARD_TITLE}</CardTitle>
+        {!status ? (
           <Skeleton className="h-5 w-20" />
-        )}
+        ) : status.state === 'connected' ? (
+          <Badge variant="new">Linked</Badge>
+        ) : status.state === 'billing_unavailable' ? (
+          <Badge variant="destructive">Billing unavailable</Badge>
+        ) : null}
       </CardHeader>
-      <CardContent className="flex min-h-[8rem] flex-col gap-3">
+      <CardContent className="flex flex-col gap-3">
         {outcome && (outcome !== 'connected' || connected) ? (
           <Alert variant={outcome === 'connected' ? 'default' : 'destructive'}>
             <AlertDescription>{outcomeMessage(outcome, scope, connected)}</AlertDescription>
@@ -190,17 +206,11 @@ export function ClaudeBillingCardView({
         ) : null}
         {status ? (
           <>
-            <p className="text-muted-foreground text-sm">{copy.description}</p>
-            <p className="text-muted-foreground text-sm">
-              You will go to Claude to approve. An owner, admin, or billing admin of your Claude
-              organization must approve.
-              {copy.manageNote} Claude requests pause if Anthropic refuses billing. Kilo does not
-              fall back to Kilo credits.
-            </p>
-            {(status.connectedAt || status.sharedWith.length > 0) && connected ? (
-              <p className="text-muted-foreground text-xs">
+            <p className="type-body text-muted-foreground">{copy.description}</p>
+            {connected && (status.connectedAt || status.sharedWith.length > 0) ? (
+              <p className="type-body text-muted-foreground">
                 {status.connectedAt
-                  ? `Linked ${new Date(status.connectedAt).toLocaleDateString()}.`
+                  ? `Linked on ${new Date(status.connectedAt).toLocaleDateString()}.`
                   : null}
                 {status.connectedAt && status.sharedWith.length > 0 ? ' ' : null}
                 {status.sharedWith.length > 0
@@ -208,14 +218,6 @@ export function ClaudeBillingCardView({
                   : null}
               </p>
             ) : null}
-            <a
-              className="text-sm underline underline-offset-4"
-              href={CONNECTED_PLATFORMS_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Set a spend limit or unlink in Claude Console
-            </a>
             {status.canManage && (onConnect || (onShare && selectedShareLink) || connected) ? (
               <div className="flex flex-wrap items-center gap-2">
                 {onConnect ? (
@@ -301,15 +303,27 @@ export function ClaudeBillingCardView({
                 ) : null}
               </div>
             ) : !status.canManage ? (
-              <p className="text-muted-foreground text-sm">
+              <p className="type-body text-muted-foreground">
                 {scope === 'shared_services'
                   ? 'Ask a Kilo organization owner or admin to manage Claude shared services.'
-                  : 'Join this Kilo organization as a member to link your own Claude organization here.'}
+                  : 'Only direct members of this organization can link their own Claude organization.'}
               </p>
             ) : null}
-            {connected && status.canManage ? (
-              <p className="text-muted-foreground text-xs">{copy.removeNote}</p>
-            ) : null}
+            <p className="type-body">
+              <ClaudeConsoleLink>Set a spend limit or unlink in Claude Console</ClaudeConsoleLink>
+            </p>
+            <details>
+              <summary className="type-body text-muted-foreground hover:text-foreground w-fit cursor-pointer">
+                How Linked billing with Claude Platform works
+              </summary>
+              <ul className="type-body text-muted-foreground mt-2 list-disc space-y-1 pl-5">
+                <li>{ELIGIBILITY_NOTE}</li>
+                <li>{APPROVAL_NOTE}</li>
+                {copy.coverageNote ? <li>{copy.coverageNote}</li> : null}
+                <li>{REFUSED_BILLING_NOTE}</li>
+                {connected && status.canManage ? <li>{copy.removeNote}</li> : null}
+              </ul>
+            </details>
           </>
         ) : error ? null : (
           <Skeleton className="h-24 w-full" />

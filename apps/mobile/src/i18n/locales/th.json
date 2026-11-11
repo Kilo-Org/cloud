@@ -2477,6 +2477,8 @@
       "toolList": "แสดงรายการ",
       "toolPatch": "ใช้แพตช์",
       "toolTask": "งาน",
+      "toolSendFile": "ส่งไฟล์แล้ว",
+      "toolSendFileAction": "ส่งไฟล์",
       "readTodos": "อ่านแผน",
       "updateTodos": "อัปเดตแผน",
       "linesBadge": "{{displayCount}} บรรทัด",

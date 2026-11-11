@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { verifyTurnstileJWT } from './verify-turnstile-jwt';
 import jwt from 'jsonwebtoken';
 import type { TurnstileJwtPayload } from '@/lib/user/next-auth-options';
@@ -7,7 +7,7 @@ import type { TurnstileJwtPayload } from '@/lib/user/next-auth-options';
 // Note: Next.js may show runtime warnings about calling cookies/headers outside request scope,
 // but these are expected in test environment and the mocks will work correctly.
 const mockCookiesGet = jest.fn();
-const mockHeadersGet = jest.fn();
+const mockHeadersGet = jest.fn((name: string) => mockRequestHeaders[name]);
 
 // Mock Next.js headers module - using any for test mocks is acceptable
 jest.mock('next/headers', () => {
@@ -35,32 +35,82 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: jest.fn(() => jest.fn()),
 }));
 
+let mockRequestHeaders: Record<string, string> = {};
+
 describe('verifyTurnstileJWT', () => {
   const testIP = '192.168.1.1';
   const testSecret = 'test-secret-key-for-testing-purposes-only';
+  const originalEnv = process.env;
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('should successfully verify valid JWT with matching IP', async () => {
+  function signedToken(ip: string) {
     const payload: TurnstileJwtPayload = {
       guid: '00000000-0000-0000-0000-000000000000' as const,
-      ip: testIP,
+      ip,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 3600,
     };
-    const token = jwt.sign(payload, testSecret, { algorithm: 'HS256' });
+    return jwt.sign(payload, testSecret, { algorithm: 'HS256' });
+  }
 
-    mockCookiesGet.mockReturnValue({ value: token });
-    mockHeadersGet.mockReturnValue(testIP);
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env = { ...originalEnv };
+    // The test env file labels itself as a Vercel environment; clear the labels
+    // so each case picks the platform branch it means to exercise.
+    delete process.env.VERCEL;
+    delete process.env.VERCEL_ENV;
+    mockRequestHeaders = {};
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('should successfully verify valid JWT with matching IP', async () => {
+    mockCookiesGet.mockReturnValue({ value: signedToken(testIP) });
+    mockRequestHeaders = { 'x-forwarded-for': testIP };
 
     const result = await verifyTurnstileJWT('test-context');
 
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.token.ip).toBe(testIP);
-      expect(result.token.guid).toBe(payload.guid);
+      expect(result.token.guid).toBe('00000000-0000-0000-0000-000000000000');
+    }
+  });
+
+  it('should accept a forwarded chain whose client hop is the recorded address', async () => {
+    mockCookiesGet.mockReturnValue({ value: signedToken(testIP) });
+    mockRequestHeaders = { 'x-forwarded-for': `${testIP}, 10.0.0.1` };
+
+    const result = await verifyTurnstileJWT('test-context');
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should read the platform address when Vercel labels the request', async () => {
+    process.env.VERCEL = '1';
+    mockCookiesGet.mockReturnValue({ value: signedToken(testIP) });
+    mockRequestHeaders = {
+      'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+      'x-vercel-forwarded-for': `${testIP}, 10.0.0.2`,
+    };
+
+    const result = await verifyTurnstileJWT('test-context');
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should return error when the client address cannot be resolved', async () => {
+    mockCookiesGet.mockReturnValue({ value: signedToken(testIP) });
+
+    const result = await verifyTurnstileJWT('test-context');
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.response.status).toBe(401);
+      const data = await result.response.json();
+      expect(data.error).toBe('Security verification failed');
     }
   });
 
@@ -93,16 +143,8 @@ describe('verifyTurnstileJWT', () => {
   });
 
   it('should return error when IP addresses do not match', async () => {
-    const payload: TurnstileJwtPayload = {
-      guid: '00000000-0000-0000-0000-000000000000' as const,
-      ip: testIP,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 3600,
-    };
-    const token = jwt.sign(payload, testSecret, { algorithm: 'HS256' });
-
-    mockCookiesGet.mockReturnValue({ value: token });
-    mockHeadersGet.mockReturnValue('10.0.0.1'); // Different IP
+    mockCookiesGet.mockReturnValue({ value: signedToken(testIP) });
+    mockRequestHeaders = { 'x-forwarded-for': '10.0.0.1' };
 
     const result = await verifyTurnstileJWT('test-context');
 

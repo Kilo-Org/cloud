@@ -2483,6 +2483,8 @@
       "toolList": "فهرست کردن",
       "toolPatch": "اعمال وصله",
       "toolTask": "وظیفه",
+      "toolSendFile": "فایل ارسال شد",
+      "toolSendFileAction": "ارسال فایل",
       "readTodos": "خواندن طرح",
       "updateTodos": "به‌روزرسانی طرح",
       "linesBadge": "{{displayCount}} خط",

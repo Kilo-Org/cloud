@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 
 const cookieStore = new Map<string, { name: string; value: string }>();
@@ -90,6 +90,18 @@ async function setSessionCookie(userId: string, claims: Partial<JWT> = {}) {
     }),
   });
 }
+
+// These suites exercise a request the way a local run serves it: the client
+// address arrives in the forwarded header, and no platform label rewrites it.
+const originalEnv = process.env;
+beforeEach(() => {
+  process.env = { ...originalEnv };
+  delete process.env.VERCEL;
+  delete process.env.VERCEL_ENV;
+});
+afterEach(() => {
+  process.env = originalEnv;
+});
 
 describe('authOptions.callbacks.signIn auto-link wiring', () => {
   beforeEach(() => {

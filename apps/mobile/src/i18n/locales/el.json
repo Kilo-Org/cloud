@@ -2477,6 +2477,8 @@
       "toolList": "προβολή λίστας",
       "toolPatch": "εφαρμογή αλλαγών",
       "toolTask": "εργασία",
+      "toolSendFile": "Στάλθηκε αρχείο",
+      "toolSendFileAction": "αποστολή αρχείου",
       "readTodos": "Ανάγνωση πλάνου",
       "updateTodos": "Ενημέρωση πλάνου",
       "linesBadge": "{{displayCount}} γραμμές",

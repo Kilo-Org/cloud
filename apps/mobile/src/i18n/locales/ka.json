@@ -2477,6 +2477,8 @@
       "toolList": "ჩამოთვლა",
       "toolPatch": "ცვლილებების შეტანა",
       "toolTask": "დავალება",
+      "toolSendFile": "ფაილი გაიგზავნა",
+      "toolSendFileAction": "ფაილის გაგზავნა",
       "readTodos": "გეგმის წაკითხვა",
       "updateTodos": "გეგმის განახლება",
       "linesBadge": "{{displayCount}} სტრიქონი",

@@ -2483,6 +2483,8 @@
       "toolList": "bhala uhlu",
       "toolPatch": "lungisa",
       "toolTask": "umsebenzi",
+      "toolSendFile": "Kuthunyelwe ifayela",
+      "toolSendFileAction": "Thumela ifayela",
       "readTodos": "Funda uhlelo",
       "updateTodos": "Buyekeza uhlelo",
       "linesBadge": "imigqa engu-{{displayCount}}",

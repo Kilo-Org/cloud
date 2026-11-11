@@ -85,18 +85,56 @@ describe('ClaudeBillingCardView', () => {
     expect(buttons({ status: { ...status('connected'), canManage: false } })).toHaveLength(0);
   });
 
+  function render(props: ClaudeBillingCardViewProps): string {
+    return renderToStaticMarkup(React.createElement(ClaudeBillingCardView, props));
+  }
+
   it.each([
-    ['personal', 'Linked billing with Claude Platform'],
-    ['member', 'Linked billing with Claude Platform'],
-    ['shared_services', 'Claude billing for shared services'],
-  ] as const)('names the %s connection it shows', (scope, title) => {
-    const html = renderToStaticMarkup(
-      React.createElement(ClaudeBillingCardView, {
-        status: status('not_connected'),
-        scope,
-      })
-    );
-    expect(html).toContain(title);
+    ['personal', 'your Claude usage in Kilo'],
+    ['member', 'the Claude requests you make in this organization'],
+    ['shared_services', 'Link a Claude API organization for this organization'],
+  ] as const)('says what the %s connection bills', (scope, description) => {
+    const html = render({ status: status('not_connected'), scope });
+    expect(html).toContain('Claude (linked billing)');
+    expect(html).toContain(description);
+  });
+
+  it.each(['personal', 'member', 'shared_services'] as const)(
+    'keeps the %s billing terms behind one disclosure',
+    scope => {
+      const { document } = parseHTML(render({ status: status('not_connected'), scope }));
+      const details = document.querySelectorAll('details');
+      expect(details).toHaveLength(1);
+      expect(details[0].hasAttribute('open')).toBe(false);
+      expect(details[0].querySelector('summary')?.textContent).toBe(
+        'How Linked billing with Claude Platform works'
+      );
+      expect(details[0].textContent).toContain('Kilo does not fall back to Kilo credits.');
+      expect(details[0].textContent).toContain('owner, admin, or billing admin');
+      expect(details[0].textContent).toContain('Claude API organizations only');
+    }
+  );
+
+  it('shows a status badge only once a link exists', () => {
+    expect(render({ status: status('not_connected') })).not.toContain('Not linked');
+    expect(render({ status: status('connected') })).toContain('>Linked<');
+    expect(render({ status: status('billing_unavailable') })).toContain('Billing unavailable');
+  });
+
+  it.each(['not_connected', 'connected'] as const)(
+    'keeps the Claude Console link outside the disclosure when %s',
+    state => {
+      const { document } = parseHTML(render({ status: status(state) }));
+      const links = Array.from(document.querySelectorAll('a'));
+      expect(links).toHaveLength(1);
+      expect(links[0].textContent).toBe('Set a spend limit or unlink in Claude Console');
+      expect(links[0].closest('details')).toBeNull();
+    }
+  );
+
+  it('explains what removing an existing link does', () => {
+    const { document } = parseHTML(render({ status: status('connected') }));
+    expect(document.querySelector('details')?.textContent).toContain('Removing the link from Kilo');
   });
 
   it('offers an organization link on an unlinked personal card', () => {

@@ -17,10 +17,10 @@ export type ToolDisplay = {
   badge?: string;
   /**
    * Whether the shown label (`subtitle ?? title`) carries tool content worth
-   * translating. The fallback labels are either already-localized UI copy
-   * (`read`, `Read plan`) or raw tool ids (`websearch`); sending those to the
-   * gateway would translate text that is already in the app language, so the
-   * transcript row skips them.
+   * translating. The fallback labels are already-localized UI copy (`read`,
+   * `searching the web`, `Read plan`); sending those to the gateway would
+   * translate text that is already in the app language, so the transcript row
+   * skips them.
    */
   translatable: boolean;
   /**
@@ -65,6 +65,28 @@ const toolInputSchema = z.object({
   prompt: optionalString,
   suggest: optionalString,
 });
+
+/**
+ * A search tool row: the title names the tool from the catalog — the same key
+ * the permission card's subject uses — and the subtitle carries the query or
+ * URL. A call with neither repeats the label, as the other rows do.
+ */
+function searchToolDisplay(
+  fields: z.infer<typeof toolInputSchema>,
+  labelKey:
+    | 'agentChat.toolCard.toolWebSearch'
+    | 'agentChat.toolCard.toolCodeSearch'
+    | 'agentChat.toolCard.toolWebFetch'
+): ToolDisplay {
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty query must fall back to url; ?? would skip ''
+  const search = fields.query || fields.url;
+  const label = i18n.t(labelKey);
+  return {
+    title: label,
+    subtitle: search ? truncateText(search, 60) : label,
+    translatable: Boolean(search),
+  };
+}
 
 /**
  * Pure row projection for a tool part. The strings and badge rules are copied
@@ -240,29 +262,25 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
         translatable: files.length === 1,
       };
     }
-    case 'websearch':
-    case 'codesearch':
+    case 'websearch': {
+      return searchToolDisplay(fields, 'agentChat.toolCard.toolWebSearch');
+    }
+    case 'codesearch': {
+      return searchToolDisplay(fields, 'agentChat.toolCard.toolCodeSearch');
+    }
     case 'webfetch': {
-      const query = fields.query;
-      const url = fields.url;
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty query must fall back to url; ?? would skip ''
-      const search = query || url;
-      return {
-        title: part.tool,
-        subtitle: search ? truncateText(search, 60) : part.tool,
-        translatable: Boolean(search),
-      };
+      return searchToolDisplay(fields, 'agentChat.toolCard.toolWebFetch');
     }
     case 'todoread': {
       return {
-        title: part.tool,
+        title: i18n.t('agentChat.toolCard.toolTodo'),
         subtitle: i18n.t('agentChat.toolCard.readTodos'),
         translatable: false,
       };
     }
     case 'todowrite': {
       return {
-        title: part.tool,
+        title: i18n.t('agentChat.toolCard.toolTodo'),
         subtitle: i18n.t('agentChat.toolCard.updateTodos'),
         translatable: false,
       };

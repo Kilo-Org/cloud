@@ -444,13 +444,19 @@ export function generateWorkflowGatewayToken(
     expiresIn?: number;
   }
 ): string {
+  const expiresIn = Math.min(options.expiresIn ?? ONE_HOUR_IN_SECONDS, ONE_HOUR_IN_SECONDS);
   if (!isResourceTokenIssuanceEnabled('workflow-gateway')) {
-    return generateApiToken(user, { tokenSource: options.tokenSource });
+    // The audience-less payload keeps its compatibility shape. The one-hour
+    // bound and the organization claim apply to both payloads.
+    return generateApiToken(
+      user,
+      { organizationId: options.organizationId, tokenSource: options.tokenSource },
+      { expiresIn }
+    );
   }
   if (user.api_token_pepper !== null && !user.api_token_pepper) {
     throw new Error('Workflow gateway tokens require a current user pepper');
   }
-  const expiresIn = Math.min(options.expiresIn ?? ONE_HOUR_IN_SECONDS, ONE_HOUR_IN_SECONDS);
   if (expiresIn <= 0) {
     throw new Error('Workflow gateway token expiry must be positive');
   }

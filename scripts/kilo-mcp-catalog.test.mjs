@@ -227,6 +227,47 @@ function assertKiloCliSteps(job, gate, jobName) {
   return install;
 }
 
+/**
+ * A frozen-lockfile install of the web closure resolves ~2.5k packages. The
+ * shared store is content-addressed, so a run that arrives with a new lockfile
+ * only adds what it does not hold yet; setup-node's pnpm cache is keyed by the
+ * lockfile hash with no restore key, so that run restores no store at all and
+ * downloads the whole closure from the registry.
+ */
+function assertPnpmStoreSteps(job, gate, jobName) {
+  const pnpm = findStep(
+    job,
+    step => (step.uses ?? '').startsWith('pnpm/action-setup@'),
+    'sets up pnpm'
+  );
+  const mount = findStep(
+    job,
+    step => step.uses === './.github/actions/pnpm-store',
+    'mounts the shared pnpm store'
+  );
+  assert.equal(mount.if, gate, `${jobName}: the store mount is gated on catalog-relevant changes`);
+  const node = findStep(
+    job,
+    step => (step.uses ?? '').startsWith('actions/setup-node@'),
+    'sets up Node'
+  );
+  assert.equal(
+    node.with?.cache,
+    undefined,
+    `${jobName}: a lockfile-keyed setup-node cache restores nothing on a lockfile move; the store replaces it`
+  );
+  const mountIndex = job.steps.indexOf(mount);
+  assert.ok(
+    job.steps.indexOf(pnpm) < mountIndex && mountIndex < job.steps.indexOf(node),
+    `${jobName}: pnpm, then the store mount, then Node`
+  );
+  const installIndex = job.steps.findIndex(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.ok(
+    mountIndex < installIndex,
+    `${jobName}: the store must be mounted before the install it warms`
+  );
+}
+
 /** The `grep -Eq '…'` pattern a change-detection step runs. */
 function detectionPattern(step, jobName) {
   const match = /\| grep -Eq '([^']+)'/.exec(step.run ?? '');
@@ -417,6 +458,7 @@ function validate(workflow) {
     'PR dump must not use the personal CLI credential'
   );
   assertKiloCliSteps(pr, changeGate, 'PR job');
+  assertPnpmStoreSteps(pr, changeGate, 'PR job');
 
   // One install pass covers the wiring check and the dump. Splitting it back
   // into a root-only pass and a wider pass resolves and links the same
@@ -579,6 +621,7 @@ function validate(workflow) {
     'merge dump must not use the personal CLI credential'
   );
   assertKiloCliSteps(merge, mergeChangeGate, 'merge job');
+  assertPnpmStoreSteps(merge, mergeChangeGate, 'merge job');
   const mergeSkill = findStep(
     merge,
     step => step.run === skillCommand,
@@ -1021,6 +1064,44 @@ for (const [name, defect] of [
     workflow => {
       const step = workflow.jobs[prJobName].steps.find(item => item.run === installCommand);
       step.run = 'pnpm --filter kilocode-monorepo install --frozen-lockfile';
+    },
+  ],
+  [
+    'pnpm store mount removed from the PR job',
+    workflow => dropStep(workflow, prJobName, step => step.uses === './.github/actions/pnpm-store'),
+  ],
+  [
+    'pnpm store mount removed from the merge job',
+    workflow =>
+      dropStep(workflow, mergeJobName, step => step.uses === './.github/actions/pnpm-store'),
+  ],
+  [
+    'pnpm store mount ungated',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(
+        item => item.uses === './.github/actions/pnpm-store'
+      );
+      delete step.if;
+    },
+  ],
+  [
+    'pnpm store mounted after the install',
+    workflow => {
+      const steps = workflow.jobs[mergeJobName].steps;
+      const [mount] = steps.splice(
+        steps.findIndex(item => item.uses === './.github/actions/pnpm-store'),
+        1
+      );
+      steps.push(mount);
+    },
+  ],
+  [
+    'lockfile-keyed setup-node cache restored',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item =>
+        (item.uses ?? '').startsWith('actions/setup-node@')
+      );
+      step.with.cache = 'pnpm';
     },
   ],
 ]) {

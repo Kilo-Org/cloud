@@ -641,7 +641,6 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `EXPO_PUBLIC_SESSION_SYNC_URL` - Native remote preview relay URL for development bundles, inlined into the JS bundle. The preview requires `__DEV__` and an explicit isolated Worker URL, such as `http://localhost:8817`. Release bundles ignore this setting and expose neither the Profile entry nor the `/native-remote` screen. [PUBLIC]
 - `APPSFLYER_DEV_KEY` - AppsFlyer development key for mobile attribution. Bundled into the binary (not secret — it's a device-level SDK key). [PUBLIC]
 - `APPSFLYER_APP_ID` - AppsFlyer app ID for mobile attribution tracking. [PUBLIC]
-- `KILO_CHAT_URL` - Base URL for Kilo Chat in the mobile app. Bundled into the binary. [PUBLIC]
 - `EVENT_SERVICE_URL` - WebSocket URL for the event service from mobile. Bundled into the binary. [PUBLIC]
 - `NOTIFICATIONS_URL` - HTTP URL for the push-notifications backend from mobile. [PUBLIC]
 - `MOBILE_DEV_HOST` - LAN host override for mobile dev (replaces `localhost` on physical devices); read in `dev/local/mobile-env.ts`. [SERVER]

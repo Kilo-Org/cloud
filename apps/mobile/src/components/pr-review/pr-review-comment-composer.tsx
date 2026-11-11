@@ -359,7 +359,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
           />
           <View className="gap-1">
             <Text className="text-sm font-medium text-foreground">
-              {t('prReview.composer.comment')}
+              {t('prReview.composer.commentBody')}
             </Text>
             {isEdit || draft.settled ? (
               <CommentBodyField

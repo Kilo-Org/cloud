@@ -311,6 +311,8 @@ function CloudSidebarLayoutContent({
     null
   );
   const [worktreePendingDeletion, setWorktreePendingDeletion] = useState<string>();
+  // Keep the display name through the dialog's close animation.
+  const [worktreeDeletionName, setWorktreeDeletionName] = useState('');
   const [deletingWorktreeIds, setDeletingWorktreeIds] = useState<ReadonlySet<string>>(
     () => new Set()
   );
@@ -974,6 +976,11 @@ function CloudSidebarLayoutContent({
     [organizationId, queryClient, renameWorktree, trpc]
   );
 
+  const handleRequestWorktreeDelete = useCallback((worktreeId: string, name: string) => {
+    setWorktreePendingDeletion(worktreeId);
+    setWorktreeDeletionName(name);
+  }, []);
+
   const handleConfirmWorktreeDelete = useCallback(() => {
     const worktreeId = worktreePendingDeletion;
     if (
@@ -1115,7 +1122,7 @@ function CloudSidebarLayoutContent({
               workspaceRowsTruncated={workspaceRowsTruncated}
               isLoading={isLoadingSessions}
               onRenameWorktree={handleRenameWorktree}
-              onDeleteWorktree={setWorktreePendingDeletion}
+              onDeleteWorktree={handleRequestWorktreeDelete}
               deletingWorktreeIds={deletingWorktreeIdList}
               onCreateWorktreeChat={handleCreateWorktreeChat}
               isInSheet
@@ -1158,7 +1165,7 @@ function CloudSidebarLayoutContent({
             workspaceRowsTruncated={workspaceRowsTruncated}
             isLoading={isLoadingSessions}
             onRenameWorktree={handleRenameWorktree}
-            onDeleteWorktree={setWorktreePendingDeletion}
+            onDeleteWorktree={handleRequestWorktreeDelete}
             deletingWorktreeIds={deletingWorktreeIdList}
             onCreateWorktreeChat={handleCreateWorktreeChat}
             activeSessions={activeSessions}
@@ -1199,7 +1206,9 @@ function CloudSidebarLayoutContent({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete worktree?</AlertDialogTitle>
+            <AlertDialogTitle className="wrap-anywhere">
+              Delete worktree “{worktreeDeletionName}”?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               This permanently deletes every chat and the worktree’s files, stops its running work,
               and cleans up its sandbox resources. Other worktrees are not affected.

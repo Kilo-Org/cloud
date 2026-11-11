@@ -107,12 +107,18 @@ jobs:
         if: steps.catalog_changes.outputs.catalog == 'true'
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
+      # The shared store keeps this install warm when a pull request moves the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        uses: ./.github/actions/pnpm-store
+
       - name: Setup Node
         if: steps.catalog_changes.outputs.catalog == 'true'
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       # The dump shells out to `kilo run` to generate missing summaries.
       # A cold install downloads large platform packages, so it legitimately
@@ -471,12 +477,18 @@ jobs:
         if: steps.merge_changes.outputs.catalog == 'true'
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
+      # The shared store keeps this install warm when a main push moves the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        if: steps.merge_changes.outputs.catalog == 'true'
+        uses: ./.github/actions/pnpm-store
+
       - name: Setup Node
         if: steps.merge_changes.outputs.catalog == 'true'
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       # The dump shells out to `kilo run` to fill any straggler summaries. Same
       # version resolution and per-version cache as the PR job: the key and the

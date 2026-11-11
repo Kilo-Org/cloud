@@ -14,11 +14,9 @@ export type Sample<T> = Readonly<{ t: number; repeat: number; dump: T }>;
  * far more than a counter implies, so a long capture grew past the app's own heap and
  * the dev client stopped on an out-of-memory error while a matrix cell sampled a busy
  * screen. Both limits are enforced, oldest first, so a capture keeps the newest
- * layouts that fit the budget.
- *
- * The count is therefore an upper bound and nothing promises it: a screen with large
- * dumps keeps fewer than `MAX_SAMPLES` layouts, and truncation is reported whenever
- * either limit evicts.
+ * layouts that fit the budget. The count is an upper bound and nothing promises it:
+ * a screen with large dumps keeps fewer than `MAX_SAMPLES` layouts, and truncation
+ * is reported whenever either limit evicts.
  */
 const MAX_SAMPLES = 400;
 const MAX_RETAINED_CHARS = 4_000_000;

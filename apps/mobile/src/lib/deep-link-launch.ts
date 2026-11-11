@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- the launch capture, the pending slot and its durable mirror share one module so their precedence rules cannot drift */
 import * as Sentry from '@sentry/react-native';
-import * as z from 'zod';
 
 import {
   type IncomingResume,
@@ -8,12 +7,14 @@ import {
   SESSION_RESUME_ANCHOR_PARAM,
 } from '@kilocode/app-shared/universal-links';
 
+import { isRemovedMobileDeepLink } from './deep-link-policy';
+import { parsePendingDeepLinkRecord, type PendingDeepLinkRecord } from './deep-link-record';
 import { currentRouteHref } from './current-route-href';
 import { opensDestination, shellRouteHref } from './deep-link-destination';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 import { APP_SCHEME, isSystemSearchFamilyLink } from './system-search-families';
 
-type DeepLinkSource = 'universal-link' | 'notification' | 'system-search';
+type DeepLinkSource = PendingDeepLinkRecord['source'];
 
 type GetLinkingURL = () => string | null;
 
@@ -42,13 +43,6 @@ type SecureStoreLike = {
   deleteItemAsync: (key: string) => Promise<void>;
   getItemAsync: (key: string) => Promise<string | null>;
 };
-
-/**
- * Persisted shape of the pending slot, mirroring the in-memory slot. Derived
- * from `pendingDeepLinkRecordSchema` (declared with the parser below) so the
- * durable record and the shape read back can never drift.
- */
-type PendingDeepLinkRecord = z.infer<typeof pendingDeepLinkRecordSchema>;
 
 /** A persisted record older than this is discarded on restore. */
 const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
@@ -231,6 +225,9 @@ export function setPendingDeepLink(
   source: DeepLinkSource,
   options?: PendingDeepLinkOptions
 ): void {
+  if (isRemovedMobileDeepLink(href)) {
+    return;
+  }
   const sessionBound = source === 'system-search' || options?.sessionBound === true;
   if (sessionBound) {
     // A destination captured before the account is known. The native
@@ -407,7 +404,11 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
     return;
   }
 
-  if (record === null || Date.now() - record.storedAt > PENDING_DEEP_LINK_TTL_MS) {
+  if (
+    record === null ||
+    Date.now() - record.storedAt > PENDING_DEEP_LINK_TTL_MS ||
+    isRemovedMobileDeepLink(record.href)
+  ) {
     deletePersistedPendingDeepLink();
     return;
   }
@@ -427,7 +428,7 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
   }
 
   const { href, source, sessionBound, organizationId } = record;
-  setPendingDeepLink(href, source, { sessionBound, organizationId });
+  setPendingDeepLink(currentRouteHref(href), source, { sessionBound, organizationId });
 }
 
 async function readPersistedPendingDeepLink(): Promise<string | null> {
@@ -437,32 +438,6 @@ async function readPersistedPendingDeepLink(): Promise<string | null> {
     Sentry.captureException(error, {
       tags: { 'error.subsystem': 'deep_link', 'error.operation': 'read_pending_link' },
     });
-    return null;
-  }
-}
-
-const pendingDeepLinkRecordSchema = z.object({
-  href: z.string(),
-  source: z.enum(['universal-link', 'notification', 'system-search']),
-  storedAt: z.number(),
-  // Signed-in user id at persist time, or null when captured while signed out.
-  userId: z.string().nullable(),
-  // Absent in a record written before the session binding existed: such a
-  // record can only be an account-independent destination (a link or a
-  // notification), which is what the default restores as.
-  sessionBound: z.boolean().default(false),
-  // Absent in a record written before the organization rode with the pending
-  // slot: such a record restores as no organization, which leaves the
-  // selection unchanged on the tap.
-  organizationId: z.string().nullable().default(null),
-});
-
-function parsePendingDeepLinkRecord(raw: string): PendingDeepLinkRecord | null {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    const result = pendingDeepLinkRecordSchema.safeParse(parsed);
-    return result.success ? { ...result.data, href: currentRouteHref(result.data.href) } : null;
-  } catch {
     return null;
   }
 }
@@ -514,7 +489,7 @@ export function captureLaunchDeepLink(): void {
     return;
   }
   const url = readLaunchUrl();
-  if (!url) {
+  if (!url || isRemovedMobileDeepLink(url)) {
     return;
   }
   const resume = resolveIncomingResume(url);

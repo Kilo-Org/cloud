@@ -5,6 +5,7 @@ import {
   canManageOrganizationBilling,
   canManageOrganizationOwners,
   ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_PARENT_ACCESS_ROLES,
   ORGANIZATION_ROLES,
   ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES,
 } from './roles';
@@ -12,6 +13,12 @@ import {
 describe('ORGANIZATION_ROLES', () => {
   it('is exactly owner, admin, member, billing_manager', () => {
     expect(ORGANIZATION_ROLES).toEqual(['owner', 'admin', 'member', 'billing_manager']);
+  });
+});
+
+describe('ORGANIZATION_PARENT_ACCESS_ROLES', () => {
+  it('grants parent inheritance to owner, admin and billing_manager only', () => {
+    expect(ORGANIZATION_PARENT_ACCESS_ROLES).toEqual(['owner', 'admin', 'billing_manager']);
   });
 });
 

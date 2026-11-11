@@ -5,6 +5,7 @@ import { eq, and, lt, lte, gt, isNull, isNotNull, sql } from 'drizzle-orm';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { requestingClientOfRow, type RequestingClient } from './requesting-client';
 import {
   completePendingLinkByHash,
@@ -491,7 +492,7 @@ export async function consumeDeviceAuthByDeviceCode(
       throw new Error('User not found');
     }
 
-    if (user.blocked_reason) {
+    if (isBlockedAccount(user)) {
       await db
         .update(device_auth_requests)
         .set({ status: 'denied' })
@@ -606,7 +607,7 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
         throw new Error('User not found');
       }
 
-      if (user.blocked_reason) {
+      if (isBlockedAccount(user)) {
         await db
           .update(device_auth_requests)
           .set({ status: 'denied' })

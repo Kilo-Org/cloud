@@ -1,5 +1,6 @@
 import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
+import { runAfterResponse } from '@/lib/after-response';
 import { cleanupRemovedClaudeProfilesForUser } from '@/lib/claude-billing/delete';
 import {
   updateUserRoleInOrganization,
@@ -467,7 +468,9 @@ export const organizationsMembersRouter = createTRPCRouter({
         );
       }
       if (removed.length > 0) {
-        await cleanupRemovedClaudeProfilesForUser(memberId).catch(() => undefined);
+        await runAfterResponse(async () => {
+          await cleanupRemovedClaudeProfilesForUser(memberId).catch(() => undefined);
+        });
       }
 
       if (added.length > 0 || removed.length > 0) {

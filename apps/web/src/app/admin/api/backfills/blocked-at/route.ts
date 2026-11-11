@@ -1,82 +1,19 @@
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { kilocode_users } from '@kilocode/db';
-import { goneOrDeletingBlockedReasonSql } from '@kilocode/db/user-soft-delete';
-import { and, count, inArray, isNotNull, isNull, not, sql } from 'drizzle-orm';
-
-export const blockedAtBackfillCandidates = and(
-  isNotNull(kilocode_users.blocked_reason),
-  isNull(kilocode_users.blocked_at),
-  not(goneOrDeletingBlockedReasonSql(kilocode_users.blocked_reason))
-);
+import type { BackfillBatchResult } from '@/lib/backfills/batch';
+import { backfillBlockedAtBatch, countMissingBlockedAt } from '@/lib/backfills/blocked-at';
 
 export type BlockedAtCountsResponse = {
   missing: number;
 };
 
-export type BlockedAtBackfillResponse = {
-  processed: number;
-  remaining: boolean;
-};
+export type BlockedAtBackfillResponse = BackfillBatchResult;
 
 export async function GET(): Promise<NextResponse<BlockedAtCountsResponse | { error: string }>> {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  const [result] = await db
-    .select({ count: count() })
-    .from(kilocode_users)
-    .where(blockedAtBackfillCandidates);
-
-  return NextResponse.json({ missing: result?.count ?? 0 });
-}
-
-const BATCH_SIZE = 1000;
-const BATCHES_PER_REQUEST = 50;
-
-export async function backfillBlockedAtBatch(): Promise<BlockedAtBackfillResponse> {
-  let totalProcessed = 0;
-  let reachedEnd = false;
-
-  for (let i = 0; i < BATCHES_PER_REQUEST; i++) {
-    const rows = await db
-      .select({ id: kilocode_users.id })
-      .from(kilocode_users)
-      .where(blockedAtBackfillCandidates)
-      .limit(BATCH_SIZE);
-
-    if (rows.length === 0) {
-      reachedEnd = true;
-      break;
-    }
-
-    const updated = await db
-      .update(kilocode_users)
-      .set({
-        blocked_at: sql`${kilocode_users.updated_at}`,
-        updated_at: sql`${kilocode_users.updated_at}`,
-      })
-      .where(
-        and(
-          inArray(
-            kilocode_users.id,
-            rows.map(r => r.id)
-          ),
-          blockedAtBackfillCandidates
-        )
-      )
-      .returning({ id: kilocode_users.id });
-
-    totalProcessed += updated.length;
-
-    if (rows.length < BATCH_SIZE) {
-      reachedEnd = true;
-      break;
-    }
-  }
-
-  return { processed: totalProcessed, remaining: !reachedEnd };
+  return NextResponse.json({ missing: await countMissingBlockedAt() });
 }
 
 export async function POST(): Promise<NextResponse<BlockedAtBackfillResponse | { error: string }>> {

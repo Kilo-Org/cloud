@@ -2495,6 +2495,53 @@ describe('createPreparationManager', () => {
     expect(harness.gitCalls).toEqual([]);
   });
 
+  it.each(['org-session', undefined])(
+    'carries the route organization %s into the contained runtime config and environment',
+    async organizationId => {
+      const harness = createHarness();
+      const spec = routeSpec();
+      if (!spec.kilo) throw new Error('Missing test Kilo config');
+      if (organizationId) spec.kilo.organizationId = organizationId;
+      const credentials: ControlPlaneSessionCredentialsPayload = {
+        sessionId: spec.sessionId,
+        kilo: { token: 'kilo-alias' },
+        proxy: {
+          handle: 'proxy-handle',
+          targets: {
+            backendBaseUrl: 'https://facade.test',
+            providerBaseUrl: 'https://facade.test/api/openrouter',
+            sessionIngestBaseUrl: 'https://facade.test',
+          },
+        },
+      };
+      await harness.manager.prepare(spec, credentials);
+
+      const env = harness.ensureInputs[0]?.env;
+      if (organizationId) expect(env?.KILOCODE_ORGANIZATION_ID).toBe(organizationId);
+      else expect(env?.KILOCODE_ORGANIZATION_ID).toBeUndefined();
+      for (const key of ['KILO_CONFIG_CONTENT', 'OPENCODE_CONFIG_CONTENT']) {
+        const config = JSON.parse(env?.[key] ?? '{}');
+        expect(config.provider.kilo.options.kilocodeOrganizationId).toBe(organizationId);
+        expect(config.provider.kilo.options.baseURL).toBe(
+          credentials.proxy?.targets.providerBaseUrl
+        );
+      }
+      expect(env?.KILOCODE_TOKEN).toBe('proxy-handle');
+
+      await harness.manager.installCredentials({
+        ...credentials,
+        proxy: { ...credentials.proxy!, handle: 'renewed-proxy-handle' },
+      });
+      if (organizationId)
+        expect(harness.installCalls[0]?.env.KILOCODE_ORGANIZATION_ID).toBe(organizationId);
+      else expect(harness.installCalls[0]?.env.KILOCODE_ORGANIZATION_ID).toBeUndefined();
+      expect(
+        JSON.parse(harness.installCalls[0]?.env.KILO_CONFIG_CONTENT ?? '{}').provider.kilo.options
+          .kilocodeOrganizationId
+      ).toBe(organizationId);
+    }
+  );
+
   it('prefers the runtime-proxy handle and facade targets over the spec alias', async () => {
     const harness = createHarness();
     const spec = routeSpec();

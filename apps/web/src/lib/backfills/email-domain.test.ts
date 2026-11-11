@@ -4,7 +4,7 @@ import { kilocode_users } from '@kilocode/db';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { softDeleteUser } from '@/lib/user';
-import { emailDomainBackfillCandidates } from './route';
+import { backfillEmailDomainBatch, emailDomainBackfillCandidates } from './email-domain';
 
 describe('emailDomainBackfillCandidates', () => {
   afterEach(async () => {
@@ -78,5 +78,44 @@ describe('emailDomainBackfillCandidates', () => {
       .where(emailDomainBackfillCandidates);
 
     expect(rows.map(r => r.id)).toContain(user.id);
+  });
+});
+
+describe('backfillEmailDomainBatch', () => {
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await db.delete(kilocode_users);
+  });
+
+  it('fills missing email domains', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'someone@mail.example.co.uk',
+      email_domain: null,
+    });
+
+    await expect(backfillEmailDomainBatch()).resolves.toEqual({ processed: 1, remaining: false });
+
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
+    expect(row.email_domain).toBe('example.co.uk');
+  });
+
+  it('does not write a domain onto a row soft-deleted after the select', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'someone@example.com',
+      email_domain: null,
+    });
+    const execute = db.execute.bind(db);
+    jest.spyOn(db, 'execute').mockImplementationOnce((async (
+      query: Parameters<typeof execute>[0]
+    ) => {
+      await softDeleteUser(user.id);
+      return execute(query);
+    }) as unknown as typeof db.execute);
+
+    await backfillEmailDomainBatch();
+
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
+    expect(row.email_domain).toBeNull();
+    expect(row.google_user_email).not.toBe('someone@example.com');
   });
 });

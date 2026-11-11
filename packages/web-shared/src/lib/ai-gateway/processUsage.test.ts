@@ -504,7 +504,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
           is_free: false,
         } as MicrodollarUsageContext,
         undefined
-      )
+      ).usagePromise
     ).resolves.toBeNull();
   });
 
@@ -2269,7 +2269,7 @@ describe('logMicrodollarUsage', () => {
           ? events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')
           : JSON.stringify(response);
 
-        const result = await countAndStoreUsage(
+        const accounting = countAndStoreUsage(
           new Response(body),
           {
             ...createBaseUsageContext(user),
@@ -2282,6 +2282,8 @@ describe('logMicrodollarUsage', () => {
           undefined,
           { ...OPENROUTER, type: 'direct-byok', inferenceProviderId: 'neuralwatt' }
         );
+        expect((await accounting.statsPromise)?.inference_provider).toBe('neuralwatt');
+        const result = await accounting.usagePromise;
 
         assert(result);
         const usageRecord = await db.query.microdollar_usage.findFirst({
@@ -2367,7 +2369,7 @@ describe('logMicrodollarUsage', () => {
           new Response(`data: ${JSON.stringify(errorEvent)}\n\n`),
           { ...createBaseUsageContext(user), api_kind: 'responses', provider, user_byok },
           undefined
-        );
+        ).usagePromise;
 
         const authError = new Error('Responses API error: Incorrect API key provided');
         const authErrorContext = expect.objectContaining({
@@ -2437,7 +2439,7 @@ describe('logMicrodollarUsage', () => {
         new Response(body),
         { ...createBaseUsageContext(user), requestStartedAt: 50 },
         undefined
-      );
+      ).usagePromise;
 
       assert(result);
       const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({

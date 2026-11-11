@@ -31,10 +31,10 @@ export const STARTER_ROW_HEIGHT = 112;
  * Composer chrome other than the input itself, kept out of the input's
  * remaining-space budget: the control-row padding (20), the toolbar (48), the
  * counter (16), the starter rows (112), and a reserve for the attachment strip
- * (40). The toolbar allowance is the tallest control row on either platform:
- * the voice toggle and the send control both render the 48dp target box, so a
- * row that grows to it is still inside the budget. Conservative so the input
- * stays clear of the keyboard at every Dynamic Type scale.
+ * (40). The toolbar allowance is the row's tallest control: the voice toggle
+ * renders the shared 48dp target box on either platform, so the row reaches
+ * 48dp even where the send control keeps its 44pt frame. Conservative so the
+ * input stays clear of the keyboard at every Dynamic Type scale.
  */
 export const COMPOSER_CHROME_HEIGHT = 124 + STARTER_ROW_HEIGHT;
 

@@ -1198,13 +1198,13 @@
       "triageReasoning": "Justification du triage",
       "watchInCloudAgent": "Suivre dans l'agent cloud",
       "whereFound": "Emplacements détectés ({{displayCount}})",
-      "whereFound_one": "Emplacements détectés ({{displayCount}})",
+      "whereFound_one": "Emplacement détecté ({{displayCount}})",
       "whereFound_many": "Emplacements détectés ({{displayCount}})",
       "whereFound_other": "Emplacements détectés ({{displayCount}})",
       "yes": "Oui",
       "action": {
         "analyzeCodebase": "Analyser la base de code",
-        "dismiss": "Ignorer",
+        "dismiss": "Exclure",
         "manualReview": "Examen manuel",
         "monitor": "Surveiller",
         "openPr": "Ouvrir une PR"
@@ -1399,7 +1399,7 @@
       "reasonNoBandwidth": "Manque de ressources disponibles",
       "reasonNotUsed": "Code vulnérable non utilisé",
       "reasonTolerableRisk": "Risque acceptable",
-      "title": "Ignorer le problème"
+      "title": "Exclure le problème"
     },
     "findingDetail": {
       "tabAnalysis": "Analyse",
@@ -1592,9 +1592,9 @@
       "notExploitableDescription": "Aucun chemin d'exécution ne permet d'accéder à la fonctionnalité vulnérable dans ce dépôt.",
       "unknown": "À vérifier",
       "unknownDescription": "L'analyse n'a pas pu confirmer si la fonctionnalité vulnérable est accessible.",
-      "safeToDismiss": "Peut être ignoré sans risque",
+      "safeToDismiss": "Peut être exclu sans risque",
       "safeToDismissDescription": "Le triage a établi que ce signalement peut être exclu sans risque et sans analyser le code.",
-      "manualReviewTitle": "Vérification manuelle requise",
+      "manualReviewTitle": "Examen manuel requis",
       "manualReviewDescription": "Le triage a identifié ce signalement comme nécessitant un examen manuel.",
       "analysisRequired": "Analyse requise",
       "analysisRequiredTitle": "Analyse du code requise",

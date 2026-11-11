@@ -208,6 +208,12 @@ function createInternalApiContext(options: {
         getBitbucketToken:
           options.getBitbucketToken ??
           vi.fn().mockResolvedValue({ success: true, token: 'managed-bitbucket-token' }),
+        getGitLabToken: vi.fn().mockResolvedValue({
+          success: true,
+          token: 'managed-gitlab-token',
+          instanceUrl: 'https://gitlab.com',
+          glabIsOAuth2: false,
+        }),
       } as unknown as TRPCContext['env']['GIT_TOKEN_SERVICE'],
       HYPERDRIVE: {
         connectionString: 'postgres://profile-test',

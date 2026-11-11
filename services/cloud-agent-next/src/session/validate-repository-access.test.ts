@@ -207,6 +207,127 @@ describe('Bitbucket session creation preflight', () => {
   });
 });
 
+describe('GitLab session creation preflight', () => {
+  const orgId = '123e4567-e89b-12d3-a456-426614174030';
+  const gitlabRepository = {
+    type: 'gitlab' as const,
+    url: 'https://gitlab.com/group/sub/project.git',
+  };
+
+  it('resolves the launch repository against the managed token for the creating origin', async () => {
+    const getGitLabToken = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'token',
+      instanceUrl: 'https://gitlab.com',
+      glabIsOAuth2: false,
+    });
+
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { getGitLabToken } } as never,
+        userId: 'user-1',
+        orgId,
+        createdOnPlatform: 'cloud-agent-web',
+        repository: gitlabRepository,
+      })
+    ).resolves.toBeUndefined();
+    expect(getGitLabToken).toHaveBeenCalledWith({
+      userId: 'user-1',
+      orgId,
+      repositoryUrl: gitlabRepository.url,
+      createdOnPlatform: 'cloud-agent-web',
+    });
+  });
+
+  it('keeps the code-review origin, which resolves a project-exact token', async () => {
+    const getGitLabToken = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'token',
+      instanceUrl: 'https://gitlab.com',
+      glabIsOAuth2: false,
+    });
+
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { getGitLabToken } } as never,
+        userId: 'user-1',
+        createdOnPlatform: 'code-review',
+        repository: gitlabRepository,
+      })
+    ).resolves.toBeUndefined();
+    expect(getGitLabToken).toHaveBeenCalledWith({
+      userId: 'user-1',
+      repositoryUrl: gitlabRepository.url,
+      createdOnPlatform: 'code-review',
+    });
+  });
+
+  it('rejects a launch whose project has no usable integration before allocation', async () => {
+    const getGitLabToken = vi.fn().mockResolvedValue({
+      success: false,
+      reason: 'no_matching_integration',
+    });
+
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { getGitLabToken } } as never,
+        userId: 'user-1',
+        createdOnPlatform: 'code-review',
+        repository: gitlabRepository,
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'GitLab repository authorization failed (no_matching_integration)',
+    });
+  });
+
+  it('reports a provider credential failure as service unavailable', async () => {
+    const getGitLabToken = vi.fn().mockResolvedValue({
+      success: false,
+      reason: 'token_refresh_failed',
+    });
+
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { getGitLabToken } } as never,
+        userId: 'user-1',
+        repository: gitlabRepository,
+      })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'GitLab repository authorization failed (token_refresh_failed)',
+    });
+  });
+
+  it('reports an unavailable token-service binding as service unavailable', async () => {
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: {} as never,
+        userId: 'user-1',
+        repository: gitlabRepository,
+      })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'GitLab repository authorization failed (service_not_configured)',
+    });
+  });
+
+  it('reports token-service RPC failures as service unavailable', async () => {
+    const getGitLabToken = vi.fn().mockRejectedValue(new Error('binding unavailable'));
+
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { getGitLabToken } } as never,
+        userId: 'user-1',
+        repository: gitlabRepository,
+      })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'GitLab repository authorization failed (rpc_error)',
+    });
+  });
+});
+
 describe('environment repository preflight', () => {
   const orgId = '123e4567-e89b-12d3-a456-426614174030';
   const github = (repoFullName: string) => ({
@@ -235,6 +356,10 @@ describe('environment repository preflight', () => {
     githubIntegrationId: integrationId,
   };
   const unpinnedLaunch = { type: 'github' as const, repo: 'acme/launch' };
+  const gitlabLaunch = {
+    type: 'gitlab' as const,
+    url: 'https://gitlab.com/group/sub/project.git',
+  };
   const services = () => ({
     authorizeCloudAgentGitHubRepo: vi.fn().mockResolvedValue({ success: true }),
     getGitLabToken: vi.fn().mockResolvedValue({
@@ -316,11 +441,7 @@ describe('environment repository preflight', () => {
   it('authorizes a GitHub member of a GitLab launch with the default access and no pin', async () => {
     const binding = services();
 
-    await check(
-      binding,
-      { repositories: [gitlab, github('acme/api')] },
-      { type: 'gitlab', url: 'https://gitlab.com/group/sub/project.git' }
-    );
+    await check(binding, { repositories: [gitlab, github('acme/api')] }, gitlabLaunch);
 
     expect(binding.authorizeCloudAgentGitHubRepo).toHaveBeenCalledWith({
       accessPurpose: 'workflow',
@@ -351,21 +472,21 @@ describe('environment repository preflight', () => {
     );
   });
 
-  it('authorizes a GitLab launch repository as a member, since no launch check covers it', async () => {
+  it('does not resolve a GitLab launch repository again as a member', async () => {
     const binding = services();
     binding.getGitLabToken.mockResolvedValue({ success: false, reason: 'no_token' });
 
     await expect(
-      check(
-        binding,
-        { repositories: [gitlab, github('acme/api')] },
-        {
-          type: 'gitlab',
-          url: 'https://gitlab.com/group/sub/project.git',
-        }
-      )
-    ).rejects.toMatchObject({
-      message: 'Repository group/sub/project: GitLab repository authorization failed (no_token)',
+      check(binding, { repositories: [gitlab, github('acme/api')] }, gitlabLaunch)
+    ).resolves.toBeUndefined();
+
+    expect(binding.getGitLabToken).not.toHaveBeenCalled();
+    expect(binding.authorizeCloudAgentGitHubRepo).toHaveBeenCalledTimes(1);
+    expect(binding.authorizeCloudAgentGitHubRepo).toHaveBeenCalledWith({
+      accessPurpose: 'workflow',
+      githubRepo: 'acme/api',
+      userId: 'user-1',
+      orgId,
     });
   });
 

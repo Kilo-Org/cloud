@@ -5,6 +5,7 @@ import {
 } from '@kilocode/worker-utils/github-authorization';
 import type {
   BitbucketTokenFailureReason,
+  GetGitLabTokenFailureReason,
   GitAuthorConfig,
   GitTokenService,
   ManagedGitHubFallbackReason,
@@ -398,9 +399,30 @@ export type ResolvedCloudAgentGitLabCapability = {
   glabIsOAuth2: boolean;
 };
 
+export type ManagedGitLabTokenFailureReason =
+  | GetGitLabTokenFailureReason
+  | 'service_not_configured'
+  | 'rpc_error';
+
 export type ResolveManagedGitLabTokenResult =
   | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
-  | { success: false; reason: string };
+  | { success: false; reason: ManagedGitLabTokenFailureReason };
+
+/**
+ * A failure the token service reports about its own state, not about the
+ * caller's access: the credential cannot be resolved until the service or the
+ * provider credential recovers.
+ */
+export function isServiceSideManagedGitLabTokenFailure(
+  reason: ManagedGitLabTokenFailureReason
+): boolean {
+  return (
+    reason === 'service_not_configured' ||
+    reason === 'rpc_error' ||
+    reason === 'database_not_configured' ||
+    reason === 'token_refresh_failed'
+  );
+}
 
 export type ManagedBitbucketTokenFailureReason =
   | BitbucketTokenFailureReason

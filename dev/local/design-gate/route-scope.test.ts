@@ -93,3 +93,30 @@ test('keeps a node under no route screen, such as the tab bar', () => {
   assert.ok(scoped.nodes.some(entry => entry.testID === 'tab-bar'));
   assert.ok(!scoped.nodes.some(entry => entry.testID === 'home-body'));
 });
+
+test('drops the tab behind a pushed route whose owner names the whole path', () => {
+  // A pushed route's navigator owner carries the screen path while the probe's
+  // focused screen key carries the leaf, so the tab behind it must still go.
+  const pushed = dump(
+    [
+      node({ parent: 0, owners: HOME }),
+      node({ parent: 1, testID: 'home-body' }),
+      node({ parent: 0, owners: ['View', 'Route', 'Route(agent-chat/[session-id])'] }),
+      node({ parent: 3, testID: 'composer' }),
+    ],
+    { screen: '(app)/agent-chat/[session-id]' }
+  );
+  const scoped = scopeToFocusedRoute(pushed);
+  assert.deepEqual(
+    scoped.nodes.map(entry => entry.testID ?? entry.tag),
+    ['View', 'View', 'composer']
+  );
+});
+
+test('keeps both screens when neither owner names the focused leaf', () => {
+  const both = dump(
+    [node({ parent: 0, owners: HOME }), node({ parent: 0, owners: ['View', 'Route(other)'] })],
+    { screen: '(app)/agent-chat/[session-id]' }
+  );
+  assert.equal(scopeToFocusedRoute(both), both);
+});

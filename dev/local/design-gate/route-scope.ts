@@ -3,6 +3,20 @@ import type { ProbeDump, ProbeNode } from './tree';
 /** The navigator route a screen node belongs to, from its owner chain. */
 const ROUTE_OWNER = /^Route\((.+)\)$/;
 
+/**
+ * Whether a screen's route is the focused one.
+ *
+ * A navigator names a pushed route with the screen's whole path
+ * (`Route(agent-chat/[session-id])`) while the probe reports the focused screen as
+ * the grouped key (`(app)/agent-chat/[session-id]`), whose last segment is the leaf
+ * (`[session-id]`). Matching the leaf alone left every pushed route unmatched, so
+ * the tab behind it stayed in the dump and its churn made a static screen
+ * unmeasurable. A route therefore matches on the leaf segment or on that path's tail.
+ */
+function isFocusedRoute(route: string, focusedRoute: string): boolean {
+  return route === focusedRoute || route.endsWith(`/${focusedRoute}`);
+}
+
 function routeOwner(node: ProbeNode): string | null {
   for (const owner of node.owners ?? []) {
     const match = ROUTE_OWNER.exec(owner);
@@ -48,7 +62,7 @@ export function scopeToFocusedRoute(dump: ProbeDump): ProbeDump {
   let focusedScreens = 0;
   for (const [index, node] of dump.nodes.entries()) {
     const route = routeOwner(node);
-    if (route === focusedRoute) {
+    if (route !== null && isFocusedRoute(route, focusedRoute)) {
       focusedScreens += 1;
     } else if (route !== null) {
       backgroundScreens.add(index);

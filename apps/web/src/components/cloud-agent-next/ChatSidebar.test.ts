@@ -688,6 +688,15 @@ describe('ChatSidebar row rendering', () => {
           sortMode: 'manual' as const,
           worktreeIds: [] as string[],
         },
+        {
+          id: ids[1],
+          name: 'Needs you',
+          color: 'yellow' as const,
+          kind: 'smart' as const,
+          smartPreset: 'needs_you' as const,
+          sortMode: 'activity' as const,
+          worktreeIds: [] as string[],
+        },
       ],
       isLoading: false,
       isFirstLoadPending: false,
@@ -761,6 +770,24 @@ describe('ChatSidebar row rendering', () => {
     expect(workspaceFolders.deleteFolder).toHaveBeenCalledTimes(1);
     expect(workspaceFolders.deleteFolder).toHaveBeenCalledWith(workspaceFolders.folders[0].id);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('removes a smart folder from the sidebar without confirmation', async () => {
+    const { sessions, workspaceFolders } = folderDragFixture();
+    renderSidebar({ sessions, workspaceFolders, workspaceGroups: [] });
+    const smartFolder = workspaceFolders.folders[1];
+    const folder = dom.container.querySelector<HTMLElement>(`[data-folder-id="${smartFolder.id}"]`);
+    if (!folder) throw new Error('Smart folder missing');
+    expect(workspaceFolders.deleteFolder).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+
+    await act(async () => {
+      menuItem(folder, 'Remove from sidebar').click();
+    });
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(workspaceFolders.deleteFolder).toHaveBeenCalledTimes(1);
+    expect(workspaceFolders.deleteFolder).toHaveBeenCalledWith(smartFolder.id);
   });
 
   it.each([0, 1])('drags only ungrouped workspace row %i from its title into a folder', index => {

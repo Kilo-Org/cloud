@@ -336,6 +336,7 @@ describe('GET /admin/api/api-request-log/download', () => {
       {
         guardrail: 'input',
         scan: 'blocking',
+        part: 'conversation',
         request: inputRequest,
         response: 'Service unavailable',
         status_code: 503,
@@ -344,6 +345,7 @@ describe('GET /admin/api/api-request-log/download', () => {
       {
         guardrail: 'input',
         scan: 'blocking',
+        part: 'conversation',
         request: inputRequest,
         response: '{"summary":{"toxicity":0}}',
         status_code: 200,
@@ -352,6 +354,7 @@ describe('GET /admin/api/api-request-log/download', () => {
       {
         guardrail: 'output',
         scan: 'log_only',
+        part: 'response',
         request: outputRequest,
         response: null,
         status_code: null,
@@ -360,6 +363,7 @@ describe('GET /admin/api/api-request-log/download', () => {
       {
         guardrail: 'output',
         scan: 'log_only',
+        part: 'response',
         request: outputRequest,
         response: '{"summary":{"toxicity":0}}',
         status_code: 200,

@@ -18,7 +18,8 @@ type Text = string | null | undefined;
  */
 type Piece = { header: string; texts: Text[] | null };
 
-function piece(header: string, ...texts: Text[]): Piece {
+/** Takes an array, not rest parameters: a tool result can have more lines than a call takes. */
+function piece(header: string, texts: Text[]): Piece {
   return { header, texts };
 }
 
@@ -57,7 +58,7 @@ type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string
  */
 function unrecognized(role: string | null, value: never): Piece[] {
   const type = jsonType(value);
-  return [piece(role ? `${role} ${type}` : type, ...jsonTexts(value))];
+  return [piece(role ? `${role} ${type}` : type, jsonTexts(value))];
 }
 
 function jsonType(value: JsonValue): string {
@@ -82,11 +83,11 @@ function jsonTexts(value: JsonValue | undefined): Text[] {
 }
 
 function toolCall(role: string, name: Text, input: Text): Piece {
-  return piece(name ? `${role} tool call: ${name}` : `${role} tool call`, input);
+  return piece(name ? `${role} tool call: ${name}` : `${role} tool call`, [input]);
 }
 
-function toolDefinition(name: Text, ...texts: Text[]): Piece {
-  return piece(name ? `tool definition: ${name}` : 'tool definition', ...texts);
+function toolDefinition(name: Text, texts: Text[]): Piece {
+  return piece(name ? `tool definition: ${name}` : 'tool definition', texts);
 }
 
 function namedFile(header: string, filename: Text): Piece {
@@ -100,9 +101,9 @@ type ChatContentPart =
 function chatPartPieces(role: string, part: ChatContentPart): Piece[] {
   switch (part.type) {
     case 'text':
-      return [piece(role, part.text)];
+      return [piece(role, [part.text])];
     case 'refusal':
-      return [piece(`${role} refusal`, part.refusal)];
+      return [piece(`${role} refusal`, [part.refusal])];
     case 'image_url':
       return [omitted(`${role} image`)];
     case 'input_audio':
@@ -118,7 +119,7 @@ function chatContentPieces(
   role: string,
   content: string | ChatContentPart[] | null | undefined
 ): Piece[] {
-  if (typeof content === 'string') return [piece(role, content)];
+  if (typeof content === 'string') return [piece(role, [content])];
   return content ? content.flatMap(part => chatPartPieces(role, part)) : [];
 }
 
@@ -142,7 +143,7 @@ function chatReasoning(message: MessageWithReasoning): Piece {
     message.reasoning_content,
     (message.reasoning_details ?? []).flatMap(reasoningDetailTexts).join(''),
   ];
-  return piece('assistant reasoning', ...new Set(texts));
+  return piece('assistant reasoning', [...new Set(texts)]);
 }
 
 function chatToolCallPiece(call: OpenAI.Chat.ChatCompletionMessageToolCall): Piece[] {
@@ -163,7 +164,7 @@ function chatMessagePieces(message: ChatMessage): Piece[] {
     case 'tool':
       return chatContentPieces('tool result', message.content);
     case 'function':
-      return [piece(`function result: ${message.name}`, message.content)];
+      return [piece(`function result: ${message.name}`, [message.content])];
     case 'system':
     case 'developer':
     case 'user':
@@ -172,7 +173,7 @@ function chatMessagePieces(message: ChatMessage): Piece[] {
       return [
         chatReasoning(message),
         ...chatContentPieces('assistant', message.content),
-        piece('assistant refusal', message.refusal),
+        piece('assistant refusal', [message.refusal]),
         ...(message.function_call
           ? [toolCall('assistant', message.function_call.name, message.function_call.arguments)]
           : []),
@@ -187,20 +188,18 @@ function chatToolDefinitionPieces(tool: OpenAI.Chat.ChatCompletionTool): Piece[]
   switch (tool.type) {
     case 'function':
       return [
-        toolDefinition(
-          tool.function.name,
+        toolDefinition(tool.function.name, [
           tool.function.description,
-          jsonText(tool.function.parameters)
-        ),
+          jsonText(tool.function.parameters),
+        ]),
       ];
     case 'custom': {
       const { format } = tool.custom;
       return [
-        toolDefinition(
-          tool.custom.name,
+        toolDefinition(tool.custom.name, [
           tool.custom.description,
-          format?.type === 'grammar' ? format.grammar.definition : undefined
-        ),
+          format?.type === 'grammar' ? format.grammar.definition : undefined,
+        ]),
       ];
     }
     default:
@@ -213,7 +212,7 @@ function chatResponseFormatPieces(
 ): Piece[] {
   if (format?.type !== 'json_schema') return [];
   const { name, description, schema } = format.json_schema;
-  return [piece('response format', name, description, jsonText(schema))];
+  return [piece('response format', [name, description, jsonText(schema)])];
 }
 
 function isInstructionRole(role: unknown): boolean {
@@ -235,7 +234,7 @@ function chatCompletionsParts(body: OpenRouterChatCompletionRequest): ScanPieces
       ...body.messages.slice(0, instructions).map(chatMessagePieces),
       ...(body.tools ?? []).map(chatToolDefinitionPieces),
       ...(body.functions ?? []).map(fn => [
-        toolDefinition(fn.name, fn.description, jsonText(fn.parameters)),
+        toolDefinition(fn.name, [fn.description, jsonText(fn.parameters)]),
       ]),
       chatResponseFormatPieces(body.response_format),
     ],
@@ -257,22 +256,23 @@ function anthropicDocumentPieces(
   const texts: Text[] = [document.title, document.context];
   switch (source.type) {
     case 'text':
-      return [piece(header, ...texts, source.data)];
+      return [piece(header, [...texts, source.data])];
     case 'content':
       return [
-        piece(
-          header,
+        piece(header, [
           ...texts,
           ...(typeof source.content === 'string'
             ? [source.content]
-            : source.content.map(part => (part.type === 'text' ? part.text : undefined)))
-        ),
+            : source.content.map(part => (part.type === 'text' ? part.text : undefined))),
+        ]),
         ...(typeof source.content === 'string'
           ? []
-          : source.content.flatMap(part => (part.type === 'image' ? [omitted(`${header} image`)] : []))),
+          : source.content.flatMap(part =>
+              part.type === 'image' ? [omitted(`${header} image`)] : []
+            )),
       ];
     default:
-      return [piece(header, ...texts), omitted(header)];
+      return [piece(header, texts), omitted(header)];
   }
 }
 
@@ -280,18 +280,18 @@ function anthropicSearchResultPiece(
   header: string,
   result: Anthropic.Beta.BetaSearchResultBlockParam
 ): Piece {
-  return piece(header, result.title, ...anthropicTextBlocksTexts(result.content));
+  return piece(header, [result.title, ...anthropicTextBlocksTexts(result.content)]);
 }
 
 type AnthropicToolResultContent = NonNullable<Anthropic.Beta.BetaToolResultBlockParam['content']>;
 
 function anthropicToolResultPieces(content: AnthropicToolResultContent | undefined): Piece[] {
   const header = 'tool result';
-  if (typeof content === 'string') return [piece(header, content)];
+  if (typeof content === 'string') return [piece(header, [content])];
   return (content ?? []).flatMap(part => {
     switch (part.type) {
       case 'text':
-        return [piece(header, part.text)];
+        return [piece(header, [part.text])];
       case 'document':
         return anthropicDocumentPieces(`${header} document`, part);
       case 'search_result':
@@ -315,9 +315,9 @@ function anthropicCodeExecutionPieces(
   switch (result.type) {
     case 'code_execution_result':
     case 'bash_code_execution_result':
-      return [piece(header, result.stdout, result.stderr)];
+      return [piece(header, [result.stdout, result.stderr])];
     case 'encrypted_code_execution_result':
-      return [piece(header, result.stderr)];
+      return [piece(header, [result.stderr])];
     case 'code_execution_tool_result_error':
     case 'bash_code_execution_tool_result_error':
       return [];
@@ -332,11 +332,11 @@ function anthropicTextEditorPieces(
   const header = 'text editor result';
   switch (result.type) {
     case 'text_editor_code_execution_view_result':
-      return [piece(header, result.content)];
+      return [piece(header, [result.content])];
     case 'text_editor_code_execution_str_replace_result':
-      return [piece(header, ...(result.lines ?? []))];
+      return [piece(header, result.lines ?? [])];
     case 'text_editor_code_execution_tool_result_error':
-      return [piece(header, result.error_message)];
+      return [piece(header, [result.error_message])];
     case 'text_editor_code_execution_create_result':
       return [];
     default:
@@ -347,9 +347,9 @@ function anthropicTextEditorPieces(
 function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
   switch (block.type) {
     case 'text':
-      return [piece(role, block.text)];
+      return [piece(role, [block.text])];
     case 'thinking':
-      return [piece(`${role} reasoning`, block.thinking)];
+      return [piece(`${role} reasoning`, [block.thinking])];
     case 'tool_use':
     case 'server_tool_use':
     case 'mcp_tool_use':
@@ -357,9 +357,9 @@ function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
     case 'document':
       return anthropicDocumentPieces(`${role} document`, block);
     case 'compaction':
-      return [piece('compaction summary', block.content)];
+      return [piece('compaction summary', [block.content])];
     case 'mid_conv_system':
-      return [piece('system', ...anthropicTextBlocksTexts(block.content))];
+      return [piece('system', anthropicTextBlocksTexts(block.content))];
     case 'tool_result':
     case 'mcp_tool_result':
       return anthropicToolResultPieces(block.content);
@@ -367,7 +367,12 @@ function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
       return [anthropicSearchResultPiece(`${role} search result`, block)];
     case 'web_search_tool_result':
       return Array.isArray(block.content)
-        ? [piece('web search result', ...block.content.map(result => result.title))]
+        ? [
+            piece(
+              'web search result',
+              block.content.map(result => result.title)
+            ),
+          ]
         : [];
     case 'web_fetch_tool_result':
       return block.content.type === 'web_fetch_result'
@@ -380,11 +385,11 @@ function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
       return anthropicTextEditorPieces(block.content);
     case 'tool_search_tool_result':
       return block.content.type === 'tool_search_tool_result_error'
-        ? [piece('tool search result', block.content.error_message)]
+        ? [piece('tool search result', [block.content.error_message])]
         : [];
     case 'advisor_tool_result':
       return block.content.type === 'advisor_result'
-        ? [piece('advisor result', block.content.text)]
+        ? [piece('advisor result', [block.content.text])]
         : [];
     case 'image':
       return [omitted(`${role} image`)];
@@ -400,17 +405,16 @@ function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
 
 function anthropicMessagePieces(message: Anthropic.Beta.BetaMessageParam): Piece[] {
   return typeof message.content === 'string'
-    ? [piece(message.role, message.content)]
+    ? [piece(message.role, [message.content])]
     : message.content.flatMap(block => anthropicBlockPieces(message.role, block));
 }
 
 function anthropicToolDefinitionPiece(tool: Anthropic.Beta.BetaToolUnion): Piece {
-  return toolDefinition(
-    'name' in tool ? tool.name : undefined,
+  return toolDefinition('name' in tool ? tool.name : undefined, [
     'description' in tool ? tool.description : undefined,
     'input_schema' in tool ? jsonText(tool.input_schema) : undefined,
-    'input_examples' in tool ? jsonText(tool.input_examples) : undefined
-  );
+    'input_examples' in tool ? jsonText(tool.input_examples) : undefined,
+  ]);
 }
 
 type AnthropicTextSources = Pick<
@@ -423,14 +427,18 @@ function messagesParts(request: GatewayMessagesRequest): ScanPieces {
   const { system } = body;
   return {
     context: [
-      [piece('system', ...(typeof system === 'string' ? [system] : anthropicTextBlocksTexts(system ?? [])))],
-      ...(body.tools ?? []).map(tool => [anthropicToolDefinitionPiece(tool)]),
       [
         piece(
-          'response format',
-          jsonText(body.output_format?.schema),
-          jsonText(body.output_config?.format?.schema)
+          'system',
+          typeof system === 'string' ? [system] : anthropicTextBlocksTexts(system ?? [])
         ),
+      ],
+      ...(body.tools ?? []).map(tool => [anthropicToolDefinitionPiece(tool)]),
+      [
+        piece('response format', [
+          jsonText(body.output_format?.schema),
+          jsonText(body.output_config?.format?.schema),
+        ]),
       ],
     ],
     conversation: body.messages.map(anthropicMessagePieces),
@@ -456,24 +464,23 @@ function responsesToolDefinitionPieces(tool: ResponsesTool): Piece[] {
   switch (tool.type) {
     case 'function':
       return [
-        toolDefinition(
-          tool.name,
+        toolDefinition(tool.name, [
           tool.description,
           jsonText(tool.parameters),
-          jsonText(tool.output_schema)
-        ),
+          jsonText(tool.output_schema),
+        ]),
       ];
     case 'custom':
-      return [toolDefinition(tool.name, tool.description, ...responsesFormatTexts(tool.format))];
+      return [toolDefinition(tool.name, [tool.description, ...responsesFormatTexts(tool.format)])];
     case 'namespace':
       return [
-        toolDefinition(tool.name, tool.description),
+        toolDefinition(tool.name, [tool.description]),
         ...tool.tools.flatMap(responsesToolDefinitionPieces),
       ];
     case 'tool_search':
-      return [toolDefinition('tool_search', tool.description, jsonText(tool.parameters))];
+      return [toolDefinition('tool_search', [tool.description, jsonText(tool.parameters)])];
     case 'mcp':
-      return [toolDefinition(`MCP server ${tool.server_label}`, tool.server_description)];
+      return [toolDefinition(`MCP server ${tool.server_label}`, [tool.server_description])];
     case 'file_search':
     case 'computer':
     case 'computer_use_preview':
@@ -503,9 +510,9 @@ function responsesPartPieces(header: string, part: ResponsesMessagePart): Piece[
   switch (part.type) {
     case 'input_text':
     case 'output_text':
-      return [piece(header, part.text)];
+      return [piece(header, [part.text])];
     case 'refusal':
-      return [piece(`${header} refusal`, part.refusal)];
+      return [piece(`${header} refusal`, [part.refusal])];
     case 'input_image':
       return [omitted(`${header} image`)];
     case 'input_file':
@@ -517,7 +524,7 @@ function responsesPartPieces(header: string, part: ResponsesMessagePart): Piece[
 
 function responsesContentPieces(header: string, content: string | ResponsesMessagePart[]): Piece[] {
   return typeof content === 'string'
-    ? [piece(header, content)]
+    ? [piece(header, [content])]
     : content.flatMap(part => responsesPartPieces(header, part));
 }
 
@@ -534,26 +541,34 @@ function responsesItemPieces(item: OpenAI.Responses.ResponseInputItem): Piece[] 
     case 'message':
       return 'content' in item ? responsesContentPieces(item.role, item.content) : [];
     case 'reasoning':
-      return [piece('assistant reasoning', ...(item.content ?? []).map(content => content.text))];
+      return [
+        piece(
+          'assistant reasoning',
+          (item.content ?? []).map(content => content.text)
+        ),
+      ];
     case 'function_call':
       return [toolCall('assistant', item.name, item.arguments)];
     case 'custom_tool_call':
       return [toolCall('assistant', item.name, item.input)];
     case 'mcp_approval_request':
-      return [piece(`assistant MCP approval request: ${item.name}`, item.arguments)];
+      return [piece(`assistant MCP approval request: ${item.name}`, [item.arguments])];
     case 'mcp_approval_response':
-      return [piece('MCP approval response', item.reason)];
+      return [piece('MCP approval response', [item.reason])];
     case 'mcp_call':
       return [
         toolCall('assistant MCP', item.name, item.arguments),
-        piece('MCP tool result', item.output, item.error),
+        piece('MCP tool result', [item.output, item.error]),
       ];
     case 'tool_search_call':
       return [toolCall('assistant', 'tool_search', jsonText(item.arguments))];
     case 'file_search_call':
       return [
         toolCall('assistant', 'file_search', item.queries.join('\n')),
-        piece('file search result', ...(item.results ?? []).map(result => result.text)),
+        piece(
+          'file search result',
+          (item.results ?? []).map(result => result.text)
+        ),
       ];
     case 'web_search_call':
       return item.action.type === 'search'
@@ -567,18 +582,17 @@ function responsesItemPieces(item: OpenAI.Responses.ResponseInputItem): Piece[] 
         : [];
     case 'computer_call':
       return [
-        piece(
-          'assistant computer call',
+        piece('assistant computer call', [
           ...(item.action ? computerActionTexts(item.action) : []),
-          ...(item.actions ?? []).flatMap(computerActionTexts)
-        ),
+          ...(item.actions ?? []).flatMap(computerActionTexts),
+        ]),
       ];
     case 'code_interpreter_call':
       return [
         toolCall('assistant', 'code_interpreter', item.code),
         piece(
           'code interpreter result',
-          ...(item.outputs ?? []).map(output => (output.type === 'logs' ? output.logs : undefined))
+          (item.outputs ?? []).map(output => (output.type === 'logs' ? output.logs : undefined))
         ),
         ...(item.outputs ?? []).flatMap(output =>
           output.type === 'image' ? [omitted('code interpreter result image')] : []
@@ -599,7 +613,7 @@ function responsesItemPieces(item: OpenAI.Responses.ResponseInputItem): Piece[] 
         ),
       ];
     case 'program':
-      return [piece('assistant program', item.code)];
+      return [piece('assistant program', [item.code])];
     case 'additional_tools':
       return item.tools.flatMap(responsesToolDefinitionPieces);
     case 'function_call_output':
@@ -607,17 +621,22 @@ function responsesItemPieces(item: OpenAI.Responses.ResponseInputItem): Piece[] 
       return responsesContentPieces('tool result', item.output);
     case 'local_shell_call_output':
     case 'apply_patch_call_output':
-      return [piece('tool result', item.output)];
+      return [piece('tool result', [item.output])];
     case 'shell_call_output':
-      return [piece('tool result', ...item.output.flatMap(output => [output.stdout, output.stderr]))];
+      return [
+        piece(
+          'tool result',
+          item.output.flatMap(output => [output.stdout, output.stderr])
+        ),
+      ];
     case 'program_output':
-      return [piece('program result', item.result)];
+      return [piece('program result', [item.result])];
     case 'mcp_list_tools':
       return [
         ...item.tools.map(tool =>
-          toolDefinition(tool.name, tool.description, jsonText(tool.input_schema))
+          toolDefinition(tool.name, [tool.description, jsonText(tool.input_schema)])
         ),
-        piece('MCP tool list error', item.error),
+        piece('MCP tool list error', [item.error]),
       ];
     case 'tool_search_output':
       return item.tools.flatMap(responsesToolDefinitionPieces);
@@ -647,14 +666,14 @@ function responsesParts(body: GatewayResponsesRequest): ScanPieces {
   const instructions = leadingInstructionCount(items, isInstructionItem);
   return {
     context: [
-      [piece('instructions', body.instructions)],
+      [piece('instructions', [body.instructions])],
       ...items.slice(0, instructions).map(responsesItemPieces),
       ...(body.tools ?? []).map(responsesToolDefinitionPieces),
-      [piece('response format', ...responsesFormatTexts(body.text?.format))],
+      [piece('response format', responsesFormatTexts(body.text?.format))],
     ],
     conversation:
       typeof input === 'string'
-        ? [[piece('user', input)]]
+        ? [[piece('user', [input])]]
         : items.slice(instructions).map(responsesItemPieces),
   };
 }

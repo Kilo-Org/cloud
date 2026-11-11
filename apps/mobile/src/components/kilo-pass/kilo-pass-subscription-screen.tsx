@@ -1,16 +1,24 @@
+import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { CenteredState } from '@/components/centered-state';
 import { DetailScreenScrollView } from '@/components/detail-screen';
+import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Crown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openExternalUrl } from '@/lib/external-link';
 import { useTRPC } from '@/lib/trpc';
-import { KILO_PASS_TITLE, type PurchasePresentationKind } from '@kilocode/app-shared/commerce';
+import {
+  KILO_PASS_TITLE,
+  type PurchasePresentationKind,
+  type PurchaseStatusClass,
+} from '@kilocode/app-shared/commerce';
 
 function KiloPassLoadingScreen() {
   const { t } = useTranslation();
@@ -59,17 +67,51 @@ function KiloPassPresentationErrorScreen({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-/** Shows the server presentation and opens web management when available. */
-function KiloPassUnavailableScreen({
-  presentation,
-}: {
-  presentation: { kind: PurchasePresentationKind; webUrl: string | null };
-}) {
+type PresentationProps = {
+  presentation: {
+    kind: PurchasePresentationKind;
+    statusClass: PurchaseStatusClass;
+    webUrl: string | null;
+  };
+};
+
+/**
+ * Shows the server presentation: web management opens the web console, and the
+ * non-retryable unavailable kind is a finished state with its own way out.
+ */
+function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
   const { t } = useTranslation();
-  const isWebManagement = presentation.kind === 'web_management';
-  const description = isWebManagement
-    ? t('kiloPass.managedOnWeb')
-    : t('kiloPass.purchaseUnavailable');
+  const router = useRouter();
+
+  if (presentation.kind === 'unavailable') {
+    // The ended sentence only where the server says the pass ended, so the copy
+    // never claims a lapse for an account that never had one.
+    const ended =
+      presentation.statusClass === 'terminal' ? t('kiloPass.purchaseUnavailableEnded') : null;
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={t('kiloPass.title')} modal />
+        <EmptyState
+          icon={Crown}
+          title={t('kiloPass.purchaseUnavailableTitle')}
+          description={ended ?? t('kiloPass.purchaseUnavailable')}
+          action={
+            <Button
+              accessibilityLabel={t('credits.title')}
+              className={STATE_ACTION_CLASS}
+              onPress={() => {
+                // Replacing the dead-end modal keeps one sheet on screen.
+                router.replace('/(app)/credits' as Href);
+              }}
+              variant="outline"
+            >
+              <Text>{t('credits.title')}</Text>
+            </Button>
+          }
+        />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">
@@ -80,8 +122,10 @@ function KiloPassUnavailableScreen({
             {t('kiloPass.subscriptionHeaderDescription')}
           </Text>
           <Text className="text-center font-semibold text-foreground">{KILO_PASS_TITLE}</Text>
-          <Text className="text-center text-sm text-muted-foreground">{description}</Text>
-          {isWebManagement && presentation.webUrl ? (
+          <Text className="text-center text-sm text-muted-foreground">
+            {t('kiloPass.managedOnWeb')}
+          </Text>
+          {presentation.webUrl ? (
             // The lone centered CTA: 48dp keeps the whole pressable above the
             // Android minimum without hitSlop, since nothing sits beside it.
             <Button

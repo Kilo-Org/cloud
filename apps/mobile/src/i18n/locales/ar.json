@@ -2763,6 +2763,8 @@
     "retryHint": "يعيد محاولة التحقق من حالة Kilo Pass.",
     "cardAccessibility": "{{title}}؛ {{description}}؛ {{actionLabel}}",
     "purchaseUnavailable": "شراء Kilo Pass غير متاح حاليًا.",
+    "purchaseUnavailableTitle": "غير متاح حاليًا",
+    "purchaseUnavailableEnded": "انتهى اشتراك Kilo Pass الخاص بك. شراء Kilo Pass غير متاح حاليًا.",
     "kiloPassManagement": "إدارة Kilo Pass",
     "kiloPassSetup": "إعداد Kilo Pass",
     "subscriptionHeaderDescription": "اشتراك شهري يضيف أرصدة إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo.",

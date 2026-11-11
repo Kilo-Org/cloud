@@ -3173,6 +3173,8 @@
     "retryHint": "Mencuba semula untuk mendapatkan status Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Pembelian Kilo Pass tidak tersedia sekarang.",
+    "purchaseUnavailableTitle": "Tidak tersedia sekarang",
+    "purchaseUnavailableEnded": "Kilo Pass anda telah tamat. Pembelian Kilo Pass tidak tersedia sekarang.",
     "kiloPassManagement": "Pengurusan Kilo Pass",
     "kiloPassSetup": "Persediaan Kilo Pass",
     "subscriptionHeaderDescription": "Langganan bulanan yang menambah kredit ke baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo.",

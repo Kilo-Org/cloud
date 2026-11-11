@@ -3341,6 +3341,8 @@
     "retryHint": "Jerġa' jipprova jgħabbi l-istat ta' Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Ix-xiri ta' Kilo Pass mhux disponibbli bħalissa.",
+    "purchaseUnavailableTitle": "Mhux disponibbli bħalissa",
+    "purchaseUnavailableEnded": "Il-Kilo Pass tiegħek intemm. Ix-xiri ta' Kilo Pass mhux disponibbli bħalissa.",
     "kiloPassManagement": "Ġestjoni ta' Kilo Pass",
     "kiloPassSetup": "Konfigurazzjoni ta' Kilo Pass",
     "subscriptionHeaderDescription": "Sottoskrizzjoni mensili li żżid krediti mal-bilanċ ta' Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo.",

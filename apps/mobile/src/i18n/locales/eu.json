@@ -3173,6 +3173,8 @@
     "retryHint": "Kilo Pass-en egoera berriro kargatzen saiatzen da.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Une honetan ezin da Kilo Pass erosi.",
+    "purchaseUnavailableTitle": "Une honetan ez dago eskuragarri",
+    "purchaseUnavailableEnded": "Zure Kilo Pass amaitu da. Une honetan ezin da Kilo Pass erosi.",
     "kiloPassManagement": "Kilo Pass-en kudeaketa",
     "kiloPassSetup": "Kilo Pass-en konfigurazioa",
     "subscriptionHeaderDescription": "Hileroko harpidetza bat, zure Kilo saldoari kredituak gehitzen dizkiona Kilo App-en AI kodetze-saioak exekutatzeko.",

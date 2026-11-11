@@ -3173,6 +3173,8 @@
     "retryHint": "Նորից բեռնում է Kilo Pass-ի կարգավիճակը։",
     "cardAccessibility": "{{title}}։ {{description}}։ {{actionLabel}}",
     "purchaseUnavailable": "Այս պահին հնարավոր չէ գնել Kilo Pass-ը։",
+    "purchaseUnavailableTitle": "Այս պահին հնարավոր չէ",
+    "purchaseUnavailableEnded": "Ձեր Kilo Pass-ը ավարտվել է։ Այս պահին հնարավոր չէ գնել Kilo Pass-ը։",
     "kiloPassManagement": "Kilo Pass-ի կառավարում",
     "kiloPassSetup": "Kilo Pass-ի կարգավորում",
     "subscriptionHeaderDescription": "Ամսական բաժանորդագրություն, որը կրեդիտներ է ավելացնում քո Kilo մնացորդին՝ Kilo App-ում AI ծրագրավորման նստաշրջաններ վարելու համար։",

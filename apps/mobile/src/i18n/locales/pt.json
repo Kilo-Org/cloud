@@ -3235,6 +3235,8 @@
     "retryHint": "Tenta obter novamente o estado do Kilo Pass.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "A compra do Kilo Pass não está disponível neste momento.",
+    "purchaseUnavailableTitle": "Não disponível neste momento",
+    "purchaseUnavailableEnded": "O seu Kilo Pass terminou. A compra do Kilo Pass não está disponível neste momento.",
     "kiloPassManagement": "Gestão do Kilo Pass",
     "kiloPassSetup": "Configuração do Kilo Pass",
     "subscriptionHeaderDescription": "Uma subscrição mensal que adiciona créditos ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo.",

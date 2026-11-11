@@ -3173,6 +3173,8 @@
     "retryHint": "Kilo Pass ની સ્થિતિ ફરી મેળવવાનો પ્રયાસ કરે છે.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "હમણાં Kilo Pass ખરીદી શકાતો નથી.",
+    "purchaseUnavailableTitle": "હમણાં ઉપલબ્ધ નથી",
+    "purchaseUnavailableEnded": "તમારો Kilo Pass સમાપ્ત થઈ ગયો છે. હમણાં Kilo Pass ખરીદી શકાતો નથી.",
     "kiloPassManagement": "Kilo Pass નું સંચાલન",
     "kiloPassSetup": "Kilo Pass નું સેટઅપ",
     "subscriptionHeaderDescription": "આ માસિક સબસ્ક્રિપ્શન તમારા Kilo બેલેન્સમાં ક્રેડિટ ઉમેરે છે, જેથી તમે Kilo App માં AI કોડિંગ સત્રો ચલાવી શકો.",

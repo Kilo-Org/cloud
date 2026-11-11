@@ -6,23 +6,28 @@ import '@/i18n';
 import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
 
 const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' as string }));
+const mockRouter = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
 const mocks = vi.hoisted(() => ({
   presentation: {
     isPending: false,
     isError: false,
-    data: null as { kind: string; webUrl: string | null } | null,
+    data: null as { kind: string; statusClass: string; webUrl: string | null } | null,
     refetch: vi.fn(),
   },
 }));
 
+vi.mock('expo-router', () => ({ useRouter: () => mockRouter }));
 vi.mock('react-native', () => ({ Platform: mockedPlatform, View: 'View' }));
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => mocks.presentation }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icons', () => ({ Crown: 'Crown' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'min-h-[48px]' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ kiloPass: { getPurchasePresentation: { queryOptions: () => ({}) } } }),
@@ -58,6 +63,13 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string {
   return texts.join(' ');
 }
 
+function nodesOfType(
+  renderer: TestRenderer.ReactTestRenderer,
+  type: string
+): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(node => String(node.type) === type);
+}
+
 describe('KiloPassSubscriptionScreen', () => {
   beforeEach(() => {
     mockedPlatform.OS = 'ios';
@@ -65,19 +77,76 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.presentation.isError = false;
     mocks.presentation.data = null;
     mocks.presentation.refetch.mockClear();
+    mockRouter.replace.mockClear();
+    mockRouter.push.mockClear();
   });
 
-  it.each([
-    ['web_management', 'This Kilo Pass is managed on web'],
-    ['unavailable', 'Kilo Pass purchase is not available right now.'],
-  ] as const)('centers %s outside the purchase scroller', async (kind, description) => {
-    mocks.presentation.data = { kind, webUrl: null };
+  it('unavailable: renders the shared empty state with a title, the explanation, and one way out', async () => {
+    mocks.presentation.data = { kind: 'unavailable', statusClass: 'inactive', webUrl: null };
     const renderer = await renderScreen();
-    expect(allText(renderer)).toContain(description);
-    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'DetailScreenScrollView')
-    ).toHaveLength(0);
+    const emptyState = nodesOfType(renderer, 'EmptyState');
+    expect(emptyState).toHaveLength(1);
+    expect(emptyState[0]?.props).toMatchObject({
+      title: 'Not available right now',
+      description: 'Kilo Pass purchase is not available right now.',
+    });
+    // The state is a finished surface, not the raw centered text it used to be.
+    expect(nodesOfType(renderer, 'CenteredState')).toHaveLength(0);
+    expect(nodesOfType(renderer, 'DetailScreenScrollView')).toHaveLength(0);
+    const action = emptyState[0]?.props.action as {
+      props: {
+        accessibilityLabel: string;
+        className: string;
+        children: { type: unknown; props: { children: unknown } };
+        onPress: () => void;
+      };
+    };
+    expect(action.props.accessibilityLabel).toBe('Buy credits');
+    // Pressable is a View, so the label must be a Text element; a bare string
+    // child would paint nothing on either platform.
+    expect(String(action.props.children.type)).toBe('Text');
+    expect(action.props.children.props.children).toBe('Buy credits');
+    expect(action.props.className.split(' ')).toContain('min-h-[48px]');
+    act(() => {
+      action.props.onPress();
+    });
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/credits');
+    renderer.unmount();
+  });
+
+  it('unavailable: a lapsed pass says the pass ended', async () => {
+    mocks.presentation.data = { kind: 'unavailable', statusClass: 'terminal', webUrl: null };
+    const renderer = await renderScreen();
+    expect(nodesOfType(renderer, 'EmptyState')[0]?.props.description).toBe(
+      'Your Kilo Pass has ended. Kilo Pass purchase is not available right now.'
+    );
+    renderer.unmount();
+  });
+
+  it('web_management: keeps the web copy and Manage, and renders no empty state', async () => {
+    mockedPlatform.OS = 'android';
+    mocks.presentation.data = {
+      kind: 'web_management',
+      statusClass: 'healthy',
+      webUrl: 'https://example.com/subscriptions/kilo-pass',
+    };
+    const renderer = await renderScreen();
+    expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
+    expect(nodesOfType(renderer, 'CenteredState')).toHaveLength(1);
+    expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
+    expect(allText(renderer)).toContain('Manage');
+    const button = nodesOfType(renderer, 'Button').find(
+      node => node.props.accessibilityLabel === 'Manage'
+    );
+    if (!button) {
+      throw new Error('Manage action missing');
+    }
+    // The label must be a Text element, not a bare string: Pressable is a
+    // View, and a View draws no text, so a bare string leaves a blank button.
+    const label = button.find(node => String(node.type) === 'Text');
+    expect(label.children).toEqual(['Manage']);
+    // The lone centered CTA carries the 48dp Android target.
+    expect((button.props.className as string).split(' ')).toContain('min-h-[48px]');
     renderer.unmount();
   });
 
@@ -94,38 +163,11 @@ describe('KiloPassSubscriptionScreen', () => {
   });
 
   it('keeps a cached presentation after a refetch failure', async () => {
-    mocks.presentation.data = { kind: 'web_management', webUrl: null };
+    mocks.presentation.data = { kind: 'web_management', statusClass: 'healthy', webUrl: null };
     mocks.presentation.isError = true;
     const renderer = await renderScreen();
     expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
     expect(allText(renderer)).not.toContain("Couldn't load Kilo Pass.");
-    renderer.unmount();
-  });
-
-  it('non-retryable presentation: unavailable shows the unavailable screen with no purchase CTA', async () => {
-    mocks.presentation.data = { kind: 'unavailable', webUrl: null };
-    const renderer = await renderScreen();
-    expect(allText(renderer)).toContain('Kilo Pass purchase is not available right now.');
-    expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
-    renderer.unmount();
-  });
-
-  it('non-retryable presentation: web_management shows Manage and no purchase CTA', async () => {
-    mockedPlatform.OS = 'android';
-    mocks.presentation.data = {
-      kind: 'web_management',
-      webUrl: 'https://example.com/subscriptions/kilo-pass',
-    };
-    const renderer = await renderScreen();
-    expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
-    expect(allText(renderer)).toContain('Manage');
-    const button = renderer.root.find(node => String(node.type) === 'Button');
-    // The label must be a Text element, not a bare string: Pressable is a
-    // View, and a View draws no text, so a bare string leaves a blank button.
-    const label = button.find(node => String(node.type) === 'Text');
-    expect(label.children).toEqual(['Manage']);
-    // The lone centered CTA carries the 48dp Android target.
-    expect((button.props.className as string).split(' ')).toContain('min-h-[48px]');
     renderer.unmount();
   });
 });

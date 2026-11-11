@@ -3229,6 +3229,8 @@
     "retryHint": "Încearcă din nou să încarce starea Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Pass nu poate fi achiziționat în acest moment.",
+    "purchaseUnavailableTitle": "Indisponibil în acest moment",
+    "purchaseUnavailableEnded": "Kilo Pass-ul tău s-a încheiat. Kilo Pass nu poate fi achiziționat în acest moment.",
     "kiloPassManagement": "Gestionarea Kilo Pass",
     "kiloPassSetup": "Configurarea Kilo Pass",
     "subscriptionHeaderDescription": "Un abonament lunar care adaugă credite la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App.",

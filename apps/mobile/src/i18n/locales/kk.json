@@ -3173,6 +3173,8 @@
     "retryHint": "Kilo Pass күйін қайта тексереді.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Қазір Kilo Pass сатып алу мүмкін емес.",
+    "purchaseUnavailableTitle": "Қазір қолжетімсіз",
+    "purchaseUnavailableEnded": "Сіздің Kilo Pass-ыңыз аяқталды. Қазір Kilo Pass сатып алу мүмкін емес.",
     "kiloPassManagement": "Kilo Pass жазылымын басқару",
     "kiloPassSetup": "Kilo Pass баптау",
     "subscriptionHeaderDescription": "Kilo App-те AI бағдарламалау сессияларын жүргізу үшін Kilo балансына ай сайын кредит қосатын айлық жазылым.",

@@ -2121,7 +2121,7 @@ export default function CloudChatPage({
                     )}
                     {canOpenArtifacts && changesCloudSessionId && (
                       <WorkspaceArtifactsView
-                        key={fileScope}
+                        key={`workspace-artifacts:${fileScope}`}
                         userId={currentUserId}
                         cloudAgentSessionId={changesCloudSessionId}
                         organizationId={organizationId}

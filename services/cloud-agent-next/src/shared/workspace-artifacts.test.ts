@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import * as publicArtifacts from '@kilocode/worker-utils/cloud-agent-workspace-artifacts';
 import {
   validateWorkspaceArtifactPath,
   workspaceArtifactContentType,
   workspaceArtifactObjectKey,
   WORKSPACE_ARTIFACT_MAX_DEPTH,
+  WORKSPACE_ARTIFACT_MAX_FILES,
   WORKSPACE_ARTIFACT_MAX_PATH_BYTES,
+  WORKSPACE_ARTIFACT_RETENTION_MS,
 } from './workspace-artifacts.js';
 
 describe('validateWorkspaceArtifactPath', () => {
@@ -79,6 +82,14 @@ describe('validateWorkspaceArtifactPath', () => {
 });
 
 describe('workspace artifact helpers', () => {
+  it('keeps standalone wrapper limits aligned with the public API', () => {
+    expect(WORKSPACE_ARTIFACT_MAX_FILES).toBe(publicArtifacts.WORKSPACE_ARTIFACT_MAX_FILES);
+    expect(WORKSPACE_ARTIFACT_MAX_PATH_BYTES).toBe(
+      publicArtifacts.WORKSPACE_ARTIFACT_MAX_PATH_BYTES
+    );
+    expect(WORKSPACE_ARTIFACT_RETENTION_MS).toBe(publicArtifacts.WORKSPACE_ARTIFACT_RETENTION_MS);
+  });
+
   it('maps file extensions to content types and falls back to octet-stream', () => {
     expect(workspaceArtifactContentType('reports/summary.PDF')).toBe('application/pdf');
     expect(workspaceArtifactContentType('images/photo.png')).toBe('image/png');

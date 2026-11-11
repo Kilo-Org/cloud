@@ -625,11 +625,12 @@ async function keepAsked(sessionId: string): Promise<void> {
   if (held.asked === null || held.status !== 'idle') {
     return;
   }
-  /* What the question itself failed with. The state's key is not it: a tool-set
-     move that failed after an answer overwrites that key with its own failure,
-     while the question's record was written when its answer gave up. */
+  /* What the question itself failed with. The record names it when the write
+     that keeps it landed; a refused write leaves the state's key as the only
+     copy. The state's key can also be a later tool-set move's failure, which is
+     why the record wins whenever it names a cause. */
   const recorded = await askedIn(sessionId).catch(() => null);
-  const failureKey = recorded === null ? held.failureKey : recorded.failureKey;
+  const failureKey = recorded?.failureKey ?? held.failureKey;
   const outcome: Displaced['outcome'] = failureKey === null ? 'stopped' : 'failed';
   const askedFrom = held.askedFrom;
   if (askedFrom !== null) {

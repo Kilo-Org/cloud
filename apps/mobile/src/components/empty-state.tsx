@@ -26,6 +26,8 @@ type EmptyStateProps = {
    *  depend on a measured surface (the root runtime-error screen). */
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
+  /** Placement-memory identity; see `CenteredState`'s `stateKey`. */
+  stateKey?: string;
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
   /** Overrides the glyph color. Defaults to the muted token, which reads a step
@@ -52,12 +54,15 @@ type EmptyStateProps = {
 export function EmptyState({
   placement = 'center',
   refreshControl,
+  stateKey,
   compact,
   ...props
 }: Readonly<EmptyStateProps>) {
   const body = <EmptyStateBody {...props} placement={placement} compact={compact} />;
   return placement === 'center' ? (
-    <CenteredState refreshControl={refreshControl}>{body}</CenteredState>
+    <CenteredState refreshControl={refreshControl} stateKey={stateKey}>
+      {body}
+    </CenteredState>
   ) : (
     body
   );

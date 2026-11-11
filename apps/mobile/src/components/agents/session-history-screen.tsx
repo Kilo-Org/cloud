@@ -235,6 +235,7 @@ export function SessionHistoryScreen() {
       isRetrying={isRetrying}
       onClearQuery={handleClearQuery}
       onCreateSession={handleCreateSession}
+      stateKey="session-history"
     />
   );
 

@@ -18,6 +18,8 @@ type BodyEmptyProps = {
   createSessionAction?: ReactNode;
   onRetry: () => void;
   refreshControl?: ScrollViewProps['refreshControl'];
+  /** Placement-memory identity for the list this body belongs to. */
+  stateKey?: string;
 };
 
 export function BodyEmpty({
@@ -29,6 +31,7 @@ export function BodyEmpty({
   createSessionAction,
   onRetry,
   refreshControl,
+  stateKey,
 }: Readonly<BodyEmptyProps>) {
   const { t } = useTranslation();
   if (kind === 'filtered-empty') {
@@ -43,6 +46,7 @@ export function BodyEmpty({
         }
         action={clearQueryAction}
         refreshControl={refreshControl}
+        stateKey={stateKey}
       />
     );
   }
@@ -75,6 +79,7 @@ export function BodyEmpty({
       description={t('agents.sessionList.completedWillAppear')}
       action={createSessionAction}
       refreshControl={refreshControl}
+      stateKey={stateKey}
     />
   );
 }

@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
 
-import { CenteredState, _resetRememberedSurfaceForTests } from './centered-state';
+import { _resetRememberedSurfaceForTests, CenteredState } from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
 import { EmptyState } from './empty-state';
 import { InvalidRouteState } from './invalid-route-state';
@@ -307,18 +307,14 @@ describe('CenteredState measurements', () => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
     expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
+    const placed = mounted.scroll().contentContainerStyle;
     const stale = native.measurements.splice(0);
     native.surface.frame = { top: 300, bottom: 800 };
     mounted.rerender();
-    // The measured placement drops back to the centering fallback, but the
-    // state stays painted: a surface change never blanks what is on screen.
+    // The state keeps the placement it painted at: a surface that changed under
+    // it never blanks the body and never re-centres it on the way.
     expectPainted(mounted);
-    expect(mounted.scroll().contentContainerStyle).toEqual({
-      flexGrow: 1,
-      justifyContent: 'center',
-      paddingTop: 16,
-      paddingBottom: 16,
-    });
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
       for (const onMeasure of stale) {
         onMeasure(0, 80, 400, 340);
@@ -326,15 +322,15 @@ describe('CenteredState measurements', () => {
     });
     // A viewport measured against the old frame is not reused for the new one.
     expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
+    mounted.settle(380, 340);
+    expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual({
       flexGrow: 1,
-      justifyContent: 'center',
+      minHeight: 340,
       paddingTop: 16,
       paddingBottom: 16,
     });
-    mounted.settle(380, 340);
-    expectPainted(mounted);
-    expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
     mounted.unmount();
   });
 
@@ -490,6 +486,25 @@ describe('CenteredState first-frame paint', () => {
     });
     expect(scroll().contentContainerStyle).toEqual(placed);
     returned.unmount();
+  });
+
+  it('remembers one placement per state, not one per surface', async () => {
+    // A tab's empty body and a pushed screen's body share one surface and one
+    // default testID. The second state must not be placed with the first one's
+    // size: the history body would paint about 29 dp off its own centre.
+    const tabState = await mount();
+    tabState.settle();
+    tabState.unmount();
+
+    native.surface = {
+      ...native.surface,
+      frame: null,
+      bounds: null,
+    };
+    const otherState = await mount({ stateKey: 'other-screen' });
+    otherState.settle();
+    expect(otherState.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
+    otherState.unmount();
   });
 
   it('reserves the surface bottom band once while the layout measurement is pending', async () => {

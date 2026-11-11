@@ -142,14 +142,9 @@ function createFixtureClient() {
 }
 
 /**
- * Fills every cache entry the screen reads, then mounts it.
- *
- * The screen reserves skeleton rows and a balance placeholder while its reads
- * are pending, so a capture started on a screen that mounts with empty caches
- * measures that content arriving rather than the row layout. The entries are
- * written in a state initializer, which runs during the first render: the first
- * paint is already the state under test, and a later background read replaces
- * each entry with identical data and moves nothing.
+ * The key is the state: opening the other state's link repaints this route with
+ * a new parameter and React reuses the mounted tree, so the seed written for
+ * the first state would otherwise stay in the cache the second state reads.
  */
 function SeededScreen({ state }: { state: CreditPackPricesFixtureState }) {
   const trpc = useTRPC();
@@ -209,7 +204,7 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
     <QueryClientProvider client={queryClient}>
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         <CreditNativeIapContext.Provider value={store}>
-          <SeededScreen state={state} />
+          <SeededScreen key={state} state={state} />
         </CreditNativeIapContext.Provider>
       </TRPCProvider>
     </QueryClientProvider>

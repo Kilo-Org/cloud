@@ -450,6 +450,34 @@ describe('GET /admin/api/api-request-log/download', () => {
     }
   );
 
+  it('exports a combined log whose Enkrypt calls predate scan parts', async () => {
+    const key = '2026-08-01/before-parts/log.json';
+    const request = { request: true };
+    const enkrypt = [
+      {
+        guardrail: 'input',
+        scan: 'log_only',
+        request: { text: 'hello', detectors: {}, user_metadata: { organization_id: 'org' } },
+        response: null,
+        status_code: 200,
+        error: null,
+      },
+    ];
+    fakeR2.objects.set(
+      `${BUCKET}/${key}`,
+      JSON.stringify({ version: 1, request, response: '{"response":true}', enkrypt })
+    );
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+      .returning({ id: api_request_log.id });
+
+    const entries = await downloadEntries();
+
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+    expect(readEntry(entries, `_${row.id}_enkrypt.json`)).toBe(JSON.stringify(enkrypt, null, 2));
+  });
+
   it('omits the response file for a combined log with a null response', async () => {
     const key = '2026-08-01/no-response/log.json';
     fakeR2.objects.set(

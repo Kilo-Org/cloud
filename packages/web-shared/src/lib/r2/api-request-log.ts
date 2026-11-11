@@ -31,7 +31,13 @@ export const apiRequestLogBlobSchema = z.object({
   version: z.literal(1),
   request: z.record(z.string(), z.unknown()),
   response: z.string().nullable(),
-  enkrypt: z.array(enkryptRequestLogSchema).optional(),
+  enkrypt: z
+    .array(
+      // Blobs written before scans were split into parts have no `part`, but still hold the
+      // request and response bodies.
+      enkryptRequestLogSchema.extend({ part: enkryptRequestLogSchema.shape.part.optional() })
+    )
+    .optional(),
 });
 
 type ApiRequestLogStorage = { client: S3Client; bucket: string };

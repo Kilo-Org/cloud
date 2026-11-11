@@ -8,6 +8,7 @@ import type { InstallationToken } from '@/lib/integrations/core/types';
 import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 import { isGitHubOwnerName, isGitHubRepositoryName } from './repository-coordinates';
+import { lastLinkedPage } from './link-header';
 import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
 
 export type { GitHubAppType } from './app-selector';
@@ -639,7 +640,7 @@ async function scanPRIssueComments(
   };
 
   const firstResponse = await octokit.issues.listComments({ ...base, page: 1 });
-  const lastPage = lastIssueCommentPage(firstResponse.headers.link);
+  const lastPage = lastLinkedPage(firstResponse.headers.link);
   const comments: PRIssueComment[] = [...firstResponse.data];
 
   if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {
@@ -664,21 +665,6 @@ async function scanPRIssueComments(
   }
 
   return { comments, reachedScanLimit: true };
-}
-
-/**
- * Reads the `rel="last"` page number from a `Link` response header.
- */
-function lastIssueCommentPage(linkHeader: string | undefined): number {
-  if (!linkHeader) return 1;
-
-  for (const segment of linkHeader.split(',')) {
-    if (!segment.includes('rel="last"')) continue;
-    const page = segment.match(/[?&]page=(\d+)/);
-    if (page) return Number(page[1]);
-  }
-
-  return 1;
 }
 
 /**

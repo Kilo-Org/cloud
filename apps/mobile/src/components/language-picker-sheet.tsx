@@ -3,7 +3,13 @@ import { reloadAppAsync } from 'expo';
 import { useFocusEffect, usePreventRemove } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { I18nManager, type TextInput, View, type ViewStyle } from 'react-native';
+import {
+  I18nManager,
+  type TextInput,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -21,6 +27,8 @@ import { LANGUAGE_ENDONYMS, type SupportedLanguage } from '@/i18n/languages';
 import { resolveDeviceLanguage } from '@/i18n/resolve-language';
 import { isRtlLanguage } from '@/i18n/rtl';
 import { type LanguageReturnTarget } from '@/i18n/return-target';
+import { searchPickerHeaderInList } from '@/lib/form-sheet-detents';
+import { cn } from '@/lib/utils';
 import {
   getLanguagePreference,
   getResolvedLanguage,
@@ -55,6 +63,11 @@ export function LanguagePickerSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  // A sheet shorter than its header plus one row (a short window, and the
+  // keyboard takes more of it) cannot show a pinned search field and a result
+  // row at the same time. The search field then leads the scrolling list
+  // instead of pinning under the title row.
+  const searchInList = searchPickerHeaderInList({ windowHeight: useWindowDimensions().height });
   const [selected, setSelected] = useState<LanguagePreference>('device');
   const [applied, setApplied] = useState<LanguagePreference>('device');
   const [appliedLanguage, setAppliedLanguage] = useState<SupportedLanguage>('en');
@@ -70,6 +83,12 @@ export function LanguagePickerSheet({
   // `value`), so an emptied field is cleared through this ref rather than by
   // remounting the input.
   const searchInputRef = useRef<TextInput>(null);
+  // The typed term, kept out of the controlled path but readable when the field
+  // is mounted again. A window resize that crosses the short-window threshold
+  // moves the field between the pinned header and the list header, which mounts
+  // a new native input: without this the field would come back empty while the
+  // list stayed filtered by the query it no longer shows.
+  const searchTextRef = useRef('');
   const [closing, setClosing] = useState(false);
   const closeRequestedRef = useRef(false);
   const disablePrevention = usePreventRemove(
@@ -99,6 +118,7 @@ export function LanguagePickerSheet({
       // same behaviour — a reopened sheet starts empty — without recreating the
       // view.
       searchInputRef.current?.clear();
+      searchTextRef.current = '';
       setSelected(getLanguagePreference());
       setApplied(getLanguagePreference());
       setAppliedLanguage(getResolvedLanguage());
@@ -284,6 +304,51 @@ export function LanguagePickerSheet({
       </PickerSheet>
     );
   }
+  // Filled pill with a leading magnifier, the one search-field shape the
+  // repository and share pickers use. Pinned under the title row in a window
+  // tall enough for it plus a result row; the list header otherwise. The
+  // outlined box this replaced made the same control look like two different
+  // controls across pickers. The field itself is the shared single-line
+  // `Input`: it owns the height floor, the one line box for the placeholder
+  // and the value, and the RTL content alignment, so the pill owns only the
+  // chrome and this field keeps only its flex share and text size.
+  const searchField = (
+    <View
+      className={cn(
+        'mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2',
+        // As the list header the list's own content padding stands in for the
+        // pinned side margin, so the field keeps its width and aligns with the
+        // rows.
+        searchInList ? 'mx-0' : 'mx-4'
+      )}
+    >
+      <Search size={18} color={colors.mutedForeground} />
+      <Input
+        ref={searchInputRef}
+        accessibilityLabel={t('language.search')}
+        // The pill supplies the horizontal inset, so the field zeroes both
+        // physical sides of the shared box.
+        className="flex-1 pl-0 pr-0 text-base text-foreground"
+        placeholder={t('language.search')}
+        placeholderTextColor={colors.mutedForeground}
+        // Uncontrolled: iOS drops keystrokes when state drives `value`. The
+        // focus effect clears the live field through the ref, so a reopen
+        // starts empty.
+        onChangeText={text => {
+          searchTextRef.current = text;
+          setQuery(text);
+        }}
+        // A resize that moves this field between the pinned header and the list
+        // header mounts a new input; the draft then comes back with it.
+        defaultValue={searchTextRef.current}
+        autoCapitalize="none"
+        autoCorrect={false}
+        editable={!busy}
+        clearButtonMode="while-editing"
+        returnKeyType="search"
+      />
+    </View>
+  );
   return (
     <PickerSheet
       title={t('common.language')}
@@ -294,56 +359,35 @@ export function LanguagePickerSheet({
       doneLabel={t('common.done')}
       disabled={busy}
       scrollable={false}
-      headerContent={
-        // Filled pill with a leading magnifier, the one search-field shape the
-        // repository and share pickers use. The outlined box this replaced made
-        // the same control look like two different controls across pickers. The
-        // field itself is the shared single-line `Input`: it owns the height
-        // floor, the one line box for the placeholder and the value, and the RTL
-        // content alignment, so the pill owns only the chrome and this field
-        // keeps only its flex share and text size.
-        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-          <Search size={18} color={colors.mutedForeground} />
-          <Input
-            ref={searchInputRef}
-            accessibilityLabel={t('language.search')}
-            // The pill supplies the horizontal inset, so the field zeroes both
-            // physical sides of the shared box.
-            className="flex-1 pl-0 pr-0 text-base text-foreground"
-            placeholder={t('language.search')}
-            placeholderTextColor={colors.mutedForeground}
-            // Uncontrolled: iOS drops keystrokes when state drives `value`. The
-            // focus effect clears the live field through the ref, so a reopen
-            // starts empty.
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!busy}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-          />
-        </View>
-      }
+      headerInBody={searchInList}
+      headerContent={searchField}
     >
-      {items.length === 0 ? (
-        <EmptyState
-          icon={SearchX}
-          title={t('language.noMatches')}
-          description={t('agents.sessionList.tryDifferentSearch')}
-        />
-      ) : (
-        <FlashList
-          nestedScrollEnabled
-          style={listStyle}
-          contentContainerStyle={listContentContainerStyle}
-          data={items}
-          extraData={rowExtraData}
-          keyExtractor={item => item.key}
-          {...SEARCHABLE_PICKER_LIST_PROPS}
-          ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
-          renderItem={renderItem}
-        />
-      )}
+      {/*
+        One list for both states. The search field is uncontrolled (see its
+        `ref` above), so a branch that re-parents it between the list header and
+        an empty-state wrapper remounts the native input: a query that matched
+        nothing would close the keyboard and drop the typed text. The empty
+        state is the list's own empty component, which leaves the field in place.
+      */}
+      <FlashList
+        nestedScrollEnabled
+        style={listStyle}
+        contentContainerStyle={listContentContainerStyle}
+        data={items}
+        extraData={rowExtraData}
+        keyExtractor={item => item.key}
+        {...SEARCHABLE_PICKER_LIST_PROPS}
+        ListHeaderComponent={searchInList ? searchField : undefined}
+        ListEmptyComponent={
+          <EmptyState
+            icon={SearchX}
+            title={t('language.noMatches')}
+            description={t('agents.sessionList.tryDifferentSearch')}
+          />
+        }
+        ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
+        renderItem={renderItem}
+      />
     </PickerSheet>
   );
 }

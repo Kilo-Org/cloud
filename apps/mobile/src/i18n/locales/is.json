@@ -229,6 +229,21 @@
     "signInCodeField": "Innskráningarkóði",
     "or": "eða"
   },
+  "pendingLink": {
+    "description": "Reikningur notar nú þegar {{email}}. Skráðu þig inn með einni af aðferðum hans til að bæta {{provider}} við.",
+    "emailCode": "Senda mér innskráningarkóða í tölvupósti",
+    "continueInBrowser": "Halda áfram í vafra",
+    "startAgain": "Byrja aftur",
+    "expired": "Þessi beiðni um að bæta {{provider}} við er útrunnin.",
+    "noMethods": "Þessi reikningur hefur enga aðra innskráningaraðferð, svo ekki er hægt að bæta {{provider}} við.",
+    "linked": "{{provider}} var bætt við reikninginn þinn.",
+    "failedExpired": "{{provider}} var ekki bætt við því beiðnin rann út.",
+    "failedWrongAccount": "{{provider}} var ekki bætt við því þú skráðir þig inn á annan reikning.",
+    "failedAccountAlreadyLinked": "{{provider}} var ekki bætt við því það er nú þegar tengt öðrum reikningi.",
+    "failedProviderAlreadyLinked": "{{provider}} var ekki bætt við því reikningurinn þinn er nú þegar með aðra {{provider}}-innskráningu.",
+    "failedLinking": "Ekki tókst að bæta {{provider}} við reikninginn þinn.",
+    "notAdded": "Innskráning tókst. {{provider}} var ekki bætt við reikninginn þinn."
+  },
   "profile": {
     "codeReviewerSubtitle": "Sjálfvirk yfirferð PR",
     "securityAgentSubtitle": "Finna og laga veikleika",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Prófunarreikningur",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO fyrir fyrirtæki",
     "passkeysTitle": "Aðgangslyklar",
     "passkeysSubtitle": "Skrá sig inn án lykilorðs",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Skilaboðunum þínum og upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
       "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur.",
       "remoteHint": "Til að keyra á tölvunni þinni skaltu ræsa Kilo þar og láta það keyra áfram.",
-      "continueFrom": "Haldið er áfram með {{title}}.",
+      "continueFrom": "Haldið er áfram með „{{title}}“.",
       "importingSession": "Flytur lotuna inn",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
       "importFailed": "Ekki tókst að flytja inn þessa lotu.",
@@ -2460,6 +2477,8 @@
       "toolList": "birta lista",
       "toolPatch": "lagfæra",
       "toolTask": "verkefni",
+      "toolSendFile": "Skjal sent",
+      "toolSendFileAction": "senda skjal",
       "readTodos": "Lesa áætlun",
       "updateTodos": "Uppfæra áætlun",
       "linesBadge": "{{displayCount}} línur",
@@ -2560,7 +2579,21 @@
       "thought": "Hugsun",
       "showDetails": "Sýna upplýsingar",
       "pending": "Í bið…",
-      "running": "Í keyrslu…"
+      "running": "Í keyrslu…",
+      "field": {
+        "filePath": "Skráarslóð",
+        "path": "Slóð",
+        "offset": "Hliðrun",
+        "limit": "Hámark",
+        "pattern": "Mynstur",
+        "include": "Innifalið",
+        "patchText": "Breytingatexti",
+        "query": "Fyrirspurn",
+        "prompt": "Fyrirmæli",
+        "header": "Fyrirsögn",
+        "question": "Spurning",
+        "options": "Valkostir"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Ekki tókst að birta efnið."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"
     },
-    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð. Bættu við inneign og reyndu aftur."
+    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð."
   },
   "settingsTools": {
     "confirmTitle": "Staðfesta þessa breytingu?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Umboðsmaður minn",
       "promptPlaceholder": "Þú ert a...",
       "tools": "Verkfæri",
+      "wholeToolRule": "Þessi agent beitir einni reglu á öll verkfæri í einu: {{rule}}. Þessir rofar eru skrifvarðir.",
       "visibility": "Skyggni",
       "visibilityPrimary": "Aðal — sýnt í veljarann",
       "visibilitySubagent": "Subagent — aðeins hægt að hringja frá öðrum",
@@ -4244,5 +4278,8 @@
     "noEnabledContexts": "Engin samhengi eru virkjuð fyrir áætluð yfirlit",
     "sourceBlocker": "Lota þarfnast athygli",
     "sourceMetadata": "Vistuð lýsigögn lotu"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ekki tókst að opna þessa leitarniðurstöðu"
   }
 }

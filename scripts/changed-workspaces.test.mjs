@@ -99,10 +99,10 @@ function runMatrix(fixture, base, args = [], extraEnv = {}) {
 }
 
 // The document the changes job publishes, from this fixture's own detector.
-function detectorDocument(fixture, base) {
+function detectorDocument(fixture, base, args = []) {
   const result = spawnSync(
     'node',
-    [join(fixture.dir, 'scripts', 'affected-workspaces.mjs'), base],
+    [join(fixture.dir, 'scripts', 'affected-workspaces.mjs'), base, ...args],
     { cwd: fixture.dir, encoding: 'utf8' }
   );
   assert.equal(result.status, 0, result.stderr);
@@ -140,6 +140,21 @@ test('a change selects the changed workspace and its reader', t => {
   assert.deepEqual(rows(JSON.parse(result.stdout)), [
     'leaf packages/leaf',
     'reader packages/reader',
+  ]);
+});
+
+// A local check runs before the work is committed, so the incremental typecheck
+// asks for the working tree; the default answers for the committed head.
+test('worktree mode selects edits that are not committed yet', t => {
+  const fixture = createFixture();
+  t.after(() => rmSync(fixture.dir, { recursive: true, force: true }));
+  const base = fixture.head();
+  edit(fixture.dir, 'packages/leaf/src/index.ts', 'export const leaf = 4;\n');
+
+  assert.deepEqual(JSON.parse(detectorDocument(fixture, base)).packages, []);
+  assert.deepEqual(JSON.parse(detectorDocument(fixture, base, ['--worktree'])).packages, [
+    'leaf',
+    'reader',
   ]);
 });
 

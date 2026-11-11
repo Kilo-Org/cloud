@@ -229,6 +229,21 @@
     "signInCodeField": "Нэвтрэх код",
     "or": "эсвэл"
   },
+  "pendingLink": {
+    "description": "{{email}}-г аль хэдийн нэг бүртгэл ашиглаж байна. {{provider}}-г нэмэхийн тулд тухайн бүртгэлийн нэвтрэх аргуудын аль нэгээр нэвтэрнэ үү.",
+    "emailCode": "Нэвтрэх кодыг имэйлээр илгээх",
+    "continueInBrowser": "Хөтөч дээр үргэлжлүүлэх",
+    "startAgain": "Дахин эхлэх",
+    "expired": "{{provider}}-г нэмэх энэ хүсэлтийн хугацаа дууссан.",
+    "noMethods": "Энэ бүртгэлд өөр нэвтрэх арга байхгүй тул {{provider}}-г нэмэх боломжгүй.",
+    "linked": "{{provider}} таны бүртгэлд нэмэгдлээ.",
+    "failedExpired": "Хүсэлтийн хугацаа дууссан тул {{provider}} нэмэгдсэнгүй.",
+    "failedWrongAccount": "Та өөр бүртгэлээр нэвтэрсэн тул {{provider}} нэмэгдсэнгүй.",
+    "failedAccountAlreadyLinked": "{{provider}} өөр бүртгэлтэй аль хэдийн холбогдсон тул нэмэгдсэнгүй.",
+    "failedProviderAlreadyLinked": "Таны бүртгэлд өөр {{provider}} нэвтрэлт аль хэдийн байгаа тул {{provider}} нэмэгдсэнгүй.",
+    "failedLinking": "{{provider}}-г таны бүртгэлд нэмж чадсангүй.",
+    "notAdded": "Та нэвтэрсэн байна. {{provider}} таны бүртгэлд нэмэгдсэнгүй."
+  },
   "profile": {
     "codeReviewerSubtitle": "PR-ийн автомат хяналт",
     "securityAgentSubtitle": "Эмзэг байдлыг олж, арилгах",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Туршилтын бүртгэл",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Байгууллагын SSO",
     "passkeysTitle": "Нэвтрэх түлхүүр",
     "passkeysSubtitle": "Нууц үггүйгээр нэвтрэх",
@@ -2460,6 +2477,8 @@
       "toolList": "жагсаах",
       "toolPatch": "засвар оруулах",
       "toolTask": "даалгавар",
+      "toolSendFile": "Файл илгээсэн",
+      "toolSendFileAction": "Файл илгээх",
       "readTodos": "Төлөвлөгөө унших",
       "updateTodos": "Төлөвлөгөө шинэчлэх",
       "linesBadge": "{{displayCount}} мөр",
@@ -2560,7 +2579,21 @@
       "thought": "Бодол",
       "showDetails": "Дэлгэрэнгүйг харуулах",
       "pending": "Хүлээгдэж байна…",
-      "running": "Ажиллаж байна…"
+      "running": "Ажиллаж байна…",
+      "field": {
+        "filePath": "Файлын зам",
+        "path": "Зам",
+        "offset": "Эхлэл",
+        "limit": "Хязгаар",
+        "pattern": "Загвар",
+        "include": "Оруулах",
+        "patchText": "Засварын бичвэр",
+        "query": "Асуулга",
+        "prompt": "Заавар",
+        "header": "Гарчиг",
+        "question": "Асуулт",
+        "options": "Сонголтууд"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Агуулгыг харуулж чадсангүй."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Энэ загвар бодох түвшинг дэмждэг"
     },
-    "creditsRequired": "Энэ мессежийг илгээхэд хангалттай кредит байхгүй. Кредит нэмээд дахин оролдоно уу."
+    "creditsRequired": "Энэ мессежийг илгээхэд хангалттай кредит байхгүй."
   },
   "settingsTools": {
     "confirmTitle": "Энэ өөрчлөлтийг баталгаажуулах уу?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Миний агент",
       "promptPlaceholder": "Та бол ...",
       "tools": "Багаж хэрэгсэл",
+      "wholeToolRule": "Энэ агент бүх багаж хэрэгсэлд нэг дүрмийг нэгэн зэрэг хэрэглэнэ: {{rule}}. Эдгээр унтраалга нь зөвхөн уншигдах боломжтой.",
       "visibility": "Харагдах байдал",
       "visibilityPrimary": "Үндсэн — сонгогч дээр харуулав",
       "visibilitySubagent": "Дэд агент — зөвхөн бусдаас дуудах боломжтой",
@@ -4244,5 +4278,8 @@
     "noEnabledContexts": "Товлосон тоймд идэвхжүүлсэн орчин алга",
     "sourceBlocker": "Сессэд анхаарал хандуулах шаардлагатай",
     "sourceMetadata": "Хадгалсан сессийн мета өгөгдөл"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Энэ хайлтын үр дүнг нээж чадсангүй"
   }
 }

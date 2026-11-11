@@ -58,12 +58,14 @@ import {
 import {
   logRuntimeProxyRequestFailed,
   readUpstreamFailureEvidence,
+  runtimeProxyRequestShape,
 } from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopeIngestRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
+  runtimeProxyAttestationAudience,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
 import { readBoundedBody } from './utils/read-bounded-body.js';
@@ -76,7 +78,6 @@ import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
-  type RuntimeProxyAttestationAudience,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { TRPCError } from '@trpc/server';
 import {
@@ -552,10 +553,29 @@ async function forwardRuntimeCredentialProxy(
   path: string
 ): Promise<Response> {
   if (!claims || !isControlSession(claims.sessionId)) return c.text('Unauthorized', 401);
+  const correlation = { sessionId: claims.sessionId, kiloSessionId: claims.kiloSessionId };
+  const requestShape = (organizationId: string | undefined) =>
+    runtimeProxyRequestShape({
+      route,
+      method: c.req.method,
+      path,
+      organizationId,
+      kiloSessionId: claims.kiloSessionId,
+    });
+  // One diagnostic per refused request: the path, method or body has no allowlist entry.
+  const rejectRoute = (organizationId: string | undefined): Response => {
+    logRuntimeProxyRequestFailed({
+      upstreamAttempted: false,
+      rejectionStage: 'route',
+      request: requestShape(organizationId),
+      ...correlation,
+    });
+    return c.text('Not found', 404);
+  };
   let bodyText: string | undefined;
   if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
-    if (bodyText === undefined) return c.text('Not found', 404);
+    if (bodyText === undefined) return rejectRoute(undefined);
   }
   let credential: {
     token: string;
@@ -596,7 +616,7 @@ async function forwardRuntimeCredentialProxy(
       contentType: c.req.header('content-type'),
       bodyText,
     });
-    if (adopted === null) return c.text('Not found', 404);
+    if (adopted === null) return rejectRoute(credential.organizationId);
     upstream = adopted.upstream;
     if (adopted.kind === 'scoped') {
       const v2Headers = encodeCloudAgentSessionScopeV2ViewHeaders(scopeView);
@@ -630,11 +650,10 @@ async function forwardRuntimeCredentialProxy(
         bodyText
       );
   }
-  if (!upstream) return c.text('Not found', 404);
+  if (!upstream) return rejectRoute(credential.organizationId);
   try {
     // The route allowlist is resolved above before a proof is issued.
-    const audience: RuntimeProxyAttestationAudience =
-      route === 'backend' ? 'kilo-api' : route === 'ingest' ? 'session-ingest' : 'kilo-gateway';
+    const audience = runtimeProxyAttestationAudience(route, path);
     const proof = await issueRuntimeProxyAttestation({
       secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
         if (!value) throw new Error('Authentication unavailable');
@@ -669,8 +688,8 @@ async function forwardRuntimeCredentialProxy(
         upstreamAttempted: true,
         upstreamStatus: response.status,
         evidence: await readUpstreamFailureEvidence(response),
-        sessionId: claims.sessionId,
-        kiloSessionId: claims.kiloSessionId,
+        request: requestShape(credential.organizationId),
+        ...correlation,
       });
     }
     return sanitizeRuntimeProxyResponse(response);
@@ -809,6 +828,9 @@ app.get('/terminal', async (c: Context<HonoContext>) => {
   return handleTerminalWebSocket(c.req.raw, c.env);
 });
 
+/** Concurrent revocation closes per wave. */
+const ORG_STREAM_CLOSE_CONCURRENCY = 8;
+
 app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
   const unauthorized = requireInternalApi(c);
   if (unauthorized) return unauthorized;
@@ -840,10 +862,35 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
       )
     );
 
-  for (const row of rows) {
+  // The caller bounds this request, and a close that has a route to retire can
+  // refresh the provider policy or stop its sandbox. Matching closes therefore
+  // run in waves of eight, so the sessions of one wave share the caller's
+  // budget and the request keeps a bounded number of concurrent DO calls.
+  const sessionIds = rows.flatMap(row => {
     const sessionId = row.cloudAgentSessionId;
-    if (!sessionId || !isControlSession(sessionId)) continue;
-    await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
+    return sessionId && isControlSession(sessionId) ? [sessionId] : [];
+  });
+  for (let index = 0; index < sessionIds.length; index += ORG_STREAM_CLOSE_CONCURRENCY) {
+    await Promise.all(
+      sessionIds.slice(index, index + ORG_STREAM_CLOSE_CONCURRENCY).map(async sessionId => {
+        try {
+          await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
+        } catch (error) {
+          // One session's failed close (an unreachable Durable Object, or a
+          // release that could not finish) must not stop the others. Every
+          // later grant is issued only on a current membership, so authority
+          // ends at the next issuance: until then the session keeps the grant
+          // it already holds.
+          logger
+            .withFields({
+              cloudAgentSessionId: sessionId,
+              userId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            .error('/internal/streams/close: session close failed');
+        }
+      })
+    );
   }
 
   return c.body(null, 204);

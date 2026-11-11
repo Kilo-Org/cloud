@@ -72,6 +72,7 @@ const FAILURE_TEXT: Record<string, string> = {
   input_unavailable: 'The builder could not read its inputs.',
   repository_unauthorized: 'Repository access is no longer authorized.',
   actor_unauthorized: 'The person who started the build no longer has access.',
+  account_blocked: 'This account is blocked.',
   billing_blocked: 'Builds need available credits.',
   billing_unavailable: 'Billing could not admit the build. Try again.',
   container_limit_reached: 'The concurrent container limit is reached.',
@@ -121,7 +122,7 @@ export function stalenessText(status: EnvironmentBuildStatus): string | null {
     case 'age':
       return 'The snapshot is older than four days; the next session starts a refresh.';
     case 'image':
-      return 'The snapshot was built for an earlier sandbox image. Sessions start without it until a refresh completes.';
+      return 'The snapshot was built for an earlier sandbox image. Sessions keep using it until a refresh publishes, unless the runtime changed.';
     default:
       return null;
   }
@@ -170,18 +171,4 @@ export function buildAction(
     kind: status.published === null ? 'build' : 'refresh',
     disabledReason: options.hasUnsavedChanges ? 'Save your changes before building.' : null,
   };
-}
-
-/** Short status for the environment list row. */
-export function snapshotBadge(
-  status: EnvironmentBuildStatus | undefined,
-  now: number
-): string | null {
-  if (status === undefined || !status.supported) return null;
-  if (isBuildActive(status.activeBuild)) return 'Building snapshot';
-  if (status.published === null) {
-    return status.latestBuild?.state === 'failed' ? 'Snapshot build failed' : 'No snapshot';
-  }
-  const age = formatAge(status.published.capturedAt, now);
-  return status.published.stale === null ? `Snapshot ${age}` : `Snapshot ${age} (stale)`;
 }

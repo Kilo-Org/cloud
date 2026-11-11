@@ -124,6 +124,8 @@ export function controlPlaneRouteSpecFromAttachPayload(
     directory: payload.directory,
     ...(payload.branch ? { branch: payload.branch } : {}),
     ...(payload.branchMode ? { branchMode: payload.branchMode } : {}),
+    ...(payload.baseBranch ? { baseBranch: payload.baseBranch } : {}),
+    ...(payload.baseSha ? { baseSha: payload.baseSha } : {}),
     ...(git ? { git } : {}),
     ...(env ? { env } : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands } : {}),
@@ -240,7 +242,7 @@ export function buildControlPlaneSessionRegistration(
     if (!validated.success) throw new McpAttachValidationError(validated.reason);
   }
   // A read-only Bitbucket review runs with worker-owned env only, so its
-  // encrypted profile secrets, agents, commands and MCP are withheld.
+  // encrypted profile secrets, instructions, agents, commands and MCP are withheld.
   // Its runtime skills stay: they
   // carry the trusted review skill that the Code Reviewer attaches.
   const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
@@ -249,6 +251,9 @@ export function buildControlPlaneSessionRegistration(
     encryptedSecrets !== undefined && Object.keys(encryptedSecrets).length > 0;
   const profile = readProfileBundle(metadata);
   const runtimeProfile = {
+    ...(!readOnlyBitbucketReview && profile.runtimeInstructions?.length
+      ? { runtimeInstructions: profile.runtimeInstructions }
+      : {}),
     ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
     ...(!readOnlyBitbucketReview && profile.runtimeAgents?.length
       ? { runtimeAgents: profile.runtimeAgents }

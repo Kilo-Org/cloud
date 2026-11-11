@@ -229,6 +229,21 @@
     "signInCodeField": "साइन इन कोड",
     "or": "वा"
   },
+  "pendingLink": {
+    "description": "{{email}} पहिले नै एउटा खाताले प्रयोग गरिरहेको छ। {{provider}} थप्न त्यसको कुनै एक विधिबाट साइन इन गर्नुहोस्।",
+    "emailCode": "मलाई इमेलमा साइन इन कोड पठाउनुहोस्",
+    "continueInBrowser": "ब्राउजरमा जारी राख्नुहोस्",
+    "startAgain": "फेरि सुरु गर्नुहोस्",
+    "expired": "{{provider}} थप्ने यो अनुरोधको म्याद सकियो।",
+    "noMethods": "यो खातामा साइन इन गर्ने अर्को विधि छैन, त्यसैले {{provider}} थप्न सकिँदैन।",
+    "linked": "{{provider}} तपाईंको खातामा थपियो।",
+    "failedExpired": "अनुरोधको म्याद सकिएकाले {{provider}} थपिएन।",
+    "failedWrongAccount": "तपाईंले अर्कै खातामा साइन इन गर्नुभएकाले {{provider}} थपिएन।",
+    "failedAccountAlreadyLinked": "{{provider}} पहिले नै अर्को खातासँग जोडिएकाले थपिएन।",
+    "failedProviderAlreadyLinked": "तपाईंको खातामा पहिले नै फरक {{provider}} साइन इन भएकाले {{provider}} थपिएन।",
+    "failedLinking": "{{provider}} तपाईंको खातामा थप्न सकिएन।",
+    "notAdded": "तपाईं साइन इन हुनुभएको छ। {{provider}} तपाईंको खातामा थपिएन।"
+  },
   "profile": {
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाहरू",
     "securityAgentSubtitle": "सुरक्षा कमजोरीहरू पत्ता लगाएर समाधान गर्नुहोस्",
@@ -267,6 +282,8 @@
     "providerTestAccount": "परीक्षण खाता",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "उद्यम SSO",
     "passkeysTitle": "पासकीहरू",
     "passkeysSubtitle": "पासवर्ड बिना साइन इन गर्नुहोस्",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "तपाईंको प्रम्प्ट र कुनै सन्देशमा संलग्न नभएका अपलोड गरिएका फाइलहरू मेटिनेछन्।",
       "discardFailed": "मस्यौदा मेट्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "remoteHint": "तपाईंको कम्प्युटरमा चलाउन त्यहाँ Kilo सुरु गर्नुहोस् र यसलाई चालु राख्नुहोस्।",
-      "continueFrom": "{{title}} जारी राखिँदैछ।",
+      "continueFrom": "“{{title}}” जारी राखिँदैछ।",
       "importingSession": "सत्र आयात गर्दै",
       "cliCannotContinue": "यो CLI ले सत्र जारी राख्न सक्दैन। Cloud Agent वा अर्को CLI छान्नुहोस्।",
       "importFailed": "यो सत्र आयात गर्न सकिएन।",
@@ -2460,6 +2477,8 @@
       "toolList": "सूची देखाउनुहोस्",
       "toolPatch": "संशोधन लागू गर्नुहोस्",
       "toolTask": "कार्य",
+      "toolSendFile": "फाइल पठाइयो",
+      "toolSendFileAction": "फाइल पठाउनुहोस्",
       "readTodos": "योजना पढ्नुहोस्",
       "updateTodos": "योजना अद्यावधिक गर्नुहोस्",
       "linesBadge": "{{displayCount}} पङ्क्ति",
@@ -2560,7 +2579,21 @@
       "thought": "विचार",
       "showDetails": "विवरण देखाउनुहोस्",
       "pending": "पर्खाइमा…",
-      "running": "चलिरहेको…"
+      "running": "चलिरहेको…",
+      "field": {
+        "filePath": "फाइल पथ",
+        "path": "पथ",
+        "offset": "अफसेट",
+        "limit": "सीमा",
+        "pattern": "ढाँचा",
+        "include": "समावेश",
+        "patchText": "प्याच पाठ",
+        "query": "क्वेरी",
+        "prompt": "निर्देश",
+        "header": "शीर्षक",
+        "question": "प्रश्न",
+        "options": "विकल्पहरू"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "सामग्री देखाउन सकिएन।"
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "यो मोडेलले सोच्ने प्रयासको स्तर समर्थन गर्छ"
     },
-    "creditsRequired": "यो सन्देश पठाउन पर्याप्त क्रेडिट छैन। क्रेडिट थप्नुहोस् र फेरि प्रयास गर्नुहोस्।"
+    "creditsRequired": "यो सन्देश पठाउन पर्याप्त क्रेडिट छैन।"
   },
   "settingsTools": {
     "confirmTitle": "यो परिवर्तन पुष्टि गर्ने?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "मेरो एजेन्ट",
       "promptPlaceholder": "तिमी एक...",
       "tools": "उपकरणहरू",
+      "wholeToolRule": "यो एजेन्टले एकैचोटि हरेक उपकरणमा एउटै नियम लागू गर्छ: {{rule}}। यी स्विचहरू पढ्नका लागि मात्र हुन्।",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकरमा देखाइएको छ",
       "visibilitySubagent": "Subagent — अरूबाट मात्र कल गर्न मिल्ने",
@@ -4244,5 +4278,8 @@
     "noEnabledContexts": "निर्धारित ब्रिफिङहरूका लागि कुनै सन्दर्भ सक्षम गरिएको छैन",
     "sourceBlocker": "सत्रमा ध्यान दिन आवश्यक छ",
     "sourceMetadata": "सङ्कलित सत्र मेटाडाटा"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "यो खोज परिणाम खोल्न सकिएन"
   }
 }

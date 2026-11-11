@@ -589,6 +589,8 @@ describe('projectSafeFailure', () => {
     ['git_clone_timeout', 'Repository clone timed out'],
     ['git_authentication_failed', 'Repository authentication failed'],
     ['setup_command_failed', 'Setup command failed'],
+    ['workspace_snapshot_start_failed', 'Workspace snapshot could not be restored'],
+    ['environment_snapshot_required', 'Environment snapshot is required but unavailable'],
     ['workspace_setup_unknown', 'Workspace setup failed'],
   ] as const)('derives an allowlisted message for %s', (failureSubtype, message) => {
     expect(projectSafeFailure({ failureCode: 'workspace_setup_failed', failureSubtype })).toEqual({

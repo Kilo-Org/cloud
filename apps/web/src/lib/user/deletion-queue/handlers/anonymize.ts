@@ -23,10 +23,7 @@ import {
   OWNED_BY_USER_DELETE_TABLES,
   type OwnedByUserDeleteTable,
 } from '@/lib/user/owned-by-user-batch-delete';
-import {
-  ClaudeProfileDeletionError,
-  deletePersonalClaudeProfile,
-} from '@/lib/claude-billing/delete';
+import { ClaudeProfileDeletionError, deleteUserClaudeProfiles } from '@/lib/claude-billing/delete';
 
 type DrainResult =
   | { kind: 'drained'; progress: UserDeletionTaskProgress | undefined }
@@ -91,7 +88,7 @@ export const handleAnonymize: DeletionHandler = async ({ request, step, context 
   const stop = continueIfLowTime(context);
   if (stop) return stop;
   try {
-    await deletePersonalClaudeProfile(userId);
+    await deleteUserClaudeProfiles(userId);
   } catch (error) {
     return {
       kind:

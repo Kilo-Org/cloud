@@ -30,12 +30,34 @@ vi.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 vi.mock('@/routers/cli-sessions-v2-router', async () => {
-  const { sql } = await import('drizzle-orm');
   const { z } = await import('zod');
   return {
     associatedPrSchema: z.unknown(),
     formatAssociatedPr: () => null,
-    sessionPrJoinPredicate: sql`false`,
+  };
+});
+// SQLite has no LATERAL: stand in an uncorrelated subquery that never matches.
+vi.mock('@/lib/session-associated-pr', async () => {
+  const { sql } = await import('drizzle-orm');
+  const { QueryBuilder } = await import('drizzle-orm/pg-core');
+  const { github_branch_pull_requests: pr } = await import('@kilocode/db/schema');
+  return {
+    sessionAssociatedPr: new QueryBuilder()
+      .select({
+        pr_url: pr.pr_url,
+        pr_number: pr.pr_number,
+        pr_state: pr.pr_state,
+        pr_title: pr.pr_title,
+        pr_head_sha: pr.pr_head_sha,
+        pr_observations: pr.pr_observations,
+        pr_last_synced_at: pr.pr_last_synced_at,
+        pr_review_decision: pr.pr_review_decision,
+        review_decision_pending: pr.review_decision_pending,
+        pr_from_workspace: sql<boolean>`false`.as('pr_from_workspace'),
+      })
+      .from(pr)
+      .where(sql`false`)
+      .as('session_pr'),
   };
 });
 
@@ -94,6 +116,7 @@ function setup(options: { beforeCommit?: () => Promise<void>; refreshError?: Err
     const statement = sqlite.prepare(
       query
         .replace(/\$\d+/g, '?')
+        .replace(/\bleft join lateral\b/gi, 'left join')
         .replace(/\bdefault\b/gi, 'null')
         .replaceAll(
           "now() - interval '15 minutes'",

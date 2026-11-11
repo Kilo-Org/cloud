@@ -1,6 +1,9 @@
 import type { ControlPlaneSandboxPeer } from '../../../src/control-plane/session/session-do.js';
 import type { ControlRuntimeCredentialProxyFence } from '../../../src/control-plane/sandbox/sandbox-do.js';
-import type { PreviewTargetResult } from '../../../src/control-plane/sandbox/preview-target.js';
+import type {
+  PreviewSandboxScope,
+  PreviewTargetResult,
+} from '../../../src/control-plane/sandbox/preview-target.js';
 import type { SandboxStatusSnapshot } from '../../../src/shared/sandbox-status.js';
 import type { WorkspaceBillingProjection } from '../../../src/shared/workspace-runtime-status.js';
 import type {
@@ -125,6 +128,20 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
     return this.billingProjection;
   }
 
+  /** The workspace snapshot descriptor's capture time, or null when absent. */
+  workspaceSnapshotRecovery: { capturedAt: number | null } | null = null;
+  readonly removeWorkspaceSnapshotCalls: string[] = [];
+
+  async removeWorkspaceSnapshot(payload: { sessionId: string }): Promise<{ success: true }> {
+    this.removeWorkspaceSnapshotCalls.push(payload.sessionId);
+    this.workspaceSnapshotRecovery = null;
+    return { success: true };
+  }
+
+  async getWorkspaceSnapshotRecovery(): Promise<{ capturedAt: number | null } | null> {
+    return this.workspaceSnapshotRecovery;
+  }
+
   previewTargetResult: PreviewTargetResult = {
     status: 'ok',
     coordinates: {
@@ -133,10 +150,10 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
       allocationRef: 'sbx',
     },
   };
-  readonly previewTargetCalls: string[] = [];
+  readonly previewTargetCalls: PreviewSandboxScope[] = [];
 
-  async previewTarget(sessionId: string): Promise<PreviewTargetResult> {
-    this.previewTargetCalls.push(sessionId);
+  async previewTarget(scope: PreviewSandboxScope): Promise<PreviewTargetResult> {
+    this.previewTargetCalls.push(scope);
     return this.previewTargetResult;
   }
 }

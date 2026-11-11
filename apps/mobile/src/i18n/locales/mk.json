@@ -229,6 +229,21 @@
     "signInCodeField": "Код за најавување",
     "or": "или"
   },
+  "pendingLink": {
+    "description": "Сметка веќе користи {{email}}. Најави се со еден од нејзините начини за да додадеш {{provider}}.",
+    "emailCode": "Испрати ми код за најавување по е-пошта",
+    "continueInBrowser": "Продолжи во прелистувачот",
+    "startAgain": "Започни одново",
+    "expired": "Ова барање за додавање {{provider}} истече.",
+    "noMethods": "Оваа сметка нема друг начин за најавување, па {{provider}} не може да се додаде.",
+    "linked": "{{provider}} е додаден на твојата сметка.",
+    "failedExpired": "{{provider}} не е додаден бидејќи барањето истече.",
+    "failedWrongAccount": "{{provider}} не е додаден бидејќи се најави на друга сметка.",
+    "failedAccountAlreadyLinked": "{{provider}} не е додаден бидејќи веќе е поврзан со друга сметка.",
+    "failedProviderAlreadyLinked": "{{provider}} не е додаден бидејќи твојата сметка веќе има друго најавување со {{provider}}.",
+    "failedLinking": "{{provider}} не можеше да се додаде на твојата сметка.",
+    "notAdded": "Најавен си. {{provider}} не е додаден на твојата сметка."
+  },
   "profile": {
     "codeReviewerSubtitle": "Автоматски прегледи на PR",
     "securityAgentSubtitle": "Пронаоѓај и отстранувај ранливости",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Тестна сметка",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Деловно SSO",
     "passkeysTitle": "Клучеви за пристап",
     "passkeysSubtitle": "Најави се без лозинка",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Твоето упатство и сите прикачени датотеки што не се приложени кон испратени пораки ќе се избришат.",
       "discardFailed": "Не успеа отфрлањето на нацртот. Обиди се повторно.",
       "remoteHint": "За да се изврши на твојот компјутер, стартувај го Kilo таму и остави го да работи.",
-      "continueFrom": "Се продолжува сесијата {{title}}.",
+      "continueFrom": "Се продолжува сесијата „{{title}}“.",
       "importingSession": "Увезување на сесијата",
       "cliCannotContinue": "Овој CLI не може да продолжи сесија. Избери Cloud Agent или друг CLI.",
       "importFailed": "Не успеа увезувањето на оваа сесија.",
@@ -2460,6 +2477,8 @@
       "toolList": "прикажување список",
       "toolPatch": "примена на закрпа",
       "toolTask": "задача",
+      "toolSendFile": "испратена датотека",
+      "toolSendFileAction": "испраќање датотека",
       "readTodos": "Прочитај го планот",
       "updateTodos": "Ажурирај го планот",
       "linesBadge": "{{displayCount}} редови",
@@ -2560,7 +2579,21 @@
       "thought": "Мисла",
       "showDetails": "Прикажи ги деталите",
       "pending": "Се чека…",
-      "running": "Во тек…"
+      "running": "Во тек…",
+      "field": {
+        "filePath": "Датотечна патека",
+        "path": "Патека",
+        "offset": "Отстапување",
+        "limit": "Ограничување",
+        "pattern": "Шаблон",
+        "include": "Вклучување",
+        "patchText": "Текст на закрпа",
+        "query": "Барање",
+        "prompt": "Упатство",
+        "header": "Наслов",
+        "question": "Прашање",
+        "options": "Опции"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не успеа прикажувањето на содржината."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Овој модел поддржува ниво на размислување"
     },
-    "creditsRequired": "Немате доволно кредити за да ја испратите оваа порака. Додајте кредити и обидете се повторно."
+    "creditsRequired": "Немате доволно кредити за да ја испратите оваа порака."
   },
   "settingsTools": {
     "confirmTitle": "Да се потврди оваа промена?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Мојот агент",
       "promptPlaceholder": "Вие сте еден ...",
       "tools": "Алатки",
+      "wholeToolRule": "Овој агент применува едно правило на сите алатки одеднаш: {{rule}}. Овие прекинувачи се само за читање.",
       "visibility": "Видливост",
       "visibilityPrimary": "Примарно — прикажано во избирачот",
       "visibilitySubagent": "Субагент — може да се повика само од други",
@@ -4244,5 +4278,8 @@
     "noEnabledContexts": "Нема овозможени контексти за закажани извештаи",
     "sourceBlocker": "Сесијата бара внимание",
     "sourceMetadata": "Зачувани метаподатоци за сесијата"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Не успеа отворањето на овој резултат од пребарувањето"
   }
 }

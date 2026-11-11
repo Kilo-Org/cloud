@@ -14,6 +14,7 @@ const mockAddReactionToPR = jest.fn();
 const mockResolveMergeHeadContent = jest.fn();
 const mockFindReviewCoveringHeads = jest.fn();
 const mockGetCheckRunConclusion = jest.fn();
+const mockFindLatestCheckRunId = jest.fn();
 const mockIsCouncilEntitledForOwner = jest.fn();
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
@@ -54,6 +55,7 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   addReactionToPR: (...args: unknown[]) => mockAddReactionToPR(...args),
   createCheckRun: (...args: unknown[]) => mockCreateCheckRun(...args),
+  findLatestCheckRunId: (...args: unknown[]) => mockFindLatestCheckRunId(...args),
   getCheckRunConclusion: (...args: unknown[]) => mockGetCheckRunConclusion(...args),
   resolveMergeHeadContent: (...args: unknown[]) => mockResolveMergeHeadContent(...args),
   updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
@@ -125,6 +127,7 @@ beforeEach(() => {
   mockResolveMergeHeadContent.mockResolvedValue({ kind: 'not_merge' });
   mockFindReviewCoveringHeads.mockResolvedValue(null);
   mockGetCheckRunConclusion.mockResolvedValue(undefined);
+  mockFindLatestCheckRunId.mockResolvedValue(undefined);
   mockIsCouncilEntitledForOwner.mockResolvedValue(false);
 });
 
@@ -665,6 +668,42 @@ describe('handlePullRequest', () => {
       expect.objectContaining({ conclusion: 'success' }),
       'standard'
     );
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('gates the merge-commit head once when its Kilo check already exists', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockResolveMergeHeadContent.mockResolvedValue({
+      kind: 'review_content',
+      shas: ['merge-sha', 'content-sha'],
+    });
+    mockFindReviewCoveringHeads.mockResolvedValue({
+      checkRunId: 12345,
+      headSha: 'content-sha',
+      id: 'review-1',
+      status: 'completed',
+    });
+    mockGetCheckRunConclusion.mockResolvedValue('success');
+    // A run already sits on the merge head: the same delivery was gated before,
+    // or a recovery sweep already visited this head.
+    mockFindLatestCheckRunId.mockResolvedValue(55555);
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Skipped merge commit' });
+    expect(mockFindLatestCheckRunId).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      'abc123',
+      'standard'
+    );
+    expect(mockCreateCheckRun).not.toHaveBeenCalled();
     expect(mockCreateCodeReview).not.toHaveBeenCalled();
   });
 

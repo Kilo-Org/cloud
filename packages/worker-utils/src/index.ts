@@ -166,6 +166,9 @@ export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
 
 export { redactSensitiveHeaders } from './redact-headers.js';
 
+export { getVercelExecutionRegion } from './vercel-execution-region.js';
+export type { VercelExecutionRegion } from './vercel-execution-region.js';
+
 export { normalizeGitUrl } from './normalize-git-url.js';
 
 export { chunkArray } from './chunk-array.js';

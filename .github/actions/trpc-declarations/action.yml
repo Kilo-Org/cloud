@@ -4,8 +4,11 @@ description: >-
   every repository file in the tRPC declaration program (from
   `tsgo --listFilesOnly`), the build configuration, and the lockfile entries of
   the package's importer closure, which pin every file the build reads under
-  node_modules. A hit therefore restores exactly what the build would write. Run
-  it after `pnpm install`.
+  node_modules. A hit therefore restores exactly what the build would write. The
+  dist is a TypeScript declaration emit, so one entry serves every runner
+  operating system: actions/cache derives its version from the paths, the
+  compression method and the platform only on Windows, and the Linux and macOS
+  images both compress with zstd. Run it after `pnpm install`.
 
 runs:
   using: composite
@@ -20,7 +23,7 @@ runs:
       uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       with:
         path: packages/trpc/dist
-        key: ${{ runner.os }}-trpc-declarations-${{ steps.key.outputs.key }}
+        key: trpc-declarations-${{ steps.key.outputs.key }}
 
     # A hit proves the key, not the tree: a restore that failed halfway, or an
     # entry written by a future build step that emits something else, would

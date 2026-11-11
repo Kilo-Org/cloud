@@ -15,7 +15,7 @@ vi.mock('./cloud-agent-session', () => ({
   NotApprovableError: class NotApprovableError extends Error {},
   resolveCloudAgentSessionId: vi.fn(),
 }));
-vi.mock('./pending-permission', () => ({ resolvePendingPermissionId: vi.fn() }));
+vi.mock('./pending-permission', () => ({ resolveLeadingPendingPermissionId: vi.fn() }));
 
 const {
   ASK_BIND_RETRY_MS,

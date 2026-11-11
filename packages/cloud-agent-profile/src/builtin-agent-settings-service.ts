@@ -1,4 +1,4 @@
-import { cloud_agent_builtin_agent_settings } from '@kilocode/db/schema';
+import { cloud_agent_user_settings } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { ProfileDatabase } from './types';
 import {
@@ -12,9 +12,9 @@ export async function getBuiltinAgentSettings(
   userId: string
 ): Promise<BuiltinAgentSettings> {
   const [row] = await db
-    .select({ agents: cloud_agent_builtin_agent_settings.agents })
-    .from(cloud_agent_builtin_agent_settings)
-    .where(eq(cloud_agent_builtin_agent_settings.user_id, userId))
+    .select({ agents: cloud_agent_user_settings.builtin_agents })
+    .from(cloud_agent_user_settings)
+    .where(eq(cloud_agent_user_settings.kilo_user_id, userId))
     .limit(1);
   return BuiltinAgentSettingsSchema.parse(row?.agents ?? {});
 }
@@ -26,20 +26,11 @@ export async function setBuiltinAgentSettings(
 ): Promise<BuiltinAgentSettings> {
   const agents = normalizeBuiltinAgentSettings(BuiltinAgentSettingsSchema.parse(settings));
   await db
-    .insert(cloud_agent_builtin_agent_settings)
-    .values({ user_id: userId, agents })
+    .insert(cloud_agent_user_settings)
+    .values({ kilo_user_id: userId, builtin_agents: agents })
     .onConflictDoUpdate({
-      target: cloud_agent_builtin_agent_settings.user_id,
-      set: { agents },
+      target: cloud_agent_user_settings.kilo_user_id,
+      set: { builtin_agents: agents },
     });
   return agents;
-}
-
-export async function clearBuiltinAgentSettings(
-  db: ProfileDatabase,
-  userId: string
-): Promise<void> {
-  await db
-    .delete(cloud_agent_builtin_agent_settings)
-    .where(eq(cloud_agent_builtin_agent_settings.user_id, userId));
 }

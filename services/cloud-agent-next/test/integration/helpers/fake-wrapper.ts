@@ -1,5 +1,7 @@
 import {
   RUNTIME_HARNESS_HEADER,
+  RUNTIME_INSTRUCTIONS_HEADER,
+  RUNTIME_INSTRUCTIONS_VERSION,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
   WORKTREE_RUNTIME_HEADER,
@@ -22,6 +24,7 @@ export type FakeWrapperConnectInput = {
   path?: string;
   runtimeContract?: 'legacy' | 'worktree';
   workspaceConfiguration?: boolean;
+  runtimeInstructions?: boolean;
   /** Raw `x-kilo-runtime-harness` value, so a test can also send an unknown one. */
   runtimeHarness?: string;
   kiloCliVersion?: string;
@@ -38,6 +41,7 @@ export type FakeWrapperHelloInput = {
   /** The retired capability sent by wrappers built before workspace snapshots. */
   sessionSnapshots?: boolean;
   startCommands?: boolean;
+  worktreeGit?: boolean;
 };
 
 export type FakeNativeEvent = {
@@ -98,6 +102,9 @@ export class FakeWrapper {
           : { [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION }),
         ...(input.workspaceConfiguration
           ? { [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION }
+          : {}),
+        ...(input.runtimeInstructions
+          ? { [RUNTIME_INSTRUCTIONS_HEADER]: RUNTIME_INSTRUCTIONS_VERSION }
           : {}),
         ...(input.runtimeHarness === undefined
           ? {}
@@ -194,6 +201,7 @@ export class FakeWrapper {
       ...(input.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
       ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
       ...(input.startCommands ? { startCommands: true } : {}),
+      ...(input.worktreeGit ? { worktreeGit: true } : {}),
     });
     return this.next();
   }

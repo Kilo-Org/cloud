@@ -29,7 +29,6 @@ const expectedResult = {
 const expectedEnkrypt = {
   settings: {
     status: 'ready',
-    scan_tool_results: true,
     detectors: [
       { detector: 'injection_attack', action: 'block' },
       { detector: 'pii', action: 'log', pii_entities: ['secrets'] },
@@ -82,8 +81,11 @@ describe('parseRoutingDetails', () => {
     expect(parsed?.result).toEqual(expectedResult);
   });
 
-  test('returns the Enkrypt guardrail report', () => {
+  test('returns the historical Enkrypt guardrail report without its retired tool result setting', () => {
     expect(parseRoutingDetails(productionRecord)?.enkrypt).toEqual(expectedEnkrypt);
+    expect(parseRoutingDetails(productionRecord)?.enkrypt?.settings).not.toHaveProperty(
+      'scan_tool_results'
+    );
   });
 
   test('strips provider response and client session identifiers from the output', () => {
@@ -234,7 +236,6 @@ describe('parseRoutingDetails', () => {
     const outputReport = {
       settings: {
         status: 'ready',
-        scan_tool_results: false,
         detectors: [{ detector: 'toxicity', action: 'block' }],
       },
       held_back: true,

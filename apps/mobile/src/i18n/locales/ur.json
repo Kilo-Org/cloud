@@ -229,6 +229,21 @@
     "signInCodeField": "سائن ان کوڈ",
     "or": "یا"
   },
+  "pendingLink": {
+    "description": "ایک اکاؤنٹ پہلے ہی {{email}} استعمال کر رہا ہے۔ {{provider}} شامل کرنے کے لیے اس کے کسی طریقے سے سائن ان کریں۔",
+    "emailCode": "مجھے ای میل پر سائن ان کوڈ بھیجیں",
+    "continueInBrowser": "براؤزر میں جاری رکھیں",
+    "startAgain": "دوبارہ شروع کریں",
+    "expired": "{{provider}} شامل کرنے کی یہ درخواست ختم ہو چکی ہے۔",
+    "noMethods": "اس اکاؤنٹ میں سائن ان کا کوئی دوسرا طریقہ نہیں ہے، اس لیے {{provider}} شامل نہیں کیا جا سکتا۔",
+    "linked": "{{provider}} آپ کے اکاؤنٹ میں شامل کر دیا گیا۔",
+    "failedExpired": "{{provider}} شامل نہیں کیا گیا کیونکہ درخواست ختم ہو گئی تھی۔",
+    "failedWrongAccount": "{{provider}} شامل نہیں کیا گیا کیونکہ آپ نے کسی دوسرے اکاؤنٹ میں سائن ان کیا۔",
+    "failedAccountAlreadyLinked": "{{provider}} شامل نہیں کیا گیا کیونکہ یہ پہلے ہی کسی دوسرے اکاؤنٹ سے منسلک ہے۔",
+    "failedProviderAlreadyLinked": "{{provider}} شامل نہیں کیا گیا کیونکہ آپ کے اکاؤنٹ میں پہلے ہی ایک مختلف {{provider}} سائن ان موجود ہے۔",
+    "failedLinking": "{{provider}} آپ کے اکاؤنٹ میں شامل نہیں کیا جا سکا۔",
+    "notAdded": "آپ سائن ان ہو چکے ہیں۔ {{provider}} آپ کے اکاؤنٹ میں شامل نہیں کیا گیا۔"
+  },
   "profile": {
     "codeReviewerSubtitle": "خودکار PR جائزے",
     "securityAgentSubtitle": "کمزوریاں تلاش کریں اور دور کریں",
@@ -267,6 +282,8 @@
     "providerTestAccount": "آزمائشی اکاؤنٹ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "انٹرپرائز SSO",
     "passkeysTitle": "رسائی کلیدیں",
     "passkeysSubtitle": "بغیر پاس ورڈ سائن ان کریں",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "آپ کا پرامپٹ اور اپ لوڈ کی گئی وہ فائلیں حذف ہو جائیں گی جو کسی بھیجے گئے پیغام سے منسلک نہیں ہیں۔",
       "discardFailed": "مسودہ حذف نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
       "remoteHint": "اپنے کمپیوٹر پر چلانے کے لیے وہاں Kilo شروع کریں اور اسے چلتا رہنے دیں۔",
-      "continueFrom": "{{title}} جاری رکھا جا رہا ہے۔",
+      "continueFrom": "”{{title}}“ جاری رکھا جا رہا ہے۔",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
       "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
@@ -2460,6 +2477,8 @@
       "toolList": "فہرست بنانا",
       "toolPatch": "ترمیم کرنا",
       "toolTask": "کام",
+      "toolSendFile": "فائل بھیجی",
+      "toolSendFileAction": "فائل بھیجنا",
       "readTodos": "منصوبہ پڑھیں",
       "updateTodos": "منصوبہ اپ ڈیٹ کریں",
       "linesBadge": "{{displayCount}} سطریں",
@@ -2560,7 +2579,21 @@
       "thought": "سوچ",
       "showDetails": "تفصیلات دکھائیں",
       "pending": "زیر التواء…",
-      "running": "چل رہا ہے…"
+      "running": "چل رہا ہے…",
+      "field": {
+        "filePath": "فائل کا راستہ",
+        "path": "راستہ",
+        "offset": "آفسیٹ",
+        "limit": "حد",
+        "pattern": "نمونہ",
+        "include": "شمولیت",
+        "patchText": "متنِ پیچ",
+        "query": "استفسار",
+        "prompt": "ہدایت",
+        "header": "سرخی",
+        "question": "سوال",
+        "options": "اختیارات"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "مواد دکھایا نہیں جا سکا۔"
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
     },
-    "creditsRequired": "اس پیغام کو بھیجنے کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔"
+    "creditsRequired": "اس پیغام کو بھیجنے کے لیے کافی کریڈٹس نہیں ہیں۔"
   },
   "settingsTools": {
     "confirmTitle": "اس تبدیلی کی تصدیق کریں؟"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "میرا ایجنٹ",
       "promptPlaceholder": "آپ ایک...",
       "tools": "اوزار",
+      "wholeToolRule": "یہ ایجنٹ بیک وقت ہر اوزار پر ایک اصول لاگو کرتا ہے: {{rule}}۔ یہ سوئچز صرف پڑھنے کے لیے ہیں۔",
       "visibility": "مرئیت",
       "visibilityPrimary": "پرائمری — چننے والے میں دکھایا گیا ہے۔",
       "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",
@@ -4244,5 +4278,8 @@
     "noEnabledContexts": "شیڈول شدہ بریفنگز کے لیے کوئی سیاق فعال نہیں ہے",
     "sourceBlocker": "سیشن کو توجہ درکار ہے",
     "sourceMetadata": "محفوظ کردہ سیشن میٹا ڈیٹا"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "یہ تلاش کا نتیجہ کھولا نہیں جا سکا"
   }
 }

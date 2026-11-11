@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Введіть адресу електронної пошти.",
     "or": "або"
   },
+  "pendingLink": {
+    "description": "Адреса {{email}} уже використовується в обліковому записі. Увійдіть одним із його способів, щоб додати {{provider}}.",
+    "emailCode": "Надіслати код для входу електронною поштою",
+    "continueInBrowser": "Продовжити в браузері",
+    "startAgain": "Почати знову",
+    "expired": "Термін дії цього запиту на додавання {{provider}} минув.",
+    "noMethods": "Цей обліковий запис не має іншого способу входу, тому {{provider}} не можна додати.",
+    "linked": "{{provider}} додано до вашого облікового запису.",
+    "failedExpired": "{{provider}} не додано, бо термін дії запиту минув.",
+    "failedWrongAccount": "{{provider}} не додано, бо ви увійшли в інший обліковий запис.",
+    "failedAccountAlreadyLinked": "{{provider}} не додано, бо його вже пов’язано з іншим обліковим записом.",
+    "failedProviderAlreadyLinked": "{{provider}} не додано, бо у вашому обліковому записі вже є інший вхід через {{provider}}.",
+    "failedLinking": "Не вдалося додати {{provider}} до вашого облікового запису.",
+    "notAdded": "Ви увійшли. {{provider}} не додано до вашого облікового запису."
+  },
   "profile": {
     "codeReviewerSubtitle": "Автоматичні перевірки PR",
     "securityAgentSubtitle": "Пошук і усунення вразливостей",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Тестовий обліковий запис",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Корпоративний SSO",
     "passkeysTitle": "Ключі доступу",
     "passkeysSubtitle": "Увійти без пароля",
@@ -1966,6 +1983,8 @@
       "toolList": "показати список",
       "toolPatch": "застосувати зміни",
       "toolTask": "завдання",
+      "toolSendFile": "Файл надіслано",
+      "toolSendFileAction": "надіслати файл",
       "readTodos": "Прочитати план",
       "updateTodos": "Оновити план",
       "linesBadge": "рядків: {{displayCount}}",
@@ -2072,7 +2091,21 @@
       "thought": "Міркування",
       "showDetails": "Показати відомості",
       "pending": "Очікування…",
-      "running": "Виконання…"
+      "running": "Виконання…",
+      "field": {
+        "filePath": "Шлях до файлу",
+        "path": "Шлях",
+        "offset": "Зсув",
+        "limit": "Обмеження",
+        "pattern": "Шаблон",
+        "include": "Включення",
+        "patchText": "Текст виправлення",
+        "query": "Запит",
+        "prompt": "Підказка",
+        "header": "Заголовок",
+        "question": "Питання",
+        "options": "Варіанти"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не вдалося відобразити вміст."
@@ -3914,7 +3947,7 @@
     "reasoningEffort": {
       "modelFlag": "Ця модель підтримує рівень міркування"
     },
-    "creditsRequired": "Недостатньо кредитів, щоб надіслати це повідомлення. Поповніть баланс і повторіть спробу."
+    "creditsRequired": "Недостатньо кредитів, щоб надіслати це повідомлення."
   },
   "settingsTools": {
     "confirmTitle": "Підтвердити цю зміну?"
@@ -4119,6 +4152,7 @@
       "namePlaceholder": "Мій агент",
       "promptPlaceholder": "Ви...",
       "tools": "Інструменти",
+      "wholeToolRule": "Цей агент застосовує одне правило до кожного інструмента одночасно: {{rule}}. Ці перемикачі доступні лише для читання.",
       "visibility": "Видимість",
       "visibilityPrimary": "Основний — відображається в панелі вибору",
       "visibilitySubagent": "Субагент — тільки для виклику від інших",
@@ -4376,5 +4410,8 @@
     "noEnabledContexts": "Для запланованих звітів не ввімкнено жодного контексту",
     "sourceBlocker": "Сесія потребує уваги",
     "sourceMetadata": "Зафіксовані метадані сесії"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Не вдалося відкрити цей результат пошуку"
   }
 }

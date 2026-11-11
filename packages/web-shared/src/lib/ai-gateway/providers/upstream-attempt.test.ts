@@ -20,7 +20,7 @@ jest.mock('./preferred-provider-order-config', () => ({
 
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
-import type { StoredModel } from '@kilocode/db';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -54,7 +54,7 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 describe('bounded spending provider enforcement', () => {
-  const model: StoredModel = {
+  const model: GatewayModelWithEndpoints = {
     id: 'test/preferred',
     name: 'Preferred model',
     endpoints: [

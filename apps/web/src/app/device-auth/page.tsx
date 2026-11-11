@@ -4,7 +4,11 @@ import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server'
 import { DeviceAuthClient } from './DeviceAuthClient';
 import { buildDeviceAuthPath, isDeviceAuthAppMode } from './device-auth-url';
 import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
-import { getDeviceAuthRequest, isDeviceAuthRequestExpired } from '@/lib/device-auth/device-auth';
+import {
+  getDeviceAuthPendingLink,
+  getDeviceAuthRequest,
+  isDeviceAuthRequestExpired,
+} from '@/lib/device-auth/device-auth';
 import { requestingClientOfRow, type RequestingClient } from '@/lib/device-auth/requesting-client';
 
 type PageProps = {
@@ -48,6 +52,7 @@ export default async function DeviceAuthPage({ searchParams }: PageProps) {
 
   const viewerToken = createDeviceAuthViewerToken(code, user.id);
   const requestingClient = await loadRequestingClient(code);
+  const pendingLink = await getDeviceAuthPendingLink(code);
 
   return (
     <DeviceAuthClient
@@ -55,6 +60,7 @@ export default async function DeviceAuthPage({ searchParams }: PageProps) {
       viewerToken={viewerToken}
       isAppMode={isAppMode}
       requestingClient={requestingClient}
+      pendingLink={pendingLink}
       user={{
         name: user.google_user_name,
         email: user.google_user_email,

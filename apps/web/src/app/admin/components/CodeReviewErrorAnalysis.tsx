@@ -20,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatDate } from '@/lib/admin-utils';
-import { CopyButton } from '@/components/admin/CopyButton';
+import { CopyButton } from '@/components/shared/CopyButton';
 import { useCodeReviewErrorSessions, type FilterParams } from '@/app/admin/api/code-reviews/hooks';
 
 type CategoryData = {

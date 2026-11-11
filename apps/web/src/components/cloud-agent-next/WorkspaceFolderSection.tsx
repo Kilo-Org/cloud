@@ -4,6 +4,7 @@ import type { DragEventHandler, ReactNode } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  ArrowUpDown,
   ChevronDown,
   ChevronRight,
   Folder,
@@ -12,7 +13,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import type { WorkspaceFolder } from '@/lib/cloud-agent/workspace-folders';
+import type { WorkspaceFolder, WorkspaceFolderSortMode } from '@/lib/cloud-agent/workspace-folders';
 import { workspaceFolderColorSchema } from '@/lib/cloud-agent/workspace-folders';
 import {
   DropdownMenu,
@@ -38,9 +39,11 @@ export function WorkspaceFolderSection({
   isDragging,
   dropPlacement,
   visibleCount,
+  totalCount,
   onEdit,
   onDelete,
   onMove,
+  onSortModeChange,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -55,9 +58,11 @@ export function WorkspaceFolderSection({
   isDragging: boolean;
   dropPlacement: 'inside' | 'before' | 'after' | null;
   visibleCount: number;
+  totalCount?: number;
   onEdit: () => void;
   onDelete: () => void;
   onMove: (direction: 'up' | 'down') => void;
+  onSortModeChange?: (sortMode: WorkspaceFolderSortMode) => void;
   onDragStart: DragEventHandler<HTMLDivElement>;
   onDragEnd: DragEventHandler<HTMLDivElement>;
   onDragOver: DragEventHandler<HTMLElement>;
@@ -68,6 +73,8 @@ export function WorkspaceFolderSection({
   const collapsed = controller.collapsedFolderIds.includes(folder.id);
   const disabled = controller.isSaving || controller.isError;
   const color = getWorkspaceFolderColor(folder.color);
+  const isSmart = folder.kind === 'smart';
+  const count = totalCount ?? folder.worktreeIds.length;
 
   return (
     <section
@@ -88,9 +95,9 @@ export function WorkspaceFolderSection({
       )}
     >
       <div
-        draggable={!disabled}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
+        draggable={!disabled && !isSmart}
+        onDragStart={isSmart ? undefined : onDragStart}
+        onDragEnd={isSmart ? undefined : onDragEnd}
         className="group/folder hover:bg-accent flex items-center gap-1 rounded-md pr-1 transition-colors"
       >
         <button
@@ -98,7 +105,10 @@ export function WorkspaceFolderSection({
           aria-label={`${collapsed ? 'Expand' : 'Collapse'} folder ${folder.name}`}
           aria-expanded={!collapsed}
           onClick={() => controller.toggleFolder(folder.id)}
-          className="focus-visible:ring-ring flex min-h-9 min-w-0 flex-1 cursor-grab items-center gap-2 rounded-md px-2 text-left text-sm focus-visible:ring-2 focus-visible:outline-none active:cursor-grabbing [@media(any-pointer:coarse)]:min-h-11"
+          className={cn(
+            'focus-visible:ring-ring flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm focus-visible:ring-2 focus-visible:outline-none [@media(any-pointer:coarse)]:min-h-11',
+            !isSmart && 'cursor-grab active:cursor-grabbing'
+          )}
         >
           {collapsed ? (
             <ChevronRight className="text-muted-foreground size-3.5 shrink-0" />
@@ -111,9 +121,9 @@ export function WorkspaceFolderSection({
           </span>
           <span
             className="text-muted-foreground text-xs tabular-nums"
-            title={`${visibleCount} of ${folder.worktreeIds.length} workspaces shown`}
+            title={`${visibleCount} of ${count} workspaces shown`}
           >
-            {folder.worktreeIds.length}
+            {count}
           </span>
         </button>
         <DropdownMenu>
@@ -166,6 +176,34 @@ export function WorkspaceFolderSection({
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
+            {onSortModeChange && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={disabled} className="gap-2">
+                  <ArrowUpDown className="text-muted-foreground size-4" />
+                  Sort workspaces
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup
+                    value={folder.sortMode}
+                    onValueChange={value => {
+                      if (value === 'manual' || value === 'created' || value === 'activity') {
+                        onSortModeChange(value);
+                      }
+                    }}
+                  >
+                    <DropdownMenuRadioItem value="manual" disabled={disabled}>
+                      Manual
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="created" disabled={disabled}>
+                      Created
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="activity" disabled={disabled}>
+                      Last activity
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled={disabled || isFirst} onSelect={() => onMove('up')}>
               <ArrowUp className="size-4" />
@@ -178,7 +216,7 @@ export function WorkspaceFolderSection({
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" disabled={disabled} onSelect={onDelete}>
               <Trash2 className="size-4" />
-              Delete folder
+              {isSmart ? 'Remove from sidebar' : 'Delete folder'}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -189,7 +227,7 @@ export function WorkspaceFolderSection({
             children
           ) : (
             <p className="text-muted-foreground px-3 py-3 text-xs">
-              {folder.worktreeIds.length > 0 ? 'No matching workspaces' : 'Drop workspaces here'}
+              {count > 0 ? 'No matching workspaces' : 'Drop workspaces here'}
             </p>
           )}
         </div>

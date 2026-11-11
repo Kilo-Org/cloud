@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MessageBubble as V1MessageBubble } from '@/components/cloud-agent/MessageBubble';
 import { MessageErrorBoundary as V1MessageErrorBoundary } from '@/components/cloud-agent/MessageErrorBoundary';
-import { convertToCloudMessages } from '@/components/cloud-agent/store/db-session-atoms';
+import { convertToCloudMessages } from '@/components/cloud-agent-next/legacy-session-types';
 import { CloudReadOnlyThread } from '@/components/cloud-agent-next/assistant-ui/CloudThread';
 import { CloudMessage as V2Message } from '@/components/cloud-agent-next/assistant-ui/CloudMessage';
 import { useCloudMessagePresentation } from '@/components/cloud-agent-next/assistant-ui/cloud-presentation-context';

@@ -10,7 +10,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { selectSessionRowEyebrowRight } from '@/components/ui/session-row-eyebrow-right';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Text } from '@/components/ui/text';
-import { agentColor, stateTint } from '@/lib/agent-color';
+import { agentColor, isPlaceholderTint, stateTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -117,7 +117,11 @@ export function SessionRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const color = agentState ? stateTint(agentState) : agentColor(agentLabel);
-  const dimStrip = !live && !needsInput;
+  // A row that is neither live nor waiting recedes behind one that is. The
+  // muted context tint is already the quietest mark a row can carry, and
+  // multiplying it again erased the strip on the dark page, so only an accent
+  // strip dims.
+  const dimStrip = !live && !needsInput && !isPlaceholderTint(color);
   const liveKind: GlanceableStatusKind = statusKind === 'idle' ? 'idle' : 'running';
 
   const eyebrowDecision = selectSessionRowEyebrowRight({

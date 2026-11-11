@@ -229,6 +229,21 @@
     "signInCodeField": "Kòd koneksyon",
     "or": "oswa"
   },
+  "pendingLink": {
+    "description": "Gen yon kont ki deja itilize {{email}}. Konekte ak youn nan metòd li yo pou ajoute {{provider}}.",
+    "emailCode": "Voye yon kòd koneksyon ban mwen pa imèl",
+    "continueInBrowser": "Kontinye nan navigatè a",
+    "startAgain": "Rekòmanse",
+    "expired": "Demann sa a pou ajoute {{provider}} ekspire.",
+    "noMethods": "Kont sa a pa gen okenn lòt metòd koneksyon, kidonk yo pa ka ajoute {{provider}}.",
+    "linked": "Yo ajoute {{provider}} nan kont ou.",
+    "failedExpired": "Yo pa t ajoute {{provider}} paske demann lan ekspire.",
+    "failedWrongAccount": "Yo pa t ajoute {{provider}} paske ou te konekte nan yon lòt kont.",
+    "failedAccountAlreadyLinked": "Yo pa t ajoute {{provider}} paske li deja lye ak yon lòt kont.",
+    "failedProviderAlreadyLinked": "Yo pa t ajoute {{provider}} paske kont ou deja gen yon lòt koneksyon {{provider}}.",
+    "failedLinking": "Nou pa t ka ajoute {{provider}} nan kont ou.",
+    "notAdded": "Ou konekte. Yo pa t ajoute {{provider}} nan kont ou."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revizyon otomatik PR yo",
     "securityAgentSubtitle": "Jwenn epi korije vilnerabilite",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Kont tès",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO antrepriz",
     "passkeysTitle": "Kle aksè",
     "passkeysSubtitle": "Konekte san modpas",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Enstriksyon ou yo ak tout fichye ou voye ki poko atache ak yon mesaj ap efase.",
       "discardFailed": "Nou pa t ka jete bouyon an. Tanpri eseye ankò.",
       "remoteHint": "Pou egzekite sou òdinatè w la, lanse Kilo la epi kite li ap mache.",
-      "continueFrom": "Nou ap kontinye {{title}}.",
+      "continueFrom": "Nou ap kontinye «{{title}}».",
       "importingSession": "Ap enpòte sesyon an",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
       "importFailed": "Nou pa t ka enpòte sesyon sa a.",
@@ -2460,6 +2477,8 @@
       "toolList": "fè lis",
       "toolPatch": "korije",
       "toolTask": "travay",
+      "toolSendFile": "Fichye voye",
+      "toolSendFileAction": "Voye fichye",
       "readTodos": "Li plan an",
       "updateTodos": "Mete plan an ajou",
       "linesBadge": "{{displayCount}} liy",
@@ -2560,7 +2579,21 @@
       "thought": "Refleksyon",
       "showDetails": "Montre detay yo",
       "pending": "Annatant…",
-      "running": "Ap egzekite…"
+      "running": "Ap egzekite…",
+      "field": {
+        "filePath": "Chemen fichye",
+        "path": "Chemen",
+        "offset": "Dekalaj",
+        "limit": "Limit",
+        "pattern": "Modèl",
+        "include": "Enklizyon",
+        "patchText": "Tèks koreksyon",
+        "query": "Rechèch",
+        "prompt": "Enstriksyon",
+        "header": "Tit",
+        "question": "Kesyon",
+        "options": "Opsyon"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nou pa t ka afiche kontni an."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Modèl sa a sipòte efò refleksyon"
     },
-    "creditsRequired": "Ou pa gen ase kredi pou voye mesaj sa a. Ajoute kredi epi eseye ankò."
+    "creditsRequired": "Ou pa gen ase kredi pou voye mesaj sa a."
   },
   "settingsTools": {
     "confirmTitle": "Konfime chanjman sa a?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Ajan mwen an",
       "promptPlaceholder": "Ou se yon...",
       "tools": "Zouti",
+      "wholeToolRule": "Ajan sa a aplike yon sèl règ sou chak zouti an menm tan: {{rule}}. Switch sa yo se lekti sèlman.",
       "visibility": "Vizibilite",
       "visibilityPrimary": "Prensipal — yo montre nan seleksyon an",
       "visibilitySubagent": "Subagent — sèlman rele nan men lòt moun",
@@ -4244,5 +4278,8 @@
     "noEnabledContexts": "Pa gen kontèks ki aktive pou rapò pwograme yo",
     "sourceBlocker": "Sesyon an bezwen atansyon",
     "sourceMetadata": "Metadone sesyon an ki anrejistre"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Pa t ka louvri rezilta rechèch sa a"
   }
 }

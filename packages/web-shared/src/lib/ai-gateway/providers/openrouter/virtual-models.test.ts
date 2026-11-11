@@ -9,7 +9,7 @@ import type {
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 const SONNET = 'anthropic/claude-sonnet-5';
 const SONNET_LATEST = '~anthropic/claude-sonnet-latest';
@@ -67,7 +67,7 @@ function catalogModel(
   };
 }
 
-function storedModel(id: string, aliasTarget?: string): StoredModel {
+function storedModel(id: string, aliasTarget?: string): GatewayModelWithEndpoints {
   return {
     id,
     name: id,

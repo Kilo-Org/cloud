@@ -1,7 +1,10 @@
 import type { ClientEvalBilling } from '@kilocode/auto-routing-contracts';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
-import { recordUsage, type UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
+import {
+  recordLlmUsage,
+  type LlmUsageWriteOutcome,
+} from '@kilocode/worker-utils/usage-writer-client';
 
 export const GRADER_USAGE_MODEL = 'auto-routing/grader';
 
@@ -89,8 +92,8 @@ export async function buildGraderUsage(
 export async function writeGraderUsage(
   env: Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'>,
   usage: UsageRecordRequest
-): Promise<UsageWriteOutcome> {
-  return recordUsage(usage, {
+): Promise<LlmUsageWriteOutcome> {
+  return recordLlmUsage(usage, {
     url: new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href,
     secret: await env.INTERNAL_API_SECRET_PROD.get(),
   });

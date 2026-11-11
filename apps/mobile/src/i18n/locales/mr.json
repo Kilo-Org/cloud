@@ -229,6 +229,21 @@
     "signInCodeField": "साइन-इन कोड",
     "or": "किंवा"
   },
+  "pendingLink": {
+    "description": "{{email}} आधीच एका खात्याद्वारे वापरला जात आहे. {{provider}} जोडण्यासाठी त्या खात्याच्या एका पद्धतीने साइन इन करा.",
+    "emailCode": "मला साइन-इन कोड ईमेल करा",
+    "continueInBrowser": "ब्राउझरमध्ये सुरू ठेवा",
+    "startAgain": "पुन्हा सुरू करा",
+    "expired": "{{provider}} जोडण्याच्या या विनंतीची मुदत संपली आहे.",
+    "noMethods": "या खात्याला दुसरी कोणतीही साइन-इन पद्धत नाही, त्यामुळे {{provider}} जोडता येणार नाही.",
+    "linked": "{{provider}} तुमच्या खात्यात जोडले गेले.",
+    "failedExpired": "विनंतीची मुदत संपल्यामुळे {{provider}} जोडले गेले नाही.",
+    "failedWrongAccount": "तुम्ही वेगळ्या खात्यात साइन इन केल्यामुळे {{provider}} जोडले गेले नाही.",
+    "failedAccountAlreadyLinked": "{{provider}} आधीच दुसऱ्या खात्याशी लिंक असल्यामुळे जोडले गेले नाही.",
+    "failedProviderAlreadyLinked": "तुमच्या खात्यात आधीच वेगळे {{provider}} साइन-इन असल्यामुळे {{provider}} जोडले गेले नाही.",
+    "failedLinking": "{{provider}} तुमच्या खात्यात जोडता आले नाही.",
+    "notAdded": "तुम्ही साइन इन केले आहे. {{provider}} तुमच्या खात्यात जोडले गेले नाही."
+  },
   "profile": {
     "codeReviewerSubtitle": "स्वयंचलित PR पुनरावलोकने",
     "securityAgentSubtitle": "सुरक्षेतील त्रुटी शोधा आणि दुरुस्त करा",
@@ -267,6 +282,8 @@
     "providerTestAccount": "चाचणी खाते",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "एंटरप्राइझ SSO",
     "passkeysTitle": "पासक्या",
     "passkeysSubtitle": "पासवर्डशिवाय साइन इन करा",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "तुमचा प्रॉम्प्ट आणि जोडल्या न गेलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील.",
       "discardFailed": "मसुदा रद्द करता आला नाही. कृपया पुन्हा प्रयत्न करा.",
       "remoteHint": "तुमच्या संगणकावर चालवण्यासाठी तिथे Kilo सुरू करा आणि ते चालू ठेवा.",
-      "continueFrom": "{{title}} हे सत्र पुढे सुरू होत आहे.",
+      "continueFrom": "“{{title}}” हे सत्र पुढे सुरू होत आहे.",
       "importingSession": "सत्र आयात होत आहे",
       "cliCannotContinue": "हे CLI सत्र सुरू ठेवू शकत नाही. Cloud Agent किंवा दुसरे CLI निवडा.",
       "importFailed": "हे सत्र आयात करता आले नाही.",
@@ -2460,6 +2477,8 @@
       "toolList": "यादी",
       "toolPatch": "पॅच लागू करणे",
       "toolTask": "काम",
+      "toolSendFile": "फाइल पाठवली",
+      "toolSendFileAction": "फाइल पाठवणे",
       "readTodos": "योजना वाचा",
       "updateTodos": "योजना अद्ययावत करा",
       "linesBadge": "{{displayCount}} ओळी",
@@ -2560,7 +2579,21 @@
       "thought": "विचार",
       "showDetails": "तपशील दाखवा",
       "pending": "प्रलंबित…",
-      "running": "चालू आहे…"
+      "running": "चालू आहे…",
+      "field": {
+        "filePath": "फाइल मार्ग",
+        "path": "मार्ग",
+        "offset": "ऑफसेट",
+        "limit": "मर्यादा",
+        "pattern": "नमुना",
+        "include": "समावेश",
+        "patchText": "पॅच मजकूर",
+        "query": "क्वेरी",
+        "prompt": "प्रॉम्प्ट",
+        "header": "शीर्षक",
+        "question": "प्रश्न",
+        "options": "पर्याय"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "मजकूर किंवा इतर सामग्री दाखवता आली नाही."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "हे मॉडेल विचारांची पातळी समर्थित करते"
     },
-    "creditsRequired": "हा संदेश पाठवण्यासाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडा आणि पुन्हा प्रयत्न करा."
+    "creditsRequired": "हा संदेश पाठवण्यासाठी पुरेसे क्रेडिट नाहीत."
   },
   "settingsTools": {
     "confirmTitle": "हा बदल निश्चित करायचा?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "माझा एजंट",
       "promptPlaceholder": "तुम्ही एक...",
       "tools": "साधने",
+      "wholeToolRule": "हा एजंट एकाच वेळी प्रत्येक साधनावर एक नियम लागू करतो: {{rule}}. हे स्विचेस केवळ वाचनासाठी आहेत.",
       "visibility": "दृश्यमानता",
       "visibilityPrimary": "प्राथमिक — पिकरमध्ये दाखवले आहे",
       "visibilitySubagent": "उपएजंट — फक्त इतरांकडून कॉल करण्यायोग्य",
@@ -4244,5 +4278,8 @@
     "noEnabledContexts": "नियोजित आढाव्यांसाठी कोणताही संदर्भ सक्षम केलेला नाही",
     "sourceBlocker": "सत्राकडे लक्ष देणे आवश्यक आहे",
     "sourceMetadata": "नोंदवलेला सत्राचा मेटाडेटा"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "हा शोध परिणाम उघडता आले नाही"
   }
 }

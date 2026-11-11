@@ -120,12 +120,15 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'redis', 'redis-http'],
     dir: 'apps/ai-gateway',
   },
-  // A no-behavior placeholder for now (see services/scim-sync/README.md): it
-  // runs with the core stack so every local session exercises the Worker and
-  // its Durable Object binding. No dependencies and no secrets.
+  // Applies WorkOS directory events by calling the app's internal SCIM
+  // endpoints, so it needs Next.js up and Postgres behind it — the same
+  // dependencies `user-data-export` declares for the same reason. Without a
+  // `WORKOS_API_KEY` in `services/scim-sync/.dev.vars` the poll fails and
+  // reports the failure, which is harmless: the alarm retries and nothing is
+  // applied.
   'cloudflare-scim-sync': {
     group: 'core',
-    dependsOn: [],
+    dependsOn: ['postgres', 'nextjs'],
     dir: 'services/scim-sync',
   },
   'user-data-export': {

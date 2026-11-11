@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { NativeDownloadProgress } from '@/lib/native-transfer-progress';
 
 import { localTargetId } from './backend-target';
 import { ggufModelClient, loadProjector } from './gguf-client';
@@ -66,7 +67,14 @@ const storage: GgufStorage = {
     fileIn(INDEX).writeSync(text);
   },
   createDownload: (url, name, onProgress) =>
-    File.createDownloadTask(url, fileIn(name), { onProgress }),
+    File.createDownloadTask(url, fileIn(name), {
+      onProgress: progress => {
+        const parsed = NativeDownloadProgress.safeParse(progress);
+        if (parsed.success) {
+          onProgress(parsed.data);
+        }
+      },
+    }),
 };
 
 // Metal runs every layer on iOS. Android stays on the CPU: llama.rn's GPU

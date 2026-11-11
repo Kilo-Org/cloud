@@ -23,6 +23,8 @@ const STEP_LABEL_KEYS = {
   branch: 'agentChat.preparation.stepBranch',
   devcontainer_setup: 'agentChat.preparation.stepDevcontainerSetup',
   setup_commands: 'agentChat.preparation.detailRunningSetupCommands',
+  session_setup_commands: 'agentChat.preparation.detailRunningSetupCommands',
+  start_commands: 'agentChat.computeStatus.runningCommands',
   workspace_restore: 'agentChat.preparation.stepWorkspaceRestore',
   workspace_backup: 'agentChat.preparation.stepWorkspaceBackup',
   sandbox_provision: 'agentChat.preparation.stepSandboxProvision',
@@ -49,6 +51,9 @@ const MESSAGE_KEYS = {
   'Updating repository': 'agentChat.preparation.detailUpdatingRepository',
   'Checking out branch': 'agentChat.preparation.detailCheckingOutBranch',
   'Running setup commands': 'agentChat.preparation.detailRunningSetupCommands',
+  'Running build commands': 'agentChat.preparation.detailRunningSetupCommands',
+  'Running session setup': 'agentChat.preparation.detailRunningSetupCommands',
+  'Running start commands': 'agentChat.computeStatus.runningCommands',
   'Saving repository for faster starts': 'agentChat.preparation.detailSavingRepository',
   'Starting Kilo runtime': 'agentChat.preparation.detailStartingKiloRuntime',
   'Starting Kilo': 'agentChat.preparation.stepKiloServer',
@@ -113,8 +118,10 @@ const RESTORE_REPORT_PATTERN =
   /^Session restore incomplete: (\d+) of (\d+) files were not restored \(([^)]*)\)\.?(?: Missing: (.*))?$/u;
 const RESTORE_MORE_PATTERN = /^(.*) and (\d+) more$/u;
 const CLONE_RETRY_PATTERN = /^Retrying clone \(attempt (\d+) of (\d+)\)$/u;
-const SETUP_COMMAND_FAILED_PATTERN = /^Setup command (\d+) failed$/u;
-const SETUP_COMMAND_TIMED_OUT_PATTERN = /^Setup command (\d+) timed out$/u;
+/** Every command kind reuses the setup-command copy until the catalogs gain kind-specific sentences. */
+const SETUP_COMMAND_FAILED_PATTERN = /^(?:Setup|Build|Session setup|Start) command (\d+) failed$/u;
+const SETUP_COMMAND_TIMED_OUT_PATTERN =
+  /^(?:Setup|Build|Session setup|Start) command (\d+) timed out$/u;
 const COLD_RESTORE_PATTERN = /^Cold restore, snapshot applied, (\d+)\/(\d+) files restored$/u;
 const GIT_PROGRESS_PATTERN = /(\d{1,3})%$/u;
 

@@ -229,6 +229,21 @@
     "signInCodeField": "Kôd za prijavu",
     "or": "ili"
   },
+  "pendingLink": {
+    "description": "Račun s adresom {{email}} već postoji. Prijavi se jednim od njegovih načina da dodaš {{provider}}.",
+    "emailCode": "Pošalji mi kôd za prijavu e-poštom",
+    "continueInBrowser": "Nastavi u pregledniku",
+    "startAgain": "Počni ispočetka",
+    "expired": "Ovaj zahtjev za dodavanje usluge {{provider}} je istekao.",
+    "noMethods": "Ovaj račun nema drugi način prijave pa se {{provider}} ne može dodati.",
+    "linked": "{{provider}} je dodan tvom računu.",
+    "failedExpired": "{{provider}} nije dodan jer je zahtjev istekao.",
+    "failedWrongAccount": "{{provider}} nije dodan jer si se prijavio u drugi račun.",
+    "failedAccountAlreadyLinked": "{{provider}} nije dodan jer je već povezan s drugim računom.",
+    "failedProviderAlreadyLinked": "{{provider}} nije dodan jer tvoj račun već ima drugu prijavu putem usluge {{provider}}.",
+    "failedLinking": "{{provider}} nije moguće dodati tvom računu.",
+    "notAdded": "Prijavljen si. {{provider}} nije dodan tvom računu."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatski pregledi PR-ova",
     "securityAgentSubtitle": "Pronađi i otkloni ranjivosti",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testni račun",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Poslovni SSO",
     "passkeysTitle": "Pristupni ključevi",
     "passkeysSubtitle": "Prijavi se bez lozinke",
@@ -2450,7 +2467,7 @@
       "discardWithUploadsMessage": "Tvoj upit i sve prenesene datoteke koje nisu priložene poslanim porukama bit će izbrisani.",
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušaj ponovno.",
       "remoteHint": "Za pokretanje na tvom računalu pokreni Kilo tamo i ostavi ga da radi.",
-      "continueFrom": "Nastavlja se sesija {{title}}.",
+      "continueFrom": "Nastavlja se sesija „{{title}}”.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",
       "importFailed": "Uvoz ove sesije nije uspio.",
@@ -2503,6 +2520,8 @@
       "toolList": "prikaži popis",
       "toolPatch": "primijeni izmjene",
       "toolTask": "zadatak",
+      "toolSendFile": "Poslana datoteka",
+      "toolSendFileAction": "pošalji datoteku",
       "readTodos": "Pročitaj plan",
       "updateTodos": "Ažuriraj plan",
       "linesBadge": "redaka: {{displayCount}}",
@@ -2606,7 +2625,21 @@
       "thought": "Misao",
       "showDetails": "Prikaži pojedinosti",
       "pending": "Na čekanju…",
-      "running": "Izvođenje…"
+      "running": "Izvođenje…",
+      "field": {
+        "filePath": "Putanja datoteke",
+        "path": "Putanja",
+        "offset": "Pomak",
+        "limit": "Ograničenje",
+        "pattern": "Uzorak",
+        "include": "Uključivanje",
+        "patchText": "Tekst zakrpe",
+        "query": "Upit",
+        "prompt": "Uputa",
+        "header": "Naslov",
+        "question": "Pitanje",
+        "options": "Mogućnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Prikaz sadržaja nije uspio."
@@ -3858,7 +3891,7 @@
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
     },
-    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke. Dodajte kredite i pokušajte ponovno."
+    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke."
   },
   "settingsTools": {
     "confirmTitle": "Potvrditi ovu promjenu?"
@@ -4057,6 +4090,7 @@
       "namePlaceholder": "Moj agent",
       "promptPlaceholder": "ti si...",
       "tools": "Alati",
+      "wholeToolRule": "Ovaj agent primjenjuje jedno pravilo na sve alate odjednom: {{rule}}. Ovi su prekidači samo za čitanje.",
       "visibility": "Vidljivost",
       "visibilityPrimary": "Primarno — prikazano u alatu za odabir",
       "visibilitySubagent": "Subagent — samo poziv od drugih",
@@ -4310,5 +4344,8 @@
     "noEnabledContexts": "Nijedan kontekst nije omogućen za zakazana izvješća",
     "sourceBlocker": "Sesija zahtijeva pozornost",
     "sourceMetadata": "Zabilježeni metapodaci sesije"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
   }
 }

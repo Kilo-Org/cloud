@@ -57,6 +57,29 @@ function metadata(overrides: Record<string, unknown> = {}) {
 
 const selection = { provider: 'cloudflare' as const };
 
+describe('trusted runtime origin', () => {
+  it.each(['cloud-agent-web', 'cloud-agent', 'code-review', 'agent-manager', undefined])(
+    'preserves the worker origin %s separately from a client web claim',
+    billingOrigin => {
+      const input = metadata({
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+          createdOnPlatform: 'cloud-agent-web',
+          billingOrigin,
+        },
+      });
+      const registration = buildControlPlaneSessionRegistration(input, selection);
+      const parsed = controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      });
+      expect(parsed.credentials).toMatchObject({ createdOnPlatform: 'cloud-agent-web' });
+      expect(parsed.credentials.billingOrigin).toBe(billingOrigin);
+    }
+  );
+});
+
 describe('workspace tail snapshot authority', () => {
   it('carries a registered workspace from metadata, without inferring one for standalone sessions', () => {
     const workspaceId = 'worktree_00000000-0000-4000-8000-000000000001';
@@ -364,7 +387,7 @@ describe('migrated origin permissions', () => {
         webfetch: 'deny',
         websearch: 'deny',
         codesearch: 'deny',
-        bash: { git: 'allow' },
+        bash: { git: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny' },
       });
       expect(spec.permission?.bash).toMatchObject(
         createdOnPlatform === 'security-remediation'
@@ -375,10 +398,13 @@ describe('migrated origin permissions', () => {
               curl: 'deny',
             }
           : {
-              'git push': 'deny',
+              'git *': 'deny',
+              'git diff': 'allow',
               'gh pr create': 'deny',
               'gh api repos/*/issues/*/comments --input*': 'allow',
               'gh api repos/*/issues/comments/* -X PATCH*': 'allow',
+              'find *-exec*': 'deny',
+              'sort *--compress-program*': 'deny',
             }
       );
       expect(spec.env).toMatchObject({
@@ -721,6 +747,9 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
           envVars: { USER_SETTING: 'private-profile-env' },
           encryptedSecrets: { DATABASE_URL: envelope },
           runtimeSkills: [{ name: 'bitbucket-cloud-review', rawMarkdown: 'Review' }],
+          runtimeInstructions: [
+            { name: 'profile-proof', content: 'SYNTHETIC_PROFILE_INSTRUCTION' },
+          ],
           runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
           kiloCommands: [{ name: 'review-now', template: 'Review' }],
         },
@@ -735,6 +764,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
       { name: 'bitbucket-cloud-review', rawMarkdown: 'Review' },
     ]);
     expect(registration.spec.runtimeAgents).toBeUndefined();
+    expect(registration.spec.runtimeInstructions).toBeUndefined();
     expect(registration.spec.kiloCommands).toBeUndefined();
     expect(registration.spec.runtimeIsolation).toBe('per-session');
     expect(registration.spec.permission).toMatchObject({
@@ -1076,6 +1106,9 @@ describe('buildControlPlaneSessionRegistration session directory', () => {
 
 describe('profile runtime delivery', () => {
   const profile = {
+    runtimeInstructions: [
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ],
     runtimeSkills: [
       {
         name: 'review',
@@ -1093,7 +1126,7 @@ describe('profile runtime delivery', () => {
     kiloCommands: [{ name: 'review-now', template: 'Review $ARGUMENTS', agent: 'reviewer' }],
   };
 
-  it.each(['runtimeSkills', 'runtimeAgents', 'kiloCommands'] as const)(
+  it.each(['runtimeSkills', 'runtimeAgents', 'kiloCommands', 'runtimeInstructions'] as const)(
     'delivers %s with compatibility isolation',
     key => {
       const registration = buildControlPlaneSessionRegistration(

@@ -4,16 +4,24 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
+  organizationAccessRole,
   organizationMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_MANAGE_ROLES,
+  canManageOrganization,
+} from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import { GenerateLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import { OrganizationSSODomainSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  OrganizationSSODomainSchema,
+  type OrganizationSsoConfigView,
+  type OrganizationSsoStatusView,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -144,11 +152,39 @@ export const organizationSsoRouter = createTRPCRouter({
     // Check if organization has SSO connections
     const hasConnection = await hasWorkOsConnections(result.id);
 
-    return {
-      ...result,
+    // The summary names the domain its verification state describes: the verified
+    // one when the organization holds one, otherwise the first configured domain.
+    const primaryDomain =
+      result.domains?.find(domain => domain.state === OrganizationDomainState.Verified) ??
+      result.domains?.[0];
+
+    const status: OrganizationSsoStatusView = {
       isDomainVerified,
       hasConnection,
+      domain: primaryDomain?.domain ?? null,
     };
+
+    // Every member reads the status above. The provider organization, its
+    // domains with their verification state, and the rest of the WorkOS object
+    // are configuration material, and only the roles that may change that
+    // configuration read them.
+    const role = organizationAccessRole(opts.ctx, opts.ctx.organizationAccess);
+    if (!canManageOrganization(role)) {
+      return { kind: 'status', ...status } satisfies OrganizationSsoConfigView;
+    }
+
+    return {
+      kind: 'configuration',
+      ...status,
+      workosOrganization: {
+        id: result.id,
+        name: result.name,
+        domains: (result.domains ?? []).map(domain => ({
+          domain: domain.domain,
+          state: domain.state,
+        })),
+      },
+    } satisfies OrganizationSsoConfigView;
   }),
   deleteConfig: adminProcedure.input(OrgIdSchema).mutation(async opts => {
     const { organizationId } = opts.input;

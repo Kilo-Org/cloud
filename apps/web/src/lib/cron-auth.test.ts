@@ -7,4 +7,8 @@ describe('cron authorization', () => {
     expect(isCronAuthorizationValid('Bearer cron-secret-extra', 'cron-secret')).toBe(false);
     expect(isCronAuthorizationValid(null, 'cron-secret')).toBe(false);
   });
+
+  it('rejects every header when no secret is configured', () => {
+    expect(isCronAuthorizationValid('Bearer ', '')).toBe(false);
+  });
 });

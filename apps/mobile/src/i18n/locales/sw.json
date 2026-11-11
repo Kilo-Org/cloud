@@ -229,6 +229,21 @@
     "signInCodeField": "Msimbo wa kuingia",
     "or": "au"
   },
+  "pendingLink": {
+    "description": "Akaunti tayari inatumia {{email}}. Ingia kwa mojawapo ya njia zake za kuingia ili kuongeza {{provider}}.",
+    "emailCode": "Nitumie msimbo wa kuingia kwa barua pepe",
+    "continueInBrowser": "Endelea kwenye kivinjari",
+    "startAgain": "Anza tena",
+    "expired": "Ombi hili la kuongeza {{provider}} limeisha muda.",
+    "noMethods": "Akaunti hii haina njia nyingine ya kuingia, kwa hivyo {{provider}} haiwezi kuongezwa.",
+    "linked": "{{provider}} imeongezwa kwenye akaunti yako.",
+    "failedExpired": "{{provider}} haikuongezwa kwa sababu ombi liliisha muda.",
+    "failedWrongAccount": "{{provider}} haikuongezwa kwa sababu uliingia kwenye akaunti tofauti.",
+    "failedAccountAlreadyLinked": "{{provider}} haikuongezwa kwa sababu tayari imeunganishwa na akaunti nyingine.",
+    "failedProviderAlreadyLinked": "{{provider}} haikuongezwa kwa sababu akaunti yako tayari ina njia nyingine ya kuingia ya {{provider}}.",
+    "failedLinking": "Imeshindikana kuongeza {{provider}} kwenye akaunti yako.",
+    "notAdded": "Umeingia. {{provider}} haikuongezwa kwenye akaunti yako."
+  },
   "profile": {
     "codeReviewerSubtitle": "Ukaguzi wa kiotomatiki wa PR",
     "securityAgentSubtitle": "Tafuta na urekebishe udhaifu wa usalama",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Akaunti ya majaribio",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ya biashara",
     "passkeysTitle": "Vifunguo vya kuingia",
     "passkeysSubtitle": "Ingia bila nenosiri",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Maagizo yako na faili zozote zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",
       "discardFailed": "Imeshindikana kufuta rasimu. Tafadhali jaribu tena.",
       "remoteHint": "Ili kuendesha kwenye kompyuta yako, anzisha Kilo hapo na iache ikiendeshwa.",
-      "continueFrom": "Kikao {{title}} kinaendelea.",
+      "continueFrom": "Kikao “{{title}}” kinaendelea.",
       "importingSession": "Inaingiza kikao",
       "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
       "importFailed": "Imeshindikana kuingiza kikao hiki.",
@@ -2460,6 +2477,8 @@
       "toolList": "orodhesha",
       "toolPatch": "rekebisha",
       "toolTask": "kazi",
+      "toolSendFile": "Faili imetumwa",
+      "toolSendFileAction": "tuma faili",
       "readTodos": "Soma mpango",
       "updateTodos": "Sasisha mpango",
       "linesBadge": "Mistari {{displayCount}}",
@@ -2560,7 +2579,21 @@
       "thought": "Wazo",
       "showDetails": "Onyesha maelezo",
       "pending": "Inasubiri…",
-      "running": "Inaendelea…"
+      "running": "Inaendelea…",
+      "field": {
+        "filePath": "Njia ya faili",
+        "path": "Njia",
+        "offset": "Kianzio",
+        "limit": "Kikomo",
+        "pattern": "Muundo",
+        "include": "Kujumuisha",
+        "patchText": "Kiraka",
+        "query": "Hoji",
+        "prompt": "Maelekezo",
+        "header": "Kichwa",
+        "question": "Swali",
+        "options": "Chaguo"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Imeshindikana kuonyesha maudhui."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
     },
-    "creditsRequired": "Salio halitoshi kutuma ujumbe huu, ongeza salio kisha ujaribu tena."
+    "creditsRequired": "Salio halitoshi kutuma ujumbe huu."
   },
   "settingsTools": {
     "confirmTitle": "Thibitisha mabadiliko haya?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Wakala Wangu",
       "promptPlaceholder": "Wewe ni...",
       "tools": "Zana",
+      "wholeToolRule": "Wakala huyu hutumia kanuni moja kwa kila zana kwa wakati mmoja: {{rule}}. Swichi hizi ni za kusoma tu.",
       "visibility": "Mwonekano",
       "visibilityPrimary": "Msingi — imeonyeshwa kwenye kiteua",
       "visibilitySubagent": "Subagent — inaitwa tu kutoka kwa wengine",
@@ -4244,5 +4278,8 @@
     "noEnabledContexts": "Hakuna miktadha iliyowezeshwa kwa ripoti zilizoratibiwa",
     "sourceBlocker": "Kipindi kinahitaji kushughulikiwa",
     "sourceMetadata": "Metadata za kipindi zilizohifadhiwa"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"
   }
 }

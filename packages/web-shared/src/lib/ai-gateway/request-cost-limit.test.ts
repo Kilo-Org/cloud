@@ -1,4 +1,4 @@
-import type { StoredModel } from '@kilocode/db';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getOpenRouterModelsMetadataFromDatabase } from './providers/gateway-models-cache';
 import { getRawOpenRouterModels, pickerModelPricing } from './providers/openrouter';
@@ -28,7 +28,7 @@ jest.mock('./providers/vercel/mapModelIdToVercel', () => ({
   ...jest.requireActual('./providers/vercel/mapModelIdToVercel'),
   getVercelModelIdOverrides: jest.fn(async () => new Map()),
 }));
-const model: StoredModel = {
+const model: GatewayModelWithEndpoints = {
   id: 'test/bounded',
   name: 'Bounded model',
   endpoints: [
@@ -86,7 +86,7 @@ beforeEach(() => {
   jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
   jest.mocked(getVercelModelIdOverrides).mockResolvedValue(new Map());
 });
-function mockModels(models: StoredModel[]) {
+function mockModels(models: GatewayModelWithEndpoints[]) {
   const modelMap = Object.fromEntries(models.map(entry => [entry.id, entry]));
   jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(modelMap);
   jest.mocked(getRawOpenRouterModels).mockResolvedValue({
@@ -137,7 +137,7 @@ describe('request cost admission', () => {
   });
   it('admits against the preferred route price rather than a more expensive route', async () => {
     const id = 'test/preferred';
-    const routeModel: StoredModel = {
+    const routeModel: GatewayModelWithEndpoints = {
       id,
       name: 'Preferred model',
       endpoints: [
@@ -266,7 +266,7 @@ describe('request cost admission', () => {
     await expect(enforceRequestCostLimit('2000000', model.id, body, 2_000_000)).resolves.toBeNull();
   });
   it('admits a latest alias using its target prices and still enforces spend and balance limits', async () => {
-    const alias: StoredModel = {
+    const alias: GatewayModelWithEndpoints = {
       id: '~test/bounded-latest',
       name: 'Bounded latest',
       endpoints: [],
@@ -284,12 +284,12 @@ describe('request cost admission', () => {
     ).resolves.toMatch(/balance/);
   });
   it('refuses a stale transformed alias target instead of admitting it at a cheaper target price', async () => {
-    const cheaper: StoredModel = {
+    const cheaper: GatewayModelWithEndpoints = {
       id: 'test/cheaper',
       name: 'Cheaper model',
       endpoints: [{ pricing: { prompt: '0', completion: '0.000001' } }],
     };
-    const alias: StoredModel = {
+    const alias: GatewayModelWithEndpoints = {
       id: '~test/bounded-latest',
       name: 'Bounded latest',
       endpoints: [],
@@ -313,7 +313,7 @@ describe('request cost admission', () => {
     'accepts a target with the configured Vercel model mapping',
     async ({ overrides, transformed }) => {
       const target = { ...model, id: 'qwen/bounded' };
-      const alias: StoredModel = {
+      const alias: GatewayModelWithEndpoints = {
         id: '~qwen/bounded-latest',
         name: 'Bounded latest',
         endpoints: [],
@@ -327,7 +327,7 @@ describe('request cost admission', () => {
     }
   );
   it('rejects an alias attempt without a transformed model', async () => {
-    const alias: StoredModel = {
+    const alias: GatewayModelWithEndpoints = {
       id: '~test/bounded-latest',
       name: 'Bounded latest',
       endpoints: [],
@@ -339,7 +339,7 @@ describe('request cost admission', () => {
     );
   });
   it('rejects an alias whose target has no picker price', async () => {
-    const alias: StoredModel = {
+    const alias: GatewayModelWithEndpoints = {
       id: '~test/bounded-latest',
       name: 'Bounded latest',
       endpoints: [],
@@ -518,7 +518,7 @@ describe('request cost admission', () => {
 });
 
 describe('System One request cost bound', () => {
-  const jev: StoredModel = {
+  const jev: GatewayModelWithEndpoints = {
     id: 'typesafe/jev-1.13',
     name: 'TypeSafe: Jev 1.13',
     endpoints: [{ pricing: { prompt: '0.000000042', completion: '0' } }],
@@ -526,7 +526,7 @@ describe('System One request cost bound', () => {
   const questions = { relevant: { type: 'noul' as const } };
 
   function boundOf(
-    metadata: StoredModel,
+    metadata: GatewayModelWithEndpoints,
     state: unknown,
     askedQuestions: Record<string, unknown> = questions
   ): number {
@@ -558,7 +558,7 @@ describe('System One request cost bound', () => {
   });
 
   it('includes the per-request fee for a request with no measurable tokens', () => {
-    const flat: StoredModel = {
+    const flat: GatewayModelWithEndpoints = {
       id: 'typesafe/flat',
       name: 'Flat',
       endpoints: [{ pricing: { prompt: '0', completion: '0', request: '0.02' } }],
@@ -568,12 +568,12 @@ describe('System One request cost bound', () => {
   });
 
   it('reserves the output allowance on a model that bills completion', () => {
-    const completionPriced: StoredModel = {
+    const completionPriced: GatewayModelWithEndpoints = {
       id: 'typesafe/completion-priced',
       name: 'Completion priced',
       endpoints: [{ pricing: { prompt: '0', completion: '0.000001' } }],
     };
-    const zeroCompletion: StoredModel = {
+    const zeroCompletion: GatewayModelWithEndpoints = {
       ...completionPriced,
       endpoints: [{ pricing: { prompt: '0', completion: '0' } }],
     };
@@ -605,12 +605,12 @@ describe('System One request cost bound', () => {
   });
 
   it('bounds a discounted route at its undiscounted price', () => {
-    const discounted: StoredModel = {
+    const discounted: GatewayModelWithEndpoints = {
       id: 'typesafe/discounted',
       name: 'Discounted',
       endpoints: [{ pricing: { prompt: '0.0000005', completion: '0', discount: 0.5 } }],
     };
-    const full: StoredModel = {
+    const full: GatewayModelWithEndpoints = {
       id: 'typesafe/full',
       name: 'Full',
       endpoints: [{ pricing: { prompt: '0.000001', completion: '0' } }],
@@ -645,7 +645,7 @@ describe('System One request cost bound', () => {
       get endpoints(): never {
         throw new TypeError('unexpected');
       },
-    } as unknown as StoredModel;
+    } as unknown as GatewayModelWithEndpoints;
 
     expect(() =>
       systemOneRequestCostBound(broken, { state: null, questions }, TEST_CUSTOM_PRICING_CONFIG)

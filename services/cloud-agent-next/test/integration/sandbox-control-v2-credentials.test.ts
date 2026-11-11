@@ -53,7 +53,7 @@ import {
 import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
   type FakeCredentialBroker,
 } from './helpers/fake-credentials.js';
 import { createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
@@ -334,7 +334,7 @@ async function setup(
   }));
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker, {
+    installFakeSandboxEnv(instance, broker, {
       WORKER_URL: VERCEL_TARGET,
       KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
       KILO_OPENROUTER_BASE: 'https://api.kilo.ai',
@@ -496,6 +496,9 @@ async function reconstructPreB(
     Object.assign(reconstructed, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
+      // A reconstructed instance keeps the fixture membership reader, so these
+      // route tests run against a current member.
+      organizationMembershipFor: async () => true,
       sessionPeerFor: (_ownerId: string, sessionId: string) => ({
         onRoute: async (update: ControlPlaneRouteUpdate) => {
           updates.push({ sessionId, update });
@@ -1043,6 +1046,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       Object.assign(reconstructed, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
+        organizationMembershipFor: async () => true,
         sessionPeerFor: () => ({
           onRoute: async () => {},
           onEvents: async () => {},
@@ -1999,6 +2003,129 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(credentialsFrame.sessionId).toBe(SESSION);
   });
 
+  it('renews a due grant from the alarm without a message and keeps the sandbox-visible values', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    const before = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      kilo: { alias: string; runtimeProxy?: unknown };
+    };
+    const issuedBefore = broker.githubIssued();
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+
+    // A long execution sends no message, so only the alarm can renew the lease.
+    await runInDurableObject(stub, instance => instance.alarm());
+
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.credentials') throw new Error('expected session.credentials');
+    const renewed = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      kilo: { alias: string; runtimeProxy?: unknown };
+      expiresAt: number;
+    };
+    expect(renewed.kilo.alias === before.kilo.alias).toBe(true);
+    expect(
+      JSON.stringify(renewed.kilo.runtimeProxy) === JSON.stringify(before.kilo.runtimeProxy)
+    ).toBe(true);
+    expect(frame.kilo.token === renewed.kilo.alias).toBe(true);
+    expect(renewed.expiresAt - Date.now()).toBeGreaterThan(TIMERS.credentialGrantReissueBelowMs);
+    expect(broker.githubIssued()).toBe(issuedBefore + 1);
+    expect(await wrapper.next(50)).toBeNull();
+    expect(await stub.status({ sessionId: SESSION })).toMatchObject({ view: { state: 'ready' } });
+
+    // The renewed grant is outside the window, so the next alarm does nothing.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(broker.githubIssued()).toBe(issuedBefore + 1);
+  });
+
+  it('retries a failed alarm renewal after a pause and fails the route when the grant expires', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+    );
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    const framesBefore = wrapper.receivedFrames();
+    let attempts = 0;
+    const update = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
+      attempts += 1;
+      return update(ref, grants);
+    };
+    provider.failPolicy = true;
+
+    // The grant is still valid: no frame, and the route stays ready.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+    expect(wrapper.receivedFrames()).toBe(framesBefore);
+    expect(await stub.status({ sessionId: SESSION })).toMatchObject({ view: { state: 'ready' } });
+
+    // Before the retry time, a second alarm does not attempt again.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+
+    // At expiry, the pending retry does not delay the attempt, and the route fails.
+    await setGrantExpiry(stub, SESSION, Date.now() - 1);
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(2);
+    expect(await stub.status({ sessionId: SESSION })).toEqual({
+      sessionId: SESSION,
+      view: { state: 'failed', attemptId: expect.any(String), reason: 'workspace_setup_failed' },
+    });
+    expect(await wrapper.next(50)).toBeNull();
+    expect(wrapper.receivedFrames()).toBe(framesBefore);
+  });
+
+  it('attempts a failed shared-scope renewal once for all members', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const input = (sessionId: string) =>
+      prepareInput(
+        sessionId,
+        { ...vercelSource(sessionId), scopeId: 'shared_modern' },
+        {
+          ...routeSpec(sessionId),
+          directory: '/workspace/shared_modern',
+          runtimeIsolation: 'per-session',
+        }
+      );
+    const { wrapper } = await prepareWarmRoute(stub, provider, input(SESSION));
+    await stub.prepare(input(SESSION_NEXT));
+    if ((await wrapper.next())?.type !== 'session.prepare') throw new Error('missing prepare');
+    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () => {
+      expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready');
+    });
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    let attempts = 0;
+    const update = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
+      attempts += 1;
+      return update(ref, grants);
+    };
+    provider.failPolicy = true;
+
+    // Both members share one grant, so one failed attempt sets one retry.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+
+    // At expiry, one more attempt fails both members.
+    await setGrantExpiry(stub, SESSION, Date.now() - 1);
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(2);
+    for (const sessionId of [SESSION, SESSION_NEXT]) {
+      expect(await stub.status({ sessionId })).toMatchObject({
+        view: { state: 'failed', reason: 'workspace_setup_failed' },
+      });
+    }
+  });
+
   it('replaces scoped MCP credentials on normal warm credential renewal without persisting them', async () => {
     const provider = createFakeProvider();
     const stub = await setup(provider);
@@ -2393,6 +2520,32 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const state = await stub.getAllocationState();
     expect(state.kind === 'stopping' || state.kind === 'stopped').toBe(true);
     expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
+  it('releases a session without a route and keeps the shared policy', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+    );
+    const policyCalls = provider.policyCalls.length;
+    const framesBefore = wrapper.receivedFrames();
+
+    // The session holds no alias, so its release keeps the shared policy and
+    // the live route connected.
+    provider.failPolicy = true;
+    await stub.release({ sessionId: SESSION_NEXT });
+
+    expect(provider.policyCalls.length).toBe(policyCalls);
+    expect((await stub.getAllocationState()).kind).toBe('connected');
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+    expect(wrapper.receivedFrames()).toBe(framesBefore);
+    expect(await wrapper.next(50)).toBeNull();
+    wrapper.close();
   });
 
   it('stops a live Vercel sandbox when the provider adapter lacks the policy hook', async () => {
@@ -3697,6 +3850,31 @@ describe('SandboxControlV2 environment repository credentials', () => {
     expect(prepareFrame.spec.directory).toBe(`/workspace/${SESSION}`);
     const row = await readRouteRow(stub, SESSION);
     expect(JSON.parse(row?.grant ?? '{}')).toMatchObject({ directory: `/workspace/${SESSION}` });
+  });
+
+  it('delivers a stacked base in the prepare frame', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker());
+    const baseSha = 'a'.repeat(40);
+    const { prepareFrame } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, credentialsSource(SESSION), {
+        ...routeSpec(SESSION),
+        branch: 'kilo/stacked',
+        branchMode: 'working',
+        baseBranch: 'feature/parent',
+        baseSha,
+      })
+    );
+
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec).toMatchObject({
+      branch: 'kilo/stacked',
+      branchMode: 'working',
+      baseBranch: 'feature/parent',
+      baseSha,
+    });
   });
 
   it('redeems the capability of the member that the request URL names', async () => {

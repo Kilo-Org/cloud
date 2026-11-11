@@ -4,9 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type LogoutCleanupRecord } from '@/lib/auth/logout-cleanup';
 
 const cleanupMock = vi.hoisted(() => {
-  const readState: { records: LogoutCleanupRecord[]; unreadable: boolean; corrupt: boolean } = {
+  const readState: {
+    records: LogoutCleanupRecord[];
+    unreadable: boolean;
+    unsupported: boolean;
+    corrupt: boolean;
+  } = {
     records: [],
     unreadable: false,
+    unsupported: false,
     corrupt: false,
   };
   return {
@@ -15,6 +21,9 @@ const cleanupMock = vi.hoisted(() => {
       await Promise.resolve();
       if (readState.unreadable) {
         return { status: 'unreadable' } as const;
+      }
+      if (readState.unsupported) {
+        return { status: 'unsupported' } as const;
       }
       if (readState.corrupt) {
         return { status: 'corrupt' } as const;
@@ -77,6 +86,7 @@ describe('attemptLogoutReconciliation', () => {
     resetLogoutReconciliationForTests();
     cleanupMock.readState.records = [];
     cleanupMock.readState.unreadable = false;
+    cleanupMock.readState.unsupported = false;
     cleanupMock.readState.corrupt = false;
     cleanupMock.readLogoutCleanupStore.mockImplementation(cleanupMock.defaultStoreRead);
     cleanupMock.writeLogoutCleanupRecords.mockResolvedValue(undefined);
@@ -95,6 +105,18 @@ describe('attemptLogoutReconciliation', () => {
     const outcome = await attemptLogoutReconciliation('u1');
 
     // A store that cannot be read must not be rewritten from an empty list.
+    expect(outcome).toEqual({ kind: 'unreadable-store' });
+    expect(cleanupMock.writeLogoutCleanupRecords).not.toHaveBeenCalled();
+    expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
+  });
+
+  it('leaves an unsupported store untouched without a network call', async () => {
+    cleanupMock.readState.unsupported = true;
+
+    const outcome = await attemptLogoutReconciliation('u1');
+
+    // A payload this build cannot interpret records nothing it can retry, so
+    // the payload stays for the build that wrote it.
     expect(outcome).toEqual({ kind: 'unreadable-store' });
     expect(cleanupMock.writeLogoutCleanupRecords).not.toHaveBeenCalled();
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
@@ -464,6 +486,52 @@ describe('attemptLogoutReconciliation', () => {
   });
 
   it('reports no pending activity unregister when no record exists', async () => {
+    await expect(hasPendingActivityUnregister('u1')).resolves.toBe(false);
+  });
+
+  it('reports a pending activity unregister while the store cannot be read', async () => {
+    cleanupMock.readState.records = [
+      makeRecord({ needsActivityUnregister: true, activityTokens: ['activity-1'] }),
+    ];
+    cleanupMock.readState.unreadable = true;
+
+    // A failed read says nothing about what the store holds, so registration
+    // waits for a later read to decide.
+    await expect(hasPendingActivityUnregister('u1')).resolves.toBe(true);
+  });
+
+  it('reports a pending activity unregister for an unreadable store holding no known record', async () => {
+    cleanupMock.readState.unreadable = true;
+
+    await expect(hasPendingActivityUnregister('u1')).resolves.toBe(true);
+  });
+
+  it('lets registration start again once the store is readable and holds no obligation', async () => {
+    cleanupMock.readState.unreadable = true;
+    await expect(hasPendingActivityUnregister('u1')).resolves.toBe(true);
+
+    cleanupMock.readState.unreadable = false;
+
+    await expect(hasPendingActivityUnregister('u1')).resolves.toBe(false);
+  });
+
+  it('still reports the recorded obligation once the store is readable again', async () => {
+    cleanupMock.readState.unreadable = true;
+    cleanupMock.readState.records = [
+      makeRecord({ needsActivityUnregister: true, activityTokens: ['activity-1'] }),
+    ];
+    await expect(hasPendingActivityUnregister('u1')).resolves.toBe(true);
+
+    cleanupMock.readState.unreadable = false;
+
+    await expect(hasPendingActivityUnregister('u1')).resolves.toBe(true);
+  });
+
+  it('reports no pending activity unregister for a payload this build cannot interpret', async () => {
+    cleanupMock.readState.unsupported = true;
+
+    // No record of that payload is readable for this build, so registration
+    // does not wait while it exists.
     await expect(hasPendingActivityUnregister('u1')).resolves.toBe(false);
   });
 });

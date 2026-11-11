@@ -16,6 +16,8 @@ import {
   getDeviceAuthSignInUrl,
 } from './device-auth-url';
 import type { RequestingClient } from '@/lib/device-auth/requesting-client';
+import type { DeviceAuthPendingLink } from '@/lib/device-auth/device-auth';
+import { getProviderById } from '@/lib/auth/provider-metadata';
 
 type DeviceAuthClientProps = {
   code: string;
@@ -23,6 +25,8 @@ type DeviceAuthClientProps = {
   isAppMode: boolean;
   /** The OAuth client this request asks to connect, when the request names one. */
   requestingClient: RequestingClient | null;
+  /** The live pending account link this request carries, when it carries one. */
+  pendingLink: DeviceAuthPendingLink | null;
   user: {
     name: string;
     email: string;
@@ -55,6 +59,7 @@ export function DeviceAuthClient({
   viewerToken,
   isAppMode,
   requestingClient,
+  pendingLink,
   user,
 }: DeviceAuthClientProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'denied' | 'error'>('idle');
@@ -64,6 +69,9 @@ export function DeviceAuthClient({
   // a request that names none needs no confirmation (unchanged flow).
   const [clientConfirmed, setClientConfirmed] = useState(false);
   const needsClientConfirmation = requestingClient !== null;
+  // No preselected attach: the approver chooses whether the pending link is
+  // added, and Authorize stays disabled until they do.
+  const [addPendingLink, setAddPendingLink] = useState<boolean | null>(null);
 
   const displayName = user.name.trim() || user.email;
   const shellClassName = getDeviceAuthShellClassName(isAppMode);
@@ -97,6 +105,7 @@ export function DeviceAuthClient({
         body: JSON.stringify({
           code,
           ...(requestingClient ? { confirmed_client_id: requestingClient.clientId } : {}),
+          ...(pendingLink ? { add_pending_link: addPendingLink === true } : {}),
         }),
       });
 
@@ -281,6 +290,54 @@ export function DeviceAuthClient({
             </div>
           ) : null}
 
+          {pendingLink ? (
+            <div
+              className="space-y-2 rounded-lg border p-4 max-[22rem]:p-2"
+              data-testid="pending-link"
+            >
+              <p className="text-sm">
+                This app also asks to add {getProviderById(pendingLink.provider).name} (
+                {pendingLink.displayName || pendingLink.email}) to your account
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2 pointer-coarse:min-h-11">
+                  <input
+                    type="radio"
+                    id="pending-link-add"
+                    name="pending-link-choice"
+                    className="mt-1"
+                    checked={addPendingLink === true}
+                    onChange={() => setAddPendingLink(true)}
+                    disabled={status === 'loading'}
+                  />
+                  <label
+                    htmlFor="pending-link-add"
+                    className="text-sm leading-5 pointer-coarse:py-2"
+                  >
+                    Approve and add it
+                  </label>
+                </div>
+                <div className="flex items-start gap-2 pointer-coarse:min-h-11">
+                  <input
+                    type="radio"
+                    id="pending-link-skip"
+                    name="pending-link-choice"
+                    className="mt-1"
+                    checked={addPendingLink === false}
+                    onChange={() => setAddPendingLink(false)}
+                    disabled={status === 'loading'}
+                  />
+                  <label
+                    htmlFor="pending-link-skip"
+                    className="text-sm leading-5 pointer-coarse:py-2"
+                  >
+                    Approve without adding it
+                  </label>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="space-y-2 rounded-lg border p-4 max-[22rem]:p-2">
             <p className="text-sm font-medium">This will allow the device to:</p>
             <ul className="text-muted-foreground space-y-1 text-sm">
@@ -293,6 +350,11 @@ export function DeviceAuthClient({
           {needsClientConfirmation && !clientConfirmed ? (
             <p className="text-muted-foreground text-xs">
               Confirm the requesting app above to authorize it.
+            </p>
+          ) : null}
+          {pendingLink && addPendingLink === null ? (
+            <p className="text-muted-foreground text-xs">
+              Choose whether to add the sign-in method above to authorize.
             </p>
           ) : null}
 
@@ -308,7 +370,11 @@ export function DeviceAuthClient({
             <Button
               className="flex-1 max-[22rem]:w-full max-[22rem]:px-2 pointer-coarse:min-h-11"
               onClick={() => handleAuthorize(true)}
-              disabled={status === 'loading' || (needsClientConfirmation && !clientConfirmed)}
+              disabled={
+                status === 'loading' ||
+                (needsClientConfirmation && !clientConfirmed) ||
+                (pendingLink !== null && addPendingLink === null)
+              }
             >
               {status === 'loading' ? (
                 <>

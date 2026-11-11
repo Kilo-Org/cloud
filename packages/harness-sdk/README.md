@@ -759,5 +759,3 @@ split and moves when the client does.
 | `@kilocode/harness-sdk/plugins/store/node` | The store on `node:sqlite` |
 | `@kilocode/harness-sdk/plugins/store/expo` | The store on `expo-sqlite` |
 | `@kilocode/harness-sdk/testing` | `checkStore` and `checkAssembler`, for a plugin author's own test suite |
-
-<!-- Temporary: exercises this package's CI job. Removed in the next commit. -->

@@ -20,7 +20,6 @@ import {
 } from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
@@ -256,7 +255,15 @@ export function LoginScreen() {
   // indicator below instead of a wholesale swap to the spinner.
   const startInFlight = status === 'pending' && !code;
   const showTerminalError = status === 'denied' || status === 'expired' || status === 'error';
-  const showIdleForm = status === 'idle' ? draft !== null : showTerminalError || startInFlight;
+  // The idle form paints on the first frame, before the stored draft resolves.
+  // A shorter placeholder instead of the form would grow the centered column
+  // into its place and lift the logo and the heading off the position they had
+  // already painted; painting the form reserves that space by construction.
+  const showIdleForm = status === 'idle' || showTerminalError || startInFlight;
+  // The form reads its seed once, so a stored address or SSO recovery reaches
+  // it through one remount when the restore lands. The module draft keeps the
+  // value a person already typed, so that remount cannot replace it.
+  const restoredDraft = draft !== null && (draft.email !== '' || draft.ssoRecovery !== null);
 
   return (
     // One wrapper owns the vertical space on both platforms: it paints the
@@ -328,16 +335,9 @@ export function LoginScreen() {
             </Text>
           )}
 
-          {status === 'idle' && draft === null && (
-            <>
-              {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-11 w-full" />
-            </>
-          )}
-
           {showIdleForm && (
             <IdleAuth
+              key={restoredDraft ? 'restored-draft' : 'blank-draft'}
               start={start}
               initialEmail={draft?.email ?? ''}
               initialSsoRecovery={draft?.ssoRecovery ?? null}

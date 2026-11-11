@@ -649,7 +649,7 @@ describe('login-screen timeout error dismissal', () => {
   });
 });
 
-describe('login-screen idle skeleton', () => {
+describe('login-screen idle form', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     deviceAuth.status = 'idle';
@@ -666,7 +666,7 @@ describe('login-screen idle skeleton', () => {
     vi.mocked(persistLoginDrafts).mockClear();
   });
 
-  it('shows a form skeleton until the draft restore finishes', async () => {
+  it('paints the form before the draft restore and re-seeds it when an address arrives', async () => {
     const state: {
       resolve: ((value: { email: string; ssoRecovery: null }) => void) | undefined;
     } = { resolve: undefined };
@@ -678,16 +678,22 @@ describe('login-screen idle skeleton', () => {
 
     const renderer = await mountLoginScreen();
 
-    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(2);
-    expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(0);
+    // The form owns its space on the first frame, so the centered column never
+    // grows into a placeholder's place.
+    const before = findByType(renderer.root, 'IdleAuth');
+    expect(before).toHaveLength(1);
+    expect(before[0]?.props.initialEmail).toBe('');
 
     await act(async () => {
-      state.resolve?.({ email: '', ssoRecovery: null });
+      state.resolve?.({ email: 'stored@example.com', ssoRecovery: null });
       await Promise.resolve();
     });
 
-    expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(1);
-    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
+    // The field reads its seed once: the restored address needs a fresh mount.
+    const after = findByType(renderer.root, 'IdleAuth');
+    expect(after).toHaveLength(1);
+    expect(after[0]).not.toBe(before[0]);
+    expect(after[0]?.props.initialEmail).toBe('stored@example.com');
 
     renderer.unmount();
   });

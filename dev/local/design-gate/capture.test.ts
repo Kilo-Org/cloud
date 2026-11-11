@@ -286,34 +286,56 @@ test('waitForLoadingPlaceholder releases a link that never lands without claimin
   assert.ok(waited.elapsedMs >= 1_000 && waited.elapsedMs < 5_000);
 });
 
-test('a measured loading placeholder is named instead of escaping as content', () => {
+test('an unsettled capture from a loading placeholder names that cause', () => {
   const dump = dumpWith();
-  dump.nodes.push({
-    parent: 0,
-    tag: 'View',
-    rect: [0, 0, 10, 10],
-    owners: ['View', 'Skeleton'],
-  });
-  const findings = screenFindings({
+  const blocked = screenFindings({
     cell: 'base',
-    target: 'session',
+    target: 'loading',
     dump,
     tree: normalize(dump),
     sampled: {
       dump,
       timeline: [dump, dump, dump],
-      settled: true,
-      elapsedMs: 2_500,
-      loading: { elapsedMs: 30_000 },
+      settled: false,
+      elapsedMs: 12_000,
+      blockedBy: 'loading-placeholder',
     },
   });
   assert.deepEqual(
-    findings.map(finding => finding.rule),
-    ['loading-placeholder']
+    blocked.map(finding => finding.rule),
+    ['unsettled']
   );
-  assert.equal(findings[0]?.severity, 'warning');
-  assert.equal(findings[0]?.measured, 30_000);
-  assert.match(findings[0]?.message ?? '', /loading placeholder after 30000 ms of waiting/);
+  assert.match(blocked[0]?.message ?? '', /still paints its loading placeholder/u);
+  // The finding measures the wait that ran, not the settle loop's own elapsed time.
+  const waited = screenFindings({
+    cell: 'base',
+    target: 'loading',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [dump, dump, dump],
+      settled: false,
+      elapsedMs: 12_000,
+      blockedBy: 'loading-placeholder',
+      loadingWaitMs: 30_101,
+    },
+  });
+  assert.equal(waited[0]?.measured, 30_101);
+  assert.match(waited[0]?.message ?? '', /after 30101 ms/u);
+  const changing = screenFindings({
+    cell: 'base',
+    target: 'moving',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [dumpWith({ y: 50 }), dump],
+      settled: false,
+      elapsedMs: 12_000,
+    },
+  });
+  assert.match(changing[0]?.message ?? '', /kept changing/u);
 });
 
 type ProbeState = {

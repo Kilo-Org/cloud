@@ -7,7 +7,26 @@ import { i18n } from '@/i18n';
  * Fixed, safe copy for a failed user-message delivery, keyed by the delivery
  * `reason`. Never surfaces raw provider or transport text.
  */
-type DeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reason'];
+type SdkDeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reason'];
+
+/**
+ * The reason the chat reports for a turn it could not send because the account's
+ * balance could not pay for it. The SDK never records it: no transport carried
+ * the message, so there is nothing for it to report. The chat hands it to the
+ * bubble in the same failed-delivery statement, so the footer, its actions and
+ * its accessibility label stay one mechanism.
+ */
+export const CREDITS_DELIVERY_REASON = 'credits';
+
+/**
+ * What a bubble is told about a turn that failed: the SDK's delivery record, or
+ * the chat's own credits statement above.
+ */
+export type MessageDeliveryStatement =
+  | MessageDeliveryState
+  | { status: 'failed'; error: string; reason: typeof CREDITS_DELIVERY_REASON };
+
+type DeliveryReason = SdkDeliveryReason | typeof CREDITS_DELIVERY_REASON;
 
 /**
  * The row a delivery failure draws, keyed by its `reason`. A message the person
@@ -42,6 +61,16 @@ const DELIVERY_FAILURE_ROW = {
     error: true,
     titleKey: 'agentChat.messageFailure.assistantTitle',
     detailKey: 'agentChat.messageFailure.deliveryExecution',
+  },
+  /* The account's balance refused the send: the message itself did not go, so the
+     statement sits under the person's own bubble, like the other delivery rows.
+     The title alone states the cause, because the action under it carries the
+     recovery, and a second line would repeat it. */
+  credits: {
+    side: 'user',
+    error: true,
+    titleKey: 'modelChat.creditsRequired',
+    detailKey: null,
   },
 } as const satisfies Record<
   DeliveryReason,
@@ -302,7 +331,7 @@ export function messageFailureLabel(
 }
 
 export function selectMessageFailure(input: {
-  deliveryState?: MessageDeliveryState;
+  deliveryState?: MessageDeliveryStatement;
   info: MessageInfo;
   /**
    * Whether this row's session can accept a re-send right now. A read-only
@@ -316,8 +345,16 @@ export function selectMessageFailure(input: {
   const retryAvailable = input.retryAvailable ?? true;
 
   if (info.role === 'user' && deliveryState?.status === 'failed') {
-    if (deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON) {
-      const copy = DELIVERY_FAILURE_ROW.execution;
+    // A failed response and a send the balance refused state their own cause
+    // rather than the transport's; both keep Copy to composer. The credits row
+    // drops the Retry its cause would make pointless and carries the one action
+    // that settles it.
+    if (
+      deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON ||
+      deliveryState.reason === CREDITS_DELIVERY_REASON
+    ) {
+      const credits = deliveryState.reason === CREDITS_DELIVERY_REASON;
+      const copy = credits ? DELIVERY_FAILURE_ROW.credits : DELIVERY_FAILURE_ROW.execution;
       return {
         kind: 'delivery',
         side: copy.side,
@@ -325,10 +362,10 @@ export function selectMessageFailure(input: {
         titleKey: copy.titleKey,
         title: i18n.t(copy.titleKey),
         detailKey: copy.detailKey,
-        detail: i18n.t(copy.detailKey),
+        detail: copy.detailKey === null ? null : i18n.t(copy.detailKey),
         copyDetail: deliveryState.error,
-        canRetry: retryAvailable,
-        canAddCredits: false,
+        canRetry: credits ? false : retryAvailable,
+        canAddCredits: credits,
         canCopy: true,
       };
     }

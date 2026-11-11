@@ -53,9 +53,10 @@ export function EmptyState({
   placement = 'center',
   refreshControl,
   compact,
+  title,
   ...props
 }: Readonly<EmptyStateProps>) {
-  const body = <EmptyStateBody {...props} placement={placement} compact={compact} />;
+  const body = <EmptyStateBody {...props} title={title} placement={placement} compact={compact} />;
   return placement === 'center' ? (
     <CenteredState refreshControl={refreshControl}>{body}</CenteredState>
   ) : (

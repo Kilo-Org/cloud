@@ -28,6 +28,7 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { parseUsageWithRecovery } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { fetchGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -65,7 +66,6 @@ import {
  */
 const SYSTEM_ONE_UPSTREAM_TIMEOUT_MS = 10 * 60 * 1000;
 
-/** Only a body that carries a generation id can have its cost reconciled. */
 const generationIdSchema = z.object({ id: z.string().min(1) });
 
 /** A body the gateway could not use may still name the model the provider billed. */
@@ -327,28 +327,27 @@ export async function handleSystemOneRequest(request: NextRequest) {
    * body did not carry a usable cost. Reconcile it through the generation
    * endpoint the rest of the gateway uses for the same purpose.
    */
-  const deferReconciledUsage = (generationId: string, ttfb: number, model?: string) => {
-    const cancelled = request.signal.aborted;
-    const context = usageContextOf(502, ttfb);
+  const deferReconciledUsage = (stats: MicrodollarUsageStats, context: MicrodollarUsageContext) => {
     after(async () => {
-      const generation = await fetchGeneration(generationId, OPENROUTER);
+      const generation = stats.messageId
+        ? await fetchGeneration(stats.messageId, OPENROUTER)
+        : undefined;
       if (!generation) {
-        await logMicrodollarUsageAndReportToBouncer(
-          zeroCostUsageStats({ messageId: generationId, model, statusCode: 502, cancelled, ttfb }),
-          context
-        );
+        await logMicrodollarUsageAndReportToBouncer(stats, context);
         return;
       }
       const reconciled = mapToUsageStats(generation, '', user.id, OPENROUTER.type);
       await logMicrodollarUsageAndReportToBouncer(
         {
           ...reconciled,
+          messageId: reconciled.messageId ?? stats.messageId,
+          model: reconciled.model ?? stats.model,
           hasError: true,
-          status_code: 502,
-          cancelled,
+          status_code: stats.status_code,
+          cancelled: stats.cancelled,
           // The generation lookup carries no latency, so the gateway's own
           // measurement is the one this row reports, as it does for the other rows.
-          latency: ttfb,
+          latency: stats.latency,
           // Same split the answered path records: the provider cost stays on the
           // row as `market_cost`, and a free model charges nothing.
           cost_mUsd: isFree ? 0 : reconciled.cost_mUsd,
@@ -363,8 +362,14 @@ export async function handleSystemOneRequest(request: NextRequest) {
    * A failed upstream call still owes its attempt row. The row reports the first-byte time the
    * gateway measured, which is absent only when no response ever arrived.
    */
-  const upstreamFailureResponse = (error: unknown, measuredTtfbMs: number | null) => {
-    deferZeroCostUsage(null, isUpstreamTimeoutError(error) ? 504 : 502, measuredTtfbMs);
+  const upstreamFailureResponse = (
+    error: unknown,
+    measuredTtfbMs: number | null,
+    recordUsage = true
+  ) => {
+    if (recordUsage) {
+      deferZeroCostUsage(null, isUpstreamTimeoutError(error) ? 504 : 502, measuredTtfbMs);
+    }
     if (request.signal.aborted) {
       return errorResponse(
         'The client disconnected before the response was sent, so the request was cancelled.',
@@ -427,55 +432,52 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   let responseBody: unknown;
-  try {
+  let bodyRead = false;
+  let providerCost = 0;
+  const context = usageContextOf(response.status, ttfbMs);
+  const stats = await parseUsageWithRecovery(response, context, async () => {
     responseBody = await response.json();
-  } catch (error) {
-    // The provider received the request and may have billed it, so this row keeps the
-    // first-byte time the gateway measured before the body turned out to be unreadable.
-    errorExceptInTest('OpenRouter System One response body was unreadable', error);
-    return upstreamFailureResponse(error, ttfbMs);
-  }
-
-  const result = systemOneResponseSchema.safeParse(responseBody);
-  emitMetrics(response.status, ttfbMs, result.success ? result.data.provider : undefined);
-  if (!result.success) {
-    errorExceptInTest('Invalid OpenRouter System One response or missing usage');
-    // A body the gateway could not accept may still name the model the provider
-    // billed, and the row must attribute the attempt the same way an answered
-    // request does.
+    bodyRead = true;
+    const { id, model, provider, usage } = systemOneResponseSchema.parse(responseBody);
+    providerCost = usage.cost;
+    return {
+      ...zeroCostUsageStats({
+        messageId: id,
+        model,
+        statusCode: response.status,
+        cancelled: request.signal.aborted,
+        ttfb: ttfbMs,
+      }),
+      hasError: false,
+      inference_provider: provider ?? null,
+      inputTokens: usage.input_tokens,
+      outputTokens: usage.output_tokens,
+    };
+  });
+  emitMetrics(response.status, ttfbMs, stats.inference_provider);
+  if (stats.hasError) {
     const reportedModel = providerModelSchema.safeParse(responseBody);
-    const model = reportedModel.success ? reportedModel.data.model : undefined;
     const generationId = generationIdSchema.safeParse(responseBody);
-    if (generationId.success) deferReconciledUsage(generationId.data.id, ttfbMs, model);
-    else deferZeroCostUsage(null, 502, ttfbMs, model);
+    deferReconciledUsage(
+      {
+        ...stats,
+        messageId: generationId.success ? generationId.data.id : stats.messageId,
+        model: reportedModel.success ? reportedModel.data.model : resolvedModel,
+        latency: ttfbMs,
+        streamed: false,
+        cancelled: request.signal.aborted,
+        market_cost: 0,
+        is_byok: false,
+      },
+      context
+    );
+    if (!bodyRead) return upstreamFailureResponse(undefined, ttfbMs, false);
     return errorResponse('Invalid upstream response', 'upstream_error', 502);
   }
 
-  const { id, model, provider, usage } = result.data;
-  const cost = toMicrodollars(usage.cost);
-  const stats: MicrodollarUsageStats = {
-    messageId: id,
-    model,
-    responseContent: '',
-    hasError: false,
-    inference_provider: provider ?? null,
-    upstream_id: null,
-    finish_reason: null,
-    latency: ttfbMs,
-    moderation_latency: null,
-    generation_time: null,
-    streamed: false,
-    cancelled: request.signal.aborted,
-    status_code: response.status,
-    cost_mUsd: isFree ? 0 : cost,
-    market_cost: cost,
-    inputTokens: usage.input_tokens,
-    outputTokens: usage.output_tokens,
-    cacheWriteTokens: 0,
-    cacheHitTokens: 0,
-    is_byok: false,
-  };
-  const context = usageContextOf(response.status, ttfbMs);
+  const cost = toMicrodollars(providerCost);
+  stats.cost_mUsd = isFree ? 0 : cost;
+  stats.market_cost = cost;
   after(async () => {
     await logMicrodollarUsageAndReportToBouncer(stats, context);
   });

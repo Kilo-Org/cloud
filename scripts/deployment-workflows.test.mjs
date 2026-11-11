@@ -579,7 +579,18 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
       assert.match(production.jobs[job].if, new RegExp(`needs\\.${dependency}\\.result`));
     }
   }
-  assert.ok(staging.jobs['deploy-workers'].needs.includes('deploy-ai-gateway'));
+  // Staging Workers read nothing from the Vercel jobs, so they start with them
+  // after the gate and the matrix lookup; record-deployment below still requires
+  // all three.
+  assert.deepEqual(staging.jobs['deploy-workers'].needs, [
+    'check-changes',
+    'db-gate',
+    'detect-workers',
+  ]);
+  assert.doesNotMatch(
+    staging.jobs['deploy-workers'].if,
+    /needs\.deploy-app\.result|needs\.deploy-ai-gateway\.result/
+  );
 
   for (const [deployment, jobs] of [
     [production, ['stage-ai-gateway', 'promote-ai-gateway']],
@@ -626,10 +637,11 @@ test('one database gate per deployment checks out, installs and migrates once', 
     const steps = job.steps;
     assert.equal(steps.filter(step => step.uses?.startsWith('useblacksmith/checkout@')).length, 1);
     assert.equal(steps.filter(step => step.run === dbGateInstall).length, 1);
-    assert.equal(
-      steps.find(step => step.uses?.startsWith('useblacksmith/checkout@')).with.ref,
-      '${{ needs.check-changes.outputs.target_sha }}'
-    );
+    const checkout = steps.find(step => step.uses?.startsWith('useblacksmith/checkout@'));
+    assert.equal(checkout.with.ref, '${{ needs.check-changes.outputs.target_sha }}');
+    // The job installs two workspaces and migrates; it never builds apps/web, so
+    // it must not pay for the LFS objects only the web build reads.
+    assert.equal(checkout.with.lfs, undefined, `${name} db-gate checkout must skip LFS`);
 
     const startupIndex = steps.findIndex(step => step.name === startupStep);
     const migrateIndex = steps.findIndex(step => step.name === migrateStep);
@@ -641,6 +653,13 @@ test('one database gate per deployment checks out, installs and migrates once', 
   }
 
   assert.equal(production.jobs['db-gate']['timeout-minutes'], 45);
+
+  // Counterweight to the skipped LFS above: the web build itself keeps its
+  // objects, because next.config.mjs fails on the kilo-anim pointer file.
+  const buildCheckout = ci.jobs['build'].steps.find(step =>
+    step.uses?.startsWith('useblacksmith/checkout@')
+  );
+  assert.equal(buildCheckout.with.lfs, true, 'the web build checkout must keep LFS');
 
   for (const [deployment, jobs] of [
     [production, ['promote-app', 'promote-ai-gateway', 'deploy-workers', 'record-deployment']],
@@ -754,13 +773,13 @@ test('staging and production Worker changes use independent deployment baselines
 test('Worker detection runs beside the staging chain and still gates the Worker deploy', () => {
   // Detection reads only the SHAs check-changes publishes, so neither workflow
   // waits for a Vercel staging deploy or a promotion before it starts.
-  for (const [name, deployment, stagingDependencies] of [
+  for (const [name, deployment, chainDependencies] of [
     [
       'production',
       production,
       ['stage-app', 'stage-ai-gateway', 'promote-app', 'promote-ai-gateway'],
     ],
-    ['staging', staging, ['deploy-app', 'deploy-ai-gateway']],
+    ['staging', staging, []],
   ]) {
     const job = deployment.jobs['detect-workers'];
     assert.equal(job.needs, 'check-changes', `${name} detection starts from the lookup`);
@@ -769,7 +788,7 @@ test('Worker detection runs beside the staging chain and still gates the Worker 
     // The detection call names a baseline and no matrix, so it cannot deploy.
     assert.equal(job.with.base_sha, '${{ needs.check-changes.outputs.base_sha }}');
     assert.equal(job.with.worker_matrix, undefined);
-    for (const dependency of stagingDependencies) {
+    for (const dependency of chainDependencies) {
       assert.equal(
         [job.needs].flat().includes(dependency),
         false,
@@ -790,8 +809,18 @@ test('Worker detection runs beside the staging chain and still gates the Worker 
     assert.equal(deploy.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
     assert.equal(deploy.with.base_sha, undefined, `${name} deploy call must not run detection`);
   }
-  for (const dependency of ['db-gate', 'deploy-app', 'deploy-ai-gateway']) {
+  for (const dependency of ['db-gate', 'detect-workers']) {
     assert.ok([staging.jobs['deploy-workers'].needs].flat().includes(dependency));
+  }
+  // Staging Workers read nothing the Vercel staging deploys produce, so they run
+  // beside them. record-deployment still waits for all three.
+  for (const dependency of ['deploy-app', 'deploy-ai-gateway']) {
+    assert.equal(
+      [staging.jobs['deploy-workers'].needs].flat().includes(dependency),
+      false,
+      `staging Worker deploy must not wait for ${dependency}`
+    );
+    assert.ok(staging.jobs['record-deployment'].needs.includes(dependency));
   }
 
   // The production deploy keeps every gate it had and adds the detection result:

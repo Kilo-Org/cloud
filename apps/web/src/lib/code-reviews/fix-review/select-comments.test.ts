@@ -7,6 +7,7 @@ import type { CollaboratorPermission } from '@/lib/integrations/platforms/github
 import {
   FIX_REVIEW_COMMENT_BODY_MAX_LENGTH,
   FIX_REVIEW_MAX_COMMENTS,
+  FIX_REVIEW_PERMISSION_LOOKUP_CONCURRENCY,
   FIX_REVIEW_TOTAL_BODY_MAX_LENGTH,
   getFixReviewInitiatorIdentity,
   selectFixReviewComments,
@@ -150,6 +151,33 @@ describe('selectFixReviewComments', () => {
     expect(lookupPermission).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps no more permission lookups in flight than the limit', async () => {
+    const authors = Array.from({ length: 20 }, (_, index) => `author-${index}`);
+    let inFlight = 0;
+    let peakInFlight = 0;
+    const lookupPermission = jest.fn(async (_login: string) => {
+      inFlight += 1;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      await Promise.resolve();
+      inFlight -= 1;
+      return 'write' as CollaboratorPermission;
+    });
+
+    const selected = await selectFixReviewComments({
+      comments: authors.flatMap((author, index) => [
+        comment({ id: 100 + index * 2, authorLogin: author }),
+        comment({ id: 101 + index * 2, authorLogin: author }),
+      ]),
+      initiator: null,
+      settledCommentIds: NO_SETTLED,
+      lookupPermission,
+    });
+
+    expect(peakInFlight).toBe(FIX_REVIEW_PERMISSION_LOOKUP_CONCURRENCY);
+    expect(lookupPermission).toHaveBeenCalledTimes(authors.length);
+    expect(selected).toHaveLength(authors.length * 2);
+  });
+
   it('caps an oversized comment body and marks it', async () => {
     const [selected] = await selectFixReviewComments({
       comments: [
@@ -267,7 +295,7 @@ const baseInput = {
 
 function clientFixture(overrides: Partial<FixReviewCommentClient> = {}): FixReviewCommentClient {
   return {
-    listComments: async () => [],
+    listComments: async () => ({ comments: [], unreadCount: 0 }),
     lookupPermission: async () => null,
     listSettledCommentIds: async () => new Set(),
     ...overrides,
@@ -304,10 +332,13 @@ function depsFixture(
 describe('selectFixReviewCommentsForReview', () => {
   it('reads comments with the linked integration credential and filters them', async () => {
     const client = clientFixture({
-      listComments: async () => [
-        comment({ id: 1, authorLogin: 'initiator' }),
-        comment({ id: 2, authorLogin: 'stranger' }),
-      ],
+      listComments: async () => ({
+        comments: [
+          comment({ id: 1, authorLogin: 'initiator' }),
+          comment({ id: 2, authorLogin: 'stranger' }),
+        ],
+        unreadCount: 0,
+      }),
       lookupPermission: async () => 'read',
       listSettledCommentIds: async prAuthor => {
         expect(prAuthor).toBe('author');
@@ -350,7 +381,10 @@ describe('selectFixReviewCommentsForReview', () => {
 
   it('falls back to the initiator user token when the review has no integration', async () => {
     const client = clientFixture({
-      listComments: async () => [comment({ id: 5, authorLogin: 'linked-user' })],
+      listComments: async () => ({
+        comments: [comment({ id: 5, authorLogin: 'linked-user' })],
+        unreadCount: 0,
+      }),
     });
     const createCommentClient = jest.fn<FixReviewSelectionDeps['createCommentClient']>(
       () => client
@@ -377,7 +411,10 @@ describe('selectFixReviewCommentsForReview', () => {
   it('trusts no login when the user token has no usable binding behind it', async () => {
     const lookupPermission = jest.fn(async (_login: string) => 'read' as CollaboratorPermission);
     const client = clientFixture({
-      listComments: async () => [comment({ id: 6, authorLogin: 'linked-user' })],
+      listComments: async () => ({
+        comments: [comment({ id: 6, authorLogin: 'linked-user' })],
+        unreadCount: 0,
+      }),
       lookupPermission,
     });
 
@@ -430,10 +467,12 @@ describe('selectFixReviewCommentsForReview', () => {
 
   it('keeps the most recent comments within the prompt budget and reports the rest', async () => {
     const client = clientFixture({
-      listComments: async () =>
-        Array.from({ length: FIX_REVIEW_MAX_COMMENTS + 2 }, (_, index) =>
+      listComments: async () => ({
+        comments: Array.from({ length: FIX_REVIEW_MAX_COMMENTS + 2 }, (_, index) =>
           comment({ id: index + 1, authorLogin: 'initiator' })
         ),
+        unreadCount: 0,
+      }),
     });
 
     const selection = await selectFixReviewCommentsForReview({
@@ -455,10 +494,12 @@ describe('selectFixReviewCommentsForReview', () => {
   it('also bounds the total comment text in the prompt', async () => {
     const body = 'x'.repeat(4_000);
     const client = clientFixture({
-      listComments: async () =>
-        Array.from({ length: 12 }, (_, index) =>
+      listComments: async () => ({
+        comments: Array.from({ length: 12 }, (_, index) =>
           comment({ id: index + 1, authorLogin: 'initiator', body })
         ),
+        unreadCount: 0,
+      }),
     });
 
     const selection = await selectFixReviewCommentsForReview({
@@ -473,6 +514,30 @@ describe('selectFixReviewCommentsForReview', () => {
 
     expect(selection.comments).toHaveLength(FIX_REVIEW_TOTAL_BODY_MAX_LENGTH / body.length);
     expect(selection.omittedCount).toBe(2);
+  });
+
+  it('reports the comments the read did not fetch as omitted', async () => {
+    const client = clientFixture({
+      listComments: async () => ({
+        comments: Array.from({ length: FIX_REVIEW_MAX_COMMENTS + 2 }, (_, index) =>
+          comment({ id: index + 1, authorLogin: 'initiator' })
+        ),
+        unreadCount: 7,
+      }),
+    });
+
+    const selection = await selectFixReviewCommentsForReview({
+      ...baseInput,
+      integration: {
+        id: 'integration-1',
+        platform_installation_id: '42',
+        github_app_type: 'standard',
+      },
+      deps: depsFixture(client),
+    });
+
+    expect(selection.comments).toHaveLength(FIX_REVIEW_MAX_COMMENTS);
+    expect(selection.omittedCount).toBe(9);
   });
   it.each([401, 403, 404, 500])(
     'handles provided credential failure %s without exposing the provider request',
@@ -593,7 +658,10 @@ describe('initiator identity from the personal GitHub binding', () => {
     const binding = await insertBinding();
     const lookupPermission = jest.fn(async (_login: string) => 'read' as CollaboratorPermission);
     const client = clientFixture({
-      listComments: async () => [comment({ id: 81, authorLogin: 'octocat', authorId: 583_231 })],
+      listComments: async () => ({
+        comments: [comment({ id: 81, authorLogin: 'octocat', authorId: 583_231 })],
+        unreadCount: 0,
+      }),
       lookupPermission,
     });
     const createCommentClient = jest.fn<FixReviewSelectionDeps['createCommentClient']>(
@@ -625,7 +693,10 @@ describe('initiator identity from the personal GitHub binding', () => {
     });
     const lookupPermission = jest.fn(async (_login: string) => 'read' as CollaboratorPermission);
     const client = clientFixture({
-      listComments: async () => [comment({ id: 82, authorLogin: 'octocat', authorId: 583_231 })],
+      listComments: async () => ({
+        comments: [comment({ id: 82, authorLogin: 'octocat', authorId: 583_231 })],
+        unreadCount: 0,
+      }),
       lookupPermission,
     });
     const createCommentClient = jest.fn<FixReviewSelectionDeps['createCommentClient']>(

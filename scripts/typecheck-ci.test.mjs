@@ -301,9 +301,6 @@ test('every workflow install job restores a pnpm dependency cache', () => {
 // whenever the runner fleet's apt egress degrades, and the runner images
 // already ship the Chromium system libraries. A browser build that the
 // version-keyed cache does not satisfy is downloaded, never apt-installed.
-// chromatic.yml is disabled in the repository's Actions settings, so its jobs
-// run nowhere; it is left as it is until the workflow is re-enabled.
-const disabledWorkflows = new Set(['chromatic.yml']);
 
 test('every Chromium install skips apt and restores the browser cache first', () => {
   const directory = new URL('../.github/workflows/', import.meta.url);
@@ -313,7 +310,6 @@ test('every Chromium install skips apt and restores the browser cache first', ()
   for (const file of readdirSync(directory)
     .filter(name => /\.ya?ml$/.test(name))
     .sort()) {
-    if (disabledWorkflows.has(file)) continue;
     const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
     for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = (job.steps ?? []).filter(step => step !== null && typeof step === 'object');
@@ -341,11 +337,12 @@ test('every Chromium install skips apt and restores the browser cache first', ()
   assert.deepEqual(
     installs,
     [
+      'chromatic.yml:playwright',
       'ci.yml:mobile-diagram-host',
       'extension-ci.yml:e2e-chrome-shard',
       'setup-smoke.yml:setup-smoke',
     ],
-    'every Chromium install in a live workflow is covered'
+    'every Chromium install in a workflow is covered'
   );
 });
 

@@ -10,15 +10,19 @@ import {
   emitApiMetricsForResponse,
   emitGatewayApiMetrics,
 } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
-import { countAndStoreTranscriptionUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  INVALID_TOKEN_CODE,
+  countAndStoreTranscriptionUsage,
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
+import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 jest.mock('next/server', () => {
   return {
     ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -148,7 +152,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
     jest.mocked(countAndStoreTranscriptionUsage).mockReturnValue({
-      statsPromise: Promise.resolve(null),
+      // Metrics are mocked, so the parsed stats never need to settle.
+      statsPromise: new Promise<MicrodollarUsageStats>(() => {}),
       usagePromise: Promise.resolve(null),
     });
   });
@@ -231,6 +236,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       'https://openrouter.ai/api/v1/audio/transcriptions',
       expect.objectContaining({ method: 'POST' })
     );
+    expect(jest.mocked(countAndStoreTranscriptionUsage).mock.calls[0]?.[3]).toBe(OPENROUTER);
 
     const [, init] = mockedFetch.mock.calls[0];
     const headers = init?.headers as Headers;

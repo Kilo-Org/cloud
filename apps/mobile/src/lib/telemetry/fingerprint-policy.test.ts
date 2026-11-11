@@ -10,6 +10,12 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  STORE_FAILURE_KEY,
+  type StoreCreditProductsDiagnostics,
+  StoreCreditProductsError,
+} from '@/lib/credits/store-products-loader';
+import { reportAppError } from '@/lib/telemetry/app-error-reporting';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import {
   createNetworkErrorFetch,
@@ -186,6 +192,36 @@ describe('fingerprint policy', () => {
     expect(first).toBe('network-error | trpc | session.list | http.400');
     expect(second).toBe('network-error | trpc | session.list | http.500');
     expect(second).not.toBe(first);
+  });
+
+  it('separates two store failures that differ only in the store SDK failure code', () => {
+    const diagnostics: StoreCreditProductsDiagnostics = {
+      storefront: 'app_store',
+      backendPackCount: 4,
+      storeListingCount: 0,
+      matchedCount: 0,
+      requestedProductIds: ['credits.usd10.v1'],
+      returnedProductIds: [],
+    };
+    for (const code of ['service-error', 'query-product']) {
+      reportAppError(
+        new StoreCreditProductsError(STORE_FAILURE_KEY, diagnostics, {
+          cause: Object.assign(new Error('Failed to query product for sku'), {
+            name: '[expo-iap]: PurchaseError',
+            code,
+          }),
+        }),
+        { source: 'query', queryKey: ['credits', 'storeProducts', 'app_store'] }
+      );
+    }
+
+    const [first, second] = groupKeys();
+    expect(first).toBe(
+      'credit-catalog-query | store-error | app_store | purchase-error | service-error'
+    );
+    expect(second).toBe(
+      'credit-catalog-query | store-error | app_store | purchase-error | query-product'
+    );
   });
 
   it('keeps only the tRPC metadata of the body and no token in the fingerprint', () => {

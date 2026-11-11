@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { isStoreDeadlineError, withStoreDeadline } from '@/lib/iap/store-call-deadline';
 import { TELEMETRY_DESCRIPTION_KEY, type TelemetryDescription } from '@/lib/telemetry/error-sink';
 
@@ -44,14 +46,99 @@ export type StoreCreditProductsDiagnostics = {
 };
 
 /**
- * Carries the catalog key of a message this app wrote. The store SDK throws its
- * own errors with internal wording ("Failed to query product"), which must never
- * reach the screen, so the screen only ever translates a key from this class.
+ * The store SDK's own failure identity. The cause is whatever the SDK rejected
+ * with, so only the two name-shaped fields are read: a store error message is
+ * internal SDK wording that can embed an account or a product id, so it must
+ * never reach a report or an issue title.
+ */
+const StoreFailureIdentitySchema = z.object({
+  name: z.string().max(120).optional(),
+  code: z.string().max(120).optional(),
+});
+
+/** The longest identity token a report carries. */
+const STORE_FAILURE_TOKEN_LIMIT = 48;
+const STORE_FAILURE_TOKEN_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+
+/** The bounded identity one store failure reports. */
+type StoreFailureIdentity = { name: string; code: string };
+
+/** One bounded lowercase token from an SDK-provided name or code, or undefined. */
+function storeFailureToken(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const slug = value
+    .replaceAll(/\[[^\]]*\]/gu, ' ')
+    .replaceAll(/([a-z0-9])([A-Z])/gu, '$1-$2')
+    .replaceAll(/([A-Z]+)([A-Z][a-z])/gu, '$1-$2')
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+/u, '')
+    .slice(0, STORE_FAILURE_TOKEN_LIMIT)
+    .replace(/-+$/u, '');
+  return STORE_FAILURE_TOKEN_PATTERN.test(slug) ? slug : undefined;
+}
+
+/**
+ * The store failure's name and code, or the placeholders that say the SDK gave
+ * neither. Total: a non-object rejection, a cause shaped like nothing, or a
+ * value that is not a bounded token keeps the report readable and its
+ * cardinality bounded. The SDK's `[package]: PurchaseError` name slugs to
+ * `purchase-error`.
+ */
+function storeFailureIdentity(cause: unknown): StoreFailureIdentity {
+  const parsed = StoreFailureIdentitySchema.safeParse(cause);
+  const name = parsed.success ? storeFailureToken(parsed.data.name) : undefined;
+  const code = parsed.success ? storeFailureToken(parsed.data.code) : undefined;
+  return { name: name ?? 'unknown', code: code ?? 'uncoded' };
+}
+
+type StoreProductsOutcome = 'store-unavailable' | 'store-timeout' | 'store-error';
+
+/**
+ * Three outcomes, told apart by what the store did. No cause: it answered and
+ * priced nothing. A deadline: it never answered. Any other cause: it answered
+ * with a failure. The message, the level and the fingerprint all read this, so
+ * they cannot disagree.
+ */
+function storeProductsOutcome(cause: unknown): StoreProductsOutcome {
+  if (cause === undefined) {
+    return 'store-unavailable';
+  }
+  return isStoreDeadlineError(cause) ? 'store-timeout' : 'store-error';
+}
+
+/**
+ * The report and issue title for one outcome. It names what the store did,
+ * never the catalog key: the key is this app's copy handle, not a defect name.
+ */
+function storeProductsMessage(outcome: StoreProductsOutcome, cause: unknown): string {
+  if (outcome === 'store-unavailable') {
+    return 'Store answered with no matching credit pack';
+  }
+  if (outcome === 'store-timeout') {
+    return 'Store did not answer the credit pack lookup in time';
+  }
+  const identity = storeFailureIdentity(cause);
+  return `Store credit pack lookup failed: ${identity.name} ${identity.code}`;
+}
+
+/**
+ * Carries the catalog key of the message the screen renders, and the catalog
+ * shape behind the failure. The store SDK throws its own errors with internal
+ * wording ("Failed to query product"), which must never reach the screen, so
+ * the screen only ever translates a key from this class.
+ *
+ * The catalog key is `key`, not the message: the message is the report and
+ * issue title, so it names what the store did.
  *
  * The error also declares its own telemetry: a store failure files under an
- * error-level fingerprint; the store answering without pricing any pack, and a
- * store that missed the call deadline — both expected, handled outcomes the
- * screen shows a card for — file as warnings. Each carries
+ * error-level fingerprint that carries the store SDK failure's own name and
+ * code, so one storefront's distinct failures stay separate issues; the store
+ * answering without pricing any pack, and a store that missed the call
+ * deadline — both expected, handled outcomes the screen shows a card for —
+ * file as warnings under their own outcome. Each carries
  * {@link StoreCreditProductsDiagnostics} so a report distinguishes a store-side
  * pricing gap from a catalog id mismatch, a store failure, or a hung SDK, and
  * the caught store error rides along as `cause`.
@@ -66,41 +153,53 @@ export class StoreCreditProductsError extends Error {
     diagnostics: StoreCreditProductsDiagnostics,
     options?: { cause?: unknown }
   ) {
-    super(key, options);
+    const cause = options?.cause;
+    const outcome = storeProductsOutcome(cause);
+    super(storeProductsMessage(outcome, cause), options);
+    this.name = 'StoreCreditProductsError';
     this.key = key;
     this.diagnostics = diagnostics;
     this[TELEMETRY_DESCRIPTION_KEY] = StoreCreditProductsError.telemetry(
+      key,
       diagnostics,
-      options?.cause
+      cause
     );
   }
 
   private static telemetry(
+    key: string,
     diagnostics: StoreCreditProductsDiagnostics,
     cause: unknown
   ): TelemetryDescription {
-    // Three outcomes, told apart by what the store did. No cause: it answered
-    // and priced nothing. A deadline: it never answered — bounded, expected,
-    // and retried on the next user attempt, so it is a warning like the
-    // zero-match answer, under its own fingerprint. Any other cause: it
-    // answered with a failure, which is the one real error here.
-    let outcome: 'store-unavailable' | 'store-timeout' | 'store-error' = 'store-error';
-    if (cause === undefined) {
-      outcome = 'store-unavailable';
-    } else if (isStoreDeadlineError(cause)) {
-      outcome = 'store-timeout';
-    }
+    const outcome = storeProductsOutcome(cause);
+    // A store that answered with a failure is the one real error here, and the
+    // store SDK's own name and code are that defect's identity: without them
+    // every failure of one storefront merged into one issue. The expected
+    // answers keep their own outcome and level.
+    const identity = outcome === 'store-error' ? storeFailureIdentity(cause) : undefined;
     return {
       level: outcome === 'store-error' ? 'error' : 'warning',
-      fingerprint: ['credit-catalog-query', outcome, diagnostics.storefront],
+      fingerprint: [
+        'credit-catalog-query',
+        outcome,
+        diagnostics.storefront,
+        ...(identity === undefined ? [] : [identity.name, identity.code]),
+      ],
       tags: {
         'error.subsystem': 'credits',
         'error.operation': 'load-store-products',
         'credits.storefront': diagnostics.storefront,
         'credits.outcome': outcome,
+        ...(identity === undefined
+          ? {}
+          : {
+              'credits.store-error-name': identity.name,
+              'credits.store-error-code': identity.code,
+            }),
       },
       contexts: {
         creditCatalogQuery: {
+          catalogKey: key,
           storefront: diagnostics.storefront,
           backendPackCount: diagnostics.backendPackCount,
           storeListingCount: diagnostics.storeListingCount,

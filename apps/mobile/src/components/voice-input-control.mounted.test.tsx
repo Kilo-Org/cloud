@@ -1,13 +1,13 @@
 // Tap geometry of the voice toggle: a control-size audit measures the box a
-// control renders on its own node, so `fullTarget` carries the shared 48dp box
-// on the pressable and keeps the size's visual circle inside it.
+// control renders on its own node, so the toolbar `lg` size carries the shared
+// 48dp box on the pressable and keeps its visual circle inside it.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { VoiceInputButton } from './voice-input-control';
-import { ICON_TARGET_BOX_CLASS, VOICE_INPUT_LG_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
@@ -34,7 +34,6 @@ vi.mock('@/lib/voice-input/voice-input-view-state', () => ({
 }));
 
 type Props = {
-  fullTarget?: boolean;
   hitSlop?: { bottom: number; left: number; right: number; top: number };
   size?: 'sm' | 'md' | 'lg';
 };
@@ -71,8 +70,8 @@ function classNamesOfType(
 }
 
 describe('VoiceInputButton tap geometry', () => {
-  it('carries the shared 48dp box on its own node when it renders a full target', async () => {
-    const renderer = await renderButton({ fullTarget: true, size: 'lg' });
+  it('carries the shared 48dp box on the toolbar size own node', async () => {
+    const renderer = await renderButton({ size: 'lg' });
 
     const [button] = renderer.root.findAll(node => Object.is(node.type, 'Pressable'));
     expect(String(button?.props.className)).toContain(ICON_TARGET_BOX_CLASS);
@@ -80,8 +79,8 @@ describe('VoiceInputButton tap geometry', () => {
     expect(button?.props.hitSlop).toBeUndefined();
   });
 
-  it('keeps the size visual circle inside the full target', async () => {
-    const renderer = await renderButton({ fullTarget: true, size: 'lg' });
+  it('keeps the toolbar size visual circle inside its box', async () => {
+    const renderer = await renderButton({ size: 'lg' });
 
     const [visual] = classNamesOfType(renderer, 'View');
     expect(String(visual)).toContain('h-10 w-10');
@@ -89,24 +88,18 @@ describe('VoiceInputButton tap geometry', () => {
     expect(String(visual)).toContain('bg-secondary');
   });
 
-  it('keeps the size frame as the pressable without a full target', async () => {
-    const renderer = await renderButton({ size: 'lg' });
+  it('keeps the smaller size frame and its own slop on the pressable', async () => {
+    const renderer = await renderButton({ size: 'md' });
 
     const [button] = renderer.root.findAll(node => Object.is(node.type, 'Pressable'));
-    expect(String(button?.props.className)).toContain('h-10 w-10');
+    expect(String(button?.props.className)).toContain('h-9 w-9');
     expect(String(button?.props.className)).not.toContain(ICON_TARGET_BOX_CLASS);
-    expect(button?.props.hitSlop).toEqual({
-      top: VOICE_INPUT_LG_HIT_SLOP_DP,
-      bottom: VOICE_INPUT_LG_HIT_SLOP_DP,
-      left: VOICE_INPUT_LG_HIT_SLOP_DP,
-      right: VOICE_INPUT_LG_HIT_SLOP_DP,
-    });
+    expect(button?.props.hitSlop).toEqual({ top: 4, bottom: 4, left: 4, right: 4 });
     expect(classNamesOfType(renderer, 'View')).toHaveLength(0);
   });
 
-  it('ignores a caller slop when the box carries the whole target', async () => {
+  it('ignores a caller slop when the toolbar size box carries the whole target', async () => {
     const renderer = await renderButton({
-      fullTarget: true,
       hitSlop: { top: 3, bottom: 3, left: 0, right: 0 },
       size: 'lg',
     });

@@ -69,7 +69,7 @@ const RING_STROKE = 3;
 export const WIDEST_PERCENTAGE_VALUE = 100;
 export const WIDEST_COST_MICRODOLLARS = 1_234_560_000;
 const PILL_CLASS =
-  'h-[44px] max-w-full shrink min-w-0 flex-row items-center gap-1 rounded-full border border-border bg-secondary px-3';
+  'h-[44px] shrink min-w-0 flex-row items-center gap-1 rounded-full border border-border bg-secondary px-3';
 const VALUE_CLASS = 'min-w-0 shrink text-xs tabular-nums';
 
 /**
@@ -188,8 +188,8 @@ export function SessionContextMetrics({
   // width decides the box; it paints nothing, and its own height is clipped so
   // it never adds to the pill's.
   const reservedBox = (
-    <View className="h-[44px] max-w-full shrink min-w-0 items-end">
-      <View className="h-0 max-w-full shrink min-w-0 overflow-hidden" aria-hidden>
+    <View className="h-[44px] shrink min-w-0 items-end">
+      <View className="h-0 shrink min-w-0 overflow-hidden" aria-hidden>
         <View className={PILL_CLASS}>
           <View style={{ width: RING_SIZE, height: RING_SIZE }} />
           {valueRun(percentageSizer, costSizer, true)}

@@ -237,8 +237,8 @@ describe('SessionContextMetrics', () => {
     });
     expect(classNameOf(root)).toContain('min-w-0');
     expect(classNameOf(root)).toContain('shrink');
+    expect(classNameOf(root)).toContain('items-end');
     const pill = pillOf(root);
-    expect(classNameOf(pill)).toContain('max-w-full');
     const runs = findAll(pill, el => propsOf(el).numberOfLines === 1);
     expect(runs).toHaveLength(1);
     for (const run of runs) {

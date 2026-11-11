@@ -156,7 +156,15 @@ describe('MessageBubble', () => {
       expect(html).toContain(label);
       expect(html).toContain('Before compaction');
       expect(html).toContain('Compaction detail');
-      expect(html).not.toContain('Internal context summary');
+      if (status === 'completed') {
+        expect(html).toContain('Internal context summary');
+        expect(html).toContain('Context summary');
+        expect(html).toContain('Compaction replaces older model context with a summary.');
+        expect(html.split('Internal context summary')).toHaveLength(2);
+      } else {
+        expect(html).not.toContain('Internal context summary');
+        expect(html).not.toContain('No summary is available');
+      }
       expect(html.split(label)).toHaveLength(2);
       expect(html).not.toContain('Raw abort text');
       expect(html.match(/data-message-id="msg_compaction"/g)).toHaveLength(1);
@@ -180,7 +188,7 @@ describe('MessageBubble', () => {
       expect(sharedHtml).toContain('Compaction detail');
       expect(sharedHtml).not.toContain('Compacting context…');
       expect(sharedHtml).not.toContain('Raw abort text');
-      expect(sharedHtml).not.toContain('Internal context summary');
+      expect(sharedHtml.includes('Internal context summary')).toBe(status === 'completed');
       expect(sharedHtml.match(/data-message-id="msg_compaction"/g)).toHaveLength(1);
       const childHtml = renderToStaticMarkup(
         React.createElement(CloudReadOnlyThread, { messages, child: true, isStreaming })
@@ -189,7 +197,7 @@ describe('MessageBubble', () => {
       expect(childHtml.split(label)).toHaveLength(2);
       expect(childHtml).toContain('Compaction detail');
       expect(childHtml).not.toContain('Unknown part type');
-      expect(childHtml).not.toContain('Internal context summary');
+      expect(childHtml.includes('Internal context summary')).toBe(status === 'completed');
       expect(childHtml).not.toContain('Raw abort text');
       if (error?.type === 'model') expect(childHtml).toContain('Model unavailable');
       function NestedTranscript() {
@@ -209,6 +217,39 @@ describe('MessageBubble', () => {
       expect(nestedHtml).not.toContain('Unknown part type');
     }
   );
+
+  it('explains a completed V2 compaction that has no saved summary', () => {
+    const messages = readKilo2Messages(
+      { id: 'ses-1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+      [{ id: 'msg_compaction', type: 'compaction', status: 'completed', time: { created: 2 } }]
+    );
+    const html = renderToStaticMarkup(React.createElement(CloudSharedTranscript, { messages }));
+    expect(html).toContain('No summary is available for this compaction.');
+    expect(html).not.toContain('aria-label="Context summary"');
+  });
+
+  it('shows a summary-only V2 compaction without requiring streamed content', () => {
+    const messages = readKilo2Messages(
+      { id: 'ses-1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+      [
+        {
+          id: 'msg_compaction',
+          type: 'compaction',
+          status: 'completed',
+          reason: 'auto',
+          summary: 'Keep the task and the next step.',
+          time: { created: 2 },
+        },
+      ]
+    );
+    const html = renderToStaticMarkup(React.createElement(CloudSharedTranscript, { messages }));
+    expect(html).toContain('Context compacted');
+    expect(html).toContain('(auto)');
+    expect(html).toContain('Keep the task and the next step.');
+    expect(html).toContain('aria-label="Context summary"');
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).not.toContain('No summary is available');
+  });
 
   it('keeps one resume anchor for a compaction-only group', () => {
     const message = userMessage('');

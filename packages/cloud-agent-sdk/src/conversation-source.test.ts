@@ -172,6 +172,18 @@ describe('versioned native conversation sources', () => {
           type: 'compaction',
           auto: false,
         },
+        ...(status === 'completed'
+          ? [
+              {
+                id: `${kilo2PartId(message.id, 0)}_summary`,
+                sessionID: session.id,
+                messageID: message.id,
+                type: 'text',
+                text: 'Internal context summary',
+                metadata: { compactionSummary: true },
+              },
+            ]
+          : []),
       ]);
       const terminal = status === 'completed' || status === 'failed';
       expect(history?.info.role === 'assistant' ? history.info.time.completed : undefined).toBe(
@@ -184,7 +196,7 @@ describe('versioned native conversation sources', () => {
       ).events;
       expect(live).toEqual([
         { type: 'message.updated', info: history?.info },
-        { type: 'message.part.updated', part: history?.parts[0] },
+        ...(history?.parts ?? []).map(part => ({ type: 'message.part.updated', part })),
       ]);
       expect(message.summary).toBe('Internal context summary');
     }
@@ -239,7 +251,7 @@ describe('versioned native conversation sources', () => {
     expect(completed.slice(1)).toEqual(
       restored.parts.map(part => ({ type: 'message.part.updated', part }))
     );
-    expect(restored.parts[1]).toMatchObject({
+    expect(restored.parts[2]).toMatchObject({
       id: kilo2PartId(message.id, 1),
       type: 'reasoning',
     });
@@ -257,6 +269,54 @@ describe('versioned native conversation sources', () => {
         })
       ).events[0]
     ).toMatchObject({ part: { id: kilo2PartId(message.id, 1) } });
+  });
+
+  it.each([undefined, '', '   '])('does not invent an absent compaction summary: %j', summary => {
+    const [message] = readKilo2Messages(session, [
+      {
+        id: 'msg_compaction',
+        type: 'compaction',
+        status: 'completed',
+        time: { created: 4 },
+        summary,
+      },
+    ]);
+    expect(message.parts).toHaveLength(1);
+    expect(message.parts[0].type).toBe('compaction');
+  });
+
+  it('does not count the displayed summary as native text when restoring a live layout', () => {
+    const reader = createConversationSourceReader();
+    const [message] = readKilo2Messages(session, [
+      {
+        id: 'msg_compaction',
+        type: 'compaction',
+        status: 'completed',
+        time: { created: 4 },
+        summary: 'Saved summary',
+        content: [{ type: 'text', text: 'Native text' }],
+      },
+    ]);
+    reader.observeProjected([message]);
+    const update = reader.read(
+      wire('conversation.event', {
+        sessionID: session.id,
+        source: { version: 'v2' },
+        event: {
+          id: 'evt_text',
+          type: 'session.text.ended',
+          data: {
+            sessionID: session.id,
+            assistantMessageID: message.info.id,
+            ordinal: 0,
+            text: 'Native text',
+          },
+        },
+      })
+    ).events;
+    expect(update[0]).toMatchObject({
+      part: { id: kilo2PartId(message.info.id, 1), text: 'Native text' },
+    });
   });
 
   it('supports v1 data and rejects unknown source versions', () => {

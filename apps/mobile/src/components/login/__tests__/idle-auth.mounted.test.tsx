@@ -181,6 +181,20 @@ function findButton(root: I, label: string): I {
   return btn;
 }
 
+/**
+ * The block that reports the action under the landing view's email field, so
+ * the login shell reserves what the keyboard actually covers there.
+ */
+function belowFieldBlock(root: I): I {
+  const field = root.findByType('FormField');
+  const siblings = field.parent?.children ?? [];
+  const next = siblings[siblings.indexOf(field) + 1];
+  if (next === undefined || typeof next === 'string' || next.props.onLayout === undefined) {
+    throw new Error('no measured block follows the email field');
+  }
+  return next;
+}
+
 function linkPressables(root: I): I[] {
   return root.findAll(
     n =>
@@ -1089,8 +1103,12 @@ describe('IdleAuth email validation layout', () => {
     );
     const button = findButton(renderer.root, 'Continue with email');
     expect(button.props.disabled).toBe(false);
-    const siblings = field.parent?.children;
-    expect(siblings?.indexOf(field)).toBeLessThan(siblings?.indexOf(button) ?? 0);
+    // The action follows the field inside the measured block under it, so the
+    // tree order still reads field, then action.
+    const below = belowFieldBlock(renderer.root);
+    const siblings = field.parent?.children ?? [];
+    expect(siblings[siblings.indexOf(field) + 1]).toBe(below);
+    expect(below.findAllByProps({ accessibilityLabel: 'Continue with email' })).toHaveLength(1);
     act(() => {
       (field.props.onChangeText as (value: string) => void)('user@example.com');
     });
@@ -1212,18 +1230,68 @@ describe('IdleAuth layout repairs', () => {
     });
   });
 
+  it('reports what each step renders below its field and resets on a step change', async () => {
+    const reportBelowField = vi.fn<(height: number) => void>();
+    const ref: { current: R | undefined } = { current: undefined };
+    await act(async () => {
+      ref.current = TestRenderer.create(
+        createElement(IdleAuth, {
+          start: vi.fn<StartFn>(),
+          onBelowFieldHeightChange: reportBelowField,
+        })
+      );
+      await Promise.resolve();
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    renderers.push(renderer);
+
+    // A step change clears the previous step's block before the new one lays out.
+    expect(reportBelowField).toHaveBeenCalledWith(0);
+
+    const layout = (height: number, y = 0) => ({
+      nativeEvent: { layout: { height, y, width: 336, x: 0 } },
+    });
+    const field = renderer.root.findByType('FormField');
+    const action = belowFieldBlock(renderer.root);
+    act(() => {
+      // The field block grows by the message under the input (`text-sm` plus
+      // its 6pt inner gap), which the input's own frame marks.
+      (field.props.containerOnLayout as (event: unknown) => void)(layout(100));
+      (field.props.onLayout as (event: unknown) => void)(layout(44, 32));
+      (action.props.onLayout as (event: unknown) => void)(layout(142));
+    });
+    // Everything under the input: 100 − (32 + 44) of message, then the action.
+    expect(reportBelowField).toHaveBeenLastCalledWith(166);
+
+    // The code step clears the landing view's height, so that content never
+    // sizes the code step; the code step then reports its own.
+    nativeAuth.requestEmailCode.mockResolvedValue(true);
+    await act(async () => {
+      await (
+        findButton(renderer.root, 'Continue with email').props.onPress as () => Promise<void>
+      )();
+    });
+    expect(renderer.root.findAllByType('EmailOtpForm')).toHaveLength(1);
+    expect(reportBelowField).toHaveBeenCalledWith(0);
+  });
+
   it('keeps the field-to-Continue gutter on the shared screen gap', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
     const field = renderer.root.findByType('FormField');
     const button = findButton(renderer.root, 'Continue with email');
-    // The button is the field's next sibling in the screen's `gap-3` column, so
-    // with no reserved slot the visible input-to-Continue space is exactly
-    // `gap-3` (10.5pt / 21px at 2.02 px per point).
+    // The block under the field is its next sibling in the screen's `gap-3`
+    // column, so with no reserved slot the visible input-to-Continue space is
+    // still exactly `gap-3` (10.5pt / 21px at 2.02 px per point).
     expect(field.parent?.props.className).toBe('gap-3');
-    expect(field.parent).toBe(button.parent);
-    const siblings = field.parent?.children;
-    expect(siblings?.indexOf(field)).toBeLessThan(siblings?.indexOf(button) ?? 0);
+    const below = belowFieldBlock(renderer.root);
+    expect(below.parent).toBe(field.parent);
+    expect(button.parent).toBe(below);
+    const siblings = field.parent?.children ?? [];
+    expect(siblings[siblings.indexOf(field) + 1]).toBe(below);
 
     act(() => {
       renderer.unmount();

@@ -26,9 +26,9 @@ type EmptyStateProps = {
    *  depend on a measured surface (the root runtime-error screen). */
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
-  /** Placement-memory identity; see `CenteredState`'s `stateKey`. Defaults to
-   *  one derived from `title`, so two empty states on one surface keep their
-   *  own placements; pass one to name the state independently of its copy. */
+  /** Placement-memory identity; see `CenteredState`'s `stateKey`. A surface
+   *  that swaps a centred empty state for another one passes one identity per
+   *  state, so neither paints its first frame at the other's size. */
   stateKey?: string;
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
@@ -59,41 +59,11 @@ export function EmptyState({
   stateKey,
   compact,
   title,
-  description,
-  action,
   ...props
 }: Readonly<EmptyStateProps>) {
-  const body = (
-    <EmptyStateBody
-      {...props}
-      title={title}
-      description={description}
-      action={action}
-      placement={placement}
-      compact={compact}
-    />
-  );
-  // Placement memory names one state, so two empty states on one surface must
-  // not share it: the one that mounts second would paint its first frame at the
-  // other one's size and then shift. The state's identity is its own copy and
-  // its own controls, which is what decides its height: bodies that agree on
-  // both paint the same size, and bodies that differ on either never borrow
-  // each other's placement. A caller that renders two states with identical
-  // copy and controls passes a key of its own.
-  let descriptionIdentity = 'no-description';
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
-  if (typeof description === 'string') {
-    descriptionIdentity = description;
-  } else if (description !== undefined) {
-    descriptionIdentity = 'node-description';
-  }
-  const identity =
-    stateKey ??
-    ['empty-state', title, descriptionIdentity, action === undefined ? 'no-action' : 'action'].join(
-      ':'
-    );
+  const body = <EmptyStateBody {...props} title={title} placement={placement} compact={compact} />;
   return placement === 'center' ? (
-    <CenteredState refreshControl={refreshControl} stateKey={identity}>
+    <CenteredState refreshControl={refreshControl} stateKey={stateKey}>
       {body}
     </CenteredState>
   ) : (

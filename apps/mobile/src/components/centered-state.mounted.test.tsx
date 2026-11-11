@@ -548,70 +548,18 @@ describe('CenteredState first-frame paint', () => {
     otherState.unmount();
   });
 
-  it('keeps one placement per empty-state copy on one surface', async () => {
-    // Two empty bodies can occupy one surface in turn: clearing a no-match
-    // search hands over to the no-past-sessions body. The copy names the state,
+  it('places each named empty state by its own identity', async () => {
+    // A surface that swaps one centred empty state for another names each one,
     // so the body that mounts second never paints at the first one's size.
-    const noMatch = await renderWithProviders(
-      <EmptyState icon={SearchX} title="No matches" description="Try another term" />
-    );
-    const noMatchContent = noMatch.renderer.root.findByProps({
-      testID: 'centered-state-content',
-    }).props as ViewProps;
-    act(() => {
-      noMatchContent.onLayout?.(contentLayout as LayoutChangeEvent);
-    });
-    act(() => {
-      for (const onMeasure of native.measurements.splice(0)) {
-        onMeasure(0, 80, 400, 340);
-      }
-    });
-    const placed = (noMatch.renderer.root.findByType(ScrollView).props as ScrollViewProps)
-      .contentContainerStyle;
-    expect(placed).not.toEqual(UNPLACED_FALLBACK_STYLE);
-    noMatch.unmount();
-
-    native.surface = { ...native.surface, frame: null, bounds: null };
-    // The same copy returns with no size measured yet: it still paints at the
-    // placement it remembered, so the memory keeps working per state.
-    const returning = await renderWithProviders(
-      <EmptyState icon={SearchX} title="No matches" description="Try another term" />
-    );
-    expect(
-      (returning.renderer.root.findByType(ScrollView).props as ScrollViewProps)
-        .contentContainerStyle
-    ).toEqual(placed);
-    returning.unmount();
-
-    // A different body has no placement of its own yet, so it falls back
-    // instead of borrowing the other state's placement.
-    const noPastSessions = await renderWithProviders(
+    const first = await renderWithProviders(
       <EmptyState
         icon={SearchX}
-        title="No past sessions"
-        description="Completed sessions appear here."
+        stateKey="swap:first"
+        title="No matches"
+        description="Try another term"
       />
     );
-    expect(
-      (noPastSessions.renderer.root.findByType(ScrollView).props as ScrollViewProps)
-        .contentContainerStyle
-    ).toEqual(UNPLACED_FALLBACK_STYLE);
-    noPastSessions.unmount();
-  });
-
-  it('keeps one placement for two bodies that share a title but differ in controls', async () => {
-    // A retryable body and the action-less body can carry the same title, and
-    // the action is what makes the first one taller. The second must not paint
-    // its first frame at the error body's size and then shift.
-    const retryable = await renderWithProviders(
-      <EmptyState
-        icon={SearchX}
-        title="Empty"
-        description="Could not load older messages"
-        action={createElement('Button', null, 'Retry')}
-      />
-    );
-    const content = retryable.renderer.root.findByProps({ testID: 'centered-state-content' })
+    const content = first.renderer.root.findByProps({ testID: 'centered-state-content' })
       .props as ViewProps;
     act(() => {
       content.onLayout?.(contentLayout as LayoutChangeEvent);
@@ -621,21 +569,42 @@ describe('CenteredState first-frame paint', () => {
         onMeasure(0, 80, 400, 340);
       }
     });
-    expect(
-      (retryable.renderer.root.findByType(ScrollView).props as ScrollViewProps)
-        .contentContainerStyle
-    ).not.toEqual(UNPLACED_FALLBACK_STYLE);
-    retryable.unmount();
+    const placed = (first.renderer.root.findByType(ScrollView).props as ScrollViewProps)
+      .contentContainerStyle;
+    expect(placed).not.toEqual(UNPLACED_FALLBACK_STYLE);
+    first.unmount();
 
     native.surface = { ...native.surface, frame: null, bounds: null };
-    const actionless = await renderWithProviders(
-      <EmptyState icon={SearchX} title="Empty" description="Nothing here yet" />
+    // Its own identity returns with no size measured yet: it still paints at
+    // the placement it remembered.
+    const returning = await renderWithProviders(
+      <EmptyState
+        icon={SearchX}
+        stateKey="swap:first"
+        title="No matches"
+        description="Try another term"
+      />
     );
     expect(
-      (actionless.renderer.root.findByType(ScrollView).props as ScrollViewProps)
+      (returning.renderer.root.findByType(ScrollView).props as ScrollViewProps)
         .contentContainerStyle
+    ).toEqual(placed);
+    returning.unmount();
+
+    // The other state of the pair has no placement of its own yet, so it falls
+    // back instead of borrowing the first one's.
+    const second = await renderWithProviders(
+      <EmptyState
+        icon={SearchX}
+        stateKey="swap:second"
+        title="No past sessions"
+        description="Completed sessions appear here."
+      />
+    );
+    expect(
+      (second.renderer.root.findByType(ScrollView).props as ScrollViewProps).contentContainerStyle
     ).toEqual(UNPLACED_FALLBACK_STYLE);
-    actionless.unmount();
+    second.unmount();
   });
 
   it('reserves the surface bottom band once while the layout measurement is pending', async () => {

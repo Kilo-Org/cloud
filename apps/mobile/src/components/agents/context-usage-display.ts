@@ -107,7 +107,7 @@ type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
  * two slots while the session resolves, so a settled pill fills the slots it
  * already showed rather than growing a value out of a bare ring.
  */
-const UNKNOWN_WINDOW_LABEL = '—';
+export const UNKNOWN_WINDOW_LABEL = '—';
 
 /**
  * Single selector for the session-detail header pill. Always returns content

@@ -268,27 +268,24 @@ describe('SessionContextMetrics', () => {
     }
   });
 
-  it('messages with neither info nor cost keep the placeholder beside the track-only ring', () => {
-    const root = render({
-      hasMessages: true,
-      info: undefined,
-      totalCostMicrodollars: null,
-    });
+  it('messages with neither info nor cost keep the reserved value slots invisible', () => {
+    const root = render({ hasMessages: true, info: undefined, totalCostMicrodollars: null });
+    const propsOf = (el: React.ReactElement) =>
+      el.props as { className?: string; accessibilityElementsHidden?: boolean };
     expect(root.type).toBe('View');
-    const className = (root.props as { className?: string }).className ?? '';
-    expect(className).not.toContain('opacity-0');
-    expect(
-      (root.props as { accessibilityElementsHidden?: boolean }).accessibilityElementsHidden
-    ).toBeUndefined();
-    // A transcript that reports neither usage nor cost keeps the ring alone:
-    // there is no unresolved value to hold a slot for.
-    expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
-    const ring = findAll(root, el => el.type === 'ContextUsageRing')[0];
-    expect(ring).toBeDefined();
-    if (ring == null) {
-      throw new Error('expected ContextUsageRing');
+    expect(propsOf(root).className ?? '').not.toContain('opacity-0');
+    expect(propsOf(root).accessibilityElementsHidden).toBeUndefined();
+    // A transcript that reports neither usage nor cost paints no value, but the
+    // row keeps both slots: the pill ends the header's trailing cluster, so a row
+    // that collapsed here would pull the Follow control across the header when
+    // usage arrives. The dashes stay unpainted and unspoken.
+    const texts = findAll(root, el => el.type === 'Text');
+    expect(texts).toHaveLength(2);
+    for (const text of texts) {
+      expect(propsOf(text).className ?? '').toContain('opacity-0');
+      expect(propsOf(text).accessibilityElementsHidden).toBe(true);
     }
-    expect((ring.props as { arcFraction?: number }).arcFraction).toBe(0);
+    expect(findAll(root, el => el.type === 'ContextUsageRing')).toHaveLength(1);
   });
 
   // No usage yet: both value slots stay, dashes while settled, one bar while loading.
@@ -312,8 +309,12 @@ describe('SessionContextMetrics', () => {
     const props = settled.props as { accessibilityLabel?: string };
     expect(props.accessibilityLabel).toContain('usage unavailable');
     expect(dashes(settled)).toHaveLength(2);
-    // The settled cost dash holds the label's width.
-    expect(classOf(dashes(settled)[1] ?? settled)).toContain('w-8');
+    // Both settled dashes sit in the box their value will take: the percentage
+    // slot and the cost slot. The row keeps one width across the loading,
+    // unresolved and settled states, so the header does not move.
+    expect(classOf(dashes(settled)[0] ?? settled)).toContain('w-8');
+    expect(classOf(dashes(settled)[1] ?? settled)).toContain('w-12');
+    expect(classOf(dashes(settled)[0] ?? settled)).not.toContain('opacity-0');
     expect(bars(settled)).toHaveLength(0);
 
     const loading = bare(true);

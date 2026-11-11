@@ -1,4 +1,3 @@
-import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +11,7 @@ import {
   type ContextTone,
   getHeaderPillContent,
   getMetricsAccessibilityLabel,
+  UNKNOWN_WINDOW_LABEL,
 } from './context-usage-display';
 
 type SessionContextMetricsProps = {
@@ -46,9 +46,21 @@ const RING_SIZE = 28;
 const RING_STROKE = 3;
 
 /**
+ * The two value slots keep one width in every pill state: a placeholder row, a
+ * dash and a settled value all occupy the same box, so the row keeps its width
+ * while usage and cost arrive. The row is the trailing end of the header, so a
+ * row that grew or shrank would move the whole trailing cluster, including the
+ * Follow control beside it. The percentage slot holds the widest reading
+ * (`100%`); the cost slot holds the widest badge the pill shows
+ * (`$0.0031`). A longer cost truncates to one line inside its slot.
+ */
+const PRIMARY_SLOT_CLASS = 'w-8 text-center';
+const COST_SLOT_CLASS = 'w-12 text-center';
+
+/**
  * Full-bleed box over the value row that centres the loading bar in it. The row
- * is sized by its own text, so its width and height follow the font scale; the
- * bar takes those instead of a fixed size of its own.
+ * keeps a fixed width, and its height follows the font scale, so the bar takes
+ * those instead of a fixed size of its own.
  */
 const LOADING_BAR_OVERLAY = {
   position: 'absolute',
@@ -112,35 +124,50 @@ export function SessionContextMetrics({
   const pillClassName =
     'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
 
-  // The pill's second value slot. `bg-muted-soft` is the one gray that stands
-  // off this pill's own `bg-secondary` fill — the theme's `muted` equals
-  // `secondary` in both palettes — and the slot keeps the cost label's width in
-  // every placeholder state, so the pill never grows a value out of a smaller
-  // pill and never shrinks when a session settles without one.
-  let costSlot: ReactNode = null;
-  if (content.costSlot === 'label' && content.secondary !== null) {
-    costSlot = (
-      <Text
-        numberOfLines={1}
-        className="min-w-0 shrink text-xs tabular-nums text-muted-foreground"
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      >
-        {isolateLtrBidiText(content.secondary)}
-      </Text>
-    );
-  } else if (content.costSlot === 'unreported' || content.costSlot === 'loading') {
-    costSlot = (
-      <Text
-        numberOfLines={1}
-        className="w-8 text-center text-xs tabular-nums text-muted-foreground"
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      >
-        {content.secondary}
-      </Text>
-    );
-  }
+  // Both value slots keep one width in every pill state: the placeholder row, an
+  // unresolved dash and a settled value all occupy the same box, so the row keeps
+  // its width while usage and cost arrive. The row ends the trailing cluster, so
+  // a row that grew or shrank would move the Follow control beside it.
+  // A slot with nothing to paint keeps its dash but paints it invisible, so no
+  // dash stands in for a value that has not arrived. The cost is the only
+  // unbounded text here, and it truncates to one line inside its slot.
+  const costLabel = content.costSlot === 'label' && content.secondary !== null;
+  const costText = content.secondary ?? UNKNOWN_WINDOW_LABEL;
+  // The loading state already paints the whole row invisible under its bar.
+  const costUnresolved = content.costSlot === 'none';
+
+  const primarySlot = (
+    <Text
+      numberOfLines={1}
+      className={cn(
+        'min-w-0 shrink text-xs font-semibold tabular-nums',
+        PRIMARY_SLOT_CLASS,
+        toneTextClass(content.tone),
+        content.primary === null && 'opacity-0'
+      )}
+      {...(content.primary === null
+        ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+        : {})}
+    >
+      {content.primary ?? UNKNOWN_WINDOW_LABEL}
+    </Text>
+  );
+
+  const costSlot = (
+    <Text
+      numberOfLines={1}
+      className={cn(
+        'min-w-0 shrink text-xs tabular-nums text-muted-foreground',
+        COST_SLOT_CLASS,
+        costUnresolved && 'opacity-0'
+      )}
+      {...(costLabel
+        ? {}
+        : { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const })}
+    >
+      {costLabel ? isolateLtrBidiText(costText) : costText}
+    </Text>
+  );
 
   // While the session still resolves, the row's two dashes keep their layout and
   // paint invisible, and one bar covers the row they occupy. A bar of its own
@@ -158,37 +185,25 @@ export function SessionContextMetrics({
         arcFraction={content.arcFraction}
         tone={content.tone}
       />
-      {content.primary != null || costSlot != null ? (
-        <View className="min-w-0 shrink">
-          <View
-            className={cn(
-              'min-w-0 shrink flex-row items-baseline gap-1',
-              valueRowLoading && 'opacity-0'
-            )}
-            {...(valueRowLoading
-              ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
-              : {})}
-          >
-            {content.primary != null ? (
-              <Text
-                numberOfLines={1}
-                className={cn(
-                  'min-w-0 shrink text-xs font-semibold tabular-nums',
-                  toneTextClass(content.tone)
-                )}
-              >
-                {content.primary}
-              </Text>
-            ) : null}
-            {costSlot}
-          </View>
-          {valueRowLoading ? (
-            <View style={LOADING_BAR_OVERLAY}>
-              <Skeleton className="h-2 w-full rounded-[2px] bg-muted-soft" />
-            </View>
-          ) : null}
+      <View className="min-w-0 shrink">
+        <View
+          className={cn(
+            'min-w-0 shrink flex-row items-baseline gap-1',
+            valueRowLoading && 'opacity-0'
+          )}
+          {...(valueRowLoading
+            ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+            : {})}
+        >
+          {primarySlot}
+          {costSlot}
         </View>
-      ) : null}
+        {valueRowLoading ? (
+          <View style={LOADING_BAR_OVERLAY}>
+            <Skeleton className="h-2 w-full rounded-[2px] bg-muted-soft" />
+          </View>
+        ) : null}
+      </View>
     </>
   );
 

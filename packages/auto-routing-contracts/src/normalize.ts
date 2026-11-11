@@ -17,9 +17,9 @@ const TRUNCATED_KEY = '[truncated]';
 // (with a truncation sentinel) the moment it runs out.
 const PROVIDER_HINTS_MAX_NODES = 512;
 // The node budget limits how many values a snapshot holds. This limit caps how
-// long each kept string may be, so the serialized snapshot stays within the
-// node budget times this length. Routing hints are short identifiers, so
-// ordinary hints are copied unchanged.
+// long each kept string value and each kept property name may be, so the
+// serialized snapshot stays within the node budget times this length. Routing
+// hints are short identifiers, so ordinary hints are copied unchanged.
 const PROVIDER_HINTS_MAX_STRING_LENGTH = 256;
 // Message content, and the Responses input, are client-supplied JSON of
 // unbounded depth: no schema below `content: z.unknown()` constrains their
@@ -546,10 +546,18 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
       break;
     }
     budget.remaining -= 1;
-    result[key] = isSensitiveKey(key) ? REDACTED_VALUE : toJsonValue(value[key], budget);
+    result[keptKey(key)] = isSensitiveKey(key) ? REDACTED_VALUE : toJsonValue(value[key], budget);
   }
 
   return result;
+}
+
+// Property names reach the snapshot too, so the same cap applies to them. The
+// sensitive-key check above still reads the caller's original name.
+function keptKey(key: string) {
+  return key.length > PROVIDER_HINTS_MAX_STRING_LENGTH
+    ? key.slice(0, PROVIDER_HINTS_MAX_STRING_LENGTH) + TRUNCATED_KEY
+    : key;
 }
 
 function isSensitiveKey(key: string) {

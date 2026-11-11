@@ -327,8 +327,26 @@ describe('classifier input normalization', () => {
     const elapsed = performance.now() - started;
 
     expect(hints.provider).toMatchObject({ api_key: '[REDACTED]' });
-    expect((hints.provider as Record<string, unknown>)[repeated]).toBe('value');
+    expect(hints.provider).toEqual({
+      order: ['openai'],
+      api_key: '[REDACTED]',
+      [`${repeated.slice(0, 256)}[truncated]`]: 'value',
+    });
     expect(elapsed).toBeLessThan(budgetMs);
+  });
+
+  it('cuts an oversized property name and keeps its value', () => {
+    const long = 'k'.repeat(2_000_000);
+    const hints = redactProviderHints({
+      provider: { order: ['openai'], [long]: 'kept' },
+      providerOptions: undefined,
+    });
+
+    expect(hints.provider).toEqual({
+      order: ['openai'],
+      [`${'k'.repeat(256)}[truncated]`]: 'kept',
+    });
+    expect(JSON.stringify(hints).length).toBeLessThan(1000);
   });
 
   it('redacts credential-bearing keys nested in provider option arrays', () => {

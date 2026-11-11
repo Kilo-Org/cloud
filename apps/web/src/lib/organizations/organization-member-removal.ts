@@ -10,7 +10,12 @@ import {
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, gt, isNull } from 'drizzle-orm';
-import { removeClaudeBillingGrant } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import {
+  removeClaudeBillingGrant,
+  type UnreferencedClaudeBillingPayer,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import { runAfterResponse } from '@/lib/after-response';
+import { retireUnreferencedClaudeBillingPayer } from '@/lib/claude-billing/delete';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
@@ -24,6 +29,7 @@ export async function removeUserFromOrganization(
   removedBy?: User['id'],
   txn?: DrizzleTransaction
 ): Promise<{ rowCount: number | null }> {
+  let unreferencedClaudePayer: UnreferencedClaudeBillingPayer | null = null;
   const run = async (tx: DrizzleTransaction) => {
     await lockOrganizationMembershipMutation(tx, organizationId, userId);
     await bumpOrganizationGroupPolicyRevision(tx, organizationId, removedBy ?? userId);
@@ -58,7 +64,10 @@ export async function removeUserFromOrganization(
           )
         );
 
-      await removeClaudeBillingGrant({ kind: 'member', kiloUserId: userId, organizationId }, tx);
+      unreferencedClaudePayer = await removeClaudeBillingGrant(
+        { kind: 'member', kiloUserId: userId, organizationId },
+        tx
+      );
 
       await tx
         .insert(organization_membership_removals)
@@ -139,6 +148,23 @@ export async function removeUserFromOrganization(
   // inside a caller-provided transaction; the caller handles it after commit.
   if (!txn && (result.rowCount ?? 0) > 0) {
     await invalidateMemberSessionAccess(organizationId, userId);
+    if (unreferencedClaudePayer) {
+      const payerToRetire = unreferencedClaudePayer;
+      await runAfterResponse(async () => {
+        try {
+          await retireUnreferencedClaudeBillingPayer(payerToRetire);
+        } catch (error) {
+          errorExceptInTest(
+            'Failed to retire unreferenced Claude billing profile for removed member',
+            {
+              organizationId,
+              userId,
+              error: error instanceof Error ? error.name : 'unknown',
+            }
+          );
+        }
+      });
+    }
   }
 
   return result;

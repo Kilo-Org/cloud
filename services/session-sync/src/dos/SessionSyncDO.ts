@@ -400,7 +400,10 @@ export class SessionSyncDO extends DurableObject<Env> {
     if (!forgotten.ok) return;
     await this.ctx.storage.delete('pendingRegistration');
     this.pendingRegistration = undefined;
+    // The sweep only adds deadlines, so clear this intent's wakeup and let the
+    // recomputation restore any deadline other state still requires.
     await this.ctx.storage.deleteAlarm();
+    await this.scheduleSweep();
   }
 
   async register(input: unknown): Promise<Result<{ created: boolean; state: SessionState }>> {

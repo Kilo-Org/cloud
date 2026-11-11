@@ -22,6 +22,8 @@
     "expired": "Expirado"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cancelar",
     "done": "Concluir",
     "retry": "Tentar novamente",
@@ -2505,7 +2507,8 @@
       "selectedProfile": "Perfil selecionado",
       "manualOverrides": "Substituições manuais",
       "openSettingsToReview": "Abra as definições para rever",
-      "profileSelection": "Seleção de perfil"
+      "profileSelection": "Seleção de perfil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Foi atualizado {{displayCount}} ficheiro.",
@@ -2806,7 +2809,7 @@
       "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "O agente já passou este pedido. Este cartão será fechado quando a sessão continuar.",
       "waitingForAnswer": "O agente aguarda a sua resposta. Enquanto esta pergunta estiver aberta, o envio da sua mensagem ao agente fica em pausa.",
-      "waitingForPermission": "O agente aguarda permissão. Enquanto este pedido estiver aberto, o envio da sua mensagem ao agente fica em pausa."
+      "waitingForPermission": "Enquanto este pedido estiver aberto, o envio da sua mensagem ao agente fica em pausa."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3596,7 +3599,7 @@
       "provider": "Parado: erro do fornecedor",
       "tool": "Parado: erro da ferramenta",
       "cancelled": "Parado: cancelado",
-      "other": "PARADO"
+      "other": "Parado"
     }
   },
   "transcriptionModel": {
@@ -4300,11 +4303,11 @@
     "offline": "Offline · relatório guardado",
     "cached": "Relatório guardado · atualização indisponível",
     "window": "{{start}} – {{end}}",
-    "summary": "Resumo de AI",
-    "summaryPending": "Resumo de AI em curso. Será anexado aqui quando estiver pronto.",
-    "summaryUnavailable": "Resumo de AI indisponível. O seu relatório estruturado continua disponível.",
-    "summaryCharge": "AI cobrou {{cost}}",
-    "summaryChargePending": "Cobrança de AI a aguardar reconciliação",
+    "summary": "Resumo de IA",
+    "summaryPending": "Resumo de IA em curso. Será anexado aqui quando estiver pronto.",
+    "summaryUnavailable": "Resumo de IA indisponível. O seu relatório estruturado continua disponível.",
+    "summaryCharge": "IA cobrou {{cost}}",
+    "summaryChargePending": "Cobrança de IA a aguardar reconciliação",
     "sources": "Provas e artefactos",
     "timezone": "Fuso horário do relatório",
     "deviceTimezone": "Usar fuso horário do dispositivo",
@@ -4315,7 +4318,7 @@
     "morningEnd": "Relatório disponível até",
     "timeHint": "O cartão Início volta ao estado em direto quando o período do relatório termina, mesmo offline.",
     "invalidSchedule": "Escolha um fuso horário válido e um período do relatório não vazio.",
-    "notificationsHint": "Uma notificação genérica por relatório agendado. Independente dos resumos de AI pagos.",
+    "notificationsHint": "Uma notificação genérica por relatório agendado. Independente dos resumos de IA pagos.",
     "notificationPermission": "Ative as notificações do dispositivo em $t(common.notifications) para receber o seu relatório.",
     "defaultModel": "Usar o modelo predefinido da Kilo",
     "duration": "Limite de tempo (minutos)",
@@ -4324,7 +4327,7 @@
     "estimate": "Estimativa {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "Não está disponível um resumo pago para estas definições.",
     "confirmPaid": "Ativar resumos pagos para {{context}}?",
-    "paidDisclosure": "{{estimate}} estimado, até {{maximum}}, com um limite de {{minutes}} minutos. As cobranças aplicam-se mesmo que a geração falhe.",
+    "paidDisclosure": "{{estimate}} estimado, até {{maximum}}, com um limite de {{minutes}} min. As cobranças aplicam-se mesmo que a geração falhe.",
     "enable": "Ativar resumos pagos",
     "allContexts": "Os relatórios pessoais e da organização são mantidos em separado.",
     "emptyHistory": "Sem relatórios guardados",
@@ -4340,13 +4343,13 @@
     "capturedAt": "Captado {{time}}",
     "snapshotHint": "Instantâneo do último estado disponível das sessões, captado na manhã agendada com os dados que foi possível recolher. As contagens referem-se às sessões selecionadas, não a toda a atividade noturna.",
     "snapshotTruncated": "Algumas sessões ou dados de suporte foram omitidos para limitar o tamanho deste instantâneo.",
-    "snapshotSummaryFailed": "O resumo de AI falhou. O seu instantâneo estruturado continua disponível.",
+    "snapshotSummaryFailed": "O resumo de IA falhou. O seu instantâneo estruturado continua disponível.",
     "scheduledContextEnabled": "Relatórios agendados",
     "scheduledContextSettings": "Relatórios agendados · {{context}}",
-    "scheduledContextHint": "Ative a captura agendada e os resumos de AI pagos apenas para este contexto. Excertos selecionados, com as informações sensíveis removidas, e factos estruturados são enviados ao seu modelo. Os resumos usam o idioma da app guardado quando altera explicitamente as definições do relatório. Alterar o idioma da app não atualiza automaticamente o idioma guardado. As cobranças usam o saldo deste contexto. Os instantâneos sem atividade não usam AI.",
+    "scheduledContextHint": "Ative a captura agendada e os resumos de IA pagos apenas para este contexto. Excertos selecionados, com as informações sensíveis removidas, e factos estruturados são enviados ao seu modelo. Os resumos usam o idioma da app guardado quando altera as definições do relatório. As cobranças usam o saldo deste contexto. Os instantâneos sem atividade não usam IA.",
     "snapshotSafeguards": "Os limites de tempo e gasto por resumo aplicam-se a cada instantâneo agendado, não são um orçamento diário.",
     "snapshotEstimateInputTooLarge": "Este instantâneo contém demasiados dados de suporte para o modelo selecionado.",
-    "quietSnapshot": "Com os dados que foi possível recolher, não foi selecionada atividade de sessões para este instantâneo. Não foi feita qualquer chamada ao modelo nem solicitado ou cobrado qualquer resumo de AI.",
+    "quietSnapshot": "Não foi selecionada atividade de sessões para este instantâneo. Não foi solicitado ou cobrado qualquer resumo de IA.",
     "noEnabledContexts": "Nenhum contexto ativado para relatórios agendados",
     "sourceBlocker": "A sessão requer atenção",
     "sourceMetadata": "Metadados da sessão captados"

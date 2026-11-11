@@ -22,6 +22,8 @@
     "expired": "ጊዜው አልፏል"
   },
   "common": {
+    "sentenceJoiner": "። ",
+    "listJoiner": "፣ ",
     "cancel": "ተው",
     "done": "ጨርስ",
     "retry": "እንደገና ሞክር",
@@ -1831,15 +1833,12 @@
       "repoSummaryOpen": "{{displayCount}} ክፍት",
       "repoSummaryOpen_one": "{{displayCount}} ክፍት",
       "repoSummaryOpen_other": "{{displayCount}} ክፍት",
-      "repoSummaryOpen_zero": "{{displayCount}} ክፍት",
       "repoSummaryCritical": "{{displayCount}} እጅግ ከባድ",
       "repoSummaryCritical_one": "{{displayCount}} እጅግ ከባድ",
       "repoSummaryCritical_other": "{{displayCount}} እጅግ ከባድ",
-      "repoSummaryCritical_zero": "{{displayCount}} እጅግ ከባድ",
       "repoSummaryHigh": "{{displayCount}} ከፍተኛ",
       "repoSummaryHigh_one": "{{displayCount}} ከፍተኛ",
       "repoSummaryHigh_other": "{{displayCount}} ከፍተኛ",
-      "repoSummaryHigh_zero": "{{displayCount}} ከፍተኛ",
       "couldNotLoad": "የዳሽቦርድ ውሂብን መጫን አልተቻለም።",
       "filterByRepository": "በማከማቻ ያጣሩ",
       "lastSynced": "ለመጨረሻ ጊዜ የተመሳሰለው {{time}}",
@@ -1871,15 +1870,12 @@
       "breakdownCritical": "{{displayCount}} እጅግ ከፍተኛ",
       "breakdownCritical_one": "{{displayCount}} እጅግ ከፍተኛ",
       "breakdownCritical_other": "{{displayCount}} እጅግ ከፍተኛ",
-      "breakdownCritical_zero": "{{displayCount}} እጅግ ከፍተኛ",
       "breakdownHigh": "{{displayCount}} ከፍተኛ",
       "breakdownHigh_one": "{{displayCount}} ከፍተኛ",
       "breakdownHigh_other": "{{displayCount}} ከፍተኛ",
-      "breakdownHigh_zero": "{{displayCount}} ከፍተኛ",
       "breakdownMediumLow": "{{displayCount}} መካከለኛና ዝቅተኛ",
       "breakdownMediumLow_one": "{{displayCount}} መካከለኛና ዝቅተኛ",
       "breakdownMediumLow_other": "{{displayCount}} መካከለኛና ዝቅተኛ",
-      "breakdownMediumLow_zero": "{{displayCount}} መካከለኛና ዝቅተኛ",
       "dueThisWeek": "በዚህ ሳምንት ጊዜያቸው የሚያበቃ",
       "dueThisWeekDetail": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "dueThisWeekDetail_one": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
@@ -2463,7 +2459,8 @@
       "selectedProfile": "የተመረጠ መገለጫ",
       "manualOverrides": "በእጅ መሻር",
       "openSettingsToReview": "ለመገምገም ቅንብሮችን ይክፈቱ",
-      "profileSelection": "የመገለጫ ምርጫ"
+      "profileSelection": "የመገለጫ ምርጫ",
+      "profileLayerAccessibility": "{{label}}፦ {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል።",
@@ -2760,7 +2757,7 @@
       "positionHint": "(ከ{{displayCount}} 1ኛ)",
       "movedPastPrompt": "ወኪሉ ይህን ጥያቄ አልፎታል። ክፍለ ጊዜው ሲቀጥል ይህ ካርድ ይዘጋል።",
       "waitingForAnswer": "ወኪሉ መልስዎን እየጠበቀ ነው። ይህ ጥያቄ ክፍት ሆኖ እስካለ ድረስ፣ ወደ ወኪሉ መልእክት መላክ ለጊዜው ቆሟል።",
-      "waitingForPermission": "ወኪሉ ፈቃድ እየጠበቀ ነው። ይህ ጥያቄ ክፍት ሆኖ እስካለ ድረስ፣ ወደ ወኪሉ መልእክት መላክ ለጊዜው ቆሟል።"
+      "waitingForPermission": "ይህ ጥያቄ ክፍት ሆኖ እስካለ ድረስ፣ ወደ ወኪሉ መልእክት መላክ ለጊዜው ቆሟል።"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}፣ {{taskName}}{{modelLabel}}፣ {{latestActivityLabel}}፣ {{status}}",
@@ -4277,10 +4274,10 @@
     "snapshotSummaryFailed": "AI ማጠቃለያ አልተሳካም። የተዋቀረው የሁኔታ ቅጂዎ አሁንም ይገኛል።",
     "scheduledContextEnabled": "የመርሃ ግብር ሪፖርቶች",
     "scheduledContextSettings": "የመርሃ ግብር ሪፖርቶች · {{context}}",
-    "scheduledContextHint": "ለዚህ አውድ ብቻ በመርሃ ግብር የሁኔታ ቅጂ ማስቀመጥን እና የሚከፈልባቸውን AI ማጠቃለያዎች ያንቁ። የተመረጡ፣ ሚስጥራዊ ይዘታቸው የተሸፈነ ቅንጭቦች እና የተዋቀሩ እውነታዎች ወደ ሞዴልዎ ይላካሉ። ማጠቃለያዎች የሪፖርት ቅንብሮችን ሲያዘምኑ የተቀመጠውን የመተግበሪያ ቋንቋ ይጠቀማሉ። ይህ ቋንቋ የሚቀመጠው የሪፖርት ቅንብሮችን በግልጽ ሲቀይሩ ብቻ ነው፤ የመተግበሪያው ቋንቋ ሲቀየር በራስ-ሰር አይቀየርም። ክፍያዎች የዚህን አውድ ቀሪ ሂሳብ ይጠቀማሉ። እንቅስቃሴ ያልተመረጠባቸው የሁኔታ ቅጂዎች AI አይጠቀሙም።",
+    "scheduledContextHint": "ለዚህ አውድ ብቻ በመርሃ ግብር የሁኔታ ቅጂ ማስቀመጥን እና የሚከፈልባቸውን AI ማጠቃለያዎች ያንቁ። የተመረጡ፣ ሚስጥራዊ ይዘታቸው የተሸፈነ ቅንጭቦች እና የተዋቀሩ እውነታዎች ወደ ሞዴልዎ ይላካሉ። ማጠቃለያዎች የሪፖርት ቅንብሮችን ሲያዘምኑ የተቀመጠውን የመተግበሪያ ቋንቋ ይጠቀማሉ። ክፍያዎች የዚህን አውድ ቀሪ ሂሳብ ይጠቀማሉ። እንቅስቃሴ ያልተመረጠባቸው የሁኔታ ቅጂዎች AI አይጠቀሙም።",
     "snapshotSafeguards": "የእያንዳንዱ ማጠቃለያ የጊዜ እና የወጪ ገደቦች በመርሃ ግብር ለሚቀመጥ እያንዳንዱ የሁኔታ ቅጂ ይተገበራሉ፤ ዕለታዊ በጀት አይደሉም።",
     "snapshotEstimateInputTooLarge": "ይህ የሁኔታ ቅጂ ለተመረጠው ሞዴል ከመጠን በላይ ማስረጃ ይዟል።",
-    "quietSnapshot": "በተቻለ መጠን በተደረገው ምርጫ፣ ለዚህ የሁኔታ ቅጂ ምንም የክፍለ ጊዜ እንቅስቃሴ አልተመረጠም። ለAI ማጠቃለያ ወደ ሞዴል ጥያቄ አልተላከም፣ ክፍያም አልተጠየቀም።",
+    "quietSnapshot": "ለዚህ የሁኔታ ቅጂ ምንም የክፍለ ጊዜ እንቅስቃሴ አልተመረጠም። ለAI ማጠቃለያ ጥያቄ አልቀረበም፣ ክፍያም አልተከፈለም።",
     "noEnabledContexts": "ለመርሃ ግብር ሪፖርቶች የነቁ አውዶች የሉም",
     "sourceBlocker": "ክፍለ ጊዜው ትኩረት ይፈልጋል",
     "sourceMetadata": "የተቀመጠ የክፍለ ጊዜ ሜታዳታ"

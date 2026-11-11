@@ -22,6 +22,8 @@
     "expired": "已過期"
   },
   "common": {
+    "sentenceJoiner": "。",
+    "listJoiner": "、",
     "cancel": "取消",
     "done": "完成",
     "retry": "再試一次",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "選定的個人資料",
       "manualOverrides": "手動超控",
       "openSettingsToReview": "打開設定進行查看",
-      "profileSelection": "型材選擇"
+      "profileSelection": "型材選擇",
+      "profileLayerAccessibility": "{{label}}：{{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案。",
@@ -2216,7 +2219,7 @@
       "positionHint": "（第 1 個，共 {{displayCount}} 個）",
       "movedPastPrompt": "智慧代理已不再等待回應此提示。工作階段繼續時，此卡片會關閉。",
       "waitingForAnswer": "智慧代理正在等待你的答案。在你回答問題前，傳給智慧代理的訊息會暫停傳送。",
-      "waitingForPermission": "智慧代理正在等待授權。在你回應此請求前，傳給智慧代理的訊息會暫停傳送。"
+      "waitingForPermission": "在你回應此請求前，傳給智慧代理的訊息會暫停傳送。"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}，{{taskName}}{{modelLabel}}，{{latestActivityLabel}}，{{status}}",
@@ -4271,10 +4274,10 @@
     "snapshotSummaryFailed": "AI 摘要失敗。你的結構化快照仍可查看。",
     "scheduledContextEnabled": "排定的簡報",
     "scheduledContextSettings": "排定的簡報 · {{context}}",
-    "scheduledContextHint": "僅為此情境啟用排程擷取與付費 AI 摘要。經挑選並遮蔽敏感資訊的摘錄與結構化資料會傳送至你的模型。摘要使用的 App 語言只會在你明確變更簡報設定時儲存，不會隨 App 語言變更自動同步。費用從此情境的餘額扣除。無活動的快照不會使用 AI。",
+    "scheduledContextHint": "僅為此情境啟用排程擷取與付費 AI 摘要。經挑選並遮蔽敏感資訊的摘錄與結構化資料會傳送至你的模型。摘要會使用你更新簡報設定時所儲存的 App 語言。費用從此情境的餘額扣除。無活動的快照不會使用 AI。",
     "snapshotSafeguards": "每份摘要的時間與花費上限分別套用至每份排定的快照，並非每日預算。",
     "snapshotEstimateInputTooLarge": "此快照的證據量超出所選模型可處理的範圍。",
-    "quietSnapshot": "此快照已盡力選取工作階段活動，但未選取到任何活動。未要求 AI 摘要或呼叫模型，也未收費。",
+    "quietSnapshot": "此快照未選取任何工作階段活動。未要求 AI 摘要，也未收費。",
     "noEnabledContexts": "未為任何情境啟用排定的簡報",
     "sourceBlocker": "工作階段需要留意",
     "sourceMetadata": "已擷取的工作階段中繼資料"

@@ -22,6 +22,8 @@
     "expired": "Nag-expire"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Kanselahin",
     "done": "Tapos",
     "retry": "Subukan muli",
@@ -1831,15 +1833,12 @@
       "repoSummaryOpen": "{{displayCount}} bukas",
       "repoSummaryOpen_one": "{{displayCount}} bukas",
       "repoSummaryOpen_other": "{{displayCount}} bukas",
-      "repoSummaryOpen_zero": "{{displayCount}} bukas",
       "repoSummaryCritical": "{{displayCount}} kritikal",
       "repoSummaryCritical_one": "{{displayCount}} kritikal",
       "repoSummaryCritical_other": "{{displayCount}} kritikal",
-      "repoSummaryCritical_zero": "{{displayCount}} kritikal",
       "repoSummaryHigh": "{{displayCount}} mataas",
       "repoSummaryHigh_one": "{{displayCount}} mataas",
       "repoSummaryHigh_other": "{{displayCount}} mataas",
-      "repoSummaryHigh_zero": "{{displayCount}} mataas",
       "couldNotLoad": "Hindi ma-load ang data ng dashboard.",
       "filterByRepository": "I-filter ayon sa repository",
       "lastSynced": "Huling na-sync {{time}}",
@@ -1871,15 +1870,12 @@
       "breakdownCritical": "{{displayCount}} na kritikal",
       "breakdownCritical_one": "{{displayCount}} na kritikal",
       "breakdownCritical_other": "{{displayCount}} na kritikal",
-      "breakdownCritical_zero": "{{displayCount}} na kritikal",
       "breakdownHigh": "{{displayCount}} na mataas",
       "breakdownHigh_one": "{{displayCount}} na mataas",
       "breakdownHigh_other": "{{displayCount}} na mataas",
-      "breakdownHigh_zero": "{{displayCount}} na mataas",
       "breakdownMediumLow": "{{displayCount}} na katamtaman at mababa",
       "breakdownMediumLow_one": "{{displayCount}} na katamtaman at mababa",
       "breakdownMediumLow_other": "{{displayCount}} na katamtaman at mababa",
-      "breakdownMediumLow_zero": "{{displayCount}} na katamtaman at mababa",
       "dueThisWeek": "Takdang petsa ngayong linggo",
       "dueThisWeekDetail": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
       "dueThisWeekDetail_one": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
@@ -2463,7 +2459,8 @@
       "selectedProfile": "Napiling profile",
       "manualOverrides": "Mga manu-manong override",
       "openSettingsToReview": "Buksan ang Mga Setting para suriin",
-      "profileSelection": "Pagpili ng profile"
+      "profileSelection": "Pagpili ng profile",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} na file.",
@@ -2760,7 +2757,7 @@
       "positionHint": "(1 sa {{displayCount}})",
       "movedPastPrompt": "Nalampasan na ng ahente ang prompt na ito. Magsasara ang card na ito kapag nagpatuloy ang sesyon.",
       "waitingForAnswer": "Naghihintay ang ahente ng sagot mo. Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang tanong na ito.",
-      "waitingForPermission": "Naghihintay ang ahente ng pahintulot. Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang kahilingang ito."
+      "waitingForPermission": "Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang kahilingang ito."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3541,7 +3538,7 @@
       "provider": "Huminto: error ng provider",
       "tool": "Huminto: error ng tool",
       "cancelled": "Huminto: kinansela",
-      "other": "NAKAHINTO"
+      "other": "Nakahinto"
     }
   },
   "transcriptionModel": {
@@ -4277,10 +4274,10 @@
     "snapshotSummaryFailed": "Nabigo ang buod ng AI. Available pa rin ang iyong nakaayos na snapshot.",
     "scheduledContextEnabled": "Mga naka-iskedyul na briefing",
     "scheduledContextSettings": "Mga naka-iskedyul na briefing · {{context}}",
-    "scheduledContextHint": "I-enable ang naka-iskedyul na pagtatala at mga bayad na buod ng AI para sa kontekstong ito lamang. Ipinapadala sa iyong model ang mga piniling na-redact na sipi at nakaayos na datos. Ginagamit ng mga buod ang wika ng app na na-save noong huli mong tahasang binago ang mga setting ng briefing. Hindi ito awtomatikong nagbabago kapag binago ang wika ng app. Sinisingil sa balanse ng kontekstong ito. Hindi gumagamit ng AI ang mga snapshot na walang napiling aktibidad.",
+    "scheduledContextHint": "I-enable ang naka-iskedyul na pagtatala at mga bayad na buod ng AI para sa kontekstong ito lamang. Ipinapadala sa iyong model ang mga piniling na-redact na sipi at nakaayos na datos. Ginagamit ng mga buod ang wika ng app na na-save kapag ina-update mo ang mga setting ng briefing. Sinisingil sa balanse ng kontekstong ito. Hindi gumagamit ng AI ang mga snapshot na walang napiling aktibidad.",
     "snapshotSafeguards": "Ang mga limitasyon sa oras at gastos bawat buod ay para sa bawat naka-iskedyul na snapshot, hindi pang-araw-araw na budget.",
     "snapshotEstimateInputTooLarge": "Masyadong maraming ebidensya sa snapshot na ito para sa napiling modelo.",
-    "quietSnapshot": "Walang aktibidad ng session na napili para sa snapshot na ito; maaaring hindi kumpleto ang pagpili. Walang hiniling na buod ng AI, walang tawag sa model, at walang siningil.",
+    "quietSnapshot": "Walang aktibidad ng session na napili para sa snapshot na ito. Walang buod ng AI na hiniling o siningil.",
     "noEnabledContexts": "Walang naka-enable na konteksto para sa mga naka-iskedyul na briefing",
     "sourceBlocker": "Kailangang asikasuhin ang session",
     "sourceMetadata": "Naitalang metadata ng session"

@@ -22,6 +22,8 @@
     "expired": "Waqtigiisu dhacay"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Jooji",
     "done": "Dhammaystiran",
     "retry": "Mar kale isku day",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "profile la doortay",
       "manualOverrides": "Buug-gudbiyeedka",
       "openSettingsToReview": "Fur Settings si aad dib ugu eegto",
-      "profileSelection": "Doorashada astaanta"
+      "profileSelection": "Doorashada astaanta",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay.",
@@ -2754,7 +2757,7 @@
       "positionHint": "(1 ka mid ah {{displayCount}})",
       "movedPastPrompt": "Wakiilku wuu dhaafay codsigan. Kaadhkan wuu xirmi doonaa marka kalfadhigu sii socdo.",
       "waitingForAnswer": "Wakiilku wuxuu sugayaa jawaabtaada. Inta su'aashani furan tahay, dirista farriintaada wakiilka waa la hakiyay.",
-      "waitingForPermission": "Wakiilku wuxuu sugayaa oggolaansho. Inta codsigani furan yahay, dirista farriintaada wakiilka waa la hakiyay."
+      "waitingForPermission": "Inta codsigani furan yahay, dirista farriintaada wakiilka waa la hakiyay."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3535,7 +3538,7 @@
       "provider": "La joojiyay: khalad bixiye",
       "tool": "La joojiyay: khalad qalab",
       "cancelled": "La joojiyay: la baajiyay",
-      "other": "JOOGSATAY"
+      "other": "Joogsatay"
     }
   },
   "transcriptionModel": {
@@ -4271,10 +4274,10 @@
     "snapshotSummaryFailed": "Soo koobidda AI way fashilantay. Nuqulkaaga xaaladda ee habaysan weli waa la heli karaa.",
     "scheduledContextEnabled": "Warbixinnada la jadwalay",
     "scheduledContextSettings": "Warbixinnada la jadwalay · {{context}}",
-    "scheduledContextHint": "Shid kaydinta la jadwalay iyo soo koobidda AI ee lacagta leh xaaladdan oo keliya. Qaybo la doortay oo xogta xasaasiga ah laga qariyay iyo xaqiiqooyin habaysan ayaa loo diraa moodeelkaaga. Soo koobiddu waxay isticmaashaa luqadda app-ka ee la kaydiyo oo keliya marka aad si cad u beddesho dejinta warbixinta. Luqaddaas si toos ah looma cusboonaysiiyo marka luqadda app-ku is beddesho. Lacagaha waxaa laga jaraa haraaga xaaladdan. Nuqullada xaaladda ee aan dhaqdhaqaaq lahayn ma isticmaalaan AI.",
+    "scheduledContextHint": "Shid kaydinta la jadwalay iyo soo koobidda AI ee lacagta leh xaaladdan oo keliya. Qaybo la doortay oo xogta xasaasiga ah laga qariyay iyo xaqiiqooyin habaysan ayaa loo diraa moodeelkaaga. Soo koobiddu waxay isticmaashaa luqadda app-ka ee la kaydiyo marka aad cusboonaysiiso dejinta warbixinta. Lacagaha waxaa laga jaraa haraaga xaaladdan. Nuqullada xaaladda ee aan dhaqdhaqaaq lahayn ma isticmaalaan AI.",
     "snapshotSafeguards": "Xadadka waqtiga iyo kharashka ee soo koobid kasta waxay khuseeyaan nuqul kasta oo xaaladda ah oo la jadwalay, mana aha miisaaniyad maalinle ah.",
     "snapshotEstimateInputTooLarge": "Nuqulkan xaaladda waxaa ku jira caddaymo aad ugu badan moodeelka la doortay.",
-    "quietSnapshot": "Xulashadii la sameeyay intii suurtagal ahayd, wax dhaqdhaqaaq fadhi ah looma dooran nuqulkan xaaladda. Moodeel AI ah lama wicin, soo koobid AI ahna lama codsan, wax lacag ahna laguma dallacin.",
+    "quietSnapshot": "Wax dhaqdhaqaaq fadhi ah looma dooran nuqulkan xaaladda. Soo koobid AI ahna lama codsan, wax lacag ahna laguma dallacin.",
     "noEnabledContexts": "Ma jiraan xaalado loo shiday warbixinnada la jadwalay",
     "sourceBlocker": "Fadhigu wuxuu u baahan yahay fiiro gaar ah",
     "sourceMetadata": "Xogta sharaxaysa fadhiga ee la kaydiyay"

@@ -22,6 +22,8 @@
     "expired": "Imithe in éag"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cealaigh",
     "done": "Déanta",
     "retry": "Bain triail eile as",
@@ -2583,7 +2585,8 @@
       "selectedProfile": "Próifíl roghnaithe",
       "manualOverrides": "Sáruithe láimhe",
       "openSettingsToReview": "Oscail Socruithe chun athbhreithniú a dhéanamh",
-      "profileSelection": "Roghnú próifíle"
+      "profileSelection": "Roghnú próifíle",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} chomhad.",
@@ -2892,7 +2895,7 @@
       "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "Tá an gníomhaire tar éis dul ar aghaidh ón leid seo. Dúnfaidh an cárta seo nuair a leanfaidh an seisiún ar aghaidh.",
       "waitingForAnswer": "Tá an gníomhaire ag fanacht le do fhreagra. Fanfaidh do theachtaireacht chuig an ngníomhaire ar sos fad a bheidh an cheist seo oscailte.",
-      "waitingForPermission": "Tá an gníomhaire ag fanacht le cead. Fanfaidh do theachtaireacht chuig an ngníomhaire ar sos fad a bheidh an t-iarratas seo oscailte."
+      "waitingForPermission": "Fanfaidh do theachtaireacht chuig an ngníomhaire ar sos fad a bheidh an t-iarratas seo oscailte."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3700,7 +3703,7 @@
       "provider": "Stoptha: earráid soláthraí",
       "tool": "Stoptha: earráid uirlise",
       "cancelled": "Stoptha: cealaithe",
-      "other": "STADTA"
+      "other": "Stadta"
     }
   },
   "transcriptionModel": {
@@ -4469,10 +4472,10 @@
     "snapshotSummaryFailed": "Theip ar an achoimre AI. Tá do léargas struchtúrtha ar fáil fós.",
     "scheduledContextEnabled": "Tuarascálacha sceidealaithe",
     "scheduledContextSettings": "Tuarascálacha sceidealaithe · {{context}}",
-    "scheduledContextHint": "Cumasaigh gabháil sceidealaithe agus achoimrí AI íoctha don chomhthéacs seo amháin. Seoltar sleachta roghnaithe a bhfuil sonraí íogaire bainte astu agus fíricí struchtúrtha chuig do mhúnla. Úsáideann achoimrí teanga na haipe a shábháiltear nuair a athraíonn tú socruithe tuarascála go sainráite. Ní athraítear an teanga shábháilte go huathoibríoch nuair a athraíonn teanga na haipe. Úsáidtear iarmhéid an chomhthéacs seo le haghaidh muirear. Ní úsáidtear AI do léargais chiúine.",
+    "scheduledContextHint": "Cumasaigh gabháil sceidealaithe agus achoimrí AI íoctha don chomhthéacs seo amháin. Seoltar sleachta roghnaithe a bhfuil sonraí íogaire bainte astu agus fíricí struchtúrtha chuig do mhúnla. Úsáideann achoimrí teanga na haipe a shábháiltear nuair a athraíonn tú socruithe tuarascála. Úsáidtear iarmhéid an chomhthéacs seo le haghaidh muirear. Ní úsáidtear AI do léargais chiúine.",
     "snapshotSafeguards": "Baineann teorainneacha ama agus caiteachais in aghaidh na hachoimre le gach léargas sceidealaithe; ní buiséad laethúil iad.",
     "snapshotEstimateInputTooLarge": "Tá an iomarca fianaise sa léargas seo don tsamhail roghnaithe.",
-    "quietSnapshot": "Níor roghnaíodh aon ghníomhaíocht seisiúin don léargas seo. Déantar an roghnú chomh maith agus is féidir leis an bhfaisnéis atá ar fáil. Níor iarradh aon achoimre AI, níor glaodh ar aon mhúnla agus níor gearradh aon mhuirear.",
+    "quietSnapshot": "Níor roghnaíodh aon ghníomhaíocht seisiúin don léargas seo. Níor iarradh aon achoimre AI agus níor gearradh aon mhuirear.",
     "noEnabledContexts": "Níl aon chomhthéacsanna cumasaithe le haghaidh tuarascálacha sceidealaithe",
     "sourceBlocker": "Tá aird de dhíth ar an seisiún",
     "sourceMetadata": "Meiteashonraí seisiúin gafa"

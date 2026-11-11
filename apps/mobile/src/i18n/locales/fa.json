@@ -22,6 +22,8 @@
     "expired": "منقضی شد"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": "، ",
     "cancel": "لغو",
     "done": "تمام",
     "retry": "تلاش مجدد",
@@ -1831,15 +1833,12 @@
       "repoSummaryOpen": "{{displayCount}} باز",
       "repoSummaryOpen_one": "{{displayCount}} باز",
       "repoSummaryOpen_other": "{{displayCount}} باز",
-      "repoSummaryOpen_zero": "{{displayCount}} باز",
       "repoSummaryCritical": "{{displayCount}} بحرانی",
       "repoSummaryCritical_one": "{{displayCount}} بحرانی",
       "repoSummaryCritical_other": "{{displayCount}} بحرانی",
-      "repoSummaryCritical_zero": "{{displayCount}} بحرانی",
       "repoSummaryHigh": "{{displayCount}} با شدت بالا",
       "repoSummaryHigh_one": "{{displayCount}} با شدت بالا",
       "repoSummaryHigh_other": "{{displayCount}} با شدت بالا",
-      "repoSummaryHigh_zero": "{{displayCount}} با شدت بالا",
       "couldNotLoad": "بارگذاری داده‌های داشبورد ممکن نشد.",
       "filterByRepository": "فیلتر بر اساس مخزن",
       "lastSynced": "آخرین همگام‌سازی: {{time}}",
@@ -1871,15 +1870,12 @@
       "breakdownCritical": "{{displayCount}} بحرانی",
       "breakdownCritical_one": "{{displayCount}} بحرانی",
       "breakdownCritical_other": "{{displayCount}} بحرانی",
-      "breakdownCritical_zero": "{{displayCount}} بحرانی",
       "breakdownHigh": "{{displayCount}} بالا",
       "breakdownHigh_one": "{{displayCount}} بالا",
       "breakdownHigh_other": "{{displayCount}} بالا",
-      "breakdownHigh_zero": "{{displayCount}} بالا",
       "breakdownMediumLow": "{{displayCount}} متوسط و پایین",
       "breakdownMediumLow_one": "{{displayCount}} متوسط و پایین",
       "breakdownMediumLow_other": "{{displayCount}} متوسط و پایین",
-      "breakdownMediumLow_zero": "{{displayCount}} متوسط و پایین",
       "dueThisWeek": "سررسید این هفته",
       "dueThisWeekDetail": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
       "dueThisWeekDetail_one": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
@@ -2463,7 +2459,8 @@
       "selectedProfile": "نمایه انتخاب شده",
       "manualOverrides": "لغو دستی",
       "openSettingsToReview": "برای بازبینی تنظیمات را باز کنید",
-      "profileSelection": "انتخاب نمایه"
+      "profileSelection": "انتخاب نمایه",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل به‌روزرسانی شد.",
@@ -2760,7 +2757,7 @@
       "positionHint": "(۱ از {{displayCount}})",
       "movedPastPrompt": "عامل از این درخواست گذشته است. با ادامهٔ نشست، این کارت بسته می‌شود.",
       "waitingForAnswer": "عامل منتظر پاسخ شماست. تا زمانی که این پرسش باز است، ارسال پیام شما به عامل متوقف می‌ماند.",
-      "waitingForPermission": "عامل منتظر مجوز است. تا زمانی که این درخواست باز است، ارسال پیام شما به عامل متوقف می‌ماند."
+      "waitingForPermission": "تا زمانی که این درخواست باز است، ارسال پیام شما به عامل متوقف می‌ماند."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",
@@ -4277,10 +4274,10 @@
     "snapshotSummaryFailed": "تهیه خلاصه AI ناموفق بود. تصویر لحظه‌ای ساختاریافته شما همچنان در دسترس است.",
     "scheduledContextEnabled": "گزارش‌های زمان‌بندی‌شده",
     "scheduledContextSettings": "گزارش‌های زمان‌بندی‌شده · {{context}}",
-    "scheduledContextHint": "ثبت زمان‌بندی‌شده و خلاصه‌های پولی AI را فقط برای این بخش فعال کنید. گزیده‌های انتخاب‌شده پس از حذف اطلاعات حساس و داده‌های ساختاریافته به مدل شما ارسال می‌شوند. زبان برنامه فقط زمانی ذخیره می‌شود که خودتان تنظیمات گزارش را تغییر دهید و خلاصه‌ها از همان زبان ذخیره‌شده استفاده می‌کنند. تغییر زبان برنامه به‌تنهایی این زبان ذخیره‌شده را تغییر نمی‌دهد. هزینه‌ها از موجودی این بخش کسر می‌شود. تصویرهای لحظه‌ای بدون فعالیت از AI استفاده نمی‌کنند.",
+    "scheduledContextHint": "ثبت زمان‌بندی‌شده و خلاصه‌های پولی AI را فقط برای این بخش فعال کنید. گزیده‌های انتخاب‌شده پس از حذف اطلاعات حساس و داده‌های ساختاریافته به مدل شما ارسال می‌شوند. خلاصه‌ها از زبان برنامه‌ای استفاده می‌کنند که هنگام به‌روزرسانی تنظیمات گزارش ذخیره شده است. هزینه‌ها از موجودی این بخش کسر می‌شود. تصویرهای لحظه‌ای بدون فعالیت از AI استفاده نمی‌کنند.",
     "snapshotSafeguards": "محدودیت زمان و هزینهٔ هر خلاصه برای هر تصویر لحظه‌ای زمان‌بندی‌شده اعمال می‌شود، نه به‌عنوان بودجهٔ روزانه.",
     "snapshotEstimateInputTooLarge": "حجم شواهد این تصویر لحظه‌ای برای مدل انتخاب‌شده بیش از حد زیاد است.",
-    "quietSnapshot": "انتخاب فعالیت جلسه‌ها بر اساس اطلاعات در دسترس و تا حد امکان انجام می‌شود؛ برای این تصویر لحظه‌ای هیچ فعالیتی انتخاب نشد. هیچ خلاصه AI درخواست نشد، مدلی فراخوانی نشد و هزینه‌ای دریافت نشد.",
+    "quietSnapshot": "برای این تصویر لحظه‌ای هیچ فعالیتی انتخاب نشد. هیچ خلاصه AI درخواست نشد و هزینه‌ای دریافت نشد.",
     "noEnabledContexts": "هیچ بخشی برای گزارش‌های زمان‌بندی‌شده فعال نیست",
     "sourceBlocker": "جلسه به توجه نیاز دارد",
     "sourceMetadata": "فراداده‌های ثبت‌شدهٔ جلسه"

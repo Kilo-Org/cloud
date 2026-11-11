@@ -22,6 +22,8 @@
     "expired": "Skaduar"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Anulo",
     "done": "U krye",
     "retry": "Riprovo",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Profili i zgjedhur",
       "manualOverrides": "Anulimet manuale",
       "openSettingsToReview": "Hapni Cilësimet për t'i rishikuar",
-      "profileSelection": "Zgjedhja e profilit"
+      "profileSelection": "Zgjedhja e profilit",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar.",
@@ -2754,7 +2757,7 @@
       "positionHint": "(1 nga {{displayCount}})",
       "movedPastPrompt": "Agjenti e ka kaluar këtë kërkesë. Kjo kartë do të mbyllet kur të vazhdojë seanca.",
       "waitingForAnswer": "Agjenti po pret përgjigjen tënde. Derisa t'i përgjigjesh kësaj pyetjeje, mesazhi yt për agjentin mbetet në pritje.",
-      "waitingForPermission": "Agjenti po pret lejen. Derisa të vendosësh për këtë kërkesë, mesazhi yt për agjentin mbetet në pritje."
+      "waitingForPermission": "Derisa të vendosësh për këtë kërkesë, mesazhi yt për agjentin mbetet në pritje."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3535,7 +3538,7 @@
       "provider": "U ndal: gabim ofruesi",
       "tool": "U ndal: gabim mjeti",
       "cancelled": "U ndal: anuluar",
-      "other": "U NDAL"
+      "other": "U ndal"
     }
   },
   "transcriptionModel": {
@@ -4252,7 +4255,7 @@
     "estimate": "Vlerësimi {{estimate}} · maksimumi {{maximum}}",
     "estimateUnavailable": "Një përmbledhje me pagesë nuk është e disponueshme për këto rregullime.",
     "confirmPaid": "Të aktivizohen përmbledhjet me pagesë për {{context}}?",
-    "paidDisclosure": "{{estimate}} e vlerësuar, deri në {{maximum}}, me kufi {{minutes}} minuta. Tarifat zbatohen edhe nëse gjenerimi dështon.",
+    "paidDisclosure": "{{estimate}} e vlerësuar, deri në {{maximum}}, me kufi {{minutes}} min. Tarifat zbatohen edhe nëse gjenerimi dështon.",
     "enable": "Aktivizo përmbledhjet me pagesë",
     "allContexts": "Raportet personale dhe të organizatës mbahen të ndara.",
     "emptyHistory": "Nuk ka raporte të ruajtura",
@@ -4271,10 +4274,10 @@
     "snapshotSummaryFailed": "Përmbledhja AI dështoi. Pamja jote e strukturuar e çastit mbetet e disponueshme.",
     "scheduledContextEnabled": "Raporte të planifikuara",
     "scheduledContextSettings": "Raporte të planifikuara · {{context}}",
-    "scheduledContextHint": "Aktivizo regjistrimin e planifikuar dhe përmbledhjet AI me pagesë vetëm për këtë kontekst. Fragmente të zgjedhura me të dhënat e ndjeshme të fshehura dhe fakte të strukturuara dërgohen te modeli yt. Përmbledhjet përdorin gjuhën e aplikacionit që ruhet vetëm kur ndryshon shprehimisht cilësimet e raportit. Kjo gjuhë nuk përditësohet automatikisht kur ndryshon gjuhën e aplikacionit. Tarifat përdorin balancën e këtij konteksti. Pamjet e çastit pa aktivitet nuk përdorin AI.",
+    "scheduledContextHint": "Aktivizo regjistrimin e planifikuar dhe përmbledhjet AI me pagesë vetëm për këtë kontekst. Fragmente të zgjedhura me të dhënat e ndjeshme të fshehura dhe fakte të strukturuara dërgohen te modeli yt. Përmbledhjet përdorin gjuhën e aplikacionit që ruhet kur përditëson cilësimet e raportit. Tarifat përdorin balancën e këtij konteksti. Pamjet e çastit pa aktivitet nuk përdorin AI.",
     "snapshotSafeguards": "Kufijtë e kohës dhe shpenzimit për përmbledhje zbatohen për çdo pamje të planifikuar të çastit, jo si buxhet ditor.",
     "snapshotEstimateInputTooLarge": "Kjo pamje e çastit përmban tepër prova për modelin e zgjedhur.",
-    "quietSnapshot": "Me aq të dhëna sa mund të mblidheshin, nuk u zgjodh asnjë aktivitet seance për këtë pamje të çastit. Nuk u kërkua përmbledhje AI, nuk u thirr modeli dhe nuk u aplikua asnjë tarifë.",
+    "quietSnapshot": "Nuk u zgjodh asnjë aktivitet seance për këtë pamje të çastit. Nuk u kërkua përmbledhje AI dhe nuk u aplikua asnjë tarifë.",
     "noEnabledContexts": "Asnjë kontekst i aktivizuar për raportet e planifikuara",
     "sourceBlocker": "Seanca kërkon vëmendje",
     "sourceMetadata": "Metatëdhënat e regjistruara të seancës"

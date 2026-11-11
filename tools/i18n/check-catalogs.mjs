@@ -468,6 +468,12 @@ const LOCALE_SEPARATED_KEYS = new Set([
   // alone separates ("ja", "zh-Hans", "zh-Hant"). "th" ends no sentence with a
   // mark, so it keeps the space the hint needs to stay a separate sentence.
   'agentChat.contextUsage.tapToViewDetails',
+  // The sentence and list joiners are the catalog's own statement about how it
+  // closes a sentence and separates two items, so both carry their own edges: a
+  // space after the mark nearly everywhere, none where the mark alone separates
+  // ("ja", "zh-Hans", "zh-Hant").
+  'common.sentenceJoiner',
+  'common.listJoiner',
 ]);
 
 /**

@@ -22,6 +22,8 @@
     "expired": "Platnosť vypršala"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Zrušiť",
     "done": "Hotovo",
     "retry": "Skúsiť znova",
@@ -2541,7 +2543,8 @@
       "selectedProfile": "Vybraný profil",
       "manualOverrides": "Manuálne prepisy",
       "openSettingsToReview": "Ak chcete skontrolovať, otvorte Nastavenia",
-      "profileSelection": "Výber profilu"
+      "profileSelection": "Výber profilu",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizoval sa {{displayCount}} súbor.",
@@ -2846,7 +2849,7 @@
       "positionHint": "(1 z {{displayCount}})",
       "movedPastPrompt": "Agent už pokračoval ďalej a túto výzvu nepotrebuje. Karta sa zatvorí, keď bude relácia pokračovať.",
       "waitingForAnswer": "Agent čaká na tvoju odpoveď. Kým je táto otázka otvorená, odosielanie tvojej správy agentovi je pozastavené.",
-      "waitingForPermission": "Agent čaká na povolenie. Kým je táto žiadosť otvorená, odosielanie tvojej správy agentovi je pozastavené."
+      "waitingForPermission": "Kým je táto žiadosť otvorená, odosielanie tvojej správy agentovi je pozastavené."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3645,7 +3648,7 @@
       "provider": "Zastavené: chyba poskytovateľa",
       "tool": "Zastavené: chyba nástroja",
       "cancelled": "Zastavené: zrušené",
-      "other": "ZASTAVENÉ"
+      "other": "Zastavené"
     }
   },
   "transcriptionModel": {
@@ -4403,10 +4406,10 @@
     "snapshotSummaryFailed": "AI zhrnutie zlyhalo. Vaša štruktúrovaná snímka je stále k dispozícii.",
     "scheduledContextEnabled": "Naplánované prehľady",
     "scheduledContextSettings": "Naplánované prehľady · {{context}}",
-    "scheduledContextHint": "Povoľte plánované zachytávanie stavu a platené AI zhrnutia iba pre tento kontext. Vybrané úryvky s odstránenými citlivými údajmi a štruktúrované fakty sa odošlú vášmu modelu. Zhrnutia používajú jazyk aplikácie uložený pri výslovnej zmene nastavení prehľadu. Uložený jazyk sa pri zmene jazyka aplikácie automaticky neaktualizuje. Poplatky sa strhávajú zo zostatku tohto kontextu. Snímky bez aktivity nevyužívajú AI.",
+    "scheduledContextHint": "Povoľte plánované zachytávanie stavu a platené AI zhrnutia iba pre tento kontext. Vybrané úryvky s odstránenými citlivými údajmi a štruktúrované fakty sa odošlú vášmu modelu. Zhrnutia používajú jazyk aplikácie uložený pri aktualizácii nastavení prehľadu. Poplatky sa strhávajú zo zostatku tohto kontextu. Snímky bez aktivity nevyužívajú AI.",
     "snapshotSafeguards": "Časový limit a limit výdavkov na jedno zhrnutie platia pre každú naplánovanú snímku, nie ako denný rozpočet.",
     "snapshotEstimateInputTooLarge": "Táto snímka obsahuje príliš veľa podkladov pre vybraný model.",
-    "quietSnapshot": "Pre túto snímku nebola vybraná žiadna aktivita relácií. Výber nemusí byť úplný. AI model sa nepoužil a nebol účtovaný žiadny poplatok za AI zhrnutie.",
+    "quietSnapshot": "Pre túto snímku nebola vybraná žiadna aktivita relácií. Žiadne AI zhrnutie nebolo vyžiadané ani účtované.",
     "noEnabledContexts": "Pre naplánované prehľady nie sú povolené žiadne kontexty",
     "sourceBlocker": "Relácia si vyžaduje pozornosť",
     "sourceMetadata": "Zachytené metadáta relácie"

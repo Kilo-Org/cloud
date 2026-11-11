@@ -18,6 +18,9 @@ import {
 } from './runtime-profile.js';
 import { buildWorktreeKiloEnvironment } from '../control/worktree-runtime.js';
 import { buildCloudAgentRules } from '../../../src/shared/cloud-agent-rules.js';
+import { createTurnManager } from './turn.js';
+import { runtimeKey } from './prepare.js';
+import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
 
 const binary = process.env.KILO2_BINARY;
 const suite = binary ? describe : describe.skip;
@@ -630,7 +633,7 @@ suite('real Kilo v2 harness', () => {
     }
   }, 120_000);
 
-  it('delivers enabled profile instructions through the production v1-shaped config and KILO_CONFIG', async () => {
+  it('discovers profile skills and agents and executes profile commands through production configuration', async () => {
     if (!binary) throw new Error('KILO2_BINARY is required');
     if (process.env.KILO_RUNTIME_HARNESS !== 'kilo2')
       throw new Error('Run this suite with KILO_RUNTIME_HARNESS=kilo2');
@@ -649,7 +652,47 @@ suite('real Kilo v2 harness', () => {
       runtimeInstructions: [
         { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
       ],
-      kiloCommands: [{ name: 'profile-command', template: 'Run the profile command' }],
+      kiloCommands: [
+        {
+          name: 'profile-command',
+          template: 'Run the profile command $ARGUMENTS',
+          agent: 'profile-reviewer',
+        },
+        {
+          name: 'profile-subtask',
+          template: 'Run a profile subtask',
+          agent: 'profile-helper',
+          subtask: true,
+        },
+      ],
+      runtimeAgents: [
+        {
+          slug: 'profile-reviewer',
+          name: 'Profile reviewer',
+          config: {
+            mode: 'primary' as const,
+            prompt: 'SYNTHETIC_PROFILE_AGENT',
+            model: 'kilo/fake-deterministic',
+            temperature: 0.25,
+            top_p: 0.8,
+            steps: 4,
+            permission: { bash: 'deny' },
+          },
+        },
+        {
+          slug: 'profile-helper',
+          name: 'Profile helper',
+          config: { mode: 'subagent' as const, prompt: 'SYNTHETIC_PROFILE_HELPER' },
+        },
+      ],
+      runtimeSkills: [
+        {
+          name: 'profile-review',
+          rawMarkdown:
+            '---\nname: profile-review\ndescription: SYNTHETIC_PROFILE_SKILL\n---\nReview profile fixtures.',
+          files: { 'scripts/check.sh': 'echo synthetic-profile-skill' },
+        },
+      ],
     };
     await materializer.materialize(root, profile);
     const requests: string[] = [];
@@ -714,6 +757,7 @@ suite('real Kilo v2 harness', () => {
     expect(env.KILO_CONFIG).toBe(path.join(root, '.config', 'kilo', 'profile.json'));
     expect(Object.keys(JSON.parse(env.KILO_CONFIG_CONTENT))).toContain('permission');
     const events: KiloFeedEvent[] = [];
+    let profileServer: KiloServer | undefined;
     const runtime = createKiloRuntime({
       directory,
       env,
@@ -722,14 +766,38 @@ suite('real Kilo v2 harness', () => {
       log: message => {
         if (process.env.KILO2_TEST_LOG) console.error(message);
       },
-      onEvent: event => events.push(event),
+      onEvent(event) {
+        events.push(event);
+        manager.observeKiloEvent({ ...event, runtimeKey: runtimeKey(route) });
+      },
       onHarnessActivity() {},
       openFeed(source, callbacks) {
+        profileServer = source.server;
         return createKilo2EventFeed({ source, ...callbacks });
       },
     });
     const signal = AbortSignal.timeout(60_000);
     const sessionId = `ses_${'b'.repeat(26)}`;
+    const route = {
+      sessionId: 'workspace_profile',
+      kiloSessionId: sessionId,
+      directory,
+      attemptId: 'profile',
+    };
+    const frames: ControlPlaneWrapperFrame[] = [];
+    const manager = createTurnManager({
+      timers: CONTROL_PLANE_TIMERS,
+      runtimes: { get: key => (key === runtimeKey(route) ? runtime : undefined) },
+      emit: frame => frames.push(frame),
+    });
+    manager.registerRoute(route);
+    async function until(check: () => Promise<boolean>, label: string) {
+      const deadline = Date.now() + 20_000;
+      while (!(await check())) {
+        if (Date.now() > deadline) throw new Error(`Timed out: ${label}`);
+        await Bun.sleep(50);
+      }
+    }
     try {
       const harness = await runtime.ensure();
       await harness.open({
@@ -748,16 +816,83 @@ suite('real Kilo v2 harness', () => {
         model: 'fake-deterministic',
         signal,
       });
-      const deadline = Date.now() + 20_000;
       const turnClose = () => events.find(event => event.type === 'session.turn.close');
-      while (!turnClose()) {
-        if (Date.now() > deadline) throw new Error('Timed out: profile instruction turn');
-        await Bun.sleep(50);
-      }
+      await until(async () => Boolean(turnClose()), 'profile instruction turn');
       expect(turnClose()?.properties.reason).toBe('completed');
+      await until(
+        async () =>
+          frames.some(
+            frame =>
+              frame.type === 'session.events' &&
+              frame.events.some(
+                event =>
+                  event.type === 'commands.available' &&
+                  JSON.stringify(event.properties.commands).includes('profile-command')
+              )
+          ),
+        'native command.updated catalog publication'
+      );
+      expect(events.some(event => event.type === 'command.updated')).toBe(true);
       expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
       expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
       expect(requests.at(-1)).not.toContain('SYNTHETIC_DISABLED_PROFILE_INSTRUCTION');
+      expect((await harness.listCommands()).commands).toContainEqual(
+        expect.objectContaining({ name: 'profile-command' })
+      );
+      if (!profileServer) throw new Error('Profile runtime did not start');
+      const api = createKilo2Api(profileServer);
+      const query = `location[directory]=${encodeURIComponent(directory)}`;
+      expect(await api.data(`/api/agent?${query}`)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'profile-reviewer',
+            steps: 4,
+            request: expect.objectContaining({ body: { temperature: 0.25, top_p: 0.8 } }),
+            permissions: expect.arrayContaining([
+              { action: 'shell', resource: '*', effect: 'deny' },
+            ]),
+          }),
+        ])
+      );
+      expect(await api.data(`/api/skill?${query}`)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'profile-review',
+            description: 'SYNTHETIC_PROFILE_SKILL',
+          }),
+        ])
+      );
+      const start = events.length;
+      await harness.command({
+        sessionId,
+        directory,
+        command: 'profile-command',
+        args: 'SYNTHETIC_ARGUMENT',
+        model: 'fake-deterministic',
+        signal,
+      });
+      await until(
+        async () => events.slice(start).some(event => event.type === 'session.turn.close'),
+        'profile command turn'
+      );
+      expect(requests.at(-1)).toContain('Run the profile command SYNTHETIC_ARGUMENT');
+      expect(requests.at(-1)).toContain('SYNTHETIC_PROFILE_AGENT');
+      await harness.command({
+        sessionId,
+        directory,
+        command: 'profile-subtask',
+        model: 'fake-deterministic',
+        signal,
+      });
+      const children = () => api.data(`/api/session?${query}`);
+      await until(
+        async () =>
+          z
+            .array(z.object({ parentID: z.string().optional() }))
+            .parse(await children())
+            .some(child => child.parentID === sessionId),
+        'profile subtask child'
+      );
     } finally {
       await runtime.shutdown();
       await fake.stop(true);

@@ -45,7 +45,12 @@ function DismissFindingSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
+      <ScreenHeader
+        className="px-6"
+        title={t('securityAgent.dismiss.title')}
+        modal
+        modalTopInset="bottom-form-sheet"
+      />
       <View className="gap-6 px-6 pt-4">
         {/* The identity card: p-3 plus a title line and the two meta lines. */}
         <Skeleton className="h-[86px] w-full rounded-lg" />
@@ -143,7 +148,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader
+          className="px-6"
+          title={t('securityAgent.dismiss.title')}
+          modal
+          modalTopInset="bottom-form-sheet"
+        />
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.notFoundTitle')}
@@ -156,7 +166,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (findingQuery.isError && !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader
+          className="px-6"
+          title={t('securityAgent.dismiss.title')}
+          modal
+          modalTopInset="bottom-form-sheet"
+        />
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
@@ -168,7 +183,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (capability.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader
+          className="px-6"
+          title={t('securityAgent.dismiss.title')}
+          modal
+          modalTopInset="bottom-form-sheet"
+        />
         <QueryError
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
@@ -191,7 +211,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (!capability.canManage) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader
+          className="px-6"
+          title={t('securityAgent.dismiss.title')}
+          modal
+          modalTopInset="bottom-form-sheet"
+        />
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
@@ -204,7 +229,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (finding.status !== 'open') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
+        <ScreenHeader
+          className="px-6"
+          title={t('securityAgent.dismiss.title')}
+          modal
+          modalTopInset="bottom-form-sheet"
+        />
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
@@ -220,7 +250,12 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
+      <ScreenHeader
+        className="px-6"
+        title={t('securityAgent.dismiss.title')}
+        modal
+        modalTopInset="bottom-form-sheet"
+      />
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pb-8 pt-4"

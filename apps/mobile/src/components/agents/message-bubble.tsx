@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- the transcript element-tree suite asserts this component's unrendered tree, so splitting the failure footer behind a component boundary would hide every assertion's target */
 import { memo, useCallback, useMemo } from 'react';
 import {
-  type MessageDeliveryState,
   type Part,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
@@ -25,7 +24,11 @@ import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
-import { messageFailureLabel, selectMessageFailure } from './message-failure-state';
+import {
+  type MessageDeliveryStatement,
+  messageFailureLabel,
+  selectMessageFailure,
+} from './message-failure-state';
 import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
 import { firstHumanText, humanTextParts, isFilePart } from './part-types';
@@ -51,8 +54,11 @@ type MessageBubbleProps = {
   modelOptions?: SessionModelOption[];
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
-  /** Per-user-message delivery state. v1 surfaces only a "Queued" badge. */
-  deliveryState?: MessageDeliveryState;
+  /**
+   * What the turn's delivery did, as the SDK recorded it or as the chat states
+   * it (`MessageDeliveryStatement`). v1 surfaces only a "Queued" badge.
+   */
+  deliveryState?: MessageDeliveryStatement;
   /** Opens the message-details sheet; long-press never triggers the copy ActionSheet. */
   onLongPressDetails?: (message: StoredMessage) => void;
   /**
@@ -165,16 +171,19 @@ function MessageBubbleImpl({
 
   // Failed-row footer. Renders when the relevant handler is wired
   // (mobile-w2b wires onRetryMessage/onCopyToComposer); a delivery row needs
-  // Retry or Copy, an assistant row needs Retry or, when the account's balance
-  // caused the failure, Add credits. A caller that already knows the session
-  // cannot accept a re-send passes `retryAvailable: false`: the footer then
-  // still states the failure, with no action that could not act.
+  // Retry, Copy, or — for the send the balance refused — Add credits, and an
+  // assistant row needs Retry or, when the account's balance caused the
+  // failure, Add credits. A caller that already knows the session cannot accept
+  // a re-send passes `retryAvailable: false`: the footer then still states the
+  // failure, with no action that could not act.
   const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
   const relevantHandlerWired =
     retryAvailable === false ||
     (failure !== null &&
       (failure.kind === 'delivery'
-        ? onRetryMessage !== undefined || onCopyToComposer !== undefined
+        ? onRetryMessage !== undefined ||
+          onCopyToComposer !== undefined ||
+          (failure.canAddCredits && onAddCredits !== undefined)
         : onRetryMessage !== undefined || (failure.canAddCredits && onAddCredits !== undefined)));
   // The footer is the failed turn's status, so it sits in the column that turn
   // occupies rather than the row that carries it: a message that never reached

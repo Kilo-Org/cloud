@@ -2,13 +2,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  type MessageDeliveryState,
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
 import type * as React from 'react';
 
 import type * as PartTypes from './part-types';
+import { type MessageDeliveryStatement } from './message-failure-state';
 import {
   assistantMessage,
   findElementByType,
@@ -247,7 +247,7 @@ describe('MessageBubble failed delivery state', () => {
 async function renderBubbleWithHandlers(
   message: StoredMessage,
   props: {
-    deliveryState?: MessageDeliveryState;
+    deliveryState?: MessageDeliveryStatement;
     onRetryMessage?: (m: StoredMessage) => void;
     onAddCredits?: () => void;
     retryAvailable?: boolean;
@@ -445,6 +445,39 @@ describe('MessageBubble failure footer', () => {
       String(executionFooter?.props.className),
     ];
     expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
+  });
+
+  it('states a refused send under the person’s bubble with Add credits and no Retry', async () => {
+    const onAddCredits = vi.fn<() => void>();
+    const tree = await renderBubbleWithHandlers(userMessage('m-credits'), {
+      deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      onAddCredits,
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    expect(findText(tree, t => t === 'Not enough credits to send this message.')).toBe(true);
+    // The cause is the whole statement: neither the generic title line nor the
+    // agent-failure line repeats or contradicts it.
+    expect(findText(tree, t => t === 'Response failed')).toBe(false);
+    expect(findText(tree, t => t === 'The agent could not run this message.')).toBe(false);
+    // The send never left, so the statement sits in the bubble's own column.
+    expect(String(footerOf(tree)?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
+    const addCredits = findElementByType(
+      tree,
+      'Button',
+      p => p.accessibilityLabel === 'Add credits'
+    );
+    if (!addCredits) {
+      throw new Error('the footer drew no Add credits button');
+    }
+    (addCredits.props.onPress as () => void)();
+    expect(onAddCredits).toHaveBeenCalledTimes(1);
+    // A re-send meets the same balance, so the only other action keeps the
+    // words for the send that follows the purchase.
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).not.toBeNull();
   });
 
   it('renders only the failure footer when the user text sanitizes to empty', async () => {

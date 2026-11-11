@@ -28,11 +28,11 @@ const GuardrailSettingsSchema = z.object({
 
 /**
  * One Enkrypt scan: of the blocking detectors or the log-only detectors, over the request's tool
- * definitions and system prompt (`context`), its conversation, or the model's response.
+ * definitions, its system prompt, its conversation, or the model's response.
  */
 export const EnkryptScanReportSchema = z.object({
   scan: z.enum(['blocking', 'log_only']),
-  part: z.enum(['context', 'conversation', 'response']),
+  part: z.enum(['tools', 'system', 'conversation', 'response']),
   detectors_enabled: z.array(DetectorIdSchema),
   detectors_blocking: z.array(DetectorIdSchema),
   verdict_cache: z.enum(['off', 'miss', 'hit', 'error']),

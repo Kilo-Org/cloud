@@ -91,7 +91,7 @@ export function usageRecordsWithAddedLatency(
 /**
  * Starts the organization's input guardrail scans. A null scan (no organization, or the guardrail
  * is off) makes no Enkrypt call. Blocking detectors and log-only detectors are scanned
- * concurrently, each over the request's context and conversation separately; only the blocking
+ * concurrently, each over the request's tool definitions, system prompt, and conversation separately; only the blocking
  * calls gate the request, so log-only detectors never delay or reject it.
  *
  * Usage records are written in an `after()` callback registered now, so a request that returns

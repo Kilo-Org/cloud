@@ -34,12 +34,14 @@ function omitted(header: string): Piece {
 export type RequestSegment = { header: string; body: string | null };
 
 /**
- * `context` is what configures the model rather than the conversation: tool definitions, output
- * formats, and the system prompt. It rarely changes within a session and is scanned and cached as
- * a whole. `conversation` is the message history, which grows request by request.
+ * A request in three parts, each scanned and cached on its own. `tools` holds tool definitions and
+ * output formats, which rarely change within a session. `system` is the system prompt, which
+ * clients rebuild more often, for example with the date or workspace state. Both are cached as a
+ * whole. `conversation` is the message history, which grows request by request.
  */
 export type RequestScanParts = {
-  context: RequestSegment[];
+  tools: RequestSegment[];
+  system: RequestSegment[];
   conversation: RequestSegment[];
 };
 
@@ -230,14 +232,14 @@ function chatCompletionsParts(body: OpenRouterChatCompletionRequest): ScanPieces
     isInstructionRole(message.role)
   );
   return {
-    context: [
-      ...body.messages.slice(0, instructions).map(chatMessagePieces),
+    tools: [
       ...(body.tools ?? []).map(chatToolDefinitionPieces),
       ...(body.functions ?? []).map(fn => [
         toolDefinition(fn.name, [fn.description, jsonText(fn.parameters)]),
       ]),
       chatResponseFormatPieces(body.response_format),
     ],
+    system: body.messages.slice(0, instructions).map(chatMessagePieces),
     conversation: body.messages.slice(instructions).map(chatMessagePieces),
   };
 }
@@ -426,13 +428,15 @@ function messagesParts(request: GatewayMessagesRequest): ScanPieces {
   const body: AnthropicTextSources = request;
   const { system } = body;
   return {
-    context: [
+    system: [
       [
         piece(
           'system',
           typeof system === 'string' ? [system] : anthropicTextBlocksTexts(system ?? [])
         ),
       ],
+    ],
+    tools: [
       ...(body.tools ?? []).map(tool => [anthropicToolDefinitionPiece(tool)]),
       [
         piece('response format', [
@@ -665,11 +669,13 @@ function responsesParts(body: GatewayResponsesRequest): ScanPieces {
   const items = typeof input === 'string' ? [] : (input ?? []);
   const instructions = leadingInstructionCount(items, isInstructionItem);
   return {
-    context: [
-      [piece('instructions', [body.instructions])],
-      ...items.slice(0, instructions).map(responsesItemPieces),
+    tools: [
       ...(body.tools ?? []).map(responsesToolDefinitionPieces),
       [piece('response format', responsesFormatTexts(body.text?.format))],
+    ],
+    system: [
+      [piece('instructions', [body.instructions])],
+      ...items.slice(0, instructions).map(responsesItemPieces),
     ],
     conversation:
       typeof input === 'string'
@@ -679,7 +685,7 @@ function responsesParts(body: GatewayResponsesRequest): ScanPieces {
 }
 
 /** Pieces grouped by the tool definition, message, or input item they came from. */
-type ScanPieces = { context: Piece[][]; conversation: Piece[][] };
+type ScanPieces = Record<keyof RequestScanParts, Piece[][]>;
 
 function scanPieces(request: GatewayRequest): ScanPieces {
   switch (request.kind) {
@@ -737,9 +743,10 @@ function messageSegments(pieces: Piece[]): RequestSegment[] {
  * Encrypted content, reasoning summaries, and transport settings are never scanned.
  */
 export function extractRequestParts(request: GatewayRequest): RequestScanParts {
-  const { context, conversation } = scanPieces(request);
+  const { tools, system, conversation } = scanPieces(request);
   return {
-    context: context.flatMap(messageSegments),
+    tools: tools.flatMap(messageSegments),
+    system: system.flatMap(messageSegments),
     conversation: conversation.flatMap(messageSegments),
   };
 }

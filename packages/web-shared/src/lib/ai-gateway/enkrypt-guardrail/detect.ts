@@ -42,7 +42,8 @@ const MAX_BLOCK_MESSAGE_LENGTH = 500;
 const MAX_SCAN_CHARACTERS_LABEL = ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US');
 
 export const SCAN_TOO_LARGE_MESSAGES: Record<EnkryptScanPart, string> = {
-  context: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of tool definitions and system prompt at once, so this request was not sent. Reduce the enabled tools or MCP servers, or shorten the system prompt, then retry. Retrying the unchanged request will not help.`,
+  tools: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of tool definitions at once, so this request was not sent. Reduce the enabled tools or MCP servers, then retry. Retrying the unchanged request will not help.`,
+  system: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of system prompt at once, so this request was not sent. Shorten the system prompt, for example by removing custom instructions or rules files, then retry. Retrying the unchanged request will not help.`,
   conversation: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of new conversation text at once, so this request was not sent. Compact or prune earlier conversation history, reduce tool output, or start a new session, then retry. Retrying the unchanged request will not help.`,
   response: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry.`,
 };
@@ -53,10 +54,10 @@ const detectResponseSchema = z.object({
 });
 
 /**
- * What a scan covers: the request's tool definitions and system prompt, its conversation, or the
+ * What a scan covers: the request's tool definitions, its system prompt, its conversation, or the
  * model's response.
  */
-export type EnkryptScanPart = 'context' | 'conversation' | 'response';
+export type EnkryptScanPart = 'tools' | 'system' | 'conversation' | 'response';
 
 /**
  * How much of the part `text` covers. With a cached conversation prefix, `text` is only the

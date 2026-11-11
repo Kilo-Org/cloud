@@ -128,7 +128,7 @@ export function verdictCacheKeys(
 
 /**
  * The longest cached prefix among the keys from `firstProbed` on. Only the conversation is
- * matched by prefix; the context probes only its full key.
+ * matched by prefix; tool definitions and the system prompt probe only their full key.
  */
 async function cachedPrefix(
   organizationId: string,
@@ -233,8 +233,8 @@ function isCacheableAllow({ verdict, report, usageRecords }: EnkryptGuardrailSca
 
 /**
  * Scans one part of the request. The conversation is scanned only from where no earlier allowed
- * request with the same scope covered it, plus an overlap; the context is skipped only when the
- * whole of it was allowed before. A cached block rejects requests retaining that content. A cache
+ * request with the same scope covered it, plus an overlap; tool definitions and the system prompt
+ * are skipped only when the whole of them was allowed before. A cached block rejects requests retaining that content. A cache
  * failure scans the part in full, so it never lets unscanned content through. A failed blocking
  * scan is never cached; see `isCacheableAllow` for log-only scans.
  */
@@ -336,21 +336,22 @@ async function scanPartWithVerdictCache(
   return { ...result, cacheEntry };
 }
 
+const REQUEST_PARTS: readonly RequestPart[] = ['tools', 'system', 'conversation'];
+
 /**
- * Scans the request's context (tool definitions and system prompt), when it has any, and its
- * conversation in two concurrent Enkrypt calls, each with its own verdict cache entries. Returns
- * one result per scanned part, context first.
+ * Scans the request's tool definitions and system prompt, when it has any, and its conversation in
+ * concurrent Enkrypt calls, each with its own verdict cache entries. Returns one result per scanned
+ * part, in `REQUEST_PARTS` order.
  */
 export async function scanRequestWithVerdictCache(
   { parts, ...request }: EnkryptGuardrailRequest,
   deps: EnkryptDetectDependencies & { store: EnkryptVerdictCacheStore | null }
 ): Promise<EnkryptCachedScanResult[]> {
-  return Promise.all([
-    ...(parts.context.length > 0
-      ? [scanPartWithVerdictCache('context', parts.context, request, deps)]
-      : []),
-    scanPartWithVerdictCache('conversation', parts.conversation, request, deps),
-  ]);
+  return Promise.all(
+    REQUEST_PARTS.filter(part => part === 'conversation' || parts[part].length > 0).map(part =>
+      scanPartWithVerdictCache(part, parts[part], request, deps)
+    )
+  );
 }
 
 export async function rememberRequestVerdict(

@@ -34,7 +34,8 @@ const DECISIONS: Record<Scan['decision'], { label: string; tone: StepTone }> = {
 };
 
 const PART_LABELS: Record<Scan['part'], string | null> = {
-  context: 'Tools and system prompt',
+  tools: 'Tool definitions',
+  system: 'System prompt',
   conversation: 'Conversation',
   response: null,
 };

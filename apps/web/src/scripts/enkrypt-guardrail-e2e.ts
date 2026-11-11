@@ -350,9 +350,9 @@ const hugeTools = Array.from({ length: 60 }, (_, index) => ({
   },
 }));
 
-/** The expected verdict cache result and verdict of each part. Context is absent when not scanned. */
+/** The expected verdict cache result and verdict of each scanned part. */
 type Expected = Partial<
-  Record<'context' | 'conversation', `${'miss' | 'hit'} ${'allow' | 'block'}`>
+  Record<'tools' | 'system' | 'conversation', `${'miss' | 'hit'} ${'allow' | 'block'}`>
 >;
 
 type Step = {
@@ -368,13 +368,13 @@ const steps: Step[] = [
     name: '01-chat-first-turn',
     request: chat(chatTurn1),
     store: chatStore,
-    expected: { context: 'miss allow', conversation: 'miss allow' },
+    expected: { tools: 'miss allow', system: 'miss allow', conversation: 'miss allow' },
   },
   {
     name: '02-chat-second-turn',
     request: chat(chatTurn2),
     store: chatStore,
-    expected: { context: 'hit allow', conversation: 'hit allow' },
+    expected: { tools: 'hit allow', system: 'hit allow', conversation: 'hit allow' },
   },
   {
     name: '03-chat-tools-changed',
@@ -390,31 +390,40 @@ const steps: Step[] = [
       },
     ]),
     store: chatStore,
-    expected: { context: 'miss allow', conversation: 'hit allow' },
+    expected: { tools: 'miss allow', system: 'hit allow', conversation: 'hit allow' },
   },
   {
-    name: '04-chat-injection-in-tool-result',
+    name: '04-chat-system-prompt-changed',
+    request: chat([
+      { role: 'system', content: SYSTEM_PROMPT.replace('macOS 15.1', 'macOS 15.2') },
+      ...chatTurn2.slice(1),
+    ]),
+    store: chatStore,
+    expected: { tools: 'hit allow', system: 'miss allow', conversation: 'hit allow' },
+  },
+  {
+    name: '05-chat-injection-in-tool-result',
     request: chat(chatTurn3),
     store: chatStore,
-    expected: { context: 'hit allow', conversation: 'hit block' },
+    expected: { tools: 'hit allow', system: 'hit allow', conversation: 'hit block' },
   },
   {
-    name: '05-messages-api',
+    name: '06-messages-api',
     request: messagesRequest,
     store: memoryStore(),
-    expected: { context: 'miss allow', conversation: 'miss allow' },
+    expected: { tools: 'miss allow', system: 'miss allow', conversation: 'miss allow' },
   },
   {
-    name: '06-responses-api',
+    name: '07-responses-api',
     request: responsesRequest,
     store: memoryStore(),
-    expected: { context: 'miss allow', conversation: 'miss allow' },
+    expected: { tools: 'miss allow', system: 'miss allow', conversation: 'miss allow' },
   },
   {
-    name: '07-context-too-large',
+    name: '08-tools-too-large',
     request: chat(chatTurn1, hugeTools),
     store: memoryStore(),
-    expected: { context: 'miss block', conversation: 'miss allow' },
+    expected: { tools: 'miss block', system: 'miss allow', conversation: 'miss allow' },
   },
 ];
 

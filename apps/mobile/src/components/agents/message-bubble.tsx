@@ -1,9 +1,6 @@
 /* eslint-disable max-lines -- the transcript element-tree suite asserts this component's unrendered tree, so splitting the failure footer behind a component boundary would hide every assertion's target */
 import { memo, useCallback, useMemo } from 'react';
-import {
-  type Part,
-  type StoredMessage,
-} from '@kilocode/cloud-agent-sdk';
+import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { AlertCircle, Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';

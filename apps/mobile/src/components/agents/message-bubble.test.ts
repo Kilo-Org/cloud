@@ -1,10 +1,7 @@
 /* eslint-disable max-lines -- Queued-badge, delivery, and a11y seams share the direct-invocation MessageBubble harness. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  type StoredMessage,
-  type ToolPart,
-} from '@kilocode/cloud-agent-sdk';
+import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import type * as React from 'react';
 
 import type * as PartTypes from './part-types';

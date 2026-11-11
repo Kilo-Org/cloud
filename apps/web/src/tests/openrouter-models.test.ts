@@ -192,6 +192,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: jest.fn(async (_userId: string, models: unknown[]) => models),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models', () => ({
+  tagClaudeBillingByokModels: jest.fn(async (_owner: unknown, models: unknown[]) => models),
+}));
+
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkRoutingTable: jest.fn(async () => ({ status: 200, body: { table: null } })),
 }));

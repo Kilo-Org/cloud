@@ -15,7 +15,7 @@ import {
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
-import { getClaudeBillingByokModelIds } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
+import { tagClaudeBillingByokModels } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   addAutoRoutingModels,
@@ -77,7 +77,7 @@ export async function handleModelsRequest(
             auth.organizationId,
             { type: 'member', kiloUserId: auth.user.id },
             'member',
-            { fromDb: readDb, countryCode, requesterEmail: auth.user.google_user_email }
+            { fromDb: readDb, countryCode }
           )
         : null;
     if (result && auth.user && auth.organizationId) {
@@ -102,28 +102,21 @@ export async function handleModelsRequest(
       });
     }
 
-    const [
-      byokModels,
-      enabledByokProviderIds,
-      directByokCatalogModelIds,
-      claudeBillingModelIds,
-      customRouters,
-    ] = await Promise.all([
-      getDirectByokModelsForUser(auth.user.id),
-      getUserByokProviderIds(readDb, auth.user.id),
-      getDirectByokCatalogModelIds({ type: 'user', id: auth.user.id }),
-      getClaudeBillingByokModelIds(
-        { kind: 'personal', kiloUserId: auth.user.id },
-        models.map(model => model.id),
-        auth.user.google_user_email
-      ),
-      usableCustomRouters({ userId: auth.user.id, organizationId: null }),
-    ]);
-    const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
-      { kiloUserId: auth.user.id, organizationId: null },
-      addDirectByokCatalogAvailability(
-        await addUserByokAvailability(models, enabledByokProviderIds),
-        new Set([...directByokCatalogModelIds, ...claudeBillingModelIds])
+    const [byokModels, enabledByokProviderIds, directByokCatalogModelIds, customRouters] =
+      await Promise.all([
+        getDirectByokModelsForUser(auth.user.id),
+        getUserByokProviderIds(readDb, auth.user.id),
+        getDirectByokCatalogModelIds({ type: 'user', id: auth.user.id }),
+        usableCustomRouters({ userId: auth.user.id, organizationId: null }),
+      ]);
+    const modelsWithByokAvailability = await tagClaudeBillingByokModels(
+      { kind: 'personal', kiloUserId: auth.user.id },
+      await tagOpenAiChatGptByokModels(
+        { kiloUserId: auth.user.id, organizationId: null },
+        addDirectByokCatalogAvailability(
+          await addUserByokAvailability(models, enabledByokProviderIds),
+          directByokCatalogModelIds
+        )
       )
     );
     return await modelResponse({

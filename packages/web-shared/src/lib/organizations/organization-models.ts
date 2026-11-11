@@ -26,12 +26,12 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { tagClaudeBillingByokModels } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models';
+import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import {
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
-import { tagClaudeBillingByokModels } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
-import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import type { OrganizationModelAudience } from '@kilocode/app-shared/organizations';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -59,10 +59,7 @@ function chatGptByokOwner(
   return null;
 }
 
-/**
- * The Claude billing connection whose models the list marks BYOK-available,
- * chosen the way `checkClaudeBilling` picks the connection a request uses.
- */
+/** The Claude billing link whose models the list marks BYOK-available, scoped like the ChatGPT one. */
 function claudeBillingByokOwner(
   organizationId: string,
   subject: OrganizationPolicySubject,
@@ -82,15 +79,11 @@ export async function getAvailableModelsForOrganization(
   {
     fromDb = db,
     countryCode,
-    requesterEmail = null,
   }: {
     fromDb?: typeof db;
     /** The requester's Vercel IP country; custom LLMs denied there are left out.
      * Null lists every custom LLM, for callers that do not serve a request. */
     countryCode: string | null;
-    /** Gates the Claude billing BYOK tag of a member's own connection; without
-     * it that connection's models are not tagged. */
-    requesterEmail?: string | null;
   }
 ): Promise<OpenRouterModelsResponse | null> {
   const context = await getOrganizationGroupPolicyContext({ organizationId, subject, fromDb });
@@ -137,11 +130,7 @@ export async function getAvailableModelsForOrganization(
   }
   const claudeOwner = claudeBillingByokOwner(organizationId, subject, audience);
   if (claudeOwner) {
-    availableModels = await tagClaudeBillingByokModels(
-      claudeOwner,
-      availableModels,
-      requesterEmail
-    );
+    availableModels = await tagClaudeBillingByokModels(claudeOwner, availableModels);
   }
 
   const snapshot = await getEnkryptBenchmarks();

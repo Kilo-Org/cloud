@@ -1,5 +1,4 @@
 import 'server-only';
-import { captureException } from '@sentry/nextjs';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { appendAnthropicBetaHeader } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/beta-header';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -16,7 +15,7 @@ import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/clau
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { getGrantedClaudeBillingConnection, type ClaudeBillingOwner } from './store';
+import type { ClaudeBillingOwner } from './store';
 import { getAuthoritativeClaudeBillingState, type ClaudeBillingPayerState } from './payer-state';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 
@@ -81,12 +80,12 @@ function ownerCandidates(input: ClaudeBillingRoutingInput): ClaudeBillingOwner[]
  * that person, so the requester stands in, as it did there.
  */
 async function gateEmail(
+  input: ClaudeBillingRoutingInput,
   owner: ClaudeBillingOwner,
-  createdBy: string | undefined,
-  requesterEmail: string | null
+  connection: ClaudeBillingPayerState
 ): Promise<string | null> {
-  if (owner.kind !== 'shared_services' || !createdBy) return requesterEmail;
-  return (await findUserById(createdBy, readDb))?.google_user_email ?? null;
+  if (owner.kind !== 'shared_services' || !connection.created_by) return input.requesterEmail;
+  return (await findUserById(connection.created_by, readDb))?.google_user_email ?? null;
 }
 
 /** Billing connections serve the Messages API and Anthropic's OpenAI-compatible endpoint. */
@@ -191,7 +190,7 @@ export async function checkClaudeBilling(
       return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
     }
     if (connection.status !== ClaudeBillingConnectionStatus.Connected) continue;
-    const email = await gateEmail(owner, connection.created_by, input.requesterEmail);
+    const email = await gateEmail(input, owner, connection);
     if (!email || !(await isClaudePlatformOAuthEnabled(email))) {
       return {
         kind: 'unavailable',
@@ -227,55 +226,4 @@ export async function checkClaudeBilling(
   }
 
   return null;
-}
-
-/**
- * The catalog model ids a Claude billing connection would serve, for the models
- * list's BYOK tag. The checks are the ones `checkClaudeBilling` needs to serve a
- * request, but the connection is read from the replica, so the tag may briefly
- * lag a fresh link. A failure yields no ids rather than failing the models list.
- */
-export async function getClaudeBillingByokModelIds(
-  owner: ClaudeBillingOwner,
-  candidateModelIds: readonly string[],
-  requesterEmail: string | null
-): Promise<Set<string>> {
-  if (owner.kind !== 'shared_services' && !requesterEmail) return new Set();
-  if (!isClaudeOperatorConfigured()) return new Set();
-  try {
-    const connection = await getGrantedClaudeBillingConnection(owner, readDb);
-    if (connection?.status !== ClaudeBillingConnectionStatus.Connected) return new Set();
-    const email = await gateEmail(owner, connection.created_by, requesterEmail);
-    if (!(await isClaudePlatformOAuthEnabled(email))) return new Set();
-    const served = await Promise.all(
-      candidateModelIds.map(async modelId =>
-        (await resolveClaudeBillingModel(modelId)) === null ? null : modelId
-      )
-    );
-    return new Set(served.filter(modelId => modelId !== null));
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'claude_billing_byok_models' },
-      extra: { ownerKind: owner.kind },
-    });
-    return new Set();
-  }
-}
-
-/**
- * Returns `models` with the ones a Claude billing connection would serve marked
- * BYOK-available, so clients show the BYOK badge like pasted BYOK keys.
- */
-export async function tagClaudeBillingByokModels<
-  T extends { id: string; hasUserByokAvailable?: boolean },
->(owner: ClaudeBillingOwner, models: T[], requesterEmail: string | null): Promise<T[]> {
-  const byokModelIds = await getClaudeBillingByokModelIds(
-    owner,
-    models.filter(model => model.hasUserByokAvailable !== true).map(model => model.id),
-    requesterEmail
-  );
-  if (byokModelIds.size === 0) return models;
-  return models.map(model =>
-    byokModelIds.has(model.id) ? { ...model, hasUserByokAvailable: true } : model
-  );
 }

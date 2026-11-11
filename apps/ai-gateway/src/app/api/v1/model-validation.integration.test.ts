@@ -297,7 +297,7 @@ describe('cloud-agent model validation through real web authentication', () => {
         org.id,
         { type: 'member', kiloUserId: user.id, allowNonMember: true },
         'member',
-        { countryCode: null, requesterEmail: user.google_user_email }
+        { countryCode: null }
       );
     }
   );

@@ -15,8 +15,8 @@ import {
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
+import { useSessionTailRepin } from '@/components/agents/use-session-tail-repin';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { createFrameCoalescer } from '@/lib/coalesce-frame';
 
 type UseSessionListAutoScrollParams = {
   itemCount: number;
@@ -137,16 +137,14 @@ export function useSessionListAutoScroll<ItemT>({
     }, 150);
   }, [clearAutoScrollResetTimeout]);
 
-  // One tail correction per frame: a keyboard slide reports several layout
-  // passes and a content change in the same frame, and correcting each of them
-  // hard-scrolls the list twice per frame.
-  const scrollToLatestRef = useRef(scrollToLatestMessage);
-  scrollToLatestRef.current = scrollToLatestMessage;
-  const tailRepin = useRef(
-    createFrameCoalescer<null>(() => {
-      scrollToLatestRef.current();
-    })
-  ).current;
+  const tailRepin = useSessionTailRepin(
+    () =>
+      shouldRetrySessionAutoScroll({
+        isUserScrolling: isUserScrollingRef.current,
+        shouldAutoScroll: shouldAutoScrollRef.current,
+      }),
+    scrollToLatestMessage
+  );
 
   // Animated scroll for the user-initiated "scroll to bottom" button.
   // Intentionally does NOT set `isAutoScrollingRef`: that flag suppresses
@@ -306,8 +304,6 @@ export function useSessionListAutoScroll<ItemT>({
       clearAutoScrollResetTimeout();
       clearAutoScrollRetryTimeout();
       clearUserScrollingTimeout();
-      // A layout event in the unmounting task must not scroll a detached list
-      // or arm a timer nothing will clear.
       tailRepin.cancel();
     },
     [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout, clearUserScrollingTimeout, tailRepin]

@@ -16,6 +16,7 @@ type ProbeApi = {
   listRef: { current: unknown };
   handleListLayout: (event: LayoutChangeEvent) => void;
   handleContentSizeChange: (width: number, height: number) => void;
+  handleScrollBeginDrag: () => void;
 };
 
 type ScrollList = { scrollToEnd: ReturnType<typeof vi.fn> };
@@ -79,6 +80,7 @@ function mountProbe() {
       listRef: hook.listRef,
       handleListLayout: hook.handleListLayout,
       handleContentSizeChange: hook.handleContentSizeChange,
+      handleScrollBeginDrag: hook.handleScrollBeginDrag,
     };
     return null;
   }
@@ -132,6 +134,20 @@ describe('useSessionListAutoScroll viewport re-pin', () => {
     runFrame();
 
     expect(probe.list.scrollToEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not correct when the user starts dragging before the frame', () => {
+    const probe = mountProbe();
+
+    act(() => {
+      probe.api.handleListLayout(layoutAt(500));
+    });
+    act(() => {
+      probe.api.handleScrollBeginDrag();
+    });
+    runFrame();
+
+    expect(probe.list.scrollToEnd).not.toHaveBeenCalled();
   });
 
   it('does not correct after the list unmounts', () => {

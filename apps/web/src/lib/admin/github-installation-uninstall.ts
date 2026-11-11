@@ -4,6 +4,7 @@ import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { verifyAndDeleteGitHubOrganizationInstallation } from '@/lib/integrations/platforms/github/adapter';
 import { observeGitHubInstallationLifecycle } from '@/lib/integrations/db/github-installations';
@@ -187,12 +188,16 @@ async function lockAffectedRecords(
 
 async function requireFreshActiveAdmin(tx: DrizzleTransaction, actorId: string) {
   const [admin] = await tx
-    .select({ isAdmin: kilocode_users.is_admin, blockedReason: kilocode_users.blocked_reason })
+    .select({
+      isAdmin: kilocode_users.is_admin,
+      blocked_at: kilocode_users.blocked_at,
+      blocked_reason: kilocode_users.blocked_reason,
+    })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, actorId))
     .limit(1)
     .for('share');
-  if (!admin || !admin.isAdmin || admin.blockedReason !== null) {
+  if (!admin || !admin.isAdmin || isBlockedAccount(admin)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
   }
 }

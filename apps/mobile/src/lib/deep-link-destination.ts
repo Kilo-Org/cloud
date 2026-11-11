@@ -12,7 +12,7 @@
 
 import { parseKiloWebPath } from '@kilocode/app-shared/universal-links';
 
-import { isPlausibleKiloSessionId } from './session-id-shape';
+import { isAddressableStoredSessionId } from './session-id-shape';
 import {
   APP_SCHEME,
   canonicalSystemSearchId,
@@ -41,25 +41,53 @@ export const APP_ROUTE_ROOTS: readonly string[] = [
 /** Route param that opens the New-session composer instead of a session. */
 const NEW_SESSION_CAPTURE = 'new';
 
+/**
+ * The screens registered beside the session route in `agent-chat/`, without
+ * their extension. Their names are single segments the store's id rule accepts,
+ * so the session filter must not take one for a session: expo-router matches a
+ * static route ahead of `[session-id]`, and following such a link would open a
+ * picker sheet outside the flow that seeds it. `new` is deliberately absent; it
+ * is the composer capture the session route itself answers.
+ *
+ * `deep-link-destination.test.ts` keeps the list equal to the route
+ * directory's entries.
+ */
+export const SESSION_ROUTE_SIBLINGS: readonly string[] = [
+  'branch-picker',
+  'folder-picker',
+  'instance-picker',
+  'mode-picker',
+  'model-picker',
+  'profile-picker',
+  'repo-picker',
+];
+
 /** The session family's group-stripped prefix, as an indexed link carries it. */
 const SESSION_FAMILY_PREFIX = deeplinkPathFromHref(SESSION_HREF_PREFIX);
 
 /**
  * Whether a universal-link destination opens something the app can show. Every
  * row but the session row names a fixed screen; the session row accepts any
- * capture, so its capture has to be the composer's `new` or an id this app can
- * prove openable. A link is the one entry point that is not tied to a row the
- * store issued, so it keeps the canonical `isPlausibleKiloSessionId` rule: an
- * unrecognized capture opens nothing and never replaces the visible screen.
- * (The session route itself accepts every id the store can hold, because a
- * stored row can carry an id minted before the canonical shape.)
+ * capture, so its capture has to be the composer's `new` or an id the session
+ * route can address. A session link can be built on one device and arrive on
+ * another, so it keeps the store's own id rule (`isAddressableStoredSessionId`,
+ * the rule the session route and the server read apply) instead of the
+ * canonical shape: an id minted before that shape still names a stored session,
+ * and a link must never be refused by a rule stricter than the route that would
+ * open it. The app cannot prove from the id alone that the session exists, so a
+ * capture the store cannot address opens nothing, and any other capture reaches
+ * the route, whose denial shows the not-found state. A capture that names one
+ * of the session route's sibling screens is not a session either.
  */
 export function opensDestination(href: string): boolean {
   if (!href.startsWith(SESSION_HREF_PREFIX)) {
     return true;
   }
   const capture = href.slice(SESSION_HREF_PREFIX.length);
-  return capture === NEW_SESSION_CAPTURE || isPlausibleKiloSessionId(capture);
+  if (SESSION_ROUTE_SIBLINGS.includes(capture)) {
+    return false;
+  }
+  return capture === NEW_SESSION_CAPTURE || isAddressableStoredSessionId(capture);
 }
 
 /**

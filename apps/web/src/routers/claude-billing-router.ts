@@ -16,7 +16,6 @@ import {
   type ClaudeBillingOwner,
   type ClaudeBillingScopeSharing,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
-import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import {
   baseProcedure,
@@ -26,6 +25,10 @@ import {
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { isClaudeBillingOrganizationMember } from '@/lib/claude-billing/access';
+import {
+  claudeBillingConnectionState,
+  type ClaudeBillingConnectionState,
+} from '@/lib/claude-billing/profile';
 import { retireUnreferencedClaudeBillingPayer } from '@/lib/claude-billing/delete';
 /**
  * The caller's Claude billing connections: their personal one, their own in an
@@ -53,7 +56,13 @@ export const ClaudeBillingShareInputSchema = z.object({
 });
 
 export const ClaudeBillingStatusSchema = z.object({
-  state: z.enum(['not_connected', 'connected', 'billing_unavailable', 'pending']),
+  state: z.enum([
+    'not_connected',
+    'connected',
+    'billing_unavailable',
+    'pending',
+    'reconnect_required',
+  ]),
   connectedAt: z.string().nullable(),
   /** Anthropic's refusal code for the last refused request, when one applied. */
   lastRefusalCode: z.string().nullable(),
@@ -113,12 +122,13 @@ async function resolveOwner(
 function statusOf(
   row: ClaudeBillingConnectionRow | null,
   canManage: boolean,
+  state: ClaudeBillingConnectionState,
   sharing: ClaudeBillingScopeSharing = { shareableLinks: [], sharedWith: [] }
 ): ClaudeBillingStatus {
   const canSharePersonal = sharing.shareableLinks.some(
     link => link.source.organizationId === undefined
   );
-  const base = {
+  return {
     providerId: CLAUDE_BILLING_PROVIDER_ID,
     providerName: CLAUDE_BILLING_PROVIDER_NAME,
     canManage,
@@ -127,17 +137,8 @@ function statusOf(
     sharedWith: sharing.sharedWith,
     connectedAt: row?.connected_at ? new Date(row.connected_at).toISOString() : null,
     lastRefusalCode: row?.last_refusal_code ?? null,
-  } as const;
-  switch (row?.status) {
-    case ClaudeBillingConnectionStatus.Connected:
-      return { ...base, state: 'connected' };
-    case ClaudeBillingConnectionStatus.BillingUnavailable:
-      return { ...base, state: 'billing_unavailable' };
-    case ClaudeBillingConnectionStatus.Pending:
-      return { ...base, state: 'pending' };
-    default:
-      return { ...base, state: 'not_connected' };
-  }
+    state,
+  };
 }
 
 async function buildScopeStatus(
@@ -146,8 +147,11 @@ async function buildScopeStatus(
   canManage: boolean
 ): Promise<ClaudeBillingStatus> {
   const current = await getGrantedClaudeBillingConnection(owner);
-  const sharing = await describeClaudeBillingSharing(userId, owner, canManage, current);
-  return statusOf(current, canManage, sharing);
+  const [sharing, state] = await Promise.all([
+    describeClaudeBillingSharing(userId, owner, canManage, current),
+    claudeBillingConnectionState(owner, current),
+  ]);
+  return statusOf(current, canManage, state, sharing);
 }
 
 function forbiddenManageMessage(owner: ClaudeBillingOwner): string {

@@ -2087,9 +2087,17 @@ describe('ChatSidebar worktree controls', () => {
     expect(html).not.toContain('Session actions for');
   });
 
-  it('creates from the latest chat but delegates deletion using only the worktree ID', () => {
+  it.each([
+    { details: undefined, label: 'kilo/repo · main' },
+    {
+      details: { name: 'Release cleanup', defaultTitle: 'Generated title' },
+      label: 'Release cleanup',
+    },
+    { details: { name: null, defaultTitle: 'Generated title' }, label: 'Generated title' },
+    { details: { name: null, defaultTitle: null }, label: 'New chat' },
+  ])('delegates deletion with the worktree ID and display name: $label', ({ details, label }) => {
     const createdFrom: string[] = [];
-    const deletedWorktrees: string[] = [];
+    const deletedWorktrees: { worktreeId: string; name: string }[] = [];
     const deletedSessions: string[] = [];
     const openedSessions: string[] = [];
     renderChatSidebar(
@@ -2102,10 +2110,13 @@ describe('ChatSidebar worktree controls', () => {
             worktreeId: 'worktree_shared',
           }),
         ],
+        worktreeDetails: details
+          ? { worktree_shared: { ...details, prSession: null, sessions: [] } }
+          : {},
         onCreateWorktreeChat: sessionId => {
           createdFrom.push(sessionId);
         },
-        onDeleteWorktree: worktreeId => deletedWorktrees.push(worktreeId),
+        onDeleteWorktree: (worktreeId, name) => deletedWorktrees.push({ worktreeId, name }),
         onDeleteSession: sessionId => deletedSessions.push(sessionId),
         onOpenSession: sessionId => openedSessions.push(sessionId),
       },
@@ -2116,7 +2127,7 @@ describe('ChatSidebar worktree controls', () => {
     getSidebarMenuItemProps('Delete worktree').onSelect?.(new Event('select'));
 
     expect(createdFrom).toEqual(['ses_latest']);
-    expect(deletedWorktrees).toEqual(['worktree_shared']);
+    expect(deletedWorktrees).toEqual([{ worktreeId: 'worktree_shared', name: label }]);
     expect(deletedSessions).toEqual([]);
     expect(openedSessions).toEqual([]);
   });

@@ -11120,9 +11120,10 @@ export const enkrypt_usage = pgTable(
     // is an `allowed` row with detectors here. PostgreSQL cannot enforce foreign keys on array
     // elements, so the writer resolves every id through the lookup table.
     fired_detector_ids: integer().array(),
-    // Sizes in UTF-16 code units. `total_characters` is the text the scan covers: the whole
-    // extracted request or response. `scanned_characters` is what this call sent to Enkrypt: the
-    // part no cached verdict covers, plus an overlap of already-scanned text. Requests that the
+    // Sizes in UTF-16 code units. `total_characters` is the text the scan covers: the request's
+    // context (system prompt and tool definitions) or its conversation, each scanned by its own
+    // call, or the response. `scanned_characters` is what this call sent to Enkrypt: the part no
+    // cached verdict covers, plus an overlap of already-scanned conversation text. Parts that the
     // verdict cache covers entirely make no call and have no row. Null on rows that predate them.
     scanned_characters: integer(),
     total_characters: integer(),

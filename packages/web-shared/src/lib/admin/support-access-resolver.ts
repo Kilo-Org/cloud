@@ -48,7 +48,9 @@ const parentOrganization = alias(organizations, 'parent_organization');
  * the grant are all read in one statement, so a detach or a soft delete that
  * lands between checks cannot admit a child. The order prefers an exact
  * action-class match, then a grant on the organization itself over an
- * inherited one, then the longest remaining lifetime.
+ * inherited one, then the longest remaining lifetime. The actor must also be an
+ * available admin account: both block columns are read, as `isBlockedAccount`
+ * does.
  */
 async function findUsableGrant(params: {
   actorKiloUserId: string;
@@ -89,6 +91,7 @@ async function findUsableGrant(params: {
         eq(support_access_grants.status, 'active'),
         sql`${support_access_grants.expires_at} > now()`,
         eq(kilocode_users.is_admin, true),
+        isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason),
         or(
           eq(grantOrganization.id, targetOrganization.id),

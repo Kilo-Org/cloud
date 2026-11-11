@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { and, eq, inArray } from 'drizzle-orm';
 import {
+  kilocode_users,
   organizations,
   passkey_credentials,
   session_step_up_proofs,
@@ -170,6 +171,32 @@ describe('admin.supportAccess request', () => {
       'issued',
       'requested',
     ]);
+  });
+
+  test('refuses to approve a grant whose requester has a block timestamp now', async () => {
+    const requester = await insertRequester();
+    const approver = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const caller = await stepUpCaller(requester.id);
+
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      reason: 'fixing a broken organization setting',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: '2026-01-15T12:00:00.000Z' })
+      .where(eq(kilocode_users.id, requester.id));
+
+    await expect(
+      (await stepUpCaller(approver.id)).admin.supportAccess.approve({ grantId: grant.id })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const stored = await db.query.support_access_grants.findFirst({
+      where: eq(support_access_grants.id, grant.id),
+    });
+    expect(stored?.status).toBe('pending');
   });
 
   test('concurrent approvals of one pending grant produce exactly one success', async () => {

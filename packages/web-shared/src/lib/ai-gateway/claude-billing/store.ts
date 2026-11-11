@@ -792,6 +792,14 @@ export async function describeClaudeBillingSharing(
   return { shareableLinks, sharedWith };
 }
 
+/**
+ * Clears the grants a deleted person held. The organization's shared-services
+ * connection and its grant stay when the connector is erased: the connection
+ * belongs to the organization, and the row keeps `created_by` as the record of
+ * who linked it until an organization owner reconnects it. Routing and the
+ * billing card report that connection as requiring a reconnect while its
+ * connector is gone.
+ */
 export async function removeUserClaudeBillingGrants(
   userId: string,
   onDb: WriteDatabase
@@ -852,6 +860,38 @@ export async function removeUserClaudeBillingGrants(
 }
 
 /**
+ * Columns that refusal bookkeeping may change on a connected row.
+ */
+type ConnectedClaudeBillingConnectionChange = Partial<
+  Pick<ClaudeBillingConnectionRow, 'status' | 'last_refusal_code' | 'last_refusal_at'>
+>;
+
+/**
+ * Updates only the connected row that refused the request: the same profile with
+ * the same `connected_at`, so a removal or a newer reconnect is never undone.
+ * `updated_at` keeps its value because an approval already in flight is keyed on it.
+ */
+async function updateConnectedClaudeBillingConnection(
+  userProfileId: string,
+  connectedAt: string,
+  change: ConnectedClaudeBillingConnectionChange
+): Promise<void> {
+  await db
+    .update(claude_billing_connections)
+    .set({
+      ...change,
+      updated_at: claude_billing_connections.updated_at,
+    })
+    .where(
+      and(
+        eq(claude_billing_connections.user_profile_id, userProfileId),
+        eq(claude_billing_connections.connected_at, connectedAt),
+        eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected)
+      )
+    );
+}
+
+/**
  * Anthropic refused a request for this profile with `user_profile_not_billable`.
  * Later requests fail without an upstream call until an admin acts. Only a
  * connected row changes, so a removal or a newer reconnect is never undone.
@@ -861,22 +901,11 @@ export async function markClaudeBillingUnavailable(
   refusalCode: string,
   connectedAt: string
 ): Promise<void> {
-  await db
-    .update(claude_billing_connections)
-    .set({
-      status: ClaudeBillingConnectionStatus.BillingUnavailable,
-      last_refusal_code: refusalCode,
-      // Request bookkeeping must not invalidate an approval already in flight.
-      updated_at: claude_billing_connections.updated_at,
-      last_refusal_at: new Date().toISOString(),
-    })
-    .where(
-      and(
-        eq(claude_billing_connections.user_profile_id, userProfileId),
-        eq(claude_billing_connections.connected_at, connectedAt),
-        eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected)
-      )
-    );
+  await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
+    status: ClaudeBillingConnectionStatus.BillingUnavailable,
+    last_refusal_code: refusalCode,
+    last_refusal_at: new Date().toISOString(),
+  });
 }
 
 /** Records a refusal that leaves the connection usable, such as a spend limit. */
@@ -885,20 +914,10 @@ export async function recordClaudeBillingRefusal(
   refusalCode: string,
   connectedAt: string
 ): Promise<void> {
-  await db
-    .update(claude_billing_connections)
-    .set({
-      last_refusal_code: refusalCode,
-      last_refusal_at: new Date().toISOString(),
-      updated_at: claude_billing_connections.updated_at,
-    })
-    .where(
-      and(
-        eq(claude_billing_connections.user_profile_id, userProfileId),
-        eq(claude_billing_connections.connected_at, connectedAt),
-        eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected)
-      )
-    );
+  await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
+    last_refusal_code: refusalCode,
+    last_refusal_at: new Date().toISOString(),
+  });
 }
 
 /** A request the customer paid for succeeded, so an earlier refusal no longer applies. */
@@ -906,18 +925,8 @@ export async function clearClaudeBillingRefusal(
   userProfileId: string,
   connectedAt: string
 ): Promise<void> {
-  await db
-    .update(claude_billing_connections)
-    .set({
-      last_refusal_code: null,
-      last_refusal_at: null,
-      updated_at: claude_billing_connections.updated_at,
-    })
-    .where(
-      and(
-        eq(claude_billing_connections.user_profile_id, userProfileId),
-        eq(claude_billing_connections.connected_at, connectedAt),
-        eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected)
-      )
-    );
+  await updateConnectedClaudeBillingConnection(userProfileId, connectedAt, {
+    last_refusal_code: null,
+    last_refusal_at: null,
+  });
 }

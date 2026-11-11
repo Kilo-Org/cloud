@@ -186,15 +186,13 @@ describe('GET /users/after-sign-in', () => {
     );
   });
 
-  it('routes callbackPath=/claw through the interstitial', async () => {
+  it('keeps the web-only Claw callback outside the mobile interstitial', async () => {
     const response = await GET(
       new NextRequest('http://localhost:3000/users/after-sign-in?callbackPath=%2Fclaw')
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/users/continue?to=%2Fclaw'
-    );
+    expect(response.headers.get('location')).toBe('http://localhost:3000/claw');
   });
 
   it('routes callbackPath=/cloud/sessions through the interstitial', async () => {
@@ -248,6 +246,23 @@ describe('GET /users/after-sign-in', () => {
         id: 'user-after-sign-in',
         google_user_email: 'after-sign-in@example.com',
         blocked_reason: 'payment',
+        has_validation_stytch: true,
+      },
+    } as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const response = await GET(new NextRequest('http://localhost:3000/users/after-sign-in'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost:3000/account-blocked');
+  });
+
+  it('routes an account with a block timestamp to /account-blocked', async () => {
+    mockGetUserFromAuth.mockResolvedValueOnce({
+      user: {
+        id: 'user-after-sign-in',
+        google_user_email: 'after-sign-in@example.com',
+        blocked_reason: null,
+        blocked_at: '2026-01-15T12:00:00.000Z',
         has_validation_stytch: true,
       },
     } as Awaited<ReturnType<typeof getUserFromAuth>>);

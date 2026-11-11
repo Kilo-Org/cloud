@@ -190,6 +190,7 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
     scans: [
       {
         scan: 'blocking',
+        part: 'conversation',
         detectors_enabled: ['injection_attack'],
         detectors_blocking: ['injection_attack'],
         verdict_cache: 'hit',
@@ -197,6 +198,7 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
         total_segments: 12,
         cached_characters: 8_000,
         cached_segments: 10,
+        omitted_attachments: 1,
         scanned_characters: 3_000,
         decision: 'blocked',
         error: null,
@@ -243,6 +245,7 @@ test('adds the Enkrypt output guardrail report read at upload time', async () =>
     scans: [
       {
         scan: 'blocking',
+        part: 'response',
         detectors_enabled: ['pii'],
         detectors_blocking: ['pii'],
         verdict_cache: 'off',
@@ -250,6 +253,7 @@ test('adds the Enkrypt output guardrail report read at upload time', async () =>
         total_segments: 1,
         cached_characters: 0,
         cached_segments: 0,
+        omitted_attachments: 0,
         scanned_characters: 1_200,
         decision: 'blocked',
         error: null,

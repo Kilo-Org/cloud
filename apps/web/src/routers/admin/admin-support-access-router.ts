@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 import { kilocode_users } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   SUPPORT_READ_MAX_DURATION_SECONDS,
@@ -48,7 +49,7 @@ async function dbUserIsSuperadmin(userId: string): Promise<boolean> {
   const user = await db.query.kilocode_users.findFirst({
     where: eq(kilocode_users.id, userId),
   });
-  return user !== undefined && user.blocked_reason === null && userIsSuperadmin(user);
+  return user !== undefined && !isBlockedAccount(user) && userIsSuperadmin(user);
 }
 
 export const adminSupportAccessRouter = createTRPCRouter({

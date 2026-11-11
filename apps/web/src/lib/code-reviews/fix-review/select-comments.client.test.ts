@@ -202,6 +202,43 @@ describe('createFixReviewCommentClient', () => {
     );
   });
 
+  it('refuses a full first page whose next page holds comments', async () => {
+    const commentPage = (page: number, size: number) =>
+      Array.from({ length: size }, (_, index) => ({
+        id: (page - 1) * 100 + index + 1,
+        path: 'src/file.ts',
+        line: index + 1,
+        body: 'comment',
+        user: { login: 'reviewer', id: 1, type: 'User' },
+      }));
+    const { octokit } = octokitWithFetch(call => {
+      const page = Number(new URL(call.url).searchParams.get('page'));
+      return commentPage(page, page === 1 ? 100 : 20);
+    });
+
+    await expect(createFixReviewCommentClient(octokit, TARGET).listComments()).rejects.toThrow(
+      'GitHub did not report the last page of the review comments'
+    );
+  });
+
+  it('reads a complete list whose first page is full', async () => {
+    const commentPage = Array.from({ length: 100 }, (_, index) => ({
+      id: index + 1,
+      path: 'src/file.ts',
+      line: index + 1,
+      body: 'comment',
+      user: { login: 'reviewer', id: 1, type: 'User' },
+    }));
+    const { octokit } = octokitWithFetch(call =>
+      Number(new URL(call.url).searchParams.get('page')) === 1 ? commentPage : []
+    );
+
+    const listing = await createFixReviewCommentClient(octokit, TARGET).listComments();
+
+    expect(listing.comments).toHaveLength(100);
+    expect(listing.unreadCount).toBe(0);
+  });
+
   it('reads a long review thread to its last page before deciding it is answered', async () => {
     const { octokit, calls } = octokitWithFetch(call => {
       if (call.query?.includes('FixReviewThreadComments')) {

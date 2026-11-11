@@ -225,6 +225,17 @@ async function readReviewComments(
     }
     listedCount = probedLastPage;
     lastPage = Math.max(1, Math.ceil(listedCount / COMMENTS_PAGE_SIZE));
+  } else if (
+    lastPage === null &&
+    firstPage.headers.link === undefined &&
+    firstPage.data.length === COMMENTS_PAGE_SIZE
+  ) {
+    // This first page states no next page, so read the next page once: the
+    // list ends there only when that page is empty.
+    const nextPage = await readPage(2);
+    if (nextPage.data.length > 0) {
+      throw new Error('GitHub did not report the last page of the review comments');
+    }
   }
   const pageCount = lastPage ?? 1;
   const firstPageToRead = Math.max(1, pageCount - FIX_REVIEW_COMMENTS_MAX_PAGES + 1);

@@ -943,7 +943,10 @@ async function claimAttemptForLaunch(db: WorkerDb, attemptId: string, jobId: str
   return rows.rows[0] ?? null;
 }
 
-async function deferContendedRemediationAttempt(db: WorkerDb, attemptId: string): Promise<void> {
+export async function deferContendedRemediationAttempt(
+  db: WorkerDb,
+  attemptId: string
+): Promise<void> {
   await db.execute<{ id: string }>(sql`
     UPDATE security_remediation_attempts AS attempt
     SET

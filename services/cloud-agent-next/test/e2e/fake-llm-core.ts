@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 
 import { isAdminAuthorized } from './fake-llm-admin.js';
 import { supervisionScenario } from './fake-llm-supervision.js';
+import { fakeCompactionSummary } from './fake-llm-compaction.js';
 
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
 export type FakeLlmRequest = {
@@ -1803,7 +1804,7 @@ async function handleChatCompletions(
   emit.onClose(() => finalize(0, 'connection-closed'));
 
   if (directive === null) {
-    emitEcho(ctx, stripKiloPromptWrapping(prompt));
+    emitEcho(ctx, fakeCompactionSummary(prompt) ?? stripKiloPromptWrapping(prompt));
     finalize(200, 'finished');
     return;
   }

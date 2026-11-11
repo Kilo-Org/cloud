@@ -91,7 +91,14 @@ export type Harness = {
       variant?: string;
     }
   ): Promise<void>;
-  compact(input: HarnessSession & { model: string; auto?: boolean }): Promise<boolean>;
+  compact(
+    input: HarnessSession & {
+      /** Native message identity for Kilo v2; the Kilo v1 summarize API cannot accept an ID. */
+      messageId: string;
+      model: string;
+      auto?: boolean;
+    }
+  ): Promise<'executed' | 'replayed'>;
   condense(input: HarnessSession & { model: string }): Promise<CondenseResult>;
   answer(input: {
     directory: string;
